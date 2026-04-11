@@ -154,6 +154,45 @@ std::string build_json_pair(const char* key, const std::string& value) {
   return stream.str();
 }
 
+void append_json_pair_if_present(
+  std::vector<std::string>& parts,
+  const char* key,
+  const std::string& value
+) {
+  if (!value.empty()) {
+    parts.push_back(build_json_pair(key, value));
+  }
+}
+
+std::string build_device_profile_json(const DeviceProfileRequest& profile) {
+  std::vector<std::string> parts;
+  append_json_pair_if_present(parts, "machineCode", profile.machine_code);
+  append_json_pair_if_present(parts, "machineGuid", profile.machine_guid);
+  append_json_pair_if_present(parts, "cpuId", profile.cpu_id);
+  append_json_pair_if_present(parts, "diskSerial", profile.disk_serial);
+  append_json_pair_if_present(parts, "boardSerial", profile.board_serial);
+  append_json_pair_if_present(parts, "biosSerial", profile.bios_serial);
+  append_json_pair_if_present(parts, "macAddress", profile.mac_address);
+  append_json_pair_if_present(parts, "installationId", profile.installation_id);
+  append_json_pair_if_present(parts, "publicIp", profile.public_ip);
+  append_json_pair_if_present(parts, "localIp", profile.local_ip);
+
+  if (parts.empty()) {
+    return std::string();
+  }
+
+  std::ostringstream stream;
+  stream << "{";
+  for (size_t index = 0; index < parts.size(); index += 1) {
+    if (index > 0) {
+      stream << ",";
+    }
+    stream << parts[index];
+  }
+  stream << "}";
+  return stream.str();
+}
+
 TransportResult perform_http_request(
   const HttpEndpoint& endpoint,
   const wchar_t* method,
@@ -740,18 +779,23 @@ std::string LicenseClientWin::to_json(const RechargeRequest& request) {
 }
 
 std::string LicenseClientWin::to_json(const CardLoginRequest& request) {
+  const std::string device_profile_json = build_device_profile_json(request.device_profile);
   std::ostringstream stream;
   stream
     << "{"
     << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
     << build_json_pair("cardKey", require_not_empty("cardKey", request.card_key)) << ","
     << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint)) << ","
-    << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name))
-    << "}";
+    << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name));
+  if (!device_profile_json.empty()) {
+    stream << ",\"deviceProfile\":" << device_profile_json;
+  }
+  stream << "}";
   return stream.str();
 }
 
 std::string LicenseClientWin::to_json(const LoginRequest& request) {
+  const std::string device_profile_json = build_device_profile_json(request.device_profile);
   std::ostringstream stream;
   stream
     << "{"
@@ -759,8 +803,11 @@ std::string LicenseClientWin::to_json(const LoginRequest& request) {
     << build_json_pair("username", require_not_empty("username", request.username)) << ","
     << build_json_pair("password", require_not_empty("password", request.password)) << ","
     << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint)) << ","
-    << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name))
-    << "}";
+    << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name));
+  if (!device_profile_json.empty()) {
+    stream << ",\"deviceProfile\":" << device_profile_json;
+  }
+  stream << "}";
   return stream.str();
 }
 

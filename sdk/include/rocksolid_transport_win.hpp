@@ -84,11 +84,25 @@ struct RechargeRequest {
   std::string card_key;
 };
 
+struct DeviceProfileRequest {
+  std::string machine_code;
+  std::string machine_guid;
+  std::string cpu_id;
+  std::string disk_serial;
+  std::string board_serial;
+  std::string bios_serial;
+  std::string mac_address;
+  std::string installation_id;
+  std::string public_ip;
+  std::string local_ip;
+};
+
 struct CardLoginRequest {
   std::string product_code;
   std::string card_key;
   std::string device_fingerprint;
   std::string device_name;
+  DeviceProfileRequest device_profile;
 };
 
 struct LoginRequest {
@@ -97,6 +111,7 @@ struct LoginRequest {
   std::string password;
   std::string device_fingerprint;
   std::string device_name;
+  DeviceProfileRequest device_profile;
 };
 
 struct HeartbeatRequest {

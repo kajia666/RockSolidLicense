@@ -355,10 +355,48 @@
           <label>策略名称<input id="policy-name" placeholder="Professional 30D" /></label>
           <label>有效天数<input id="policy-duration" type="number" value="30" /></label>
           <label>最大设备数<input id="policy-max-devices" type="number" value="1" /></label>
+          <label>
+            允许多开
+            <select id="policy-allow-concurrent">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
           <label>心跳间隔秒数<input id="policy-heartbeat-interval" type="number" value="60" /></label>
           <label>心跳超时秒数<input id="policy-heartbeat-timeout" type="number" value="180" /></label>
           <label>令牌 TTL 秒数<input id="policy-token-ttl" type="number" value="300" /></label>
+          <label>
+            换绑检测模式
+            <select id="policy-bind-mode">
+              <option value="strict">strict</option>
+              <option value="selected_fields">selected_fields</option>
+            </select>
+          </label>
+          <label>换绑检测字段<input id="policy-bind-fields" value="deviceFingerprint" placeholder="deviceFingerprint,machineGuid,requestIp" /></label>
+          <div class="hint">支持字段：deviceFingerprint、machineCode、machineGuid、cpuId、diskSerial、boardSerial、biosSerial、macAddress、installationId、requestIp、publicIp、localIp。</div>
           <button class="secondary" id="create-policy-btn">创建策略</button>
+        </article>
+
+        <article class="card">
+          <h2>策略运行配置</h2>
+          <label>策略 ID<input id="runtime-policy-id" placeholder="pol_xxx" /></label>
+          <label>
+            允许多开
+            <select id="runtime-allow-concurrent">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <label>
+            换绑检测模式
+            <select id="runtime-bind-mode">
+              <option value="strict">strict</option>
+              <option value="selected_fields">selected_fields</option>
+            </select>
+          </label>
+          <label>换绑检测字段<input id="runtime-bind-fields" value="deviceFingerprint" placeholder="deviceFingerprint,machineGuid,requestIp" /></label>
+          <button class="secondary" id="update-policy-runtime-btn">更新策略运行配置</button>
+          <div class="hint">作者可以随时切换是否允许多开，以及决定换绑检测是否参考硬件信息和请求 IP。</div>
         </article>
 
         <article class="card">
@@ -560,6 +598,7 @@
                   <th>用户</th>
                   <th>指纹</th>
                   <th>设备名</th>
+                  <th>换绑字段</th>
                   <th>状态</th>
                   <th>在线会话</th>
                   <th>最后绑定</th>
@@ -786,7 +825,7 @@
 
       function renderBindings(items) {
         if (!items.length) {
-          renderEmptyRow("bindings-body", 6, "没有匹配的设备绑定。");
+          renderEmptyRow("bindings-body", 7, "没有匹配的设备绑定。");
           return;
         }
 
@@ -795,6 +834,7 @@
             <td><strong>${escapeHtml(item.username)}</strong><div>${escapeHtml(item.product_code)}</div></td>
             <td class="mono">${escapeHtml(shortText(item.fingerprint, 24))}</td>
             <td>${escapeHtml(item.device_name || "未命名设备")}</td>
+            <td>${escapeHtml((item.matchFields || []).join(", ") || "deviceFingerprint")}<div class="hint">${escapeHtml(item.bindRequestIp || "-")}</div></td>
             <td>${renderTag(item.status)}</td>
             <td>${escapeHtml(item.active_session_count ?? 0)}</td>
             <td>${escapeHtml(formatTime(item.last_bound_at))}</td>
@@ -1056,15 +1096,42 @@
             name: el("policy-name").value,
             durationDays: Number(el("policy-duration").value),
             maxDevices: Number(el("policy-max-devices").value),
+            allowConcurrentSessions: el("policy-allow-concurrent").value === "true",
             heartbeatIntervalSeconds: Number(el("policy-heartbeat-interval").value),
             heartbeatTimeoutSeconds: Number(el("policy-heartbeat-timeout").value),
-            tokenTtlSeconds: Number(el("policy-token-ttl").value)
+            tokenTtlSeconds: Number(el("policy-token-ttl").value),
+            bindMode: el("policy-bind-mode").value,
+            bindFields: el("policy-bind-fields").value
           })
         });
         setOutput(data);
         setStatus(`策略 ${data.name} 创建成功。`);
         el("card-policy-id").value = data.id;
+        el("runtime-policy-id").value = data.id;
+        el("runtime-allow-concurrent").value = String(data.allowConcurrentSessions);
+        el("runtime-bind-mode").value = data.bindMode;
+        el("runtime-bind-fields").value = (data.bindFields || []).join(",");
         await refreshDashboard();
+      }));
+
+      el("update-policy-runtime-btn").addEventListener("click", () => guarded(async () => {
+        const policyId = el("runtime-policy-id").value.trim();
+        if (!policyId) {
+          throw new Error("请先输入策略 ID。");
+        }
+        const data = await callApi(`/api/admin/policies/${encodeURIComponent(policyId)}/runtime-config`, {
+          method: "POST",
+          body: JSON.stringify({
+            allowConcurrentSessions: el("runtime-allow-concurrent").value === "true",
+            bindMode: el("runtime-bind-mode").value,
+            bindFields: el("runtime-bind-fields").value
+          })
+        });
+        setOutput(data);
+        setStatus(`策略运行配置已更新：${data.name}。`);
+        await loadBindings();
+        await refreshDashboard();
+        await loadAuditLogs();
       }));
 
       el("create-card-btn").addEventListener("click", () => guarded(async () => {

@@ -10,6 +10,7 @@ import {
   randomAppId,
   randomCardKey,
   randomToken,
+  sha256Hex,
   signClientRequest,
   verifyPassword
 } from "./security.js";
@@ -123,6 +124,309 @@ function requireProductByCode(db, code) {
   return product;
 }
 
+const SUPPORTED_BIND_FIELDS = new Set([
+  "deviceFingerprint",
+  "machineCode",
+  "machineGuid",
+  "cpuId",
+  "diskSerial",
+  "boardSerial",
+  "biosSerial",
+  "macAddress",
+  "installationId",
+  "requestIp",
+  "localIp",
+  "publicIp"
+]);
+
+const BIND_FIELD_ALIASES = new Map([
+  ["devicefingerprint", "deviceFingerprint"],
+  ["fingerprint", "deviceFingerprint"],
+  ["machinecode", "machineCode"],
+  ["machineguid", "machineGuid"],
+  ["cpuid", "cpuId"],
+  ["cpuserial", "cpuId"],
+  ["diskserial", "diskSerial"],
+  ["diskid", "diskSerial"],
+  ["boardserial", "boardSerial"],
+  ["motherboardserial", "boardSerial"],
+  ["biosserial", "biosSerial"],
+  ["macaddress", "macAddress"],
+  ["mac", "macAddress"],
+  ["installationid", "installationId"],
+  ["installid", "installationId"],
+  ["requestip", "requestIp"],
+  ["ip", "requestIp"],
+  ["publicip", "publicIp"],
+  ["localip", "localIp"]
+]);
+
+const DEFAULT_BIND_FIELDS = ["deviceFingerprint"];
+const SUPPORTED_BIND_MODES = new Set(["strict", "selected_fields"]);
+
+function safeParseJsonObject(value, fallback = {}) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeOptionalText(value, maxLength = 256) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  return String(value)
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeBindMode(value = "strict") {
+  const normalized = String(value ?? "strict")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+
+  if (!SUPPORTED_BIND_MODES.has(normalized)) {
+    throw new AppError(
+      400,
+      "INVALID_BIND_MODE",
+      `Bind mode must be one of: ${Array.from(SUPPORTED_BIND_MODES).join(", ")}.`
+    );
+  }
+
+  return normalized;
+}
+
+function normalizeBindFieldName(value) {
+  const compact = String(value ?? "")
+    .trim()
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase();
+
+  if (!compact) {
+    return null;
+  }
+
+  return BIND_FIELD_ALIASES.get(compact) ?? null;
+}
+
+function parseBindFieldsInput(value, bindMode = "strict") {
+  if (bindMode === "strict") {
+    return [...DEFAULT_BIND_FIELDS];
+  }
+
+  const rawValues = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(/[,\n]/)
+      : [];
+
+  const fields = [];
+  for (const rawValue of rawValues) {
+    const normalized = normalizeBindFieldName(rawValue);
+    if (!normalized) {
+      continue;
+    }
+
+    if (!SUPPORTED_BIND_FIELDS.has(normalized)) {
+      throw new AppError(400, "INVALID_BIND_FIELD", `Unsupported bind field: ${rawValue}.`);
+    }
+
+    if (!fields.includes(normalized)) {
+      fields.push(normalized);
+    }
+  }
+
+  return fields.length ? fields : [...DEFAULT_BIND_FIELDS];
+}
+
+function parseOptionalBoolean(value, fieldName) {
+  if (value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["false", "0", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new AppError(400, "INVALID_BOOLEAN", `${fieldName} must be a boolean value.`);
+}
+
+function normalizeBindFieldValue(field, value) {
+  if (field === "requestIp" || field === "publicIp" || field === "localIp") {
+    return normalizeIpAddress(value);
+  }
+
+  return normalizeOptionalText(value, 256).toLowerCase();
+}
+
+function parsePolicyBindConfigRow(row, fallbackBindMode = "strict", fallbackUpdatedAt = null) {
+  const bindMode = normalizeBindMode(row?.bind_mode ?? fallbackBindMode);
+  const bindFields = parseBindFieldsInput(
+    row?.bind_fields_json ? (() => {
+      try {
+        return JSON.parse(row.bind_fields_json);
+      } catch {
+        return null;
+      }
+    })() : null,
+    bindMode
+  );
+
+  return {
+    bindMode,
+    bindFields,
+    createdAt: row?.created_at ?? fallbackUpdatedAt ?? null,
+    updatedAt: row?.updated_at ?? fallbackUpdatedAt ?? null
+  };
+}
+
+function loadPolicyBindConfig(db, policyId, fallbackBindMode = "strict", fallbackUpdatedAt = null) {
+  const row = one(db, "SELECT * FROM policy_bind_configs WHERE policy_id = ?", policyId);
+  return parsePolicyBindConfigRow(row, fallbackBindMode, fallbackUpdatedAt);
+}
+
+function persistPolicyBindConfig(db, policyId, bindMode, bindFields, timestamp) {
+  const existing = one(db, "SELECT policy_id FROM policy_bind_configs WHERE policy_id = ?", policyId);
+  const bindFieldsJson = JSON.stringify(parseBindFieldsInput(bindFields, bindMode));
+
+  if (existing) {
+    run(
+      db,
+      `
+        UPDATE policy_bind_configs
+        SET bind_mode = ?, bind_fields_json = ?, updated_at = ?
+        WHERE policy_id = ?
+      `,
+      bindMode,
+      bindFieldsJson,
+      timestamp,
+      policyId
+    );
+    return;
+  }
+
+  run(
+    db,
+    `
+      INSERT INTO policy_bind_configs (policy_id, bind_mode, bind_fields_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    policyId,
+    bindMode,
+    bindFieldsJson,
+    timestamp,
+    timestamp
+  );
+}
+
+function formatPolicyRow(row) {
+  const bindConfig = parsePolicyBindConfigRow(row, row.bind_mode, row.updated_at);
+
+  return {
+    id: row.id,
+    productId: row.product_id,
+    productCode: row.product_code,
+    productName: row.product_name,
+    name: row.name,
+    durationDays: Number(row.duration_days),
+    maxDevices: Number(row.max_devices),
+    allowConcurrentSessions: Boolean(row.allow_concurrent_sessions),
+    heartbeatIntervalSeconds: Number(row.heartbeat_interval_seconds),
+    heartbeatTimeoutSeconds: Number(row.heartbeat_timeout_seconds),
+    tokenTtlSeconds: Number(row.token_ttl_seconds),
+    bindMode: bindConfig.bindMode,
+    bindFields: bindConfig.bindFields,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function extractClientDeviceProfile(body, meta = {}) {
+  const rawProfile =
+    body.deviceProfile && typeof body.deviceProfile === "object" && !Array.isArray(body.deviceProfile)
+      ? body.deviceProfile
+      : {};
+
+  return {
+    deviceFingerprint: normalizeOptionalText(body.deviceFingerprint || rawProfile.deviceFingerprint),
+    deviceName: normalizeOptionalText(body.deviceName || rawProfile.deviceName || "Client Device"),
+    machineCode: normalizeOptionalText(rawProfile.machineCode),
+    machineGuid: normalizeOptionalText(rawProfile.machineGuid),
+    cpuId: normalizeOptionalText(rawProfile.cpuId),
+    diskSerial: normalizeOptionalText(rawProfile.diskSerial),
+    boardSerial: normalizeOptionalText(rawProfile.boardSerial),
+    biosSerial: normalizeOptionalText(rawProfile.biosSerial),
+    macAddress: normalizeOptionalText(rawProfile.macAddress),
+    installationId: normalizeOptionalText(rawProfile.installationId),
+    requestIp: normalizeIpAddress(meta.ip),
+    publicIp: normalizeIpAddress(rawProfile.publicIp),
+    localIp: normalizeIpAddress(rawProfile.localIp)
+  };
+}
+
+function compactDeviceProfile(profile = {}) {
+  return Object.fromEntries(
+    Object.entries(profile).filter(([, value]) => value !== undefined && value !== null && value !== "")
+  );
+}
+
+function buildBindingIdentity(bindConfig, deviceProfile) {
+  const fields = parseBindFieldsInput(bindConfig.bindFields, bindConfig.bindMode);
+  const identity = {};
+  const missingFields = [];
+
+  for (const field of fields) {
+    const normalizedValue = normalizeBindFieldValue(field, deviceProfile[field]);
+    if (!normalizedValue) {
+      missingFields.push(field);
+      continue;
+    }
+    identity[field] = normalizedValue;
+  }
+
+  if (missingFields.length) {
+    throw new AppError(
+      400,
+      "BIND_CONTEXT_INCOMPLETE",
+      `Client is missing bind fields required by policy: ${missingFields.join(", ")}.`,
+      {
+        bindMode: bindConfig.bindMode,
+        bindFields: fields,
+        missingFields
+      }
+    );
+  }
+
+  const orderedIdentity = Object.fromEntries(
+    Object.entries(identity).sort(([left], [right]) => left.localeCompare(right))
+  );
+
+  return {
+    bindMode: bindConfig.bindMode,
+    bindFields: fields,
+    identity: orderedIdentity,
+    identityHash: sha256Hex(JSON.stringify(orderedIdentity)),
+    requestIp: deviceProfile.requestIp || null
+  };
+}
+
 function maskCardKey(cardKey) {
   const normalized = String(cardKey ?? "")
     .trim()
@@ -149,7 +453,7 @@ function getActiveEntitlement(db, accountId, productId, now) {
     db,
     `
       SELECT e.*, p.name AS policy_name, p.max_devices, p.allow_concurrent_sessions,
-             p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds
+             p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode
       FROM entitlements e
       JOIN policies p ON p.id = e.policy_id
       WHERE e.account_id = ?
@@ -239,7 +543,53 @@ function createCardLoginAccount(db, product, card, timestamp = nowIso()) {
   return one(db, "SELECT * FROM customer_accounts WHERE id = ?", accountId);
 }
 
-function upsertDevice(db, productId, fingerprint, deviceName, meta) {
+function upsertBindingProfile(db, binding, device, bindingIdentity) {
+  const timestamp = nowIso();
+  const existing = one(db, "SELECT binding_id FROM device_binding_profiles WHERE binding_id = ?", binding.id);
+  const matchFieldsJson = JSON.stringify(bindingIdentity.bindFields);
+  const identityJson = JSON.stringify(bindingIdentity.identity);
+
+  if (existing) {
+    run(
+      db,
+      `
+        UPDATE device_binding_profiles
+        SET entitlement_id = ?, device_id = ?, identity_hash = ?, match_fields_json = ?, identity_json = ?,
+            request_ip = ?, updated_at = ?
+        WHERE binding_id = ?
+      `,
+      binding.entitlement_id,
+      device.id,
+      bindingIdentity.identityHash,
+      matchFieldsJson,
+      identityJson,
+      bindingIdentity.requestIp,
+      timestamp,
+      binding.id
+    );
+    return;
+  }
+
+  run(
+    db,
+    `
+      INSERT INTO device_binding_profiles
+      (binding_id, entitlement_id, device_id, identity_hash, match_fields_json, identity_json, request_ip, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    binding.id,
+    binding.entitlement_id,
+    device.id,
+    bindingIdentity.identityHash,
+    matchFieldsJson,
+    identityJson,
+    bindingIdentity.requestIp,
+    timestamp,
+    timestamp
+  );
+}
+
+function upsertDevice(db, productId, fingerprint, deviceName, meta, deviceProfile = {}) {
   const existing = one(
     db,
     "SELECT * FROM devices WHERE product_id = ? AND fingerprint = ?",
@@ -248,6 +598,14 @@ function upsertDevice(db, productId, fingerprint, deviceName, meta) {
   );
 
   const timestamp = nowIso();
+  const previousMetadata = existing ? safeParseJsonObject(existing.metadata_json) : {};
+  const metadataJson = JSON.stringify({
+    ...previousMetadata,
+    userAgent: meta.userAgent,
+    requestIp: normalizeIpAddress(meta.ip),
+    deviceProfile: compactDeviceProfile(deviceProfile)
+  });
+
   if (existing) {
     run(
       db,
@@ -259,7 +617,7 @@ function upsertDevice(db, productId, fingerprint, deviceName, meta) {
       deviceName ?? existing.device_name,
       timestamp,
       meta.ip,
-      JSON.stringify({ userAgent: meta.userAgent }),
+      metadataJson,
       existing.id
     );
     return one(db, "SELECT * FROM devices WHERE id = ?", existing.id);
@@ -279,12 +637,12 @@ function upsertDevice(db, productId, fingerprint, deviceName, meta) {
     timestamp,
     timestamp,
     meta.ip,
-    JSON.stringify({ userAgent: meta.userAgent })
+    metadataJson
   );
   return one(db, "SELECT * FROM devices WHERE id = ?", deviceId);
 }
 
-function bindDeviceToEntitlement(db, entitlement, device) {
+function bindDeviceToEntitlement(db, entitlement, device, bindingIdentity) {
   const existing = one(
     db,
     `
@@ -297,7 +655,85 @@ function bindDeviceToEntitlement(db, entitlement, device) {
 
   if (existing?.status === "active") {
     run(db, "UPDATE device_bindings SET last_bound_at = ? WHERE id = ?", nowIso(), existing.id);
-    return existing;
+    const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", existing.id);
+    upsertBindingProfile(db, binding, device, bindingIdentity);
+    return {
+      binding,
+      mode: "exact_active",
+      releasedSessions: 0
+    };
+  }
+
+  if (existing) {
+    const timestamp = nowIso();
+    run(
+      db,
+      `
+        UPDATE device_bindings
+        SET status = 'active', revoked_at = NULL, last_bound_at = ?
+        WHERE id = ?
+      `,
+      timestamp,
+      existing.id
+    );
+    const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", existing.id);
+    upsertBindingProfile(db, binding, device, bindingIdentity);
+    return {
+      binding,
+      mode: "exact_reactivated",
+      releasedSessions: 0
+    };
+  }
+
+  const profileMatch = one(
+    db,
+    `
+      SELECT b.*, bp.identity_hash
+      FROM device_binding_profiles bp
+      JOIN device_bindings b ON b.id = bp.binding_id
+      WHERE bp.entitlement_id = ? AND bp.identity_hash = ?
+    `,
+    entitlement.id,
+    bindingIdentity.identityHash
+  );
+
+  if (profileMatch) {
+    const timestamp = nowIso();
+    let releasedSessions = 0;
+
+    if (profileMatch.status === "active" && profileMatch.device_id !== device.id) {
+      const result = run(
+        db,
+        `
+          UPDATE sessions
+          SET status = 'expired', revoked_reason = 'binding_rebound'
+          WHERE entitlement_id = ? AND device_id = ? AND status = 'active'
+        `,
+        entitlement.id,
+        profileMatch.device_id
+      );
+      releasedSessions = Number(result.changes ?? 0);
+    }
+
+    run(
+      db,
+      `
+        UPDATE device_bindings
+        SET device_id = ?, status = 'active', revoked_at = NULL, last_bound_at = ?
+        WHERE id = ?
+      `,
+      device.id,
+      timestamp,
+      profileMatch.id
+    );
+
+    const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", profileMatch.id);
+    upsertBindingProfile(db, binding, device, bindingIdentity);
+    return {
+      binding,
+      mode: profileMatch.status === "active" ? "identity_rebound" : "identity_reactivated",
+      releasedSessions
+    };
   }
 
   const activeCount = one(
@@ -314,23 +750,12 @@ function bindDeviceToEntitlement(db, entitlement, device) {
     throw new AppError(
       409,
       "DEVICE_LIMIT_REACHED",
-      `This license plan allows at most ${entitlement.max_devices} bound device(s).`
+      `This license plan allows at most ${entitlement.max_devices} bound device(s).`,
+      {
+        bindMode: bindingIdentity.bindMode,
+        bindFields: bindingIdentity.bindFields
+      }
     );
-  }
-
-  if (existing) {
-    const timestamp = nowIso();
-    run(
-      db,
-      `
-        UPDATE device_bindings
-        SET status = 'active', revoked_at = NULL, last_bound_at = ?
-        WHERE id = ?
-      `,
-      timestamp,
-      existing.id
-    );
-    return one(db, "SELECT * FROM device_bindings WHERE id = ?", existing.id);
   }
 
   const timestamp = nowIso();
@@ -347,7 +772,13 @@ function bindDeviceToEntitlement(db, entitlement, device) {
     timestamp,
     timestamp
   );
-  return one(db, "SELECT * FROM device_bindings WHERE id = ?", bindingId);
+  const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", bindingId);
+  upsertBindingProfile(db, binding, device, bindingIdentity);
+  return {
+    binding,
+    mode: "new_binding",
+    releasedSessions: 0
+  };
 }
 
 function expireStaleSessions(db) {
@@ -498,10 +929,36 @@ function activateFreshCardEntitlement(db, product, account, card, eventType = "c
 function issueClientSession(
   db,
   config,
-  { product, account, entitlement, deviceFingerprint, deviceName, meta, authMode = "account", tokenSubject }
+  {
+    product,
+    account,
+    entitlement,
+    deviceProfile,
+    meta,
+    authMode = "account",
+    tokenSubject,
+    bindConfig = null
+  }
 ) {
-  const device = upsertDevice(db, product.id, deviceFingerprint, deviceName, meta);
-  bindDeviceToEntitlement(db, entitlement, device);
+  const resolvedDeviceProfile = extractClientDeviceProfile(
+    {
+      deviceFingerprint: deviceProfile.deviceFingerprint,
+      deviceName: deviceProfile.deviceName,
+      deviceProfile
+    },
+    meta
+  );
+  const resolvedBindConfig = bindConfig ?? loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode);
+  const bindingIdentity = buildBindingIdentity(resolvedBindConfig, resolvedDeviceProfile);
+  const device = upsertDevice(
+    db,
+    product.id,
+    resolvedDeviceProfile.deviceFingerprint,
+    resolvedDeviceProfile.deviceName,
+    meta,
+    resolvedDeviceProfile
+  );
+  const bindingResult = bindDeviceToEntitlement(db, entitlement, device, bindingIdentity);
 
   if (!entitlement.allow_concurrent_sessions) {
     run(
@@ -566,7 +1023,8 @@ function issueClientSession(
   audit(db, "account", account.id, "session.login", "session", sessionId, {
     productCode: product.code,
     deviceFingerprint: device.fingerprint,
-    authMode
+    authMode,
+    bindingMode: bindingResult.mode
   });
 
   return {
@@ -575,6 +1033,12 @@ function issueClientSession(
     licenseToken,
     expiresAt,
     authMode,
+    binding: {
+      id: bindingResult.binding.id,
+      mode: bindingResult.mode,
+      matchFields: bindingIdentity.bindFields,
+      releasedSessions: bindingResult.releasedSessions
+    },
     heartbeat: {
       intervalSeconds: entitlement.heartbeat_interval_seconds,
       timeoutSeconds: entitlement.heartbeat_timeout_seconds
@@ -1834,19 +2298,24 @@ export function createServices(db, config) {
       requireAdminSession(db, token);
       const sql = productCode
         ? `
-            SELECT p.*, pr.code AS product_code, pr.name AS product_name
+            SELECT p.*, pr.code AS product_code, pr.name AS product_name,
+                   pbc.bind_fields_json
             FROM policies p
             JOIN products pr ON pr.id = p.product_id
+            LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
             WHERE pr.code = ?
             ORDER BY p.created_at DESC
           `
         : `
-            SELECT p.*, pr.code AS product_code, pr.name AS product_name
+            SELECT p.*, pr.code AS product_code, pr.name AS product_name,
+                   pbc.bind_fields_json
             FROM policies p
             JOIN products pr ON pr.id = p.product_id
+            LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
             ORDER BY p.created_at DESC
           `;
-      return productCode ? many(db, sql, productCode) : many(db, sql);
+      const rows = productCode ? many(db, sql, productCode) : many(db, sql);
+      return rows.map(formatPolicyRow);
     },
 
     createPolicy(token, body) {
@@ -1862,11 +2331,12 @@ export function createServices(db, config) {
         name: String(body.name).trim(),
         durationDays: Number(body.durationDays ?? 30),
         maxDevices: Number(body.maxDevices ?? 1),
-        allowConcurrentSessions: body.allowConcurrentSessions === false ? 0 : 1,
+        allowConcurrentSessions: parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions") === false ? 0 : 1,
         heartbeatIntervalSeconds: Number(body.heartbeatIntervalSeconds ?? 60),
         heartbeatTimeoutSeconds: Number(body.heartbeatTimeoutSeconds ?? 180),
         tokenTtlSeconds: Number(body.tokenTtlSeconds ?? 300),
-        bindMode: String(body.bindMode ?? "strict"),
+        bindMode: normalizeBindMode(body.bindMode ?? "strict"),
+        bindFields: parseBindFieldsInput(body.bindFields, normalizeBindMode(body.bindMode ?? "strict")),
         status: "active",
         createdAt: now,
         updatedAt: now
@@ -1905,11 +2375,84 @@ export function createServices(db, config) {
         policy.updatedAt
       );
 
+      persistPolicyBindConfig(db, policy.id, policy.bindMode, policy.bindFields, now);
+
       audit(db, "admin", admin.admin_id, "policy.create", "policy", policy.id, {
         productCode: product.code,
-        name: policy.name
+        name: policy.name,
+        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
+        bindMode: policy.bindMode,
+        bindFields: policy.bindFields
       });
-      return policy;
+      return {
+        ...policy,
+        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions)
+      };
+    },
+
+    updatePolicyRuntimeConfig(token, policyId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const policy = one(
+        db,
+        `
+          SELECT p.*, pr.code AS product_code, pr.name AS product_name
+          FROM policies p
+          JOIN products pr ON pr.id = p.product_id
+          WHERE p.id = ?
+        `,
+        policyId
+      );
+
+      if (!policy) {
+        throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
+      }
+
+      const currentBindConfig = loadPolicyBindConfig(db, policy.id, policy.bind_mode, policy.updated_at);
+      const nextBindMode = body.bindMode !== undefined
+        ? normalizeBindMode(body.bindMode)
+        : currentBindConfig.bindMode;
+      const nextBindFields = body.bindFields !== undefined
+        ? parseBindFieldsInput(body.bindFields, nextBindMode)
+        : currentBindConfig.bindFields;
+      const allowConcurrentSessions = parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions");
+      const nextAllowConcurrentSessions = allowConcurrentSessions === null
+        ? Number(policy.allow_concurrent_sessions)
+        : allowConcurrentSessions ? 1 : 0;
+      const timestamp = nowIso();
+
+      run(
+        db,
+        `
+          UPDATE policies
+          SET allow_concurrent_sessions = ?, bind_mode = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        nextAllowConcurrentSessions,
+        nextBindMode,
+        timestamp,
+        policy.id
+      );
+
+      persistPolicyBindConfig(db, policy.id, nextBindMode, nextBindFields, timestamp);
+
+      audit(db, "admin", admin.admin_id, "policy.runtime.update", "policy", policy.id, {
+        productCode: policy.product_code,
+        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
+        bindMode: nextBindMode,
+        bindFields: nextBindFields
+      });
+
+      return {
+        id: policy.id,
+        productId: policy.product_id,
+        productCode: policy.product_code,
+        productName: policy.product_name,
+        name: policy.name,
+        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
+        bindMode: nextBindMode,
+        bindFields: nextBindFields,
+        updatedAt: timestamp
+      };
     },
 
     createCardBatch(token, body) {
@@ -3272,6 +3815,7 @@ export function createServices(db, config) {
                  pol.name AS policy_name,
                  e.ends_at AS entitlement_ends_at,
                  d.fingerprint, d.device_name, d.last_seen_at, d.last_seen_ip,
+                 bp.identity_hash, bp.match_fields_json, bp.identity_json, bp.request_ip AS bind_request_ip,
                  COALESCE(sess.active_session_count, 0) AS active_session_count
           FROM device_bindings b
           JOIN entitlements e ON e.id = b.entitlement_id
@@ -3279,6 +3823,7 @@ export function createServices(db, config) {
           JOIN products pr ON pr.id = e.product_id
           JOIN policies pol ON pol.id = e.policy_id
           JOIN devices d ON d.id = b.device_id
+          LEFT JOIN device_binding_profiles bp ON bp.binding_id = b.id
           LEFT JOIN (
             SELECT entitlement_id, device_id, COUNT(*) AS active_session_count
             FROM sessions
@@ -3293,7 +3838,12 @@ export function createServices(db, config) {
       );
 
       return {
-        items,
+        items: items.map((row) => ({
+          ...row,
+          matchFields: row.match_fields_json ? JSON.parse(row.match_fields_json) : [],
+          identity: row.identity_json ? JSON.parse(row.identity_json) : {},
+          bindRequestIp: row.bind_request_ip ?? null
+        })),
         total: items.length,
         filters: normalizedFilters
       };
@@ -4628,7 +5178,8 @@ export function createServices(db, config) {
         }
 
         const now = nowIso();
-        const deviceFingerprint = String(body.deviceFingerprint).trim();
+        const deviceProfile = extractClientDeviceProfile(body, meta);
+        const deviceFingerprint = deviceProfile.deviceFingerprint;
         requireDeviceNotBlocked(db, product.id, deviceFingerprint);
         const entitlement = getActiveEntitlement(db, account.id, product.id, now);
         if (!entitlement) {
@@ -4636,16 +5187,17 @@ export function createServices(db, config) {
         }
 
         const maskedKey = maskCardKey(card.card_key);
+        const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
         return {
           ...issueClientSession(db, config, {
             product,
             account,
             entitlement,
-            deviceFingerprint,
-            deviceName: String(body.deviceName ?? "Client Device"),
+            deviceProfile,
             meta,
             authMode: "card",
-            tokenSubject: account.username
+            tokenSubject: account.username,
+            bindConfig
           }),
           card: {
             maskedKey
@@ -4692,22 +5244,24 @@ export function createServices(db, config) {
         }
 
         const now = nowIso();
-        const deviceFingerprint = String(body.deviceFingerprint).trim();
+        const deviceProfile = extractClientDeviceProfile(body, meta);
+        const deviceFingerprint = deviceProfile.deviceFingerprint;
         requireDeviceNotBlocked(db, product.id, deviceFingerprint);
         const entitlement = getActiveEntitlement(db, account.id, product.id, now);
         if (!entitlement) {
           throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
         }
 
+        const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
         return issueClientSession(db, config, {
           product,
           account,
           entitlement,
-          deviceFingerprint,
-          deviceName: String(body.deviceName ?? "Client Device"),
+          deviceProfile,
           meta,
           authMode: "account",
-          tokenSubject: account.username
+          tokenSubject: account.username,
+          bindConfig
         });
       });
     },

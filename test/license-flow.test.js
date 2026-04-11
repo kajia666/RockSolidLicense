@@ -93,7 +93,7 @@ async function getText(baseUrl, path, token) {
   };
 }
 
-async function signedClientPost(baseUrl, path, appId, secret, payload) {
+async function signedClientPost(baseUrl, path, appId, secret, payload, extraHeaders = {}) {
   const body = JSON.stringify(payload);
   const timestamp = new Date().toISOString();
   const nonce = crypto.randomBytes(8).toString("hex");
@@ -112,7 +112,8 @@ async function signedClientPost(baseUrl, path, appId, secret, payload) {
       "x-rs-app-id": appId,
       "x-rs-timestamp": timestamp,
       "x-rs-nonce": nonce,
-      "x-rs-signature": signature
+      "x-rs-signature": signature,
+      ...extraHeaders
     },
     body
   });
@@ -122,7 +123,7 @@ async function signedClientPost(baseUrl, path, appId, secret, payload) {
   return json.data;
 }
 
-async function signedClientPostExpectError(baseUrl, path, appId, secret, payload) {
+async function signedClientPostExpectError(baseUrl, path, appId, secret, payload, extraHeaders = {}) {
   const body = JSON.stringify(payload);
   const timestamp = new Date().toISOString();
   const nonce = crypto.randomBytes(8).toString("hex");
@@ -141,7 +142,8 @@ async function signedClientPostExpectError(baseUrl, path, appId, secret, payload
       "x-rs-app-id": appId,
       "x-rs-timestamp": timestamp,
       "x-rs-nonce": nonce,
-      "x-rs-signature": signature
+      "x-rs-signature": signature,
+      ...extraHeaders
     },
     body
   });
@@ -1011,6 +1013,230 @@ test("admin operations can inspect and control accounts, sessions, and device bi
     assert.ok(eventTypes.includes("account.disable"));
     assert.ok(eventTypes.includes("account.enable"));
     assert.ok(eventTypes.includes("device-binding.release"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("policy runtime config can control multi-open policy and configurable rebind detection", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "REBIND_APP",
+        name: "Rebind App",
+        description: "Configurable binding detection"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "REBIND_APP",
+        name: "Rebind Policy",
+        durationDays: 30,
+        maxDevices: 1,
+        allowConcurrentSessions: true,
+        heartbeatIntervalSeconds: 30,
+        heartbeatTimeoutSeconds: 90,
+        tokenTtlSeconds: 180,
+        bindMode: "selected_fields",
+        bindFields: ["machineGuid"]
+      },
+      adminSession.token
+    );
+
+    assert.equal(policy.allowConcurrentSessions, true);
+    assert.deepEqual(policy.bindFields, ["machineGuid"]);
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "REBIND_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "REBIND"
+      },
+      adminSession.token
+    );
+
+    const cardKey = batch.keys[0];
+    assert.ok(cardKey);
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "REBIND_APP",
+      username: "dora",
+      password: "StrongPass123"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "REBIND_APP",
+      username: "dora",
+      password: "StrongPass123",
+      cardKey
+    });
+
+    const firstLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "REBIND_APP",
+        username: "dora",
+        password: "StrongPass123",
+        deviceFingerprint: "rebind-device-a",
+        deviceName: "Desk A",
+        deviceProfile: {
+          machineGuid: "MG-001",
+          cpuId: "CPU-A"
+        }
+      },
+      {
+        "x-forwarded-for": "198.51.100.10"
+      }
+    );
+
+    assert.equal(firstLogin.binding.mode, "new_binding");
+
+    const reboundLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "REBIND_APP",
+        username: "dora",
+        password: "StrongPass123",
+        deviceFingerprint: "rebind-device-b",
+        deviceName: "Desk B",
+        deviceProfile: {
+          machineGuid: "MG-001",
+          cpuId: "CPU-B"
+        }
+      },
+      {
+        "x-forwarded-for": "198.51.100.11"
+      }
+    );
+
+    assert.equal(reboundLogin.binding.mode, "identity_rebound");
+
+    const oldHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "REBIND_APP",
+        sessionToken: firstLogin.sessionToken,
+        deviceFingerprint: "rebind-device-a"
+      }
+    );
+    assert.equal(oldHeartbeat.status, 401);
+    assert.equal(oldHeartbeat.error.code, "SESSION_INVALID");
+
+    const bindingsAfterRebound = await getJson(
+      baseUrl,
+      "/api/admin/device-bindings?productCode=REBIND_APP&status=active",
+      adminSession.token
+    );
+    assert.equal(bindingsAfterRebound.total, 1);
+    assert.equal(bindingsAfterRebound.items[0].fingerprint, "rebind-device-b");
+    assert.deepEqual(bindingsAfterRebound.items[0].matchFields, ["machineGuid"]);
+
+    const runtimeConfig = await postJson(
+      baseUrl,
+      `/api/admin/policies/${policy.id}/runtime-config`,
+      {
+        allowConcurrentSessions: false,
+        bindMode: "selected_fields",
+        bindFields: ["machineGuid", "requestIp"]
+      },
+      adminSession.token
+    );
+
+    assert.equal(runtimeConfig.allowConcurrentSessions, false);
+    assert.deepEqual(runtimeConfig.bindFields, ["machineGuid", "requestIp"]);
+
+    const blockedRebind = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "REBIND_APP",
+        username: "dora",
+        password: "StrongPass123",
+        deviceFingerprint: "rebind-device-c",
+        deviceName: "Desk C",
+        deviceProfile: {
+          machineGuid: "MG-001",
+          cpuId: "CPU-C"
+        }
+      },
+      {
+        "x-forwarded-for": "203.0.113.25"
+      }
+    );
+    assert.equal(blockedRebind.status, 409);
+    assert.equal(blockedRebind.error.code, "DEVICE_LIMIT_REACHED");
+    assert.deepEqual(blockedRebind.error.details.bindFields, ["machineGuid", "requestIp"]);
+
+    const released = await postJson(
+      baseUrl,
+      `/api/admin/device-bindings/${bindingsAfterRebound.items[0].id}/release`,
+      {
+        reason: "operator_rebind_approved"
+      },
+      adminSession.token
+    );
+    assert.equal(released.status, "revoked");
+
+    const reboundAfterRelease = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "REBIND_APP",
+        username: "dora",
+        password: "StrongPass123",
+        deviceFingerprint: "rebind-device-c",
+        deviceName: "Desk C",
+        deviceProfile: {
+          machineGuid: "MG-001",
+          cpuId: "CPU-C"
+        }
+      },
+      {
+        "x-forwarded-for": "203.0.113.25"
+      }
+    );
+
+    assert.equal(reboundAfterRelease.binding.mode, "new_binding");
+
+    const bindingsAfterRelease = await getJson(
+      baseUrl,
+      "/api/admin/device-bindings?productCode=REBIND_APP&status=active",
+      adminSession.token
+    );
+    assert.equal(bindingsAfterRelease.total, 1);
+    assert.equal(bindingsAfterRelease.items[0].fingerprint, "rebind-device-c");
+    assert.deepEqual(bindingsAfterRelease.items[0].matchFields, ["machineGuid", "requestIp"]);
+    assert.equal(bindingsAfterRelease.items[0].bindRequestIp, "203.0.113.25");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

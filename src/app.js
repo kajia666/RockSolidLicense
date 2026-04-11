@@ -133,6 +133,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      const policyRuntimeRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/policies/:policyId/runtime-config")
+        : null;
+      if (policyRuntimeRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updatePolicyRuntimeConfig(
+            getBearerToken(req),
+            policyRuntimeRoute.policyId,
+            body
+          )
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/admin/cards/batch") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, { ok: true, data: services.createCardBatch(getBearerToken(req), body) });

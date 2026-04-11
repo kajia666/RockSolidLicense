@@ -51,6 +51,7 @@ Effects:
 
 - `GET /api/admin/device-bindings`
 - `POST /api/admin/device-bindings/:bindingId/release`
+- `POST /api/admin/policies/:policyId/runtime-config`
 
 Supported query parameters:
 
@@ -72,6 +73,38 @@ Effects:
 - marks the binding as released
 - expires any active session currently using that binding
 - allows the same device to bind again later if the customer logs in
+
+Policy runtime config request body:
+
+```json
+{
+  "allowConcurrentSessions": false,
+  "bindMode": "selected_fields",
+  "bindFields": ["machineGuid", "requestIp"]
+}
+```
+
+Supported bind fields:
+
+- `deviceFingerprint`
+- `machineCode`
+- `machineGuid`
+- `cpuId`
+- `diskSerial`
+- `boardSerial`
+- `biosSerial`
+- `macAddress`
+- `installationId`
+- `requestIp`
+- `publicIp`
+- `localIp`
+
+Notes:
+
+- `allowConcurrentSessions` controls whether the product allows multiple live sessions for the same account
+- `bindMode=strict` keeps the old exact-fingerprint behavior
+- `bindMode=selected_fields` lets the author decide which hardware or IP signals count for rebinding detection
+- changing bind fields affects future logins; existing bindings remain until they are revalidated or released
 
 ### Device blocks
 

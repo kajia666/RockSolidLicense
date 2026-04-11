@@ -78,6 +78,23 @@ rocksolid::CardLoginRequest card_request{
 const rocksolid::LoginResponse card_login = client.card_login_tcp_parsed(card_request);
 ```
 
+Optional rebinding profile:
+
+```cpp
+rocksolid::LoginRequest request{
+  "MY_SOFTWARE",
+  "alice",
+  "StrongPass123",
+  client.generate_device_fingerprint(),
+  "Alice Workstation"
+};
+
+request.device_profile.machine_guid = "GUID-001";
+request.device_profile.cpu_id = "CPU-ABC";
+request.device_profile.disk_serial = "DISK-XYZ";
+request.device_profile.public_ip = "198.51.100.10";
+```
+
 ## Notes
 
 - Use `GET /api/system/token-key` to retrieve the server public key for SDK distribution or verification bootstrap.
@@ -87,5 +104,6 @@ const rocksolid::LoginResponse card_login = client.card_login_tcp_parsed(card_re
 - The SDK now also exposes parsed response structs for the main client flows.
 - `LoginResponse.auth_mode` tells you whether the session came from `account` login or direct `card` login.
 - `LoginResponse.card_masked_key` is populated for direct card login responses.
+- `LoginRequest` and `CardLoginRequest` can optionally carry hardware/IP profile fields for configurable rebinding detection.
 - The server TCP protocol is line-delimited JSON. See [tcp-protocol.md](/D:/code/OnlineVerification/docs/tcp-protocol.md).
 - Build steps are in [BUILD_WINDOWS.md](/D:/code/OnlineVerification/sdk/BUILD_WINDOWS.md).

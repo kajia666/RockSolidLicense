@@ -62,6 +62,36 @@ Behavior:
 - a card that was already recharged onto a named account is rejected for direct login
 - direct-card sessions still use the same device binding, heartbeat, token signing, notice blocking, version checks, and IP/network rules as account login
 
+## Rebind detection
+
+Login and card-login can now carry an optional `deviceProfile` object:
+
+```json
+{
+  "productCode": "MY_APP",
+  "username": "alice",
+  "password": "StrongPass123",
+  "deviceFingerprint": "fp-001",
+  "deviceName": "Alice PC",
+  "deviceProfile": {
+    "machineGuid": "GUID-001",
+    "cpuId": "CPU-ABC",
+    "diskSerial": "DISK-XYZ",
+    "requestIp": "not sent by client",
+    "publicIp": "198.51.100.10",
+    "localIp": "192.168.1.20"
+  }
+}
+```
+
+The software author can configure, per policy:
+
+- whether concurrent sessions are allowed
+- whether rebinding should stay strict to the exact `deviceFingerprint`
+- or whether rebinding should be decided by selected hardware/IP fields instead
+
+When `bindMode=selected_fields`, the server can treat a new fingerprint as the same logical device if the selected fields still match.
+
 ## Internal model
 
 Sessions in this project are still account-backed.

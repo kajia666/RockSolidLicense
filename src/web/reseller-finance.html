@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Reseller Finance</title>
+    <style>
+      :root {
+        --bg: #f5efe5;
+        --surface: rgba(255, 251, 245, 0.95);
+        --line: rgba(28, 33, 30, 0.1);
+        --ink: #1c211e;
+        --muted: #66706b;
+        --accent: #0f7c68;
+        --accent-soft: rgba(15, 124, 104, 0.12);
+        --warn: #9a5c1f;
+        --warn-soft: rgba(154, 92, 31, 0.12);
+        --danger: #a0422c;
+        --danger-soft: rgba(160, 66, 44, 0.12);
+        --shadow: 0 24px 58px rgba(58, 52, 45, 0.16);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 124, 104, 0.14), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(208, 145, 86, 0.18), transparent 28%),
+          linear-gradient(135deg, #f3ebdf 0%, #f8f4ec 52%, #eee2d1 100%);
+      }
+
+      code, pre {
+        font-family: "Cascadia Code", "Consolas", monospace;
+      }
+
+      .shell {
+        width: min(1440px, calc(100vw - 28px));
+        margin: 20px auto 36px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero, .card {
+        padding: 20px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        gap: 10px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+      }
+
+      .table-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(28, 33, 30, 0.08);
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 24px;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      h1, h2, p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(28px, 5vw, 44px);
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      .sub, .hint, .nav {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .hint, .nav {
+        font-size: 13px;
+      }
+
+      .nav a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      input, select, textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 90px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        color: white;
+        background: var(--ink);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.secondary { background: var(--accent); }
+      button.warn { background: var(--warn); }
+      button.danger { background: var(--danger); }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .status {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+      }
+
+      .status.warn {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(28, 33, 30, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        background: rgba(247, 243, 236, 0.98);
+        color: var(--muted);
+      }
+
+      tbody tr {
+        cursor: pointer;
+      }
+
+      tbody tr:hover {
+        background: rgba(15, 124, 104, 0.06);
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(28, 33, 30, 0.08);
+        color: var(--muted);
+      }
+
+      .tag.ok {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tag.danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      pre {
+        margin: 0;
+        min-height: 200px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef8f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1120px) {
+        .table-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Reseller Finance Center</h1>
+        <p class="sub">
+          Configure reseller pricing rules, inspect settlement totals, and export finance-ready CSV reports.
+        </p>
+        <div class="nav">
+          Route: <code>/admin/resellers/finance</code>.
+          Related pages:
+          <a href="/admin/resellers">Reseller Center</a> /
+          <a href="/admin">Console</a> /
+          <a href="/admin/security">Security Center</a>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Admin Login</h2>
+          <label>Username<input id="username" value="admin" /></label>
+          <label>Password<input id="password" type="password" value="ChangeMe!123" /></label>
+          <div class="actions">
+            <button id="login-btn">Log In</button>
+            <button class="secondary" id="refresh-all-btn">Refresh All</button>
+          </div>
+          <div class="status" id="status-box">Waiting for admin login.</div>
+        </article>
+
+        <article class="card">
+          <h2>Create Price Rule</h2>
+          <label>Reseller ID<input id="rule-reseller-id" placeholder="reseller_xxx" /></label>
+          <label>Product Code<input id="rule-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>Policy ID<input id="rule-policy-id" placeholder="optional policy id" /></label>
+          <label>Currency<input id="rule-currency" value="CNY" /></label>
+          <label>Unit Price<input id="rule-unit-price" type="number" min="0" step="0.01" value="99.00" /></label>
+          <label>Unit Cost<input id="rule-unit-cost" type="number" min="0" step="0.01" value="49.00" /></label>
+          <label>Notes<textarea id="rule-notes" placeholder="stable desktop channel default price"></textarea></label>
+          <button class="secondary" id="create-rule-btn">Create Price Rule</button>
+        </article>
+
+        <article class="card">
+          <h2>Rule Status</h2>
+          <label>Rule ID<input id="status-rule-id" placeholder="click a rule row to auto-fill" /></label>
+          <label>
+            Target Status
+            <select id="rule-status">
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <button class="danger" id="update-rule-status-btn">Update Rule Status</button>
+          <div class="hint">
+            Archive old rules instead of deleting them so historical settlement snapshots stay readable.
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Settlement Filters</h2>
+          <label>Reseller ID<input id="filter-reseller-id" placeholder="blank means all" /></label>
+          <label>Product Code<input id="filter-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>
+            Card Status
+            <select id="filter-card-status">
+              <option value="">all</option>
+              <option value="fresh">fresh</option>
+              <option value="redeemed">redeemed</option>
+            </select>
+          </label>
+          <label>Keyword<input id="filter-search" placeholder="reseller code / card key / username" /></label>
+          <div class="actions">
+            <button class="secondary" id="refresh-rules-btn">Refresh Rules</button>
+            <button class="warn" id="refresh-settlement-btn">Load Settlement Report</button>
+            <button id="export-settlement-btn">Export Settlement CSV</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Settlement Totals</h2>
+        <div class="stats" id="settlement-stats">
+          <div class="stat"><strong>0</strong><span>Total Keys</span></div>
+          <div class="stat"><strong>0</strong><span>Priced Keys</span></div>
+          <div class="stat"><strong>0</strong><span>Unpriced Keys</span></div>
+          <div class="stat"><strong>0</strong><span>Redeemed Keys</span></div>
+          <div class="stat"><strong>0.00</strong><span>Gross Redeemed</span></div>
+          <div class="stat"><strong>0.00</strong><span>Commission Redeemed</span></div>
+        </div>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
+          <h2>Price Rules</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Reseller</th>
+                  <th>Product</th>
+                  <th>Policy</th>
+                  <th>Currency</th>
+                  <th>Price</th>
+                  <th>Cost</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="price-rule-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Settlement by Currency</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Currency</th>
+                  <th>Priced</th>
+                  <th>Redeemed</th>
+                  <th>Gross Redeemed</th>
+                  <th>Commission Redeemed</th>
+                </tr>
+              </thead>
+              <tbody id="currency-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
+          <h2>Settlement by Reseller</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Reseller</th>
+                  <th>Currency</th>
+                  <th>Priced</th>
+                  <th>Redeemed</th>
+                  <th>Gross Redeemed</th>
+                  <th>Commission Redeemed</th>
+                </tr>
+              </thead>
+              <tbody id="settlement-reseller-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Settlement by Product</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Currency</th>
+                  <th>Priced</th>
+                  <th>Redeemed</th>
+                  <th>Gross Redeemed</th>
+                  <th>Commission Redeemed</th>
+                </tr>
+              </thead>
+              <tbody id="settlement-product-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>API Output</h2>
+        <pre id="output">Waiting for actions...</pre>
+      </section>
+    </main>
+
+    <script>
+      let adminToken = "";
+
+      function el(id) {
+        return document.getElementById(id);
+      }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = JSON.stringify(value, null, 2);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function renderTag(value) {
+        const text = String(value ?? "unknown");
+        const className = text === "active" ? "tag ok" : text === "archived" ? "tag danger" : "tag";
+        return `<span class="${className}">${escapeHtml(text)}</span>`;
+      }
+
+      function money(value) {
+        return Number(value ?? 0).toFixed(2);
+      }
+
+      function buildFilterSuffix() {
+        const query = new URLSearchParams();
+        const resellerId = el("filter-reseller-id").value.trim();
+        const productCode = el("filter-product-code").value.trim();
+        const cardStatus = el("filter-card-status").value;
+        const search = el("filter-search").value.trim();
+
+        if (resellerId) query.set("resellerId", resellerId);
+        if (productCode) query.set("productCode", productCode);
+        if (cardStatus) query.set("cardStatus", cardStatus);
+        if (search) query.set("search", search);
+
+        return query.toString() ? `?${query.toString()}` : "";
+      }
+
+      async function callApi(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+        if (body) headers["Content-Type"] = "application/json";
+        if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers,
+          body
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          const error = payload.error || { code: "UNKNOWN", message: "Request failed." };
+          throw new Error(`${error.code}: ${error.message}`);
+        }
+        return payload.data;
+      }
+
+      async function downloadCsv(path, filename) {
+        const response = await fetch(path, {
+          headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {}
+        });
+
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error(`CSV_EXPORT_FAILED: ${text}`);
+        }
+
+        const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function renderPriceRules(items) {
+        const body = el("price-rule-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="7">No price rules yet.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = items.map((item) => `
+          <tr data-rule-id="${escapeHtml(item.id)}" data-reseller-id="${escapeHtml(item.resellerId)}" data-product-code="${escapeHtml(item.productCode)}" data-policy-id="${escapeHtml(item.policyId || "")}">
+            <td>${escapeHtml(item.resellerCode)}<br /><span class="hint">${escapeHtml(item.resellerName)}</span></td>
+            <td>${escapeHtml(item.productCode)}</td>
+            <td>${escapeHtml(item.policyName || "default")}</td>
+            <td>${escapeHtml(item.currency)}</td>
+            <td>${escapeHtml(money(item.unitPrice))}</td>
+            <td>${escapeHtml(money(item.unitCost))}</td>
+            <td>${renderTag(item.status)}</td>
+          </tr>
+        `).join("");
+
+        for (const row of body.querySelectorAll("tr[data-rule-id]")) {
+          row.addEventListener("click", () => {
+            el("status-rule-id").value = row.dataset.ruleId;
+            el("rule-reseller-id").value = row.dataset.resellerId;
+            el("rule-product-code").value = row.dataset.productCode;
+            el("rule-policy-id").value = row.dataset.policyId;
+            el("filter-reseller-id").value = row.dataset.resellerId;
+            el("filter-product-code").value = row.dataset.productCode;
+          });
+        }
+      }
+
+      function renderSettlement(report) {
+        el("settlement-stats").innerHTML = `
+          <div class="stat"><strong>${escapeHtml(report.totals.totalKeys)}</strong><span>Total Keys</span></div>
+          <div class="stat"><strong>${escapeHtml(report.totals.pricedKeys)}</strong><span>Priced Keys</span></div>
+          <div class="stat"><strong>${escapeHtml(report.totals.unpricedKeys)}</strong><span>Unpriced Keys</span></div>
+          <div class="stat"><strong>${escapeHtml(report.totals.redeemedKeys)}</strong><span>Redeemed Keys</span></div>
+          <div class="stat"><strong>${escapeHtml(money(report.totals.grossRedeemed))}</strong><span>Gross Redeemed</span></div>
+          <div class="stat"><strong>${escapeHtml(money(report.totals.commissionRedeemed))}</strong><span>Commission Redeemed</span></div>
+        `;
+
+        const currencyBody = el("currency-body");
+        currencyBody.innerHTML = report.byCurrency.length
+          ? report.byCurrency.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.currency)}</td>
+                <td>${escapeHtml(item.pricedKeys)}</td>
+                <td>${escapeHtml(item.pricedRedeemedKeys)}</td>
+                <td>${escapeHtml(money(item.grossRedeemed))}</td>
+                <td>${escapeHtml(money(item.commissionRedeemed))}</td>
+              </tr>
+            `).join("")
+          : '<tr><td colspan="5">No settlement rows.</td></tr>';
+
+        const resellerBody = el("settlement-reseller-body");
+        resellerBody.innerHTML = report.byReseller.length
+          ? report.byReseller.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.resellerCode)}<br /><span class="hint">${escapeHtml(item.resellerName)}</span></td>
+                <td>${escapeHtml(item.currency)}</td>
+                <td>${escapeHtml(item.pricedKeys)}</td>
+                <td>${escapeHtml(item.pricedRedeemedKeys)}</td>
+                <td>${escapeHtml(money(item.grossRedeemed))}</td>
+                <td>${escapeHtml(money(item.commissionRedeemed))}</td>
+              </tr>
+            `).join("")
+          : '<tr><td colspan="6">No reseller settlement rows.</td></tr>';
+
+        const productBody = el("settlement-product-body");
+        productBody.innerHTML = report.byProduct.length
+          ? report.byProduct.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.productCode)}<br /><span class="hint">${escapeHtml(item.productName)}</span></td>
+                <td>${escapeHtml(item.currency)}</td>
+                <td>${escapeHtml(item.pricedKeys)}</td>
+                <td>${escapeHtml(item.pricedRedeemedKeys)}</td>
+                <td>${escapeHtml(money(item.grossRedeemed))}</td>
+                <td>${escapeHtml(money(item.commissionRedeemed))}</td>
+              </tr>
+            `).join("")
+          : '<tr><td colspan="6">No product settlement rows.</td></tr>';
+      }
+
+      async function refreshRules() {
+        const query = new URLSearchParams();
+        const resellerId = el("filter-reseller-id").value.trim();
+        const productCode = el("filter-product-code").value.trim();
+        if (resellerId) query.set("resellerId", resellerId);
+        if (productCode) query.set("productCode", productCode);
+
+        const suffix = query.toString() ? `?${query.toString()}` : "";
+        const data = await callApi(`/api/admin/reseller-price-rules${suffix}`);
+        renderPriceRules(data.items);
+        return data;
+      }
+
+      async function refreshSettlement() {
+        const suffix = buildFilterSuffix();
+        const data = await callApi(`/api/admin/reseller-settlement-report${suffix}`);
+        renderSettlement(data);
+        return data;
+      }
+
+      async function refreshAll() {
+        const [rules, settlement] = await Promise.all([
+          refreshRules(),
+          refreshSettlement()
+        ]);
+        setOutput({ rules, settlement });
+      }
+
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/login", {
+            method: "POST",
+            body: {
+              username: el("username").value.trim(),
+              password: el("password").value
+            }
+          });
+          adminToken = data.token;
+          setStatus(`Admin ${data.admin.username} is connected.`);
+          setOutput(data);
+          await refreshAll();
+        } catch (error) {
+          adminToken = "";
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("create-rule-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/reseller-price-rules", {
+            method: "POST",
+            body: {
+              resellerId: el("rule-reseller-id").value.trim(),
+              productCode: el("rule-product-code").value.trim(),
+              policyId: el("rule-policy-id").value.trim(),
+              currency: el("rule-currency").value.trim(),
+              unitPrice: Number(el("rule-unit-price").value || 0),
+              unitCost: Number(el("rule-unit-cost").value || 0),
+              notes: el("rule-notes").value.trim()
+            }
+          });
+          el("status-rule-id").value = data.id;
+          setOutput(data);
+          await refreshRules();
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("update-rule-status-btn").addEventListener("click", async () => {
+        try {
+          const ruleId = el("status-rule-id").value.trim();
+          const data = await callApi(`/api/admin/reseller-price-rules/${encodeURIComponent(ruleId)}/status`, {
+            method: "POST",
+            body: {
+              status: el("rule-status").value
+            }
+          });
+          setOutput(data);
+          await refreshRules();
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-all-btn").addEventListener("click", async () => {
+        try {
+          await refreshAll();
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-rules-btn").addEventListener("click", async () => {
+        try {
+          const data = await refreshRules();
+          setOutput(data);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-settlement-btn").addEventListener("click", async () => {
+        try {
+          const data = await refreshSettlement();
+          setOutput(data);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("export-settlement-btn").addEventListener("click", async () => {
+        try {
+          const suffix = buildFilterSuffix();
+          await downloadCsv(`/api/admin/reseller-settlement/export${suffix}`, "reseller-settlement.csv");
+          setStatus("Settlement CSV export downloaded.");
+          setOutput({ exported: true, filters: suffix || "all" });
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+    </script>
+  </body>
+</html>

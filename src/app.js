@@ -13,6 +13,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), "utf8");
 const noticeCenterHtml = fs.readFileSync(path.join(currentDir, "web", "notice-center.html"), "utf8");
 const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-ops.html"), "utf8");
+const resellerFinanceHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-finance.html"), "utf8");
 const securityCenterHtml = fs.readFileSync(path.join(currentDir, "web", "security-center.html"), "utf8");
 
 function matchPath(pathname, pattern) {
@@ -72,6 +73,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/admin/resellers") {
         sendHtml(res, 200, resellerCenterHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/admin/resellers/finance") {
+        sendHtml(res, 200, resellerFinanceHtml);
         return;
       }
 
@@ -166,6 +172,28 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/admin/reseller-price-rules") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.listResellerPriceRules(getBearerToken(req), {
+            resellerId: url.searchParams.get("resellerId"),
+            productCode: url.searchParams.get("productCode"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/admin/reseller-price-rules") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.createResellerPriceRule(getBearerToken(req), body)
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/admin/reseller-report") {
         sendJson(res, 200, {
           ok: true,
@@ -193,6 +221,38 @@ export function createApp(overrides = {}) {
           "text/csv; charset=utf-8",
           {
             "content-disposition": `attachment; filename="reseller-inventory-${Date.now()}.csv"`
+          }
+        );
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/reseller-settlement-report") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.resellerSettlementReport(getBearerToken(req), {
+            resellerId: url.searchParams.get("resellerId"),
+            productCode: url.searchParams.get("productCode"),
+            cardStatus: url.searchParams.get("cardStatus"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/reseller-settlement/export") {
+        const csv = services.exportResellerSettlementCsv(getBearerToken(req), {
+          resellerId: url.searchParams.get("resellerId"),
+          productCode: url.searchParams.get("productCode"),
+          cardStatus: url.searchParams.get("cardStatus"),
+          search: url.searchParams.get("search")
+        });
+        sendText(
+          res,
+          200,
+          csv,
+          "text/csv; charset=utf-8",
+          {
+            "content-disposition": `attachment; filename="reseller-settlement-${Date.now()}.csv"`
           }
         );
         return;
@@ -374,6 +434,22 @@ export function createApp(overrides = {}) {
           data: services.allocateResellerInventory(
             getBearerToken(req),
             resellerAllocationRoute.resellerId,
+            body
+          )
+        });
+        return;
+      }
+
+      const resellerPriceRuleStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/reseller-price-rules/:ruleId/status")
+        : null;
+      if (resellerPriceRuleStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updateResellerPriceRuleStatus(
+            getBearerToken(req),
+            resellerPriceRuleStatusRoute.ruleId,
             body
           )
         });

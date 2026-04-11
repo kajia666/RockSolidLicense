@@ -185,6 +185,11 @@ Effects:
 - `GET /api/admin/reseller-inventory`
 - `GET /api/admin/reseller-inventory/export`
 - `GET /api/admin/reseller-report`
+- `GET /api/admin/reseller-price-rules`
+- `POST /api/admin/reseller-price-rules`
+- `POST /api/admin/reseller-price-rules/:ruleId/status`
+- `GET /api/admin/reseller-settlement-report`
+- `GET /api/admin/reseller-settlement/export`
 - `POST /api/admin/resellers/:resellerId/allocate-cards`
 
 Effects:
@@ -195,6 +200,8 @@ Effects:
 - recharge responses can now include reseller metadata for settlement or audit use
 - filtered reseller inventory can now be exported as CSV
 - reseller reporting now summarizes channel activity by reseller and by product
+- active price rules can stamp pricing into newly allocated reseller inventory
+- settlement reports and settlement CSV export can now be used for payout and reconciliation
 
 ### Notices
 

@@ -1638,3 +1638,173 @@ test("reseller inventory can be allocated, tracked, and blocked from new allocat
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("reseller price rules can feed settlement reporting and csv export", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "FIN_APP",
+        name: "Finance App",
+        description: "Reseller settlement coverage"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "FIN_APP",
+        name: "Finance Policy",
+        durationDays: 30,
+        maxDevices: 1,
+        heartbeatIntervalSeconds: 30,
+        heartbeatTimeoutSeconds: 90,
+        tokenTtlSeconds: 180
+      },
+      adminSession.token
+    );
+
+    const reseller = await postJson(
+      baseUrl,
+      "/api/admin/resellers",
+      {
+        code: "AGENT_FIN",
+        name: "Finance Partner",
+        contactName: "Li Si",
+        contactEmail: "finance-agent@example.com"
+      },
+      adminSession.token
+    );
+
+    const priceRule = await postJson(
+      baseUrl,
+      "/api/admin/reseller-price-rules",
+      {
+        resellerId: reseller.id,
+        productCode: "FIN_APP",
+        policyId: policy.id,
+        currency: "CNY",
+        unitPrice: 99,
+        unitCost: 40,
+        notes: "default desktop settlement"
+      },
+      adminSession.token
+    );
+    assert.equal(priceRule.currency, "CNY");
+    assert.equal(priceRule.unitPriceCents, 9900);
+    assert.equal(priceRule.unitCostCents, 4000);
+    assert.equal(priceRule.unitCommissionCents, 5900);
+
+    const rules = await getJson(
+      baseUrl,
+      `/api/admin/reseller-price-rules?resellerId=${encodeURIComponent(reseller.id)}&productCode=FIN_APP&status=active`,
+      adminSession.token
+    );
+    assert.equal(rules.total, 1);
+    assert.equal(rules.items[0].id, priceRule.id);
+
+    const allocation = await postJson(
+      baseUrl,
+      `/api/admin/resellers/${reseller.id}/allocate-cards`,
+      {
+        productCode: "FIN_APP",
+        policyId: policy.id,
+        count: 2,
+        prefix: "FINGRP"
+      },
+      adminSession.token
+    );
+    assert.equal(allocation.count, 2);
+    assert.equal(allocation.pricing.ruleId, priceRule.id);
+    assert.equal(allocation.pricing.grossAllocatedCents, 19800);
+    assert.equal(allocation.pricing.commissionAllocatedCents, 11800);
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "FIN_APP",
+      username: "iris",
+      password: "StrongPass123"
+    });
+
+    const recharge = await signedClientPost(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FIN_APP",
+        username: "iris",
+        password: "StrongPass123",
+        cardKey: allocation.keys[0]
+      }
+    );
+    assert.equal(recharge.reseller.code, "AGENT_FIN");
+
+    const settlement = await getJson(
+      baseUrl,
+      `/api/admin/reseller-settlement-report?resellerId=${encodeURIComponent(reseller.id)}&productCode=FIN_APP`,
+      adminSession.token
+    );
+    assert.equal(settlement.totals.totalKeys, 2);
+    assert.equal(settlement.totals.pricedKeys, 2);
+    assert.equal(settlement.totals.unpricedKeys, 0);
+    assert.equal(settlement.totals.redeemedKeys, 1);
+    assert.equal(settlement.totals.pricedRedeemedKeys, 1);
+    assert.equal(settlement.totals.grossAllocatedCents, 19800);
+    assert.equal(settlement.totals.costAllocatedCents, 8000);
+    assert.equal(settlement.totals.commissionAllocatedCents, 11800);
+    assert.equal(settlement.totals.grossRedeemedCents, 9900);
+    assert.equal(settlement.totals.costRedeemedCents, 4000);
+    assert.equal(settlement.totals.commissionRedeemedCents, 5900);
+    assert.equal(settlement.byCurrency[0].currency, "CNY");
+    assert.equal(settlement.byCurrency[0].grossRedeemedCents, 9900);
+    assert.equal(settlement.byReseller[0].resellerCode, "AGENT_FIN");
+    assert.equal(settlement.byReseller[0].commissionRedeemedCents, 5900);
+    assert.equal(settlement.byProduct[0].productCode, "FIN_APP");
+
+    const exported = await getText(
+      baseUrl,
+      `/api/admin/reseller-settlement/export?resellerId=${encodeURIComponent(reseller.id)}&productCode=FIN_APP`,
+      adminSession.token
+    );
+    assert.match(exported.contentType, /^text\/csv/);
+    assert.match(exported.body, /AGENT_FIN/);
+    assert.match(exported.body, /FIN_APP/);
+    assert.match(exported.body, /99\.00/);
+    assert.match(exported.body, /59\.00/);
+    assert.match(exported.body, /iris/);
+
+    const archivedRule = await postJson(
+      baseUrl,
+      `/api/admin/reseller-price-rules/${priceRule.id}/status`,
+      { status: "archived" },
+      adminSession.token
+    );
+    assert.equal(archivedRule.status, "archived");
+
+    const archivedRules = await getJson(
+      baseUrl,
+      `/api/admin/reseller-price-rules?resellerId=${encodeURIComponent(reseller.id)}&status=archived`,
+      adminSession.token
+    );
+    assert.equal(archivedRules.total, 1);
+    assert.equal(archivedRules.items[0].id, priceRule.id);
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=60", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("reseller-price-rule.create"));
+    assert.ok(eventTypes.includes("reseller-price-rule.status"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

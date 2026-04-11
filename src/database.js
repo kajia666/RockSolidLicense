@@ -218,6 +218,46 @@ CREATE TABLE IF NOT EXISTS reseller_inventory (
   FOREIGN KEY (license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS reseller_price_rules (
+  id TEXT PRIMARY KEY,
+  reseller_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  policy_id TEXT,
+  status TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  unit_price_cents INTEGER NOT NULL,
+  unit_cost_cents INTEGER NOT NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS reseller_settlement_snapshots (
+  id TEXT PRIMARY KEY,
+  reseller_inventory_id TEXT NOT NULL UNIQUE,
+  reseller_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  policy_id TEXT NOT NULL,
+  license_key_id TEXT NOT NULL UNIQUE,
+  price_rule_id TEXT NOT NULL,
+  allocation_batch_code TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  unit_price_cents INTEGER NOT NULL,
+  unit_cost_cents INTEGER NOT NULL,
+  commission_amount_cents INTEGER NOT NULL,
+  priced_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (reseller_inventory_id) REFERENCES reseller_inventory(id) ON DELETE CASCADE,
+  FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE,
+  FOREIGN KEY (license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE,
+  FOREIGN KEY (price_rule_id) REFERENCES reseller_price_rules(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
@@ -270,6 +310,10 @@ CREATE INDEX IF NOT EXISTS idx_network_rules_lookup
   ON network_rules(status, action_scope, target_type, product_id);
 CREATE INDEX IF NOT EXISTS idx_reseller_inventory_lookup
   ON reseller_inventory(reseller_id, product_id, policy_id, status, allocated_at);
+CREATE INDEX IF NOT EXISTS idx_reseller_price_rules_lookup
+  ON reseller_price_rules(reseller_id, product_id, policy_id, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_reseller_settlement_lookup
+  ON reseller_settlement_snapshots(reseller_id, product_id, policy_id, currency, priced_at);
 `;
 
 export function createDatabase(config) {

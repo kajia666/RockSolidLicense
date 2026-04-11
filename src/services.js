@@ -434,6 +434,334 @@ function toCsvCell(value) {
   return `"${text.replace(/"/g, "\"\"")}"`;
 }
 
+function parseMoneyToCents(value, fieldName) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new AppError(400, "INVALID_MONEY_AMOUNT", `${fieldName} must be a non-negative number.`);
+  }
+  return Math.round(amount * 100);
+}
+
+function centsToAmount(cents) {
+  return Number((Number(cents ?? 0) / 100).toFixed(2));
+}
+
+function normalizeCurrency(value) {
+  const currency = String(value ?? "CNY").trim().toUpperCase();
+  if (!/^[A-Z]{3,8}$/.test(currency)) {
+    throw new AppError(400, "INVALID_CURRENCY", "Currency must be 3-8 uppercase letters.");
+  }
+  return currency;
+}
+
+function formatResellerPriceRuleRow(row) {
+  const unitPriceCents = Number(row.unit_price_cents ?? 0);
+  const unitCostCents = Number(row.unit_cost_cents ?? 0);
+  const unitCommissionCents = unitPriceCents - unitCostCents;
+
+  return {
+    id: row.id,
+    resellerId: row.reseller_id,
+    resellerCode: row.reseller_code,
+    resellerName: row.reseller_name,
+    productCode: row.product_code,
+    productName: row.product_name,
+    policyId: row.policy_id ?? null,
+    policyName: row.policy_name ?? null,
+    status: row.status,
+    currency: row.currency,
+    unitPriceCents,
+    unitPrice: centsToAmount(unitPriceCents),
+    unitCostCents,
+    unitCost: centsToAmount(unitCostCents),
+    unitCommissionCents,
+    unitCommission: centsToAmount(unitCommissionCents),
+    notes: row.notes ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function normalizeResellerPriceRuleFilters(filters = {}) {
+  return {
+    resellerId: filters.resellerId ? String(filters.resellerId).trim() : null,
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+}
+
+function resolveResellerPriceRule(db, resellerId, productId, policyId) {
+  return one(
+    db,
+    `
+      SELECT rpr.*, rs.code AS reseller_code, rs.name AS reseller_name,
+             pr.code AS product_code, pr.name AS product_name,
+             pol.name AS policy_name
+      FROM reseller_price_rules rpr
+      JOIN resellers rs ON rs.id = rpr.reseller_id
+      JOIN products pr ON pr.id = rpr.product_id
+      LEFT JOIN policies pol ON pol.id = rpr.policy_id
+      WHERE rpr.reseller_id = ?
+        AND rpr.product_id = ?
+        AND rpr.status = 'active'
+        AND (rpr.policy_id = ? OR rpr.policy_id IS NULL)
+      ORDER BY CASE WHEN rpr.policy_id = ? THEN 0 ELSE 1 END, rpr.updated_at DESC
+      LIMIT 1
+    `,
+    resellerId,
+    productId,
+    policyId,
+    policyId
+  );
+}
+
+function queryResellerPriceRuleRows(db, filters = {}) {
+  const normalizedFilters = normalizeResellerPriceRuleFilters(filters);
+  const conditions = [];
+  const params = [];
+
+  if (normalizedFilters.resellerId) {
+    conditions.push("rpr.reseller_id = ?");
+    params.push(normalizedFilters.resellerId);
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.status) {
+    if (!["active", "archived"].includes(normalizedFilters.status)) {
+      throw new AppError(400, "INVALID_PRICE_RULE_STATUS", "Price rule status must be active or archived.");
+    }
+    conditions.push("rpr.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(rs.code LIKE ? ESCAPE '\\' OR pr.code LIKE ? ESCAPE '\\' OR COALESCE(pol.name, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT rpr.*, rs.code AS reseller_code, rs.name AS reseller_name,
+             pr.code AS product_code, pr.name AS product_name,
+             pol.name AS policy_name
+      FROM reseller_price_rules rpr
+      JOIN resellers rs ON rs.id = rpr.reseller_id
+      JOIN products pr ON pr.id = rpr.product_id
+      LEFT JOIN policies pol ON pol.id = rpr.policy_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY rpr.updated_at DESC, rpr.created_at DESC
+      LIMIT 200
+    `,
+    ...params
+  ).map(formatResellerPriceRuleRow);
+
+  return {
+    items,
+    filters: normalizedFilters
+  };
+}
+
+function queryResellerSettlementRows(db, filters = {}, options = {}) {
+  const normalizedFilters = normalizeResellerInventoryFilters(filters);
+  const conditions = ["ri.status = 'active'"];
+  const params = [];
+
+  if (normalizedFilters.resellerId) {
+    conditions.push("r.id = ?");
+    params.push(normalizedFilters.resellerId);
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.cardStatus) {
+    if (!["fresh", "redeemed"].includes(normalizedFilters.cardStatus)) {
+      throw new AppError(400, "INVALID_CARD_STATUS", "Card status must be fresh or redeemed.");
+    }
+    conditions.push("lk.status = ?");
+    params.push(normalizedFilters.cardStatus);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(r.code LIKE ? ESCAPE '\\' OR lk.card_key LIKE ? ESCAPE '\\' OR COALESCE(a.username, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const limit = options.limit === undefined || options.limit === null
+    ? ""
+    : `LIMIT ${Math.max(1, Number(options.limit))}`;
+
+  const items = many(
+    db,
+    `
+      SELECT ri.id AS reseller_inventory_id, ri.allocation_batch_code, ri.allocated_at, ri.notes,
+             r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name, r.status AS reseller_status,
+             pr.code AS product_code, pr.name AS product_name,
+             pol.id AS policy_id, pol.name AS policy_name,
+             lk.id AS license_key_id, lk.card_key, lk.status AS card_status, lk.issued_at, lk.redeemed_at,
+             a.username AS redeemed_username,
+             rss.id AS settlement_snapshot_id, rss.price_rule_id, rss.currency, rss.unit_price_cents,
+             rss.unit_cost_cents, rss.commission_amount_cents, rss.priced_at
+      FROM reseller_inventory ri
+      JOIN resellers r ON r.id = ri.reseller_id
+      JOIN products pr ON pr.id = ri.product_id
+      JOIN policies pol ON pol.id = ri.policy_id
+      JOIN license_keys lk ON lk.id = ri.license_key_id
+      LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
+      LEFT JOIN reseller_settlement_snapshots rss ON rss.reseller_inventory_id = ri.id
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY ri.allocated_at DESC, lk.issued_at DESC
+      ${limit}
+    `,
+    ...params
+  ).map((row) => {
+    const unitPriceCents = row.unit_price_cents === null || row.unit_price_cents === undefined
+      ? null
+      : Number(row.unit_price_cents);
+    const unitCostCents = row.unit_cost_cents === null || row.unit_cost_cents === undefined
+      ? null
+      : Number(row.unit_cost_cents);
+    const commissionAmountCents = row.commission_amount_cents === null || row.commission_amount_cents === undefined
+      ? null
+      : Number(row.commission_amount_cents);
+
+    return {
+      resellerInventoryId: row.reseller_inventory_id,
+      allocationBatchCode: row.allocation_batch_code,
+      allocatedAt: row.allocated_at,
+      notes: row.notes ?? null,
+      resellerId: row.reseller_id,
+      resellerCode: row.reseller_code,
+      resellerName: row.reseller_name,
+      resellerStatus: row.reseller_status,
+      productCode: row.product_code,
+      productName: row.product_name,
+      policyId: row.policy_id,
+      policyName: row.policy_name,
+      licenseKeyId: row.license_key_id,
+      cardKey: row.card_key,
+      cardStatus: row.card_status,
+      issuedAt: row.issued_at,
+      redeemedAt: row.redeemed_at,
+      redeemedUsername: row.redeemed_username ?? null,
+      settlementSnapshotId: row.settlement_snapshot_id ?? null,
+      priceRuleId: row.price_rule_id ?? null,
+      currency: row.currency ?? null,
+      priced: Boolean(row.settlement_snapshot_id),
+      unitPriceCents,
+      unitPrice: unitPriceCents === null ? null : centsToAmount(unitPriceCents),
+      unitCostCents,
+      unitCost: unitCostCents === null ? null : centsToAmount(unitCostCents),
+      commissionAmountCents,
+      commissionAmount: commissionAmountCents === null ? null : centsToAmount(commissionAmountCents),
+      pricedAt: row.priced_at ?? null
+    };
+  });
+
+  return {
+    items,
+    filters: normalizedFilters
+  };
+}
+
+function createEmptySettlementSummary() {
+  return {
+    totalKeys: 0,
+    pricedKeys: 0,
+    unpricedKeys: 0,
+    redeemedKeys: 0,
+    pricedRedeemedKeys: 0,
+    grossAllocatedCents: 0,
+    costAllocatedCents: 0,
+    commissionAllocatedCents: 0,
+    grossRedeemedCents: 0,
+    costRedeemedCents: 0,
+    commissionRedeemedCents: 0
+  };
+}
+
+function summarizeResellerSettlement(items) {
+  const totals = createEmptySettlementSummary();
+  const currencyBuckets = new Map();
+
+  for (const item of items) {
+    totals.totalKeys += 1;
+    if (item.cardStatus === "redeemed") {
+      totals.redeemedKeys += 1;
+    }
+
+    if (!item.priced) {
+      totals.unpricedKeys += 1;
+      continue;
+    }
+
+    totals.pricedKeys += 1;
+    totals.grossAllocatedCents += item.unitPriceCents;
+    totals.costAllocatedCents += item.unitCostCents;
+    totals.commissionAllocatedCents += item.commissionAmountCents;
+
+    const bucket = currencyBuckets.get(item.currency) ?? {
+      currency: item.currency,
+      ...createEmptySettlementSummary()
+    };
+
+    bucket.totalKeys += 1;
+    bucket.pricedKeys += 1;
+    bucket.grossAllocatedCents += item.unitPriceCents;
+    bucket.costAllocatedCents += item.unitCostCents;
+    bucket.commissionAllocatedCents += item.commissionAmountCents;
+    if (item.cardStatus === "redeemed") {
+      bucket.redeemedKeys += 1;
+      bucket.pricedRedeemedKeys += 1;
+      bucket.grossRedeemedCents += item.unitPriceCents;
+      bucket.costRedeemedCents += item.unitCostCents;
+      bucket.commissionRedeemedCents += item.commissionAmountCents;
+
+      totals.pricedRedeemedKeys += 1;
+      totals.grossRedeemedCents += item.unitPriceCents;
+      totals.costRedeemedCents += item.unitCostCents;
+      totals.commissionRedeemedCents += item.commissionAmountCents;
+    }
+
+    currencyBuckets.set(item.currency, bucket);
+  }
+
+  return {
+    totals: {
+      ...totals,
+      grossAllocated: centsToAmount(totals.grossAllocatedCents),
+      costAllocated: centsToAmount(totals.costAllocatedCents),
+      commissionAllocated: centsToAmount(totals.commissionAllocatedCents),
+      grossRedeemed: centsToAmount(totals.grossRedeemedCents),
+      costRedeemed: centsToAmount(totals.costRedeemedCents),
+      commissionRedeemed: centsToAmount(totals.commissionRedeemedCents)
+    },
+    byCurrency: Array.from(currencyBuckets.values()).map((bucket) => ({
+      ...bucket,
+      grossAllocated: centsToAmount(bucket.grossAllocatedCents),
+      costAllocated: centsToAmount(bucket.costAllocatedCents),
+      commissionAllocated: centsToAmount(bucket.commissionAllocatedCents),
+      grossRedeemed: centsToAmount(bucket.grossRedeemedCents),
+      costRedeemed: centsToAmount(bucket.costRedeemedCents),
+      commissionRedeemed: centsToAmount(bucket.commissionRedeemedCents)
+    }))
+  };
+}
+
 function activeDeviceBlock(db, productId, fingerprint) {
   return one(
     db,
@@ -1304,6 +1632,190 @@ export function createServices(db, config) {
       };
     },
 
+    listResellerPriceRules(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items, filters: normalizedFilters } = queryResellerPriceRuleRows(db, filters);
+      return {
+        items,
+        total: items.length,
+        filters: normalizedFilters
+      };
+    },
+
+    createResellerPriceRule(token, body = {}) {
+      const admin = requireAdminSession(db, token);
+      requireField(body, "resellerId");
+      requireField(body, "productCode");
+      requireField(body, "unitPrice");
+
+      const reseller = one(db, "SELECT * FROM resellers WHERE id = ?", String(body.resellerId).trim());
+      if (!reseller) {
+        throw new AppError(404, "RESELLER_NOT_FOUND", "Reseller does not exist.");
+      }
+
+      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const policyId = body.policyId ? String(body.policyId).trim() : null;
+      const policy = policyId
+        ? one(db, "SELECT * FROM policies WHERE id = ? AND product_id = ?", policyId, product.id)
+        : null;
+      if (policyId && !policy) {
+        throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
+      }
+
+      const status = String(body.status ?? "active").trim().toLowerCase();
+      if (!["active", "archived"].includes(status)) {
+        throw new AppError(400, "INVALID_PRICE_RULE_STATUS", "Price rule status must be active or archived.");
+      }
+
+      const currency = normalizeCurrency(body.currency);
+      const unitPriceCents = parseMoneyToCents(body.unitPrice, "unitPrice");
+      const unitCostCents = parseMoneyToCents(body.unitCost ?? 0, "unitCost");
+      if (unitCostCents > unitPriceCents) {
+        throw new AppError(400, "INVALID_PRICE_RULE_COST", "unitCost cannot exceed unitPrice.");
+      }
+
+      const duplicateActive = one(
+        db,
+        `
+          SELECT id
+          FROM reseller_price_rules
+          WHERE reseller_id = ?
+            AND product_id = ?
+            AND ((policy_id = ?) OR (policy_id IS NULL AND ? IS NULL))
+            AND status = 'active'
+        `,
+        reseller.id,
+        product.id,
+        policyId,
+        policyId
+      );
+      if (status === "active" && duplicateActive) {
+        throw new AppError(409, "PRICE_RULE_EXISTS", "An active reseller price rule already exists for this scope.");
+      }
+
+      const timestamp = nowIso();
+      const id = generateId("rprice");
+      run(
+        db,
+        `
+          INSERT INTO reseller_price_rules
+          (id, reseller_id, product_id, policy_id, status, currency, unit_price_cents, unit_cost_cents, notes, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        id,
+        reseller.id,
+        product.id,
+        policy?.id ?? null,
+        status,
+        currency,
+        unitPriceCents,
+        unitCostCents,
+        String(body.notes ?? "").trim() || null,
+        timestamp,
+        timestamp
+      );
+
+      audit(db, "admin", admin.admin_id, "reseller-price-rule.create", "reseller_price_rule", id, {
+        resellerCode: reseller.code,
+        productCode: product.code,
+        policyId: policy?.id ?? null,
+        currency,
+        unitPriceCents,
+        unitCostCents,
+        status
+      });
+
+      return formatResellerPriceRuleRow(one(
+        db,
+        `
+          SELECT rpr.*, rs.code AS reseller_code, rs.name AS reseller_name,
+                 pr.code AS product_code, pr.name AS product_name,
+                 pol.name AS policy_name
+          FROM reseller_price_rules rpr
+          JOIN resellers rs ON rs.id = rpr.reseller_id
+          JOIN products pr ON pr.id = rpr.product_id
+          LEFT JOIN policies pol ON pol.id = rpr.policy_id
+          WHERE rpr.id = ?
+        `,
+        id
+      ));
+    },
+
+    updateResellerPriceRuleStatus(token, ruleId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const row = one(
+        db,
+        `
+          SELECT rpr.*, rs.code AS reseller_code, rs.name AS reseller_name,
+                 pr.code AS product_code, pr.name AS product_name,
+                 pol.name AS policy_name
+          FROM reseller_price_rules rpr
+          JOIN resellers rs ON rs.id = rpr.reseller_id
+          JOIN products pr ON pr.id = rpr.product_id
+          LEFT JOIN policies pol ON pol.id = rpr.policy_id
+          WHERE rpr.id = ?
+        `,
+        ruleId
+      );
+      if (!row) {
+        throw new AppError(404, "PRICE_RULE_NOT_FOUND", "Reseller price rule does not exist.");
+      }
+
+      const status = String(body.status ?? "").trim().toLowerCase();
+      if (!["active", "archived"].includes(status)) {
+        throw new AppError(400, "INVALID_PRICE_RULE_STATUS", "Price rule status must be active or archived.");
+      }
+
+      if (status === "active") {
+        const duplicateActive = one(
+          db,
+          `
+            SELECT id
+            FROM reseller_price_rules
+            WHERE reseller_id = ?
+              AND product_id = ?
+              AND ((policy_id = ?) OR (policy_id IS NULL AND ? IS NULL))
+              AND status = 'active'
+              AND id <> ?
+          `,
+          row.reseller_id,
+          row.product_id,
+          row.policy_id,
+          row.policy_id,
+          row.id
+        );
+        if (duplicateActive) {
+          throw new AppError(409, "PRICE_RULE_EXISTS", "Another active reseller price rule already exists for this scope.");
+        }
+      }
+
+      const timestamp = nowIso();
+      run(
+        db,
+        `
+          UPDATE reseller_price_rules
+          SET status = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        status,
+        timestamp,
+        row.id
+      );
+
+      audit(db, "admin", admin.admin_id, "reseller-price-rule.status", "reseller_price_rule", row.id, {
+        resellerCode: row.reseller_code,
+        productCode: row.product_code,
+        policyId: row.policy_id ?? null,
+        status
+      });
+
+      return formatResellerPriceRuleRow({
+        ...row,
+        status,
+        updated_at: timestamp
+      });
+    },
+
     allocateResellerInventory(token, resellerId, body) {
       const admin = requireAdminSession(db, token);
       requireField(body, "productCode");
@@ -1343,7 +1855,8 @@ export function createServices(db, config) {
       const allocationBatchCode = `ALLOC-${Date.now()}`;
       const allocatedAt = nowIso();
 
-      const keys = withTransaction(db, () => {
+      const allocationResult = withTransaction(db, () => {
+        const priceRule = resolveResellerPriceRule(db, reseller.id, product.id, policy.id);
         const issued = issueLicenseKeys(db, {
           productId: product.id,
           policyId: policy.id,
@@ -1355,6 +1868,7 @@ export function createServices(db, config) {
         });
 
         for (const entry of issued) {
+          const inventoryId = generateId("rstock");
           run(
             db,
             `
@@ -1362,7 +1876,7 @@ export function createServices(db, config) {
               (id, reseller_id, product_id, policy_id, license_key_id, allocation_batch_code, notes, allocated_at, status)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
             `,
-            generateId("rstock"),
+            inventoryId,
             reseller.id,
             product.id,
             policy.id,
@@ -1371,17 +1885,47 @@ export function createServices(db, config) {
             String(body.notes ?? "") || null,
             allocatedAt
           );
+
+          if (priceRule) {
+            run(
+              db,
+              `
+                INSERT INTO reseller_settlement_snapshots
+                (id, reseller_inventory_id, reseller_id, product_id, policy_id, license_key_id, price_rule_id,
+                 allocation_batch_code, currency, unit_price_cents, unit_cost_cents, commission_amount_cents,
+                 priced_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              generateId("rset"),
+              inventoryId,
+              reseller.id,
+              product.id,
+              policy.id,
+              entry.licenseKeyId,
+              priceRule.id,
+              allocationBatchCode,
+              priceRule.currency,
+              Number(priceRule.unit_price_cents),
+              Number(priceRule.unit_cost_cents),
+              Number(priceRule.unit_price_cents) - Number(priceRule.unit_cost_cents),
+              allocatedAt,
+              allocatedAt
+            );
+          }
         }
 
-        return issued;
+        return { issued, priceRule };
       });
+      const keys = allocationResult.issued;
+      const priceRule = allocationResult.priceRule;
 
       audit(db, "admin", admin.admin_id, "reseller.inventory.allocate", "reseller", reseller.id, {
         resellerCode: reseller.code,
         productCode: product.code,
         policyId: policy.id,
         count,
-        allocationBatchCode
+        allocationBatchCode,
+        priceRuleId: priceRule?.id ?? null
       });
 
       return {
@@ -1394,6 +1938,24 @@ export function createServices(db, config) {
         policyId: policy.id,
         allocationBatchCode,
         count,
+        pricing: priceRule
+          ? {
+              ruleId: priceRule.id,
+              currency: priceRule.currency,
+              unitPriceCents: Number(priceRule.unit_price_cents),
+              unitPrice: centsToAmount(priceRule.unit_price_cents),
+              unitCostCents: Number(priceRule.unit_cost_cents),
+              unitCost: centsToAmount(priceRule.unit_cost_cents),
+              unitCommissionCents: Number(priceRule.unit_price_cents) - Number(priceRule.unit_cost_cents),
+              unitCommission: centsToAmount(Number(priceRule.unit_price_cents) - Number(priceRule.unit_cost_cents)),
+              grossAllocatedCents: Number(priceRule.unit_price_cents) * count,
+              grossAllocated: centsToAmount(Number(priceRule.unit_price_cents) * count),
+              costAllocatedCents: Number(priceRule.unit_cost_cents) * count,
+              costAllocated: centsToAmount(Number(priceRule.unit_cost_cents) * count),
+              commissionAllocatedCents: (Number(priceRule.unit_price_cents) - Number(priceRule.unit_cost_cents)) * count,
+              commissionAllocated: centsToAmount((Number(priceRule.unit_price_cents) - Number(priceRule.unit_cost_cents)) * count)
+            }
+          : null,
         preview: keys.slice(0, 10).map((entry) => entry.cardKey),
         keys: keys.map((entry) => entry.cardKey)
       };
@@ -1528,6 +2090,150 @@ export function createServices(db, config) {
           item.issuedAt,
           item.redeemedAt ?? "",
           item.notes ?? ""
+        ].map(toCsvCell).join(",")))
+      ];
+
+      return lines.join("\r\n");
+    },
+
+    resellerSettlementReport(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items, filters: normalizedFilters } = queryResellerSettlementRows(db, filters);
+      const summary = summarizeResellerSettlement(items);
+      const resellerGroups = new Map();
+      const productGroups = new Map();
+
+      for (const item of items) {
+        const resellerKey = `${item.resellerId}:${item.currency ?? "UNPRICED"}`;
+        const resellerEntry = resellerGroups.get(resellerKey) ?? {
+          resellerId: item.resellerId,
+          resellerCode: item.resellerCode,
+          resellerName: item.resellerName,
+          resellerStatus: item.resellerStatus,
+          currency: item.currency ?? "UNPRICED",
+          ...createEmptySettlementSummary()
+        };
+        resellerEntry.totalKeys += 1;
+        if (item.cardStatus === "redeemed") {
+          resellerEntry.redeemedKeys += 1;
+        }
+        if (item.priced) {
+          resellerEntry.pricedKeys += 1;
+          resellerEntry.grossAllocatedCents += item.unitPriceCents;
+          resellerEntry.costAllocatedCents += item.unitCostCents;
+          resellerEntry.commissionAllocatedCents += item.commissionAmountCents;
+          if (item.cardStatus === "redeemed") {
+            resellerEntry.pricedRedeemedKeys += 1;
+            resellerEntry.grossRedeemedCents += item.unitPriceCents;
+            resellerEntry.costRedeemedCents += item.unitCostCents;
+            resellerEntry.commissionRedeemedCents += item.commissionAmountCents;
+          }
+        } else {
+          resellerEntry.unpricedKeys += 1;
+        }
+        resellerGroups.set(resellerKey, resellerEntry);
+
+        const productKey = `${item.productCode}:${item.currency ?? "UNPRICED"}`;
+        const productEntry = productGroups.get(productKey) ?? {
+          productCode: item.productCode,
+          productName: item.productName,
+          currency: item.currency ?? "UNPRICED",
+          ...createEmptySettlementSummary()
+        };
+        productEntry.totalKeys += 1;
+        if (item.cardStatus === "redeemed") {
+          productEntry.redeemedKeys += 1;
+        }
+        if (item.priced) {
+          productEntry.pricedKeys += 1;
+          productEntry.grossAllocatedCents += item.unitPriceCents;
+          productEntry.costAllocatedCents += item.unitCostCents;
+          productEntry.commissionAllocatedCents += item.commissionAmountCents;
+          if (item.cardStatus === "redeemed") {
+            productEntry.pricedRedeemedKeys += 1;
+            productEntry.grossRedeemedCents += item.unitPriceCents;
+            productEntry.costRedeemedCents += item.unitCostCents;
+            productEntry.commissionRedeemedCents += item.commissionAmountCents;
+          }
+        } else {
+          productEntry.unpricedKeys += 1;
+        }
+        productGroups.set(productKey, productEntry);
+      }
+
+      const finalizeGroup = (group) => ({
+        ...group,
+        grossAllocated: centsToAmount(group.grossAllocatedCents),
+        costAllocated: centsToAmount(group.costAllocatedCents),
+        commissionAllocated: centsToAmount(group.commissionAllocatedCents),
+        grossRedeemed: centsToAmount(group.grossRedeemedCents),
+        costRedeemed: centsToAmount(group.costRedeemedCents),
+        commissionRedeemed: centsToAmount(group.commissionRedeemedCents)
+      });
+
+      return {
+        totals: {
+          ...summary.totals,
+          resellerGroupCount: resellerGroups.size,
+          productGroupCount: productGroups.size
+        },
+        byCurrency: summary.byCurrency.sort((left, right) => left.currency.localeCompare(right.currency)),
+        byReseller: Array.from(resellerGroups.values())
+          .map(finalizeGroup)
+          .sort((left, right) => right.commissionRedeemedCents - left.commissionRedeemedCents),
+        byProduct: Array.from(productGroups.values())
+          .map(finalizeGroup)
+          .sort((left, right) => right.grossRedeemedCents - left.grossRedeemedCents),
+        filters: normalizedFilters
+      };
+    },
+
+    exportResellerSettlementCsv(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items } = queryResellerSettlementRows(db, filters);
+
+      const header = [
+        "resellerId",
+        "resellerCode",
+        "resellerName",
+        "productCode",
+        "productName",
+        "policyId",
+        "policyName",
+        "allocationBatchCode",
+        "cardKey",
+        "cardStatus",
+        "redeemedUsername",
+        "currency",
+        "unitPrice",
+        "unitCost",
+        "unitCommission",
+        "allocatedAt",
+        "redeemedAt",
+        "pricedAt"
+      ];
+
+      const lines = [
+        header.map(toCsvCell).join(","),
+        ...items.map((item) => ([
+          item.resellerId,
+          item.resellerCode,
+          item.resellerName,
+          item.productCode,
+          item.productName,
+          item.policyId,
+          item.policyName,
+          item.allocationBatchCode,
+          item.cardKey,
+          item.cardStatus,
+          item.redeemedUsername ?? "",
+          item.currency ?? "",
+          item.unitPrice === null ? "" : item.unitPrice.toFixed(2),
+          item.unitCost === null ? "" : item.unitCost.toFixed(2),
+          item.commissionAmount === null ? "" : item.commissionAmount.toFixed(2),
+          item.allocatedAt,
+          item.redeemedAt ?? "",
+          item.pricedAt ?? ""
         ].map(toCsvCell).join(",")))
       ];
 

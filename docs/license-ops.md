@@ -66,6 +66,7 @@ HTTP endpoints:
 - `GET /api/admin/entitlements`
 - `POST /api/admin/entitlements/:entitlementId/status`
 - `POST /api/admin/entitlements/:entitlementId/extend`
+- `POST /api/admin/entitlements/:entitlementId/points`
 
 Supported filters:
 
@@ -110,6 +111,7 @@ Effects:
 - frozen entitlements reject new login requests with `LICENSE_FROZEN`
 - extending an entitlement pushes `endsAt` forward without changing the source card or policy
 - resuming an entitlement switches it back to `active`, after which login works again if the source card is still available
+- point entitlements can be manually adjusted by add, subtract, or set operations
 
 ## Client-side behavior changes
 

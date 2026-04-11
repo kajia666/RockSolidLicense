@@ -1624,6 +1624,165 @@ test("point-based policies can consume login credits in account and card-direct 
   }
 });
 
+test("admin can add, subtract, and set remaining points for point entitlements", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "POINT_OPS",
+        name: "Point Ops",
+        description: "Admin point adjustments"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "POINT_OPS",
+        name: "Point Ops Policy",
+        grantType: "points",
+        grantPoints: 2,
+        durationDays: 0,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "POINT_OPS",
+        policyId: policy.id,
+        count: 1,
+        prefix: "PTOPS"
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_OPS",
+      username: "ops_points_user",
+      password: "Points123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_OPS",
+      username: "ops_points_user",
+      password: "Points123!",
+      cardKey: batch.keys[0]
+    });
+
+    const firstLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_OPS",
+        username: "ops_points_user",
+        password: "Points123!",
+        deviceFingerprint: "point-ops-device-001",
+        deviceName: "Point Ops Device"
+      }
+    );
+    assert.equal(firstLogin.quota.remainingPoints, 1);
+
+    await signedClientPost(baseUrl, "/api/client/logout", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_OPS",
+      sessionToken: firstLogin.sessionToken
+    });
+
+    const entitlements = await getJson(
+      baseUrl,
+      "/api/admin/entitlements?productCode=POINT_OPS&username=ops_points_user&grantType=points",
+      adminSession.token
+    );
+    assert.equal(entitlements.total, 1);
+    assert.equal(entitlements.items[0].remainingPoints, 1);
+    const entitlementId = entitlements.items[0].id;
+
+    const addResult = await postJson(
+      baseUrl,
+      `/api/admin/entitlements/${entitlementId}/points`,
+      {
+        mode: "add",
+        points: 3
+      },
+      adminSession.token
+    );
+    assert.equal(addResult.previousRemainingPoints, 1);
+    assert.equal(addResult.remainingPoints, 4);
+    assert.equal(addResult.totalPoints, 5);
+
+    const subtractResult = await postJson(
+      baseUrl,
+      `/api/admin/entitlements/${entitlementId}/points`,
+      {
+        mode: "subtract",
+        points: 2
+      },
+      adminSession.token
+    );
+    assert.equal(subtractResult.previousRemainingPoints, 4);
+    assert.equal(subtractResult.remainingPoints, 2);
+    assert.equal(subtractResult.totalPoints, 3);
+
+    const setResult = await postJson(
+      baseUrl,
+      `/api/admin/entitlements/${entitlementId}/points`,
+      {
+        mode: "set",
+        points: 0
+      },
+      adminSession.token
+    );
+    assert.equal(setResult.remainingPoints, 0);
+    assert.equal(setResult.totalPoints, 1);
+
+    const blockedLogin = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_OPS",
+        username: "ops_points_user",
+        password: "Points123!",
+        deviceFingerprint: "point-ops-device-001",
+        deviceName: "Point Ops Device"
+      }
+    );
+    assert.equal(blockedLogin.status, 403);
+    assert.equal(blockedLogin.error.code, "LICENSE_POINTS_EXHAUSTED");
+
+    const finalEntitlements = await getJson(
+      baseUrl,
+      "/api/admin/entitlements?productCode=POINT_OPS&username=ops_points_user&grantType=points",
+      adminSession.token
+    );
+    assert.equal(finalEntitlements.items[0].remainingPoints, 0);
+    assert.equal(finalEntitlements.items[0].consumedPoints, 1);
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=100", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("entitlement.points.adjust"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("admin can block and unblock a device fingerprint", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

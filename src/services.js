@@ -1310,6 +1310,7 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
     productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
     username: filters.username ? String(filters.username).trim() : null,
     status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    grantType: filters.grantType ? normalizeGrantType(filters.grantType) : null,
     search: filters.search ? String(filters.search).trim() : null
   };
   const conditions = [];
@@ -1323,6 +1324,11 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
   if (normalizedFilters.username) {
     conditions.push("a.username = ?");
     params.push(normalizedFilters.username);
+  }
+
+  if (normalizedFilters.grantType) {
+    conditions.push("COALESCE(pgc.grant_type, 'duration') = ?");
+    params.push(normalizedFilters.grantType);
   }
 
   if (normalizedFilters.search) {
@@ -1409,6 +1415,44 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
     items,
     filters: normalizedFilters
   };
+}
+
+function loadPointEntitlementForAdmin(db, entitlementId) {
+  return one(
+    db,
+    `
+      SELECT e.id, e.status, e.ends_at, e.account_id,
+             pr.code AS product_code, pr.name AS product_name,
+             a.username,
+             pol.name AS policy_name,
+             COALESCE(pgc.grant_type, 'duration') AS grant_type,
+             COALESCE(pgc.grant_points, 0) AS grant_points,
+             em.total_points, em.remaining_points, em.consumed_points,
+             COALESCE(sess.active_session_count, 0) AS active_session_count
+      FROM entitlements e
+      JOIN products pr ON pr.id = e.product_id
+      JOIN customer_accounts a ON a.id = e.account_id
+      JOIN policies pol ON pol.id = e.policy_id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = e.policy_id
+      LEFT JOIN entitlement_metering em ON em.entitlement_id = e.id
+      LEFT JOIN (
+        SELECT entitlement_id, COUNT(*) AS active_session_count
+        FROM sessions
+        WHERE status = 'active'
+        GROUP BY entitlement_id
+      ) sess ON sess.entitlement_id = e.id
+      WHERE e.id = ?
+    `,
+    entitlementId
+  );
+}
+
+function normalizePointAdjustMode(value = "add") {
+  const mode = String(value ?? "add").trim().toLowerCase();
+  if (!["add", "subtract", "set"].includes(mode)) {
+    throw new AppError(400, "INVALID_POINT_ADJUST_MODE", "mode must be add, subtract, or set.");
+  }
+  return mode;
 }
 
 function findClientCardByKey(db, productId, cardKey) {
@@ -4148,6 +4192,83 @@ export function createServices(db, config) {
         previousEndsAt: entitlement.ends_at,
         endsAt,
         addedDays: days,
+        updatedAt: timestamp
+      };
+    },
+
+    adjustEntitlementPoints(token, entitlementId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const entitlement = loadPointEntitlementForAdmin(db, entitlementId);
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+
+      if (normalizeGrantType(entitlement.grant_type ?? "duration") !== "points") {
+        throw new AppError(409, "ENTITLEMENT_NOT_POINTS", "This entitlement is not a point-based authorization.");
+      }
+
+      const mode = normalizePointAdjustMode(body.mode ?? "add");
+      const points = normalizeNonNegativeInteger(body.points, "points", 0, 1000000);
+      if (mode !== "set" && points < 1) {
+        throw new AppError(400, "INVALID_POINT_ADJUSTMENT", "points must be at least 1 for add or subtract mode.");
+      }
+
+      const previous = {
+        totalPoints: Number(entitlement.total_points ?? entitlement.grant_points ?? 0),
+        remainingPoints: Number(entitlement.remaining_points ?? entitlement.grant_points ?? 0),
+        consumedPoints: Number(entitlement.consumed_points ?? 0)
+      };
+
+      let nextRemainingPoints = previous.remainingPoints;
+      if (mode === "add") {
+        nextRemainingPoints = previous.remainingPoints + points;
+      } else if (mode === "subtract") {
+        nextRemainingPoints = Math.max(0, previous.remainingPoints - points);
+      } else {
+        nextRemainingPoints = points;
+      }
+
+      const nextTotalPoints = previous.consumedPoints + nextRemainingPoints;
+      const timestamp = nowIso();
+      upsertEntitlementMetering(
+        db,
+        entitlement.id,
+        "points",
+        nextTotalPoints,
+        nextRemainingPoints,
+        previous.consumedPoints,
+        timestamp
+      );
+
+      audit(db, "admin", admin.admin_id, "entitlement.points.adjust", "entitlement", entitlement.id, {
+        productCode: entitlement.product_code,
+        username: entitlement.username,
+        mode,
+        points,
+        previousTotalPoints: previous.totalPoints,
+        previousRemainingPoints: previous.remainingPoints,
+        previousConsumedPoints: previous.consumedPoints,
+        totalPoints: nextTotalPoints,
+        remainingPoints: nextRemainingPoints,
+        consumedPoints: previous.consumedPoints
+      });
+
+      return {
+        id: entitlement.id,
+        productCode: entitlement.product_code,
+        productName: entitlement.product_name,
+        username: entitlement.username,
+        policyName: entitlement.policy_name,
+        grantType: "points",
+        mode,
+        points,
+        totalPoints: nextTotalPoints,
+        remainingPoints: nextRemainingPoints,
+        consumedPoints: previous.consumedPoints,
+        previousTotalPoints: previous.totalPoints,
+        previousRemainingPoints: previous.remainingPoints,
+        previousConsumedPoints: previous.consumedPoints,
+        activeSessionCount: Number(entitlement.active_session_count ?? 0),
         updatedAt: timestamp
       };
     },

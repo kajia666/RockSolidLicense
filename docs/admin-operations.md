@@ -133,6 +133,21 @@ Notes:
 - `grantType=points` creates a metered authorization that consumes 1 point per successful new login session
 - point-based entitlements are visible in `GET /api/admin/entitlements`
 
+Point entitlement adjustment request example:
+
+```json
+{
+  "mode": "add",
+  "points": 5
+}
+```
+
+Notes:
+
+- use `POST /api/admin/entitlements/:entitlementId/points`
+- supported modes are `add`, `subtract`, and `set`
+- this is the fastest way for an operator to gift, recover, or deduct login credits
+
 Policy self-unbind config request body:
 
 ```json

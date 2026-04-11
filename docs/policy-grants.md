@@ -57,6 +57,48 @@ This model works in both:
 - account mode
 - direct card-login mode
 
+## Operator adjustments
+
+Point entitlements can now be adjusted directly from the admin API:
+
+- `POST /api/admin/entitlements/:entitlementId/points`
+
+Supported modes:
+
+- `add`
+- `subtract`
+- `set`
+
+Examples:
+
+```json
+{
+  "mode": "add",
+  "points": 5
+}
+```
+
+```json
+{
+  "mode": "subtract",
+  "points": 2
+}
+```
+
+```json
+{
+  "mode": "set",
+  "points": 0
+}
+```
+
+Behavior:
+
+- `add` increases remaining credits
+- `subtract` removes remaining credits down to zero
+- `set` directly overwrites remaining credits
+- when remaining credits reach `0`, future login is blocked with `LICENSE_POINTS_EXHAUSTED`
+
 ## Operator visibility
 
 Admin entitlement queries now include:

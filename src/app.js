@@ -412,6 +412,7 @@ export function createApp(overrides = {}) {
             productCode: url.searchParams.get("productCode"),
             username: url.searchParams.get("username"),
             status: url.searchParams.get("status"),
+            grantType: url.searchParams.get("grantType"),
             search: url.searchParams.get("search")
           })
         });
@@ -593,6 +594,22 @@ export function createApp(overrides = {}) {
           data: services.extendEntitlement(
             getBearerToken(req),
             entitlementExtendRoute.entitlementId,
+            body
+          )
+        });
+        return;
+      }
+
+      const entitlementPointsRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/entitlements/:entitlementId/points")
+        : null;
+      if (entitlementPointsRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.adjustEntitlementPoints(
+            getBearerToken(req),
+            entitlementPointsRoute.entitlementId,
             body
           )
         });

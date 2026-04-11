@@ -1,0 +1,752 @@
+#ifdef _WIN32
+
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#include <winhttp.h>
+
+#include "../include/rocksolid_transport_win.hpp"
+
+#include <memory>
+#include <sstream>
+#include <type_traits>
+#include <vector>
+
+#pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "ws2_32.lib")
+
+namespace rocksolid {
+namespace {
+
+class HandleCloser {
+ public:
+  void operator()(HINTERNET handle) const {
+    if (handle != nullptr) {
+      WinHttpCloseHandle(handle);
+    }
+  }
+};
+
+using HttpHandle = std::unique_ptr<std::remove_pointer<HINTERNET>::type, HandleCloser>;
+
+std::wstring utf8_to_wide(const std::string& input) {
+  if (input.empty()) {
+    return std::wstring();
+  }
+
+  const int required = MultiByteToWideChar(
+    CP_UTF8,
+    0,
+    input.data(),
+    static_cast<int>(input.size()),
+    nullptr,
+    0
+  );
+
+  if (required <= 0) {
+    throw std::runtime_error("utf8_to_wide failed");
+  }
+
+  std::wstring output(static_cast<size_t>(required), L'\0');
+  const int converted = MultiByteToWideChar(
+    CP_UTF8,
+    0,
+    input.data(),
+    static_cast<int>(input.size()),
+    output.data(),
+    required
+  );
+
+  if (converted != required) {
+    throw std::runtime_error("utf8_to_wide conversion mismatch");
+  }
+
+  return output;
+}
+
+std::string format_http_headers(const SignedHeaders& headers) {
+  std::ostringstream stream;
+  stream
+    << "Content-Type: application/json\r\n"
+    << "x-rs-app-id: " << headers.app_id << "\r\n"
+    << "x-rs-timestamp: " << headers.timestamp << "\r\n"
+    << "x-rs-nonce: " << headers.nonce << "\r\n"
+    << "x-rs-signature: " << headers.signature << "\r\n";
+  return stream.str();
+}
+
+void send_all(SOCKET socket, const std::string& data) {
+  size_t total_sent = 0;
+  while (total_sent < data.size()) {
+    const int sent = send(
+      socket,
+      data.data() + total_sent,
+      static_cast<int>(data.size() - total_sent),
+      0
+    );
+
+    if (sent == SOCKET_ERROR) {
+      throw std::runtime_error("TCP send failed");
+    }
+    total_sent += static_cast<size_t>(sent);
+  }
+}
+
+class WsaSession {
+ public:
+  WsaSession() {
+    WSADATA data{};
+    const int status = WSAStartup(MAKEWORD(2, 2), &data);
+    if (status != 0) {
+      throw std::runtime_error("WSAStartup failed");
+    }
+  }
+
+  ~WsaSession() {
+    WSACleanup();
+  }
+
+  WsaSession(const WsaSession&) = delete;
+  WsaSession& operator=(const WsaSession&) = delete;
+};
+
+struct AddrInfoDeleter {
+  void operator()(addrinfo* value) const {
+    if (value != nullptr) {
+      freeaddrinfo(value);
+    }
+  }
+};
+
+std::string read_line(SOCKET socket) {
+  std::string buffer;
+  char chunk[512] = {0};
+
+  while (true) {
+    const int received = recv(socket, chunk, sizeof(chunk), 0);
+    if (received == SOCKET_ERROR) {
+      throw std::runtime_error("TCP recv failed");
+    }
+    if (received == 0) {
+      break;
+    }
+
+    buffer.append(chunk, chunk + received);
+    const auto newline = buffer.find('\n');
+    if (newline != std::string::npos) {
+      buffer.resize(newline);
+      break;
+    }
+  }
+
+  return buffer;
+}
+
+std::string build_json_pair(const char* key, const std::string& value) {
+  std::ostringstream stream;
+  stream
+    << "\""
+    << key
+    << "\":\""
+    << escape_json(value)
+    << "\"";
+  return stream.str();
+}
+
+TransportResult perform_http_request(
+  const HttpEndpoint& endpoint,
+  const wchar_t* method,
+  const std::string& path,
+  const std::string* header_block_utf8,
+  const std::string* body
+) {
+  HttpHandle session(
+    WinHttpOpen(
+      endpoint.user_agent.c_str(),
+      WINHTTP_ACCESS_TYPE_NO_PROXY,
+      WINHTTP_NO_PROXY_NAME,
+      WINHTTP_NO_PROXY_BYPASS,
+      0
+    )
+  );
+  if (!session) {
+    throw std::runtime_error("WinHttpOpen failed");
+  }
+
+  WinHttpSetTimeouts(
+    session.get(),
+    static_cast<int>(endpoint.timeout_ms),
+    static_cast<int>(endpoint.timeout_ms),
+    static_cast<int>(endpoint.timeout_ms),
+    static_cast<int>(endpoint.timeout_ms)
+  );
+
+  HttpHandle connect(
+    WinHttpConnect(session.get(), endpoint.host.c_str(), endpoint.port, 0)
+  );
+  if (!connect) {
+    throw std::runtime_error("WinHttpConnect failed");
+  }
+
+  const std::wstring wide_path = utf8_to_wide(path);
+  const DWORD flags = endpoint.secure ? WINHTTP_FLAG_SECURE : 0;
+  HttpHandle handle(
+    WinHttpOpenRequest(
+      connect.get(),
+      method,
+      wide_path.c_str(),
+      nullptr,
+      WINHTTP_NO_REFERER,
+      WINHTTP_DEFAULT_ACCEPT_TYPES,
+      flags
+    )
+  );
+  if (!handle) {
+    throw std::runtime_error("WinHttpOpenRequest failed");
+  }
+
+  const std::wstring headers = header_block_utf8 ? utf8_to_wide(*header_block_utf8) : std::wstring();
+  LPVOID request_body = WINHTTP_NO_REQUEST_DATA;
+  DWORD request_body_length = 0;
+  if (body && !body->empty()) {
+    request_body = const_cast<char*>(body->data());
+    request_body_length = static_cast<DWORD>(body->size());
+  }
+
+  const BOOL sent = WinHttpSendRequest(
+    handle.get(),
+    header_block_utf8 ? headers.c_str() : WINHTTP_NO_ADDITIONAL_HEADERS,
+    header_block_utf8 ? static_cast<DWORD>(headers.size()) : 0,
+    request_body,
+    request_body_length,
+    request_body_length,
+    0
+  );
+  if (!sent) {
+    throw std::runtime_error("WinHttpSendRequest failed");
+  }
+
+  if (!WinHttpReceiveResponse(handle.get(), nullptr)) {
+    throw std::runtime_error("WinHttpReceiveResponse failed");
+  }
+
+  DWORD status_code = 0;
+  DWORD status_size = sizeof(status_code);
+  if (!WinHttpQueryHeaders(
+        handle.get(),
+        WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+        WINHTTP_HEADER_NAME_BY_INDEX,
+        &status_code,
+        &status_size,
+        WINHTTP_NO_HEADER_INDEX
+      )) {
+    throw std::runtime_error("WinHttpQueryHeaders failed");
+  }
+
+  std::string response_body;
+  while (true) {
+    DWORD available = 0;
+    if (!WinHttpQueryDataAvailable(handle.get(), &available)) {
+      throw std::runtime_error("WinHttpQueryDataAvailable failed");
+    }
+    if (available == 0) {
+      break;
+    }
+
+    std::vector<char> chunk(available);
+    DWORD read = 0;
+    if (!WinHttpReadData(handle.get(), chunk.data(), available, &read)) {
+      throw std::runtime_error("WinHttpReadData failed");
+    }
+
+    response_body.append(chunk.data(), chunk.data() + read);
+  }
+
+  return TransportResult{static_cast<long>(status_code), response_body};
+}
+
+}  // namespace
+
+HttpTransportWin::HttpTransportWin(HttpEndpoint endpoint) : endpoint_(endpoint) {}
+
+TransportResult HttpTransportWin::post_json(const SignedRequest& request) const {
+  const std::string header_block_utf8 = format_http_headers(request.headers);
+  return perform_http_request(endpoint_, L"POST", request.path, &header_block_utf8, &request.body);
+}
+
+TransportResult HttpTransportWin::get_json(const std::string& path) const {
+  return perform_http_request(endpoint_, L"GET", path, nullptr, nullptr);
+}
+
+TcpTransportWin::TcpTransportWin(TcpEndpoint endpoint) : endpoint_(endpoint) {}
+
+TransportResult TcpTransportWin::call(const TcpFrame& frame) const {
+  WsaSession wsa_session;
+
+  addrinfo hints{};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+
+  addrinfo* raw_results = nullptr;
+  const std::string port = std::to_string(endpoint_.port);
+  const int resolved = getaddrinfo(endpoint_.host.c_str(), port.c_str(), &hints, &raw_results);
+  if (resolved != 0) {
+    throw std::runtime_error("getaddrinfo failed");
+  }
+
+  std::unique_ptr<addrinfo, AddrInfoDeleter> results(raw_results);
+  SOCKET socket_handle = INVALID_SOCKET;
+
+  for (addrinfo* current = results.get(); current != nullptr; current = current->ai_next) {
+    socket_handle = socket(current->ai_family, current->ai_socktype, current->ai_protocol);
+    if (socket_handle == INVALID_SOCKET) {
+      continue;
+    }
+
+    const DWORD timeout = endpoint_.timeout_ms;
+    setsockopt(
+      socket_handle,
+      SOL_SOCKET,
+      SO_RCVTIMEO,
+      reinterpret_cast<const char*>(&timeout),
+      sizeof(timeout)
+    );
+    setsockopt(
+      socket_handle,
+      SOL_SOCKET,
+      SO_SNDTIMEO,
+      reinterpret_cast<const char*>(&timeout),
+      sizeof(timeout)
+    );
+
+    if (connect(socket_handle, current->ai_addr, static_cast<int>(current->ai_addrlen)) == 0) {
+      break;
+    }
+
+    closesocket(socket_handle);
+    socket_handle = INVALID_SOCKET;
+  }
+
+  if (socket_handle == INVALID_SOCKET) {
+    throw std::runtime_error("TCP connect failed");
+  }
+
+  const std::string wire = frame.to_json_line();
+  send_all(socket_handle, wire);
+  const std::string response = read_line(socket_handle);
+  closesocket(socket_handle);
+
+  return TransportResult{200, response};
+}
+
+ApiEnvelope LicenseClientWin::parse_api_envelope(const TransportResult& result) {
+  ApiEnvelope envelope;
+  envelope.transport_status = result.status_code;
+  envelope.raw_body = result.response_body;
+  envelope.root = JsonValue::parse(result.response_body);
+
+  if (!envelope.root.is_object()) {
+    throw std::runtime_error("API response root must be a JSON object.");
+  }
+
+  envelope.ok = envelope.root.has("ok") && envelope.root.at("ok").is_bool()
+    ? envelope.root.at("ok").as_bool()
+    : false;
+
+  if (envelope.root.has("data")) {
+    envelope.data = envelope.root.at("data");
+  }
+  if (envelope.root.has("error")) {
+    envelope.error = envelope.root.at("error");
+  }
+
+  return envelope;
+}
+
+ApiError LicenseClientWin::parse_api_error(const JsonValue& error) {
+  if (!error.is_object()) {
+    return ApiError{0, "INVALID_ERROR", "Malformed API error payload.", JsonValue()};
+  }
+
+  ApiError parsed;
+  if (error.has("status") && error.at("status").is_number()) {
+    parsed.status = json_number_to_long(error.at("status"));
+  }
+  if (error.has("code") && error.at("code").is_string()) {
+    parsed.code = error.at("code").as_string();
+  }
+  if (error.has("message") && error.at("message").is_string()) {
+    parsed.message = error.at("message").as_string();
+  }
+  if (error.has("details")) {
+    parsed.details = error.at("details");
+  }
+  return parsed;
+}
+
+std::string LicenseClientWin::require_json_string(const JsonValue& object, const char* key) {
+  const JsonValue& value = object.at(key);
+  if (!value.is_string()) {
+    throw std::runtime_error(std::string("Expected string field: ") + key);
+  }
+  return value.as_string();
+}
+
+int LicenseClientWin::require_json_int(const JsonValue& object, const char* key) {
+  const JsonValue& value = object.at(key);
+  if (!value.is_number()) {
+    throw std::runtime_error(std::string("Expected numeric field: ") + key);
+  }
+  return static_cast<int>(value.as_number());
+}
+
+const JsonValue& LicenseClientWin::require_json_object(const JsonValue& object, const char* key) {
+  const JsonValue& value = object.at(key);
+  if (!value.is_object()) {
+    throw std::runtime_error(std::string("Expected object field: ") + key);
+  }
+  return value;
+}
+
+TokenKeyInfo LicenseClientWin::parse_token_key_info(const JsonValue& object, const std::string& issuer) {
+  if (!object.is_object()) {
+    throw std::runtime_error("Token key payload must be an object.");
+  }
+
+  TokenKeyInfo info;
+  info.key_id = require_json_string(object, "keyId");
+  info.algorithm = require_json_string(object, "algorithm");
+  info.issuer = issuer;
+  info.public_key_fingerprint = require_json_string(object, "publicKeyFingerprint");
+  info.public_key_pem = require_json_string(object, "publicKeyPem");
+  info.status = object.has("status") && object.at("status").is_string()
+    ? object.at("status").as_string()
+    : "active";
+  info.created_at = object.has("createdAt") && object.at("createdAt").is_string()
+    ? object.at("createdAt").as_string()
+    : "";
+  return info;
+}
+
+TokenKeySet LicenseClientWin::parse_token_key_set(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Token key request failed." : error.message);
+  }
+
+  if (!envelope.data.is_object()) {
+    throw std::runtime_error("Token key data must be an object.");
+  }
+
+  TokenKeySet key_set;
+  key_set.algorithm = require_json_string(envelope.data, "algorithm");
+  key_set.issuer = require_json_string(envelope.data, "issuer");
+  key_set.active_key_id = envelope.data.has("activeKeyId") && envelope.data.at("activeKeyId").is_string()
+    ? envelope.data.at("activeKeyId").as_string()
+    : envelope.data.has("keyId") && envelope.data.at("keyId").is_string()
+      ? envelope.data.at("keyId").as_string()
+      : "";
+
+  if (envelope.data.has("keys")) {
+    const JsonValue& keys = envelope.data.at("keys");
+    if (!keys.is_array()) {
+      throw std::runtime_error("Token key set 'keys' must be an array.");
+    }
+    for (const JsonValue& item : keys.as_array()) {
+      key_set.keys.push_back(parse_token_key_info(item, key_set.issuer));
+    }
+  } else {
+    key_set.keys.push_back(parse_token_key_info(envelope.data, key_set.issuer));
+  }
+
+  return key_set;
+}
+
+RegisterResponse LicenseClientWin::parse_register_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Register request failed." : error.message);
+  }
+
+  RegisterResponse response;
+  response.account_id = require_json_string(envelope.data, "accountId");
+  response.product_code = require_json_string(envelope.data, "productCode");
+  response.username = require_json_string(envelope.data, "username");
+  return response;
+}
+
+RechargeResponse LicenseClientWin::parse_recharge_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Recharge request failed." : error.message);
+  }
+
+  RechargeResponse response;
+  response.entitlement_id = require_json_string(envelope.data, "entitlementId");
+  response.policy_name = require_json_string(envelope.data, "policyName");
+  response.starts_at = require_json_string(envelope.data, "startsAt");
+  response.ends_at = require_json_string(envelope.data, "endsAt");
+  return response;
+}
+
+LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Login request failed." : error.message);
+  }
+
+  LoginResponse response;
+  response.session_id = require_json_string(envelope.data, "sessionId");
+  response.session_token = require_json_string(envelope.data, "sessionToken");
+  response.license_token = require_json_string(envelope.data, "licenseToken");
+  response.expires_at = require_json_string(envelope.data, "expiresAt");
+
+  const JsonValue& heartbeat = require_json_object(envelope.data, "heartbeat");
+  response.heartbeat_interval_seconds = require_json_int(heartbeat, "intervalSeconds");
+  response.heartbeat_timeout_seconds = require_json_int(heartbeat, "timeoutSeconds");
+
+  const JsonValue& device = require_json_object(envelope.data, "device");
+  response.device_id = require_json_string(device, "id");
+  response.device_fingerprint = require_json_string(device, "fingerprint");
+  response.device_name = require_json_string(device, "name");
+
+  const JsonValue& entitlement = require_json_object(envelope.data, "entitlement");
+  response.entitlement_id = require_json_string(entitlement, "id");
+  response.entitlement_policy_name = require_json_string(entitlement, "policyName");
+  response.entitlement_ends_at = require_json_string(entitlement, "endsAt");
+  return response;
+}
+
+HeartbeatResponse LicenseClientWin::parse_heartbeat_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Heartbeat request failed." : error.message);
+  }
+
+  HeartbeatResponse response;
+  response.status = require_json_string(envelope.data, "status");
+  response.account = require_json_string(envelope.data, "account");
+  response.expires_at = require_json_string(envelope.data, "expiresAt");
+  response.next_heartbeat_in_seconds = require_json_int(envelope.data, "nextHeartbeatInSeconds");
+  return response;
+}
+
+LogoutResponse LicenseClientWin::parse_logout_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Logout request failed." : error.message);
+  }
+
+  LogoutResponse response;
+  response.status = require_json_string(envelope.data, "status");
+  return response;
+}
+
+LicenseClientWin::LicenseClientWin(
+  ClientIdentity identity,
+  HttpEndpoint http_endpoint,
+  TcpEndpoint tcp_endpoint
+)
+    : identity_(identity), http_(http_endpoint), tcp_(tcp_endpoint) {}
+
+std::string LicenseClientWin::generate_device_fingerprint() const {
+  return rocksolid::generate_device_fingerprint(identity_.app_salt);
+}
+
+TransportResult LicenseClientWin::register_http(const RegisterRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/register", to_json(request)));
+}
+
+TransportResult LicenseClientWin::recharge_http(const RechargeRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/recharge", to_json(request)));
+}
+
+TransportResult LicenseClientWin::login_http(const LoginRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/login", to_json(request)));
+}
+
+TransportResult LicenseClientWin::heartbeat_http(const HeartbeatRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/heartbeat", to_json(request)));
+}
+
+TransportResult LicenseClientWin::logout_http(const LogoutRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/logout", to_json(request)));
+}
+
+TransportResult LicenseClientWin::register_tcp(const RegisterRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.register", "/api/client/register", to_json(request)));
+}
+
+TransportResult LicenseClientWin::recharge_tcp(const RechargeRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.recharge", "/api/client/recharge", to_json(request)));
+}
+
+TransportResult LicenseClientWin::login_tcp(const LoginRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.login", "/api/client/login", to_json(request)));
+}
+
+TransportResult LicenseClientWin::heartbeat_tcp(const HeartbeatRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.heartbeat", "/api/client/heartbeat", to_json(request)));
+}
+
+TransportResult LicenseClientWin::logout_tcp(const LogoutRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.logout", "/api/client/logout", to_json(request)));
+}
+
+RegisterResponse LicenseClientWin::register_http_parsed(const RegisterRequest& request) const {
+  return parse_register_response(parse_api_envelope(register_http(request)));
+}
+
+RechargeResponse LicenseClientWin::recharge_http_parsed(const RechargeRequest& request) const {
+  return parse_recharge_response(parse_api_envelope(recharge_http(request)));
+}
+
+LoginResponse LicenseClientWin::login_http_parsed(const LoginRequest& request) const {
+  return parse_login_response(parse_api_envelope(login_http(request)));
+}
+
+HeartbeatResponse LicenseClientWin::heartbeat_http_parsed(const HeartbeatRequest& request) const {
+  return parse_heartbeat_response(parse_api_envelope(heartbeat_http(request)));
+}
+
+LogoutResponse LicenseClientWin::logout_http_parsed(const LogoutRequest& request) const {
+  return parse_logout_response(parse_api_envelope(logout_http(request)));
+}
+
+RegisterResponse LicenseClientWin::register_tcp_parsed(const RegisterRequest& request) const {
+  return parse_register_response(parse_api_envelope(register_tcp(request)));
+}
+
+RechargeResponse LicenseClientWin::recharge_tcp_parsed(const RechargeRequest& request) const {
+  return parse_recharge_response(parse_api_envelope(recharge_tcp(request)));
+}
+
+LoginResponse LicenseClientWin::login_tcp_parsed(const LoginRequest& request) const {
+  return parse_login_response(parse_api_envelope(login_tcp(request)));
+}
+
+HeartbeatResponse LicenseClientWin::heartbeat_tcp_parsed(const HeartbeatRequest& request) const {
+  return parse_heartbeat_response(parse_api_envelope(heartbeat_tcp(request)));
+}
+
+LogoutResponse LicenseClientWin::logout_tcp_parsed(const LogoutRequest& request) const {
+  return parse_logout_response(parse_api_envelope(logout_tcp(request)));
+}
+
+TokenKeyInfo LicenseClientWin::fetch_active_token_key() const {
+  const TokenKeySet key_set = parse_token_key_set(parse_api_envelope(http_.get_json("/api/system/token-key")));
+  if (key_set.keys.empty()) {
+    throw std::runtime_error("Active token key response did not contain a key.");
+  }
+  return key_set.keys.front();
+}
+
+TokenKeySet LicenseClientWin::fetch_token_keys() const {
+  return parse_token_key_set(parse_api_envelope(http_.get_json("/api/system/token-keys")));
+}
+
+TokenValidationResult LicenseClientWin::validate_license_token_online(const std::string& token) const {
+  TokenValidationResult result;
+  result.payload_json = decode_license_token_payload(token);
+  result.payload = JsonValue::parse(result.payload_json);
+  if (!result.payload.is_object() || !result.payload.has("kid")) {
+    throw std::runtime_error("License token payload does not contain a kid.");
+  }
+
+  result.key_id = require_json_string(result.payload, "kid");
+  const TokenKeySet key_set = fetch_token_keys();
+  for (const TokenKeyInfo& key : key_set.keys) {
+    if (key.key_id == result.key_id) {
+      result.valid = verify_license_token(key.public_key_pem, token);
+      return result;
+    }
+  }
+
+  result.valid = false;
+  return result;
+}
+
+SignedRequest LicenseClientWin::make_signed_http_request(
+  const std::string& path,
+  const std::string& body
+) const {
+  return build_signed_request(identity_.app_id, identity_.app_secret, "POST", path, body);
+}
+
+TcpFrame LicenseClientWin::make_signed_tcp_frame(
+  const std::string& action,
+  const std::string& path,
+  const std::string& body
+) const {
+  return build_tcp_frame(generate_nonce(), action, make_signed_http_request(path, body));
+}
+
+std::string LicenseClientWin::to_json(const RegisterRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("username", require_not_empty("username", request.username)) << ","
+    << build_json_pair("password", require_not_empty("password", request.password))
+    << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const RechargeRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("username", require_not_empty("username", request.username)) << ","
+    << build_json_pair("password", require_not_empty("password", request.password)) << ","
+    << build_json_pair("cardKey", require_not_empty("cardKey", request.card_key))
+    << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const LoginRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("username", require_not_empty("username", request.username)) << ","
+    << build_json_pair("password", require_not_empty("password", request.password)) << ","
+    << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint)) << ","
+    << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name))
+    << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const HeartbeatRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("sessionToken", require_not_empty("sessionToken", request.session_token)) << ","
+    << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint))
+    << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const LogoutRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("sessionToken", require_not_empty("sessionToken", request.session_token))
+    << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::require_not_empty(const char* field_name, const std::string& value) {
+  if (value.empty()) {
+    throw std::invalid_argument(std::string(field_name) + " must not be empty");
+  }
+  return value;
+}
+
+}  // namespace rocksolid
+
+#endif

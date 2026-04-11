@@ -1,0 +1,16 @@
+[Unit]
+Description=RockSolidLicense License Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rocksolidlicense
+EnvironmentFile=/etc/rocksolidlicense/rocksolid.env
+ExecStart=/usr/bin/node /opt/rocksolidlicense/src/server.js
+Restart=always
+RestartSec=3
+User=rocksolid
+Group=rocksolid
+
+[Install]
+WantedBy=multi-user.target

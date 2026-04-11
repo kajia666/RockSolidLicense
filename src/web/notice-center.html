@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Notice Center</title>
+    <style>
+      :root {
+        --bg: #f4efe4;
+        --surface: rgba(255, 252, 246, 0.94);
+        --line: rgba(23, 32, 27, 0.1);
+        --ink: #17201b;
+        --muted: #617066;
+        --accent: #0f7c68;
+        --danger: #a0422c;
+        --accent-soft: rgba(15, 124, 104, 0.12);
+        --danger-soft: rgba(160, 66, 44, 0.12);
+        --shadow: 0 24px 58px rgba(54, 49, 42, 0.14);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 124, 104, 0.15), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(201, 126, 78, 0.16), transparent 28%),
+          linear-gradient(135deg, #f4ede0 0%, #f8f4ed 52%, #efe5d5 100%);
+      }
+
+      code, pre {
+        font-family: "Cascadia Code", "Consolas", monospace;
+      }
+
+      .shell {
+        width: min(1320px, calc(100vw - 28px));
+        margin: 20px auto 36px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero, .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero, .card { padding: 20px; }
+      .hero { display: grid; gap: 10px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+
+      h1, h2, p { margin: 0; }
+      h1 { font-size: clamp(28px, 5vw, 44px); }
+      h2 { font-size: 20px; }
+
+      .sub, .hint { color: var(--muted); line-height: 1.6; }
+      .hint { font-size: 13px; }
+
+      label { display: grid; gap: 8px; color: var(--muted); font-size: 14px; }
+      input, select, textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--ink);
+        font: inherit;
+      }
+      textarea { min-height: 110px; resize: vertical; }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        color: white;
+        background: var(--ink);
+        font: inherit;
+        cursor: pointer;
+      }
+      button.secondary { background: var(--accent); }
+      button.danger { background: var(--danger); }
+
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      .status {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+      }
+      .status.warn {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(23, 32, 27, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: rgba(247, 243, 235, 0.96);
+        color: var(--muted);
+      }
+
+      tbody tr { cursor: pointer; }
+      tbody tr:hover { background: rgba(15, 124, 104, 0.06); }
+
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(23, 32, 27, 0.08);
+        color: var(--muted);
+      }
+      .tag.ok { background: var(--accent-soft); color: var(--accent); }
+      .tag.danger { background: var(--danger-soft); color: var(--danger); }
+
+      pre {
+        margin: 0;
+        min-height: 220px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef7f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Notice Center</h1>
+        <p class="sub">这里专门管理客户端公告、维护通知和临时登录拦截。建议把常规公告和维护停机通知分开发布，方便审计和回滚。</p>
+        <div class="hint">入口：<code>/admin/notices</code>。主控制台仍在 <code>/admin</code>。</div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>管理员登录</h2>
+          <label>用户名<input id="username" value="admin" /></label>
+          <label>密码<input id="password" type="password" value="ChangeMe!123" /></label>
+          <div class="actions">
+            <button id="login-btn">登录</button>
+            <button class="secondary" id="refresh-btn">刷新公告列表</button>
+          </div>
+          <div class="status" id="status-box">等待登录。</div>
+        </article>
+
+        <article class="card">
+          <h2>发布公告</h2>
+          <label>产品代号<input id="product-code" placeholder="留空表示全局公告" /></label>
+          <label>通道<input id="channel" value="all" /></label>
+          <label>
+            类型
+            <select id="kind">
+              <option value="announcement">announcement</option>
+              <option value="maintenance">maintenance</option>
+            </select>
+          </label>
+          <label>
+            严重级别
+            <select id="severity">
+              <option value="info">info</option>
+              <option value="warning">warning</option>
+              <option value="critical">critical</option>
+            </select>
+          </label>
+          <label>标题<input id="title" placeholder="例如：维护通知" /></label>
+          <label>正文<textarea id="body" placeholder="例如：北京时间今晚 23:00 至 23:30 做授权服务维护。"></textarea></label>
+          <label>动作链接<input id="action-url" placeholder="https://example.com/status" /></label>
+          <label>开始时间<input id="starts-at" placeholder="留空表示立即生效" /></label>
+          <label>结束时间<input id="ends-at" placeholder="例如：2026-04-12T23:30:00+08:00" /></label>
+          <label>
+            初始状态
+            <select id="notice-status">
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <label>
+            阻止登录
+            <select id="block-login">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+          <button class="secondary" id="create-btn">创建公告</button>
+        </article>
+
+        <article class="card">
+          <h2>公告状态</h2>
+          <label>公告 ID<input id="notice-id" placeholder="点击下方表格自动填充" /></label>
+          <label>
+            目标状态
+            <select id="update-status">
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <label>
+            阻止登录
+            <select id="update-block-login">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+          <button class="danger" id="update-btn">更新状态</button>
+          <div class="hint">维护结束后，最稳妥的做法是把公告直接归档，避免旧维护提示继续影响登录。</div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>公告列表</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>标题</th>
+                <th>产品</th>
+                <th>类型</th>
+                <th>状态</th>
+                <th>阻止登录</th>
+                <th>开始时间</th>
+              </tr>
+            </thead>
+            <tbody id="notice-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>接口输出</h2>
+        <pre id="output">等待操作结果…</pre>
+      </section>
+    </main>
+
+    <script>
+      let adminToken = "";
+
+      function el(id) { return document.getElementById(id); }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = JSON.stringify(value, null, 2);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function formatTime(value) {
+        if (!value) return "—";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function renderTag(value) {
+        const text = String(value ?? "unknown");
+        const className = text === "active" || text === "false" ? "tag ok" : text === "archived" || text === "true" ? "tag danger" : "tag";
+        return `<span class="${className}">${escapeHtml(text)}</span>`;
+      }
+
+      async function callApi(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (options.body) headers["Content-Type"] = "application/json";
+        if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+
+        const response = await fetch(path, { ...options, headers });
+        const json = await response.json();
+        if (!response.ok || !json.ok) {
+          throw new Error(json.error?.message || `Request failed: ${response.status}`);
+        }
+        return json.data;
+      }
+
+      function renderNotices(items) {
+        if (!items.length) {
+          el("notice-body").innerHTML = `<tr><td colspan="6">暂无公告。</td></tr>`;
+          return;
+        }
+
+        el("notice-body").innerHTML = items.map((item) => `
+          <tr data-id="${escapeHtml(item.id)}" data-block-login="${escapeHtml(item.blockLogin)}">
+            <td><strong>${escapeHtml(item.title)}</strong><div>${escapeHtml(item.body)}</div></td>
+            <td>${escapeHtml(item.productCode || "GLOBAL")}</td>
+            <td>${escapeHtml(item.kind)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${renderTag(String(item.blockLogin))}</td>
+            <td>${escapeHtml(formatTime(item.startsAt))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of el("notice-body").querySelectorAll("tr")) {
+          row.addEventListener("click", () => {
+            el("notice-id").value = row.dataset.id || "";
+            el("update-block-login").value = String(row.dataset.blockLogin || "false");
+            setStatus("已带入公告 ID，可以直接调整状态。");
+          });
+        }
+      }
+
+      async function loadNotices() {
+        const data = await callApi("/api/admin/notices");
+        renderNotices(data.items);
+        setOutput(data);
+        setStatus(`公告列表已刷新，共 ${data.total} 条。`);
+      }
+
+      async function guarded(action) {
+        try {
+          await action();
+        } catch (error) {
+          setOutput({ error: error.message });
+          setStatus(error.message, true);
+        }
+      }
+
+      el("login-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/login", {
+          method: "POST",
+          body: JSON.stringify({
+            username: el("username").value,
+            password: el("password").value
+          })
+        });
+        adminToken = data.token;
+        setOutput(data);
+        setStatus(`已登录管理员 ${data.admin.username}。`);
+        await loadNotices();
+      }));
+
+      el("refresh-btn").addEventListener("click", () => guarded(loadNotices));
+
+      el("create-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/notices", {
+          method: "POST",
+          body: JSON.stringify({
+            productCode: el("product-code").value,
+            channel: el("channel").value,
+            kind: el("kind").value,
+            severity: el("severity").value,
+            title: el("title").value,
+            body: el("body").value,
+            actionUrl: el("action-url").value,
+            startsAt: el("starts-at").value,
+            endsAt: el("ends-at").value,
+            status: el("notice-status").value,
+            blockLogin: el("block-login").value === "true"
+          })
+        });
+        setOutput(data);
+        el("notice-id").value = data.id;
+        setStatus(`公告已创建：${data.title}`);
+        await loadNotices();
+      }));
+
+      el("update-btn").addEventListener("click", () => guarded(async () => {
+        const noticeId = el("notice-id").value.trim();
+        if (!noticeId) throw new Error("请先输入公告 ID。");
+        const data = await callApi(`/api/admin/notices/${encodeURIComponent(noticeId)}/status`, {
+          method: "POST",
+          body: JSON.stringify({
+            status: el("update-status").value,
+            blockLogin: el("update-block-login").value === "true"
+          })
+        });
+        setOutput(data);
+        setStatus(`公告状态已更新为 ${data.status}。`);
+        await loadNotices();
+      }));
+
+      renderNotices([]);
+    </script>
+  </body>
+</html>

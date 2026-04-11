@@ -1,0 +1,9 @@
+data/
+*.db
+*.db-shm
+*.db-wal
+coverage/
+node_modules/
+build/
+*.obj
+*.exe

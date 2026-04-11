@@ -1,0 +1,10 @@
+.git
+.gitignore
+build/
+coverage/
+data/
+deploy/
+node_modules/
+*.db
+*.db-shm
+*.db-wal

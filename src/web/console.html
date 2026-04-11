@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Console</title>
+    <style>
+      :root {
+        --bg-1: #f3ecdf;
+        --bg-2: #f8f5ee;
+        --surface: rgba(255, 252, 247, 0.92);
+        --surface-strong: rgba(255, 255, 255, 0.86);
+        --line: rgba(30, 36, 30, 0.1);
+        --ink: #17201b;
+        --muted: #5f6a62;
+        --accent: #0f7c68;
+        --accent-soft: rgba(15, 124, 104, 0.12);
+        --danger: #a0422c;
+        --danger-soft: rgba(160, 66, 44, 0.12);
+        --shadow: 0 28px 70px rgba(54, 49, 42, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 124, 104, 0.16), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(201, 126, 78, 0.16), transparent 28%),
+          linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 50%, #efe5d5 100%);
+      }
+
+      code,
+      pre,
+      .mono {
+        font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+      }
+
+      .shell {
+        width: min(1380px, calc(100vw - 28px));
+        margin: 20px auto 36px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero,
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .hero {
+        padding: 28px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .card {
+        padding: 20px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+      }
+
+      .wide-grid {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 18px;
+      }
+
+      .data-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+        gap: 18px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(30px, 5vw, 48px);
+        letter-spacing: 0.03em;
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      .sub {
+        max-width: 820px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .hero-band {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.66);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .token-strip {
+        border: 1px dashed rgba(23, 32, 27, 0.16);
+        background: rgba(255, 255, 255, 0.55);
+        border-radius: 18px;
+        padding: 14px 16px;
+        font-size: 13px;
+        color: var(--muted);
+        word-break: break-all;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 108px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        background: var(--ink);
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(23, 32, 27, 0.16);
+      }
+
+      button.secondary {
+        background: var(--accent);
+      }
+
+      button.ghost {
+        background: rgba(23, 32, 27, 0.08);
+        color: var(--ink);
+      }
+
+      button.danger {
+        background: var(--danger);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--surface-strong);
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 28px;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .status {
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+      }
+
+      .status.warn {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(23, 32, 27, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        background: rgba(247, 243, 235, 0.96);
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      tbody tr {
+        cursor: pointer;
+      }
+
+      tbody tr:hover {
+        background: rgba(15, 124, 104, 0.06);
+      }
+
+      .empty {
+        color: var(--muted);
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(23, 32, 27, 0.08);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .tag.ok {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tag.danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      pre {
+        margin: 0;
+        min-height: 220px;
+        padding: 18px;
+        border-radius: 20px;
+        overflow: auto;
+        background: #101715;
+        color: #eef7f2;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1100px) {
+        .wide-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>RockSolidLicense Console</h1>
+        <p class="sub">
+          面向商业软件授权的运营控制台。这里可以创建产品、授权策略和卡密批次，也可以直接查看用户账号、
+          在线会话、设备绑定与审计日志，并执行账号禁用、会话下线、设备释放等后台操作。
+        </p>
+        <div class="hero-band">
+          <div class="pill">默认管理员：<code>admin</code> / <code>ChangeMe!123</code></div>
+          <div class="pill">HTTP 管理入口：<code>/api/admin/*</code></div>
+          <div class="pill">客户端授权入口：<code>/api/client/*</code> + TCP</div>
+        </div>
+        <div class="token-strip" id="session-strip">尚未登录管理后台。</div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>管理员登录</h2>
+          <label>用户名<input id="admin-username" value="admin" /></label>
+          <label>密码<input id="admin-password" type="password" value="ChangeMe!123" /></label>
+          <div class="actions">
+            <button id="login-btn">登录后台</button>
+            <button class="ghost" id="refresh-all-btn">刷新全部面板</button>
+          </div>
+          <div class="hint">登录成功后，下面所有管理接口都会自动带上 Bearer Token。</div>
+        </article>
+
+        <article class="card">
+          <h2>创建产品</h2>
+          <label>产品代号<input id="product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>产品名称<input id="product-name" placeholder="My Software" /></label>
+          <label>描述<textarea id="product-description" placeholder="例如：专业版桌面软件授权"></textarea></label>
+          <button class="secondary" id="create-product-btn">创建产品</button>
+        </article>
+
+        <article class="card">
+          <h2>创建策略</h2>
+          <label>产品代号<input id="policy-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>策略名称<input id="policy-name" placeholder="Professional 30D" /></label>
+          <label>有效天数<input id="policy-duration" type="number" value="30" /></label>
+          <label>最大设备数<input id="policy-max-devices" type="number" value="1" /></label>
+          <label>心跳间隔秒数<input id="policy-heartbeat-interval" type="number" value="60" /></label>
+          <label>心跳超时秒数<input id="policy-heartbeat-timeout" type="number" value="180" /></label>
+          <label>令牌 TTL 秒数<input id="policy-token-ttl" type="number" value="300" /></label>
+          <button class="secondary" id="create-policy-btn">创建策略</button>
+        </article>
+
+        <article class="card">
+          <h2>批量生成卡密</h2>
+          <label>产品代号<input id="card-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>策略 ID<input id="card-policy-id" placeholder="pol_xxx" /></label>
+          <label>数量<input id="card-count" type="number" value="10" /></label>
+          <label>卡密前缀<input id="card-prefix" placeholder="MYSOFT" /></label>
+          <button class="secondary" id="create-card-btn">生成卡密</button>
+          <div class="hint">创建策略成功后，返回结果里会携带策略 ID。生成完成后可在输出面板中复制卡密。</div>
+        </article>
+
+        <article class="card">
+          <h2>客户端版本</h2>
+          <label>产品代号<input id="version-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>版本号<input id="version-value" placeholder="1.2.0" /></label>
+          <label>发布通道<input id="version-channel" value="stable" /></label>
+          <label>
+            初始状态
+            <select id="version-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>
+            强制升级
+            <select id="version-force-update">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+          <label>下载地址<input id="version-download-url" placeholder="https://example.com/download/app-1.2.0.exe" /></label>
+          <label>公告标题<input id="version-notice-title" placeholder="关键升级通知" /></label>
+          <label>公告内容<textarea id="version-notice-body" placeholder="例如：1.2.0 修复了授权稳定性问题。"></textarea></label>
+          <label>发布说明<textarea id="version-release-notes" placeholder="例如：Improve verification stability."></textarea></label>
+          <button class="secondary" id="create-version-btn">创建版本规则</button>
+        </article>
+      </section>
+
+      <section class="wide-grid">
+        <article class="card">
+          <h2>实时概览</h2>
+          <div class="stats" id="stats"></div>
+          <div class="actions">
+            <button id="refresh-dashboard-btn">刷新概览</button>
+            <button class="ghost" id="load-audit-btn">读取审计日志</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>运营筛选</h2>
+          <label>产品代号<input id="ops-product-code" placeholder="留空表示全部产品" /></label>
+          <label>用户名<input id="ops-username" placeholder="例如 alice" /></label>
+          <label>模糊搜索<input id="ops-search" placeholder="支持用户名 / 设备指纹 / 会话 ID" /></label>
+          <label>
+            账号状态
+            <select id="ops-account-status">
+              <option value="">全部</option>
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>
+            会话状态
+            <select id="ops-session-status">
+              <option value="">全部</option>
+              <option value="active">active</option>
+              <option value="expired">expired</option>
+            </select>
+          </label>
+          <label>
+            设备绑定状态
+            <select id="ops-binding-status">
+              <option value="">全部</option>
+              <option value="active">active</option>
+              <option value="revoked">revoked</option>
+            </select>
+          </label>
+          <label>
+            设备封禁状态
+            <select id="ops-block-status">
+              <option value="">全部</option>
+              <option value="active">active</option>
+              <option value="released">released</option>
+            </select>
+          </label>
+          <label>日志条数<input id="audit-limit" type="number" min="1" max="200" value="30" /></label>
+          <div class="actions">
+            <button class="ghost" id="load-accounts-btn">加载账号</button>
+            <button class="ghost" id="load-bindings-btn">加载设备</button>
+            <button class="ghost" id="load-blocks-btn">加载封禁</button>
+            <button class="ghost" id="load-sessions-btn">加载会话</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>账号控制</h2>
+          <label>账号 ID<input id="account-id" placeholder="点击下方账号列表可自动填充" /></label>
+          <label>
+            目标状态
+            <select id="account-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <button class="danger" id="set-account-status-btn">更新账号状态</button>
+          <div class="hint">禁用账号会立即踢下该账号下所有在线会话；恢复为 active 后允许重新登录。</div>
+        </article>
+
+        <article class="card">
+          <h2>会话控制</h2>
+          <label>会话 ID<input id="session-id" placeholder="点击下方会话列表可自动填充" /></label>
+          <label>下线原因<input id="session-reason" value="manual_review" /></label>
+          <button class="danger" id="revoke-session-btn">强制下线会话</button>
+          <div class="hint">会话被下线后，旧的 <code>sessionToken</code> 心跳会立即失效。</div>
+        </article>
+
+        <article class="card">
+          <h2>设备控制</h2>
+          <label>绑定 ID<input id="binding-id" placeholder="点击下方设备列表可自动填充" /></label>
+          <label>释放原因<input id="binding-reason" value="operator_release" /></label>
+          <button class="danger" id="release-binding-btn">释放设备绑定</button>
+          <div class="hint">释放设备会腾出设备名额，并使该设备当前在线会话失效。之后该设备可重新绑定。</div>
+        </article>
+
+        <article class="card">
+          <h2>设备封禁</h2>
+          <label>产品代号<input id="block-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>设备指纹<input id="block-fingerprint" placeholder="device-fingerprint" /></label>
+          <label>封禁原因<input id="block-reason" value="fraud_risk" /></label>
+          <label>备注<textarea id="block-notes" placeholder="例如：人工风控、共享账号、自动化滥用"></textarea></label>
+          <div class="actions">
+            <button class="danger" id="block-device-btn">封禁设备</button>
+            <button class="ghost" id="unblock-device-btn">解除封禁</button>
+          </div>
+          <label>封禁记录 ID<input id="block-id" placeholder="点击下方封禁记录表可自动填充" /></label>
+          <label>解除原因<input id="unblock-reason" value="appeal_approved" /></label>
+          <div class="hint">封禁设备会立即踢下相关在线会话，并阻止该设备再次登录。解除封禁后，该设备可以重新登录和绑定。</div>
+        </article>
+
+        <article class="card">
+          <h2>版本状态控制</h2>
+          <label>版本规则 ID<input id="version-id" placeholder="点击下方版本规则表可自动填充" /></label>
+          <label>
+            目标状态
+            <select id="version-update-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>
+            强制升级
+            <select id="version-update-force">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <button class="danger" id="update-version-status-btn">更新版本状态</button>
+          <div class="hint">你可以把旧版本直接置为 disabled，也可以把活跃版本标记为 force update，用于强制升级。</div>
+        </article>
+
+        <article class="card">
+          <h2>操作提示</h2>
+          <div class="status" id="action-status">控制台就绪，等待你的操作。</div>
+          <div class="hint">
+            小技巧：点击下方表格中的任意一行，会自动把对应的账号 ID、会话 ID 或绑定 ID 带到上面的操作输入框。
+          </div>
+        </article>
+      </section>
+
+      <section class="data-grid">
+        <article class="card">
+          <h2>账号列表</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>账号</th>
+                  <th>产品</th>
+                  <th>状态</th>
+                  <th>在线会话</th>
+                  <th>授权数</th>
+                  <th>授权到期</th>
+                </tr>
+              </thead>
+              <tbody id="accounts-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>设备绑定</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>用户</th>
+                  <th>指纹</th>
+                  <th>设备名</th>
+                  <th>状态</th>
+                  <th>在线会话</th>
+                  <th>最后绑定</th>
+                </tr>
+              </thead>
+              <tbody id="bindings-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>设备封禁记录</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>产品</th>
+                  <th>指纹</th>
+                  <th>状态</th>
+                  <th>原因</th>
+                  <th>在线会话</th>
+                  <th>更新时间</th>
+                </tr>
+              </thead>
+              <tbody id="blocks-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>版本规则</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>产品</th>
+                  <th>版本</th>
+                  <th>通道</th>
+                  <th>状态</th>
+                  <th>强制升级</th>
+                  <th>发布时间</th>
+                </tr>
+              </thead>
+              <tbody id="versions-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>在线会话</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>会话</th>
+                  <th>用户</th>
+                  <th>产品</th>
+                  <th>状态</th>
+                  <th>设备</th>
+                  <th>最近心跳</th>
+                </tr>
+              </thead>
+              <tbody id="sessions-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>审计日志</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>事件</th>
+                  <th>操作者</th>
+                  <th>实体</th>
+                  <th>摘要</th>
+                </tr>
+              </thead>
+              <tbody id="audit-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>接口输出</h2>
+        <pre id="output">等待操作结果…</pre>
+      </section>
+    </main>
+
+    <script>
+      let adminToken = "";
+
+      function el(id) {
+        return document.getElementById(id);
+      }
+
+      function setStatus(message, level = "ok") {
+        const status = el("action-status");
+        status.textContent = message;
+        status.className = `status${level === "warn" ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = JSON.stringify(value, null, 2);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function shortText(value, size = 18) {
+        const text = String(value ?? "");
+        if (text.length <= size) {
+          return text;
+        }
+        return `${text.slice(0, size)}…`;
+      }
+
+      function formatTime(value) {
+        if (!value) {
+          return "—";
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+          return String(value);
+        }
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function renderTag(value) {
+        const text = String(value ?? "unknown");
+        const className = text === "active" ? "tag ok" : text === "disabled" || text === "revoked" || text === "expired" ? "tag danger" : "tag";
+        return `<span class="${className}">${escapeHtml(text)}</span>`;
+      }
+
+      async function callApi(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (options.body) {
+          headers["Content-Type"] = "application/json";
+        }
+        if (adminToken) {
+          headers.Authorization = `Bearer ${adminToken}`;
+        }
+
+        const response = await fetch(path, { ...options, headers });
+        const json = await response.json();
+        if (!response.ok || !json.ok) {
+          throw new Error(json.error?.message || `Request failed: ${response.status}`);
+        }
+        return json.data;
+      }
+
+      function buildQuery(params) {
+        const query = new URLSearchParams();
+        for (const [key, value] of Object.entries(params)) {
+          if (value !== null && value !== undefined && String(value).trim() !== "") {
+            query.set(key, String(value).trim());
+          }
+        }
+        const text = query.toString();
+        return text ? `?${text}` : "";
+      }
+
+      function renderStats(summary = {}) {
+        const stats = el("stats");
+        stats.innerHTML = "";
+        const entries = [
+          ["产品数", summary.products ?? 0],
+          ["策略数", summary.policies ?? 0],
+          ["未使用卡密", summary.cardsFresh ?? 0],
+          ["已兑换卡密", summary.cardsRedeemed ?? 0],
+          ["账号数", summary.accounts ?? 0],
+          ["禁用账号", summary.disabledAccounts ?? 0],
+          ["在线会话", summary.onlineSessions ?? 0],
+          ["活跃绑定", summary.activeBindings ?? 0],
+          ["已释放绑定", summary.releasedBindings ?? 0],
+          ["封禁设备", summary.blockedDevices ?? 0]
+        ];
+
+        for (const [label, value] of entries) {
+          const item = document.createElement("div");
+          item.className = "stat";
+          item.innerHTML = `<div>${escapeHtml(label)}</div><strong>${escapeHtml(value)}</strong>`;
+          stats.appendChild(item);
+        }
+      }
+
+      function renderEmptyRow(targetId, columnCount, message) {
+        el(targetId).innerHTML = `<tr><td class="empty" colspan="${columnCount}">${escapeHtml(message)}</td></tr>`;
+      }
+
+      function renderAccounts(items) {
+        if (!items.length) {
+          renderEmptyRow("accounts-body", 6, "没有匹配的账号。");
+          return;
+        }
+
+        el("accounts-body").innerHTML = items.map((item) => `
+          <tr data-account-id="${escapeHtml(item.id)}">
+            <td><strong>${escapeHtml(item.username)}</strong><div class="mono">${escapeHtml(shortText(item.id, 20))}</div></td>
+            <td>${escapeHtml(item.product_code)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${escapeHtml(item.active_session_count ?? 0)}</td>
+            <td>${escapeHtml(item.active_entitlement_count ?? 0)}</td>
+            <td>${escapeHtml(formatTime(item.latest_entitlement_ends_at))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of el("accounts-body").querySelectorAll("tr")) {
+          row.addEventListener("click", () => {
+            el("account-id").value = row.dataset.accountId || "";
+            setStatus("已带入账号 ID，可以直接修改状态。");
+          });
+        }
+      }
+
+      function renderBindings(items) {
+        if (!items.length) {
+          renderEmptyRow("bindings-body", 6, "没有匹配的设备绑定。");
+          return;
+        }
+
+        el("bindings-body").innerHTML = items.map((item) => `
+          <tr data-binding-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-fingerprint="${escapeHtml(item.fingerprint)}">
+            <td><strong>${escapeHtml(item.username)}</strong><div>${escapeHtml(item.product_code)}</div></td>
+            <td class="mono">${escapeHtml(shortText(item.fingerprint, 24))}</td>
+            <td>${escapeHtml(item.device_name || "未命名设备")}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${escapeHtml(item.active_session_count ?? 0)}</td>
+            <td>${escapeHtml(formatTime(item.last_bound_at))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of el("bindings-body").querySelectorAll("tr")) {
+          row.addEventListener("click", () => {
+            el("binding-id").value = row.dataset.bindingId || "";
+            el("block-product-code").value = row.dataset.productCode || "";
+            el("block-fingerprint").value = row.dataset.fingerprint || "";
+            setStatus("已带入绑定信息，也可以直接封禁这台设备。");
+          });
+        }
+      }
+
+      function renderBlocks(items) {
+        if (!items.length) {
+          renderEmptyRow("blocks-body", 6, "没有匹配的设备封禁记录。");
+          return;
+        }
+
+        el("blocks-body").innerHTML = items.map((item) => `
+          <tr data-block-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-fingerprint="${escapeHtml(item.fingerprint)}">
+            <td>${escapeHtml(item.product_code)}</td>
+            <td class="mono">${escapeHtml(shortText(item.fingerprint, 24))}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${escapeHtml(item.reason)}</td>
+            <td>${escapeHtml(item.active_session_count ?? 0)}</td>
+            <td>${escapeHtml(formatTime(item.updated_at))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of el("blocks-body").querySelectorAll("tr")) {
+          row.addEventListener("click", () => {
+            el("block-id").value = row.dataset.blockId || "";
+            el("block-product-code").value = row.dataset.productCode || "";
+            el("block-fingerprint").value = row.dataset.fingerprint || "";
+            setStatus("已带入封禁记录，可以直接解除封禁。");
+          });
+        }
+      }
+
+      function renderVersions(items) {
+        if (!items.length) {
+          renderEmptyRow("versions-body", 6, "No matching version rules.");
+          return;
+        }
+
+        el("versions-body").innerHTML = items.map((item) => `
+          <tr data-version-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-version="${escapeHtml(item.version)}" data-channel="${escapeHtml(item.channel)}" data-force-update="${escapeHtml(item.forceUpdate)}">
+            <td>${escapeHtml(item.product_code)}</td>
+            <td><strong>${escapeHtml(item.version)}</strong><div class="mono">${escapeHtml(shortText(item.id, 18))}</div></td>
+            <td>${escapeHtml(item.channel)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${renderTag(String(item.forceUpdate))}</td>
+            <td>${escapeHtml(formatTime(item.released_at))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of el("versions-body").querySelectorAll("tr")) {
+          row.addEventListener("click", () => {
+            el("version-id").value = row.dataset.versionId || "";
+            el("version-product-code").value = row.dataset.productCode || "";
+            el("version-value").value = row.dataset.version || "";
+            el("version-channel").value = row.dataset.channel || "stable";
+            el("version-update-force").value = String(row.dataset.forceUpdate || "false");
+            setStatus("已带入版本规则，可以直接调整状态或强制升级标记。");
+          });
+        }
+      }
+
+      function renderSessions(items) {
+        if (!items.length) {
+          renderEmptyRow("sessions-body", 6, "没有匹配的会话。");
+          return;
+        }
+
+        el("sessions-body").innerHTML = items.map((item) => `
+          <tr data-session-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-fingerprint="${escapeHtml(item.fingerprint)}">
+            <td class="mono">${escapeHtml(shortText(item.id, 20))}</td>
+            <td><strong>${escapeHtml(item.username)}</strong><div>${escapeHtml(item.policy_name)}</div></td>
+            <td>${escapeHtml(item.product_code)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${escapeHtml(item.device_name || "未命名设备")}<div class="mono">${escapeHtml(shortText(item.fingerprint, 18))}</div></td>
+            <td>${escapeHtml(formatTime(item.last_heartbeat_at))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of el("sessions-body").querySelectorAll("tr")) {
+          row.addEventListener("click", () => {
+            el("session-id").value = row.dataset.sessionId || "";
+            el("block-product-code").value = row.dataset.productCode || "";
+            el("block-fingerprint").value = row.dataset.fingerprint || "";
+            setStatus("已带入会话信息，也可以直接封禁这台设备。");
+          });
+        }
+      }
+
+      function renderAuditLogs(items) {
+        if (!items.length) {
+          renderEmptyRow("audit-body", 5, "暂无审计日志。");
+          return;
+        }
+
+        el("audit-body").innerHTML = items.map((item) => `
+          <tr>
+            <td>${escapeHtml(formatTime(item.created_at))}</td>
+            <td><span class="tag">${escapeHtml(item.event_type)}</span></td>
+            <td>${escapeHtml(item.actor_type)}<div class="mono">${escapeHtml(shortText(item.actor_id || "-", 20))}</div></td>
+            <td>${escapeHtml(item.entity_type)}<div class="mono">${escapeHtml(shortText(item.entity_id || "-", 20))}</div></td>
+            <td>${escapeHtml(JSON.stringify(item.metadata || {}))}</td>
+          </tr>
+        `).join("");
+      }
+
+      function readOpsFilters() {
+        return {
+          productCode: el("ops-product-code").value,
+          username: el("ops-username").value,
+          search: el("ops-search").value
+        };
+      }
+
+      async function refreshDashboard() {
+        const data = await callApi("/api/admin/dashboard");
+        renderStats(data.summary);
+        setOutput(data);
+        setStatus("实时概览已刷新。");
+      }
+
+      async function loadAccounts() {
+        const filters = readOpsFilters();
+        filters.status = el("ops-account-status").value;
+        const data = await callApi(`/api/admin/accounts${buildQuery(filters)}`);
+        renderAccounts(data.items);
+        setOutput(data);
+        setStatus(`账号列表已刷新，共 ${data.total} 条。`);
+      }
+
+      async function loadBindings() {
+        const filters = readOpsFilters();
+        filters.status = el("ops-binding-status").value;
+        const data = await callApi(`/api/admin/device-bindings${buildQuery(filters)}`);
+        renderBindings(data.items);
+        setOutput(data);
+        setStatus(`设备绑定列表已刷新，共 ${data.total} 条。`);
+      }
+
+      async function loadBlocks() {
+        const data = await callApi(`/api/admin/device-blocks${buildQuery({
+          productCode: el("ops-product-code").value,
+          status: el("ops-block-status").value,
+          search: el("ops-search").value
+        })}`);
+        renderBlocks(data.items);
+        setOutput(data);
+        setStatus(`设备封禁记录已刷新，共 ${data.total} 条。`);
+      }
+
+      async function loadSessions() {
+        const filters = readOpsFilters();
+        filters.status = el("ops-session-status").value;
+        const data = await callApi(`/api/admin/sessions${buildQuery(filters)}`);
+        renderSessions(data.items);
+        setOutput(data);
+        setStatus(`会话列表已刷新，共 ${data.total} 条。`);
+      }
+
+      async function loadVersions() {
+        const data = await callApi(`/api/admin/client-versions${buildQuery({
+          productCode: el("ops-product-code").value,
+          channel: el("ops-version-channel") ? el("ops-version-channel").value : "stable",
+          status: el("ops-version-status") ? el("ops-version-status").value : "",
+          search: el("ops-search").value
+        })}`);
+        renderVersions(data.items);
+        setOutput(data);
+        setStatus(`Version rules refreshed: ${data.total}`);
+      }
+
+      async function loadAuditLogs() {
+        const data = await callApi(`/api/admin/audit-logs${buildQuery({ limit: el("audit-limit").value })}`);
+        renderAuditLogs(data.items);
+        setOutput(data);
+        setStatus(`审计日志已刷新，共 ${data.total} 条。`);
+      }
+
+      async function refreshAllPanels() {
+        await refreshDashboard();
+        await loadAccounts();
+        await loadBindings();
+        await loadBlocks();
+        await loadSessions();
+        await loadVersions();
+        await loadAuditLogs();
+      }
+
+      async function guarded(action) {
+        try {
+          await action();
+        } catch (error) {
+          setOutput({ error: error.message });
+          setStatus(error.message, "warn");
+        }
+      }
+
+      el("login-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/login", {
+          method: "POST",
+          body: JSON.stringify({
+            username: el("admin-username").value,
+            password: el("admin-password").value
+          })
+        });
+        adminToken = data.token;
+        el("session-strip").textContent = `已登录管理员 ${data.admin.username}，Bearer Token：${data.token}`;
+        setOutput(data);
+        setStatus("管理员登录成功，正在刷新控制台。");
+        await refreshAllPanels();
+      }));
+
+      el("refresh-all-btn").addEventListener("click", () => guarded(refreshAllPanels));
+      el("refresh-dashboard-btn").addEventListener("click", () => guarded(refreshDashboard));
+      el("load-audit-btn").addEventListener("click", () => guarded(loadAuditLogs));
+      el("load-accounts-btn").addEventListener("click", () => guarded(loadAccounts));
+      el("load-bindings-btn").addEventListener("click", () => guarded(loadBindings));
+      el("load-blocks-btn").addEventListener("click", () => guarded(loadBlocks));
+      el("load-sessions-btn").addEventListener("click", () => guarded(loadSessions));
+      if (el("load-versions-btn")) {
+        el("load-versions-btn").addEventListener("click", () => guarded(loadVersions));
+      }
+
+      el("create-product-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/products", {
+          method: "POST",
+          body: JSON.stringify({
+            code: el("product-code").value,
+            name: el("product-name").value,
+            description: el("product-description").value
+          })
+        });
+        setOutput(data);
+        setStatus(`产品 ${data.code} 创建成功。`);
+        el("policy-product-code").value = data.code;
+        el("card-product-code").value = data.code;
+        el("block-product-code").value = data.code;
+        if (el("version-product-code")) {
+          el("version-product-code").value = data.code;
+        }
+        await refreshDashboard();
+      }));
+
+      el("create-policy-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/policies", {
+          method: "POST",
+          body: JSON.stringify({
+            productCode: el("policy-product-code").value,
+            name: el("policy-name").value,
+            durationDays: Number(el("policy-duration").value),
+            maxDevices: Number(el("policy-max-devices").value),
+            heartbeatIntervalSeconds: Number(el("policy-heartbeat-interval").value),
+            heartbeatTimeoutSeconds: Number(el("policy-heartbeat-timeout").value),
+            tokenTtlSeconds: Number(el("policy-token-ttl").value)
+          })
+        });
+        setOutput(data);
+        setStatus(`策略 ${data.name} 创建成功。`);
+        el("card-policy-id").value = data.id;
+        await refreshDashboard();
+      }));
+
+      el("create-card-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/cards/batch", {
+          method: "POST",
+          body: JSON.stringify({
+            productCode: el("card-product-code").value,
+            policyId: el("card-policy-id").value,
+            count: Number(el("card-count").value),
+            prefix: el("card-prefix").value
+          })
+        });
+        setOutput(data);
+        setStatus(`已生成 ${data.count} 个卡密，批次号 ${data.batchCode}。`);
+        await refreshDashboard();
+      }));
+
+      if (el("create-version-btn")) {
+        el("create-version-btn").addEventListener("click", () => guarded(async () => {
+          const data = await callApi("/api/admin/client-versions", {
+            method: "POST",
+            body: JSON.stringify({
+              productCode: el("version-product-code").value,
+              version: el("version-value").value,
+              channel: el("version-channel").value,
+              status: el("version-status").value,
+              forceUpdate: el("version-force-update").value === "true",
+              downloadUrl: el("version-download-url").value,
+              noticeTitle: el("version-notice-title").value,
+              noticeBody: el("version-notice-body").value,
+              releaseNotes: el("version-release-notes").value
+            })
+          });
+          setOutput(data);
+          el("version-id").value = data.id;
+          setStatus(`Version rule created: ${data.version}`);
+          await loadVersions();
+          await refreshDashboard();
+          await loadAuditLogs();
+        }));
+      }
+
+      el("set-account-status-btn").addEventListener("click", () => guarded(async () => {
+        const accountId = el("account-id").value.trim();
+        if (!accountId) {
+          throw new Error("请先输入账号 ID。");
+        }
+        const data = await callApi(`/api/admin/accounts/${encodeURIComponent(accountId)}/status`, {
+          method: "POST",
+          body: JSON.stringify({
+            status: el("account-status").value
+          })
+        });
+        setOutput(data);
+        setStatus(`账号状态已更新为 ${data.status}。`);
+        await loadAccounts();
+        await loadSessions();
+        await refreshDashboard();
+        await loadAuditLogs();
+      }));
+
+      el("revoke-session-btn").addEventListener("click", () => guarded(async () => {
+        const sessionId = el("session-id").value.trim();
+        if (!sessionId) {
+          throw new Error("请先输入会话 ID。");
+        }
+        const data = await callApi(`/api/admin/sessions/${encodeURIComponent(sessionId)}/revoke`, {
+          method: "POST",
+          body: JSON.stringify({
+            reason: el("session-reason").value
+          })
+        });
+        setOutput(data);
+        setStatus(`会话已下线，原因：${data.revokedReason || el("session-reason").value}。`);
+        await loadSessions();
+        await refreshDashboard();
+        await loadAuditLogs();
+      }));
+
+      el("release-binding-btn").addEventListener("click", () => guarded(async () => {
+        const bindingId = el("binding-id").value.trim();
+        if (!bindingId) {
+          throw new Error("请先输入绑定 ID。");
+        }
+        const data = await callApi(`/api/admin/device-bindings/${encodeURIComponent(bindingId)}/release`, {
+          method: "POST",
+          body: JSON.stringify({
+            reason: el("binding-reason").value
+          })
+        });
+        setOutput(data);
+        setStatus(`设备绑定已释放，影响会话数 ${data.releasedSessions ?? 0}。`);
+        await loadBindings();
+        await loadSessions();
+        await refreshDashboard();
+        await loadAuditLogs();
+      }));
+
+      el("block-device-btn").addEventListener("click", () => guarded(async () => {
+        const productCode = el("block-product-code").value.trim();
+        const deviceFingerprint = el("block-fingerprint").value.trim();
+        if (!productCode || !deviceFingerprint) {
+          throw new Error("请先填写产品代号和设备指纹。");
+        }
+        const data = await callApi("/api/admin/device-blocks", {
+          method: "POST",
+          body: JSON.stringify({
+            productCode,
+            deviceFingerprint,
+            reason: el("block-reason").value,
+            notes: el("block-notes").value
+          })
+        });
+        setOutput(data);
+        el("block-id").value = data.id;
+        setStatus(`设备已封禁，影响会话 ${data.affectedSessions ?? 0}。`);
+        await loadBindings();
+        await loadBlocks();
+        await loadSessions();
+        await refreshDashboard();
+        await loadAuditLogs();
+      }));
+
+      el("unblock-device-btn").addEventListener("click", () => guarded(async () => {
+        const blockId = el("block-id").value.trim();
+        if (!blockId) {
+          throw new Error("请先输入封禁记录 ID。");
+        }
+        const data = await callApi(`/api/admin/device-blocks/${encodeURIComponent(blockId)}/unblock`, {
+          method: "POST",
+          body: JSON.stringify({
+            reason: el("unblock-reason").value
+          })
+        });
+        setOutput(data);
+        setStatus(`设备封禁已解除，原因：${data.releaseReason || el("unblock-reason").value}。`);
+        await loadBlocks();
+        await refreshDashboard();
+        await loadAuditLogs();
+      }));
+
+      if (el("update-version-status-btn")) {
+        el("update-version-status-btn").addEventListener("click", () => guarded(async () => {
+          const versionId = el("version-id").value.trim();
+          if (!versionId) {
+            throw new Error("请输入版本规则 ID。");
+          }
+          const data = await callApi(`/api/admin/client-versions/${encodeURIComponent(versionId)}/status`, {
+            method: "POST",
+            body: JSON.stringify({
+              status: el("version-update-status").value,
+              forceUpdate: el("version-update-force").value === "true"
+            })
+          });
+          setOutput(data);
+          setStatus(`Version status updated: ${data.status}`);
+          await loadVersions();
+          await refreshDashboard();
+          await loadAuditLogs();
+        }));
+      }
+
+      renderStats();
+      renderAccounts([]);
+      renderBindings([]);
+      renderBlocks([]);
+      renderSessions([]);
+      renderVersions([]);
+      renderAuditLogs([]);
+    </script>
+  </body>
+</html>

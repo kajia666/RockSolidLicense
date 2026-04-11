@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Console</title>
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --surface: rgba(255, 252, 246, 0.92);
+        --ink: #1b1f1d;
+        --muted: #5f665f;
+        --line: rgba(27, 31, 29, 0.12);
+        --accent: #0d7c66;
+        --danger: #a73f2d;
+        --shadow: 0 24px 60px rgba(46, 47, 41, 0.12);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(13, 124, 102, 0.16), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(240, 157, 87, 0.18), transparent 26%),
+          linear-gradient(135deg, #f2ebdf 0%, #f7f2ea 50%, #efe7d8 100%);
+      }
+
+      .shell {
+        width: min(1200px, calc(100vw - 32px));
+        margin: 24px auto;
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero,
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero { padding: 28px; display: grid; gap: 12px; }
+      .card { padding: 20px; display: grid; gap: 14px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+      h1, h2 { margin: 0; }
+      h1 { font-size: clamp(28px, 6vw, 44px); letter-spacing: 0.02em; }
+      .sub { color: var(--muted); max-width: 780px; line-height: 1.6; }
+      .token { font-size: 13px; color: var(--muted); word-break: break-all; }
+      label { display: grid; gap: 8px; color: var(--muted); font-size: 14px; }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      textarea { min-height: 108px; resize: vertical; }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        background: var(--ink);
+        color: white;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.secondary { background: var(--accent); }
+      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+      .stat { padding: 14px; border-radius: 18px; background: rgba(255,255,255,0.8); border: 1px solid var(--line); }
+      .stat strong { display: block; font-size: 26px; }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: rgba(19, 27, 24, 0.94);
+        color: #f3f6f3;
+        border-radius: 18px;
+        padding: 16px;
+        min-height: 180px;
+        overflow: auto;
+      }
+
+      .hint { color: var(--muted); font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>RockSolidLicense Console</h1>
+        <div class="sub">
+          商业级网络验证系统第一版控制台。可以创建产品、策略、卡密批次，并查看在线会话与 SDK 所需的签名凭据。
+        </div>
+        <div class="token">
+          默认管理员账号：<code>admin</code> / <code>ChangeMe!123</code>。生产环境请用环境变量覆盖。
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>管理员登录</h2>
+          <label>用户名<input id="admin-username" value="admin" /></label>
+          <label>密码<input id="admin-password" type="password" value="ChangeMe!123" /></label>
+          <button id="login-btn">登录</button>
+          <div class="token" id="admin-session">未登录</div>
+        </article>
+
+        <article class="card">
+          <h2>创建产品</h2>
+          <label>产品代号<input id="product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>产品名称<input id="product-name" placeholder="My Software" /></label>
+          <label>描述<textarea id="product-description" placeholder="例如：专业版桌面客户端授权系统"></textarea></label>
+          <button class="secondary" id="create-product-btn">创建产品</button>
+        </article>
+
+        <article class="card">
+          <h2>创建策略</h2>
+          <label>产品代号<input id="policy-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>策略名<input id="policy-name" placeholder="Professional 30D" /></label>
+          <label>有效天数<input id="policy-duration" type="number" value="30" /></label>
+          <label>最多设备数<input id="policy-max-devices" type="number" value="1" /></label>
+          <label>心跳间隔秒数<input id="policy-heartbeat-interval" type="number" value="60" /></label>
+          <label>心跳超时秒数<input id="policy-heartbeat-timeout" type="number" value="180" /></label>
+          <label>令牌 TTL 秒数<input id="policy-token-ttl" type="number" value="300" /></label>
+          <button class="secondary" id="create-policy-btn">创建策略</button>
+        </article>
+
+        <article class="card">
+          <h2>批量生成卡密</h2>
+          <label>产品代号<input id="card-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>策略 ID<input id="card-policy-id" placeholder="pol_xxx" /></label>
+          <label>数量<input id="card-count" type="number" value="10" /></label>
+          <label>卡密前缀<input id="card-prefix" placeholder="MYSOFT" /></label>
+          <button class="secondary" id="create-card-btn">生成卡密</button>
+          <div class="hint">策略创建成功后，返回值里会有策略 ID。</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>实时概览</h2>
+          <div class="stats" id="stats"></div>
+          <button id="refresh-dashboard-btn">刷新仪表盘</button>
+        </article>
+
+        <article class="card">
+          <h2>接口输出</h2>
+          <pre id="output">等待操作…</pre>
+          <div class="hint">产品创建完成后，会返回 `sdkAppId` 和 `sdkAppSecret`，客户端 SDK 需要这两个值。</div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      let adminToken = "";
+
+      async function callApi(path, options = {}) {
+        const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+        if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+
+        const response = await fetch(path, { ...options, headers });
+        const json = await response.json();
+        if (!response.ok || !json.ok) {
+          throw new Error(json.error?.message || `Request failed: ${response.status}`);
+        }
+        return json.data;
+      }
+
+      function setOutput(value) {
+        document.getElementById("output").textContent = JSON.stringify(value, null, 2);
+      }
+
+      function renderStats(summary = {}) {
+        const stats = document.getElementById("stats");
+        stats.innerHTML = "";
+        const entries = [
+          ["产品数", summary.products ?? 0],
+          ["策略数", summary.policies ?? 0],
+          ["未使用卡密", summary.cardsFresh ?? 0],
+          ["已兑换卡密", summary.cardsRedeemed ?? 0],
+          ["用户数", summary.accounts ?? 0],
+          ["在线会话", summary.onlineSessions ?? 0]
+        ];
+
+        for (const [label, value] of entries) {
+          const item = document.createElement("div");
+          item.className = "stat";
+          item.innerHTML = `<div>${label}</div><strong>${value}</strong>`;
+          stats.appendChild(item);
+        }
+      }
+
+      document.getElementById("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/login", {
+            method: "POST",
+            body: JSON.stringify({
+              username: document.getElementById("admin-username").value,
+              password: document.getElementById("admin-password").value
+            })
+          });
+          adminToken = data.token;
+          document.getElementById("admin-session").textContent = `已登录，令牌：${data.token}`;
+          setOutput(data);
+        } catch (error) {
+          setOutput({ error: error.message });
+        }
+      });
+
+      document.getElementById("create-product-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/products", {
+            method: "POST",
+            body: JSON.stringify({
+              code: document.getElementById("product-code").value,
+              name: document.getElementById("product-name").value,
+              description: document.getElementById("product-description").value
+            })
+          });
+          setOutput(data);
+        } catch (error) {
+          setOutput({ error: error.message });
+        }
+      });
+
+      document.getElementById("create-policy-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/policies", {
+            method: "POST",
+            body: JSON.stringify({
+              productCode: document.getElementById("policy-product-code").value,
+              name: document.getElementById("policy-name").value,
+              durationDays: Number(document.getElementById("policy-duration").value),
+              maxDevices: Number(document.getElementById("policy-max-devices").value),
+              heartbeatIntervalSeconds: Number(document.getElementById("policy-heartbeat-interval").value),
+              heartbeatTimeoutSeconds: Number(document.getElementById("policy-heartbeat-timeout").value),
+              tokenTtlSeconds: Number(document.getElementById("policy-token-ttl").value)
+            })
+          });
+          setOutput(data);
+        } catch (error) {
+          setOutput({ error: error.message });
+        }
+      });
+
+      document.getElementById("create-card-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/cards/batch", {
+            method: "POST",
+            body: JSON.stringify({
+              productCode: document.getElementById("card-product-code").value,
+              policyId: document.getElementById("card-policy-id").value,
+              count: Number(document.getElementById("card-count").value),
+              prefix: document.getElementById("card-prefix").value
+            })
+          });
+          setOutput(data);
+        } catch (error) {
+          setOutput({ error: error.message });
+        }
+      });
+
+      document.getElementById("refresh-dashboard-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/dashboard");
+          renderStats(data.summary);
+          setOutput(data);
+        } catch (error) {
+          setOutput({ error: error.message });
+        }
+      });
+    </script>
+  </body>
+</html>

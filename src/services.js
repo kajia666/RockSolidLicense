@@ -323,6 +323,117 @@ function getResellerAllocationByLicenseKey(db, licenseKeyId) {
   );
 }
 
+function normalizeResellerInventoryFilters(filters = {}) {
+  return {
+    resellerId: filters.resellerId ? String(filters.resellerId).trim() : null,
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    cardStatus: filters.cardStatus ? String(filters.cardStatus).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+}
+
+function queryResellerInventoryRows(db, filters = {}, options = {}) {
+  const normalizedFilters = normalizeResellerInventoryFilters(filters);
+  const conditions = ["ri.status = 'active'"];
+  const params = [];
+
+  if (normalizedFilters.resellerId) {
+    conditions.push("r.id = ?");
+    params.push(normalizedFilters.resellerId);
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.cardStatus) {
+    if (!["fresh", "redeemed"].includes(normalizedFilters.cardStatus)) {
+      throw new AppError(400, "INVALID_CARD_STATUS", "Card status must be fresh or redeemed.");
+    }
+    conditions.push("lk.status = ?");
+    params.push(normalizedFilters.cardStatus);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(r.code LIKE ? ESCAPE '\\' OR lk.card_key LIKE ? ESCAPE '\\' OR COALESCE(a.username, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const limit = options.limit === undefined || options.limit === null
+    ? ""
+    : `LIMIT ${Math.max(1, Number(options.limit))}`;
+
+  const items = many(
+    db,
+    `
+      SELECT ri.id, ri.allocation_batch_code, ri.allocated_at, ri.notes, ri.status,
+             r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name, r.status AS reseller_status,
+             pr.code AS product_code, pr.name AS product_name, pol.id AS policy_id, pol.name AS policy_name,
+             lk.card_key, lk.status AS card_status, lk.issued_at, lk.redeemed_at,
+             a.username AS redeemed_username
+      FROM reseller_inventory ri
+      JOIN resellers r ON r.id = ri.reseller_id
+      JOIN products pr ON pr.id = ri.product_id
+      JOIN policies pol ON pol.id = ri.policy_id
+      JOIN license_keys lk ON lk.id = ri.license_key_id
+      LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY ri.allocated_at DESC, lk.issued_at DESC
+      ${limit}
+    `,
+    ...params
+  ).map((row) => ({
+    id: row.id,
+    allocationBatchCode: row.allocation_batch_code,
+    allocatedAt: row.allocated_at,
+    notes: row.notes ?? null,
+    status: row.status,
+    resellerId: row.reseller_id,
+    resellerCode: row.reseller_code,
+    resellerName: row.reseller_name,
+    resellerStatus: row.reseller_status,
+    productCode: row.product_code,
+    productName: row.product_name,
+    policyId: row.policy_id,
+    policyName: row.policy_name,
+    cardKey: row.card_key,
+    cardStatus: row.card_status,
+    issuedAt: row.issued_at,
+    redeemedAt: row.redeemed_at,
+    redeemedUsername: row.redeemed_username ?? null
+  }));
+
+  return {
+    items,
+    filters: normalizedFilters
+  };
+}
+
+function summarizeResellerInventory(items) {
+  return items.reduce(
+    (accumulator, item) => {
+      accumulator.total += 1;
+      if (item.cardStatus === "fresh") {
+        accumulator.fresh += 1;
+      }
+      if (item.cardStatus === "redeemed") {
+        accumulator.redeemed += 1;
+      }
+      return accumulator;
+    },
+    { total: 0, fresh: 0, redeemed: 0 }
+  );
+}
+
+function toCsvCell(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, "\"\"")}"`;
+}
+
 function activeDeviceBlock(db, productId, fingerprint) {
   return one(
     db,
@@ -1290,98 +1401,137 @@ export function createServices(db, config) {
 
     listResellerInventory(token, filters = {}) {
       requireAdminSession(db, token);
-
-      const conditions = ["ri.status = 'active'"];
-      const params = [];
-      const normalizedFilters = {
-        resellerId: filters.resellerId ? String(filters.resellerId).trim() : null,
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        cardStatus: filters.cardStatus ? String(filters.cardStatus).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (normalizedFilters.resellerId) {
-        conditions.push("r.id = ?");
-        params.push(normalizedFilters.resellerId);
-      }
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
-      }
-
-      if (normalizedFilters.cardStatus) {
-        if (!["fresh", "redeemed"].includes(normalizedFilters.cardStatus)) {
-          throw new AppError(400, "INVALID_CARD_STATUS", "Card status must be fresh or redeemed.");
-        }
-        conditions.push("lk.status = ?");
-        params.push(normalizedFilters.cardStatus);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push(
-          "(r.code LIKE ? ESCAPE '\\' OR lk.card_key LIKE ? ESCAPE '\\' OR COALESCE(a.username, '') LIKE ? ESCAPE '\\')"
-        );
-        params.push(pattern, pattern, pattern);
-      }
-
-      const items = many(
-        db,
-        `
-          SELECT ri.id, ri.allocation_batch_code, ri.allocated_at, ri.notes, ri.status,
-                 r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name,
-                 pr.code AS product_code, pol.name AS policy_name,
-                 lk.card_key, lk.status AS card_status, lk.issued_at, lk.redeemed_at,
-                 a.username AS redeemed_username
-          FROM reseller_inventory ri
-          JOIN resellers r ON r.id = ri.reseller_id
-          JOIN products pr ON pr.id = ri.product_id
-          JOIN policies pol ON pol.id = ri.policy_id
-          JOIN license_keys lk ON lk.id = ri.license_key_id
-          LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
-          WHERE ${conditions.join(" AND ")}
-          ORDER BY ri.allocated_at DESC, lk.issued_at DESC
-          LIMIT 200
-        `,
-        ...params
-      ).map((row) => ({
-        id: row.id,
-        allocationBatchCode: row.allocation_batch_code,
-        allocatedAt: row.allocated_at,
-        notes: row.notes ?? null,
-        status: row.status,
-        resellerId: row.reseller_id,
-        resellerCode: row.reseller_code,
-        resellerName: row.reseller_name,
-        productCode: row.product_code,
-        policyName: row.policy_name,
-        cardKey: row.card_key,
-        cardStatus: row.card_status,
-        issuedAt: row.issued_at,
-        redeemedAt: row.redeemed_at,
-        redeemedUsername: row.redeemed_username ?? null
-      }));
-
-      const summary = items.reduce(
-        (accumulator, item) => {
-          accumulator.total += 1;
-          if (item.cardStatus === "fresh") {
-            accumulator.fresh += 1;
-          }
-          if (item.cardStatus === "redeemed") {
-            accumulator.redeemed += 1;
-          }
-          return accumulator;
-        },
-        { total: 0, fresh: 0, redeemed: 0 }
-      );
+      const { items, filters: normalizedFilters } = queryResellerInventoryRows(db, filters, { limit: 200 });
+      const summary = summarizeResellerInventory(items);
 
       return {
         items,
         summary,
         filters: normalizedFilters
       };
+    },
+
+    resellerReport(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items, filters: normalizedFilters } = queryResellerInventoryRows(db, filters);
+      const totals = summarizeResellerInventory(items);
+
+      const resellerGroups = new Map();
+      const productGroups = new Map();
+
+      for (const item of items) {
+        const resellerKey = item.resellerId;
+        const resellerEntry = resellerGroups.get(resellerKey) ?? {
+          resellerId: item.resellerId,
+          resellerCode: item.resellerCode,
+          resellerName: item.resellerName,
+          resellerStatus: item.resellerStatus,
+          totalAllocated: 0,
+          freshKeys: 0,
+          redeemedKeys: 0,
+          firstAllocatedAt: item.allocatedAt,
+          lastAllocatedAt: item.allocatedAt,
+          lastRedeemedAt: item.redeemedAt ?? null
+        };
+        resellerEntry.totalAllocated += 1;
+        if (item.cardStatus === "fresh") {
+          resellerEntry.freshKeys += 1;
+        }
+        if (item.cardStatus === "redeemed") {
+          resellerEntry.redeemedKeys += 1;
+          if (!resellerEntry.lastRedeemedAt || item.redeemedAt > resellerEntry.lastRedeemedAt) {
+            resellerEntry.lastRedeemedAt = item.redeemedAt;
+          }
+        }
+        if (item.allocatedAt < resellerEntry.firstAllocatedAt) {
+          resellerEntry.firstAllocatedAt = item.allocatedAt;
+        }
+        if (item.allocatedAt > resellerEntry.lastAllocatedAt) {
+          resellerEntry.lastAllocatedAt = item.allocatedAt;
+        }
+        resellerGroups.set(resellerKey, resellerEntry);
+
+        const productKey = item.productCode;
+        const productEntry = productGroups.get(productKey) ?? {
+          productCode: item.productCode,
+          productName: item.productName,
+          totalAllocated: 0,
+          freshKeys: 0,
+          redeemedKeys: 0
+        };
+        productEntry.totalAllocated += 1;
+        if (item.cardStatus === "fresh") {
+          productEntry.freshKeys += 1;
+        }
+        if (item.cardStatus === "redeemed") {
+          productEntry.redeemedKeys += 1;
+        }
+        productGroups.set(productKey, productEntry);
+      }
+
+      return {
+        totals: {
+          ...totals,
+          resellerCount: resellerGroups.size,
+          productCount: productGroups.size
+        },
+        byReseller: Array.from(resellerGroups.values()).sort((left, right) => {
+          if (right.redeemedKeys !== left.redeemedKeys) {
+            return right.redeemedKeys - left.redeemedKeys;
+          }
+          return right.totalAllocated - left.totalAllocated;
+        }),
+        byProduct: Array.from(productGroups.values()).sort((left, right) => right.totalAllocated - left.totalAllocated),
+        filters: normalizedFilters
+      };
+    },
+
+    exportResellerInventoryCsv(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items } = queryResellerInventoryRows(db, filters);
+
+      const header = [
+        "resellerId",
+        "resellerCode",
+        "resellerName",
+        "resellerStatus",
+        "productCode",
+        "productName",
+        "policyId",
+        "policyName",
+        "allocationBatchCode",
+        "cardKey",
+        "cardStatus",
+        "redeemedUsername",
+        "allocatedAt",
+        "issuedAt",
+        "redeemedAt",
+        "notes"
+      ];
+
+      const lines = [
+        header.map(toCsvCell).join(","),
+        ...items.map((item) => ([
+          item.resellerId,
+          item.resellerCode,
+          item.resellerName,
+          item.resellerStatus,
+          item.productCode,
+          item.productName,
+          item.policyId,
+          item.policyName,
+          item.allocationBatchCode,
+          item.cardKey,
+          item.cardStatus,
+          item.redeemedUsername ?? "",
+          item.allocatedAt,
+          item.issuedAt,
+          item.redeemedAt ?? "",
+          item.notes ?? ""
+        ].map(toCsvCell).join(",")))
+      ];
+
+      return lines.join("\r\n");
     },
 
     dashboard(token) {

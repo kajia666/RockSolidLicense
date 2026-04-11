@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Reseller Center</title>
+    <style>
+      :root {
+        --bg: #f6f1e8;
+        --surface: rgba(255, 251, 245, 0.95);
+        --line: rgba(34, 28, 22, 0.1);
+        --ink: #221c16;
+        --muted: #6d6459;
+        --accent: #186f61;
+        --accent-soft: rgba(24, 111, 97, 0.12);
+        --warn: #976322;
+        --warn-soft: rgba(151, 99, 34, 0.12);
+        --danger: #a0422c;
+        --danger-soft: rgba(160, 66, 44, 0.12);
+        --shadow: 0 24px 60px rgba(61, 54, 45, 0.15);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(24, 111, 97, 0.15), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(194, 140, 76, 0.18), transparent 30%),
+          linear-gradient(135deg, #f5ede2 0%, #f8f4ed 54%, #efe5d6 100%);
+      }
+
+      code, pre {
+        font-family: "Cascadia Code", "Consolas", monospace;
+      }
+
+      .shell {
+        width: min(1400px, calc(100vw - 28px));
+        margin: 20px auto 36px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero, .card {
+        padding: 20px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        gap: 10px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+        gap: 18px;
+      }
+
+      .table-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 18px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(34, 28, 22, 0.08);
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 24px;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      h1, h2, p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(28px, 5vw, 44px);
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      .sub, .hint, .nav {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .hint, .nav {
+        font-size: 13px;
+      }
+
+      .nav a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      input, select, textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        color: white;
+        background: var(--ink);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.secondary { background: var(--accent); }
+      button.warn { background: var(--warn); }
+      button.danger { background: var(--danger); }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .status {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+      }
+
+      .status.warn {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(34, 28, 22, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        background: rgba(247, 243, 236, 0.98);
+        color: var(--muted);
+      }
+
+      tbody tr {
+        cursor: pointer;
+      }
+
+      tbody tr:hover {
+        background: rgba(24, 111, 97, 0.06);
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(34, 28, 22, 0.08);
+        color: var(--muted);
+      }
+
+      .tag.ok {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tag.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .tag.danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      pre {
+        margin: 0;
+        min-height: 200px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef8f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1100px) {
+        .table-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Reseller Center</h1>
+        <p class="sub">
+          Manage distributors, allocate card inventory, export channel stock, and inspect redemption progress from one place.
+        </p>
+        <div class="nav">
+          Route: <code>/admin/resellers</code>.
+          Related panels:
+          <a href="/admin">Console</a> /
+          <a href="/admin/notices">Notice Center</a> /
+          <a href="/admin/security">Security Center</a>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Admin Login</h2>
+          <label>Username<input id="username" value="admin" /></label>
+          <label>Password<input id="password" type="password" value="ChangeMe!123" /></label>
+          <div class="actions">
+            <button id="login-btn">Log In</button>
+            <button class="secondary" id="refresh-all-btn">Refresh All</button>
+          </div>
+          <div class="status" id="status-box">Waiting for admin login.</div>
+        </article>
+
+        <article class="card">
+          <h2>Create Reseller</h2>
+          <label>Reseller Code<input id="reseller-code" placeholder="AGENT_EAST" /></label>
+          <label>Reseller Name<input id="reseller-name" placeholder="East Region Partner" /></label>
+          <label>Contact Name<input id="contact-name" placeholder="Zhang San" /></label>
+          <label>Contact Email<input id="contact-email" placeholder="agent@example.com" /></label>
+          <label>Notes<textarea id="reseller-notes" placeholder="Primary Windows desktop channel"></textarea></label>
+          <button class="secondary" id="create-reseller-btn">Create Reseller</button>
+        </article>
+
+        <article class="card">
+          <h2>Allocate Inventory</h2>
+          <label>Reseller ID<input id="allocate-reseller-id" placeholder="Click a reseller row to auto-fill" /></label>
+          <label>Product Code<input id="allocate-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>Policy ID<input id="allocate-policy-id" placeholder="pol_xxx" /></label>
+          <label>Count<input id="allocate-count" type="number" min="1" max="5000" value="5" /></label>
+          <label>Card Prefix<input id="allocate-prefix" placeholder="AGENT1" /></label>
+          <label>Notes<textarea id="allocate-notes" placeholder="2026Q2 launch batch"></textarea></label>
+          <button class="warn" id="allocate-btn">Generate and Allocate</button>
+        </article>
+
+        <article class="card">
+          <h2>Reseller Status</h2>
+          <label>Reseller ID<input id="status-reseller-id" placeholder="Click a reseller row to auto-fill" /></label>
+          <label>
+            Target Status
+            <select id="reseller-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <button class="danger" id="update-status-btn">Update Status</button>
+          <div class="hint">
+            Disabling a reseller blocks future inventory allocation, but does not invalidate already sold card keys.
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Inventory Filters</h2>
+        <div class="grid">
+          <label>Filter Reseller ID<input id="filter-inventory-reseller-id" placeholder="blank means all" /></label>
+          <label>Filter Product Code<input id="filter-inventory-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>
+            Card Status
+            <select id="filter-inventory-card-status">
+              <option value="">all</option>
+              <option value="fresh">fresh</option>
+              <option value="redeemed">redeemed</option>
+            </select>
+          </label>
+          <label>Keyword<input id="filter-inventory-search" placeholder="reseller code / card key / username" /></label>
+        </div>
+        <div class="actions">
+          <button class="secondary" id="refresh-inventory-btn">Refresh Inventory</button>
+          <button id="refresh-resellers-btn">Refresh Resellers</button>
+          <button class="secondary" id="refresh-report-btn">Load Report</button>
+          <button id="export-csv-btn">Export CSV</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Channel Report</h2>
+        <div class="stats" id="report-stats">
+          <div class="stat"><strong>0</strong><span>Resellers</span></div>
+          <div class="stat"><strong>0</strong><span>Products</span></div>
+          <div class="stat"><strong>0</strong><span>Allocated</span></div>
+          <div class="stat"><strong>0</strong><span>Fresh</span></div>
+          <div class="stat"><strong>0</strong><span>Redeemed</span></div>
+        </div>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
+          <h2>Reseller List</h2>
+          <div class="hint">Click a row to auto-fill reseller-related forms and filters.</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Allocated</th>
+                  <th>Redeemed</th>
+                  <th>Contact</th>
+                </tr>
+              </thead>
+              <tbody id="reseller-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Inventory Detail</h2>
+          <div class="hint">Click a row to reuse the reseller and product filters for another lookup or export.</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Card Key</th>
+                  <th>Reseller</th>
+                  <th>Product</th>
+                  <th>Policy</th>
+                  <th>Status</th>
+                  <th>Redeemed User</th>
+                  <th>Batch</th>
+                  <th>Allocated At</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
+          <h2>Report by Reseller</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Reseller</th>
+                  <th>Status</th>
+                  <th>Allocated</th>
+                  <th>Fresh</th>
+                  <th>Redeemed</th>
+                  <th>Last Redeemed</th>
+                </tr>
+              </thead>
+              <tbody id="report-reseller-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Report by Product</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Allocated</th>
+                  <th>Fresh</th>
+                  <th>Redeemed</th>
+                </tr>
+              </thead>
+              <tbody id="report-product-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>API Output</h2>
+        <pre id="output">Waiting for actions...</pre>
+      </section>
+    </main>
+
+    <script>
+      let adminToken = "";
+
+      function el(id) {
+        return document.getElementById(id);
+      }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = JSON.stringify(value, null, 2);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function formatTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function renderTag(value) {
+        const text = String(value ?? "unknown");
+        let className = "tag";
+        if (text === "active" || text === "fresh") className = "tag ok";
+        if (text === "disabled") className = "tag danger";
+        if (text === "redeemed") className = "tag warn";
+        return `<span class="${className}">${escapeHtml(text)}</span>`;
+      }
+
+      function buildFilterSuffix() {
+        const query = new URLSearchParams();
+        const resellerId = el("filter-inventory-reseller-id").value.trim();
+        const productCode = el("filter-inventory-product-code").value.trim();
+        const cardStatus = el("filter-inventory-card-status").value;
+        const search = el("filter-inventory-search").value.trim();
+
+        if (resellerId) query.set("resellerId", resellerId);
+        if (productCode) query.set("productCode", productCode);
+        if (cardStatus) query.set("cardStatus", cardStatus);
+        if (search) query.set("search", search);
+
+        return query.toString() ? `?${query.toString()}` : "";
+      }
+
+      async function callApi(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+        if (body) headers["Content-Type"] = "application/json";
+        if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers,
+          body
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          const error = payload.error || { code: "UNKNOWN", message: "Request failed." };
+          throw new Error(`${error.code}: ${error.message}`);
+        }
+        return payload.data;
+      }
+
+      async function downloadCsv(path, filename) {
+        const response = await fetch(path, {
+          headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {}
+        });
+
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error(`CSV_EXPORT_FAILED: ${text}`);
+        }
+
+        const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function renderResellers(items) {
+        const body = el("reseller-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="6">No resellers yet.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = items.map((item) => `
+          <tr data-id="${escapeHtml(item.id)}" data-code="${escapeHtml(item.code)}">
+            <td><strong>${escapeHtml(item.code)}</strong></td>
+            <td>${escapeHtml(item.name)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${escapeHtml(item.totalAllocated)}</td>
+            <td>${escapeHtml(item.redeemedKeys)}</td>
+            <td>${escapeHtml(item.contactName || item.contactEmail || "-")}</td>
+          </tr>
+        `).join("");
+
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            el("allocate-reseller-id").value = row.dataset.id;
+            el("status-reseller-id").value = row.dataset.id;
+            el("filter-inventory-reseller-id").value = row.dataset.id;
+            setOutput({
+              selectedResellerId: row.dataset.id,
+              selectedResellerCode: row.dataset.code
+            });
+          });
+        }
+      }
+
+      function renderInventory(items) {
+        const body = el("inventory-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="8">No inventory records.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = items.map((item) => `
+          <tr data-reseller-id="${escapeHtml(item.resellerId)}" data-product-code="${escapeHtml(item.productCode)}">
+            <td><code>${escapeHtml(item.cardKey)}</code></td>
+            <td>${escapeHtml(item.resellerCode)}</td>
+            <td>${escapeHtml(item.productCode)}</td>
+            <td>${escapeHtml(item.policyName)}</td>
+            <td>${renderTag(item.cardStatus)}</td>
+            <td>${escapeHtml(item.redeemedUsername || "-")}</td>
+            <td>${escapeHtml(item.allocationBatchCode)}</td>
+            <td>${escapeHtml(formatTime(item.allocatedAt))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of body.querySelectorAll("tr[data-reseller-id]")) {
+          row.addEventListener("click", () => {
+            el("filter-inventory-reseller-id").value = row.dataset.resellerId;
+            el("filter-inventory-product-code").value = row.dataset.productCode;
+          });
+        }
+      }
+
+      function renderReport(report) {
+        el("report-stats").innerHTML = `
+          <div class="stat"><strong>${escapeHtml(report.totals.resellerCount)}</strong><span>Resellers</span></div>
+          <div class="stat"><strong>${escapeHtml(report.totals.productCount)}</strong><span>Products</span></div>
+          <div class="stat"><strong>${escapeHtml(report.totals.total)}</strong><span>Allocated</span></div>
+          <div class="stat"><strong>${escapeHtml(report.totals.fresh)}</strong><span>Fresh</span></div>
+          <div class="stat"><strong>${escapeHtml(report.totals.redeemed)}</strong><span>Redeemed</span></div>
+        `;
+
+        const resellerBody = el("report-reseller-body");
+        resellerBody.innerHTML = report.byReseller.length
+          ? report.byReseller.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.resellerCode)}<br /><span class="hint">${escapeHtml(item.resellerName)}</span></td>
+                <td>${renderTag(item.resellerStatus)}</td>
+                <td>${escapeHtml(item.totalAllocated)}</td>
+                <td>${escapeHtml(item.freshKeys)}</td>
+                <td>${escapeHtml(item.redeemedKeys)}</td>
+                <td>${escapeHtml(formatTime(item.lastRedeemedAt))}</td>
+              </tr>
+            `).join("")
+          : '<tr><td colspan="6">No report rows.</td></tr>';
+
+        const productBody = el("report-product-body");
+        productBody.innerHTML = report.byProduct.length
+          ? report.byProduct.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.productCode)}<br /><span class="hint">${escapeHtml(item.productName)}</span></td>
+                <td>${escapeHtml(item.totalAllocated)}</td>
+                <td>${escapeHtml(item.freshKeys)}</td>
+                <td>${escapeHtml(item.redeemedKeys)}</td>
+              </tr>
+            `).join("")
+          : '<tr><td colspan="4">No product rows.</td></tr>';
+      }
+
+      async function refreshResellers() {
+        const data = await callApi("/api/admin/resellers");
+        renderResellers(data.items);
+        return data;
+      }
+
+      async function refreshInventory() {
+        const suffix = buildFilterSuffix();
+        const data = await callApi(`/api/admin/reseller-inventory${suffix}`);
+        renderInventory(data.items);
+        return data;
+      }
+
+      async function refreshReport() {
+        const suffix = buildFilterSuffix();
+        const data = await callApi(`/api/admin/reseller-report${suffix}`);
+        renderReport(data);
+        return data;
+      }
+
+      async function refreshAll() {
+        const [resellers, inventory, report] = await Promise.all([
+          refreshResellers(),
+          refreshInventory(),
+          refreshReport()
+        ]);
+        setOutput({ resellers, inventory, report });
+      }
+
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/login", {
+            method: "POST",
+            body: {
+              username: el("username").value.trim(),
+              password: el("password").value
+            }
+          });
+          adminToken = data.token;
+          setStatus(`Admin ${data.admin.username} is connected.`);
+          setOutput(data);
+          await refreshAll();
+        } catch (error) {
+          adminToken = "";
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("create-reseller-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/resellers", {
+            method: "POST",
+            body: {
+              code: el("reseller-code").value.trim(),
+              name: el("reseller-name").value.trim(),
+              contactName: el("contact-name").value.trim(),
+              contactEmail: el("contact-email").value.trim(),
+              notes: el("reseller-notes").value.trim()
+            }
+          });
+          el("allocate-reseller-id").value = data.id;
+          el("status-reseller-id").value = data.id;
+          el("filter-inventory-reseller-id").value = data.id;
+          setOutput(data);
+          await refreshAll();
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("allocate-btn").addEventListener("click", async () => {
+        try {
+          const resellerId = el("allocate-reseller-id").value.trim();
+          const data = await callApi(`/api/admin/resellers/${encodeURIComponent(resellerId)}/allocate-cards`, {
+            method: "POST",
+            body: {
+              productCode: el("allocate-product-code").value.trim(),
+              policyId: el("allocate-policy-id").value.trim(),
+              count: Number(el("allocate-count").value || 0),
+              prefix: el("allocate-prefix").value.trim(),
+              notes: el("allocate-notes").value.trim()
+            }
+          });
+          el("filter-inventory-reseller-id").value = resellerId;
+          el("filter-inventory-product-code").value = data.productCode;
+          setOutput(data);
+          await refreshAll();
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("update-status-btn").addEventListener("click", async () => {
+        try {
+          const resellerId = el("status-reseller-id").value.trim();
+          const data = await callApi(`/api/admin/resellers/${encodeURIComponent(resellerId)}/status`, {
+            method: "POST",
+            body: {
+              status: el("reseller-status").value
+            }
+          });
+          setOutput(data);
+          await refreshAll();
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-all-btn").addEventListener("click", async () => {
+        try {
+          await refreshAll();
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-resellers-btn").addEventListener("click", async () => {
+        try {
+          const data = await refreshResellers();
+          setOutput(data);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-inventory-btn").addEventListener("click", async () => {
+        try {
+          const data = await refreshInventory();
+          setOutput(data);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-report-btn").addEventListener("click", async () => {
+        try {
+          const data = await refreshReport();
+          setOutput(data);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("export-csv-btn").addEventListener("click", async () => {
+        try {
+          const suffix = buildFilterSuffix();
+          await downloadCsv(`/api/admin/reseller-inventory/export${suffix}`, "reseller-inventory.csv");
+          setStatus("CSV export downloaded.");
+          setOutput({ exported: true, filters: suffix || "all" });
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+    </script>
+  </body>
+</html>

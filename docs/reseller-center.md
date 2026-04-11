@@ -9,6 +9,8 @@ This document describes the reseller / distributor inventory workflow that now l
 - allocate card batches to a reseller for a specific product and policy
 - track every allocated card key back to the reseller and allocation batch
 - inspect whether a reseller-issued card is still `fresh` or already `redeemed`
+- export filtered reseller inventory as CSV
+- view aggregate report data by reseller and by product
 
 ## HTTP endpoints
 
@@ -52,6 +54,7 @@ Effects:
 ### Reseller inventory
 
 - `GET /api/admin/reseller-inventory`
+- `GET /api/admin/reseller-inventory/export`
 - `POST /api/admin/resellers/:resellerId/allocate-cards`
 
 Supported query parameters:
@@ -80,9 +83,27 @@ Effects:
 - when a customer redeems a reseller-issued card, the recharge response now includes reseller metadata
 - audit logs record reseller creation, allocation, and status changes
 
+### Reseller reports
+
+- `GET /api/admin/reseller-report`
+
+Supported query parameters:
+
+- `resellerId`
+- `productCode`
+- `cardStatus`
+- `search`
+
+Effects:
+
+- report output summarizes `total`, `fresh`, and `redeemed` channel keys
+- `byReseller` helps identify which channel is consuming inventory fastest
+- `byProduct` helps compare channel activity across software lines
+- CSV export reuses the same filter rules as the inventory list
+
 ## Operator workflow
 
-Open [reseller-center.html](/D:/code/OnlineVerification/src/web/reseller-center.html) through:
+Open [reseller-ops.html](/D:/code/OnlineVerification/src/web/reseller-ops.html) through:
 
 - `http://127.0.0.1:3000/admin/resellers`
 
@@ -93,7 +114,9 @@ Recommended flow:
 3. prepare product and policy in the main console
 4. allocate a batch to the reseller
 5. inspect inventory by `fresh` and `redeemed`
-6. use audit logs to confirm who created or changed a reseller record
+6. load the report panel to review reseller and product aggregates
+7. export filtered inventory when finance, channel support, or audit needs an extract
+8. use audit logs to confirm who created or changed a reseller record
 
 ## Notes
 

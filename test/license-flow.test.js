@@ -80,6 +80,19 @@ async function getJson(baseUrl, path, token) {
   return json.data;
 }
 
+async function getText(baseUrl, path, token) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+  const text = await response.text();
+  assert.equal(response.ok, true, text);
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    body: text
+  };
+}
+
 async function signedClientPost(baseUrl, path, appId, secret, payload) {
   const body = JSON.stringify(payload);
   const timestamp = new Date().toISOString();
@@ -1566,6 +1579,31 @@ test("reseller inventory can be allocated, tracked, and blocked from new allocat
     );
     assert.equal(resellerListAfter.items[0].freshKeys, 1);
     assert.equal(resellerListAfter.items[0].redeemedKeys, 1);
+
+    const report = await getJson(
+      baseUrl,
+      `/api/admin/reseller-report?resellerId=${encodeURIComponent(reseller.id)}&productCode=RESELLER_APP`,
+      adminSession.token
+    );
+    assert.equal(report.totals.total, 2);
+    assert.equal(report.totals.fresh, 1);
+    assert.equal(report.totals.redeemed, 1);
+    assert.equal(report.totals.resellerCount, 1);
+    assert.equal(report.totals.productCount, 1);
+    assert.equal(report.byReseller[0].resellerCode, "AGENT_EAST");
+    assert.equal(report.byReseller[0].redeemedKeys, 1);
+    assert.equal(report.byProduct[0].productCode, "RESELLER_APP");
+
+    const exported = await getText(
+      baseUrl,
+      `/api/admin/reseller-inventory/export?resellerId=${encodeURIComponent(reseller.id)}&productCode=RESELLER_APP`,
+      adminSession.token
+    );
+    assert.match(exported.contentType, /^text\/csv/);
+    assert.match(exported.body, /resellerCode/);
+    assert.match(exported.body, /AGENT_EAST/);
+    assert.match(exported.body, /RESELLER_APP/);
+    assert.match(exported.body, /olivia/);
 
     const disabled = await postJson(
       baseUrl,

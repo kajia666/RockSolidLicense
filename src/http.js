@@ -45,6 +45,15 @@ export function sendHtml(res, statusCode, html) {
   res.end(html);
 }
 
+export function sendText(res, statusCode, body, contentType = "text/plain; charset=utf-8", headers = {}) {
+  res.writeHead(statusCode, {
+    "content-type": contentType,
+    "cache-control": "no-store",
+    ...headers
+  });
+  res.end(body);
+}
+
 export function getBearerToken(req) {
   const header = req.headers.authorization ?? "";
   if (!header.startsWith("Bearer ")) {

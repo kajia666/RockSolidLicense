@@ -183,6 +183,8 @@ Effects:
 - `POST /api/admin/resellers`
 - `POST /api/admin/resellers/:resellerId/status`
 - `GET /api/admin/reseller-inventory`
+- `GET /api/admin/reseller-inventory/export`
+- `GET /api/admin/reseller-report`
 - `POST /api/admin/resellers/:resellerId/allocate-cards`
 
 Effects:
@@ -191,6 +193,8 @@ Effects:
 - disabled resellers cannot receive new inventory allocations
 - reseller inventory remains traceable after the customer redeems a card
 - recharge responses can now include reseller metadata for settlement or audit use
+- filtered reseller inventory can now be exported as CSV
+- reseller reporting now summarizes channel activity by reseller and by product
 
 ### Notices
 

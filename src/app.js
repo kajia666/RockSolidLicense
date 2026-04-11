@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import { createDatabase } from "./database.js";
-import { AppError, getBearerToken, readJsonBody, requestMeta, sendHtml, sendJson } from "./http.js";
+import { AppError, getBearerToken, readJsonBody, requestMeta, sendHtml, sendJson, sendText } from "./http.js";
 import { loadOrCreateLicenseKeyStore } from "./license-keys.js";
 import { createServices } from "./services.js";
 import { createTcpServer } from "./tcp-server.js";
@@ -12,7 +12,7 @@ import { createTcpServer } from "./tcp-server.js";
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), "utf8");
 const noticeCenterHtml = fs.readFileSync(path.join(currentDir, "web", "notice-center.html"), "utf8");
-const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-center.html"), "utf8");
+const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-ops.html"), "utf8");
 const securityCenterHtml = fs.readFileSync(path.join(currentDir, "web", "security-center.html"), "utf8");
 
 function matchPath(pathname, pattern) {
@@ -163,6 +163,38 @@ export function createApp(overrides = {}) {
             search: url.searchParams.get("search")
           })
         });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/reseller-report") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.resellerReport(getBearerToken(req), {
+            resellerId: url.searchParams.get("resellerId"),
+            productCode: url.searchParams.get("productCode"),
+            cardStatus: url.searchParams.get("cardStatus"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/reseller-inventory/export") {
+        const csv = services.exportResellerInventoryCsv(getBearerToken(req), {
+          resellerId: url.searchParams.get("resellerId"),
+          productCode: url.searchParams.get("productCode"),
+          cardStatus: url.searchParams.get("cardStatus"),
+          search: url.searchParams.get("search")
+        });
+        sendText(
+          res,
+          200,
+          csv,
+          "text/csv; charset=utf-8",
+          {
+            "content-disposition": `attachment; filename="reseller-inventory-${Date.now()}.csv"`
+          }
+        );
         return;
       }
 

@@ -36,6 +36,7 @@ Notes:
 
 - `client.register`
 - `client.recharge`
+- `client.card-login`
 - `client.login`
 - `client.heartbeat`
 - `client.logout`
@@ -45,6 +46,7 @@ For client actions, the server reuses the same business logic as the HTTP endpoi
 
 - `client.register` -> `/api/client/register`
 - `client.recharge` -> `/api/client/recharge`
+- `client.card-login` -> `/api/client/card-login`
 - `client.login` -> `/api/client/login`
 - `client.heartbeat` -> `/api/client/heartbeat`
 - `client.logout` -> `/api/client/logout`

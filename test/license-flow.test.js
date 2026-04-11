@@ -527,6 +527,256 @@ test("tcp client license flow works end-to-end", async () => {
   }
 });
 
+test("card key supports direct login over HTTP while account-redeemed cards stay account-bound", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "CARD_HTTP_APP",
+        name: "Card HTTP App",
+        description: "Direct card login and account recharge"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "CARD_HTTP_APP",
+        name: "Card 30D",
+        durationDays: 30,
+        maxDevices: 1,
+        heartbeatIntervalSeconds: 60,
+        heartbeatTimeoutSeconds: 180,
+        tokenTtlSeconds: 300
+      },
+      adminSession.token
+    );
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "CARD_HTTP_APP",
+        policyId: policy.id,
+        count: 2,
+        prefix: "CARDHTTP"
+      },
+      adminSession.token
+    );
+
+    const directCardKey = batch.keys[0];
+    const accountCardKey = batch.keys[1];
+    assert.ok(directCardKey);
+    assert.ok(accountCardKey);
+
+    const directLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_HTTP_APP",
+        cardKey: directCardKey,
+        deviceFingerprint: "card-http-device-001",
+        deviceName: "Card Login PC"
+      }
+    );
+
+    assert.equal(directLogin.authMode, "card");
+    assert.ok(directLogin.sessionToken);
+    assert.ok(directLogin.licenseToken);
+    assert.ok(directLogin.card.maskedKey.endsWith(directCardKey.slice(-4)));
+    const directPayload = decodeLicenseTokenPayload(directLogin.licenseToken);
+    assert.equal(directPayload.pid, "CARD_HTTP_APP");
+    assert.equal(directPayload.am, "card");
+
+    const heartbeat = await signedClientPost(
+      baseUrl,
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_HTTP_APP",
+        sessionToken: directLogin.sessionToken,
+        deviceFingerprint: "card-http-device-001"
+      }
+    );
+    assert.equal(heartbeat.status, "active");
+
+    const logout = await signedClientPost(
+      baseUrl,
+      "/api/client/logout",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_HTTP_APP",
+        sessionToken: directLogin.sessionToken
+      }
+    );
+    assert.equal(logout.status, "logged_out");
+
+    const relogin = await signedClientPost(
+      baseUrl,
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_HTTP_APP",
+        cardKey: directCardKey,
+        deviceFingerprint: "card-http-device-001",
+        deviceName: "Card Login PC"
+      }
+    );
+    assert.equal(relogin.authMode, "card");
+    assert.notEqual(relogin.sessionToken, directLogin.sessionToken);
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "CARD_HTTP_APP",
+      username: "charlie",
+      password: "StrongPass123"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "CARD_HTTP_APP",
+      username: "charlie",
+      password: "StrongPass123",
+      cardKey: accountCardKey
+    });
+
+    const accountBoundError = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_HTTP_APP",
+        cardKey: accountCardKey,
+        deviceFingerprint: "card-http-device-002",
+        deviceName: "Blocked Card Login"
+      }
+    );
+    assert.equal(accountBoundError.status, 409);
+    assert.equal(accountBoundError.error.code, "CARD_BOUND_TO_ACCOUNT");
+    assert.equal(accountBoundError.error.details.redeemedUsername, "charlie");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("tcp card-login flow works end-to-end", async () => {
+  const { app, baseUrl, tcpPort, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "CARD_TCP_APP",
+        name: "Card TCP App",
+        description: "Direct card login over TCP"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "CARD_TCP_APP",
+        name: "Card TCP 30D",
+        durationDays: 30,
+        maxDevices: 1,
+        heartbeatIntervalSeconds: 45,
+        heartbeatTimeoutSeconds: 120,
+        tokenTtlSeconds: 240
+      },
+      adminSession.token
+    );
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "CARD_TCP_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "CARDTCP"
+      },
+      adminSession.token
+    );
+
+    const cardKey = batch.keys[0];
+    assert.ok(cardKey);
+
+    const login = await signedTcpClientCall(
+      tcpPort,
+      "client.card-login",
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_TCP_APP",
+        cardKey,
+        deviceFingerprint: "card-tcp-device-001",
+        deviceName: "TCP Card Client"
+      }
+    );
+
+    assert.equal(login.authMode, "card");
+    assert.ok(login.sessionToken);
+    assert.ok(login.card.maskedKey.endsWith(cardKey.slice(-4)));
+    const payload = decodeLicenseTokenPayload(login.licenseToken);
+    assert.equal(payload.pid, "CARD_TCP_APP");
+    assert.equal(payload.am, "card");
+
+    const heartbeat = await signedTcpClientCall(
+      tcpPort,
+      "client.heartbeat",
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_TCP_APP",
+        sessionToken: login.sessionToken,
+        deviceFingerprint: "card-tcp-device-001"
+      }
+    );
+    assert.equal(heartbeat.status, "active");
+
+    const logout = await signedTcpClientCall(
+      tcpPort,
+      "client.logout",
+      "/api/client/logout",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "CARD_TCP_APP",
+        sessionToken: login.sessionToken
+      }
+    );
+    assert.equal(logout.status, "logged_out");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("admin operations can inspect and control accounts, sessions, and device bindings", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

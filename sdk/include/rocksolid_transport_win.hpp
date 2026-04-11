@@ -84,6 +84,13 @@ struct RechargeRequest {
   std::string card_key;
 };
 
+struct CardLoginRequest {
+  std::string product_code;
+  std::string card_key;
+  std::string device_fingerprint;
+  std::string device_name;
+};
+
 struct LoginRequest {
   std::string product_code;
   std::string username;
@@ -121,6 +128,7 @@ struct LoginResponse {
   std::string session_token;
   std::string license_token;
   std::string expires_at;
+  std::string auth_mode;
   int heartbeat_interval_seconds = 0;
   int heartbeat_timeout_seconds = 0;
   std::string device_id;
@@ -129,6 +137,9 @@ struct LoginResponse {
   std::string entitlement_id;
   std::string entitlement_policy_name;
   std::string entitlement_ends_at;
+  std::string account_id;
+  std::string account_username;
+  std::string card_masked_key;
 };
 
 struct HeartbeatResponse {
@@ -178,24 +189,28 @@ class LicenseClientWin {
 
   TransportResult register_http(const RegisterRequest& request) const;
   TransportResult recharge_http(const RechargeRequest& request) const;
+  TransportResult card_login_http(const CardLoginRequest& request) const;
   TransportResult login_http(const LoginRequest& request) const;
   TransportResult heartbeat_http(const HeartbeatRequest& request) const;
   TransportResult logout_http(const LogoutRequest& request) const;
 
   TransportResult register_tcp(const RegisterRequest& request) const;
   TransportResult recharge_tcp(const RechargeRequest& request) const;
+  TransportResult card_login_tcp(const CardLoginRequest& request) const;
   TransportResult login_tcp(const LoginRequest& request) const;
   TransportResult heartbeat_tcp(const HeartbeatRequest& request) const;
   TransportResult logout_tcp(const LogoutRequest& request) const;
 
   RegisterResponse register_http_parsed(const RegisterRequest& request) const;
   RechargeResponse recharge_http_parsed(const RechargeRequest& request) const;
+  LoginResponse card_login_http_parsed(const CardLoginRequest& request) const;
   LoginResponse login_http_parsed(const LoginRequest& request) const;
   HeartbeatResponse heartbeat_http_parsed(const HeartbeatRequest& request) const;
   LogoutResponse logout_http_parsed(const LogoutRequest& request) const;
 
   RegisterResponse register_tcp_parsed(const RegisterRequest& request) const;
   RechargeResponse recharge_tcp_parsed(const RechargeRequest& request) const;
+  LoginResponse card_login_tcp_parsed(const CardLoginRequest& request) const;
   LoginResponse login_tcp_parsed(const LoginRequest& request) const;
   HeartbeatResponse heartbeat_tcp_parsed(const HeartbeatRequest& request) const;
   LogoutResponse logout_tcp_parsed(const LogoutRequest& request) const;
@@ -217,6 +232,7 @@ class LicenseClientWin {
 
   static std::string to_json(const RegisterRequest& request);
   static std::string to_json(const RechargeRequest& request);
+  static std::string to_json(const CardLoginRequest& request);
   static std::string to_json(const LoginRequest& request);
   static std::string to_json(const HeartbeatRequest& request);
   static std::string to_json(const LogoutRequest& request);

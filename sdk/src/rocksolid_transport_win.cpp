@@ -502,6 +502,9 @@ LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope
   response.session_token = require_json_string(envelope.data, "sessionToken");
   response.license_token = require_json_string(envelope.data, "licenseToken");
   response.expires_at = require_json_string(envelope.data, "expiresAt");
+  response.auth_mode = envelope.data.has("authMode") && envelope.data.at("authMode").is_string()
+    ? envelope.data.at("authMode").as_string()
+    : "account";
 
   const JsonValue& heartbeat = require_json_object(envelope.data, "heartbeat");
   response.heartbeat_interval_seconds = require_json_int(heartbeat, "intervalSeconds");
@@ -516,6 +519,20 @@ LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope
   response.entitlement_id = require_json_string(entitlement, "id");
   response.entitlement_policy_name = require_json_string(entitlement, "policyName");
   response.entitlement_ends_at = require_json_string(entitlement, "endsAt");
+
+  if (envelope.data.has("account") && envelope.data.at("account").is_object()) {
+    const JsonValue& account = envelope.data.at("account");
+    response.account_id = require_json_string(account, "id");
+    response.account_username = require_json_string(account, "username");
+  }
+
+  if (envelope.data.has("card") && envelope.data.at("card").is_object()) {
+    const JsonValue& card = envelope.data.at("card");
+    if (card.has("maskedKey") && card.at("maskedKey").is_string()) {
+      response.card_masked_key = card.at("maskedKey").as_string();
+    }
+  }
+
   return response;
 }
 
@@ -563,6 +580,10 @@ TransportResult LicenseClientWin::recharge_http(const RechargeRequest& request) 
   return http_.post_json(make_signed_http_request("/api/client/recharge", to_json(request)));
 }
 
+TransportResult LicenseClientWin::card_login_http(const CardLoginRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/card-login", to_json(request)));
+}
+
 TransportResult LicenseClientWin::login_http(const LoginRequest& request) const {
   return http_.post_json(make_signed_http_request("/api/client/login", to_json(request)));
 }
@@ -581,6 +602,10 @@ TransportResult LicenseClientWin::register_tcp(const RegisterRequest& request) c
 
 TransportResult LicenseClientWin::recharge_tcp(const RechargeRequest& request) const {
   return tcp_.call(make_signed_tcp_frame("client.recharge", "/api/client/recharge", to_json(request)));
+}
+
+TransportResult LicenseClientWin::card_login_tcp(const CardLoginRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.card-login", "/api/client/card-login", to_json(request)));
 }
 
 TransportResult LicenseClientWin::login_tcp(const LoginRequest& request) const {
@@ -603,6 +628,10 @@ RechargeResponse LicenseClientWin::recharge_http_parsed(const RechargeRequest& r
   return parse_recharge_response(parse_api_envelope(recharge_http(request)));
 }
 
+LoginResponse LicenseClientWin::card_login_http_parsed(const CardLoginRequest& request) const {
+  return parse_login_response(parse_api_envelope(card_login_http(request)));
+}
+
 LoginResponse LicenseClientWin::login_http_parsed(const LoginRequest& request) const {
   return parse_login_response(parse_api_envelope(login_http(request)));
 }
@@ -621,6 +650,10 @@ RegisterResponse LicenseClientWin::register_tcp_parsed(const RegisterRequest& re
 
 RechargeResponse LicenseClientWin::recharge_tcp_parsed(const RechargeRequest& request) const {
   return parse_recharge_response(parse_api_envelope(recharge_tcp(request)));
+}
+
+LoginResponse LicenseClientWin::card_login_tcp_parsed(const CardLoginRequest& request) const {
+  return parse_login_response(parse_api_envelope(card_login_tcp(request)));
 }
 
 LoginResponse LicenseClientWin::login_tcp_parsed(const LoginRequest& request) const {
@@ -702,6 +735,18 @@ std::string LicenseClientWin::to_json(const RechargeRequest& request) {
     << build_json_pair("username", require_not_empty("username", request.username)) << ","
     << build_json_pair("password", require_not_empty("password", request.password)) << ","
     << build_json_pair("cardKey", require_not_empty("cardKey", request.card_key))
+    << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const CardLoginRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("cardKey", require_not_empty("cardKey", request.card_key)) << ","
+    << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint)) << ","
+    << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name))
     << "}";
   return stream.str();
 }

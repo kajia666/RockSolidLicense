@@ -100,6 +100,16 @@ CREATE TABLE IF NOT EXISTS entitlements (
   FOREIGN KEY (source_license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS card_login_accounts (
+  license_key_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL UNIQUE,
+  product_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id) REFERENCES customer_accounts(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
@@ -337,6 +347,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_license_keys_product_status ON license_keys(product_id, status);
 CREATE INDEX IF NOT EXISTS idx_entitlements_account_status ON entitlements(account_id, status, ends_at);
+CREATE INDEX IF NOT EXISTS idx_card_login_accounts_product ON card_login_accounts(product_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_status_expires ON sessions(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_bindings_entitlement_status ON device_bindings(entitlement_id, status);
 CREATE INDEX IF NOT EXISTS idx_device_blocks_product_status ON device_blocks(product_id, status);

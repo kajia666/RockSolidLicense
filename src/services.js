@@ -123,6 +123,27 @@ function requireProductByCode(db, code) {
   return product;
 }
 
+function maskCardKey(cardKey) {
+  const normalized = String(cardKey ?? "")
+    .trim()
+    .toUpperCase();
+  if (!normalized) {
+    return "";
+  }
+
+  const parts = normalized.split("-");
+  const lastPart = parts.at(-1) ?? normalized;
+  if (parts.length >= 2) {
+    return `${parts[0]}-******-${lastPart.slice(-4)}`;
+  }
+
+  if (normalized.length <= 6) {
+    return `${normalized.slice(0, 2)}***`;
+  }
+
+  return `${normalized.slice(0, 2)}******${normalized.slice(-4)}`;
+}
+
 function getActiveEntitlement(db, accountId, productId, now) {
   return one(
     db,
@@ -144,6 +165,78 @@ function getActiveEntitlement(db, accountId, productId, now) {
     now,
     now
   );
+}
+
+function findClientCardByKey(db, productId, cardKey) {
+  return one(
+    db,
+    `
+      SELECT lk.*, p.duration_days, p.name AS policy_name,
+             cla.account_id AS card_login_account_id,
+             cla.created_at AS card_login_created_at,
+             card_account.username AS card_login_username,
+             card_account.status AS card_login_account_status,
+             redeemed_account.username AS redeemed_username
+      FROM license_keys lk
+      JOIN policies p ON p.id = lk.policy_id
+      LEFT JOIN card_login_accounts cla ON cla.license_key_id = lk.id
+      LEFT JOIN customer_accounts card_account ON card_account.id = cla.account_id
+      LEFT JOIN customer_accounts redeemed_account ON redeemed_account.id = lk.redeemed_by_account_id
+      WHERE lk.product_id = ? AND lk.card_key = ?
+    `,
+    productId,
+    String(cardKey).trim().toUpperCase()
+  );
+}
+
+function createCardLoginAccount(db, product, card, timestamp = nowIso()) {
+  const accountId = generateId("acct");
+  const productCode = String(product.code)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 8) || "product";
+  const cardTail = String(card.card_key ?? card.id)
+    .trim()
+    .replace(/[^A-Z0-9]/gi, "")
+    .slice(-6)
+    .toLowerCase() || accountId.slice(-6).toLowerCase();
+  const username = `card_${productCode}_${cardTail}_${accountId.slice(-4).toLowerCase()}`;
+
+  run(
+    db,
+    `
+      INSERT INTO customer_accounts
+      (id, product_id, username, password_hash, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'active', ?, ?)
+    `,
+    accountId,
+    product.id,
+    username,
+    hashPassword(randomToken(32)),
+    timestamp,
+    timestamp
+  );
+
+  run(
+    db,
+    `
+      INSERT INTO card_login_accounts (license_key_id, account_id, product_id, created_at)
+      VALUES (?, ?, ?, ?)
+    `,
+    card.id,
+    accountId,
+    product.id,
+    timestamp
+  );
+
+  audit(db, "license_key", card.id, "card.direct_account_create", "account", accountId, {
+    productCode: product.code,
+    username,
+    cardKeyMasked: maskCardKey(card.card_key)
+  });
+
+  return one(db, "SELECT * FROM customer_accounts WHERE id = ?", accountId);
 }
 
 function upsertDevice(db, productId, fingerprint, deviceName, meta) {
@@ -321,6 +414,186 @@ function getResellerAllocationByLicenseKey(db, licenseKeyId) {
     `,
     licenseKeyId
   );
+}
+
+function activateFreshCardEntitlement(db, product, account, card, eventType = "card.redeem", metadata = {}) {
+  const latest = one(
+    db,
+    `
+      SELECT ends_at
+      FROM entitlements
+      WHERE account_id = ? AND product_id = ? AND policy_id = ?
+      ORDER BY ends_at DESC
+      LIMIT 1
+    `,
+    account.id,
+    product.id,
+    card.policy_id
+  );
+
+  const now = nowIso();
+  const startsAt = latest && latest.ends_at > now ? latest.ends_at : now;
+  const endsAt = addDays(startsAt, card.duration_days);
+  const entitlementId = generateId("ent");
+  const resellerAllocation = getResellerAllocationByLicenseKey(db, card.id);
+
+  run(
+    db,
+    `
+      INSERT INTO entitlements
+      (id, product_id, policy_id, account_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+    `,
+    entitlementId,
+    product.id,
+    card.policy_id,
+    account.id,
+    card.id,
+    startsAt,
+    endsAt,
+    now,
+    now
+  );
+
+  run(
+    db,
+    `
+      UPDATE license_keys
+      SET status = 'redeemed', redeemed_at = ?, redeemed_by_account_id = ?
+      WHERE id = ?
+    `,
+    now,
+    account.id,
+    card.id
+  );
+
+  audit(db, "account", account.id, eventType, "license_key", card.id, {
+    cardKey: card.card_key,
+    cardKeyMasked: maskCardKey(card.card_key),
+    policyName: card.policy_name,
+    resellerCode: resellerAllocation?.reseller_code ?? null,
+    resellerName: resellerAllocation?.reseller_name ?? null,
+    startsAt,
+    endsAt,
+    ...metadata
+  });
+
+  return {
+    entitlementId,
+    policyName: card.policy_name,
+    reseller: resellerAllocation
+      ? {
+          id: resellerAllocation.reseller_id,
+          code: resellerAllocation.reseller_code,
+          name: resellerAllocation.reseller_name,
+          allocationBatchCode: resellerAllocation.allocation_batch_code,
+          allocatedAt: resellerAllocation.allocated_at
+        }
+      : null,
+    startsAt,
+    endsAt
+  };
+}
+
+function issueClientSession(
+  db,
+  config,
+  { product, account, entitlement, deviceFingerprint, deviceName, meta, authMode = "account", tokenSubject }
+) {
+  const device = upsertDevice(db, product.id, deviceFingerprint, deviceName, meta);
+  bindDeviceToEntitlement(db, entitlement, device);
+
+  if (!entitlement.allow_concurrent_sessions) {
+    run(
+      db,
+      `
+        UPDATE sessions
+        SET status = 'expired', revoked_reason = 'single_session_policy'
+        WHERE account_id = ? AND product_id = ? AND status = 'active'
+      `,
+      account.id,
+      product.id
+    );
+  }
+
+  const issuedAt = nowIso();
+  const expiresAt = addSeconds(issuedAt, entitlement.token_ttl_seconds);
+  const sessionId = generateId("sess");
+  const sessionToken = randomToken(32);
+  const licenseToken = issueLicenseToken(config.licenseKeys, {
+    sid: sessionId,
+    pid: product.code,
+    sub: tokenSubject ?? account.username,
+    did: device.fingerprint,
+    plan: entitlement.policy_name,
+    am: authMode,
+    iss: config.tokenIssuer,
+    kid: config.licenseKeys.keyId,
+    iat: issuedAt,
+    exp: expiresAt
+  });
+
+  run(
+    db,
+    `
+      INSERT INTO sessions
+      (id, product_id, account_id, entitlement_id, device_id, session_token, license_token, status, issued_at,
+       expires_at, last_heartbeat_at, last_seen_ip, user_agent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
+    `,
+    sessionId,
+    product.id,
+    account.id,
+    entitlement.id,
+    device.id,
+    sessionToken,
+    licenseToken,
+    issuedAt,
+    expiresAt,
+    issuedAt,
+    meta.ip,
+    meta.userAgent
+  );
+
+  run(
+    db,
+    "UPDATE customer_accounts SET last_login_at = ?, updated_at = ? WHERE id = ?",
+    issuedAt,
+    issuedAt,
+    account.id
+  );
+
+  audit(db, "account", account.id, "session.login", "session", sessionId, {
+    productCode: product.code,
+    deviceFingerprint: device.fingerprint,
+    authMode
+  });
+
+  return {
+    sessionId,
+    sessionToken,
+    licenseToken,
+    expiresAt,
+    authMode,
+    heartbeat: {
+      intervalSeconds: entitlement.heartbeat_interval_seconds,
+      timeoutSeconds: entitlement.heartbeat_timeout_seconds
+    },
+    device: {
+      id: device.id,
+      fingerprint: device.fingerprint,
+      name: device.device_name
+    },
+    entitlement: {
+      id: entitlement.id,
+      policyName: entitlement.policy_name,
+      endsAt: entitlement.ends_at
+    },
+    account: {
+      id: account.id,
+      username: account.username
+    }
+  };
 }
 
 function normalizeResellerInventoryFilters(filters = {}) {
@@ -4296,84 +4569,92 @@ export function createServices(db, config) {
           throw new AppError(404, "CARD_NOT_AVAILABLE", "Card key is invalid, already redeemed, or revoked.");
         }
 
-        const latest = one(
-          db,
-          `
-            SELECT ends_at
-            FROM entitlements
-            WHERE account_id = ? AND product_id = ? AND policy_id = ?
-            ORDER BY ends_at DESC
-            LIMIT 1
-          `,
-          account.id,
-          product.id,
-          card.policy_id
-        );
+        return activateFreshCardEntitlement(db, product, account, card, "card.redeem");
+      });
+    },
+
+    cardLoginClient(reqLike, body, rawBody, meta = {}) {
+      const product = requireSignedProduct(db, config, reqLike, rawBody);
+      requireField(body, "productCode");
+      requireField(body, "cardKey");
+      requireField(body, "deviceFingerprint");
+
+      if (String(body.productCode).trim().toUpperCase() !== product.code) {
+        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
+      }
+
+      enforceNetworkRules(db, product, meta.ip, "login");
+      requireNoBlockingNotices(db, product, body.channel);
+      requireClientVersionAllowed(
+        db,
+        product,
+        body.clientVersion ? String(body.clientVersion).trim() : null,
+        body.channel
+      );
+
+      return withTransaction(db, () => {
+        expireStaleSessions(db);
+
+        const card = findClientCardByKey(db, product.id, body.cardKey);
+        if (!card || !["fresh", "redeemed"].includes(card.status)) {
+          throw new AppError(404, "CARD_NOT_AVAILABLE", "Card key is invalid, already redeemed, or revoked.");
+        }
+
+        if (card.status === "redeemed" && !card.card_login_account_id) {
+          throw new AppError(
+            409,
+            "CARD_BOUND_TO_ACCOUNT",
+            "This card key has already been recharged to an account and cannot be used for direct card login.",
+            {
+              redeemedUsername: card.redeemed_username ?? null
+            }
+          );
+        }
+
+        let account = null;
+        if (card.card_login_account_id) {
+          account = one(db, "SELECT * FROM customer_accounts WHERE id = ?", card.card_login_account_id);
+          if (!account) {
+            throw new AppError(409, "CARD_LOGIN_CORRUPTED", "Card-login mapping is missing its internal account.");
+          }
+          if (account.status !== "active") {
+            throw new AppError(403, "CARD_LOGIN_DISABLED", "This card-login identity has been disabled.");
+          }
+        } else {
+          account = createCardLoginAccount(db, product, card);
+          activateFreshCardEntitlement(db, product, account, card, "card.direct_redeem", {
+            authMode: "card"
+          });
+        }
 
         const now = nowIso();
-        const startsAt = latest && latest.ends_at > now ? latest.ends_at : now;
-        const endsAt = addDays(startsAt, card.duration_days);
-        const entitlementId = generateId("ent");
-        const resellerAllocation = getResellerAllocationByLicenseKey(db, card.id);
+        const deviceFingerprint = String(body.deviceFingerprint).trim();
+        requireDeviceNotBlocked(db, product.id, deviceFingerprint);
+        const entitlement = getActiveEntitlement(db, account.id, product.id, now);
+        if (!entitlement) {
+          throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this card.");
+        }
 
-        run(
-          db,
-          `
-            INSERT INTO entitlements
-            (id, product_id, policy_id, account_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-          `,
-          entitlementId,
-          product.id,
-          card.policy_id,
-          account.id,
-          card.id,
-          startsAt,
-          endsAt,
-          now,
-          now
-        );
-
-        run(
-          db,
-          `
-            UPDATE license_keys
-            SET status = 'redeemed', redeemed_at = ?, redeemed_by_account_id = ?
-            WHERE id = ?
-          `,
-          now,
-          account.id,
-          card.id
-        );
-
-        audit(db, "account", account.id, "card.redeem", "license_key", card.id, {
-          cardKey: card.card_key,
-          policyName: card.policy_name,
-          resellerCode: resellerAllocation?.reseller_code ?? null,
-          resellerName: resellerAllocation?.reseller_name ?? null,
-          startsAt,
-          endsAt
-        });
-
+        const maskedKey = maskCardKey(card.card_key);
         return {
-          entitlementId,
-          policyName: card.policy_name,
-          reseller: resellerAllocation
-            ? {
-                id: resellerAllocation.reseller_id,
-                code: resellerAllocation.reseller_code,
-                name: resellerAllocation.reseller_name,
-                allocationBatchCode: resellerAllocation.allocation_batch_code,
-                allocatedAt: resellerAllocation.allocated_at
-              }
-            : null,
-          startsAt,
-          endsAt
+          ...issueClientSession(db, config, {
+            product,
+            account,
+            entitlement,
+            deviceFingerprint,
+            deviceName: String(body.deviceName ?? "Client Device"),
+            meta,
+            authMode: "card",
+            tokenSubject: account.username
+          }),
+          card: {
+            maskedKey
+          }
         };
       });
     },
 
-    loginClient(reqLike, body, rawBody, meta) {
+    loginClient(reqLike, body, rawBody, meta = {}) {
       const product = requireSignedProduct(db, config, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "username");
@@ -4418,99 +4699,16 @@ export function createServices(db, config) {
           throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
         }
 
-        const device = upsertDevice(
-          db,
-          product.id,
+        return issueClientSession(db, config, {
+          product,
+          account,
+          entitlement,
           deviceFingerprint,
-          String(body.deviceName ?? "Client Device"),
-          meta
-        );
-        bindDeviceToEntitlement(db, entitlement, device);
-
-        if (!entitlement.allow_concurrent_sessions) {
-          run(
-            db,
-            `
-              UPDATE sessions
-              SET status = 'expired', revoked_reason = 'single_session_policy'
-              WHERE account_id = ? AND product_id = ? AND status = 'active'
-            `,
-            account.id,
-            product.id
-          );
-        }
-
-        const issuedAt = now;
-        const expiresAt = addSeconds(issuedAt, entitlement.token_ttl_seconds);
-        const sessionId = generateId("sess");
-        const sessionToken = randomToken(32);
-        const licenseToken = issueLicenseToken(config.licenseKeys, {
-          sid: sessionId,
-          pid: product.code,
-          sub: account.username,
-          did: device.fingerprint,
-          plan: entitlement.policy_name,
-          iss: config.tokenIssuer,
-          kid: config.licenseKeys.keyId,
-          iat: issuedAt,
-          exp: expiresAt
+          deviceName: String(body.deviceName ?? "Client Device"),
+          meta,
+          authMode: "account",
+          tokenSubject: account.username
         });
-
-        run(
-          db,
-          `
-            INSERT INTO sessions
-            (id, product_id, account_id, entitlement_id, device_id, session_token, license_token, status, issued_at,
-             expires_at, last_heartbeat_at, last_seen_ip, user_agent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
-          `,
-          sessionId,
-          product.id,
-          account.id,
-          entitlement.id,
-          device.id,
-          sessionToken,
-          licenseToken,
-          issuedAt,
-          expiresAt,
-          issuedAt,
-          meta.ip,
-          meta.userAgent
-        );
-
-        run(
-          db,
-          "UPDATE customer_accounts SET last_login_at = ?, updated_at = ? WHERE id = ?",
-          issuedAt,
-          issuedAt,
-          account.id
-        );
-
-        audit(db, "account", account.id, "session.login", "session", sessionId, {
-          productCode: product.code,
-          deviceFingerprint: device.fingerprint
-        });
-
-        return {
-          sessionId,
-          sessionToken,
-          licenseToken,
-          expiresAt,
-          heartbeat: {
-            intervalSeconds: entitlement.heartbeat_interval_seconds,
-            timeoutSeconds: entitlement.heartbeat_timeout_seconds
-          },
-          device: {
-            id: device.id,
-            fingerprint: device.fingerprint,
-            name: device.device_name
-          },
-          entitlement: {
-            id: entitlement.id,
-            policyName: entitlement.policy_name,
-            endsAt: entitlement.ends_at
-          }
-        };
       });
     },
 

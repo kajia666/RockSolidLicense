@@ -12,6 +12,7 @@ This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 - HTTP transport: WinHTTP
 - TCP transport: Winsock
 - High-level client wrapper: `LicenseClientWin`
+- Dual client auth modes: account login and direct card login
 
 ## Main headers
 
@@ -64,6 +65,19 @@ const rocksolid::TokenValidationResult validation =
   client.validate_license_token_online(login.license_token);
 ```
 
+Direct card login usage:
+
+```cpp
+rocksolid::CardLoginRequest card_request{
+  "MY_SOFTWARE",
+  "RSL-AAAAAA-BBBBBB-CCCCCC-DDDDDD",
+  client.generate_device_fingerprint(),
+  "Alice Workstation"
+};
+
+const rocksolid::LoginResponse card_login = client.card_login_tcp_parsed(card_request);
+```
+
 ## Notes
 
 - Use `GET /api/system/token-key` to retrieve the server public key for SDK distribution or verification bootstrap.
@@ -71,5 +85,7 @@ const rocksolid::TokenValidationResult validation =
 - `rocksolid::verify_license_token(...)` can validate the returned `licenseToken` locally.
 - `rocksolid::decode_license_token_payload(...)` returns the token payload JSON as text.
 - The SDK now also exposes parsed response structs for the main client flows.
+- `LoginResponse.auth_mode` tells you whether the session came from `account` login or direct `card` login.
+- `LoginResponse.card_masked_key` is populated for direct card login responses.
 - The server TCP protocol is line-delimited JSON. See [tcp-protocol.md](/D:/code/OnlineVerification/docs/tcp-protocol.md).
 - Build steps are in [BUILD_WINDOWS.md](/D:/code/OnlineVerification/sdk/BUILD_WINDOWS.md).

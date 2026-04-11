@@ -695,6 +695,20 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/client/card-login") {
+        const { body, raw } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.cardLoginClient(
+            { headers: req.headers, method: req.method, path: url.pathname },
+            body,
+            raw,
+            requestMeta(req)
+          )
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/client/login") {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {

@@ -4,14 +4,18 @@ This document describes the reseller / distributor inventory workflow that now l
 
 Finance operations now also have a dedicated page at `/admin/resellers/finance`.
 
+Hierarchy and reseller-side login APIs are documented separately in [reseller-hierarchy.md](/D:/code/OnlineVerification/docs/reseller-hierarchy.md).
+
 ## What operators can do now
 
 - create channel resellers with a unique `code`
+- assign an optional parent reseller and reseller login account during creation
 - disable or re-enable a reseller without deleting historical inventory
 - allocate card batches to a reseller for a specific product and policy
 - track every allocated card key back to the reseller and allocation batch
 - inspect whether a reseller-issued card is still `fresh` or already `redeemed`
 - export filtered reseller inventory as CSV
+- let a reseller create child resellers and transfer fresh inventory to descendants
 - view aggregate report data by reseller and by product
 - define reseller pricing rules per product or per policy
 - inspect settlement totals and export settlement CSV

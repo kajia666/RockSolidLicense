@@ -163,6 +163,9 @@ const BIND_FIELD_ALIASES = new Map([
 
 const DEFAULT_BIND_FIELDS = ["deviceFingerprint"];
 const SUPPORTED_BIND_MODES = new Set(["strict", "selected_fields"]);
+const SUPPORTED_CARD_CONTROL_STATUSES = new Set(["active", "frozen", "revoked"]);
+const SUPPORTED_ENTITLEMENT_STATUSES = new Set(["active", "frozen"]);
+const SUPPORTED_CARD_DISPLAY_STATUSES = new Set(["unused", "used", "frozen", "revoked", "expired"]);
 
 function safeParseJsonObject(value, fallback = {}) {
   if (!value) {
@@ -185,6 +188,19 @@ function normalizeOptionalText(value, maxLength = 256) {
   return String(value)
     .trim()
     .slice(0, maxLength);
+}
+
+function normalizeOptionalIsoDate(value, fieldName) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AppError(400, "INVALID_DATE", `${fieldName} must be a valid ISO-8601 date string.`);
+  }
+
+  return parsed.toISOString();
 }
 
 function normalizeBindMode(value = "strict") {
@@ -248,7 +264,7 @@ function parseBindFieldsInput(value, bindMode = "strict") {
 }
 
 function parseOptionalBoolean(value, fieldName) {
-  if (value === undefined) {
+  if (value === undefined || value === null) {
     return null;
   }
 
@@ -265,6 +281,47 @@ function parseOptionalBoolean(value, fieldName) {
   }
 
   throw new AppError(400, "INVALID_BOOLEAN", `${fieldName} must be a boolean value.`);
+}
+
+function normalizeCardControlStatus(value = "active") {
+  const status = String(value ?? "active").trim().toLowerCase();
+  if (!SUPPORTED_CARD_CONTROL_STATUSES.has(status)) {
+    throw new AppError(
+      400,
+      "INVALID_CARD_STATUS",
+      `Card status must be one of: ${Array.from(SUPPORTED_CARD_CONTROL_STATUSES).join(", ")}.`
+    );
+  }
+  return status;
+}
+
+function normalizeEntitlementStatus(value = "active") {
+  const status = String(value ?? "active").trim().toLowerCase();
+  if (!SUPPORTED_ENTITLEMENT_STATUSES.has(status)) {
+    throw new AppError(
+      400,
+      "INVALID_ENTITLEMENT_STATUS",
+      `Entitlement status must be one of: ${Array.from(SUPPORTED_ENTITLEMENT_STATUSES).join(", ")}.`
+    );
+  }
+  return status;
+}
+
+function normalizeCardDisplayStatus(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const status = String(value).trim().toLowerCase();
+  if (!SUPPORTED_CARD_DISPLAY_STATUSES.has(status)) {
+    throw new AppError(
+      400,
+      "INVALID_CARD_DISPLAY_STATUS",
+      `Card filter status must be one of: ${Array.from(SUPPORTED_CARD_DISPLAY_STATUSES).join(", ")}.`
+    );
+  }
+
+  return status;
 }
 
 function normalizeBindFieldValue(field, value) {
@@ -448,27 +505,450 @@ function maskCardKey(cardKey) {
   return `${normalized.slice(0, 2)}******${normalized.slice(-4)}`;
 }
 
-function getActiveEntitlement(db, accountId, productId, now) {
+function describeLicenseKeyControl(row, referenceTime = nowIso()) {
+  const status = normalizeCardControlStatus(row?.status ?? "active");
+  const expiresAt = row?.expires_at ?? null;
+  const expired = Boolean(expiresAt && expiresAt <= referenceTime);
+  const effectiveStatus = expired ? "expired" : status;
+
+  return {
+    status,
+    expiresAt,
+    notes: row?.notes ?? null,
+    effectiveStatus,
+    available: effectiveStatus === "active"
+  };
+}
+
+function buildCardDisplayStatus(usageStatus, controlState) {
+  if (controlState.effectiveStatus === "expired") {
+    return "expired";
+  }
+  if (controlState.status === "frozen") {
+    return "frozen";
+  }
+  if (controlState.status === "revoked") {
+    return "revoked";
+  }
+  return usageStatus === "redeemed" ? "used" : "unused";
+}
+
+function formatCardRow(row, referenceTime = nowIso()) {
+  const control = describeLicenseKeyControl({
+    status: row.control_status,
+    expires_at: row.expires_at,
+    notes: row.control_notes ?? row.notes
+  }, referenceTime);
+  const usageStatus = row.status === "redeemed" ? "redeemed" : "fresh";
+  const displayStatus = buildCardDisplayStatus(usageStatus, control);
+  const entitlementEndsAt = row.entitlement_ends_at ?? null;
+  const entitlementLifecycleStatus = !row.entitlement_id
+    ? null
+    : entitlementEndsAt && entitlementEndsAt <= referenceTime
+      ? "expired"
+      : row.entitlement_status === "frozen"
+        ? "frozen"
+        : row.entitlement_status ?? "active";
+
+  return {
+    id: row.id,
+    productId: row.product_id,
+    productCode: row.product_code,
+    productName: row.product_name,
+    policyId: row.policy_id,
+    policyName: row.policy_name,
+    batchCode: row.batch_code,
+    cardKey: row.card_key,
+    maskedKey: maskCardKey(row.card_key),
+    usageStatus,
+    controlStatus: control.status,
+    effectiveControlStatus: control.effectiveStatus,
+    displayStatus,
+    available: control.available && usageStatus === "fresh",
+    notes: row.notes ?? control.notes ?? null,
+    expiresAt: control.expiresAt,
+    issuedAt: row.issued_at,
+    redeemedAt: row.redeemed_at ?? null,
+    redeemedUsername: row.redeemed_username ?? null,
+    redeemedByAccountId: row.redeemed_by_account_id ?? null,
+    entitlementId: row.entitlement_id ?? null,
+    entitlementStatus: row.entitlement_status ?? null,
+    entitlementLifecycleStatus,
+    entitlementEndsAt,
+    resellerId: row.reseller_id ?? null,
+    resellerCode: row.reseller_code ?? null,
+    resellerName: row.reseller_name ?? null
+  };
+}
+
+function normalizeCardFilters(filters = {}) {
+  return {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    policyId: filters.policyId ? String(filters.policyId).trim() : null,
+    batchCode: filters.batchCode ? String(filters.batchCode).trim() : null,
+    usageStatus: filters.usageStatus ? String(filters.usageStatus).trim().toLowerCase() : null,
+    status: normalizeCardDisplayStatus(filters.status),
+    resellerId: filters.resellerId ? String(filters.resellerId).trim() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+}
+
+function queryCardRows(db, filters = {}, options = {}) {
+  const normalizedFilters = normalizeCardFilters(filters);
+  const conditions = [];
+  const params = [];
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.policyId) {
+    conditions.push("lk.policy_id = ?");
+    params.push(normalizedFilters.policyId);
+  }
+
+  if (normalizedFilters.batchCode) {
+    conditions.push("lk.batch_code = ?");
+    params.push(normalizedFilters.batchCode);
+  }
+
+  if (normalizedFilters.usageStatus) {
+    if (!["fresh", "redeemed", "unused", "used"].includes(normalizedFilters.usageStatus)) {
+      throw new AppError(400, "INVALID_CARD_USAGE_STATUS", "usageStatus must be fresh, redeemed, unused, or used.");
+    }
+    conditions.push("lk.status = ?");
+    params.push(["unused", "fresh"].includes(normalizedFilters.usageStatus) ? "fresh" : "redeemed");
+  }
+
+  if (normalizedFilters.resellerId) {
+    conditions.push("ri.reseller_id = ?");
+    params.push(normalizedFilters.resellerId);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(lk.card_key LIKE ? ESCAPE '\\' OR lk.batch_code LIKE ? ESCAPE '\\' OR COALESCE(a.username, '') LIKE ? ESCAPE '\\' OR COALESCE(r.code, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern, pattern);
+  }
+
+  const limit = options.limit === undefined || options.limit === null
+    ? 500
+    : Math.min(Math.max(Number(options.limit), 1), 5000);
+
+  const items = many(
+    db,
+    `
+      SELECT lk.*, pr.code AS product_code, pr.name AS product_name,
+             pol.name AS policy_name,
+             a.username AS redeemed_username,
+             lkc.status AS control_status, lkc.expires_at, lkc.notes AS control_notes,
+             e.id AS entitlement_id, e.status AS entitlement_status, e.ends_at AS entitlement_ends_at,
+             r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name
+      FROM license_keys lk
+      JOIN products pr ON pr.id = lk.product_id
+      JOIN policies pol ON pol.id = lk.policy_id
+      LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
+      LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      LEFT JOIN entitlements e ON e.source_license_key_id = lk.id
+      LEFT JOIN reseller_inventory ri ON ri.license_key_id = lk.id AND ri.status = 'active'
+      LEFT JOIN resellers r ON r.id = ri.reseller_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY lk.issued_at DESC, lk.id DESC
+      LIMIT ${limit}
+    `,
+    ...params
+  )
+    .map((row) => formatCardRow({
+      ...row,
+      status: row.status,
+      notes: row.control_notes ?? row.notes
+    }))
+    .filter((item) => !normalizedFilters.status || item.displayStatus === normalizedFilters.status);
+
+  const summary = items.reduce((accumulator, item) => {
+    accumulator.total += 1;
+    accumulator[item.displayStatus] += 1;
+    return accumulator;
+  }, {
+    total: 0,
+    unused: 0,
+    used: 0,
+    frozen: 0,
+    revoked: 0,
+    expired: 0
+  });
+
+  return {
+    items,
+    summary,
+    filters: normalizedFilters
+  };
+}
+
+function getCardRowById(db, cardId) {
+  const row = one(
+    db,
+    `
+      SELECT lk.*, pr.code AS product_code, pr.name AS product_name,
+             pol.name AS policy_name,
+             a.username AS redeemed_username,
+             lkc.status AS control_status, lkc.expires_at, lkc.notes AS control_notes,
+             e.id AS entitlement_id, e.status AS entitlement_status, e.ends_at AS entitlement_ends_at,
+             r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name
+      FROM license_keys lk
+      JOIN products pr ON pr.id = lk.product_id
+      JOIN policies pol ON pol.id = lk.policy_id
+      LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
+      LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      LEFT JOIN entitlements e ON e.source_license_key_id = lk.id
+      LEFT JOIN reseller_inventory ri ON ri.license_key_id = lk.id AND ri.status = 'active'
+      LEFT JOIN resellers r ON r.id = ri.reseller_id
+      WHERE lk.id = ?
+    `,
+    cardId
+  );
+
+  return row ? formatCardRow({
+    ...row,
+    status: row.status,
+    notes: row.control_notes ?? row.notes
+  }) : null;
+}
+
+function upsertLicenseKeyControl(db, licenseKeyId, payload = {}, timestamp = nowIso()) {
+  const status = normalizeCardControlStatus(payload.status ?? "active");
+  const expiresAt = normalizeOptionalIsoDate(payload.expiresAt, "expiresAt");
+  const notes = normalizeOptionalText(payload.notes, 1000) || null;
+  const existing = one(db, "SELECT license_key_id FROM license_key_controls WHERE license_key_id = ?", licenseKeyId);
+
+  if (existing) {
+    run(
+      db,
+      `
+        UPDATE license_key_controls
+        SET status = ?, expires_at = ?, notes = ?, updated_at = ?
+        WHERE license_key_id = ?
+      `,
+      status,
+      expiresAt,
+      notes,
+      timestamp,
+      licenseKeyId
+    );
+  } else {
+    run(
+      db,
+      `
+        INSERT INTO license_key_controls (license_key_id, status, expires_at, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      licenseKeyId,
+      status,
+      expiresAt,
+      notes,
+      timestamp,
+      timestamp
+    );
+  }
+
+  return describeLicenseKeyControl({ status, expires_at: expiresAt, notes }, timestamp);
+}
+
+function ensureCardControlAvailable(controlState) {
+  if (controlState.available) {
+    return;
+  }
+
+  if (controlState.effectiveStatus === "expired") {
+    throw new AppError(403, "CARD_EXPIRED", "This card key has expired.");
+  }
+  if (controlState.status === "frozen") {
+    throw new AppError(403, "CARD_FROZEN", "This card key has been frozen by the operator.");
+  }
+  if (controlState.status === "revoked") {
+    throw new AppError(403, "CARD_REVOKED", "This card key has been revoked by the operator.");
+  }
+}
+
+function getUsableEntitlement(db, accountId, productId, now) {
   return one(
     db,
     `
       SELECT e.*, p.name AS policy_name, p.max_devices, p.allow_concurrent_sessions,
              p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode
+             , lkc.status AS card_control_status, lkc.expires_at AS card_expires_at
       FROM entitlements e
       JOIN policies p ON p.id = e.policy_id
+      JOIN license_keys lk ON lk.id = e.source_license_key_id
+      LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
       WHERE e.account_id = ?
         AND e.product_id = ?
         AND e.status = 'active'
         AND e.starts_at <= ?
         AND e.ends_at > ?
+        AND (lkc.license_key_id IS NULL OR lkc.status = 'active')
+        AND (lkc.expires_at IS NULL OR lkc.expires_at > ?)
       ORDER BY e.ends_at DESC
       LIMIT 1
     `,
     accountId,
     productId,
     now,
+    now,
     now
   );
+}
+
+function getLatestEntitlementSnapshot(db, accountId, productId) {
+  return one(
+    db,
+    `
+      SELECT e.*, p.name AS policy_name, p.max_devices, p.allow_concurrent_sessions,
+             p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode,
+             lkc.status AS card_control_status, lkc.expires_at AS card_expires_at
+      FROM entitlements e
+      JOIN policies p ON p.id = e.policy_id
+      JOIN license_keys lk ON lk.id = e.source_license_key_id
+      LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      WHERE e.account_id = ? AND e.product_id = ?
+      ORDER BY e.ends_at DESC, e.created_at DESC
+      LIMIT 1
+    `,
+    accountId,
+    productId
+  );
+}
+
+function throwEntitlementUnavailable(snapshot, referenceTime = nowIso()) {
+  if (!snapshot) {
+    throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
+  }
+
+  if (snapshot.ends_at <= referenceTime) {
+    throw new AppError(403, "LICENSE_EXPIRED", "This authorization has already expired.");
+  }
+
+  if (snapshot.status === "frozen") {
+    throw new AppError(403, "LICENSE_FROZEN", "This authorization has been frozen by the operator.", {
+      entitlementId: snapshot.id,
+      endsAt: snapshot.ends_at
+    });
+  }
+
+  const control = describeLicenseKeyControl({
+    status: snapshot.card_control_status,
+    expires_at: snapshot.card_expires_at
+  }, referenceTime);
+  ensureCardControlAvailable(control);
+
+  throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
+}
+
+function entitlementLifecycleStatus(row, referenceTime = nowIso()) {
+  if (row.ends_at <= referenceTime) {
+    return "expired";
+  }
+  return row.status === "frozen" ? "frozen" : "active";
+}
+
+function queryEntitlementRows(db, filters = {}, options = {}) {
+  const now = nowIso();
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    username: filters.username ? String(filters.username).trim() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+  const conditions = [];
+  const params = [];
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.username) {
+    conditions.push("a.username = ?");
+    params.push(normalizedFilters.username);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(a.username LIKE ? ESCAPE '\\' OR lk.card_key LIKE ? ESCAPE '\\' OR pr.code LIKE ? ESCAPE '\\' OR pol.name LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern, pattern);
+  }
+
+  const limit = options.limit === undefined || options.limit === null
+    ? 300
+    : Math.min(Math.max(Number(options.limit), 1), 2000);
+
+  const items = many(
+    db,
+    `
+      SELECT e.*, pr.code AS product_code, pr.name AS product_name,
+             a.username, pol.name AS policy_name,
+             lk.card_key, lk.id AS license_key_id,
+             lkc.status AS card_control_status, lkc.expires_at AS card_expires_at,
+             COALESCE(sess.active_session_count, 0) AS active_session_count
+      FROM entitlements e
+      JOIN products pr ON pr.id = e.product_id
+      JOIN customer_accounts a ON a.id = e.account_id
+      JOIN policies pol ON pol.id = e.policy_id
+      JOIN license_keys lk ON lk.id = e.source_license_key_id
+      LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      LEFT JOIN (
+        SELECT entitlement_id, COUNT(*) AS active_session_count
+        FROM sessions
+        WHERE status = 'active'
+        GROUP BY entitlement_id
+      ) sess ON sess.entitlement_id = e.id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY e.ends_at DESC, e.created_at DESC
+      LIMIT ${limit}
+    `,
+    ...params
+  ).map((row) => {
+    const control = describeLicenseKeyControl({
+      status: row.card_control_status,
+      expires_at: row.card_expires_at
+    }, now);
+    return {
+      id: row.id,
+      productCode: row.product_code,
+      productName: row.product_name,
+      accountId: row.account_id,
+      username: row.username,
+      policyId: row.policy_id,
+      policyName: row.policy_name,
+      sourceLicenseKeyId: row.source_license_key_id,
+      sourceCardKey: row.card_key,
+      status: row.status,
+      lifecycleStatus: entitlementLifecycleStatus(row, now),
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      activeSessionCount: Number(row.active_session_count ?? 0),
+      cardControlStatus: control.status,
+      cardEffectiveStatus: control.effectiveStatus,
+      cardExpiresAt: control.expiresAt,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }).filter((item) => {
+    if (!normalizedFilters.status) {
+      return true;
+    }
+    return item.lifecycleStatus === normalizedFilters.status;
+  });
+
+  return {
+    items,
+    filters: normalizedFilters
+  };
 }
 
 function findClientCardByKey(db, productId, cardKey) {
@@ -476,6 +956,7 @@ function findClientCardByKey(db, productId, cardKey) {
     db,
     `
       SELECT lk.*, p.duration_days, p.name AS policy_name,
+             lkc.status AS control_status, lkc.expires_at, lkc.notes AS control_notes,
              cla.account_id AS card_login_account_id,
              cla.created_at AS card_login_created_at,
              card_account.username AS card_login_username,
@@ -483,6 +964,7 @@ function findClientCardByKey(db, productId, cardKey) {
              redeemed_account.username AS redeemed_username
       FROM license_keys lk
       JOIN policies p ON p.id = lk.policy_id
+      LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
       LEFT JOIN card_login_accounts cla ON cla.license_key_id = lk.id
       LEFT JOIN customer_accounts card_account ON card_account.id = cla.account_id
       LEFT JOIN customer_accounts redeemed_account ON redeemed_account.id = lk.redeemed_by_account_id
@@ -833,6 +1315,180 @@ function normalizeResellerCode(value) {
     .replace(/[^A-Z0-9_]/g, "");
 }
 
+function normalizeResellerUsername(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function createResellerRelation(db, resellerId, parentResellerId = null, canViewDescendants = true, timestamp = nowIso()) {
+  run(
+    db,
+    `
+      INSERT INTO reseller_relations
+      (reseller_id, parent_reseller_id, can_view_descendants, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    resellerId,
+    parentResellerId,
+    canViewDescendants ? 1 : 0,
+    timestamp,
+    timestamp
+  );
+}
+
+function createResellerUserRecord(db, resellerId, username, password, timestamp = nowIso()) {
+  const normalizedUsername = normalizeResellerUsername(username);
+  if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(normalizedUsername)) {
+    throw new AppError(
+      400,
+      "INVALID_RESELLER_USERNAME",
+      "Reseller username must be 3-32 chars and use letters, digits, dot, underscore, or dash."
+    );
+  }
+
+  const rawPassword = String(password ?? "");
+  if (rawPassword.length < 8) {
+    throw new AppError(400, "INVALID_RESELLER_PASSWORD", "Reseller password must be at least 8 characters.");
+  }
+
+  if (one(db, "SELECT id FROM reseller_users WHERE username = ?", normalizedUsername)) {
+    throw new AppError(409, "RESELLER_USER_EXISTS", "Reseller username already exists.");
+  }
+
+  const userId = generateId("ruser");
+  run(
+    db,
+    `
+      INSERT INTO reseller_users
+      (id, reseller_id, username, password_hash, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'active', ?, ?)
+    `,
+    userId,
+    resellerId,
+    normalizedUsername,
+    hashPassword(rawPassword),
+    timestamp,
+    timestamp
+  );
+
+  return {
+    id: userId,
+    resellerId,
+    username: normalizedUsername,
+    status: "active",
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+
+function requireResellerSession(db, token) {
+  if (!token) {
+    throw new AppError(401, "RESELLER_AUTH_REQUIRED", "Missing reseller bearer token.");
+  }
+
+  const session = one(
+    db,
+    `
+      SELECT rs.*, ru.username, ru.status AS user_status,
+             r.code AS reseller_code, r.name AS reseller_name, r.status AS reseller_status,
+             rr.parent_reseller_id, rr.can_view_descendants
+      FROM reseller_sessions rs
+      JOIN reseller_users ru ON ru.id = rs.reseller_user_id
+      JOIN resellers r ON r.id = rs.reseller_id
+      LEFT JOIN reseller_relations rr ON rr.reseller_id = r.id
+      WHERE rs.token = ? AND rs.expires_at > ?
+    `,
+    token,
+    nowIso()
+  );
+
+  if (!session || session.user_status !== "active" || session.reseller_status !== "active") {
+    throw new AppError(401, "RESELLER_AUTH_INVALID", "Reseller session is invalid or expired.");
+  }
+
+  run(db, "UPDATE reseller_sessions SET last_seen_at = ? WHERE id = ?", nowIso(), session.id);
+  return session;
+}
+
+function resellerDescendantMap(db) {
+  const rows = many(
+    db,
+    `
+      SELECT reseller_id, parent_reseller_id
+      FROM reseller_relations
+    `
+  );
+
+  const children = new Map();
+  for (const row of rows) {
+    const key = row.parent_reseller_id ?? "__root__";
+    const bucket = children.get(key) ?? [];
+    bucket.push(row.reseller_id);
+    children.set(key, bucket);
+  }
+
+  return children;
+}
+
+function collectDescendantResellerIds(db, resellerId) {
+  const children = resellerDescendantMap(db);
+  const results = [];
+  const queue = [...(children.get(resellerId) ?? [])];
+
+  while (queue.length) {
+    const current = queue.shift();
+    results.push(current);
+    for (const childId of children.get(current) ?? []) {
+      queue.push(childId);
+    }
+  }
+
+  return results;
+}
+
+function directChildResellerIds(db, resellerId) {
+  return many(
+    db,
+    "SELECT reseller_id FROM reseller_relations WHERE parent_reseller_id = ? ORDER BY reseller_id ASC",
+    resellerId
+  ).map((row) => row.reseller_id);
+}
+
+function isDescendantReseller(db, ancestorResellerId, targetResellerId, allowSelf = false) {
+  if (allowSelf && ancestorResellerId === targetResellerId) {
+    return true;
+  }
+  return collectDescendantResellerIds(db, ancestorResellerId).includes(targetResellerId);
+}
+
+function scopedResellerIds(db, resellerId, includeDescendants = false) {
+  return includeDescendants
+    ? [resellerId, ...collectDescendantResellerIds(db, resellerId)]
+    : [resellerId];
+}
+
+function formatResellerListRow(row) {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    contactName: row.contact_name ?? null,
+    contactEmail: row.contact_email ?? null,
+    status: row.status,
+    notes: row.notes ?? null,
+    parentResellerId: row.parent_reseller_id ?? null,
+    allowViewDescendants: Boolean(row.can_view_descendants ?? 1),
+    totalAllocated: Number(row.total_allocated ?? 0),
+    freshKeys: Number(row.fresh_keys ?? 0),
+    redeemedKeys: Number(row.redeemed_keys ?? 0),
+    userCount: Number(row.user_count ?? 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 function getResellerAllocationByLicenseKey(db, licenseKeyId) {
   return one(
     db,
@@ -924,6 +1580,35 @@ function activateFreshCardEntitlement(db, product, account, card, eventType = "c
     startsAt,
     endsAt
   };
+}
+
+function expireSessionsForEntitlement(db, entitlementId, reason) {
+  const result = run(
+    db,
+    `
+      UPDATE sessions
+      SET status = 'expired', revoked_reason = ?
+      WHERE entitlement_id = ? AND status = 'active'
+    `,
+    reason,
+    entitlementId
+  );
+
+  return Number(result.changes ?? 0);
+}
+
+function expireSessionsForLicenseKey(db, licenseKeyId, reason) {
+  const entitlement = one(
+    db,
+    "SELECT id FROM entitlements WHERE source_license_key_id = ?",
+    licenseKeyId
+  );
+
+  if (!entitlement) {
+    return 0;
+  }
+
+  return expireSessionsForEntitlement(db, entitlement.id, reason);
 }
 
 function issueClientSession(
@@ -1074,6 +1759,14 @@ function queryResellerInventoryRows(db, filters = {}, options = {}) {
   const normalizedFilters = normalizeResellerInventoryFilters(filters);
   const conditions = ["ri.status = 'active'"];
   const params = [];
+  const scopeResellerIds = Array.isArray(options.scopeResellerIds) && options.scopeResellerIds.length
+    ? [...new Set(options.scopeResellerIds.map((value) => String(value).trim()).filter(Boolean))]
+    : null;
+
+  if (scopeResellerIds?.length) {
+    conditions.push(`r.id IN (${scopeResellerIds.map(() => "?").join(", ")})`);
+    params.push(...scopeResellerIds);
+  }
 
   if (normalizedFilters.resellerId) {
     conditions.push("r.id = ?");
@@ -2455,6 +3148,109 @@ export function createServices(db, config) {
       };
     },
 
+    listCards(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items, summary, filters: normalizedFilters } = queryCardRows(db, filters);
+      return {
+        items,
+        total: items.length,
+        summary,
+        filters: normalizedFilters
+      };
+    },
+
+    exportCardsCsv(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items } = queryCardRows(db, filters, { limit: 5000 });
+      const header = [
+        "cardId",
+        "productCode",
+        "policyName",
+        "batchCode",
+        "cardKey",
+        "usageStatus",
+        "displayStatus",
+        "controlStatus",
+        "expiresAt",
+        "issuedAt",
+        "redeemedAt",
+        "redeemedUsername",
+        "entitlementStatus",
+        "entitlementEndsAt",
+        "resellerCode"
+      ];
+      const lines = [header.map(toCsvCell).join(",")];
+      for (const item of items) {
+        lines.push([
+          item.id,
+          item.productCode,
+          item.policyName,
+          item.batchCode,
+          item.cardKey,
+          item.usageStatus,
+          item.displayStatus,
+          item.controlStatus,
+          item.expiresAt ?? "",
+          item.issuedAt,
+          item.redeemedAt ?? "",
+          item.redeemedUsername ?? "",
+          item.entitlementLifecycleStatus ?? "",
+          item.entitlementEndsAt ?? "",
+          item.resellerCode ?? ""
+        ].map(toCsvCell).join(","));
+      }
+      return `\uFEFF${lines.join("\n")}`;
+    },
+
+    updateCardStatus(token, cardId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const card = one(
+        db,
+        `
+          SELECT lk.id, lk.card_key, lk.status, lk.product_id, lk.redeemed_by_account_id,
+                 pr.code AS product_code, pol.name AS policy_name
+          FROM license_keys lk
+          JOIN products pr ON pr.id = lk.product_id
+          JOIN policies pol ON pol.id = lk.policy_id
+          WHERE lk.id = ?
+        `,
+        cardId
+      );
+
+      if (!card) {
+        throw new AppError(404, "CARD_NOT_FOUND", "Card key does not exist.");
+      }
+
+      return withTransaction(db, () => {
+        const timestamp = nowIso();
+        const control = upsertLicenseKeyControl(db, card.id, {
+          status: body.status ?? "active",
+          expiresAt: body.expiresAt,
+          notes: body.notes
+        }, timestamp);
+
+        let revokedSessions = 0;
+        if (!control.available) {
+          revokedSessions = expireSessionsForLicenseKey(db, card.id, `card_${control.effectiveStatus}`);
+        }
+
+        audit(db, "admin", admin.admin_id, "card.status", "license_key", card.id, {
+          productCode: card.product_code,
+          cardKeyMasked: maskCardKey(card.card_key),
+          status: control.status,
+          effectiveStatus: control.effectiveStatus,
+          expiresAt: control.expiresAt,
+          revokedSessions
+        });
+
+        return {
+          ...getCardRowById(db, card.id),
+          changed: true,
+          revokedSessions
+        };
+      });
+    },
+
     createCardBatch(token, body) {
       const admin = requireAdminSession(db, token);
       requireField(body, "productCode");
@@ -2483,9 +3279,10 @@ export function createServices(db, config) {
       const prefix = String(body.prefix ?? product.code.slice(0, 6)).replace(/[^A-Z0-9]/gi, "").toUpperCase();
       const batchCode = `BATCH-${Date.now()}`;
       const issuedAt = nowIso();
+      const expiresAt = normalizeOptionalIsoDate(body.expiresAt, "expiresAt");
 
       const keys = withTransaction(db, () => {
-        return issueLicenseKeys(db, {
+        const issued = issueLicenseKeys(db, {
           productId: product.id,
           policyId: policy.id,
           prefix,
@@ -2494,19 +3291,182 @@ export function createServices(db, config) {
           notes: String(body.notes ?? ""),
           issuedAt
         });
+        if (expiresAt) {
+          for (const entry of issued) {
+            upsertLicenseKeyControl(db, entry.licenseKeyId, {
+              status: "active",
+              expiresAt,
+              notes: body.notes
+            }, issuedAt);
+          }
+        }
+        return issued;
       });
 
       audit(db, "admin", admin.admin_id, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
         batchCode,
-        count
+        count,
+        expiresAt
       });
 
       return {
         batchCode,
         count,
+        expiresAt,
         preview: keys.slice(0, 10).map((entry) => entry.cardKey),
         keys: keys.map((entry) => entry.cardKey)
+      };
+    },
+
+    listEntitlements(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items, filters: normalizedFilters } = queryEntitlementRows(db, filters);
+      return {
+        items,
+        total: items.length,
+        filters: normalizedFilters
+      };
+    },
+
+    updateEntitlementStatus(token, entitlementId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const entitlement = one(
+        db,
+        `
+          SELECT e.*, pr.code AS product_code, a.username, pol.name AS policy_name, lk.card_key
+          FROM entitlements e
+          JOIN products pr ON pr.id = e.product_id
+          JOIN customer_accounts a ON a.id = e.account_id
+          JOIN policies pol ON pol.id = e.policy_id
+          JOIN license_keys lk ON lk.id = e.source_license_key_id
+          WHERE e.id = ?
+        `,
+        entitlementId
+      );
+
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+
+      const nextStatus = normalizeEntitlementStatus(body.status ?? "active");
+      if (nextStatus === entitlement.status) {
+        return {
+          id: entitlement.id,
+          productCode: entitlement.product_code,
+          username: entitlement.username,
+          status: nextStatus,
+          changed: false,
+          revokedSessions: 0,
+          endsAt: entitlement.ends_at
+        };
+      }
+
+      return withTransaction(db, () => {
+        const timestamp = nowIso();
+        run(
+          db,
+          `
+            UPDATE entitlements
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+          `,
+          nextStatus,
+          timestamp,
+          entitlement.id
+        );
+
+        const revokedSessions = nextStatus === "frozen"
+          ? expireSessionsForEntitlement(db, entitlement.id, "entitlement_frozen")
+          : 0;
+
+        audit(
+          db,
+          "admin",
+          admin.admin_id,
+          "entitlement.status",
+          "entitlement",
+          entitlement.id,
+          {
+            productCode: entitlement.product_code,
+            username: entitlement.username,
+            status: nextStatus,
+            revokedSessions,
+            sourceCardKeyMasked: maskCardKey(entitlement.card_key)
+          }
+        );
+
+        return {
+          id: entitlement.id,
+          productCode: entitlement.product_code,
+          username: entitlement.username,
+          status: nextStatus,
+          changed: true,
+          revokedSessions,
+          endsAt: entitlement.ends_at,
+          updatedAt: timestamp
+        };
+      });
+    },
+
+    extendEntitlement(token, entitlementId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const entitlement = one(
+        db,
+        `
+          SELECT e.*, pr.code AS product_code, a.username, pol.name AS policy_name, lk.card_key
+          FROM entitlements e
+          JOIN products pr ON pr.id = e.product_id
+          JOIN customer_accounts a ON a.id = e.account_id
+          JOIN policies pol ON pol.id = e.policy_id
+          JOIN license_keys lk ON lk.id = e.source_license_key_id
+          WHERE e.id = ?
+        `,
+        entitlementId
+      );
+
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+
+      const days = Number(body.days ?? body.extendDays ?? 0);
+      if (!Number.isInteger(days) || days < 1 || days > 3650) {
+        throw new AppError(400, "INVALID_EXTENSION_DAYS", "days must be an integer between 1 and 3650.");
+      }
+
+      const timestamp = nowIso();
+      const baseTime = entitlement.ends_at > timestamp ? entitlement.ends_at : timestamp;
+      const endsAt = addDays(baseTime, days);
+
+      run(
+        db,
+        `
+          UPDATE entitlements
+          SET ends_at = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        endsAt,
+        timestamp,
+        entitlement.id
+      );
+
+      audit(db, "admin", admin.admin_id, "entitlement.extend", "entitlement", entitlement.id, {
+        productCode: entitlement.product_code,
+        username: entitlement.username,
+        days,
+        sourceCardKeyMasked: maskCardKey(entitlement.card_key),
+        endsAt
+      });
+
+      return {
+        id: entitlement.id,
+        productCode: entitlement.product_code,
+        username: entitlement.username,
+        status: entitlement.status,
+        previousEndsAt: entitlement.ends_at,
+        endsAt,
+        addedDays: days,
+        updatedAt: timestamp
       };
     },
 
@@ -2517,6 +3477,7 @@ export function createServices(db, config) {
       const params = [];
       const normalizedFilters = {
         status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+        parentResellerId: filters.parentResellerId ? String(filters.parentResellerId).trim() : null,
         search: filters.search ? String(filters.search).trim() : null
       };
 
@@ -2526,6 +3487,11 @@ export function createServices(db, config) {
         }
         conditions.push("r.status = ?");
         params.push(normalizedFilters.status);
+      }
+
+      if (normalizedFilters.parentResellerId) {
+        conditions.push("rr.parent_reseller_id = ?");
+        params.push(normalizedFilters.parentResellerId);
       }
 
       if (normalizedFilters.search) {
@@ -2540,10 +3506,13 @@ export function createServices(db, config) {
         db,
         `
           SELECT r.*,
+                 rr.parent_reseller_id, rr.can_view_descendants,
                  COALESCE(inv.total_allocated, 0) AS total_allocated,
                  COALESCE(inv.fresh_keys, 0) AS fresh_keys,
-                 COALESCE(inv.redeemed_keys, 0) AS redeemed_keys
+                 COALESCE(inv.redeemed_keys, 0) AS redeemed_keys,
+                 COALESCE(usr.user_count, 0) AS user_count
           FROM resellers r
+          LEFT JOIN reseller_relations rr ON rr.reseller_id = r.id
           LEFT JOIN (
             SELECT ri.reseller_id,
                    COUNT(*) AS total_allocated,
@@ -2554,25 +3523,17 @@ export function createServices(db, config) {
             WHERE ri.status = 'active'
             GROUP BY ri.reseller_id
           ) inv ON inv.reseller_id = r.id
+          LEFT JOIN (
+            SELECT reseller_id, COUNT(*) AS user_count
+            FROM reseller_users
+            GROUP BY reseller_id
+          ) usr ON usr.reseller_id = r.id
           ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
           ORDER BY r.created_at DESC
           LIMIT 100
         `,
         ...params
-      ).map((row) => ({
-        id: row.id,
-        code: row.code,
-        name: row.name,
-        contactName: row.contact_name ?? null,
-        contactEmail: row.contact_email ?? null,
-        status: row.status,
-        notes: row.notes ?? null,
-        totalAllocated: Number(row.total_allocated ?? 0),
-        freshKeys: Number(row.fresh_keys ?? 0),
-        redeemedKeys: Number(row.redeemed_keys ?? 0),
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      }));
+      ).map(formatResellerListRow);
 
       return {
         items,
@@ -2595,40 +3556,83 @@ export function createServices(db, config) {
         throw new AppError(409, "RESELLER_EXISTS", "Reseller code already exists.");
       }
 
-      const now = nowIso();
-      const reseller = {
-        id: generateId("reseller"),
-        code,
-        name: String(body.name).trim(),
-        contactName: String(body.contactName ?? "").trim() || null,
-        contactEmail: String(body.contactEmail ?? "").trim() || null,
-        status: "active",
-        notes: String(body.notes ?? "").trim() || null,
-        createdAt: now,
-        updatedAt: now
-      };
+      const parentResellerId = body.parentResellerId ? String(body.parentResellerId).trim() : null;
+      const parentReseller = parentResellerId
+        ? one(db, "SELECT id, code, status FROM resellers WHERE id = ?", parentResellerId)
+        : null;
+      if (parentResellerId && !parentReseller) {
+        throw new AppError(404, "PARENT_RESELLER_NOT_FOUND", "Parent reseller does not exist.");
+      }
+      if (parentReseller && parentReseller.status !== "active") {
+        throw new AppError(409, "PARENT_RESELLER_DISABLED", "Parent reseller is disabled.");
+      }
 
-      run(
-        db,
-        `
-          INSERT INTO resellers
-          (id, code, name, contact_name, contact_email, status, notes, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        reseller.id,
-        reseller.code,
-        reseller.name,
-        reseller.contactName,
-        reseller.contactEmail,
-        reseller.status,
-        reseller.notes,
-        reseller.createdAt,
-        reseller.updatedAt
-      );
+      const allowViewDescendants = parseOptionalBoolean(body.allowViewDescendants, "allowViewDescendants");
+      const now = nowIso();
+      const reseller = withTransaction(db, () => {
+        const created = {
+          id: generateId("reseller"),
+          code,
+          name: String(body.name).trim(),
+          contactName: String(body.contactName ?? "").trim() || null,
+          contactEmail: String(body.contactEmail ?? "").trim() || null,
+          status: "active",
+          notes: String(body.notes ?? "").trim() || null,
+          createdAt: now,
+          updatedAt: now
+        };
+
+        run(
+          db,
+          `
+            INSERT INTO resellers
+            (id, code, name, contact_name, contact_email, status, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          created.id,
+          created.code,
+          created.name,
+          created.contactName,
+          created.contactEmail,
+          created.status,
+          created.notes,
+          created.createdAt,
+          created.updatedAt
+        );
+
+        createResellerRelation(
+          db,
+          created.id,
+          parentReseller?.id ?? null,
+          allowViewDescendants === null ? true : allowViewDescendants,
+          now
+        );
+
+        const loginUsername = body.loginUsername ?? body.username;
+        const loginPassword = body.loginPassword ?? body.password;
+        const user = loginUsername && loginPassword
+          ? createResellerUserRecord(db, created.id, loginUsername, loginPassword, now)
+          : null;
+
+        return {
+          ...created,
+          parentResellerId: parentReseller?.id ?? null,
+          allowViewDescendants: allowViewDescendants === null ? true : allowViewDescendants,
+          loginUser: user
+            ? {
+                id: user.id,
+                username: user.username,
+                status: user.status
+              }
+            : null
+        };
+      });
 
       audit(db, "admin", admin.admin_id, "reseller.create", "reseller", reseller.id, {
         code: reseller.code,
-        name: reseller.name
+        name: reseller.name,
+        parentResellerId: reseller.parentResellerId,
+        loginUsername: reseller.loginUser?.username ?? null
       });
 
       return reseller;
@@ -2647,29 +3651,545 @@ export function createServices(db, config) {
       }
 
       const now = nowIso();
+      return withTransaction(db, () => {
+        run(
+          db,
+          `
+            UPDATE resellers
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+          `,
+          status,
+          now,
+          reseller.id
+        );
+
+        let revokedSessions = 0;
+        if (status === "disabled") {
+          const result = run(
+            db,
+            "DELETE FROM reseller_sessions WHERE reseller_id = ?",
+            reseller.id
+          );
+          revokedSessions = Number(result.changes ?? 0);
+        }
+
+        audit(db, "admin", admin.admin_id, "reseller.status", "reseller", reseller.id, {
+          code: reseller.code,
+          status,
+          revokedSessions
+        });
+
+        return {
+          id: reseller.id,
+          code: reseller.code,
+          status,
+          changed: status !== reseller.status,
+          revokedSessions,
+          updatedAt: now
+        };
+      });
+    },
+
+    resellerLogin(body = {}) {
+      requireField(body, "username");
+      requireField(body, "password");
+
+      const username = normalizeResellerUsername(body.username);
+      const user = one(
+        db,
+        `
+          SELECT ru.*, r.code AS reseller_code, r.name AS reseller_name, r.status AS reseller_status,
+                 rr.parent_reseller_id, rr.can_view_descendants
+          FROM reseller_users ru
+          JOIN resellers r ON r.id = ru.reseller_id
+          LEFT JOIN reseller_relations rr ON rr.reseller_id = r.id
+          WHERE ru.username = ?
+        `,
+        username
+      );
+
+      if (!user || !verifyPassword(String(body.password), user.password_hash)) {
+        throw new AppError(401, "RESELLER_LOGIN_FAILED", "Username or password is incorrect.");
+      }
+      if (user.status !== "active" || user.reseller_status !== "active") {
+        throw new AppError(403, "RESELLER_LOGIN_DISABLED", "This reseller account has been disabled.");
+      }
+
+      const timestamp = nowIso();
+      const token = randomToken(32);
+      const expiresAt = addSeconds(timestamp, config.adminSessionHours * 3600);
       run(
         db,
         `
-          UPDATE resellers
-          SET status = ?, updated_at = ?
-          WHERE id = ?
+          INSERT INTO reseller_sessions
+          (id, reseller_user_id, reseller_id, token, expires_at, created_at, last_seen_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `,
-        status,
-        now,
-        reseller.id
+        generateId("rsess"),
+        user.id,
+        user.reseller_id,
+        token,
+        expiresAt,
+        timestamp,
+        timestamp
       );
 
-      audit(db, "admin", admin.admin_id, "reseller.status", "reseller", reseller.id, {
-        code: reseller.code,
-        status
+      run(
+        db,
+        "UPDATE reseller_users SET last_login_at = ?, updated_at = ? WHERE id = ?",
+        timestamp,
+        timestamp,
+        user.id
+      );
+
+      audit(db, "reseller", user.reseller_id, "reseller.login", "reseller_user", user.id, {
+        username,
+        resellerCode: user.reseller_code
       });
 
       return {
-        id: reseller.id,
-        code: reseller.code,
-        status,
-        changed: status !== reseller.status,
-        updatedAt: now
+        token,
+        expiresAt,
+        reseller: {
+          id: user.reseller_id,
+          code: user.reseller_code,
+          name: user.reseller_name,
+          parentResellerId: user.parent_reseller_id ?? null,
+          allowViewDescendants: Boolean(user.can_view_descendants ?? 1)
+        },
+        user: {
+          id: user.id,
+          username: user.username
+        }
+      };
+    },
+
+    resellerMe(token) {
+      const session = requireResellerSession(db, token);
+      return {
+        reseller: {
+          id: session.reseller_id,
+          code: session.reseller_code,
+          name: session.reseller_name,
+          parentResellerId: session.parent_reseller_id ?? null,
+          allowViewDescendants: Boolean(session.can_view_descendants ?? 1)
+        },
+        user: {
+          id: session.reseller_user_id,
+          username: session.username
+        },
+        session: {
+          id: session.id,
+          expiresAt: session.expires_at
+        }
+      };
+    },
+
+    listScopedResellers(token, filters = {}) {
+      const session = requireResellerSession(db, token);
+      const includeDescendants = parseOptionalBoolean(filters.includeDescendants, "includeDescendants") === true;
+      const includeSelf = parseOptionalBoolean(filters.includeSelf, "includeSelf") !== false;
+      if (includeDescendants && !Boolean(session.can_view_descendants ?? 1)) {
+        throw new AppError(403, "RESELLER_SCOPE_FORBIDDEN", "This reseller cannot view descendant scope.");
+      }
+
+      const ids = includeDescendants
+        ? scopedResellerIds(db, session.reseller_id, true)
+        : [...directChildResellerIds(db, session.reseller_id)];
+      if (includeSelf) {
+        ids.unshift(session.reseller_id);
+      }
+
+      const uniqueIds = [...new Set(ids)];
+      if (!uniqueIds.length) {
+        return {
+          items: [],
+          total: 0,
+          scope: {
+            resellerId: session.reseller_id,
+            includeDescendants,
+            includeSelf
+          }
+        };
+      }
+
+      const conditions = [`r.id IN (${uniqueIds.map(() => "?").join(", ")})`];
+      const params = [...uniqueIds];
+      if (filters.search) {
+        const pattern = likeFilter(filters.search);
+        conditions.push("(r.code LIKE ? ESCAPE '\\' OR r.name LIKE ? ESCAPE '\\' OR COALESCE(ru.username, '') LIKE ? ESCAPE '\\')");
+        params.push(pattern, pattern, pattern);
+      }
+
+      const items = many(
+        db,
+        `
+          SELECT r.*, rr.parent_reseller_id, rr.can_view_descendants,
+                 COALESCE(inv.total_allocated, 0) AS total_allocated,
+                 COALESCE(inv.fresh_keys, 0) AS fresh_keys,
+                 COALESCE(inv.redeemed_keys, 0) AS redeemed_keys,
+                 COALESCE(usr.user_count, 0) AS user_count
+          FROM resellers r
+          LEFT JOIN reseller_relations rr ON rr.reseller_id = r.id
+          LEFT JOIN (
+            SELECT reseller_id,
+                   COUNT(*) AS total_allocated,
+                   SUM(CASE WHEN lk.status = 'fresh' THEN 1 ELSE 0 END) AS fresh_keys,
+                   SUM(CASE WHEN lk.status = 'redeemed' THEN 1 ELSE 0 END) AS redeemed_keys
+            FROM reseller_inventory ri
+            JOIN license_keys lk ON lk.id = ri.license_key_id
+            WHERE ri.status = 'active'
+            GROUP BY reseller_id
+          ) inv ON inv.reseller_id = r.id
+          LEFT JOIN (
+            SELECT reseller_id, COUNT(*) AS user_count, MIN(username) AS username
+            FROM reseller_users
+            GROUP BY reseller_id
+          ) ru ON ru.reseller_id = r.id
+          LEFT JOIN (
+            SELECT reseller_id, COUNT(*) AS user_count
+            FROM reseller_users
+            GROUP BY reseller_id
+          ) usr ON usr.reseller_id = r.id
+          WHERE ${conditions.join(" AND ")}
+          ORDER BY r.created_at DESC
+        `,
+        ...params
+      ).map(formatResellerListRow);
+
+      return {
+        items,
+        total: items.length,
+        scope: {
+          resellerId: session.reseller_id,
+          includeDescendants,
+          includeSelf
+        }
+      };
+    },
+
+    createResellerChild(token, body = {}) {
+      const session = requireResellerSession(db, token);
+      requireField(body, "code");
+      requireField(body, "name");
+      requireField(body, "username");
+      requireField(body, "password");
+
+      const parentResellerId = body.parentResellerId ? String(body.parentResellerId).trim() : session.reseller_id;
+      if (!isDescendantReseller(db, session.reseller_id, parentResellerId, true)) {
+        throw new AppError(403, "RESELLER_SCOPE_FORBIDDEN", "Target parent reseller is outside your scope.");
+      }
+
+      const parentReseller = one(db, "SELECT * FROM resellers WHERE id = ?", parentResellerId);
+      if (!parentReseller) {
+        throw new AppError(404, "PARENT_RESELLER_NOT_FOUND", "Parent reseller does not exist.");
+      }
+      if (parentReseller.status !== "active") {
+        throw new AppError(409, "PARENT_RESELLER_DISABLED", "Parent reseller is disabled.");
+      }
+
+      const code = normalizeResellerCode(body.code);
+      if (!/^[A-Z0-9_]{3,32}$/.test(code)) {
+        throw new AppError(400, "INVALID_RESELLER_CODE", "Reseller code must be 3-32 chars: A-Z, 0-9 or underscore.");
+      }
+      if (one(db, "SELECT id FROM resellers WHERE code = ?", code)) {
+        throw new AppError(409, "RESELLER_EXISTS", "Reseller code already exists.");
+      }
+
+      const allowViewDescendants = parseOptionalBoolean(body.allowViewDescendants, "allowViewDescendants");
+      const timestamp = nowIso();
+      const reseller = withTransaction(db, () => {
+        const created = {
+          id: generateId("reseller"),
+          code,
+          name: String(body.name).trim(),
+          contactName: String(body.contactName ?? "").trim() || null,
+          contactEmail: String(body.contactEmail ?? "").trim() || null,
+          status: "active",
+          notes: String(body.notes ?? "").trim() || null,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+
+        run(
+          db,
+          `
+            INSERT INTO resellers
+            (id, code, name, contact_name, contact_email, status, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          created.id,
+          created.code,
+          created.name,
+          created.contactName,
+          created.contactEmail,
+          created.status,
+          created.notes,
+          created.createdAt,
+          created.updatedAt
+        );
+
+        createResellerRelation(
+          db,
+          created.id,
+          parentReseller.id,
+          allowViewDescendants === null ? true : allowViewDescendants,
+          timestamp
+        );
+
+        const user = createResellerUserRecord(db, created.id, body.username, body.password, timestamp);
+        return {
+          ...created,
+          parentResellerId: parentReseller.id,
+          allowViewDescendants: allowViewDescendants === null ? true : allowViewDescendants,
+          loginUser: {
+            id: user.id,
+            username: user.username,
+            status: user.status
+          }
+        };
+      });
+
+      audit(db, "reseller", session.reseller_id, "reseller.child.create", "reseller", reseller.id, {
+        parentResellerId,
+        resellerCode: reseller.code,
+        username: reseller.loginUser.username
+      });
+
+      return reseller;
+    },
+
+    listScopedResellerInventory(token, filters = {}) {
+      const session = requireResellerSession(db, token);
+      const includeDescendants = parseOptionalBoolean(filters.includeDescendants, "includeDescendants") === true;
+      if (includeDescendants && !Boolean(session.can_view_descendants ?? 1)) {
+        throw new AppError(403, "RESELLER_SCOPE_FORBIDDEN", "This reseller cannot view descendant scope.");
+      }
+
+      if (filters.resellerId && !isDescendantReseller(db, session.reseller_id, String(filters.resellerId).trim(), true)) {
+        throw new AppError(403, "RESELLER_SCOPE_FORBIDDEN", "Requested reseller inventory is outside your scope.");
+      }
+
+      const scopeIds = scopedResellerIds(db, session.reseller_id, includeDescendants);
+      const { items, filters: normalizedFilters } = queryResellerInventoryRows(db, filters, {
+        scopeResellerIds: scopeIds
+      });
+
+      return {
+        items,
+        total: items.length,
+        summary: summarizeResellerInventory(items),
+        filters: {
+          ...normalizedFilters,
+          includeDescendants
+        },
+        scope: {
+          resellerId: session.reseller_id,
+          resellerCode: session.reseller_code
+        }
+      };
+    },
+
+    exportScopedResellerInventoryCsv(token, filters = {}) {
+      const session = requireResellerSession(db, token);
+      const includeDescendants = parseOptionalBoolean(filters.includeDescendants, "includeDescendants") === true;
+      if (includeDescendants && !Boolean(session.can_view_descendants ?? 1)) {
+        throw new AppError(403, "RESELLER_SCOPE_FORBIDDEN", "This reseller cannot view descendant scope.");
+      }
+
+      if (filters.resellerId && !isDescendantReseller(db, session.reseller_id, String(filters.resellerId).trim(), true)) {
+        throw new AppError(403, "RESELLER_SCOPE_FORBIDDEN", "Requested reseller inventory is outside your scope.");
+      }
+
+      const { items } = queryResellerInventoryRows(db, filters, {
+        scopeResellerIds: scopedResellerIds(db, session.reseller_id, includeDescendants),
+        limit: 5000
+      });
+      const header = [
+        "resellerCode",
+        "productCode",
+        "policyName",
+        "cardKey",
+        "cardStatus",
+        "allocatedAt",
+        "redeemedAt",
+        "redeemedUsername"
+      ];
+      const lines = [header.map(toCsvCell).join(",")];
+      for (const item of items) {
+        lines.push([
+          item.resellerCode,
+          item.productCode,
+          item.policyName,
+          item.cardKey,
+          item.cardStatus,
+          item.allocatedAt,
+          item.redeemedAt ?? "",
+          item.redeemedUsername ?? ""
+        ].map(toCsvCell).join(","));
+      }
+      return `\uFEFF${lines.join("\n")}`;
+    },
+
+    transferResellerInventory(token, body = {}) {
+      const session = requireResellerSession(db, token);
+      requireField(body, "targetResellerId");
+      requireField(body, "productCode");
+      requireField(body, "policyId");
+
+      const targetResellerId = String(body.targetResellerId).trim();
+      if (!isDescendantReseller(db, session.reseller_id, targetResellerId)) {
+        throw new AppError(403, "RESELLER_SCOPE_FORBIDDEN", "Target reseller must be one of your descendants.");
+      }
+
+      const targetReseller = one(db, "SELECT * FROM resellers WHERE id = ?", targetResellerId);
+      if (!targetReseller) {
+        throw new AppError(404, "RESELLER_NOT_FOUND", "Target reseller does not exist.");
+      }
+      if (targetReseller.status !== "active") {
+        throw new AppError(409, "RESELLER_DISABLED", "Target reseller is disabled.");
+      }
+
+      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const policy = one(
+        db,
+        "SELECT * FROM policies WHERE id = ? AND product_id = ?",
+        String(body.policyId).trim(),
+        product.id
+      );
+      if (!policy) {
+        throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
+      }
+
+      const count = Number(body.count ?? 1);
+      if (!Number.isInteger(count) || count < 1 || count > 5000) {
+        throw new AppError(400, "INVALID_BATCH_SIZE", "Batch count must be between 1 and 5000.");
+      }
+
+      const transferBatchCode = `XFER-${Date.now()}`;
+      const timestamp = nowIso();
+      const transfer = withTransaction(db, () => {
+        const rows = many(
+          db,
+          `
+            SELECT ri.id, ri.license_key_id, ri.notes
+            FROM reseller_inventory ri
+            JOIN license_keys lk ON lk.id = ri.license_key_id
+            WHERE ri.reseller_id = ?
+              AND ri.product_id = ?
+              AND ri.policy_id = ?
+              AND ri.status = 'active'
+              AND lk.status = 'fresh'
+            ORDER BY ri.allocated_at ASC, ri.id ASC
+            LIMIT ${count}
+          `,
+          session.reseller_id,
+          product.id,
+          policy.id
+        );
+
+        if (rows.length !== count) {
+          throw new AppError(409, "RESELLER_INVENTORY_SHORTAGE", "Not enough fresh cards are available for transfer.");
+        }
+
+        const targetPriceRule = resolveResellerPriceRule(db, targetReseller.id, product.id, policy.id);
+        for (const row of rows) {
+          run(
+            db,
+            `
+              UPDATE reseller_inventory
+              SET reseller_id = ?, allocation_batch_code = ?, allocated_at = ?, notes = ?
+              WHERE id = ?
+            `,
+            targetReseller.id,
+            transferBatchCode,
+            timestamp,
+            String(body.notes ?? row.notes ?? "").trim() || null,
+            row.id
+          );
+
+          const snapshot = one(
+            db,
+            "SELECT id FROM reseller_settlement_snapshots WHERE reseller_inventory_id = ?",
+            row.id
+          );
+          if (snapshot && !targetPriceRule) {
+            run(db, "DELETE FROM reseller_settlement_snapshots WHERE reseller_inventory_id = ?", row.id);
+          } else if (snapshot && targetPriceRule) {
+            run(
+              db,
+              `
+                UPDATE reseller_settlement_snapshots
+                SET reseller_id = ?, price_rule_id = ?, allocation_batch_code = ?, currency = ?,
+                    unit_price_cents = ?, unit_cost_cents = ?, commission_amount_cents = ?, priced_at = ?
+                WHERE reseller_inventory_id = ?
+              `,
+              targetReseller.id,
+              targetPriceRule.id,
+              transferBatchCode,
+              targetPriceRule.currency,
+              Number(targetPriceRule.unit_price_cents),
+              Number(targetPriceRule.unit_cost_cents),
+              Number(targetPriceRule.unit_price_cents) - Number(targetPriceRule.unit_cost_cents),
+              timestamp,
+              row.id
+            );
+          } else if (!snapshot && targetPriceRule) {
+            run(
+              db,
+              `
+                INSERT INTO reseller_settlement_snapshots
+                (id, reseller_inventory_id, reseller_id, product_id, policy_id, license_key_id, price_rule_id,
+                 allocation_batch_code, currency, unit_price_cents, unit_cost_cents, commission_amount_cents,
+                 priced_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              generateId("rset"),
+              row.id,
+              targetReseller.id,
+              product.id,
+              policy.id,
+              row.license_key_id,
+              targetPriceRule.id,
+              transferBatchCode,
+              targetPriceRule.currency,
+              Number(targetPriceRule.unit_price_cents),
+              Number(targetPriceRule.unit_cost_cents),
+              Number(targetPriceRule.unit_price_cents) - Number(targetPriceRule.unit_cost_cents),
+              timestamp,
+              timestamp
+            );
+          }
+        }
+
+        return rows;
+      });
+
+      audit(db, "reseller", session.reseller_id, "reseller.inventory.transfer", "reseller", targetReseller.id, {
+        sourceResellerCode: session.reseller_code,
+        targetResellerCode: targetReseller.code,
+        productCode: product.code,
+        policyId: policy.id,
+        count,
+        transferBatchCode
+      });
+
+      return {
+        sourceReseller: {
+          id: session.reseller_id,
+          code: session.reseller_code,
+          name: session.reseller_name
+        },
+        targetReseller: {
+          id: targetReseller.id,
+          code: targetReseller.code,
+          name: targetReseller.name
+        },
+        productCode: product.code,
+        policyId: policy.id,
+        transferBatchCode,
+        count: transfer.length
       };
     },
 
@@ -5103,21 +6623,15 @@ export function createServices(db, config) {
           throw new AppError(401, "ACCOUNT_LOGIN_FAILED", "Username or password is incorrect.");
         }
 
-        const card = one(
-          db,
-          `
-            SELECT lk.*, p.duration_days, p.name AS policy_name
-            FROM license_keys lk
-            JOIN policies p ON p.id = lk.policy_id
-            WHERE lk.product_id = ? AND lk.card_key = ? AND lk.status = 'fresh'
-          `,
-          product.id,
-          String(body.cardKey).trim().toUpperCase()
-        );
-
-        if (!card) {
+        const card = findClientCardByKey(db, product.id, body.cardKey);
+        if (!card || card.status !== "fresh") {
           throw new AppError(404, "CARD_NOT_AVAILABLE", "Card key is invalid, already redeemed, or revoked.");
         }
+
+        ensureCardControlAvailable(describeLicenseKeyControl({
+          status: card.control_status,
+          expires_at: card.expires_at
+        }));
 
         return activateFreshCardEntitlement(db, product, account, card, "card.redeem");
       });
@@ -5150,6 +6664,11 @@ export function createServices(db, config) {
           throw new AppError(404, "CARD_NOT_AVAILABLE", "Card key is invalid, already redeemed, or revoked.");
         }
 
+        ensureCardControlAvailable(describeLicenseKeyControl({
+          status: card.control_status,
+          expires_at: card.expires_at
+        }));
+
         if (card.status === "redeemed" && !card.card_login_account_id) {
           throw new AppError(
             409,
@@ -5181,9 +6700,9 @@ export function createServices(db, config) {
         const deviceProfile = extractClientDeviceProfile(body, meta);
         const deviceFingerprint = deviceProfile.deviceFingerprint;
         requireDeviceNotBlocked(db, product.id, deviceFingerprint);
-        const entitlement = getActiveEntitlement(db, account.id, product.id, now);
+        const entitlement = getUsableEntitlement(db, account.id, product.id, now);
         if (!entitlement) {
-          throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this card.");
+          throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id), now);
         }
 
         const maskedKey = maskCardKey(card.card_key);
@@ -5247,9 +6766,9 @@ export function createServices(db, config) {
         const deviceProfile = extractClientDeviceProfile(body, meta);
         const deviceFingerprint = deviceProfile.deviceFingerprint;
         requireDeviceNotBlocked(db, product.id, deviceFingerprint);
-        const entitlement = getActiveEntitlement(db, account.id, product.id, now);
+        const entitlement = getUsableEntitlement(db, account.id, product.id, now);
         if (!entitlement) {
-          throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
+          throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id), now);
         }
 
         const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
@@ -5283,12 +6802,16 @@ export function createServices(db, config) {
         const session = one(
           db,
           `
-            SELECT s.*, d.fingerprint, a.username, pol.heartbeat_interval_seconds, pol.heartbeat_timeout_seconds, pol.token_ttl_seconds
+            SELECT s.*, d.fingerprint, a.username, e.status AS entitlement_status,
+                   pol.heartbeat_interval_seconds, pol.heartbeat_timeout_seconds, pol.token_ttl_seconds,
+                   lkc.status AS card_control_status, lkc.expires_at AS card_expires_at
             FROM sessions s
             JOIN devices d ON d.id = s.device_id
             JOIN customer_accounts a ON a.id = s.account_id
             JOIN entitlements e ON e.id = s.entitlement_id
             JOIN policies pol ON pol.id = e.policy_id
+            JOIN license_keys lk ON lk.id = e.source_license_key_id
+            LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
             WHERE s.product_id = ? AND s.session_token = ? AND s.status = 'active'
           `,
           product.id,
@@ -5319,6 +6842,29 @@ export function createServices(db, config) {
             reason: block.reason,
             blockedAt: block.created_at
           });
+        }
+
+        if (session.entitlement_status !== "active") {
+          run(
+            db,
+            "UPDATE sessions SET status = 'expired', revoked_reason = 'entitlement_frozen' WHERE id = ?",
+            session.id
+          );
+          throw new AppError(403, "LICENSE_FROZEN", "This authorization has been frozen by the operator.");
+        }
+
+        const cardControl = describeLicenseKeyControl({
+          status: session.card_control_status,
+          expires_at: session.card_expires_at
+        });
+        if (!cardControl.available) {
+          run(
+            db,
+            "UPDATE sessions SET status = 'expired', revoked_reason = ? WHERE id = ?",
+            `card_${cardControl.effectiveStatus}`,
+            session.id
+          );
+          ensureCardControlAvailable(cardControl);
         }
 
         requireClientVersionAllowed(

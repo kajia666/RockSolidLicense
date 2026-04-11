@@ -155,11 +155,50 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/admin/cards") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.listCards(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            policyId: url.searchParams.get("policyId"),
+            batchCode: url.searchParams.get("batchCode"),
+            usageStatus: url.searchParams.get("usageStatus"),
+            status: url.searchParams.get("status"),
+            resellerId: url.searchParams.get("resellerId"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/cards/export") {
+        const csv = services.exportCardsCsv(getBearerToken(req), {
+          productCode: url.searchParams.get("productCode"),
+          policyId: url.searchParams.get("policyId"),
+          batchCode: url.searchParams.get("batchCode"),
+          usageStatus: url.searchParams.get("usageStatus"),
+          status: url.searchParams.get("status"),
+          resellerId: url.searchParams.get("resellerId"),
+          search: url.searchParams.get("search")
+        });
+        sendText(
+          res,
+          200,
+          csv,
+          "text/csv; charset=utf-8",
+          {
+            "content-disposition": `attachment; filename="cards-${Date.now()}.csv"`
+          }
+        );
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/admin/resellers") {
         sendJson(res, 200, {
           ok: true,
           data: services.listResellers(getBearerToken(req), {
             status: url.searchParams.get("status"),
+            parentResellerId: url.searchParams.get("parentResellerId"),
             search: url.searchParams.get("search")
           })
         });
@@ -350,6 +389,19 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/admin/entitlements") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.listEntitlements(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
       const accountStatusRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/admin/accounts/:accountId/status")
         : null;
@@ -477,6 +529,54 @@ export function createApp(overrides = {}) {
           data: services.releaseDeviceBinding(
             getBearerToken(req),
             bindingReleaseRoute.bindingId,
+            body
+          )
+        });
+        return;
+      }
+
+      const cardStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/cards/:cardId/status")
+        : null;
+      if (cardStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updateCardStatus(
+            getBearerToken(req),
+            cardStatusRoute.cardId,
+            body
+          )
+        });
+        return;
+      }
+
+      const entitlementStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/entitlements/:entitlementId/status")
+        : null;
+      if (entitlementStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updateEntitlementStatus(
+            getBearerToken(req),
+            entitlementStatusRoute.entitlementId,
+            body
+          )
+        });
+        return;
+      }
+
+      const entitlementExtendRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/entitlements/:entitlementId/extend")
+        : null;
+      if (entitlementExtendRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.extendEntitlement(
+            getBearerToken(req),
+            entitlementExtendRoute.entitlementId,
             body
           )
         });
@@ -667,6 +767,81 @@ export function createApp(overrides = {}) {
             raw,
             requestMeta(req)
           )
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/reseller/login") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, { ok: true, data: services.resellerLogin(body) });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/reseller/me") {
+        sendJson(res, 200, { ok: true, data: services.resellerMe(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/reseller/resellers") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.listScopedResellers(getBearerToken(req), {
+            includeDescendants: url.searchParams.get("includeDescendants"),
+            includeSelf: url.searchParams.get("includeSelf"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/reseller/resellers") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.createResellerChild(getBearerToken(req), body)
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/reseller/inventory") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.listScopedResellerInventory(getBearerToken(req), {
+            resellerId: url.searchParams.get("resellerId"),
+            includeDescendants: url.searchParams.get("includeDescendants"),
+            productCode: url.searchParams.get("productCode"),
+            cardStatus: url.searchParams.get("cardStatus"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/reseller/inventory/export") {
+        const csv = services.exportScopedResellerInventoryCsv(getBearerToken(req), {
+          resellerId: url.searchParams.get("resellerId"),
+          includeDescendants: url.searchParams.get("includeDescendants"),
+          productCode: url.searchParams.get("productCode"),
+          cardStatus: url.searchParams.get("cardStatus"),
+          search: url.searchParams.get("search")
+        });
+        sendText(
+          res,
+          200,
+          csv,
+          "text/csv; charset=utf-8",
+          {
+            "content-disposition": `attachment; filename="reseller-scope-${Date.now()}.csv"`
+          }
+        );
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/reseller/inventory/transfer") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.transferResellerInventory(getBearerToken(req), body)
         });
         return;
       }

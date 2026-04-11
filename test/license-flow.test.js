@@ -2469,3 +2469,477 @@ test("reseller statements can freeze redeemed settlement items and move to paid"
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("admin card controls and entitlement lifecycle can freeze, expire, and extend authorization", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "OPS_APP",
+        name: "Ops App",
+        description: "Card and entitlement operations"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "OPS_APP",
+        name: "Ops Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const activeBatch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "OPS_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "ACTOPS"
+      },
+      adminSession.token
+    );
+
+    const frozenBatch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "OPS_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "FRZOPS"
+      },
+      adminSession.token
+    );
+
+    const expiredBatch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "OPS_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "EXPOPS",
+        expiresAt: new Date(Date.now() - 60_000).toISOString()
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "OPS_APP",
+      username: "opsuser",
+      password: "Secret123!"
+    });
+
+    const cards = await getJson(baseUrl, "/api/admin/cards?productCode=OPS_APP", adminSession.token);
+    assert.equal(cards.total, 3);
+    assert.equal(cards.summary.unused, 2);
+    assert.equal(cards.summary.expired, 1);
+
+    const frozenCard = cards.items.find((item) => item.cardKey === frozenBatch.keys[0]);
+    const expiredCard = cards.items.find((item) => item.cardKey === expiredBatch.keys[0]);
+    assert.ok(frozenCard);
+    assert.ok(expiredCard);
+    assert.equal(expiredCard.displayStatus, "expired");
+
+    const exported = await getText(baseUrl, "/api/admin/cards/export?productCode=OPS_APP", adminSession.token);
+    assert.match(exported.contentType, /^text\/csv/);
+    assert.match(exported.body, /displayStatus/);
+    assert.match(exported.body, /OPS_APP/);
+
+    const frozenControl = await postJson(
+      baseUrl,
+      `/api/admin/cards/${frozenCard.id}/status`,
+      { status: "frozen", notes: "manual freeze" },
+      adminSession.token
+    );
+    assert.equal(frozenControl.controlStatus, "frozen");
+    assert.equal(frozenControl.displayStatus, "frozen");
+
+    const frozenRecharge = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "OPS_APP",
+        username: "opsuser",
+        password: "Secret123!",
+        cardKey: frozenBatch.keys[0]
+      }
+    );
+    assert.equal(frozenRecharge.status, 403);
+    assert.equal(frozenRecharge.error.code, "CARD_FROZEN");
+
+    const expiredRecharge = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "OPS_APP",
+        username: "opsuser",
+        password: "Secret123!",
+        cardKey: expiredBatch.keys[0]
+      }
+    );
+    assert.equal(expiredRecharge.status, 403);
+    assert.equal(expiredRecharge.error.code, "CARD_EXPIRED");
+
+    const recharge = await signedClientPost(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "OPS_APP",
+        username: "opsuser",
+        password: "Secret123!",
+        cardKey: activeBatch.keys[0]
+      }
+    );
+    assert.equal(recharge.policyName, "Ops Policy");
+
+    const login = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "OPS_APP",
+        username: "opsuser",
+        password: "Secret123!",
+        deviceFingerprint: "ops-device-01",
+        deviceName: "Ops Desktop"
+      }
+    );
+
+    const entitlements = await getJson(
+      baseUrl,
+      "/api/admin/entitlements?productCode=OPS_APP&username=opsuser",
+      adminSession.token
+    );
+    assert.equal(entitlements.total, 1);
+    assert.equal(entitlements.items[0].lifecycleStatus, "active");
+    const entitlement = entitlements.items[0];
+
+    const frozenEntitlement = await postJson(
+      baseUrl,
+      `/api/admin/entitlements/${entitlement.id}/status`,
+      { status: "frozen" },
+      adminSession.token
+    );
+    assert.equal(frozenEntitlement.status, "frozen");
+    assert.equal(frozenEntitlement.revokedSessions, 1);
+
+    const frozenHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "OPS_APP",
+        sessionToken: login.sessionToken,
+        deviceFingerprint: "ops-device-01"
+      }
+    );
+    assert.equal(frozenHeartbeat.status, 401);
+    assert.equal(frozenHeartbeat.error.code, "SESSION_INVALID");
+
+    const frozenLogin = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "OPS_APP",
+        username: "opsuser",
+        password: "Secret123!",
+        deviceFingerprint: "ops-device-01",
+        deviceName: "Ops Desktop"
+      }
+    );
+    assert.equal(frozenLogin.status, 403);
+    assert.equal(frozenLogin.error.code, "LICENSE_FROZEN");
+
+    const extended = await postJson(
+      baseUrl,
+      `/api/admin/entitlements/${entitlement.id}/extend`,
+      { days: 15 },
+      adminSession.token
+    );
+    assert.equal(extended.addedDays, 15);
+    assert.ok(new Date(extended.endsAt).getTime() > new Date(entitlement.endsAt).getTime());
+
+    const resumed = await postJson(
+      baseUrl,
+      `/api/admin/entitlements/${entitlement.id}/status`,
+      { status: "active" },
+      adminSession.token
+    );
+    assert.equal(resumed.status, "active");
+
+    const relogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "OPS_APP",
+        username: "opsuser",
+        password: "Secret123!",
+        deviceFingerprint: "ops-device-01",
+        deviceName: "Ops Desktop"
+      }
+    );
+    assert.ok(relogin.sessionToken);
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=120", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("card.status"));
+    assert.ok(eventTypes.includes("entitlement.status"));
+    assert.ok(eventTypes.includes("entitlement.extend"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("reseller hierarchy can create descendants, transfer inventory, and isolate scope", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "TREE_APP",
+        name: "Tree App",
+        description: "Hierarchical reseller coverage"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "TREE_APP",
+        name: "Tree Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const root = await postJson(
+      baseUrl,
+      "/api/admin/resellers",
+      {
+        code: "ROOT_AGENT",
+        name: "Root Agent",
+        loginUsername: "root.agent",
+        loginPassword: "RootPass123!"
+      },
+      adminSession.token
+    );
+    assert.equal(root.parentResellerId, null);
+    assert.equal(root.loginUser.username, "root.agent");
+
+    await postJson(
+      baseUrl,
+      `/api/admin/resellers/${root.id}/allocate-cards`,
+      {
+        productCode: "TREE_APP",
+        policyId: policy.id,
+        count: 3,
+        prefix: "TREEA"
+      },
+      adminSession.token
+    );
+
+    const rootSession = await postJson(baseUrl, "/api/reseller/login", {
+      username: "root.agent",
+      password: "RootPass123!"
+    });
+
+    const resellerMe = await getJson(baseUrl, "/api/reseller/me", rootSession.token);
+    assert.equal(resellerMe.reseller.code, "ROOT_AGENT");
+
+    const child = await postJson(
+      baseUrl,
+      "/api/reseller/resellers",
+      {
+        code: "CHILD_AGENT",
+        name: "Child Agent",
+        username: "child.agent",
+        password: "ChildPass123!"
+      },
+      rootSession.token
+    );
+    assert.equal(child.parentResellerId, root.id);
+
+    const sibling = await postJson(
+      baseUrl,
+      "/api/reseller/resellers",
+      {
+        code: "SIB_AGENT",
+        name: "Sibling Agent",
+        username: "sibling.agent",
+        password: "Sibling123!"
+      },
+      rootSession.token
+    );
+    assert.equal(sibling.parentResellerId, root.id);
+
+    const rootTree = await getJson(baseUrl, "/api/reseller/resellers?includeDescendants=true", rootSession.token);
+    const rootTreeCodes = rootTree.items.map((item) => item.code);
+    assert.ok(rootTreeCodes.includes("ROOT_AGENT"));
+    assert.ok(rootTreeCodes.includes("CHILD_AGENT"));
+    assert.ok(rootTreeCodes.includes("SIB_AGENT"));
+
+    const transferToChild = await postJson(
+      baseUrl,
+      "/api/reseller/inventory/transfer",
+      {
+        targetResellerId: child.id,
+        productCode: "TREE_APP",
+        policyId: policy.id,
+        count: 1
+      },
+      rootSession.token
+    );
+    assert.equal(transferToChild.count, 1);
+
+    const transferToSibling = await postJson(
+      baseUrl,
+      "/api/reseller/inventory/transfer",
+      {
+        targetResellerId: sibling.id,
+        productCode: "TREE_APP",
+        policyId: policy.id,
+        count: 1
+      },
+      rootSession.token
+    );
+    assert.equal(transferToSibling.count, 1);
+
+    const childSession = await postJson(baseUrl, "/api/reseller/login", {
+      username: "child.agent",
+      password: "ChildPass123!"
+    });
+
+    const grandchild = await postJson(
+      baseUrl,
+      "/api/reseller/resellers",
+      {
+        code: "GRAND_AGENT",
+        name: "Grand Agent",
+        username: "grand.agent",
+        password: "GrandPass123!"
+      },
+      childSession.token
+    );
+    assert.equal(grandchild.parentResellerId, child.id);
+
+    const transferToGrandchild = await postJson(
+      baseUrl,
+      "/api/reseller/inventory/transfer",
+      {
+        targetResellerId: grandchild.id,
+        productCode: "TREE_APP",
+        policyId: policy.id,
+        count: 1
+      },
+      childSession.token
+    );
+    assert.equal(transferToGrandchild.count, 1);
+
+    const rootInventory = await getJson(baseUrl, "/api/reseller/inventory", rootSession.token);
+    assert.equal(rootInventory.total, 1);
+    assert.equal(rootInventory.items[0].resellerCode, "ROOT_AGENT");
+
+    const rootScopedInventory = await getJson(
+      baseUrl,
+      "/api/reseller/inventory?includeDescendants=true",
+      rootSession.token
+    );
+    assert.equal(rootScopedInventory.total, 3);
+    const scopedCodes = new Set(rootScopedInventory.items.map((item) => item.resellerCode));
+    assert.deepEqual(scopedCodes, new Set(["ROOT_AGENT", "SIB_AGENT", "GRAND_AGENT"]));
+
+    const childSelfInventory = await getJson(baseUrl, "/api/reseller/inventory", childSession.token);
+    assert.equal(childSelfInventory.total, 0);
+
+    const childScopedInventory = await getJson(
+      baseUrl,
+      "/api/reseller/inventory?includeDescendants=true",
+      childSession.token
+    );
+    assert.equal(childScopedInventory.total, 1);
+    assert.equal(childScopedInventory.items[0].resellerCode, "GRAND_AGENT");
+
+    const childTree = await getJson(
+      baseUrl,
+      "/api/reseller/resellers?includeDescendants=true",
+      childSession.token
+    );
+    const childTreeCodes = childTree.items.map((item) => item.code);
+    assert.ok(childTreeCodes.includes("CHILD_AGENT"));
+    assert.ok(childTreeCodes.includes("GRAND_AGENT"));
+    assert.ok(!childTreeCodes.includes("ROOT_AGENT"));
+    assert.ok(!childTreeCodes.includes("SIB_AGENT"));
+
+    const siblingSession = await postJson(baseUrl, "/api/reseller/login", {
+      username: "sibling.agent",
+      password: "Sibling123!"
+    });
+    const siblingInventory = await getJson(baseUrl, "/api/reseller/inventory", siblingSession.token);
+    assert.equal(siblingInventory.total, 1);
+    assert.equal(siblingInventory.items[0].resellerCode, "SIB_AGENT");
+
+    const childForbidden = await fetch(`${baseUrl}/api/reseller/inventory?resellerId=${encodeURIComponent(sibling.id)}`, {
+      headers: { authorization: `Bearer ${childSession.token}` }
+    });
+    const childForbiddenJson = await childForbidden.json();
+    assert.equal(childForbidden.ok, false, JSON.stringify(childForbiddenJson));
+    assert.equal(childForbidden.status, 403);
+    assert.equal(childForbiddenJson.error.code, "RESELLER_SCOPE_FORBIDDEN");
+
+    const scopedExport = await getText(
+      baseUrl,
+      "/api/reseller/inventory/export?includeDescendants=true",
+      rootSession.token
+    );
+    assert.match(scopedExport.contentType, /^text\/csv/);
+    assert.match(scopedExport.body, /ROOT_AGENT/);
+    assert.match(scopedExport.body, /GRAND_AGENT/);
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=160", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("reseller.child.create"));
+    assert.ok(eventTypes.includes("reseller.inventory.transfer"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

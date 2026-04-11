@@ -92,6 +92,16 @@ CREATE TABLE IF NOT EXISTS license_keys (
   FOREIGN KEY (redeemed_by_account_id) REFERENCES customer_accounts(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS license_key_controls (
+  license_key_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  expires_at TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS entitlements (
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
@@ -237,6 +247,40 @@ CREATE TABLE IF NOT EXISTS resellers (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS reseller_relations (
+  reseller_id TEXT PRIMARY KEY,
+  parent_reseller_id TEXT,
+  can_view_descendants INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+  FOREIGN KEY (parent_reseller_id) REFERENCES resellers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS reseller_users (
+  id TEXT PRIMARY KEY,
+  reseller_id TEXT NOT NULL,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_login_at TEXT,
+  FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS reseller_sessions (
+  id TEXT PRIMARY KEY,
+  reseller_user_id TEXT NOT NULL,
+  reseller_id TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  FOREIGN KEY (reseller_user_id) REFERENCES reseller_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS reseller_inventory (
   id TEXT PRIMARY KEY,
   reseller_id TEXT NOT NULL,
@@ -371,6 +415,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_license_keys_product_status ON license_keys(product_id, status);
+CREATE INDEX IF NOT EXISTS idx_license_key_controls_status ON license_key_controls(status, expires_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_policy_bind_configs_mode ON policy_bind_configs(bind_mode, updated_at);
 CREATE INDEX IF NOT EXISTS idx_entitlements_account_status ON entitlements(account_id, status, ends_at);
 CREATE INDEX IF NOT EXISTS idx_card_login_accounts_product ON card_login_accounts(product_id, created_at);
@@ -385,6 +430,12 @@ CREATE INDEX IF NOT EXISTS idx_notices_status_window
   ON notices(status, starts_at, ends_at, channel, block_login);
 CREATE INDEX IF NOT EXISTS idx_network_rules_lookup
   ON network_rules(status, action_scope, target_type, product_id);
+CREATE INDEX IF NOT EXISTS idx_reseller_relations_parent
+  ON reseller_relations(parent_reseller_id, can_view_descendants, updated_at);
+CREATE INDEX IF NOT EXISTS idx_reseller_users_reseller
+  ON reseller_users(reseller_id, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_reseller_sessions_lookup
+  ON reseller_sessions(reseller_id, expires_at, last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_inventory_lookup
   ON reseller_inventory(reseller_id, product_id, policy_id, status, allocated_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_price_rules_lookup
@@ -405,6 +456,7 @@ export function createDatabase(config) {
   const db = new DatabaseSync(config.dbPath);
   db.exec(schema);
   seedAdmin(db, config);
+  seedResellerRelations(db);
   return db;
 }
 
@@ -427,4 +479,28 @@ function seedAdmin(db, config) {
     now,
     now
   );
+}
+
+function seedResellerRelations(db) {
+  const now = nowIso();
+  const rows = db.prepare(
+    `
+      SELECT r.id
+      FROM resellers r
+      LEFT JOIN reseller_relations rr ON rr.reseller_id = r.id
+      WHERE rr.reseller_id IS NULL
+    `
+  ).all();
+
+  const insert = db.prepare(
+    `
+      INSERT INTO reseller_relations
+      (reseller_id, parent_reseller_id, can_view_descendants, created_at, updated_at)
+      VALUES (?, NULL, 1, ?, ?)
+    `
+  );
+
+  for (const row of rows) {
+    insert.run(row.id, now, now);
+  }
 }

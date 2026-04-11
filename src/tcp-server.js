@@ -10,6 +10,14 @@ const CLIENT_ACTIONS = {
     path: "/api/client/recharge",
     execute: (services, reqLike, body, rawBody, meta) => services.redeemCard(reqLike, body, rawBody, meta)
   },
+  "client.bindings": {
+    path: "/api/client/bindings",
+    execute: (services, reqLike, body, rawBody, meta) => services.clientBindings(reqLike, body, rawBody, meta)
+  },
+  "client.unbind": {
+    path: "/api/client/unbind",
+    execute: (services, reqLike, body, rawBody, meta) => services.clientUnbind(reqLike, body, rawBody, meta)
+  },
   "client.card-login": {
     path: "/api/client/card-login",
     execute: (services, reqLike, body, rawBody, meta) => services.cardLoginClient(reqLike, body, rawBody, meta)

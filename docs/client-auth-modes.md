@@ -7,6 +7,8 @@ This matches the common "network verification" product shape seen in commercial 
 - account mode: register an account, recharge the account with a card key, then log in
 - card mode: skip account registration and log in directly with a card key
 
+Client self-unbind is documented separately in [client-unbind.md](/D:/code/OnlineVerification/docs/client-unbind.md).
+
 The implementation here is our own API design, informed by the product direction described in:
 
 - [16hex introduction](https://www.16hex.cc/introduction)
@@ -27,6 +29,7 @@ Use this mode when the operator wants:
 - user-managed accounts
 - password-based sign-in
 - multiple cards recharged onto the same named user
+- account-authenticated binding inspection and self-unbind
 
 ## Card-direct mode
 
@@ -61,6 +64,7 @@ Behavior:
 - a redeemed card can log in again only if it belongs to the direct-card mode
 - a card that was already recharged onto a named account is rejected for direct login
 - direct-card sessions still use the same device binding, heartbeat, token signing, notice blocking, version checks, and IP/network rules as account login
+- direct-card identities can also use client binding list and self-unbind, as long as the card still belongs to direct-card mode
 
 ## Rebind detection
 

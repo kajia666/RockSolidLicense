@@ -149,6 +149,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      const policyUnbindRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/policies/:policyId/unbind-config")
+        : null;
+      if (policyUnbindRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updatePolicyUnbindConfig(
+            getBearerToken(req),
+            policyUnbindRoute.policyId,
+            body
+          )
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/admin/cards/batch") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, { ok: true, data: services.createCardBatch(getBearerToken(req), body) });
@@ -872,11 +888,39 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/client/bindings") {
+        const { body, raw } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.clientBindings(
+            { headers: req.headers, method: req.method, path: url.pathname },
+            body,
+            raw,
+            requestMeta(req)
+          )
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/client/recharge") {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
           data: services.redeemCard(
+            { headers: req.headers, method: req.method, path: url.pathname },
+            body,
+            raw,
+            requestMeta(req)
+          )
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/client/unbind") {
+        const { body, raw } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.clientUnbind(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,

@@ -324,6 +324,22 @@ function normalizeCardDisplayStatus(value) {
   return status;
 }
 
+function normalizeNonNegativeInteger(value, fieldName, defaultValue = 0, maxValue = 36500) {
+  const resolved = value === undefined || value === null || String(value).trim() === ""
+    ? defaultValue
+    : Number(value);
+
+  if (!Number.isInteger(resolved) || resolved < 0 || resolved > maxValue) {
+    throw new AppError(
+      400,
+      "INVALID_INTEGER",
+      `${fieldName} must be an integer between 0 and ${maxValue}.`
+    );
+  }
+
+  return resolved;
+}
+
 function normalizeBindFieldValue(field, value) {
   if (field === "requestIp" || field === "publicIp" || field === "localIp") {
     return normalizeIpAddress(value);
@@ -392,8 +408,93 @@ function persistPolicyBindConfig(db, policyId, bindMode, bindFields, timestamp) 
   );
 }
 
+function parsePolicyUnbindConfigRow(row, fallbackUpdatedAt = null) {
+  return {
+    allowClientUnbind: Boolean(Number(row?.allow_client_unbind ?? 0)),
+    clientUnbindLimit: normalizeNonNegativeInteger(row?.client_unbind_limit ?? 0, "clientUnbindLimit", 0, 1000),
+    clientUnbindWindowDays: Math.max(
+      1,
+      normalizeNonNegativeInteger(row?.client_unbind_window_days ?? 30, "clientUnbindWindowDays", 30, 3650)
+    ),
+    clientUnbindDeductDays: normalizeNonNegativeInteger(
+      row?.client_unbind_deduct_days ?? 0,
+      "clientUnbindDeductDays",
+      0,
+      3650
+    ),
+    createdAt: row?.created_at ?? fallbackUpdatedAt ?? null,
+    updatedAt: row?.updated_at ?? fallbackUpdatedAt ?? null
+  };
+}
+
+function loadPolicyUnbindConfig(db, policyId, fallbackUpdatedAt = null) {
+  const row = one(db, "SELECT * FROM policy_unbind_configs WHERE policy_id = ?", policyId);
+  return parsePolicyUnbindConfigRow(row, fallbackUpdatedAt);
+}
+
+function persistPolicyUnbindConfig(db, policyId, body = {}, timestamp) {
+  const allowClientUnbind = parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind");
+  const config = {
+    allowClientUnbind: allowClientUnbind === null ? false : allowClientUnbind,
+    clientUnbindLimit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
+    clientUnbindWindowDays: Math.max(
+      1,
+      normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
+    ),
+    clientUnbindDeductDays: normalizeNonNegativeInteger(
+      body.clientUnbindDeductDays,
+      "clientUnbindDeductDays",
+      0,
+      3650
+    )
+  };
+
+  const existing = one(db, "SELECT policy_id FROM policy_unbind_configs WHERE policy_id = ?", policyId);
+  if (existing) {
+    run(
+      db,
+      `
+        UPDATE policy_unbind_configs
+        SET allow_client_unbind = ?, client_unbind_limit = ?, client_unbind_window_days = ?,
+            client_unbind_deduct_days = ?, updated_at = ?
+        WHERE policy_id = ?
+      `,
+      config.allowClientUnbind ? 1 : 0,
+      config.clientUnbindLimit,
+      config.clientUnbindWindowDays,
+      config.clientUnbindDeductDays,
+      timestamp,
+      policyId
+    );
+  } else {
+    run(
+      db,
+      `
+        INSERT INTO policy_unbind_configs
+        (policy_id, allow_client_unbind, client_unbind_limit, client_unbind_window_days,
+         client_unbind_deduct_days, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      policyId,
+      config.allowClientUnbind ? 1 : 0,
+      config.clientUnbindLimit,
+      config.clientUnbindWindowDays,
+      config.clientUnbindDeductDays,
+      timestamp,
+      timestamp
+    );
+  }
+
+  return {
+    ...config,
+    updatedAt: timestamp,
+    createdAt: timestamp
+  };
+}
+
 function formatPolicyRow(row) {
   const bindConfig = parsePolicyBindConfigRow(row, row.bind_mode, row.updated_at);
+  const unbindConfig = parsePolicyUnbindConfigRow(row, row.updated_at);
 
   return {
     id: row.id,
@@ -409,6 +510,10 @@ function formatPolicyRow(row) {
     tokenTtlSeconds: Number(row.token_ttl_seconds),
     bindMode: bindConfig.bindMode,
     bindFields: bindConfig.bindFields,
+    allowClientUnbind: unbindConfig.allowClientUnbind,
+    clientUnbindLimit: unbindConfig.clientUnbindLimit,
+    clientUnbindWindowDays: unbindConfig.clientUnbindWindowDays,
+    clientUnbindDeductDays: unbindConfig.clientUnbindDeductDays,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -845,6 +950,194 @@ function throwEntitlementUnavailable(snapshot, referenceTime = nowIso()) {
   ensureCardControlAvailable(control);
 
   throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
+}
+
+function releaseBindingRecord(db, binding, reason, timestamp = nowIso()) {
+  run(
+    db,
+    `
+      UPDATE device_bindings
+      SET status = 'revoked', revoked_at = ?, last_bound_at = ?
+      WHERE id = ?
+    `,
+    timestamp,
+    timestamp,
+    binding.id
+  );
+
+  const result = run(
+    db,
+    `
+      UPDATE sessions
+      SET status = 'expired', revoked_reason = ?
+      WHERE entitlement_id = ? AND device_id = ? AND status = 'active'
+    `,
+    reason,
+    binding.entitlement_id,
+    binding.device_id
+  );
+
+  return Number(result.changes ?? 0);
+}
+
+function countRecentClientUnbinds(db, entitlementId, windowDays) {
+  const since = addDays(nowIso(), -Math.max(1, windowDays));
+  const row = one(
+    db,
+    `
+      SELECT COUNT(*) AS count
+      FROM entitlement_unbind_logs
+      WHERE entitlement_id = ?
+        AND actor_type = 'client'
+        AND created_at >= ?
+    `,
+    entitlementId,
+    since
+  );
+  return Number(row?.count ?? 0);
+}
+
+function recordEntitlementUnbind(db, entitlementId, bindingId, actorType, actorId, reason, deductedDays, timestamp = nowIso()) {
+  run(
+    db,
+    `
+      INSERT INTO entitlement_unbind_logs
+      (id, entitlement_id, binding_id, actor_type, actor_id, reason, deducted_days, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    generateId("unbind"),
+    entitlementId,
+    bindingId,
+    actorType,
+    actorId,
+    reason,
+    deductedDays,
+    timestamp
+  );
+}
+
+function queryBindingsForEntitlement(db, entitlementId) {
+  return many(
+    db,
+    `
+      SELECT b.id, b.entitlement_id, b.device_id, b.status, b.first_bound_at, b.last_bound_at, b.revoked_at,
+             d.fingerprint, d.device_name, d.last_seen_at, d.last_seen_ip,
+             bp.match_fields_json, bp.identity_json, bp.request_ip,
+             COALESCE(sess.active_session_count, 0) AS active_session_count
+      FROM device_bindings b
+      JOIN devices d ON d.id = b.device_id
+      LEFT JOIN device_binding_profiles bp ON bp.binding_id = b.id
+      LEFT JOIN (
+        SELECT entitlement_id, device_id, COUNT(*) AS active_session_count
+        FROM sessions
+        WHERE status = 'active'
+        GROUP BY entitlement_id, device_id
+      ) sess ON sess.entitlement_id = b.entitlement_id AND sess.device_id = b.device_id
+      WHERE b.entitlement_id = ?
+      ORDER BY CASE WHEN b.status = 'active' THEN 0 ELSE 1 END, b.last_bound_at DESC
+    `,
+    entitlementId
+  ).map((row) => ({
+    id: row.id,
+    entitlementId: row.entitlement_id,
+    deviceId: row.device_id,
+    status: row.status,
+    firstBoundAt: row.first_bound_at,
+    lastBoundAt: row.last_bound_at,
+    revokedAt: row.revoked_at ?? null,
+    fingerprint: row.fingerprint,
+    deviceName: row.device_name ?? null,
+    lastSeenAt: row.last_seen_at ?? null,
+    lastSeenIp: row.last_seen_ip ?? null,
+    matchFields: row.match_fields_json ? JSON.parse(row.match_fields_json) : [],
+    identity: row.identity_json ? JSON.parse(row.identity_json) : {},
+    bindRequestIp: row.request_ip ?? null,
+    activeSessionCount: Number(row.active_session_count ?? 0)
+  }));
+}
+
+function resolveClientManagedAccount(db, product, body) {
+  if (body.username !== undefined || body.password !== undefined) {
+    requireField(body, "username");
+    requireField(body, "password");
+    const account = one(
+      db,
+      `
+        SELECT *
+        FROM customer_accounts
+        WHERE product_id = ? AND username = ? AND status = 'active'
+      `,
+      product.id,
+      String(body.username).trim()
+    );
+
+    if (!account || !verifyPassword(String(body.password), account.password_hash)) {
+      throw new AppError(401, "ACCOUNT_LOGIN_FAILED", "Username or password is incorrect.");
+    }
+
+    const entitlement = getUsableEntitlement(db, account.id, product.id, nowIso());
+    if (!entitlement) {
+      throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id));
+    }
+
+    return {
+      authMode: "account",
+      account,
+      entitlement,
+      tokenSubject: account.username
+    };
+  }
+
+  if (body.cardKey !== undefined) {
+    const card = findClientCardByKey(db, product.id, body.cardKey);
+    if (!card || !["fresh", "redeemed"].includes(card.status)) {
+      throw new AppError(404, "CARD_NOT_AVAILABLE", "Card key is invalid, already redeemed, or revoked.");
+    }
+
+    ensureCardControlAvailable(describeLicenseKeyControl({
+      status: card.control_status,
+      expires_at: card.expires_at
+    }));
+
+    if (card.status === "redeemed" && !card.card_login_account_id) {
+      throw new AppError(
+        409,
+        "CARD_BOUND_TO_ACCOUNT",
+        "This card key has already been recharged to an account and cannot be used for direct card management.",
+        {
+          redeemedUsername: card.redeemed_username ?? null
+        }
+      );
+    }
+
+    let account = null;
+    if (card.card_login_account_id) {
+      account = one(db, "SELECT * FROM customer_accounts WHERE id = ?", card.card_login_account_id);
+      if (!account || account.status !== "active") {
+        throw new AppError(403, "CARD_LOGIN_DISABLED", "This card-login identity has been disabled.");
+      }
+    } else {
+      account = createCardLoginAccount(db, product, card);
+      activateFreshCardEntitlement(db, product, account, card, "card.direct_redeem", {
+        authMode: "card"
+      });
+    }
+
+    const entitlement = getUsableEntitlement(db, account.id, product.id, nowIso());
+    if (!entitlement) {
+      throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id));
+    }
+
+    return {
+      authMode: "card",
+      account,
+      entitlement,
+      card,
+      tokenSubject: account.username
+    };
+  }
+
+  throw new AppError(400, "CLIENT_AUTH_REQUIRED", "Provide username/password or cardKey for this action.");
 }
 
 function entitlementLifecycleStatus(row, referenceTime = nowIso()) {
@@ -2992,19 +3285,25 @@ export function createServices(db, config) {
       const sql = productCode
         ? `
             SELECT p.*, pr.code AS product_code, pr.name AS product_name,
-                   pbc.bind_fields_json
+                   pbc.bind_fields_json,
+                   puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
+                   puc.client_unbind_deduct_days
             FROM policies p
             JOIN products pr ON pr.id = p.product_id
             LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
+            LEFT JOIN policy_unbind_configs puc ON puc.policy_id = p.id
             WHERE pr.code = ?
             ORDER BY p.created_at DESC
           `
         : `
             SELECT p.*, pr.code AS product_code, pr.name AS product_name,
-                   pbc.bind_fields_json
+                   pbc.bind_fields_json,
+                   puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
+                   puc.client_unbind_deduct_days
             FROM policies p
             JOIN products pr ON pr.id = p.product_id
             LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
+            LEFT JOIN policy_unbind_configs puc ON puc.policy_id = p.id
             ORDER BY p.created_at DESC
           `;
       const rows = productCode ? many(db, sql, productCode) : many(db, sql);
@@ -3069,17 +3368,46 @@ export function createServices(db, config) {
       );
 
       persistPolicyBindConfig(db, policy.id, policy.bindMode, policy.bindFields, now);
+      persistPolicyUnbindConfig(db, policy.id, body, now);
 
       audit(db, "admin", admin.admin_id, "policy.create", "policy", policy.id, {
         productCode: product.code,
         name: policy.name,
         allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
         bindMode: policy.bindMode,
-        bindFields: policy.bindFields
+        bindFields: policy.bindFields,
+        allowClientUnbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true,
+        clientUnbindLimit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
+        clientUnbindWindowDays: Math.max(
+          1,
+          normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
+        ),
+        clientUnbindDeductDays: normalizeNonNegativeInteger(
+          body.clientUnbindDeductDays,
+          "clientUnbindDeductDays",
+          0,
+          3650
+        )
       });
       return {
         ...policy,
-        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions)
+        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
+        ...parsePolicyUnbindConfigRow({
+          allow_client_unbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true ? 1 : 0,
+          client_unbind_limit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
+          client_unbind_window_days: Math.max(
+            1,
+            normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
+          ),
+          client_unbind_deduct_days: normalizeNonNegativeInteger(
+            body.clientUnbindDeductDays,
+            "clientUnbindDeductDays",
+            0,
+            3650
+          ),
+          created_at: now,
+          updated_at: now
+        })
       };
     },
 
@@ -3144,6 +3472,64 @@ export function createServices(db, config) {
         allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
         bindMode: nextBindMode,
         bindFields: nextBindFields,
+        updatedAt: timestamp
+      };
+    },
+
+    updatePolicyUnbindConfig(token, policyId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const policy = one(
+        db,
+        `
+          SELECT p.*, pr.code AS product_code, pr.name AS product_name
+          FROM policies p
+          JOIN products pr ON pr.id = p.product_id
+          WHERE p.id = ?
+        `,
+        policyId
+      );
+
+      if (!policy) {
+        throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
+      }
+
+      const currentConfig = loadPolicyUnbindConfig(db, policy.id, policy.updated_at);
+      const nextConfig = {
+        allowClientUnbind: body.allowClientUnbind === undefined
+          ? currentConfig.allowClientUnbind
+          : parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind"),
+        clientUnbindLimit: body.clientUnbindLimit === undefined
+          ? currentConfig.clientUnbindLimit
+          : normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
+        clientUnbindWindowDays: body.clientUnbindWindowDays === undefined
+          ? currentConfig.clientUnbindWindowDays
+          : Math.max(
+              1,
+              normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
+            ),
+        clientUnbindDeductDays: body.clientUnbindDeductDays === undefined
+          ? currentConfig.clientUnbindDeductDays
+          : normalizeNonNegativeInteger(body.clientUnbindDeductDays, "clientUnbindDeductDays", 0, 3650)
+      };
+      const timestamp = nowIso();
+
+      persistPolicyUnbindConfig(db, policy.id, nextConfig, timestamp);
+
+      audit(db, "admin", admin.admin_id, "policy.unbind.update", "policy", policy.id, {
+        productCode: policy.product_code,
+        allowClientUnbind: nextConfig.allowClientUnbind,
+        clientUnbindLimit: nextConfig.clientUnbindLimit,
+        clientUnbindWindowDays: nextConfig.clientUnbindWindowDays,
+        clientUnbindDeductDays: nextConfig.clientUnbindDeductDays
+      });
+
+      return {
+        id: policy.id,
+        productId: policy.product_id,
+        productCode: policy.product_code,
+        productName: policy.product_name,
+        name: policy.name,
+        ...nextConfig,
         updatedAt: timestamp
       };
     },
@@ -5403,30 +5789,7 @@ export function createServices(db, config) {
       return withTransaction(db, () => {
         const timestamp = nowIso();
         const reason = normalizeReason(body.reason, "device_binding_released");
-        run(
-          db,
-          `
-            UPDATE device_bindings
-            SET status = 'revoked', revoked_at = ?, last_bound_at = ?
-            WHERE id = ?
-          `,
-          timestamp,
-          timestamp,
-          binding.id
-        );
-
-        const result = run(
-          db,
-          `
-            UPDATE sessions
-            SET status = 'expired', revoked_reason = ?
-            WHERE entitlement_id = ? AND device_id = ? AND status = 'active'
-          `,
-          reason,
-          binding.entitlement_id,
-          binding.device_id
-        );
-        const releasedSessions = Number(result.changes ?? 0);
+        const releasedSessions = releaseBindingRecord(db, binding, reason, timestamp);
 
         audit(db, "admin", admin.admin_id, "device-binding.release", "device_binding", binding.id, {
           productCode: binding.product_code,
@@ -6535,6 +6898,207 @@ export function createServices(db, config) {
         String(body.clientVersion).trim(),
         body.channel
       );
+    },
+
+    clientBindings(reqLike, body, rawBody, meta = {}) {
+      const product = requireSignedProduct(db, config, reqLike, rawBody);
+      requireField(body, "productCode");
+
+      if (String(body.productCode).trim().toUpperCase() !== product.code) {
+        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
+      }
+
+      enforceNetworkRules(db, product, meta.ip, "login");
+
+      return withTransaction(db, () => {
+        const subject = resolveClientManagedAccount(db, product, body);
+        const unbindConfig = loadPolicyUnbindConfig(db, subject.entitlement.policy_id, subject.entitlement.updated_at);
+        const bindings = queryBindingsForEntitlement(db, subject.entitlement.id);
+        const recentClientUnbinds = countRecentClientUnbinds(
+          db,
+          subject.entitlement.id,
+          unbindConfig.clientUnbindWindowDays
+        );
+
+        return {
+          authMode: subject.authMode,
+          account: {
+            id: subject.account.id,
+            username: subject.account.username
+          },
+          entitlement: {
+            id: subject.entitlement.id,
+            policyName: subject.entitlement.policy_name,
+            endsAt: subject.entitlement.ends_at,
+            status: subject.entitlement.status
+          },
+          bindings,
+          unbindPolicy: {
+            allowClientUnbind: unbindConfig.allowClientUnbind,
+            clientUnbindLimit: unbindConfig.clientUnbindLimit,
+            clientUnbindWindowDays: unbindConfig.clientUnbindWindowDays,
+            clientUnbindDeductDays: unbindConfig.clientUnbindDeductDays,
+            recentClientUnbinds,
+            remainingClientUnbinds: unbindConfig.clientUnbindLimit > 0
+              ? Math.max(0, unbindConfig.clientUnbindLimit - recentClientUnbinds)
+              : null
+          }
+        };
+      });
+    },
+
+    clientUnbind(reqLike, body, rawBody, meta = {}) {
+      const product = requireSignedProduct(db, config, reqLike, rawBody);
+      requireField(body, "productCode");
+
+      if (String(body.productCode).trim().toUpperCase() !== product.code) {
+        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
+      }
+
+      enforceNetworkRules(db, product, meta.ip, "login");
+
+      return withTransaction(db, () => {
+        const subject = resolveClientManagedAccount(db, product, body);
+        const unbindConfig = loadPolicyUnbindConfig(db, subject.entitlement.policy_id, subject.entitlement.updated_at);
+        if (!unbindConfig.allowClientUnbind) {
+          throw new AppError(403, "CLIENT_UNBIND_DISABLED", "Self-service unbind is disabled for this policy.");
+        }
+
+        const recentClientUnbinds = countRecentClientUnbinds(
+          db,
+          subject.entitlement.id,
+          unbindConfig.clientUnbindWindowDays
+        );
+        if (unbindConfig.clientUnbindLimit > 0 && recentClientUnbinds >= unbindConfig.clientUnbindLimit) {
+          throw new AppError(
+            429,
+            "CLIENT_UNBIND_LIMIT_REACHED",
+            "The self-service unbind limit has been reached for the current policy window.",
+            {
+              clientUnbindLimit: unbindConfig.clientUnbindLimit,
+              clientUnbindWindowDays: unbindConfig.clientUnbindWindowDays,
+              recentClientUnbinds
+            }
+          );
+        }
+
+        const requestedBindingId = body.bindingId ? String(body.bindingId).trim() : "";
+        const requestedFingerprint = body.deviceFingerprint ? String(body.deviceFingerprint).trim() : "";
+        if (!requestedBindingId && !requestedFingerprint) {
+          throw new AppError(400, "UNBIND_TARGET_REQUIRED", "Provide bindingId or deviceFingerprint to unbind.");
+        }
+
+        const bindings = queryBindingsForEntitlement(db, subject.entitlement.id);
+        const binding = bindings.find((entry) =>
+          (requestedBindingId && entry.id === requestedBindingId) ||
+          (requestedFingerprint && entry.fingerprint === requestedFingerprint)
+        );
+
+        if (!binding) {
+          throw new AppError(404, "BINDING_NOT_FOUND", "The target device binding does not exist for this authorization.");
+        }
+        if (binding.status !== "active") {
+          return {
+            binding,
+            changed: false,
+            releasedSessions: 0,
+            entitlement: {
+              id: subject.entitlement.id,
+              endsAt: subject.entitlement.ends_at,
+              status: subject.entitlement.status
+            }
+          };
+        }
+
+        const timestamp = nowIso();
+        const reason = normalizeReason(body.reason, "client_unbind");
+        let endsAt = subject.entitlement.ends_at;
+        let releasedSessions = releaseBindingRecord(db, {
+          id: binding.id,
+          entitlement_id: subject.entitlement.id,
+          device_id: binding.deviceId
+        }, reason, timestamp);
+
+        if (unbindConfig.clientUnbindDeductDays > 0) {
+          const deductedEndsAt = addDays(subject.entitlement.ends_at, -unbindConfig.clientUnbindDeductDays);
+          endsAt = deductedEndsAt > timestamp ? deductedEndsAt : timestamp;
+          run(
+            db,
+            `
+              UPDATE entitlements
+              SET ends_at = ?, updated_at = ?
+              WHERE id = ?
+            `,
+            endsAt,
+            timestamp,
+            subject.entitlement.id
+          );
+
+          if (endsAt <= timestamp) {
+            const expireResult = run(
+              db,
+              `
+                UPDATE sessions
+                SET status = 'expired', revoked_reason = 'entitlement_expired_after_unbind'
+                WHERE entitlement_id = ? AND status = 'active'
+              `,
+              subject.entitlement.id
+            );
+            releasedSessions += Number(expireResult.changes ?? 0);
+          }
+        }
+
+        recordEntitlementUnbind(
+          db,
+          subject.entitlement.id,
+          binding.id,
+          "client",
+          subject.account.id,
+          reason,
+          unbindConfig.clientUnbindDeductDays,
+          timestamp
+        );
+
+        audit(db, "account", subject.account.id, "device-binding.client-unbind", "device_binding", binding.id, {
+          productCode: product.code,
+          username: subject.account.username,
+          authMode: subject.authMode,
+          fingerprint: binding.fingerprint,
+          releasedSessions,
+          deductedDays: unbindConfig.clientUnbindDeductDays,
+          endsAt
+        });
+
+        const updatedBindings = queryBindingsForEntitlement(db, subject.entitlement.id);
+        const changedBinding = updatedBindings.find((entry) => entry.id === binding.id) ?? {
+          ...binding,
+          status: "revoked",
+          revokedAt: timestamp,
+          activeSessionCount: 0
+        };
+        const nextRecentClientUnbinds = recentClientUnbinds + 1;
+
+        return {
+          changed: true,
+          releasedSessions,
+          binding: changedBinding,
+          entitlement: {
+            id: subject.entitlement.id,
+            endsAt,
+            status: subject.entitlement.status
+          },
+          unbindPolicy: {
+            allowClientUnbind: unbindConfig.allowClientUnbind,
+            clientUnbindLimit: unbindConfig.clientUnbindLimit,
+            clientUnbindWindowDays: unbindConfig.clientUnbindWindowDays,
+            clientUnbindDeductDays: unbindConfig.clientUnbindDeductDays,
+            recentClientUnbinds: nextRecentClientUnbinds,
+            remainingClientUnbinds: unbindConfig.clientUnbindLimit > 0
+              ? Math.max(0, unbindConfig.clientUnbindLimit - nextRecentClientUnbinds)
+              : null
+          }
+        };
+      });
     },
 
     registerClient(reqLike, body, rawBody, meta = {}) {

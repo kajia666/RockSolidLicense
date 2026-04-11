@@ -8,6 +8,7 @@ This document describes the new backoffice operations endpoints and the `/admin`
 - disable or re-enable an account
 - inspect device bindings for a user
 - release a device binding to free a seat
+- configure whether a policy allows client self-unbind, with quota and deduct-days rules
 - block a device fingerprint at the product level
 - unblock a previously blocked device fingerprint
 - inspect active or expired sessions
@@ -52,6 +53,7 @@ Effects:
 - `GET /api/admin/device-bindings`
 - `POST /api/admin/device-bindings/:bindingId/release`
 - `POST /api/admin/policies/:policyId/runtime-config`
+- `POST /api/admin/policies/:policyId/unbind-config`
 
 Supported query parameters:
 
@@ -105,6 +107,24 @@ Notes:
 - `bindMode=strict` keeps the old exact-fingerprint behavior
 - `bindMode=selected_fields` lets the author decide which hardware or IP signals count for rebinding detection
 - changing bind fields affects future logins; existing bindings remain until they are revalidated or released
+
+Policy self-unbind config request body:
+
+```json
+{
+  "allowClientUnbind": true,
+  "clientUnbindLimit": 1,
+  "clientUnbindWindowDays": 30,
+  "clientUnbindDeductDays": 3
+}
+```
+
+Notes:
+
+- self-unbind is meant for end-user device switching
+- `clientUnbindLimit=0` means unlimited count
+- `clientUnbindDeductDays` implements the common "unbind deducts remaining time" rule
+- client-side unbind uses the signed endpoints documented in [client-unbind.md](/D:/code/OnlineVerification/docs/client-unbind.md)
 
 ### Device blocks
 

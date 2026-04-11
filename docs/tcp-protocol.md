@@ -35,7 +35,9 @@ Notes:
 ## Supported actions
 
 - `client.register`
+- `client.bindings`
 - `client.recharge`
+- `client.unbind`
 - `client.card-login`
 - `client.login`
 - `client.heartbeat`
@@ -45,7 +47,9 @@ Notes:
 For client actions, the server reuses the same business logic as the HTTP endpoints:
 
 - `client.register` -> `/api/client/register`
+- `client.bindings` -> `/api/client/bindings`
 - `client.recharge` -> `/api/client/recharge`
+- `client.unbind` -> `/api/client/unbind`
 - `client.card-login` -> `/api/client/card-login`
 - `client.login` -> `/api/client/login`
 - `client.heartbeat` -> `/api/client/heartbeat`

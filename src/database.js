@@ -63,6 +63,17 @@ CREATE TABLE IF NOT EXISTS policy_bind_configs (
   FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS policy_unbind_configs (
+  policy_id TEXT PRIMARY KEY,
+  allow_client_unbind INTEGER NOT NULL DEFAULT 0,
+  client_unbind_limit INTEGER NOT NULL DEFAULT 0,
+  client_unbind_window_days INTEGER NOT NULL DEFAULT 30,
+  client_unbind_deduct_days INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS customer_accounts (
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
@@ -169,6 +180,19 @@ CREATE TABLE IF NOT EXISTS device_binding_profiles (
   FOREIGN KEY (entitlement_id) REFERENCES entitlements(id) ON DELETE CASCADE,
   FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
   UNIQUE(entitlement_id, identity_hash)
+);
+
+CREATE TABLE IF NOT EXISTS entitlement_unbind_logs (
+  id TEXT PRIMARY KEY,
+  entitlement_id TEXT NOT NULL,
+  binding_id TEXT NOT NULL,
+  actor_type TEXT NOT NULL,
+  actor_id TEXT,
+  reason TEXT NOT NULL,
+  deducted_days INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (entitlement_id) REFERENCES entitlements(id) ON DELETE CASCADE,
+  FOREIGN KEY (binding_id) REFERENCES device_bindings(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS device_blocks (
@@ -417,12 +441,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_license_keys_product_status ON license_keys(product_id, status);
 CREATE INDEX IF NOT EXISTS idx_license_key_controls_status ON license_key_controls(status, expires_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_policy_bind_configs_mode ON policy_bind_configs(bind_mode, updated_at);
+CREATE INDEX IF NOT EXISTS idx_policy_unbind_configs_lookup
+  ON policy_unbind_configs(allow_client_unbind, client_unbind_limit, updated_at);
 CREATE INDEX IF NOT EXISTS idx_entitlements_account_status ON entitlements(account_id, status, ends_at);
 CREATE INDEX IF NOT EXISTS idx_card_login_accounts_product ON card_login_accounts(product_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_status_expires ON sessions(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_bindings_entitlement_status ON device_bindings(entitlement_id, status);
 CREATE INDEX IF NOT EXISTS idx_binding_profiles_lookup
   ON device_binding_profiles(entitlement_id, identity_hash, device_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_entitlement_unbind_logs_lookup
+  ON entitlement_unbind_logs(entitlement_id, actor_type, created_at);
 CREATE INDEX IF NOT EXISTS idx_device_blocks_product_status ON device_blocks(product_id, status);
 CREATE INDEX IF NOT EXISTS idx_client_versions_product_channel_status
   ON client_versions(product_id, channel, status, released_at);

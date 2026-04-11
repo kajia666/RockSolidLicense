@@ -1243,6 +1243,193 @@ test("policy runtime config can control multi-open policy and configurable rebin
   }
 });
 
+test("client self-unbind can enforce policy quota, deduct days, and work over tcp", async () => {
+  const { app, baseUrl, tcpPort, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "UNBIND_APP",
+        name: "Unbind App",
+        description: "Client self-unbind coverage"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "UNBIND_APP",
+        name: "Unbind Policy",
+        durationDays: 30,
+        maxDevices: 1,
+        allowClientUnbind: true,
+        clientUnbindLimit: 1,
+        clientUnbindWindowDays: 30,
+        clientUnbindDeductDays: 3
+      },
+      adminSession.token
+    );
+    assert.equal(policy.allowClientUnbind, true);
+    assert.equal(policy.clientUnbindDeductDays, 3);
+
+    const cardBatch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "UNBIND_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "UNBIND"
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "UNBIND_APP",
+      username: "unbinder",
+      password: "Unbind123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "UNBIND_APP",
+      username: "unbinder",
+      password: "Unbind123!",
+      cardKey: cardBatch.keys[0]
+    });
+
+    const firstLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "UNBIND_APP",
+        username: "unbinder",
+        password: "Unbind123!",
+        deviceFingerprint: "unbind-device-001",
+        deviceName: "Old Device"
+      }
+    );
+
+    const entitlementBefore = await getJson(
+      baseUrl,
+      "/api/admin/entitlements?productCode=UNBIND_APP&username=unbinder",
+      adminSession.token
+    );
+    const originalEndsAt = entitlementBefore.items[0].endsAt;
+
+    const bindings = await signedClientPost(
+      baseUrl,
+      "/api/client/bindings",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "UNBIND_APP",
+        username: "unbinder",
+        password: "Unbind123!"
+      }
+    );
+    assert.equal(bindings.bindings.length, 1);
+    assert.equal(bindings.unbindPolicy.allowClientUnbind, true);
+    assert.equal(bindings.unbindPolicy.clientUnbindLimit, 1);
+    assert.equal(bindings.unbindPolicy.clientUnbindDeductDays, 3);
+
+    const bindingId = bindings.bindings[0].id;
+    const tcpUnbind = await signedTcpClientCall(
+      tcpPort,
+      "client.unbind",
+      "/api/client/unbind",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "UNBIND_APP",
+        username: "unbinder",
+        password: "Unbind123!",
+        bindingId
+      }
+    );
+    assert.equal(tcpUnbind.changed, true);
+    assert.equal(tcpUnbind.binding.status, "revoked");
+    assert.equal(tcpUnbind.unbindPolicy.recentClientUnbinds, 1);
+    assert.equal(tcpUnbind.unbindPolicy.remainingClientUnbinds, 0);
+    assert.ok(new Date(tcpUnbind.entitlement.endsAt).getTime() < new Date(originalEndsAt).getTime());
+
+    const oldHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "UNBIND_APP",
+        sessionToken: firstLogin.sessionToken,
+        deviceFingerprint: "unbind-device-001"
+      }
+    );
+    assert.equal(oldHeartbeat.status, 401);
+    assert.equal(oldHeartbeat.error.code, "SESSION_INVALID");
+
+    const secondLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "UNBIND_APP",
+        username: "unbinder",
+        password: "Unbind123!",
+        deviceFingerprint: "unbind-device-002",
+        deviceName: "New Device"
+      }
+    );
+    assert.ok(secondLogin.sessionToken);
+
+    const secondBindings = await signedTcpClientCall(
+      tcpPort,
+      "client.bindings",
+      "/api/client/bindings",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "UNBIND_APP",
+        username: "unbinder",
+        password: "Unbind123!"
+      }
+    );
+    assert.equal(secondBindings.bindings.filter((item) => item.status === "active").length, 1);
+
+    const secondUnbind = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/unbind",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "UNBIND_APP",
+        username: "unbinder",
+        password: "Unbind123!",
+        deviceFingerprint: "unbind-device-002"
+      }
+    );
+    assert.equal(secondUnbind.status, 429);
+    assert.equal(secondUnbind.error.code, "CLIENT_UNBIND_LIMIT_REACHED");
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=80", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("device-binding.client-unbind"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("admin can block and unblock a device fingerprint", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

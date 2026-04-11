@@ -131,11 +131,41 @@ struct RegisterResponse {
   std::string username;
 };
 
+struct ResellerAllocationInfo {
+  bool present = false;
+  std::string id;
+  std::string code;
+  std::string name;
+  std::string allocation_batch_code;
+  std::string allocated_at;
+};
+
 struct RechargeResponse {
   std::string entitlement_id;
   std::string policy_name;
+  std::string grant_type;
+  bool has_points = false;
+  int total_points = 0;
+  int remaining_points = 0;
   std::string starts_at;
   std::string ends_at;
+  ResellerAllocationInfo reseller;
+};
+
+struct SessionBindingInfo {
+  std::string id;
+  std::string mode;
+  std::vector<std::string> match_fields;
+  int released_sessions = 0;
+};
+
+struct SessionQuotaInfo {
+  std::string grant_type = "duration";
+  bool metered = false;
+  int total_points = 0;
+  int remaining_points = 0;
+  int consumed_points = 0;
+  int consumed_this_login = 0;
 };
 
 struct LoginResponse {
@@ -155,6 +185,8 @@ struct LoginResponse {
   std::string account_id;
   std::string account_username;
   std::string card_masked_key;
+  SessionBindingInfo binding;
+  SessionQuotaInfo quota;
 };
 
 struct HeartbeatResponse {
@@ -166,6 +198,79 @@ struct HeartbeatResponse {
 
 struct LogoutResponse {
   std::string status;
+};
+
+struct ManagedAccountInfo {
+  std::string id;
+  std::string username;
+};
+
+struct ManagedEntitlementInfo {
+  std::string id;
+  std::string policy_name;
+  std::string ends_at;
+  std::string status;
+};
+
+struct BindingRecord {
+  std::string id;
+  std::string entitlement_id;
+  std::string device_id;
+  std::string status;
+  std::string first_bound_at;
+  std::string last_bound_at;
+  std::string revoked_at;
+  std::string fingerprint;
+  std::string device_name;
+  std::string last_seen_at;
+  std::string last_seen_ip;
+  std::vector<std::string> match_fields;
+  JsonValue identity = JsonValue(JsonValue::Object{});
+  std::string bind_request_ip;
+  int active_session_count = 0;
+};
+
+struct UnbindPolicyInfo {
+  bool allow_client_unbind = false;
+  int client_unbind_limit = 0;
+  int client_unbind_window_days = 0;
+  int client_unbind_deduct_days = 0;
+  int recent_client_unbinds = 0;
+  int remaining_client_unbinds = 0;
+  bool has_remaining_client_unbinds = false;
+};
+
+struct BindingsRequest {
+  std::string product_code;
+  std::string username;
+  std::string password;
+  std::string card_key;
+};
+
+struct UnbindRequest {
+  std::string product_code;
+  std::string username;
+  std::string password;
+  std::string card_key;
+  std::string binding_id;
+  std::string device_fingerprint;
+  std::string reason;
+};
+
+struct BindingsResponse {
+  std::string auth_mode;
+  ManagedAccountInfo account;
+  ManagedEntitlementInfo entitlement;
+  std::vector<BindingRecord> bindings;
+  UnbindPolicyInfo unbind_policy;
+};
+
+struct UnbindResponse {
+  bool changed = false;
+  int released_sessions = 0;
+  BindingRecord binding;
+  ManagedEntitlementInfo entitlement;
+  UnbindPolicyInfo unbind_policy;
 };
 
 struct TokenValidationResult {
@@ -204,6 +309,8 @@ class LicenseClientWin {
 
   TransportResult register_http(const RegisterRequest& request) const;
   TransportResult recharge_http(const RechargeRequest& request) const;
+  TransportResult bindings_http(const BindingsRequest& request) const;
+  TransportResult unbind_http(const UnbindRequest& request) const;
   TransportResult card_login_http(const CardLoginRequest& request) const;
   TransportResult login_http(const LoginRequest& request) const;
   TransportResult heartbeat_http(const HeartbeatRequest& request) const;
@@ -211,6 +318,8 @@ class LicenseClientWin {
 
   TransportResult register_tcp(const RegisterRequest& request) const;
   TransportResult recharge_tcp(const RechargeRequest& request) const;
+  TransportResult bindings_tcp(const BindingsRequest& request) const;
+  TransportResult unbind_tcp(const UnbindRequest& request) const;
   TransportResult card_login_tcp(const CardLoginRequest& request) const;
   TransportResult login_tcp(const LoginRequest& request) const;
   TransportResult heartbeat_tcp(const HeartbeatRequest& request) const;
@@ -218,6 +327,8 @@ class LicenseClientWin {
 
   RegisterResponse register_http_parsed(const RegisterRequest& request) const;
   RechargeResponse recharge_http_parsed(const RechargeRequest& request) const;
+  BindingsResponse bindings_http_parsed(const BindingsRequest& request) const;
+  UnbindResponse unbind_http_parsed(const UnbindRequest& request) const;
   LoginResponse card_login_http_parsed(const CardLoginRequest& request) const;
   LoginResponse login_http_parsed(const LoginRequest& request) const;
   HeartbeatResponse heartbeat_http_parsed(const HeartbeatRequest& request) const;
@@ -225,6 +336,8 @@ class LicenseClientWin {
 
   RegisterResponse register_tcp_parsed(const RegisterRequest& request) const;
   RechargeResponse recharge_tcp_parsed(const RechargeRequest& request) const;
+  BindingsResponse bindings_tcp_parsed(const BindingsRequest& request) const;
+  UnbindResponse unbind_tcp_parsed(const UnbindRequest& request) const;
   LoginResponse card_login_tcp_parsed(const CardLoginRequest& request) const;
   LoginResponse login_tcp_parsed(const LoginRequest& request) const;
   HeartbeatResponse heartbeat_tcp_parsed(const HeartbeatRequest& request) const;
@@ -247,6 +360,8 @@ class LicenseClientWin {
 
   static std::string to_json(const RegisterRequest& request);
   static std::string to_json(const RechargeRequest& request);
+  static std::string to_json(const BindingsRequest& request);
+  static std::string to_json(const UnbindRequest& request);
   static std::string to_json(const CardLoginRequest& request);
   static std::string to_json(const LoginRequest& request);
   static std::string to_json(const HeartbeatRequest& request);
@@ -267,6 +382,8 @@ class LicenseClientWin {
   static TokenKeySet parse_token_key_set(const ApiEnvelope& envelope);
   static RegisterResponse parse_register_response(const ApiEnvelope& envelope);
   static RechargeResponse parse_recharge_response(const ApiEnvelope& envelope);
+  static BindingsResponse parse_bindings_response(const ApiEnvelope& envelope);
+  static UnbindResponse parse_unbind_response(const ApiEnvelope& envelope);
   static LoginResponse parse_login_response(const ApiEnvelope& envelope);
   static HeartbeatResponse parse_heartbeat_response(const ApiEnvelope& envelope);
   static LogoutResponse parse_logout_response(const ApiEnvelope& envelope);

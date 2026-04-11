@@ -193,6 +193,197 @@ std::string build_device_profile_json(const DeviceProfileRequest& profile) {
   return stream.str();
 }
 
+const JsonValue* find_json_value(const JsonValue& object, const char* key) {
+  if (!object.is_object() || !object.has(key)) {
+    return nullptr;
+  }
+  return &object.at(key);
+}
+
+std::string require_object_string(const JsonValue& object, const char* key) {
+  const JsonValue* value = find_json_value(object, key);
+  if (!value || !value->is_string()) {
+    throw std::runtime_error(std::string("Expected string field: ") + key);
+  }
+  return value->as_string();
+}
+
+int require_object_int(const JsonValue& object, const char* key) {
+  const JsonValue* value = find_json_value(object, key);
+  if (!value || !value->is_number()) {
+    throw std::runtime_error(std::string("Expected numeric field: ") + key);
+  }
+  return static_cast<int>(value->as_number());
+}
+
+std::string optional_object_string(
+  const JsonValue& object,
+  const char* key,
+  const std::string& fallback = std::string()
+) {
+  const JsonValue* value = find_json_value(object, key);
+  if (!value || value->is_null()) {
+    return fallback;
+  }
+  if (!value->is_string()) {
+    throw std::runtime_error(std::string("Expected string field: ") + key);
+  }
+  return value->as_string();
+}
+
+int optional_object_int(const JsonValue& object, const char* key, int fallback = 0) {
+  const JsonValue* value = find_json_value(object, key);
+  if (!value || value->is_null()) {
+    return fallback;
+  }
+  if (!value->is_number()) {
+    throw std::runtime_error(std::string("Expected numeric field: ") + key);
+  }
+  return static_cast<int>(value->as_number());
+}
+
+bool optional_object_bool(const JsonValue& object, const char* key, bool fallback = false) {
+  const JsonValue* value = find_json_value(object, key);
+  if (!value || value->is_null()) {
+    return fallback;
+  }
+  if (!value->is_bool()) {
+    throw std::runtime_error(std::string("Expected boolean field: ") + key);
+  }
+  return value->as_bool();
+}
+
+const JsonValue* optional_object_value(const JsonValue& object, const char* key) {
+  const JsonValue* value = find_json_value(object, key);
+  if (!value || value->is_null()) {
+    return nullptr;
+  }
+  return value;
+}
+
+const JsonValue& require_object_field(const JsonValue& object, const char* key, JsonType expected_type) {
+  const JsonValue* value = find_json_value(object, key);
+  if (!value) {
+    throw std::runtime_error(std::string("Missing field: ") + key);
+  }
+  if (value->type() != expected_type) {
+    throw std::runtime_error(std::string("Unexpected JSON type for field: ") + key);
+  }
+  return *value;
+}
+
+std::vector<std::string> parse_string_array(const JsonValue& value, const char* field_name) {
+  if (!value.is_array()) {
+    throw std::runtime_error(std::string("Expected array field: ") + field_name);
+  }
+
+  std::vector<std::string> output;
+  for (const JsonValue& item : value.as_array()) {
+    if (!item.is_string()) {
+      throw std::runtime_error(std::string("Expected string items in field: ") + field_name);
+    }
+    output.push_back(item.as_string());
+  }
+  return output;
+}
+
+std::vector<std::string> optional_object_string_array(const JsonValue& object, const char* key) {
+  const JsonValue* value = optional_object_value(object, key);
+  if (!value) {
+    return {};
+  }
+  return parse_string_array(*value, key);
+}
+
+ResellerAllocationInfo parse_reseller_allocation_info(const JsonValue& object) {
+  ResellerAllocationInfo info;
+  info.present = true;
+  info.id = require_object_string(object, "id");
+  info.code = require_object_string(object, "code");
+  info.name = require_object_string(object, "name");
+  info.allocation_batch_code = optional_object_string(object, "allocationBatchCode");
+  info.allocated_at = optional_object_string(object, "allocatedAt");
+  return info;
+}
+
+SessionBindingInfo parse_session_binding_info(const JsonValue& object) {
+  SessionBindingInfo binding;
+  binding.id = require_object_string(object, "id");
+  binding.mode = require_object_string(object, "mode");
+  binding.match_fields = optional_object_string_array(object, "matchFields");
+  binding.released_sessions = optional_object_int(object, "releasedSessions", 0);
+  return binding;
+}
+
+SessionQuotaInfo parse_session_quota_info(const JsonValue& object) {
+  SessionQuotaInfo quota;
+  quota.grant_type = optional_object_string(object, "grantType", "duration");
+  quota.total_points = optional_object_int(object, "totalPoints", 0);
+  quota.remaining_points = optional_object_int(object, "remainingPoints", 0);
+  quota.consumed_points = optional_object_int(object, "consumedPoints", 0);
+  quota.consumed_this_login = optional_object_int(object, "consumedThisLogin", 0);
+  quota.metered = quota.grant_type == "points";
+  return quota;
+}
+
+ManagedAccountInfo parse_managed_account_info(const JsonValue& object) {
+  ManagedAccountInfo account;
+  account.id = require_object_string(object, "id");
+  account.username = require_object_string(object, "username");
+  return account;
+}
+
+ManagedEntitlementInfo parse_managed_entitlement_info(
+  const JsonValue& object,
+  bool require_policy_name
+) {
+  ManagedEntitlementInfo entitlement;
+  entitlement.id = require_object_string(object, "id");
+  entitlement.policy_name = require_policy_name
+    ? require_object_string(object, "policyName")
+    : optional_object_string(object, "policyName");
+  entitlement.ends_at = require_object_string(object, "endsAt");
+  entitlement.status = optional_object_string(object, "status");
+  return entitlement;
+}
+
+BindingRecord parse_binding_record(const JsonValue& object) {
+  BindingRecord binding;
+  binding.id = require_object_string(object, "id");
+  binding.entitlement_id = require_object_string(object, "entitlementId");
+  binding.device_id = require_object_string(object, "deviceId");
+  binding.status = require_object_string(object, "status");
+  binding.first_bound_at = require_object_string(object, "firstBoundAt");
+  binding.last_bound_at = require_object_string(object, "lastBoundAt");
+  binding.revoked_at = optional_object_string(object, "revokedAt");
+  binding.fingerprint = require_object_string(object, "fingerprint");
+  binding.device_name = optional_object_string(object, "deviceName");
+  binding.last_seen_at = optional_object_string(object, "lastSeenAt");
+  binding.last_seen_ip = optional_object_string(object, "lastSeenIp");
+  binding.match_fields = optional_object_string_array(object, "matchFields");
+  if (const JsonValue* identity = optional_object_value(object, "identity")) {
+    binding.identity = *identity;
+  }
+  binding.bind_request_ip = optional_object_string(object, "bindRequestIp");
+  binding.active_session_count = optional_object_int(object, "activeSessionCount", 0);
+  return binding;
+}
+
+UnbindPolicyInfo parse_unbind_policy_info(const JsonValue& object) {
+  UnbindPolicyInfo policy;
+  policy.allow_client_unbind = optional_object_bool(object, "allowClientUnbind", false);
+  policy.client_unbind_limit = optional_object_int(object, "clientUnbindLimit", 0);
+  policy.client_unbind_window_days = optional_object_int(object, "clientUnbindWindowDays", 0);
+  policy.client_unbind_deduct_days = optional_object_int(object, "clientUnbindDeductDays", 0);
+  policy.recent_client_unbinds = optional_object_int(object, "recentClientUnbinds", 0);
+  const JsonValue* remaining = optional_object_value(object, "remainingClientUnbinds");
+  if (remaining && remaining->is_number()) {
+    policy.has_remaining_client_unbinds = true;
+    policy.remaining_client_unbinds = static_cast<int>(remaining->as_number());
+  }
+  return policy;
+}
+
 TransportResult perform_http_request(
   const HttpEndpoint& endpoint,
   const wchar_t* method,
@@ -525,8 +716,84 @@ RechargeResponse LicenseClientWin::parse_recharge_response(const ApiEnvelope& en
   RechargeResponse response;
   response.entitlement_id = require_json_string(envelope.data, "entitlementId");
   response.policy_name = require_json_string(envelope.data, "policyName");
+  response.grant_type = envelope.data.has("grantType") && envelope.data.at("grantType").is_string()
+    ? envelope.data.at("grantType").as_string()
+    : "duration";
+  if (response.grant_type == "points") {
+    response.has_points = true;
+    response.total_points = optional_object_int(envelope.data, "totalPoints", 0);
+    response.remaining_points = optional_object_int(envelope.data, "remainingPoints", 0);
+  }
   response.starts_at = require_json_string(envelope.data, "startsAt");
   response.ends_at = require_json_string(envelope.data, "endsAt");
+  if (const JsonValue* reseller = optional_object_value(envelope.data, "reseller")) {
+    if (!reseller->is_object()) {
+      throw std::runtime_error("Recharge reseller payload must be an object.");
+    }
+    response.reseller = parse_reseller_allocation_info(*reseller);
+  }
+  return response;
+}
+
+BindingsResponse LicenseClientWin::parse_bindings_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Bindings request failed." : error.message);
+  }
+  if (!envelope.data.is_object()) {
+    throw std::runtime_error("Bindings response data must be an object.");
+  }
+
+  BindingsResponse response;
+  response.auth_mode = optional_object_string(envelope.data, "authMode", "account");
+
+  const JsonValue& account = require_object_field(envelope.data, "account", JsonType::object);
+  response.account = parse_managed_account_info(account);
+
+  const JsonValue& entitlement = require_object_field(envelope.data, "entitlement", JsonType::object);
+  response.entitlement = parse_managed_entitlement_info(entitlement, true);
+
+  const JsonValue& bindings = require_object_field(envelope.data, "bindings", JsonType::array);
+  for (const JsonValue& item : bindings.as_array()) {
+    if (!item.is_object()) {
+      throw std::runtime_error("Binding list items must be objects.");
+    }
+    response.bindings.push_back(parse_binding_record(item));
+  }
+
+  const JsonValue& unbind_policy = require_object_field(envelope.data, "unbindPolicy", JsonType::object);
+  response.unbind_policy = parse_unbind_policy_info(unbind_policy);
+  return response;
+}
+
+UnbindResponse LicenseClientWin::parse_unbind_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Unbind request failed." : error.message);
+  }
+  if (!envelope.data.is_object()) {
+    throw std::runtime_error("Unbind response data must be an object.");
+  }
+
+  UnbindResponse response;
+  response.changed = envelope.data.has("changed") && envelope.data.at("changed").is_bool()
+    ? envelope.data.at("changed").as_bool()
+    : false;
+  response.released_sessions = optional_object_int(envelope.data, "releasedSessions", 0);
+
+  const JsonValue& binding = require_object_field(envelope.data, "binding", JsonType::object);
+  response.binding = parse_binding_record(binding);
+
+  const JsonValue& entitlement = require_object_field(envelope.data, "entitlement", JsonType::object);
+  response.entitlement = parse_managed_entitlement_info(entitlement, false);
+
+  if (const JsonValue* unbind_policy = optional_object_value(envelope.data, "unbindPolicy")) {
+    if (!unbind_policy->is_object()) {
+      throw std::runtime_error("Unbind policy payload must be an object.");
+    }
+    response.unbind_policy = parse_unbind_policy_info(*unbind_policy);
+  }
+
   return response;
 }
 
@@ -558,6 +825,8 @@ LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope
   response.entitlement_id = require_json_string(entitlement, "id");
   response.entitlement_policy_name = require_json_string(entitlement, "policyName");
   response.entitlement_ends_at = require_json_string(entitlement, "endsAt");
+  response.binding = parse_session_binding_info(require_json_object(envelope.data, "binding"));
+  response.quota = parse_session_quota_info(require_json_object(envelope.data, "quota"));
 
   if (envelope.data.has("account") && envelope.data.at("account").is_object()) {
     const JsonValue& account = envelope.data.at("account");
@@ -619,6 +888,14 @@ TransportResult LicenseClientWin::recharge_http(const RechargeRequest& request) 
   return http_.post_json(make_signed_http_request("/api/client/recharge", to_json(request)));
 }
 
+TransportResult LicenseClientWin::bindings_http(const BindingsRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/bindings", to_json(request)));
+}
+
+TransportResult LicenseClientWin::unbind_http(const UnbindRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/unbind", to_json(request)));
+}
+
 TransportResult LicenseClientWin::card_login_http(const CardLoginRequest& request) const {
   return http_.post_json(make_signed_http_request("/api/client/card-login", to_json(request)));
 }
@@ -641,6 +918,14 @@ TransportResult LicenseClientWin::register_tcp(const RegisterRequest& request) c
 
 TransportResult LicenseClientWin::recharge_tcp(const RechargeRequest& request) const {
   return tcp_.call(make_signed_tcp_frame("client.recharge", "/api/client/recharge", to_json(request)));
+}
+
+TransportResult LicenseClientWin::bindings_tcp(const BindingsRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.bindings", "/api/client/bindings", to_json(request)));
+}
+
+TransportResult LicenseClientWin::unbind_tcp(const UnbindRequest& request) const {
+  return tcp_.call(make_signed_tcp_frame("client.unbind", "/api/client/unbind", to_json(request)));
 }
 
 TransportResult LicenseClientWin::card_login_tcp(const CardLoginRequest& request) const {
@@ -667,6 +952,14 @@ RechargeResponse LicenseClientWin::recharge_http_parsed(const RechargeRequest& r
   return parse_recharge_response(parse_api_envelope(recharge_http(request)));
 }
 
+BindingsResponse LicenseClientWin::bindings_http_parsed(const BindingsRequest& request) const {
+  return parse_bindings_response(parse_api_envelope(bindings_http(request)));
+}
+
+UnbindResponse LicenseClientWin::unbind_http_parsed(const UnbindRequest& request) const {
+  return parse_unbind_response(parse_api_envelope(unbind_http(request)));
+}
+
 LoginResponse LicenseClientWin::card_login_http_parsed(const CardLoginRequest& request) const {
   return parse_login_response(parse_api_envelope(card_login_http(request)));
 }
@@ -689,6 +982,14 @@ RegisterResponse LicenseClientWin::register_tcp_parsed(const RegisterRequest& re
 
 RechargeResponse LicenseClientWin::recharge_tcp_parsed(const RechargeRequest& request) const {
   return parse_recharge_response(parse_api_envelope(recharge_tcp(request)));
+}
+
+BindingsResponse LicenseClientWin::bindings_tcp_parsed(const BindingsRequest& request) const {
+  return parse_bindings_response(parse_api_envelope(bindings_tcp(request)));
+}
+
+UnbindResponse LicenseClientWin::unbind_tcp_parsed(const UnbindRequest& request) const {
+  return parse_unbind_response(parse_api_envelope(unbind_tcp(request)));
 }
 
 LoginResponse LicenseClientWin::card_login_tcp_parsed(const CardLoginRequest& request) const {
@@ -775,6 +1076,56 @@ std::string LicenseClientWin::to_json(const RechargeRequest& request) {
     << build_json_pair("password", require_not_empty("password", request.password)) << ","
     << build_json_pair("cardKey", require_not_empty("cardKey", request.card_key))
     << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const BindingsRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code));
+
+  if (!request.card_key.empty()) {
+    stream << "," << build_json_pair("cardKey", request.card_key);
+  } else {
+    stream
+      << "," << build_json_pair("username", require_not_empty("username", request.username))
+      << "," << build_json_pair("password", require_not_empty("password", request.password));
+  }
+
+  stream << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const UnbindRequest& request) {
+  if (request.binding_id.empty() && request.device_fingerprint.empty()) {
+    throw std::invalid_argument("unbind request requires binding_id or device_fingerprint");
+  }
+
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code));
+
+  if (!request.card_key.empty()) {
+    stream << "," << build_json_pair("cardKey", request.card_key);
+  } else {
+    stream
+      << "," << build_json_pair("username", require_not_empty("username", request.username))
+      << "," << build_json_pair("password", require_not_empty("password", request.password));
+  }
+
+  if (!request.binding_id.empty()) {
+    stream << "," << build_json_pair("bindingId", request.binding_id);
+  }
+  if (!request.device_fingerprint.empty()) {
+    stream << "," << build_json_pair("deviceFingerprint", request.device_fingerprint);
+  }
+  if (!request.reason.empty()) {
+    stream << "," << build_json_pair("reason", request.reason);
+  }
+
+  stream << "}";
   return stream.str();
 }
 

@@ -13,6 +13,8 @@ This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 - TCP transport: Winsock
 - High-level client wrapper: `LicenseClientWin`
 - Dual client auth modes: account login and direct card login
+- Binding inspection and self-unbind: account mode and direct card mode
+- Point-quota awareness: parsed recharge/login responses expose remaining points
 
 ## Main headers
 
@@ -61,6 +63,8 @@ Parsed high-level usage:
 
 ```cpp
 const rocksolid::LoginResponse login = client.login_tcp_parsed(request);
+const std::string binding_id = login.binding.id;
+const bool metered = login.quota.metered;
 const rocksolid::TokenValidationResult validation =
   client.validate_license_token_online(login.license_token);
 ```
@@ -95,6 +99,31 @@ request.device_profile.disk_serial = "DISK-XYZ";
 request.device_profile.public_ip = "198.51.100.10";
 ```
 
+Bindings and self-unbind:
+
+```cpp
+rocksolid::BindingsRequest bindings_request{
+  "MY_SOFTWARE",
+  "alice",
+  "StrongPass123",
+  ""
+};
+
+const rocksolid::BindingsResponse bindings = client.bindings_http_parsed(bindings_request);
+
+rocksolid::UnbindRequest unbind_request{
+  "MY_SOFTWARE",
+  "alice",
+  "StrongPass123",
+  "",
+  bindings.bindings.front().id,
+  "",
+  "user_replace_device"
+};
+
+const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request);
+```
+
 ## Notes
 
 - Use `GET /api/system/token-key` to retrieve the server public key for SDK distribution or verification bootstrap.
@@ -104,6 +133,11 @@ request.device_profile.public_ip = "198.51.100.10";
 - The SDK now also exposes parsed response structs for the main client flows.
 - `LoginResponse.auth_mode` tells you whether the session came from `account` login or direct `card` login.
 - `LoginResponse.card_masked_key` is populated for direct card login responses.
+- `LoginResponse.binding` exposes the server-side binding id, bind mode, and matched hardware fields.
+- `LoginResponse.quota` exposes point-based quota consumption after each successful login.
+- `RechargeResponse.grant_type` and `RechargeResponse.remaining_points` help distinguish duration cards from point cards.
+- `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.
+- `BindingsResponse.unbind_policy` tells you whether self-unbind is enabled and how many attempts remain in the current window.
 - `LoginRequest` and `CardLoginRequest` can optionally carry hardware/IP profile fields for configurable rebinding detection.
 - The server TCP protocol is line-delimited JSON. See [tcp-protocol.md](/D:/code/OnlineVerification/docs/tcp-protocol.md).
 - Build steps are in [BUILD_WINDOWS.md](/D:/code/OnlineVerification/sdk/BUILD_WINDOWS.md).

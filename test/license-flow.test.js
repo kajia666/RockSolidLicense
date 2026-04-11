@@ -1430,6 +1430,200 @@ test("client self-unbind can enforce policy quota, deduct days, and work over tc
   }
 });
 
+test("point-based policies can consume login credits in account and card-direct modes", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "POINT_APP",
+        name: "Point App",
+        description: "Point-based authorization coverage"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "POINT_APP",
+        name: "Point Policy",
+        grantType: "points",
+        grantPoints: 2,
+        durationDays: 0,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+    assert.equal(policy.grantType, "points");
+    assert.equal(policy.grantPoints, 2);
+
+    const cards = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "POINT_APP",
+        policyId: policy.id,
+        count: 2,
+        prefix: "POINT"
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_APP",
+      username: "credit_user",
+      password: "Credit123!"
+    });
+
+    const recharge = await signedClientPost(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_APP",
+        username: "credit_user",
+        password: "Credit123!",
+        cardKey: cards.keys[0]
+      }
+    );
+    assert.equal(recharge.grantType, "points");
+    assert.equal(recharge.totalPoints, 2);
+    assert.equal(recharge.remainingPoints, 2);
+
+    const entitlementRows = await getJson(
+      baseUrl,
+      "/api/admin/entitlements?productCode=POINT_APP&username=credit_user",
+      adminSession.token
+    );
+    assert.equal(entitlementRows.items[0].grantType, "points");
+    assert.equal(entitlementRows.items[0].remainingPoints, 2);
+
+    const firstLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_APP",
+        username: "credit_user",
+        password: "Credit123!",
+        deviceFingerprint: "point-device-001",
+        deviceName: "Point Device 1"
+      }
+    );
+    assert.equal(firstLogin.quota.grantType, "points");
+    assert.equal(firstLogin.quota.remainingPoints, 1);
+
+    await signedClientPost(baseUrl, "/api/client/logout", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_APP",
+      sessionToken: firstLogin.sessionToken
+    });
+
+    const secondLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_APP",
+        username: "credit_user",
+        password: "Credit123!",
+        deviceFingerprint: "point-device-001",
+        deviceName: "Point Device 1"
+      }
+    );
+    assert.equal(secondLogin.quota.remainingPoints, 0);
+
+    await signedClientPost(baseUrl, "/api/client/logout", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_APP",
+      sessionToken: secondLogin.sessionToken
+    });
+
+    const exhaustedLogin = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_APP",
+        username: "credit_user",
+        password: "Credit123!",
+        deviceFingerprint: "point-device-001",
+        deviceName: "Point Device 1"
+      }
+    );
+    assert.equal(exhaustedLogin.status, 403);
+    assert.equal(exhaustedLogin.error.code, "LICENSE_POINTS_EXHAUSTED");
+
+    const cardDirectFirst = await signedClientPost(
+      baseUrl,
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_APP",
+        cardKey: cards.keys[1],
+        deviceFingerprint: "point-card-device-001",
+        deviceName: "Point Card Device 1"
+      }
+    );
+    assert.equal(cardDirectFirst.quota.grantType, "points");
+    assert.equal(cardDirectFirst.quota.remainingPoints, 1);
+
+    await signedClientPost(baseUrl, "/api/client/logout", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_APP",
+      sessionToken: cardDirectFirst.sessionToken
+    });
+
+    const cardDirectSecond = await signedClientPost(
+      baseUrl,
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_APP",
+        cardKey: cards.keys[1],
+        deviceFingerprint: "point-card-device-001",
+        deviceName: "Point Card Device 1"
+      }
+    );
+    assert.equal(cardDirectSecond.quota.remainingPoints, 0);
+
+    await signedClientPost(baseUrl, "/api/client/logout", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "POINT_APP",
+      sessionToken: cardDirectSecond.sessionToken
+    });
+
+    const exhaustedCardLogin = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "POINT_APP",
+        cardKey: cards.keys[1],
+        deviceFingerprint: "point-card-device-001",
+        deviceName: "Point Card Device 1"
+      }
+    );
+    assert.equal(exhaustedCardLogin.status, 403);
+    assert.equal(exhaustedCardLogin.error.code, "LICENSE_POINTS_EXHAUSTED");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("admin can block and unblock a device fingerprint", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

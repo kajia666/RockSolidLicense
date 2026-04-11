@@ -8,6 +8,7 @@ This matches the common "network verification" product shape seen in commercial 
 - card mode: skip account registration and log in directly with a card key
 
 Client self-unbind is documented separately in [client-unbind.md](/D:/code/OnlineVerification/docs/client-unbind.md).
+Duration vs point grants are documented in [policy-grants.md](/D:/code/OnlineVerification/docs/policy-grants.md).
 
 The implementation here is our own API design, informed by the product direction described in:
 
@@ -65,6 +66,7 @@ Behavior:
 - a card that was already recharged onto a named account is rejected for direct login
 - direct-card sessions still use the same device binding, heartbeat, token signing, notice blocking, version checks, and IP/network rules as account login
 - direct-card identities can also use client binding list and self-unbind, as long as the card still belongs to direct-card mode
+- if the policy uses `grantType=points`, each successful new login consumes 1 remaining point
 
 ## Rebind detection
 

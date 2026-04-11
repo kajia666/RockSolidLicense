@@ -166,6 +166,7 @@ const SUPPORTED_BIND_MODES = new Set(["strict", "selected_fields"]);
 const SUPPORTED_CARD_CONTROL_STATUSES = new Set(["active", "frozen", "revoked"]);
 const SUPPORTED_ENTITLEMENT_STATUSES = new Set(["active", "frozen"]);
 const SUPPORTED_CARD_DISPLAY_STATUSES = new Set(["unused", "used", "frozen", "revoked", "expired"]);
+const SUPPORTED_GRANT_TYPES = new Set(["duration", "points"]);
 
 function safeParseJsonObject(value, fallback = {}) {
   if (!value) {
@@ -340,6 +341,18 @@ function normalizeNonNegativeInteger(value, fieldName, defaultValue = 0, maxValu
   return resolved;
 }
 
+function normalizeGrantType(value = "duration") {
+  const grantType = String(value ?? "duration").trim().toLowerCase();
+  if (!SUPPORTED_GRANT_TYPES.has(grantType)) {
+    throw new AppError(
+      400,
+      "INVALID_GRANT_TYPE",
+      `grantType must be one of: ${Array.from(SUPPORTED_GRANT_TYPES).join(", ")}.`
+    );
+  }
+  return grantType;
+}
+
 function normalizeBindFieldValue(field, value) {
   if (field === "requestIp" || field === "publicIp" || field === "localIp") {
     return normalizeIpAddress(value);
@@ -492,9 +505,73 @@ function persistPolicyUnbindConfig(db, policyId, body = {}, timestamp) {
   };
 }
 
+function parsePolicyGrantConfigRow(row, fallbackUpdatedAt = null) {
+  const grantType = normalizeGrantType(row?.grant_type ?? "duration");
+  return {
+    grantType,
+    grantPoints: grantType === "points"
+      ? normalizeNonNegativeInteger(row?.grant_points ?? 0, "grantPoints", 0, 1000000)
+      : 0,
+    createdAt: row?.created_at ?? fallbackUpdatedAt ?? null,
+    updatedAt: row?.updated_at ?? fallbackUpdatedAt ?? null
+  };
+}
+
+function loadPolicyGrantConfig(db, policyId, fallbackUpdatedAt = null) {
+  const row = one(db, "SELECT * FROM policy_grant_configs WHERE policy_id = ?", policyId);
+  return parsePolicyGrantConfigRow(row, fallbackUpdatedAt);
+}
+
+function persistPolicyGrantConfig(db, policyId, body = {}, timestamp) {
+  const config = {
+    grantType: normalizeGrantType(body.grantType ?? "duration"),
+    grantPoints: normalizeNonNegativeInteger(body.grantPoints, "grantPoints", 0, 1000000)
+  };
+
+  if (config.grantType === "points" && config.grantPoints < 1) {
+    throw new AppError(400, "INVALID_GRANT_POINTS", "grantPoints must be at least 1 for points policies.");
+  }
+
+  const existing = one(db, "SELECT policy_id FROM policy_grant_configs WHERE policy_id = ?", policyId);
+  if (existing) {
+    run(
+      db,
+      `
+        UPDATE policy_grant_configs
+        SET grant_type = ?, grant_points = ?, updated_at = ?
+        WHERE policy_id = ?
+      `,
+      config.grantType,
+      config.grantPoints,
+      timestamp,
+      policyId
+    );
+  } else {
+    run(
+      db,
+      `
+        INSERT INTO policy_grant_configs (policy_id, grant_type, grant_points, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      policyId,
+      config.grantType,
+      config.grantPoints,
+      timestamp,
+      timestamp
+    );
+  }
+
+  return {
+    ...config,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+
 function formatPolicyRow(row) {
   const bindConfig = parsePolicyBindConfigRow(row, row.bind_mode, row.updated_at);
   const unbindConfig = parsePolicyUnbindConfigRow(row, row.updated_at);
+  const grantConfig = parsePolicyGrantConfigRow(row, row.updated_at);
 
   return {
     id: row.id,
@@ -514,6 +591,8 @@ function formatPolicyRow(row) {
     clientUnbindLimit: unbindConfig.clientUnbindLimit,
     clientUnbindWindowDays: unbindConfig.clientUnbindWindowDays,
     clientUnbindDeductDays: unbindConfig.clientUnbindDeductDays,
+    grantType: grantConfig.grantType,
+    grantPoints: grantConfig.grantPoints,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -662,6 +741,8 @@ function formatCardRow(row, referenceTime = nowIso()) {
     productName: row.product_name,
     policyId: row.policy_id,
     policyName: row.policy_name,
+    grantType: normalizeGrantType(row.grant_type ?? "duration"),
+    grantPoints: Number(row.grant_points ?? 0),
     batchCode: row.batch_code,
     cardKey: row.card_key,
     maskedKey: maskCardKey(row.card_key),
@@ -748,6 +829,7 @@ function queryCardRows(db, filters = {}, options = {}) {
     `
       SELECT lk.*, pr.code AS product_code, pr.name AS product_name,
              pol.name AS policy_name,
+             pgc.grant_type, pgc.grant_points,
              a.username AS redeemed_username,
              lkc.status AS control_status, lkc.expires_at, lkc.notes AS control_notes,
              e.id AS entitlement_id, e.status AS entitlement_status, e.ends_at AS entitlement_ends_at,
@@ -755,6 +837,7 @@ function queryCardRows(db, filters = {}, options = {}) {
       FROM license_keys lk
       JOIN products pr ON pr.id = lk.product_id
       JOIN policies pol ON pol.id = lk.policy_id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = pol.id
       LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
       LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
       LEFT JOIN entitlements e ON e.source_license_key_id = lk.id
@@ -799,6 +882,7 @@ function getCardRowById(db, cardId) {
     `
       SELECT lk.*, pr.code AS product_code, pr.name AS product_name,
              pol.name AS policy_name,
+             pgc.grant_type, pgc.grant_points,
              a.username AS redeemed_username,
              lkc.status AS control_status, lkc.expires_at, lkc.notes AS control_notes,
              e.id AS entitlement_id, e.status AS entitlement_status, e.ends_at AS entitlement_ends_at,
@@ -806,6 +890,7 @@ function getCardRowById(db, cardId) {
       FROM license_keys lk
       JOIN products pr ON pr.id = lk.product_id
       JOIN policies pol ON pol.id = lk.policy_id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = pol.id
       LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
       LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
       LEFT JOIN entitlements e ON e.source_license_key_id = lk.id
@@ -878,22 +963,31 @@ function ensureCardControlAvailable(controlState) {
   }
 }
 
-function getUsableEntitlement(db, accountId, productId, now) {
+function defaultPointsEntitlementEndsAt(referenceTime = nowIso()) {
+  return addDays(referenceTime, 36500);
+}
+
+function getUsableDurationEntitlement(db, accountId, productId, now) {
   return one(
     db,
     `
       SELECT e.*, p.name AS policy_name, p.max_devices, p.allow_concurrent_sessions,
-             p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode
-             , lkc.status AS card_control_status, lkc.expires_at AS card_expires_at
+             p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode,
+             lkc.status AS card_control_status, lkc.expires_at AS card_expires_at,
+             pgc.grant_type, pgc.grant_points,
+             em.total_points, em.remaining_points, em.consumed_points
       FROM entitlements e
       JOIN policies p ON p.id = e.policy_id
       JOIN license_keys lk ON lk.id = e.source_license_key_id
       LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
+      LEFT JOIN entitlement_metering em ON em.entitlement_id = e.id
       WHERE e.account_id = ?
         AND e.product_id = ?
         AND e.status = 'active'
         AND e.starts_at <= ?
         AND e.ends_at > ?
+        AND COALESCE(pgc.grant_type, 'duration') = 'duration'
         AND (lkc.license_key_id IS NULL OR lkc.status = 'active')
         AND (lkc.expires_at IS NULL OR lkc.expires_at > ?)
       ORDER BY e.ends_at DESC
@@ -907,17 +1001,61 @@ function getUsableEntitlement(db, accountId, productId, now) {
   );
 }
 
+function getUsablePointsEntitlement(db, accountId, productId, now) {
+  return one(
+    db,
+    `
+      SELECT e.*, p.name AS policy_name, p.max_devices, p.allow_concurrent_sessions,
+             p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode,
+             lkc.status AS card_control_status, lkc.expires_at AS card_expires_at,
+             pgc.grant_type, pgc.grant_points,
+             em.total_points, em.remaining_points, em.consumed_points
+      FROM entitlements e
+      JOIN policies p ON p.id = e.policy_id
+      JOIN license_keys lk ON lk.id = e.source_license_key_id
+      LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
+      JOIN entitlement_metering em ON em.entitlement_id = e.id
+      WHERE e.account_id = ?
+        AND e.product_id = ?
+        AND e.status = 'active'
+        AND e.starts_at <= ?
+        AND e.ends_at > ?
+        AND pgc.grant_type = 'points'
+        AND em.remaining_points > 0
+        AND (lkc.license_key_id IS NULL OR lkc.status = 'active')
+        AND (lkc.expires_at IS NULL OR lkc.expires_at > ?)
+      ORDER BY e.created_at ASC, e.ends_at ASC
+      LIMIT 1
+    `,
+    accountId,
+    productId,
+    now,
+    now,
+    now
+  );
+}
+
+function getUsableEntitlement(db, accountId, productId, now) {
+  return getUsableDurationEntitlement(db, accountId, productId, now)
+    ?? getUsablePointsEntitlement(db, accountId, productId, now);
+}
+
 function getLatestEntitlementSnapshot(db, accountId, productId) {
   return one(
     db,
     `
       SELECT e.*, p.name AS policy_name, p.max_devices, p.allow_concurrent_sessions,
              p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode,
-             lkc.status AS card_control_status, lkc.expires_at AS card_expires_at
+             lkc.status AS card_control_status, lkc.expires_at AS card_expires_at,
+             pgc.grant_type, pgc.grant_points,
+             em.total_points, em.remaining_points, em.consumed_points
       FROM entitlements e
       JOIN policies p ON p.id = e.policy_id
       JOIN license_keys lk ON lk.id = e.source_license_key_id
       LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
+      LEFT JOIN entitlement_metering em ON em.entitlement_id = e.id
       WHERE e.account_id = ? AND e.product_id = ?
       ORDER BY e.ends_at DESC, e.created_at DESC
       LIMIT 1
@@ -940,6 +1078,15 @@ function throwEntitlementUnavailable(snapshot, referenceTime = nowIso()) {
     throw new AppError(403, "LICENSE_FROZEN", "This authorization has been frozen by the operator.", {
       entitlementId: snapshot.id,
       endsAt: snapshot.ends_at
+    });
+  }
+
+  if ((snapshot.grant_type ?? "duration") === "points" && Number(snapshot.remaining_points ?? 0) <= 0) {
+    throw new AppError(403, "LICENSE_POINTS_EXHAUSTED", "This authorization has no remaining points.", {
+      entitlementId: snapshot.id,
+      totalPoints: Number(snapshot.total_points ?? 0),
+      remainingPoints: Number(snapshot.remaining_points ?? 0),
+      consumedPoints: Number(snapshot.consumed_points ?? 0)
     });
   }
 
@@ -1147,6 +1294,16 @@ function entitlementLifecycleStatus(row, referenceTime = nowIso()) {
   return row.status === "frozen" ? "frozen" : "active";
 }
 
+function formatEntitlementGrant(row) {
+  return {
+    grantType: normalizeGrantType(row.grant_type ?? "duration"),
+    grantPoints: Number(row.grant_points ?? 0),
+    totalPoints: row.total_points === null || row.total_points === undefined ? null : Number(row.total_points),
+    remainingPoints: row.remaining_points === null || row.remaining_points === undefined ? null : Number(row.remaining_points),
+    consumedPoints: row.consumed_points === null || row.consumed_points === undefined ? null : Number(row.consumed_points)
+  };
+}
+
 function queryEntitlementRows(db, filters = {}, options = {}) {
   const now = nowIso();
   const normalizedFilters = {
@@ -1187,6 +1344,8 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
              a.username, pol.name AS policy_name,
              lk.card_key, lk.id AS license_key_id,
              lkc.status AS card_control_status, lkc.expires_at AS card_expires_at,
+             pgc.grant_type, pgc.grant_points,
+             em.total_points, em.remaining_points, em.consumed_points,
              COALESCE(sess.active_session_count, 0) AS active_session_count
       FROM entitlements e
       JOIN products pr ON pr.id = e.product_id
@@ -1194,6 +1353,8 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
       JOIN policies pol ON pol.id = e.policy_id
       JOIN license_keys lk ON lk.id = e.source_license_key_id
       LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = pol.id
+      LEFT JOIN entitlement_metering em ON em.entitlement_id = e.id
       LEFT JOIN (
         SELECT entitlement_id, COUNT(*) AS active_session_count
         FROM sessions
@@ -1210,6 +1371,7 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
       status: row.card_control_status,
       expires_at: row.card_expires_at
     }, now);
+    const grant = formatEntitlementGrant(row);
     return {
       id: row.id,
       productCode: row.product_code,
@@ -1224,6 +1386,11 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
       lifecycleStatus: entitlementLifecycleStatus(row, now),
       startsAt: row.starts_at,
       endsAt: row.ends_at,
+      grantType: grant.grantType,
+      grantPoints: grant.grantPoints,
+      totalPoints: grant.totalPoints,
+      remainingPoints: grant.remainingPoints,
+      consumedPoints: grant.consumedPoints,
       activeSessionCount: Number(row.active_session_count ?? 0),
       cardControlStatus: control.status,
       cardEffectiveStatus: control.effectiveStatus,
@@ -1249,6 +1416,7 @@ function findClientCardByKey(db, productId, cardKey) {
     db,
     `
       SELECT lk.*, p.duration_days, p.name AS policy_name,
+             pgc.grant_type, pgc.grant_points,
              lkc.status AS control_status, lkc.expires_at, lkc.notes AS control_notes,
              cla.account_id AS card_login_account_id,
              cla.created_at AS card_login_created_at,
@@ -1257,6 +1425,7 @@ function findClientCardByKey(db, productId, cardKey) {
              redeemed_account.username AS redeemed_username
       FROM license_keys lk
       JOIN policies p ON p.id = lk.policy_id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
       LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
       LEFT JOIN card_login_accounts cla ON cla.license_key_id = lk.id
       LEFT JOIN customer_accounts card_account ON card_account.id = cla.account_id
@@ -1796,24 +1965,74 @@ function getResellerAllocationByLicenseKey(db, licenseKeyId) {
   );
 }
 
-function activateFreshCardEntitlement(db, product, account, card, eventType = "card.redeem", metadata = {}) {
-  const latest = one(
-    db,
-    `
-      SELECT ends_at
-      FROM entitlements
-      WHERE account_id = ? AND product_id = ? AND policy_id = ?
-      ORDER BY ends_at DESC
-      LIMIT 1
-    `,
-    account.id,
-    product.id,
-    card.policy_id
-  );
+function upsertEntitlementMetering(db, entitlementId, grantType, totalPoints, remainingPoints, consumedPoints, timestamp = nowIso()) {
+  const existing = one(db, "SELECT entitlement_id FROM entitlement_metering WHERE entitlement_id = ?", entitlementId);
+  if (existing) {
+    run(
+      db,
+      `
+        UPDATE entitlement_metering
+        SET grant_type = ?, total_points = ?, remaining_points = ?, consumed_points = ?, updated_at = ?
+        WHERE entitlement_id = ?
+      `,
+      grantType,
+      totalPoints,
+      remainingPoints,
+      consumedPoints,
+      timestamp,
+      entitlementId
+    );
+  } else {
+    run(
+      db,
+      `
+        INSERT INTO entitlement_metering
+        (entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      entitlementId,
+      grantType,
+      totalPoints,
+      remainingPoints,
+      consumedPoints,
+      timestamp,
+      timestamp
+    );
+  }
+}
 
+function activateFreshCardEntitlement(db, product, account, card, eventType = "card.redeem", metadata = {}) {
   const now = nowIso();
-  const startsAt = latest && latest.ends_at > now ? latest.ends_at : now;
-  const endsAt = addDays(startsAt, card.duration_days);
+  const grantType = normalizeGrantType(card.grant_type ?? "duration");
+  let startsAt = now;
+  let endsAt = defaultPointsEntitlementEndsAt(now);
+  let totalPoints = null;
+  let remainingPoints = null;
+
+  if (grantType === "duration") {
+    const latest = one(
+      db,
+      `
+        SELECT ends_at
+        FROM entitlements
+        WHERE account_id = ? AND product_id = ? AND policy_id = ?
+        ORDER BY ends_at DESC
+        LIMIT 1
+      `,
+      account.id,
+      product.id,
+      card.policy_id
+    );
+    startsAt = latest && latest.ends_at > now ? latest.ends_at : now;
+    endsAt = addDays(startsAt, card.duration_days);
+  } else {
+    totalPoints = Number(card.grant_points ?? 0);
+    remainingPoints = totalPoints;
+    if (remainingPoints <= 0) {
+      throw new AppError(400, "INVALID_GRANT_POINTS", "Point-based policy must grant at least 1 point.");
+    }
+  }
+
   const entitlementId = generateId("ent");
   const resellerAllocation = getResellerAllocationByLicenseKey(db, card.id);
 
@@ -1835,6 +2054,10 @@ function activateFreshCardEntitlement(db, product, account, card, eventType = "c
     now
   );
 
+  if (grantType === "points") {
+    upsertEntitlementMetering(db, entitlementId, "points", totalPoints, remainingPoints, 0, now);
+  }
+
   run(
     db,
     `
@@ -1851,6 +2074,8 @@ function activateFreshCardEntitlement(db, product, account, card, eventType = "c
     cardKey: card.card_key,
     cardKeyMasked: maskCardKey(card.card_key),
     policyName: card.policy_name,
+    grantType,
+    grantPoints: totalPoints,
     resellerCode: resellerAllocation?.reseller_code ?? null,
     resellerName: resellerAllocation?.reseller_name ?? null,
     startsAt,
@@ -1861,6 +2086,9 @@ function activateFreshCardEntitlement(db, product, account, card, eventType = "c
   return {
     entitlementId,
     policyName: card.policy_name,
+    grantType,
+    totalPoints,
+    remainingPoints,
     reseller: resellerAllocation
       ? {
           id: resellerAllocation.reseller_id,
@@ -1951,6 +2179,50 @@ function issueClientSession(
     );
   }
 
+  let quota = null;
+  if ((entitlement.grant_type ?? "duration") === "points") {
+    const metering = one(
+      db,
+      "SELECT * FROM entitlement_metering WHERE entitlement_id = ?",
+      entitlement.id
+    );
+    if (!metering || Number(metering.remaining_points ?? 0) <= 0) {
+      throw new AppError(403, "LICENSE_POINTS_EXHAUSTED", "This authorization has no remaining points.", {
+        entitlementId: entitlement.id,
+        totalPoints: Number(metering?.total_points ?? 0),
+        remainingPoints: Number(metering?.remaining_points ?? 0),
+        consumedPoints: Number(metering?.consumed_points ?? 0)
+      });
+    }
+
+    const nextRemaining = Number(metering.remaining_points) - 1;
+    const nextConsumed = Number(metering.consumed_points ?? 0) + 1;
+    upsertEntitlementMetering(
+      db,
+      entitlement.id,
+      "points",
+      Number(metering.total_points ?? 0),
+      nextRemaining,
+      nextConsumed,
+      nowIso()
+    );
+    quota = {
+      grantType: "points",
+      totalPoints: Number(metering.total_points ?? 0),
+      remainingPoints: nextRemaining,
+      consumedPoints: nextConsumed,
+      consumedThisLogin: 1
+    };
+  } else {
+    quota = {
+      grantType: "duration",
+      totalPoints: null,
+      remainingPoints: null,
+      consumedPoints: null,
+      consumedThisLogin: 0
+    };
+  }
+
   const issuedAt = nowIso();
   const expiresAt = addSeconds(issuedAt, entitlement.token_ttl_seconds);
   const sessionId = generateId("sess");
@@ -2031,6 +2303,7 @@ function issueClientSession(
       policyName: entitlement.policy_name,
       endsAt: entitlement.ends_at
     },
+    quota,
     account: {
       id: account.id,
       username: account.username
@@ -3287,11 +3560,13 @@ export function createServices(db, config) {
             SELECT p.*, pr.code AS product_code, pr.name AS product_name,
                    pbc.bind_fields_json,
                    puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
-                   puc.client_unbind_deduct_days
+                   puc.client_unbind_deduct_days,
+                   pgc.grant_type, pgc.grant_points
             FROM policies p
             JOIN products pr ON pr.id = p.product_id
             LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
             LEFT JOIN policy_unbind_configs puc ON puc.policy_id = p.id
+            LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
             WHERE pr.code = ?
             ORDER BY p.created_at DESC
           `
@@ -3299,11 +3574,13 @@ export function createServices(db, config) {
             SELECT p.*, pr.code AS product_code, pr.name AS product_name,
                    pbc.bind_fields_json,
                    puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
-                   puc.client_unbind_deduct_days
+                   puc.client_unbind_deduct_days,
+                   pgc.grant_type, pgc.grant_points
             FROM policies p
             JOIN products pr ON pr.id = p.product_id
             LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
             LEFT JOIN policy_unbind_configs puc ON puc.policy_id = p.id
+            LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
             ORDER BY p.created_at DESC
           `;
       const rows = productCode ? many(db, sql, productCode) : many(db, sql);
@@ -3317,11 +3594,13 @@ export function createServices(db, config) {
 
       const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
       const now = nowIso();
+      const grantType = normalizeGrantType(body.grantType ?? "duration");
+      const grantPoints = normalizeNonNegativeInteger(body.grantPoints, "grantPoints", 0, 1000000);
       const policy = {
         id: generateId("pol"),
         productId: product.id,
         name: String(body.name).trim(),
-        durationDays: Number(body.durationDays ?? 30),
+        durationDays: Number(body.durationDays ?? (grantType === "duration" ? 30 : 0)),
         maxDevices: Number(body.maxDevices ?? 1),
         allowConcurrentSessions: parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions") === false ? 0 : 1,
         heartbeatIntervalSeconds: Number(body.heartbeatIntervalSeconds ?? 60),
@@ -3335,13 +3614,21 @@ export function createServices(db, config) {
       };
 
       if (
-        policy.durationDays <= 0 ||
         policy.maxDevices <= 0 ||
         policy.heartbeatIntervalSeconds <= 0 ||
         policy.heartbeatTimeoutSeconds <= 0 ||
         policy.tokenTtlSeconds <= 0
       ) {
         throw new AppError(400, "INVALID_POLICY", "Policy values must be positive numbers.");
+      }
+      if (grantType === "duration" && policy.durationDays <= 0) {
+        throw new AppError(400, "INVALID_POLICY", "durationDays must be a positive number for duration policies.");
+      }
+      if (grantType === "points" && grantPoints <= 0) {
+        throw new AppError(400, "INVALID_POLICY", "grantPoints must be a positive number for points policies.");
+      }
+      if (grantType === "points" && policy.durationDays < 0) {
+        throw new AppError(400, "INVALID_POLICY", "durationDays cannot be negative.");
       }
 
       run(
@@ -3369,6 +3656,7 @@ export function createServices(db, config) {
 
       persistPolicyBindConfig(db, policy.id, policy.bindMode, policy.bindFields, now);
       persistPolicyUnbindConfig(db, policy.id, body, now);
+      persistPolicyGrantConfig(db, policy.id, { grantType, grantPoints }, now);
 
       audit(db, "admin", admin.admin_id, "policy.create", "policy", policy.id, {
         productCode: product.code,
@@ -3376,6 +3664,8 @@ export function createServices(db, config) {
         allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
         bindMode: policy.bindMode,
         bindFields: policy.bindFields,
+        grantType,
+        grantPoints,
         allowClientUnbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true,
         clientUnbindLimit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
         clientUnbindWindowDays: Math.max(
@@ -3405,6 +3695,12 @@ export function createServices(db, config) {
             0,
             3650
           ),
+          created_at: now,
+          updated_at: now
+        }),
+        ...parsePolicyGrantConfigRow({
+          grant_type: grantType,
+          grant_points: grantPoints,
           created_at: now,
           updated_at: now
         })

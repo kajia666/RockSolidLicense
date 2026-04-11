@@ -2,6 +2,8 @@
 
 This document covers the new operator-facing license management workflows that focus on card control and entitlement control.
 
+Policy grant modes are documented separately in [policy-grants.md](/D:/code/OnlineVerification/docs/policy-grants.md).
+
 ## Card management
 
 HTTP endpoints:
@@ -25,6 +27,11 @@ Card list output now separates three concepts:
 - `usageStatus`: whether the card is still `fresh` or already `redeemed`
 - `controlStatus`: manual operator control state, one of `active`, `frozen`, or `revoked`
 - `displayStatus`: operator-friendly merged status such as `unused`, `used`, `frozen`, `revoked`, or `expired`
+
+Cards now also inherit the grant model from their policy:
+
+- `grantType=duration`
+- `grantType=points`
 
 Status update example:
 
@@ -50,6 +57,7 @@ Effects:
 - expired cards are blocked automatically based on `expiresAt`
 - if a redeemed card is frozen, active sessions issued from that source card are kicked offline
 - CSV export is ready for operator audits or offline reconciliation
+- point-based cards can be operated alongside time-based cards under the same product
 
 ## Entitlement management
 
@@ -71,6 +79,14 @@ Lifecycle status values:
 - `active`
 - `frozen`
 - `expired`
+
+Entitlement rows now also include point-metering fields when the policy uses `grantType=points`:
+
+- `grantType`
+- `grantPoints`
+- `totalPoints`
+- `remainingPoints`
+- `consumedPoints`
 
 Freeze example:
 
@@ -104,6 +120,7 @@ The verification layer now checks both entitlement state and card control state:
 - `CARD_EXPIRED`
 - `LICENSE_FROZEN`
 - `LICENSE_EXPIRED`
+- `LICENSE_POINTS_EXHAUSTED`
 
 This means operators can independently control:
 

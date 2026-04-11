@@ -9,6 +9,7 @@ This document describes the new backoffice operations endpoints and the `/admin`
 - inspect device bindings for a user
 - release a device binding to free a seat
 - configure whether a policy allows client self-unbind, with quota and deduct-days rules
+- create duration-based or point-based policies
 - block a device fingerprint at the product level
 - unblock a previously blocked device fingerprint
 - inspect active or expired sessions
@@ -107,6 +108,30 @@ Notes:
 - `bindMode=strict` keeps the old exact-fingerprint behavior
 - `bindMode=selected_fields` lets the author decide which hardware or IP signals count for rebinding detection
 - changing bind fields affects future logins; existing bindings remain until they are revalidated or released
+
+Policy create requests now also support:
+
+- `grantType`
+- `grantPoints`
+
+Point policy example:
+
+```json
+{
+  "productCode": "MY_SOFTWARE",
+  "name": "2 Login Credits",
+  "grantType": "points",
+  "grantPoints": 2,
+  "durationDays": 0,
+  "maxDevices": 1
+}
+```
+
+Notes:
+
+- `grantType=duration` keeps the original day-based model
+- `grantType=points` creates a metered authorization that consumes 1 point per successful new login session
+- point-based entitlements are visible in `GET /api/admin/entitlements`
 
 Policy self-unbind config request body:
 

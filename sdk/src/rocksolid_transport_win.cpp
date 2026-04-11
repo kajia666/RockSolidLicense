@@ -384,6 +384,49 @@ UnbindPolicyInfo parse_unbind_policy_info(const JsonValue& object) {
   return policy;
 }
 
+NoticeInfo parse_notice_info(const JsonValue& object) {
+  NoticeInfo notice;
+  notice.id = require_object_string(object, "id");
+  notice.product_code = optional_object_string(object, "productCode");
+  notice.product_name = optional_object_string(object, "productName");
+  notice.channel = require_object_string(object, "channel");
+  notice.kind = require_object_string(object, "kind");
+  notice.severity = require_object_string(object, "severity");
+  notice.title = require_object_string(object, "title");
+  notice.body = require_object_string(object, "body");
+  notice.action_url = optional_object_string(object, "actionUrl");
+  notice.status = require_object_string(object, "status");
+  notice.block_login = optional_object_bool(object, "blockLogin", false);
+  notice.starts_at = require_object_string(object, "startsAt");
+  notice.ends_at = optional_object_string(object, "endsAt");
+  notice.created_at = require_object_string(object, "createdAt");
+  notice.updated_at = require_object_string(object, "updatedAt");
+  return notice;
+}
+
+ClientVersionNoticeInfo parse_client_version_notice_info(const JsonValue& object) {
+  ClientVersionNoticeInfo notice;
+  notice.present = true;
+  notice.version = require_object_string(object, "version");
+  notice.title = optional_object_string(object, "title");
+  notice.body = optional_object_string(object, "body");
+  notice.release_notes = optional_object_string(object, "releaseNotes");
+  return notice;
+}
+
+ClientVersionSummary parse_client_version_summary(const JsonValue& object) {
+  ClientVersionSummary version;
+  version.id = require_object_string(object, "id");
+  version.version = require_object_string(object, "version");
+  version.channel = require_object_string(object, "channel");
+  version.status = require_object_string(object, "status");
+  version.force_update = optional_object_bool(object, "forceUpdate", false);
+  version.download_url = optional_object_string(object, "downloadUrl");
+  version.released_at = optional_object_string(object, "releasedAt");
+  version.notice_title = optional_object_string(object, "noticeTitle");
+  return version;
+}
+
 TransportResult perform_http_request(
   const HttpEndpoint& endpoint,
   const wchar_t* method,
@@ -797,6 +840,72 @@ UnbindResponse LicenseClientWin::parse_unbind_response(const ApiEnvelope& envelo
   return response;
 }
 
+ClientVersionManifestResponse LicenseClientWin::parse_version_check_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Version-check request failed." : error.message);
+  }
+  if (!envelope.data.is_object()) {
+    throw std::runtime_error("Version-check response data must be an object.");
+  }
+
+  ClientVersionManifestResponse response;
+  response.product_code = require_object_string(envelope.data, "productCode");
+  response.channel = require_object_string(envelope.data, "channel");
+  response.client_version = optional_object_string(envelope.data, "clientVersion");
+  response.allowed = optional_object_bool(envelope.data, "allowed", false);
+  response.status = require_object_string(envelope.data, "status");
+  response.message = require_object_string(envelope.data, "message");
+  response.latest_version = optional_object_string(envelope.data, "latestVersion");
+  response.minimum_allowed_version = optional_object_string(envelope.data, "minimumAllowedVersion");
+  response.latest_download_url = optional_object_string(envelope.data, "latestDownloadUrl");
+
+  if (const JsonValue* notice = optional_object_value(envelope.data, "notice")) {
+    if (!notice->is_object()) {
+      throw std::runtime_error("Version-check notice payload must be an object.");
+    }
+    response.notice = parse_client_version_notice_info(*notice);
+  }
+
+  if (const JsonValue* versions = optional_object_value(envelope.data, "versions")) {
+    if (!versions->is_array()) {
+      throw std::runtime_error("Version-check versions payload must be an array.");
+    }
+    for (const JsonValue& item : versions->as_array()) {
+      if (!item.is_object()) {
+        throw std::runtime_error("Version-check versions items must be objects.");
+      }
+      response.versions.push_back(parse_client_version_summary(item));
+    }
+  }
+
+  return response;
+}
+
+ClientNoticesResponse LicenseClientWin::parse_notices_response(const ApiEnvelope& envelope) {
+  if (!envelope.ok) {
+    const ApiError error = parse_api_error(envelope.error);
+    throw std::runtime_error(error.message.empty() ? "Client notices request failed." : error.message);
+  }
+  if (!envelope.data.is_object()) {
+    throw std::runtime_error("Client notices response data must be an object.");
+  }
+
+  ClientNoticesResponse response;
+  response.product_code = require_object_string(envelope.data, "productCode");
+  response.channel = require_object_string(envelope.data, "channel");
+
+  const JsonValue& notices = require_object_field(envelope.data, "notices", JsonType::array);
+  for (const JsonValue& item : notices.as_array()) {
+    if (!item.is_object()) {
+      throw std::runtime_error("Client notices items must be objects.");
+    }
+    response.notices.push_back(parse_notice_info(item));
+  }
+
+  return response;
+}
+
 LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
     const ApiError error = parse_api_error(envelope.error);
@@ -896,6 +1005,14 @@ TransportResult LicenseClientWin::unbind_http(const UnbindRequest& request) cons
   return http_.post_json(make_signed_http_request("/api/client/unbind", to_json(request)));
 }
 
+TransportResult LicenseClientWin::version_check_http(const ClientVersionCheckRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/version-check", to_json(request)));
+}
+
+TransportResult LicenseClientWin::notices_http(const ClientNoticesRequest& request) const {
+  return http_.post_json(make_signed_http_request("/api/client/notices", to_json(request)));
+}
+
 TransportResult LicenseClientWin::card_login_http(const CardLoginRequest& request) const {
   return http_.post_json(make_signed_http_request("/api/client/card-login", to_json(request)));
 }
@@ -958,6 +1075,16 @@ BindingsResponse LicenseClientWin::bindings_http_parsed(const BindingsRequest& r
 
 UnbindResponse LicenseClientWin::unbind_http_parsed(const UnbindRequest& request) const {
   return parse_unbind_response(parse_api_envelope(unbind_http(request)));
+}
+
+ClientVersionManifestResponse LicenseClientWin::version_check_http_parsed(
+  const ClientVersionCheckRequest& request
+) const {
+  return parse_version_check_response(parse_api_envelope(version_check_http(request)));
+}
+
+ClientNoticesResponse LicenseClientWin::notices_http_parsed(const ClientNoticesRequest& request) const {
+  return parse_notices_response(parse_api_envelope(notices_http(request)));
 }
 
 LoginResponse LicenseClientWin::card_login_http_parsed(const CardLoginRequest& request) const {
@@ -1129,6 +1256,31 @@ std::string LicenseClientWin::to_json(const UnbindRequest& request) {
   return stream.str();
 }
 
+std::string LicenseClientWin::to_json(const ClientVersionCheckRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("clientVersion", require_not_empty("clientVersion", request.client_version));
+  if (!request.channel.empty()) {
+    stream << "," << build_json_pair("channel", request.channel);
+  }
+  stream << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const ClientNoticesRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code));
+  if (!request.channel.empty()) {
+    stream << "," << build_json_pair("channel", request.channel);
+  }
+  stream << "}";
+  return stream.str();
+}
+
 std::string LicenseClientWin::to_json(const CardLoginRequest& request) {
   const std::string device_profile_json = build_device_profile_json(request.device_profile);
   std::ostringstream stream;
@@ -1138,6 +1290,12 @@ std::string LicenseClientWin::to_json(const CardLoginRequest& request) {
     << build_json_pair("cardKey", require_not_empty("cardKey", request.card_key)) << ","
     << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint)) << ","
     << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name));
+  if (!request.client_version.empty()) {
+    stream << "," << build_json_pair("clientVersion", request.client_version);
+  }
+  if (!request.channel.empty()) {
+    stream << "," << build_json_pair("channel", request.channel);
+  }
   if (!device_profile_json.empty()) {
     stream << ",\"deviceProfile\":" << device_profile_json;
   }
@@ -1155,6 +1313,12 @@ std::string LicenseClientWin::to_json(const LoginRequest& request) {
     << build_json_pair("password", require_not_empty("password", request.password)) << ","
     << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint)) << ","
     << build_json_pair("deviceName", require_not_empty("deviceName", request.device_name));
+  if (!request.client_version.empty()) {
+    stream << "," << build_json_pair("clientVersion", request.client_version);
+  }
+  if (!request.channel.empty()) {
+    stream << "," << build_json_pair("channel", request.channel);
+  }
   if (!device_profile_json.empty()) {
     stream << ",\"deviceProfile\":" << device_profile_json;
   }
@@ -1168,8 +1332,14 @@ std::string LicenseClientWin::to_json(const HeartbeatRequest& request) {
     << "{"
     << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
     << build_json_pair("sessionToken", require_not_empty("sessionToken", request.session_token)) << ","
-    << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint))
-    << "}";
+    << build_json_pair("deviceFingerprint", require_not_empty("deviceFingerprint", request.device_fingerprint));
+  if (!request.client_version.empty()) {
+    stream << "," << build_json_pair("clientVersion", request.client_version);
+  }
+  if (!request.channel.empty()) {
+    stream << "," << build_json_pair("channel", request.channel);
+  }
+  stream << "}";
   return stream.str();
 }
 

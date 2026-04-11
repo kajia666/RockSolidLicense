@@ -25,6 +25,27 @@ int main() {
 
     const std::string fingerprint = client.generate_device_fingerprint();
     std::cout << "Device fingerprint: " << fingerprint << std::endl;
+    const std::string client_version = "1.0.0";
+    const std::string channel = "stable";
+
+    rocksolid::ClientVersionCheckRequest version_request{
+      "MY_SOFTWARE",
+      client_version,
+      channel
+    };
+    const rocksolid::ClientVersionManifestResponse version_manifest =
+      client.version_check_http_parsed(version_request);
+    std::cout << "[HTTP version-check] status=" << version_manifest.status
+              << " allowed=" << (version_manifest.allowed ? "true" : "false")
+              << " latestVersion=" << version_manifest.latest_version
+              << std::endl;
+
+    rocksolid::ClientNoticesRequest notices_request{
+      "MY_SOFTWARE",
+      channel
+    };
+    const rocksolid::ClientNoticesResponse notices = client.notices_http_parsed(notices_request);
+    std::cout << "[HTTP notices] count=" << notices.notices.size() << std::endl;
 
     rocksolid::RegisterRequest register_request{
       "MY_SOFTWARE",
@@ -44,7 +65,9 @@ int main() {
       "alice",
       "StrongPass123",
       fingerprint,
-      "Alice Workstation"
+      "Alice Workstation",
+      client_version,
+      channel
     };
 
     const rocksolid::RegisterResponse register_result = client.register_http_parsed(register_request);

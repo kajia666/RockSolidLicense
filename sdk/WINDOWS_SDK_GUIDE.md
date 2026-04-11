@@ -15,6 +15,7 @@ This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 - Dual client auth modes: account login and direct card login
 - Binding inspection and self-unbind: account mode and direct card mode
 - Point-quota awareness: parsed recharge/login responses expose remaining points
+- Startup bootstrap helpers: version-check and active notice polling
 
 ## Main headers
 
@@ -62,6 +63,12 @@ const auto result = client.login_tcp(request);
 Parsed high-level usage:
 
 ```cpp
+const rocksolid::ClientVersionManifestResponse manifest =
+  client.version_check_http_parsed({"MY_SOFTWARE", "1.0.0", "stable"});
+
+const rocksolid::ClientNoticesResponse notices =
+  client.notices_http_parsed({"MY_SOFTWARE", "stable"});
+
 const rocksolid::LoginResponse login = client.login_tcp_parsed(request);
 const std::string binding_id = login.binding.id;
 const bool metered = login.quota.metered;
@@ -90,7 +97,9 @@ rocksolid::LoginRequest request{
   "alice",
   "StrongPass123",
   client.generate_device_fingerprint(),
-  "Alice Workstation"
+  "Alice Workstation",
+  "1.0.0",
+  "stable"
 };
 
 request.device_profile.machine_guid = "GUID-001";
@@ -136,8 +145,11 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `LoginResponse.binding` exposes the server-side binding id, bind mode, and matched hardware fields.
 - `LoginResponse.quota` exposes point-based quota consumption after each successful login.
 - `RechargeResponse.grant_type` and `RechargeResponse.remaining_points` help distinguish duration cards from point cards.
+- `ClientVersionCheckRequest` and `ClientNoticesRequest` let the SDK drive the same startup flow documented on the server side.
+- `ClientVersionManifestResponse` exposes `allowed/status/latest_version/minimum_allowed_version/latest_download_url`.
+- `ClientNoticesResponse` returns the currently active notice list with `block_login` and timing metadata.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.
 - `BindingsResponse.unbind_policy` tells you whether self-unbind is enabled and how many attempts remain in the current window.
-- `LoginRequest` and `CardLoginRequest` can optionally carry hardware/IP profile fields for configurable rebinding detection.
+- `LoginRequest`, `CardLoginRequest`, and `HeartbeatRequest` can optionally carry `client_version/channel` for version enforcement, plus hardware/IP profile fields for configurable rebinding detection.
 - The server TCP protocol is line-delimited JSON. See [tcp-protocol.md](/D:/code/OnlineVerification/docs/tcp-protocol.md).
 - Build steps are in [BUILD_WINDOWS.md](/D:/code/OnlineVerification/sdk/BUILD_WINDOWS.md).

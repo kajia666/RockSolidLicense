@@ -102,6 +102,8 @@ struct CardLoginRequest {
   std::string card_key;
   std::string device_fingerprint;
   std::string device_name;
+  std::string client_version;
+  std::string channel;
   DeviceProfileRequest device_profile;
 };
 
@@ -111,6 +113,8 @@ struct LoginRequest {
   std::string password;
   std::string device_fingerprint;
   std::string device_name;
+  std::string client_version;
+  std::string channel;
   DeviceProfileRequest device_profile;
 };
 
@@ -118,6 +122,8 @@ struct HeartbeatRequest {
   std::string product_code;
   std::string session_token;
   std::string device_fingerprint;
+  std::string client_version;
+  std::string channel;
 };
 
 struct LogoutRequest {
@@ -273,6 +279,74 @@ struct UnbindResponse {
   UnbindPolicyInfo unbind_policy;
 };
 
+struct ClientVersionNoticeInfo {
+  bool present = false;
+  std::string version;
+  std::string title;
+  std::string body;
+  std::string release_notes;
+};
+
+struct ClientVersionSummary {
+  std::string id;
+  std::string version;
+  std::string channel;
+  std::string status;
+  bool force_update = false;
+  std::string download_url;
+  std::string released_at;
+  std::string notice_title;
+};
+
+struct ClientVersionCheckRequest {
+  std::string product_code;
+  std::string client_version;
+  std::string channel;
+};
+
+struct ClientVersionManifestResponse {
+  std::string product_code;
+  std::string channel;
+  std::string client_version;
+  bool allowed = false;
+  std::string status;
+  std::string message;
+  std::string latest_version;
+  std::string minimum_allowed_version;
+  std::string latest_download_url;
+  ClientVersionNoticeInfo notice;
+  std::vector<ClientVersionSummary> versions;
+};
+
+struct NoticeInfo {
+  std::string id;
+  std::string product_code;
+  std::string product_name;
+  std::string channel;
+  std::string kind;
+  std::string severity;
+  std::string title;
+  std::string body;
+  std::string action_url;
+  std::string status;
+  bool block_login = false;
+  std::string starts_at;
+  std::string ends_at;
+  std::string created_at;
+  std::string updated_at;
+};
+
+struct ClientNoticesRequest {
+  std::string product_code;
+  std::string channel;
+};
+
+struct ClientNoticesResponse {
+  std::string product_code;
+  std::string channel;
+  std::vector<NoticeInfo> notices;
+};
+
 struct TokenValidationResult {
   bool valid = false;
   std::string key_id;
@@ -311,6 +385,8 @@ class LicenseClientWin {
   TransportResult recharge_http(const RechargeRequest& request) const;
   TransportResult bindings_http(const BindingsRequest& request) const;
   TransportResult unbind_http(const UnbindRequest& request) const;
+  TransportResult version_check_http(const ClientVersionCheckRequest& request) const;
+  TransportResult notices_http(const ClientNoticesRequest& request) const;
   TransportResult card_login_http(const CardLoginRequest& request) const;
   TransportResult login_http(const LoginRequest& request) const;
   TransportResult heartbeat_http(const HeartbeatRequest& request) const;
@@ -329,6 +405,8 @@ class LicenseClientWin {
   RechargeResponse recharge_http_parsed(const RechargeRequest& request) const;
   BindingsResponse bindings_http_parsed(const BindingsRequest& request) const;
   UnbindResponse unbind_http_parsed(const UnbindRequest& request) const;
+  ClientVersionManifestResponse version_check_http_parsed(const ClientVersionCheckRequest& request) const;
+  ClientNoticesResponse notices_http_parsed(const ClientNoticesRequest& request) const;
   LoginResponse card_login_http_parsed(const CardLoginRequest& request) const;
   LoginResponse login_http_parsed(const LoginRequest& request) const;
   HeartbeatResponse heartbeat_http_parsed(const HeartbeatRequest& request) const;
@@ -362,6 +440,8 @@ class LicenseClientWin {
   static std::string to_json(const RechargeRequest& request);
   static std::string to_json(const BindingsRequest& request);
   static std::string to_json(const UnbindRequest& request);
+  static std::string to_json(const ClientVersionCheckRequest& request);
+  static std::string to_json(const ClientNoticesRequest& request);
   static std::string to_json(const CardLoginRequest& request);
   static std::string to_json(const LoginRequest& request);
   static std::string to_json(const HeartbeatRequest& request);
@@ -384,6 +464,8 @@ class LicenseClientWin {
   static RechargeResponse parse_recharge_response(const ApiEnvelope& envelope);
   static BindingsResponse parse_bindings_response(const ApiEnvelope& envelope);
   static UnbindResponse parse_unbind_response(const ApiEnvelope& envelope);
+  static ClientVersionManifestResponse parse_version_check_response(const ApiEnvelope& envelope);
+  static ClientNoticesResponse parse_notices_response(const ApiEnvelope& envelope);
   static LoginResponse parse_login_response(const ApiEnvelope& envelope);
   static HeartbeatResponse parse_heartbeat_response(const ApiEnvelope& envelope);
   static LogoutResponse parse_logout_response(const ApiEnvelope& envelope);

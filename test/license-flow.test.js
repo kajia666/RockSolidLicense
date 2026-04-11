@@ -1808,3 +1808,188 @@ test("reseller price rules can feed settlement reporting and csv export", async 
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("reseller statements can freeze redeemed settlement items and move to paid", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "STMT_APP",
+        name: "Statement App",
+        description: "Statement lifecycle coverage"
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "STMT_APP",
+        name: "Statement Policy",
+        durationDays: 30,
+        maxDevices: 1,
+        heartbeatIntervalSeconds: 30,
+        heartbeatTimeoutSeconds: 90,
+        tokenTtlSeconds: 180
+      },
+      adminSession.token
+    );
+
+    const reseller = await postJson(
+      baseUrl,
+      "/api/admin/resellers",
+      {
+        code: "AGENT_STMT",
+        name: "Statement Partner",
+        contactEmail: "stmt@example.com"
+      },
+      adminSession.token
+    );
+
+    const priceRule = await postJson(
+      baseUrl,
+      "/api/admin/reseller-price-rules",
+      {
+        resellerId: reseller.id,
+        productCode: "STMT_APP",
+        policyId: policy.id,
+        currency: "CNY",
+        unitPrice: 120,
+        unitCost: 50
+      },
+      adminSession.token
+    );
+    assert.equal(priceRule.unitCommissionCents, 7000);
+
+    const allocation = await postJson(
+      baseUrl,
+      `/api/admin/resellers/${reseller.id}/allocate-cards`,
+      {
+        productCode: "STMT_APP",
+        policyId: policy.id,
+        count: 2,
+        prefix: "STMTA1"
+      },
+      adminSession.token
+    );
+    assert.equal(allocation.keys.length, 2);
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "STMT_APP",
+      username: "nina",
+      password: "StrongPass123"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "STMT_APP",
+      username: "nina",
+      password: "StrongPass123",
+      cardKey: allocation.keys[0]
+    });
+
+    const statement = await postJson(
+      baseUrl,
+      "/api/admin/reseller-statements",
+      {
+        resellerId: reseller.id,
+        currency: "CNY",
+        productCode: "STMT_APP",
+        notes: "weekly payout"
+      },
+      adminSession.token
+    );
+    assert.equal(statement.status, "draft");
+    assert.equal(statement.itemCount, 1);
+    assert.equal(statement.grossAmountCents, 12000);
+    assert.equal(statement.costAmountCents, 5000);
+    assert.equal(statement.commissionAmountCents, 7000);
+    assert.equal(statement.productCode, "STMT_APP");
+
+    const statements = await getJson(
+      baseUrl,
+      `/api/admin/reseller-statements?resellerId=${encodeURIComponent(reseller.id)}&currency=CNY&status=draft`,
+      adminSession.token
+    );
+    assert.equal(statements.total, 1);
+    assert.equal(statements.items[0].statementCode, statement.statementCode);
+
+    const items = await getJson(
+      baseUrl,
+      `/api/admin/reseller-statements/${statement.id}/items`,
+      adminSession.token
+    );
+    assert.equal(items.total, 1);
+    assert.equal(items.statement.id, statement.id);
+    assert.equal(items.items[0].cardKey, allocation.keys[0]);
+    assert.equal(items.items[0].commissionAmountCents, 7000);
+    assert.equal(items.items[0].redeemedUsername, "nina");
+
+    const noEligible = await postJsonExpectError(
+      baseUrl,
+      "/api/admin/reseller-statements",
+      {
+        resellerId: reseller.id,
+        currency: "CNY",
+        productCode: "STMT_APP"
+      },
+      adminSession.token
+    );
+    assert.equal(noEligible.status, 409);
+    assert.equal(noEligible.error.code, "NO_SETTLEMENT_ITEMS");
+
+    const reviewed = await postJson(
+      baseUrl,
+      `/api/admin/reseller-statements/${statement.id}/status`,
+      { status: "reviewed" },
+      adminSession.token
+    );
+    assert.equal(reviewed.status, "reviewed");
+
+    const paid = await postJson(
+      baseUrl,
+      `/api/admin/reseller-statements/${statement.id}/status`,
+      { status: "paid" },
+      adminSession.token
+    );
+    assert.equal(paid.status, "paid");
+    assert.ok(paid.paidAt);
+
+    const invalidRollback = await postJsonExpectError(
+      baseUrl,
+      `/api/admin/reseller-statements/${statement.id}/status`,
+      { status: "draft" },
+      adminSession.token
+    );
+    assert.equal(invalidRollback.status, 409);
+    assert.equal(invalidRollback.error.code, "INVALID_STATEMENT_TRANSITION");
+
+    const exported = await getText(
+      baseUrl,
+      `/api/admin/reseller-statements/${statement.id}/export`,
+      adminSession.token
+    );
+    assert.match(exported.contentType, /^text\/csv/);
+    assert.match(exported.body, /SETTLE-/);
+    assert.match(exported.body, /AGENT_STMT/);
+    assert.match(exported.body, /120\.00/);
+    assert.match(exported.body, /70\.00/);
+    assert.match(exported.body, /nina/);
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=80", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("reseller-statement.create"));
+    assert.ok(eventTypes.includes("reseller-statement.status"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

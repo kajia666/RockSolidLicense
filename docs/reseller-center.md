@@ -15,6 +15,8 @@ Finance operations now also have a dedicated page at `/admin/resellers/finance`.
 - view aggregate report data by reseller and by product
 - define reseller pricing rules per product or per policy
 - inspect settlement totals and export settlement CSV
+- generate statement batches from redeemed settlement items
+- move statements through draft, reviewed, and paid statuses
 
 ## HTTP endpoints
 
@@ -144,6 +146,32 @@ Effects:
 - grouped settlement rows are separated by currency to avoid mixing totals across currencies
 - CSV export is ready for reconciliation or manual payout workflows
 
+### Reseller statements
+
+- `GET /api/admin/reseller-statements`
+- `POST /api/admin/reseller-statements`
+- `GET /api/admin/reseller-statements/:statementId/items`
+- `POST /api/admin/reseller-statements/:statementId/status`
+- `GET /api/admin/reseller-statements/:statementId/export`
+
+Create request example:
+
+```json
+{
+  "resellerId": "reseller_123",
+  "currency": "CNY",
+  "productCode": "MY_SOFTWARE",
+  "notes": "weekly payout batch"
+}
+```
+
+Effects:
+
+- statement generation only picks priced and redeemed snapshots that are not already assigned to another statement
+- each statement stores a frozen total for `gross`, `cost`, and `commission`
+- statement status moves forward only: `draft -> reviewed -> paid`
+- per-statement CSV export gives accounting a stable payout document
+
 ## Operator workflow
 
 Open [reseller-ops.html](/D:/code/OnlineVerification/src/web/reseller-ops.html) through:
@@ -170,7 +198,10 @@ Recommended finance flow:
 1. define an active price rule before allocating a batch
 2. allocate inventory so settlement snapshots are captured immediately
 3. review settlement by currency, reseller, and product
-4. export settlement CSV for accounting or payout review
+4. generate a statement from eligible redeemed items
+5. review or approve the statement
+6. mark the statement as paid after finance completes the transfer
+7. export settlement CSV or statement CSV for accounting or payout review
 
 ## Notes
 

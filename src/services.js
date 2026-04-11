@@ -327,6 +327,7 @@ function normalizeResellerInventoryFilters(filters = {}) {
   return {
     resellerId: filters.resellerId ? String(filters.resellerId).trim() : null,
     productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    currency: filters.currency ? normalizeCurrency(filters.currency) : null,
     cardStatus: filters.cardStatus ? String(filters.cardStatus).trim().toLowerCase() : null,
     search: filters.search ? String(filters.search).trim() : null
   };
@@ -585,6 +586,11 @@ function queryResellerSettlementRows(db, filters = {}, options = {}) {
     params.push(normalizedFilters.productCode);
   }
 
+  if (normalizedFilters.currency) {
+    conditions.push("rss.currency = ?");
+    params.push(normalizedFilters.currency);
+  }
+
   if (normalizedFilters.cardStatus) {
     if (!["fresh", "redeemed"].includes(normalizedFilters.cardStatus)) {
       throw new AppError(400, "INVALID_CARD_STATUS", "Card status must be fresh or redeemed.");
@@ -760,6 +766,225 @@ function summarizeResellerSettlement(items) {
       commissionRedeemed: centsToAmount(bucket.commissionRedeemedCents)
     }))
   };
+}
+
+function normalizeStatementStatus(value) {
+  const status = String(value ?? "").trim().toLowerCase();
+  if (!["draft", "reviewed", "paid"].includes(status)) {
+    throw new AppError(400, "INVALID_STATEMENT_STATUS", "Statement status must be draft, reviewed, or paid.");
+  }
+  return status;
+}
+
+function normalizeResellerStatementFilters(filters = {}) {
+  return {
+    resellerId: filters.resellerId ? String(filters.resellerId).trim() : null,
+    currency: filters.currency ? normalizeCurrency(filters.currency) : null,
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    status: filters.status ? normalizeStatementStatus(filters.status) : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+}
+
+function formatResellerStatementRow(row) {
+  return {
+    id: row.id,
+    resellerId: row.reseller_id,
+    resellerCode: row.reseller_code,
+    resellerName: row.reseller_name,
+    currency: row.currency,
+    statementCode: row.statement_code,
+    status: row.status,
+    productCode: row.product_code ?? null,
+    productName: row.product_name ?? null,
+    periodStart: row.period_start ?? null,
+    periodEnd: row.period_end ?? null,
+    itemCount: Number(row.item_count ?? 0),
+    grossAmountCents: Number(row.gross_amount_cents ?? 0),
+    grossAmount: centsToAmount(row.gross_amount_cents),
+    costAmountCents: Number(row.cost_amount_cents ?? 0),
+    costAmount: centsToAmount(row.cost_amount_cents),
+    commissionAmountCents: Number(row.commission_amount_cents ?? 0),
+    commissionAmount: centsToAmount(row.commission_amount_cents),
+    notes: row.notes ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    paidAt: row.paid_at ?? null
+  };
+}
+
+function queryResellerStatementRows(db, filters = {}) {
+  const normalizedFilters = normalizeResellerStatementFilters(filters);
+  const conditions = [];
+  const params = [];
+
+  if (normalizedFilters.resellerId) {
+    conditions.push("rs.reseller_id = ?");
+    params.push(normalizedFilters.resellerId);
+  }
+
+  if (normalizedFilters.currency) {
+    conditions.push("rs.currency = ?");
+    params.push(normalizedFilters.currency);
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.status) {
+    conditions.push("rs.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(rs.statement_code LIKE ? ESCAPE '\\' OR rr.code LIKE ? ESCAPE '\\' OR COALESCE(pr.code, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT rs.*, rr.code AS reseller_code, rr.name AS reseller_name,
+             pr.code AS product_code, pr.name AS product_name
+      FROM reseller_statements rs
+      JOIN resellers rr ON rr.id = rs.reseller_id
+      LEFT JOIN products pr ON pr.id = rs.product_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY rs.created_at DESC
+      LIMIT 200
+    `,
+    ...params
+  ).map(formatResellerStatementRow);
+
+  return {
+    items,
+    filters: normalizedFilters
+  };
+}
+
+function queryResellerStatementItems(db, statementId) {
+  return many(
+    db,
+    `
+      SELECT rsi.*, rs.statement_code, rs.status AS statement_status, rs.currency,
+             rr.code AS reseller_code, rr.name AS reseller_name,
+             pr.code AS product_code, pr.name AS product_name,
+             pol.id AS policy_id, pol.name AS policy_name,
+             lk.card_key, lk.status AS card_status,
+             a.username AS redeemed_username
+      FROM reseller_statement_items rsi
+      JOIN reseller_statements rs ON rs.id = rsi.statement_id
+      JOIN reseller_settlement_snapshots rss ON rss.id = rsi.settlement_snapshot_id
+      JOIN resellers rr ON rr.id = rs.reseller_id
+      LEFT JOIN products pr ON pr.id = rs.product_id
+      JOIN reseller_inventory ri ON ri.id = rsi.reseller_inventory_id
+      JOIN policies pol ON pol.id = ri.policy_id
+      JOIN license_keys lk ON lk.id = rsi.license_key_id
+      LEFT JOIN customer_accounts a ON a.id = lk.redeemed_by_account_id
+      WHERE rsi.statement_id = ?
+      ORDER BY rsi.redeemed_at DESC, rsi.created_at DESC
+    `,
+    statementId
+  ).map((row) => ({
+    id: row.id,
+    statementId: row.statement_id,
+    statementCode: row.statement_code,
+    statementStatus: row.statement_status,
+    resellerInventoryId: row.reseller_inventory_id,
+    settlementSnapshotId: row.settlement_snapshot_id,
+    licenseKeyId: row.license_key_id,
+    resellerCode: row.reseller_code,
+    resellerName: row.reseller_name,
+    productCode: row.product_code ?? null,
+    productName: row.product_name ?? null,
+    policyId: row.policy_id,
+    policyName: row.policy_name,
+    cardKey: row.card_key,
+    cardStatus: row.card_status,
+    redeemedUsername: row.redeemed_username ?? null,
+    currency: row.currency,
+    redeemedAt: row.redeemed_at,
+    grossAmountCents: Number(row.gross_amount_cents ?? 0),
+    grossAmount: centsToAmount(row.gross_amount_cents),
+    costAmountCents: Number(row.cost_amount_cents ?? 0),
+    costAmount: centsToAmount(row.cost_amount_cents),
+    commissionAmountCents: Number(row.commission_amount_cents ?? 0),
+    commissionAmount: centsToAmount(row.commission_amount_cents),
+    createdAt: row.created_at
+  }));
+}
+
+function listEligibleResellerStatementSnapshots(db, filters = {}) {
+  const resellerId = filters.resellerId ? String(filters.resellerId).trim() : null;
+  const currency = filters.currency ? normalizeCurrency(filters.currency) : null;
+  const productCode = filters.productCode ? String(filters.productCode).trim().toUpperCase() : null;
+  const conditions = [
+    "rss.currency IS NOT NULL",
+    "lk.status = 'redeemed'",
+    "lk.redeemed_at IS NOT NULL",
+    "rsi.id IS NULL"
+  ];
+  const params = [];
+
+  if (resellerId) {
+    conditions.push("rr.id = ?");
+    params.push(resellerId);
+  }
+
+  if (currency) {
+    conditions.push("rss.currency = ?");
+    params.push(currency);
+  }
+
+  if (productCode) {
+    conditions.push("pr.code = ?");
+    params.push(productCode);
+  }
+
+  const rows = many(
+    db,
+    `
+      SELECT rss.*, rr.code AS reseller_code, rr.name AS reseller_name,
+             pr.code AS product_code, pr.name AS product_name,
+             pol.id AS policy_id, pol.name AS policy_name,
+             lk.card_key, lk.redeemed_at, lk.id AS license_key_id
+      FROM reseller_settlement_snapshots rss
+      JOIN reseller_inventory ri ON ri.id = rss.reseller_inventory_id
+      JOIN resellers rr ON rr.id = rss.reseller_id
+      JOIN products pr ON pr.id = rss.product_id
+      JOIN policies pol ON pol.id = rss.policy_id
+      JOIN license_keys lk ON lk.id = rss.license_key_id
+      LEFT JOIN reseller_statement_items rsi ON rsi.settlement_snapshot_id = rss.id
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY lk.redeemed_at ASC, rss.created_at ASC
+    `,
+    ...params
+  );
+
+  return rows.map((row) => ({
+    settlementSnapshotId: row.id,
+    resellerInventoryId: row.reseller_inventory_id,
+    resellerId: row.reseller_id,
+    resellerCode: row.reseller_code,
+    resellerName: row.reseller_name,
+    productId: row.product_id,
+    productCode: row.product_code,
+    productName: row.product_name,
+    policyId: row.policy_id,
+    policyName: row.policy_name,
+    licenseKeyId: row.license_key_id,
+    cardKey: row.card_key,
+    currency: row.currency,
+    redeemedAt: row.redeemed_at,
+    unitPriceCents: Number(row.unit_price_cents),
+    unitCostCents: Number(row.unit_cost_cents),
+    commissionAmountCents: Number(row.commission_amount_cents)
+  }));
 }
 
 function activeDeviceBlock(db, productId, fingerprint) {
@@ -2234,6 +2459,260 @@ export function createServices(db, config) {
           item.allocatedAt,
           item.redeemedAt ?? "",
           item.pricedAt ?? ""
+        ].map(toCsvCell).join(",")))
+      ];
+
+      return lines.join("\r\n");
+    },
+
+    listResellerStatements(token, filters = {}) {
+      requireAdminSession(db, token);
+      const { items, filters: normalizedFilters } = queryResellerStatementRows(db, filters);
+      return {
+        items,
+        total: items.length,
+        filters: normalizedFilters
+      };
+    },
+
+    createResellerStatement(token, body = {}) {
+      const admin = requireAdminSession(db, token);
+      requireField(body, "resellerId");
+      requireField(body, "currency");
+
+      const reseller = one(db, "SELECT * FROM resellers WHERE id = ?", String(body.resellerId).trim());
+      if (!reseller) {
+        throw new AppError(404, "RESELLER_NOT_FOUND", "Reseller does not exist.");
+      }
+
+      const currency = normalizeCurrency(body.currency);
+      const productCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null;
+      const product = productCode ? requireProductByCode(db, productCode) : null;
+      const eligible = listEligibleResellerStatementSnapshots(db, {
+        resellerId: reseller.id,
+        currency,
+        productCode: product?.code ?? null
+      });
+
+      if (!eligible.length) {
+        throw new AppError(409, "NO_SETTLEMENT_ITEMS", "No redeemed settlement items are eligible for a new statement.");
+      }
+
+      const itemCount = eligible.length;
+      const grossAmountCents = eligible.reduce((sum, item) => sum + item.unitPriceCents, 0);
+      const costAmountCents = eligible.reduce((sum, item) => sum + item.unitCostCents, 0);
+      const commissionAmountCents = eligible.reduce((sum, item) => sum + item.commissionAmountCents, 0);
+      const periodStart = eligible.reduce((best, item) => !best || item.redeemedAt < best ? item.redeemedAt : best, null);
+      const periodEnd = eligible.reduce((best, item) => !best || item.redeemedAt > best ? item.redeemedAt : best, null);
+      const timestamp = nowIso();
+      const statementId = generateId("rstmt");
+      const statementCode = `SETTLE-${Date.now()}`;
+      const notes = String(body.notes ?? "").trim() || null;
+
+      withTransaction(db, () => {
+        run(
+          db,
+          `
+            INSERT INTO reseller_statements
+            (id, reseller_id, currency, statement_code, status, product_id, period_start, period_end, item_count,
+             gross_amount_cents, cost_amount_cents, commission_amount_cents, notes, created_at, updated_at, paid_at)
+            VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          `,
+          statementId,
+          reseller.id,
+          currency,
+          statementCode,
+          product?.id ?? null,
+          periodStart,
+          periodEnd,
+          itemCount,
+          grossAmountCents,
+          costAmountCents,
+          commissionAmountCents,
+          notes,
+          timestamp,
+          timestamp
+        );
+
+        for (const item of eligible) {
+          run(
+            db,
+            `
+              INSERT INTO reseller_statement_items
+              (id, statement_id, settlement_snapshot_id, reseller_inventory_id, license_key_id, redeemed_at,
+               gross_amount_cents, cost_amount_cents, commission_amount_cents, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+            generateId("rstmti"),
+            statementId,
+            item.settlementSnapshotId,
+            item.resellerInventoryId,
+            item.licenseKeyId,
+            item.redeemedAt,
+            item.unitPriceCents,
+            item.unitCostCents,
+            item.commissionAmountCents,
+            timestamp
+          );
+        }
+      });
+
+      audit(db, "admin", admin.admin_id, "reseller-statement.create", "reseller_statement", statementId, {
+        resellerCode: reseller.code,
+        currency,
+        productCode: product?.code ?? null,
+        itemCount,
+        commissionAmountCents
+      });
+
+      return formatResellerStatementRow(one(
+        db,
+        `
+          SELECT rs.*, rr.code AS reseller_code, rr.name AS reseller_name,
+                 pr.code AS product_code, pr.name AS product_name
+          FROM reseller_statements rs
+          JOIN resellers rr ON rr.id = rs.reseller_id
+          LEFT JOIN products pr ON pr.id = rs.product_id
+          WHERE rs.id = ?
+        `,
+        statementId
+      ));
+    },
+
+    listResellerStatementItems(token, statementId) {
+      requireAdminSession(db, token);
+      const statement = one(
+        db,
+        `
+          SELECT rs.*, rr.code AS reseller_code, rr.name AS reseller_name,
+                 pr.code AS product_code, pr.name AS product_name
+          FROM reseller_statements rs
+          JOIN resellers rr ON rr.id = rs.reseller_id
+          LEFT JOIN products pr ON pr.id = rs.product_id
+          WHERE rs.id = ?
+        `,
+        statementId
+      );
+      if (!statement) {
+        throw new AppError(404, "STATEMENT_NOT_FOUND", "Reseller statement does not exist.");
+      }
+
+      const items = queryResellerStatementItems(db, statementId);
+      return {
+        statement: formatResellerStatementRow(statement),
+        items,
+        total: items.length
+      };
+    },
+
+    updateResellerStatementStatus(token, statementId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const statement = one(
+        db,
+        `
+          SELECT rs.*, rr.code AS reseller_code, rr.name AS reseller_name,
+                 pr.code AS product_code, pr.name AS product_name
+          FROM reseller_statements rs
+          JOIN resellers rr ON rr.id = rs.reseller_id
+          LEFT JOIN products pr ON pr.id = rs.product_id
+          WHERE rs.id = ?
+        `,
+        statementId
+      );
+      if (!statement) {
+        throw new AppError(404, "STATEMENT_NOT_FOUND", "Reseller statement does not exist.");
+      }
+
+      const nextStatus = normalizeStatementStatus(body.status);
+      const order = { draft: 0, reviewed: 1, paid: 2 };
+      if (order[nextStatus] < order[statement.status]) {
+        throw new AppError(409, "INVALID_STATEMENT_TRANSITION", "Statement status cannot move backwards.");
+      }
+
+      if (nextStatus === statement.status) {
+        return formatResellerStatementRow(statement);
+      }
+
+      const timestamp = nowIso();
+      run(
+        db,
+        `
+          UPDATE reseller_statements
+          SET status = ?, updated_at = ?, paid_at = ?
+          WHERE id = ?
+        `,
+        nextStatus,
+        timestamp,
+        nextStatus === "paid" ? timestamp : statement.paid_at,
+        statement.id
+      );
+
+      audit(db, "admin", admin.admin_id, "reseller-statement.status", "reseller_statement", statement.id, {
+        resellerCode: statement.reseller_code,
+        statementCode: statement.statement_code,
+        fromStatus: statement.status,
+        status: nextStatus
+      });
+
+      return formatResellerStatementRow({
+        ...statement,
+        status: nextStatus,
+        updated_at: timestamp,
+        paid_at: nextStatus === "paid" ? timestamp : statement.paid_at
+      });
+    },
+
+    exportResellerStatementCsv(token, statementId) {
+      requireAdminSession(db, token);
+      const statement = one(
+        db,
+        `
+          SELECT rs.*, rr.code AS reseller_code, rr.name AS reseller_name,
+                 pr.code AS product_code, pr.name AS product_name
+          FROM reseller_statements rs
+          JOIN resellers rr ON rr.id = rs.reseller_id
+          LEFT JOIN products pr ON pr.id = rs.product_id
+          WHERE rs.id = ?
+        `,
+        statementId
+      );
+      if (!statement) {
+        throw new AppError(404, "STATEMENT_NOT_FOUND", "Reseller statement does not exist.");
+      }
+
+      const items = queryResellerStatementItems(db, statementId);
+      const header = [
+        "statementCode",
+        "statementStatus",
+        "resellerCode",
+        "resellerName",
+        "productCode",
+        "policyName",
+        "cardKey",
+        "redeemedUsername",
+        "currency",
+        "grossAmount",
+        "costAmount",
+        "commissionAmount",
+        "redeemedAt"
+      ];
+
+      const lines = [
+        header.map(toCsvCell).join(","),
+        ...items.map((item) => ([
+          item.statementCode,
+          item.statementStatus,
+          item.resellerCode,
+          item.resellerName,
+          item.productCode ?? "",
+          item.policyName,
+          item.cardKey,
+          item.redeemedUsername ?? "",
+          item.currency,
+          item.grossAmount.toFixed(2),
+          item.costAmount.toFixed(2),
+          item.commissionAmount.toFixed(2),
+          item.redeemedAt
         ].map(toCsvCell).join(",")))
       ];
 

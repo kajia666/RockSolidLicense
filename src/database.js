@@ -258,6 +258,44 @@ CREATE TABLE IF NOT EXISTS reseller_settlement_snapshots (
   FOREIGN KEY (price_rule_id) REFERENCES reseller_price_rules(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS reseller_statements (
+  id TEXT PRIMARY KEY,
+  reseller_id TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  statement_code TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL,
+  product_id TEXT,
+  period_start TEXT,
+  period_end TEXT,
+  item_count INTEGER NOT NULL,
+  gross_amount_cents INTEGER NOT NULL,
+  cost_amount_cents INTEGER NOT NULL,
+  commission_amount_cents INTEGER NOT NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  paid_at TEXT,
+  FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS reseller_statement_items (
+  id TEXT PRIMARY KEY,
+  statement_id TEXT NOT NULL,
+  settlement_snapshot_id TEXT NOT NULL UNIQUE,
+  reseller_inventory_id TEXT NOT NULL UNIQUE,
+  license_key_id TEXT NOT NULL UNIQUE,
+  redeemed_at TEXT NOT NULL,
+  gross_amount_cents INTEGER NOT NULL,
+  cost_amount_cents INTEGER NOT NULL,
+  commission_amount_cents INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (statement_id) REFERENCES reseller_statements(id) ON DELETE CASCADE,
+  FOREIGN KEY (settlement_snapshot_id) REFERENCES reseller_settlement_snapshots(id) ON DELETE CASCADE,
+  FOREIGN KEY (reseller_inventory_id) REFERENCES reseller_inventory(id) ON DELETE CASCADE,
+  FOREIGN KEY (license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
@@ -314,6 +352,10 @@ CREATE INDEX IF NOT EXISTS idx_reseller_price_rules_lookup
   ON reseller_price_rules(reseller_id, product_id, policy_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_settlement_lookup
   ON reseller_settlement_snapshots(reseller_id, product_id, policy_id, currency, priced_at);
+CREATE INDEX IF NOT EXISTS idx_reseller_statements_lookup
+  ON reseller_statements(reseller_id, currency, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_reseller_statement_items_lookup
+  ON reseller_statement_items(statement_id, redeemed_at);
 `;
 
 export function createDatabase(config) {

@@ -190,6 +190,11 @@ Effects:
 - `POST /api/admin/reseller-price-rules/:ruleId/status`
 - `GET /api/admin/reseller-settlement-report`
 - `GET /api/admin/reseller-settlement/export`
+- `GET /api/admin/reseller-statements`
+- `POST /api/admin/reseller-statements`
+- `GET /api/admin/reseller-statements/:statementId/items`
+- `POST /api/admin/reseller-statements/:statementId/status`
+- `GET /api/admin/reseller-statements/:statementId/export`
 - `POST /api/admin/resellers/:resellerId/allocate-cards`
 
 Effects:
@@ -202,6 +207,7 @@ Effects:
 - reseller reporting now summarizes channel activity by reseller and by product
 - active price rules can stamp pricing into newly allocated reseller inventory
 - settlement reports and settlement CSV export can now be used for payout and reconciliation
+- statements can now freeze a payout batch and move through draft, reviewed, and paid states
 
 ### Notices
 

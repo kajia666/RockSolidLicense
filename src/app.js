@@ -185,11 +185,34 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/admin/reseller-statements") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.listResellerStatements(getBearerToken(req), {
+            resellerId: url.searchParams.get("resellerId"),
+            currency: url.searchParams.get("currency"),
+            productCode: url.searchParams.get("productCode"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/admin/reseller-price-rules") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
           data: services.createResellerPriceRule(getBearerToken(req), body)
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/admin/reseller-statements") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.createResellerStatement(getBearerToken(req), body)
         });
         return;
       }
@@ -231,6 +254,7 @@ export function createApp(overrides = {}) {
           ok: true,
           data: services.resellerSettlementReport(getBearerToken(req), {
             resellerId: url.searchParams.get("resellerId"),
+            currency: url.searchParams.get("currency"),
             productCode: url.searchParams.get("productCode"),
             cardStatus: url.searchParams.get("cardStatus"),
             search: url.searchParams.get("search")
@@ -242,6 +266,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/reseller-settlement/export") {
         const csv = services.exportResellerSettlementCsv(getBearerToken(req), {
           resellerId: url.searchParams.get("resellerId"),
+          currency: url.searchParams.get("currency"),
           productCode: url.searchParams.get("productCode"),
           cardStatus: url.searchParams.get("cardStatus"),
           search: url.searchParams.get("search")
@@ -253,6 +278,40 @@ export function createApp(overrides = {}) {
           "text/csv; charset=utf-8",
           {
             "content-disposition": `attachment; filename="reseller-settlement-${Date.now()}.csv"`
+          }
+        );
+        return;
+      }
+
+      const resellerStatementItemsRoute = req.method === "GET"
+        ? matchPath(url.pathname, "/api/admin/reseller-statements/:statementId/items")
+        : null;
+      if (resellerStatementItemsRoute) {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.listResellerStatementItems(
+            getBearerToken(req),
+            resellerStatementItemsRoute.statementId
+          )
+        });
+        return;
+      }
+
+      const resellerStatementExportRoute = req.method === "GET"
+        ? matchPath(url.pathname, "/api/admin/reseller-statements/:statementId/export")
+        : null;
+      if (resellerStatementExportRoute) {
+        const csv = services.exportResellerStatementCsv(
+          getBearerToken(req),
+          resellerStatementExportRoute.statementId
+        );
+        sendText(
+          res,
+          200,
+          csv,
+          "text/csv; charset=utf-8",
+          {
+            "content-disposition": `attachment; filename="reseller-statement-${Date.now()}.csv"`
           }
         );
         return;
@@ -450,6 +509,22 @@ export function createApp(overrides = {}) {
           data: services.updateResellerPriceRuleStatus(
             getBearerToken(req),
             resellerPriceRuleStatusRoute.ruleId,
+            body
+          )
+        });
+        return;
+      }
+
+      const resellerStatementStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/reseller-statements/:statementId/status")
+        : null;
+      if (resellerStatementStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updateResellerStatementStatus(
+            getBearerToken(req),
+            resellerStatementStatusRoute.statementId,
             body
           )
         });

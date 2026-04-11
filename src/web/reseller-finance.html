@@ -305,6 +305,7 @@
           <h2>Settlement Filters</h2>
           <label>Reseller ID<input id="filter-reseller-id" placeholder="blank means all" /></label>
           <label>Product Code<input id="filter-product-code" placeholder="MY_SOFTWARE" /></label>
+          <label>Currency<input id="filter-currency" placeholder="optional, for example CNY" /></label>
           <label>
             Card Status
             <select id="filter-card-status">
@@ -318,6 +319,20 @@
             <button class="secondary" id="refresh-rules-btn">Refresh Rules</button>
             <button class="warn" id="refresh-settlement-btn">Load Settlement Report</button>
             <button id="export-settlement-btn">Export Settlement CSV</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Generate Statement</h2>
+          <label>Statement Reseller ID<input id="statement-reseller-id" placeholder="reseller_xxx" /></label>
+          <label>Statement Currency<input id="statement-currency" value="CNY" /></label>
+          <label>Statement Product Code<input id="statement-product-code" placeholder="optional product code" /></label>
+          <label>Notes<textarea id="statement-notes" placeholder="for example: 2026-04 weekly payout batch"></textarea></label>
+          <div class="actions">
+            <button class="warn" id="create-statement-btn">Create Statement</button>
+          </div>
+          <div class="hint">
+            Only priced and redeemed inventory that has not been assigned to another statement will be included.
           </div>
         </article>
       </section>
@@ -414,6 +429,69 @@
         </article>
       </section>
 
+      <section class="table-grid">
+        <article class="card">
+          <h2>Statements</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Statement</th>
+                  <th>Reseller</th>
+                  <th>Status</th>
+                  <th>Currency</th>
+                  <th>Items</th>
+                  <th>Commission</th>
+                </tr>
+              </thead>
+              <tbody id="statement-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Statement Status</h2>
+          <label>Statement ID<input id="status-statement-id" placeholder="click a statement row to auto-fill" /></label>
+          <label>
+            Target Status
+            <select id="statement-status">
+              <option value="draft">draft</option>
+              <option value="reviewed">reviewed</option>
+              <option value="paid">paid</option>
+            </select>
+          </label>
+          <div class="actions">
+            <button class="secondary" id="refresh-statements-btn">Refresh Statements</button>
+            <button class="danger" id="update-statement-status-btn">Update Statement Status</button>
+            <button id="export-statement-btn">Export Statement CSV</button>
+          </div>
+          <div class="hint">
+            Statement status only moves forward: <code>draft -> reviewed -> paid</code>.
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Statement Items</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Card Key</th>
+                <th>Product</th>
+                <th>Policy</th>
+                <th>Redeemed User</th>
+                <th>Currency</th>
+                <th>Gross</th>
+                <th>Commission</th>
+                <th>Redeemed At</th>
+              </tr>
+            </thead>
+            <tbody id="statement-item-body"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card">
         <h2>API Output</h2>
         <pre id="output">Waiting for actions...</pre>
@@ -448,7 +526,9 @@
 
       function renderTag(value) {
         const text = String(value ?? "unknown");
-        const className = text === "active" ? "tag ok" : text === "archived" ? "tag danger" : "tag";
+        let className = "tag";
+        if (text === "active" || text === "reviewed" || text === "paid") className = "tag ok";
+        if (text === "archived") className = "tag danger";
         return `<span class="${className}">${escapeHtml(text)}</span>`;
       }
 
@@ -460,11 +540,13 @@
         const query = new URLSearchParams();
         const resellerId = el("filter-reseller-id").value.trim();
         const productCode = el("filter-product-code").value.trim();
+        const currency = el("filter-currency").value.trim();
         const cardStatus = el("filter-card-status").value;
         const search = el("filter-search").value.trim();
 
         if (resellerId) query.set("resellerId", resellerId);
         if (productCode) query.set("productCode", productCode);
+        if (currency) query.set("currency", currency);
         if (cardStatus) query.set("cardStatus", cardStatus);
         if (search) query.set("search", search);
 
@@ -595,6 +677,55 @@
           : '<tr><td colspan="6">No product settlement rows.</td></tr>';
       }
 
+      function renderStatements(items) {
+        const body = el("statement-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="6">No statements yet.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = items.map((item) => `
+          <tr data-statement-id="${escapeHtml(item.id)}" data-reseller-id="${escapeHtml(item.resellerId)}" data-currency="${escapeHtml(item.currency)}">
+            <td><strong>${escapeHtml(item.statementCode)}</strong><br /><span class="hint">${escapeHtml(item.id)}</span></td>
+            <td>${escapeHtml(item.resellerCode)}<br /><span class="hint">${escapeHtml(item.resellerName)}</span></td>
+            <td>${renderTag(item.status)}</td>
+            <td>${escapeHtml(item.currency)}</td>
+            <td>${escapeHtml(item.itemCount)}</td>
+            <td>${escapeHtml(money(item.commissionAmount))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of body.querySelectorAll("tr[data-statement-id]")) {
+          row.addEventListener("click", async () => {
+            el("status-statement-id").value = row.dataset.statementId;
+            el("statement-reseller-id").value = row.dataset.resellerId;
+            el("statement-currency").value = row.dataset.currency;
+            await refreshStatementItems(row.dataset.statementId);
+          });
+        }
+      }
+
+      function renderStatementItems(items) {
+        const body = el("statement-item-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="8">No statement items.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = items.map((item) => `
+          <tr>
+            <td><code>${escapeHtml(item.cardKey)}</code></td>
+            <td>${escapeHtml(item.productCode || "-")}</td>
+            <td>${escapeHtml(item.policyName)}</td>
+            <td>${escapeHtml(item.redeemedUsername || "-")}</td>
+            <td>${escapeHtml(item.currency)}</td>
+            <td>${escapeHtml(money(item.grossAmount))}</td>
+            <td>${escapeHtml(money(item.commissionAmount))}</td>
+            <td>${escapeHtml(item.redeemedAt)}</td>
+          </tr>
+        `).join("");
+      }
+
       async function refreshRules() {
         const query = new URLSearchParams();
         const resellerId = el("filter-reseller-id").value.trim();
@@ -615,12 +746,34 @@
         return data;
       }
 
+      async function refreshStatements() {
+        const query = new URLSearchParams();
+        const resellerId = el("filter-reseller-id").value.trim();
+        const productCode = el("filter-product-code").value.trim();
+        const currency = el("filter-currency").value.trim();
+        if (resellerId) query.set("resellerId", resellerId);
+        if (productCode) query.set("productCode", productCode);
+        if (currency) query.set("currency", currency);
+
+        const suffix = query.toString() ? `?${query.toString()}` : "";
+        const data = await callApi(`/api/admin/reseller-statements${suffix}`);
+        renderStatements(data.items);
+        return data;
+      }
+
+      async function refreshStatementItems(statementId) {
+        const data = await callApi(`/api/admin/reseller-statements/${encodeURIComponent(statementId)}/items`);
+        renderStatementItems(data.items);
+        return data;
+      }
+
       async function refreshAll() {
-        const [rules, settlement] = await Promise.all([
+        const [rules, settlement, statements] = await Promise.all([
           refreshRules(),
-          refreshSettlement()
+          refreshSettlement(),
+          refreshStatements()
         ]);
-        setOutput({ rules, settlement });
+        setOutput({ rules, settlement, statements });
       }
 
       el("login-btn").addEventListener("click", async () => {
@@ -706,6 +859,70 @@
         try {
           const data = await refreshSettlement();
           setOutput(data);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("create-statement-btn").addEventListener("click", async () => {
+        try {
+          const data = await callApi("/api/admin/reseller-statements", {
+            method: "POST",
+            body: {
+              resellerId: el("statement-reseller-id").value.trim(),
+              currency: el("statement-currency").value.trim(),
+              productCode: el("statement-product-code").value.trim(),
+              notes: el("statement-notes").value.trim()
+            }
+          });
+          el("status-statement-id").value = data.id;
+          setOutput(data);
+          await refreshAll();
+          await refreshStatementItems(data.id);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("refresh-statements-btn").addEventListener("click", async () => {
+        try {
+          const data = await refreshStatements();
+          setOutput(data);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("update-statement-status-btn").addEventListener("click", async () => {
+        try {
+          const statementId = el("status-statement-id").value.trim();
+          const data = await callApi(`/api/admin/reseller-statements/${encodeURIComponent(statementId)}/status`, {
+            method: "POST",
+            body: {
+              status: el("statement-status").value
+            }
+          });
+          setOutput(data);
+          await refreshStatements();
+          await refreshStatementItems(statementId);
+        } catch (error) {
+          setStatus(error.message, true);
+          setOutput({ error: error.message });
+        }
+      });
+
+      el("export-statement-btn").addEventListener("click", async () => {
+        try {
+          const statementId = el("status-statement-id").value.trim();
+          await downloadCsv(
+            `/api/admin/reseller-statements/${encodeURIComponent(statementId)}/export`,
+            "reseller-statement.csv"
+          );
+          setStatus("Statement CSV export downloaded.");
+          setOutput({ statementId, exported: true });
         } catch (error) {
           setStatus(error.message, true);
           setOutput({ error: error.message });

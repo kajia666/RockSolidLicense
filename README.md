@@ -185,6 +185,13 @@ TCP：
 - 结构化 `ApiException`，便于按错误码控制客户端流程
 - `licenseToken` 解码与 RSA 公钥验签
 
+发布建议：
+
+- 对软件作者的主分发，优先提供 `static .lib + 头文件`
+- 如果需要二进制替换能力，再额外提供 `DLL + import lib + 头文件`
+- 当前仓库里，完整 C++ SDK 更适合发 `rocksolid_sdk_static.lib`
+- `DLL` 形态当前更适合作为底层 C API 发布
+
 主要文件：
 
 - `sdk/include/rocksolid_sdk.h`

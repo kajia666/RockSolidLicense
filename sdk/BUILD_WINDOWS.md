@@ -7,6 +7,24 @@ The SDK currently targets native Windows system libraries only:
 - `ws2_32.lib`
 - `crypt32.lib`
 
+## Recommended release formats
+
+For external software authors, the safest release strategy is:
+
+1. `rocksolid_sdk_static.lib` + headers
+2. Optional `rocksolid_sdk.dll` + `rocksolid_sdk.lib` + headers
+
+Recommended default:
+
+- Use `static .lib` as the main distribution for the full C++ SDK
+- Use `DLL` mainly for the low-level C API in [rocksolid_sdk.h](/D:/code/OnlineVerification/sdk/include/rocksolid_sdk.h)
+
+Why:
+
+- static lib is simpler for C++ consumers
+- static lib avoids C++ ABI and CRT mismatch issues across different Visual Studio setups
+- DLL is still useful if you want easier binary replacement or a thinner C-only integration story
+
 ## Compile the demo with MSVC
 
 From a "Developer Command Prompt for VS":
@@ -26,6 +44,43 @@ cl /EHsc /std:c++17 ^
 
 This produces `build\win-sdk-demo\windows_client_demo.exe` and keeps intermediate MSVC files inside the build directory instead of the repository root.
 
+## Build the release libraries
+
+From a "Developer Command Prompt for VS":
+
+### Full C++ static library
+
+```bat
+call sdk\build_static_lib.bat
+```
+
+Outputs:
+
+- `build\win-sdk-release\rocksolid_sdk_static.lib`
+
+This package is intended for:
+
+- `rocksolid_sdk.h`
+- `rocksolid_client.hpp`
+- `rocksolid_transport_win.hpp`
+
+### C API DLL package
+
+```bat
+call sdk\build_c_api_dll.bat
+```
+
+Outputs:
+
+- `build\win-sdk-release\rocksolid_sdk.dll`
+- `build\win-sdk-release\rocksolid_sdk.lib`
+
+This package is intended for:
+
+- `rocksolid_sdk.h`
+
+The current DLL export surface is the C API only. The higher-level C++ wrapper is still best distributed as source or static lib.
+
 ## Files to embed in your own project
 
 - `sdk/include/rocksolid_sdk.h`
@@ -33,6 +88,8 @@ This produces `build\win-sdk-demo\windows_client_demo.exe` and keeps intermediat
 - `sdk/include/rocksolid_transport_win.hpp`
 - `sdk/src/rocksolid_crypto_win.cpp`
 - `sdk/src/rocksolid_transport_win.cpp`
+- `sdk/build_static_lib.bat`
+- `sdk/build_c_api_dll.bat`
 
 ## Suggested integration pattern
 

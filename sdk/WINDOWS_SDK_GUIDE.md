@@ -31,6 +31,23 @@ This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 - [rocksolid_crypto_win.cpp](/D:/code/OnlineVerification/sdk/src/rocksolid_crypto_win.cpp)
 - [rocksolid_transport_win.cpp](/D:/code/OnlineVerification/sdk/src/rocksolid_transport_win.cpp)
 
+## Release recommendation
+
+When you publish this SDK to software authors:
+
+- preferred package: `static .lib + headers`
+- optional package: `DLL + import lib + headers`
+
+Current recommendation:
+
+- full C++ SDK: distribute `rocksolid_sdk_static.lib`
+- low-level C API only: optionally distribute `rocksolid_sdk.dll` + `rocksolid_sdk.lib`
+
+Reason:
+
+- the C++ wrapper is easier and safer to consume as source/static lib
+- the C API is the most stable surface for DLL publishing on Windows
+
 ## High-level usage
 
 ```cpp

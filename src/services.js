@@ -3508,6 +3508,26 @@ export function createServices(db, config, runtimeState = null) {
     recordSession() {},
     touchSession() {},
     expireSession() {},
+    async getSessionState(sessionToken) {
+      const row = one(
+        db,
+        `
+          SELECT status, revoked_reason, expires_at, last_heartbeat_at
+          FROM sessions
+          WHERE session_token = ?
+        `,
+        sessionToken
+      );
+      if (!row) {
+        return null;
+      }
+      return {
+        status: row.status ?? null,
+        revokedReason: row.revoked_reason ?? null,
+        expiresAt: row.expires_at ?? null,
+        lastHeartbeatAt: row.last_heartbeat_at ?? null
+      };
+    },
     async countActiveSessions() {
       return Number(one(db, "SELECT COUNT(*) AS count FROM sessions WHERE status = 'active'")?.count ?? 0);
     },
@@ -7832,12 +7852,19 @@ export function createServices(db, config, runtimeState = null) {
       requireField(body, "productCode");
       requireField(body, "sessionToken");
       requireField(body, "deviceFingerprint");
+      const sessionToken = String(body.sessionToken).trim();
 
       if (String(body.productCode).trim().toUpperCase() !== product.code) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
       enforceNetworkRules(db, product, meta.ip, "heartbeat");
+      const runtimeSession = await stateStore.getSessionState(sessionToken);
+      if (runtimeSession?.status === "expired") {
+        throw new AppError(401, "SESSION_INVALID", "Session token is invalid or expired.", {
+          runtimeRevokedReason: runtimeSession.revokedReason ?? null
+        });
+      }
 
       return withTransaction(db, () => {
         expireStaleSessions(db, stateStore);
@@ -7857,7 +7884,7 @@ export function createServices(db, config, runtimeState = null) {
             WHERE s.product_id = ? AND s.session_token = ? AND s.status = 'active'
           `,
           product.id,
-          String(body.sessionToken).trim()
+          sessionToken
         );
 
         if (!session) {

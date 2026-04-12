@@ -291,7 +291,7 @@ cl /EHsc /std:c++17 ^
 
 - Windows Server 可直接运行当前 Node.js 服务和 Windows SDK 配套体系
 - Linux 更适合作为长期生产主环境，仓库也已提供 Docker / Nginx / systemd 部署骨架
-- 当前已经把 nonce 防重放和在线会话抽成 runtime state store，并已支持 `redis` 运行时状态层与在线会话索引
+- 当前已经把 nonce 防重放和在线会话抽成 runtime state store，并已支持 `redis` 运行时状态层、在线会话索引和心跳期 runtime invalidation
 - 真正上线前建议继续补齐 PostgreSQL、Redis、TLS、RBAC、限流、监控和备份策略
 
 ## 重点文档

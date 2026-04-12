@@ -195,6 +195,20 @@ async function startFakeRedisServer() {
             expiresAt: existing?.expiresAt ?? null
           });
           socket.write(`:${added}\r\n`);
+        } else if (command === "HGETALL") {
+          const [key] = args;
+          const existing = keyStore.get(key);
+          if (!existing || existing.type !== "hash") {
+            socket.write("*0\r\n");
+          } else {
+            const entries = Object.entries(existing.value);
+            let response = `*${entries.length * 2}\r\n`;
+            for (const [field, value] of entries) {
+              response += `$${Buffer.byteLength(field, "utf8")}\r\n${field}\r\n`;
+              response += `$${Buffer.byteLength(String(value), "utf8")}\r\n${value}\r\n`;
+            }
+            socket.write(response);
+          }
         } else if (command === "EXPIRE") {
           const [key, seconds] = args;
           const existing = keyStore.get(key);
@@ -518,6 +532,139 @@ test("redis runtime state tracks active sessions in the runtime index", async ()
     assert.equal(dashboard.summary.onlineSessions, 1);
     assert.ok(
       fakeRedis.commandLog.some((entry) => entry[0] === "ZADD" && entry[1].includes(":sessions:active")),
+      JSON.stringify(fakeRedis.commandLog)
+    );
+  } finally {
+    await app.close();
+    await fakeRedis.close();
+  }
+});
+
+test("redis runtime state can invalidate heartbeat even if database session is manually reactivated", async () => {
+  const fakeRedis = await startFakeRedisServer();
+  const { app, baseUrl } = await startServer({
+    stateStoreDriver: "redis",
+    redisUrl: fakeRedis.url,
+    redisKeyPrefix: "rocksolid:test:runtime-guard"
+  });
+
+  try {
+    const adminLogin = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(baseUrl, "/api/admin/products", {
+      code: "RUNTIMEGUARD",
+      name: "Runtime Guard Product"
+    }, adminLogin.token);
+
+    const policy = await postJson(baseUrl, "/api/admin/policies", {
+      productCode: product.code,
+      name: "Default Policy",
+      durationDays: 30,
+      bindMode: "strict"
+    }, adminLogin.token);
+
+    await postJson(baseUrl, "/api/admin/cards/batch", {
+      productCode: product.code,
+      policyId: policy.id,
+      prefix: "RTG",
+      count: 1
+    }, adminLogin.token);
+
+    const cards = await getJson(baseUrl, `/api/admin/cards?productCode=${product.code}`, adminLogin.token);
+    const cardKey = cards.items[0].cardKey;
+
+    await signedClientRequest(
+      baseUrl,
+      "/api/client/register",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "runtime_guard",
+        password: "Pass123!abc",
+        deviceFingerprint: "runtime-guard-device"
+      },
+      { nonce: "runtime-guard-register", timestamp: new Date().toISOString() }
+    );
+
+    await signedClientRequest(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "runtime_guard",
+        password: "Pass123!abc",
+        cardKey
+      },
+      { nonce: "runtime-guard-recharge", timestamp: new Date().toISOString() }
+    );
+
+    const loginResult = await signedClientRequest(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "runtime_guard",
+        password: "Pass123!abc",
+        deviceFingerprint: "runtime-guard-device"
+      },
+      { nonce: "runtime-guard-login", timestamp: new Date().toISOString() }
+    );
+    assert.equal(loginResult.status, 200, JSON.stringify(loginResult.json));
+    const sessionToken = loginResult.json.data.sessionToken;
+
+    const logoutResult = await signedClientRequest(
+      baseUrl,
+      "/api/client/logout",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        sessionToken
+      },
+      { nonce: "runtime-guard-logout", timestamp: new Date().toISOString() }
+    );
+    assert.equal(logoutResult.status, 200, JSON.stringify(logoutResult.json));
+
+    await waitFor(() =>
+      fakeRedis.commandLog.some(
+        (entry) => entry[0] === "HSET" && entry.includes("revokedReason") && entry.includes("client_logout")
+      )
+    );
+
+    app.db.prepare(
+      `
+        UPDATE sessions
+        SET status = 'active', revoked_reason = NULL
+        WHERE session_token = ?
+      `
+    ).run(sessionToken);
+
+    const heartbeatResult = await signedClientRequest(
+      baseUrl,
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        sessionToken,
+        deviceFingerprint: "runtime-guard-device"
+      },
+      { nonce: "runtime-guard-heartbeat", timestamp: new Date().toISOString() }
+    );
+    assert.equal(heartbeatResult.status, 401, JSON.stringify(heartbeatResult.json));
+    assert.equal(heartbeatResult.json.ok, false);
+    assert.equal(heartbeatResult.json.error.code, "SESSION_INVALID");
+    assert.equal(heartbeatResult.json.error.details.runtimeRevokedReason, "client_logout");
+    assert.ok(
+      fakeRedis.commandLog.some((entry) => entry[0] === "HGETALL"),
       JSON.stringify(fakeRedis.commandLog)
     );
   } finally {

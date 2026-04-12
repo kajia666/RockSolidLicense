@@ -9,6 +9,22 @@ function parseIso(value) {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
+function mapRedisHashArray(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return null;
+  }
+
+  const mapped = {};
+  for (let index = 0; index < entries.length; index += 2) {
+    const key = entries[index];
+    const value = entries[index + 1];
+    if (key !== null && key !== undefined) {
+      mapped[key] = value;
+    }
+  }
+  return mapped;
+}
+
 function normalizeStateStoreDriver(value) {
   const normalized = String(value ?? "sqlite").trim().toLowerCase();
   if (!["sqlite", "memory", "redis"].includes(normalized)) {
@@ -248,6 +264,26 @@ function createSqliteRuntimeStateStore(db, config) {
 
     expireSession() {},
 
+    async getSessionState(sessionToken) {
+      const row = db.prepare(
+        `
+          SELECT status, revoked_reason, expires_at, last_heartbeat_at
+          FROM sessions
+          WHERE session_token = ?
+        `
+      ).get(sessionToken);
+      if (!row) {
+        return null;
+      }
+
+      return {
+        status: row.status ?? null,
+        revokedReason: row.revoked_reason ?? null,
+        expiresAt: row.expires_at ?? null,
+        lastHeartbeatAt: row.last_heartbeat_at ?? null
+      };
+    },
+
     async countActiveSessions() {
       return countSqliteActiveSessions(db);
     },
@@ -340,6 +376,20 @@ function createMemoryRuntimeStateStore(db, config) {
         status: "expired",
         revokedReason: reason
       });
+    },
+
+    async getSessionState(sessionToken) {
+      pruneExpiredSessions();
+      const existing = sessions.get(sessionToken);
+      if (!existing) {
+        return null;
+      }
+      return {
+        status: existing.status ?? null,
+        revokedReason: existing.revokedReason ?? null,
+        expiresAt: existing.expiresAt ?? null,
+        lastHeartbeatAt: existing.lastHeartbeatAt ?? null
+      };
     },
 
     async countActiveSessions() {
@@ -507,6 +557,22 @@ function createRedisRuntimeStateStore(db, config) {
         ["EXPIRE", sessionKey(sessionToken), 60],
         ["ZREM", activeSessionsKey(), sessionToken]
       ]);
+    },
+
+    async getSessionState(sessionToken) {
+      const [entries] = await execute([
+        ["HGETALL", sessionKey(sessionToken)]
+      ], { background: false });
+      const mapped = mapRedisHashArray(entries);
+      if (!mapped) {
+        return null;
+      }
+      return {
+        status: mapped.status ?? null,
+        revokedReason: mapped.revokedReason ?? null,
+        expiresAt: mapped.expiresAt ?? null,
+        lastHeartbeatAt: mapped.lastHeartbeatAt ?? null
+      };
     },
 
     async countActiveSessions() {

@@ -117,12 +117,28 @@ Effects:
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/feature-config`
+- `GET /api/developer/policies`
+- `POST /api/developer/policies`
+- `POST /api/developer/policies/:policyId/runtime-config`
+- `POST /api/developer/policies/:policyId/unbind-config`
+- `GET /api/developer/cards`
+- `GET /api/developer/cards/export`
+- `POST /api/developer/cards/batch`
+- `POST /api/developer/cards/:cardId/status`
+- `GET /api/developer/client-versions`
+- `POST /api/developer/client-versions`
+- `POST /api/developer/client-versions/:versionId/status`
+- `GET /api/developer/notices`
+- `POST /api/developer/notices`
+- `POST /api/developer/notices/:noticeId/status`
 
 Effects:
 
 - a developer account can create multiple projects under its own ownership
 - developers only see projects where `products.owner_developer_id` matches their own account
 - developers can edit feature toggles for their own projects, but cannot reassign ownership
+- developers can create and manage policies, card batches, client versions, and notices only under their own projects
+- developer card export is scoped to owned products, so exported CSV files never include another developer's inventory
 - ownership transfers made by the admin take effect immediately in the developer project list
 
 ### Accounts

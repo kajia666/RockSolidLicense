@@ -261,8 +261,8 @@
       <section class="hero">
         <h1>Developer Project Center</h1>
         <p class="sub">
-          Sign in as a software author, manage only your own projects, and configure which client-facing
-          capabilities each project exposes.
+          Sign in as a software author, manage only your own projects, configure feature toggles, and use the
+          developer APIs to manage policies, card batches, client versions, and notices under your own scope.
         </p>
         <div class="nav">
           <a href="/developer">Developer Center</a>
@@ -273,6 +273,7 @@
           <div class="pill">Route: <code>/developer</code></div>
           <div class="pill">Each product is one software title or one project</div>
           <div class="pill">You only see projects owned by your developer account</div>
+          <div class="pill">APIs: <code>/api/developer/policies</code> · <code>/cards</code> · <code>/client-versions</code> · <code>/notices</code></div>
         </div>
         <div class="stats" id="stats-box"></div>
       </section>
@@ -350,6 +351,24 @@
           <div class="actions">
             <button class="secondary" id="save-btn">Save Feature Config</button>
             <button class="danger" id="clear-btn">Clear Selection</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Developer APIs</h2>
+          <div class="hint">
+            After signing in, the same bearer token also works with these scoped endpoints:
+          </div>
+          <div class="developer-list">
+            <div class="split-line"><span>Policies</span><span class="mono">GET/POST /api/developer/policies</span></div>
+            <div class="split-line"><span>Policy runtime</span><span class="mono">POST /api/developer/policies/:policyId/runtime-config</span></div>
+            <div class="split-line"><span>Policy unbind</span><span class="mono">POST /api/developer/policies/:policyId/unbind-config</span></div>
+            <div class="split-line"><span>Card batches</span><span class="mono">GET/POST /api/developer/cards</span></div>
+            <div class="split-line"><span>Client versions</span><span class="mono">GET/POST /api/developer/client-versions</span></div>
+            <div class="split-line"><span>Notices</span><span class="mono">GET/POST /api/developer/notices</span></div>
+          </div>
+          <div class="hint" style="margin-top: 14px;">
+            These routes are automatically restricted to projects owned by your developer account.
           </div>
         </article>
       </section>

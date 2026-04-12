@@ -740,6 +740,105 @@ function requireDeveloperOwnedProduct(db, developerId, productId) {
   return product;
 }
 
+function requireDeveloperOwnedProductByCode(db, developerId, productCode) {
+  const product = requireProductByCode(db, productCode);
+  if (product.owner_developer_id !== developerId) {
+    throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only manage products owned by your developer account.");
+  }
+  return product;
+}
+
+function requireDeveloperOwnedPolicy(db, developerId, policyId) {
+  const row = one(
+    db,
+    `
+      SELECT p.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id
+      FROM policies p
+      JOIN products pr ON pr.id = p.product_id
+      WHERE p.id = ?
+    `,
+    policyId
+  );
+
+  if (!row) {
+    throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
+  }
+  if (row.owner_developer_id !== developerId) {
+    throw new AppError(403, "DEVELOPER_POLICY_FORBIDDEN", "You can only manage policies under your own projects.");
+  }
+
+  return row;
+}
+
+function requireDeveloperOwnedCard(db, developerId, cardId) {
+  const row = one(
+    db,
+    `
+      SELECT lk.id, lk.card_key, lk.status, lk.product_id, lk.redeemed_by_account_id,
+             pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id,
+             pol.name AS policy_name
+      FROM license_keys lk
+      JOIN products pr ON pr.id = lk.product_id
+      JOIN policies pol ON pol.id = lk.policy_id
+      WHERE lk.id = ?
+    `,
+    cardId
+  );
+
+  if (!row) {
+    throw new AppError(404, "CARD_NOT_FOUND", "Card key does not exist.");
+  }
+  if (row.owner_developer_id !== developerId) {
+    throw new AppError(403, "DEVELOPER_CARD_FORBIDDEN", "You can only manage card keys under your own projects.");
+  }
+
+  return row;
+}
+
+function requireDeveloperOwnedClientVersion(db, developerId, versionId) {
+  const row = one(
+    db,
+    `
+      SELECT v.*, pr.code AS product_code, pr.owner_developer_id
+      FROM client_versions v
+      JOIN products pr ON pr.id = v.product_id
+      WHERE v.id = ?
+    `,
+    versionId
+  );
+
+  if (!row) {
+    throw new AppError(404, "CLIENT_VERSION_NOT_FOUND", "Client version does not exist.");
+  }
+  if (row.owner_developer_id !== developerId) {
+    throw new AppError(403, "DEVELOPER_CLIENT_VERSION_FORBIDDEN", "You can only manage client versions under your own projects.");
+  }
+
+  return row;
+}
+
+function requireDeveloperOwnedNotice(db, developerId, noticeId) {
+  const row = one(
+    db,
+    `
+      SELECT n.*, pr.code AS product_code, pr.owner_developer_id
+      FROM notices n
+      LEFT JOIN products pr ON pr.id = n.product_id
+      WHERE n.id = ?
+    `,
+    noticeId
+  );
+
+  if (!row) {
+    throw new AppError(404, "NOTICE_NOT_FOUND", "Notice does not exist.");
+  }
+  if (!row.product_id || row.owner_developer_id !== developerId) {
+    throw new AppError(403, "DEVELOPER_NOTICE_FORBIDDEN", "You can only manage notices under your own projects.");
+  }
+
+  return row;
+}
+
 function requireProductFeatureEnabled(db, product, featureKey, code, message, status = 403) {
   const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
   if (featureConfig[featureKey] !== false) {
@@ -1095,6 +1194,41 @@ function formatPolicyRow(row) {
   };
 }
 
+function queryPolicyRows(db, filters = {}) {
+  const conditions = [];
+  const params = [];
+
+  if (filters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(String(filters.productCode).trim().toUpperCase());
+  }
+  if (filters.ownerDeveloperId) {
+    conditions.push("pr.owner_developer_id = ?");
+    params.push(filters.ownerDeveloperId);
+  }
+
+  const rows = many(
+    db,
+    `
+      SELECT p.*, pr.code AS product_code, pr.name AS product_name,
+             pbc.bind_fields_json,
+             puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
+             puc.client_unbind_deduct_days,
+             pgc.grant_type, pgc.grant_points
+      FROM policies p
+      JOIN products pr ON pr.id = p.product_id
+      LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
+      LEFT JOIN policy_unbind_configs puc ON puc.policy_id = p.id
+      LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY p.created_at DESC
+    `,
+    ...params
+  );
+
+  return rows.map(formatPolicyRow);
+}
+
 function extractClientDeviceProfile(body, meta = {}) {
   const rawProfile =
     body.deviceProfile && typeof body.deviceProfile === "object" && !Array.isArray(body.deviceProfile)
@@ -1280,6 +1414,11 @@ function queryCardRows(db, filters = {}, options = {}) {
   const conditions = [];
   const params = [];
 
+  if (filters.ownerDeveloperId) {
+    conditions.push("pr.owner_developer_id = ?");
+    params.push(filters.ownerDeveloperId);
+  }
+
   if (normalizedFilters.productCode) {
     conditions.push("pr.code = ?");
     params.push(normalizedFilters.productCode);
@@ -1370,6 +1509,47 @@ function queryCardRows(db, filters = {}, options = {}) {
     summary,
     filters: normalizedFilters
   };
+}
+
+function buildCardsCsv(items = []) {
+  const header = [
+    "cardId",
+    "productCode",
+    "policyName",
+    "batchCode",
+    "cardKey",
+    "usageStatus",
+    "displayStatus",
+    "controlStatus",
+    "expiresAt",
+    "issuedAt",
+    "redeemedAt",
+    "redeemedUsername",
+    "entitlementStatus",
+    "entitlementEndsAt",
+    "resellerCode"
+  ];
+  const lines = [header.map(toCsvCell).join(",")];
+  for (const item of items) {
+    lines.push([
+      item.id,
+      item.productCode,
+      item.policyName,
+      item.batchCode,
+      item.cardKey,
+      item.usageStatus,
+      item.displayStatus,
+      item.controlStatus,
+      item.expiresAt ?? "",
+      item.issuedAt,
+      item.redeemedAt ?? "",
+      item.redeemedUsername ?? "",
+      item.entitlementLifecycleStatus ?? "",
+      item.entitlementEndsAt ?? "",
+      item.resellerCode ?? ""
+    ].map(toCsvCell).join(","));
+  }
+  return `\uFEFF${lines.join("\n")}`;
 }
 
 function getCardRowById(db, cardId) {
@@ -3773,6 +3953,156 @@ function formatNotice(row) {
   };
 }
 
+function queryClientVersionRows(db, filters = {}) {
+  const conditions = [];
+  const params = [];
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    channel: normalizeOptionalChannel(filters.channel),
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null,
+    ownerDeveloperId: filters.ownerDeveloperId ? String(filters.ownerDeveloperId).trim() : null
+  };
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.ownerDeveloperId) {
+    conditions.push("pr.owner_developer_id = ?");
+    params.push(normalizedFilters.ownerDeveloperId);
+  }
+
+  if (normalizedFilters.channel) {
+    conditions.push("v.channel = ?");
+    params.push(normalizedFilters.channel);
+  }
+
+  if (normalizedFilters.status) {
+    if (!["active", "disabled"].includes(normalizedFilters.status)) {
+      throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
+    }
+    conditions.push("v.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(v.version LIKE ? ESCAPE '\\' OR COALESCE(v.notice_title, '') LIKE ? ESCAPE '\\' OR COALESCE(v.release_notes, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT v.id, v.channel, v.version, v.status, v.force_update, v.download_url, v.release_notes,
+             v.notice_title, v.notice_body, v.released_at, v.created_at, v.updated_at,
+             pr.code AS product_code, pr.name AS product_name
+      FROM client_versions v
+      JOIN products pr ON pr.id = v.product_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY pr.code ASC, v.channel ASC, v.released_at DESC, v.created_at DESC
+      LIMIT 100
+    `,
+    ...params
+  ).map((row) => ({
+    ...row,
+    force_update: Boolean(row.force_update),
+    forceUpdate: Boolean(row.force_update)
+  }));
+
+  return {
+    items,
+    total: items.length,
+    filters: {
+      productCode: normalizedFilters.productCode,
+      channel: normalizedFilters.channel,
+      status: normalizedFilters.status,
+      search: normalizedFilters.search
+    }
+  };
+}
+
+function queryNoticeRows(db, filters = {}) {
+  const conditions = [];
+  const params = [];
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    channel: normalizeOptionalChannel(filters.channel) ?? "all",
+    kind: filters.kind ? String(filters.kind).trim().toLowerCase() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null,
+    ownerDeveloperId: filters.ownerDeveloperId ? String(filters.ownerDeveloperId).trim() : null
+  };
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  if (normalizedFilters.ownerDeveloperId) {
+    conditions.push("pr.owner_developer_id = ?");
+    params.push(normalizedFilters.ownerDeveloperId);
+  }
+
+  if (filters.channel !== undefined && filters.channel !== null && String(filters.channel).trim() !== "") {
+    conditions.push("n.channel = ?");
+    params.push(normalizedFilters.channel);
+  }
+
+  if (normalizedFilters.kind) {
+    if (!["announcement", "maintenance"].includes(normalizedFilters.kind)) {
+      throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
+    }
+    conditions.push("n.kind = ?");
+    params.push(normalizedFilters.kind);
+  }
+
+  if (normalizedFilters.status) {
+    if (!["active", "archived"].includes(normalizedFilters.status)) {
+      throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+    }
+    conditions.push("n.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(n.title LIKE ? ESCAPE '\\' OR n.body LIKE ? ESCAPE '\\' OR COALESCE(pr.code, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT n.*, pr.code AS product_code, pr.name AS product_name
+      FROM notices n
+      LEFT JOIN products pr ON pr.id = n.product_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY n.starts_at DESC, n.created_at DESC
+      LIMIT 100
+    `,
+    ...params
+  ).map(formatNotice);
+
+  return {
+    items,
+    total: items.length,
+    filters: {
+      productCode: normalizedFilters.productCode,
+      channel: normalizedFilters.channel,
+      kind: normalizedFilters.kind,
+      status: normalizedFilters.status,
+      search: normalizedFilters.search
+    }
+  };
+}
+
 function requireNoBlockingNotices(db, product, channel = "all") {
   const blocking = activeNoticesForProduct(db, product.id, channel).filter((row) => row.block_login);
   if (!blocking.length) {
@@ -4336,36 +4666,18 @@ export function createServices(db, config, runtimeState = null) {
 
     listPolicies(token, productCode = null) {
       requireAdminSession(db, token);
-      const sql = productCode
-        ? `
-            SELECT p.*, pr.code AS product_code, pr.name AS product_name,
-                   pbc.bind_fields_json,
-                   puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
-                   puc.client_unbind_deduct_days,
-                   pgc.grant_type, pgc.grant_points
-            FROM policies p
-            JOIN products pr ON pr.id = p.product_id
-            LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
-            LEFT JOIN policy_unbind_configs puc ON puc.policy_id = p.id
-            LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
-            WHERE pr.code = ?
-            ORDER BY p.created_at DESC
-          `
-        : `
-            SELECT p.*, pr.code AS product_code, pr.name AS product_name,
-                   pbc.bind_fields_json,
-                   puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
-                   puc.client_unbind_deduct_days,
-                   pgc.grant_type, pgc.grant_points
-            FROM policies p
-            JOIN products pr ON pr.id = p.product_id
-            LEFT JOIN policy_bind_configs pbc ON pbc.policy_id = p.id
-            LEFT JOIN policy_unbind_configs puc ON puc.policy_id = p.id
-            LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
-            ORDER BY p.created_at DESC
-          `;
-      const rows = productCode ? many(db, sql, productCode) : many(db, sql);
-      return rows.map(formatPolicyRow);
+      return queryPolicyRows(db, productCode ? { productCode } : {});
+    },
+
+    developerListPolicies(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+      }
+      return queryPolicyRows(db, {
+        productCode: filters.productCode ?? null,
+        ownerDeveloperId: session.developer_id
+      });
     },
 
     createPolicy(token, body) {
@@ -4461,6 +4773,128 @@ export function createServices(db, config, runtimeState = null) {
       });
       return {
         ...policy,
+        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
+        ...parsePolicyUnbindConfigRow({
+          allow_client_unbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true ? 1 : 0,
+          client_unbind_limit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
+          client_unbind_window_days: Math.max(
+            1,
+            normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
+          ),
+          client_unbind_deduct_days: normalizeNonNegativeInteger(
+            body.clientUnbindDeductDays,
+            "clientUnbindDeductDays",
+            0,
+            3650
+          ),
+          created_at: now,
+          updated_at: now
+        }),
+        ...parsePolicyGrantConfigRow({
+          grant_type: grantType,
+          grant_points: grantPoints,
+          created_at: now,
+          updated_at: now
+        })
+      };
+    },
+
+    developerCreatePolicy(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireField(body, "name");
+
+      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const now = nowIso();
+      const grantType = normalizeGrantType(body.grantType ?? "duration");
+      const grantPoints = normalizeNonNegativeInteger(body.grantPoints, "grantPoints", 0, 1000000);
+      const policy = {
+        id: generateId("pol"),
+        productId: product.id,
+        name: String(body.name).trim(),
+        durationDays: Number(body.durationDays ?? (grantType === "duration" ? 30 : 0)),
+        maxDevices: Number(body.maxDevices ?? 1),
+        allowConcurrentSessions: parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions") === false ? 0 : 1,
+        heartbeatIntervalSeconds: Number(body.heartbeatIntervalSeconds ?? 60),
+        heartbeatTimeoutSeconds: Number(body.heartbeatTimeoutSeconds ?? 180),
+        tokenTtlSeconds: Number(body.tokenTtlSeconds ?? 300),
+        bindMode: normalizeBindMode(body.bindMode ?? "strict"),
+        bindFields: parseBindFieldsInput(body.bindFields, normalizeBindMode(body.bindMode ?? "strict")),
+        status: "active",
+        createdAt: now,
+        updatedAt: now
+      };
+
+      if (
+        policy.maxDevices <= 0 ||
+        policy.heartbeatIntervalSeconds <= 0 ||
+        policy.heartbeatTimeoutSeconds <= 0 ||
+        policy.tokenTtlSeconds <= 0
+      ) {
+        throw new AppError(400, "INVALID_POLICY", "Policy values must be positive numbers.");
+      }
+      if (grantType === "duration" && policy.durationDays <= 0) {
+        throw new AppError(400, "INVALID_POLICY", "durationDays must be a positive number for duration policies.");
+      }
+      if (grantType === "points" && grantPoints <= 0) {
+        throw new AppError(400, "INVALID_POLICY", "grantPoints must be a positive number for points policies.");
+      }
+      if (grantType === "points" && policy.durationDays < 0) {
+        throw new AppError(400, "INVALID_POLICY", "durationDays cannot be negative.");
+      }
+
+      run(
+        db,
+        `
+          INSERT INTO policies
+          (id, product_id, name, duration_days, max_devices, allow_concurrent_sessions, heartbeat_interval_seconds,
+           heartbeat_timeout_seconds, token_ttl_seconds, bind_mode, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        policy.id,
+        policy.productId,
+        policy.name,
+        policy.durationDays,
+        policy.maxDevices,
+        policy.allowConcurrentSessions,
+        policy.heartbeatIntervalSeconds,
+        policy.heartbeatTimeoutSeconds,
+        policy.tokenTtlSeconds,
+        policy.bindMode,
+        policy.status,
+        policy.createdAt,
+        policy.updatedAt
+      );
+
+      persistPolicyBindConfig(db, policy.id, policy.bindMode, policy.bindFields, now);
+      persistPolicyUnbindConfig(db, policy.id, body, now);
+      persistPolicyGrantConfig(db, policy.id, { grantType, grantPoints }, now);
+
+      audit(db, "developer", session.developer_id, "policy.create", "policy", policy.id, {
+        productCode: product.code,
+        name: policy.name,
+        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
+        bindMode: policy.bindMode,
+        bindFields: policy.bindFields,
+        grantType,
+        grantPoints,
+        allowClientUnbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true,
+        clientUnbindLimit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
+        clientUnbindWindowDays: Math.max(
+          1,
+          normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
+        ),
+        clientUnbindDeductDays: normalizeNonNegativeInteger(
+          body.clientUnbindDeductDays,
+          "clientUnbindDeductDays",
+          0,
+          3650
+        )
+      });
+
+      return {
+        ...policy,
+        productCode: product.code,
+        productName: product.name,
         allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
         ...parsePolicyUnbindConfigRow({
           allow_client_unbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true ? 1 : 0,
@@ -4610,6 +5044,101 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
+    developerUpdatePolicyRuntimeConfig(token, policyId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const policy = requireDeveloperOwnedPolicy(db, session.developer_id, policyId);
+      const currentBindConfig = loadPolicyBindConfig(db, policy.id, policy.bind_mode, policy.updated_at);
+      const nextBindMode = body.bindMode !== undefined
+        ? normalizeBindMode(body.bindMode)
+        : currentBindConfig.bindMode;
+      const nextBindFields = body.bindFields !== undefined
+        ? parseBindFieldsInput(body.bindFields, nextBindMode)
+        : currentBindConfig.bindFields;
+      const allowConcurrentSessions = parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions");
+      const nextAllowConcurrentSessions = allowConcurrentSessions === null
+        ? Number(policy.allow_concurrent_sessions)
+        : allowConcurrentSessions ? 1 : 0;
+      const timestamp = nowIso();
+
+      run(
+        db,
+        `
+          UPDATE policies
+          SET allow_concurrent_sessions = ?, bind_mode = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        nextAllowConcurrentSessions,
+        nextBindMode,
+        timestamp,
+        policy.id
+      );
+
+      persistPolicyBindConfig(db, policy.id, nextBindMode, nextBindFields, timestamp);
+
+      audit(db, "developer", session.developer_id, "policy.runtime.update", "policy", policy.id, {
+        productCode: policy.product_code,
+        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
+        bindMode: nextBindMode,
+        bindFields: nextBindFields
+      });
+
+      return {
+        id: policy.id,
+        productId: policy.product_id,
+        productCode: policy.product_code,
+        productName: policy.product_name,
+        name: policy.name,
+        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
+        bindMode: nextBindMode,
+        bindFields: nextBindFields,
+        updatedAt: timestamp
+      };
+    },
+
+    developerUpdatePolicyUnbindConfig(token, policyId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const policy = requireDeveloperOwnedPolicy(db, session.developer_id, policyId);
+      const currentConfig = loadPolicyUnbindConfig(db, policy.id, policy.updated_at);
+      const nextConfig = {
+        allowClientUnbind: body.allowClientUnbind === undefined
+          ? currentConfig.allowClientUnbind
+          : parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind"),
+        clientUnbindLimit: body.clientUnbindLimit === undefined
+          ? currentConfig.clientUnbindLimit
+          : normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
+        clientUnbindWindowDays: body.clientUnbindWindowDays === undefined
+          ? currentConfig.clientUnbindWindowDays
+          : Math.max(
+              1,
+              normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
+            ),
+        clientUnbindDeductDays: body.clientUnbindDeductDays === undefined
+          ? currentConfig.clientUnbindDeductDays
+          : normalizeNonNegativeInteger(body.clientUnbindDeductDays, "clientUnbindDeductDays", 0, 3650)
+      };
+      const timestamp = nowIso();
+
+      persistPolicyUnbindConfig(db, policy.id, nextConfig, timestamp);
+
+      audit(db, "developer", session.developer_id, "policy.unbind.update", "policy", policy.id, {
+        productCode: policy.product_code,
+        allowClientUnbind: nextConfig.allowClientUnbind,
+        clientUnbindLimit: nextConfig.clientUnbindLimit,
+        clientUnbindWindowDays: nextConfig.clientUnbindWindowDays,
+        clientUnbindDeductDays: nextConfig.clientUnbindDeductDays
+      });
+
+      return {
+        id: policy.id,
+        productId: policy.product_id,
+        productCode: policy.product_code,
+        productName: policy.product_name,
+        name: policy.name,
+        ...nextConfig,
+        updatedAt: timestamp
+      };
+    },
+
     listCards(token, filters = {}) {
       requireAdminSession(db, token);
       const { items, summary, filters: normalizedFilters } = queryCardRows(db, filters);
@@ -4624,44 +5153,37 @@ export function createServices(db, config, runtimeState = null) {
     exportCardsCsv(token, filters = {}) {
       requireAdminSession(db, token);
       const { items } = queryCardRows(db, filters, { limit: 5000 });
-      const header = [
-        "cardId",
-        "productCode",
-        "policyName",
-        "batchCode",
-        "cardKey",
-        "usageStatus",
-        "displayStatus",
-        "controlStatus",
-        "expiresAt",
-        "issuedAt",
-        "redeemedAt",
-        "redeemedUsername",
-        "entitlementStatus",
-        "entitlementEndsAt",
-        "resellerCode"
-      ];
-      const lines = [header.map(toCsvCell).join(",")];
-      for (const item of items) {
-        lines.push([
-          item.id,
-          item.productCode,
-          item.policyName,
-          item.batchCode,
-          item.cardKey,
-          item.usageStatus,
-          item.displayStatus,
-          item.controlStatus,
-          item.expiresAt ?? "",
-          item.issuedAt,
-          item.redeemedAt ?? "",
-          item.redeemedUsername ?? "",
-          item.entitlementLifecycleStatus ?? "",
-          item.entitlementEndsAt ?? "",
-          item.resellerCode ?? ""
-        ].map(toCsvCell).join(","));
+      return buildCardsCsv(items);
+    },
+
+    developerListCards(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
       }
-      return `\uFEFF${lines.join("\n")}`;
+      const { items, summary, filters: normalizedFilters } = queryCardRows(
+        db,
+        { ...filters, ownerDeveloperId: session.developer_id }
+      );
+      return {
+        items,
+        total: items.length,
+        summary,
+        filters: normalizedFilters
+      };
+    },
+
+    developerExportCardsCsv(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+      }
+      const { items } = queryCardRows(
+        db,
+        { ...filters, ownerDeveloperId: session.developer_id },
+        { limit: 5000 }
+      );
+      return buildCardsCsv(items);
     },
 
     updateCardStatus(token, cardId, body = {}) {
@@ -4702,6 +5224,45 @@ export function createServices(db, config, runtimeState = null) {
         }
 
         audit(db, "admin", admin.admin_id, "card.status", "license_key", card.id, {
+          productCode: card.product_code,
+          cardKeyMasked: maskCardKey(card.card_key),
+          status: control.status,
+          effectiveStatus: control.effectiveStatus,
+          expiresAt: control.expiresAt,
+          revokedSessions
+        });
+
+        return {
+          ...getCardRowById(db, card.id),
+          changed: true,
+          revokedSessions
+        };
+      });
+    },
+
+    developerUpdateCardStatus(token, cardId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const card = requireDeveloperOwnedCard(db, session.developer_id, cardId);
+
+      return withTransaction(db, () => {
+        const timestamp = nowIso();
+        const control = upsertLicenseKeyControl(db, card.id, {
+          status: body.status ?? "active",
+          expiresAt: body.expiresAt,
+          notes: body.notes
+        }, timestamp);
+
+        let revokedSessions = 0;
+        if (!control.available) {
+          revokedSessions = expireSessionsForLicenseKey(
+            db,
+            stateStore,
+            card.id,
+            `card_${control.effectiveStatus}`
+          );
+        }
+
+        audit(db, "developer", session.developer_id, "card.status", "license_key", card.id, {
           productCode: card.product_code,
           cardKeyMasked: maskCardKey(card.card_key),
           status: control.status,
@@ -4770,6 +5331,73 @@ export function createServices(db, config, runtimeState = null) {
       });
 
       audit(db, "admin", admin.admin_id, "card.batch.create", "policy", policy.id, {
+        productCode: product.code,
+        batchCode,
+        count,
+        expiresAt
+      });
+
+      return {
+        batchCode,
+        count,
+        expiresAt,
+        preview: keys.slice(0, 10).map((entry) => entry.cardKey),
+        keys: keys.map((entry) => entry.cardKey)
+      };
+    },
+
+    developerCreateCardBatch(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireField(body, "policyId");
+
+      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const policy = one(
+        db,
+        `
+          SELECT * FROM policies
+          WHERE id = ? AND product_id = ? AND status = 'active'
+        `,
+        body.policyId,
+        product.id
+      );
+
+      if (!policy) {
+        throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
+      }
+
+      const count = Number(body.count ?? 1);
+      if (!Number.isInteger(count) || count < 1 || count > 5000) {
+        throw new AppError(400, "INVALID_BATCH_SIZE", "Batch count must be between 1 and 5000.");
+      }
+
+      const prefix = String(body.prefix ?? product.code.slice(0, 6)).replace(/[^A-Z0-9]/gi, "").toUpperCase();
+      const batchCode = `BATCH-${Date.now()}`;
+      const issuedAt = nowIso();
+      const expiresAt = normalizeOptionalIsoDate(body.expiresAt, "expiresAt");
+
+      const keys = withTransaction(db, () => {
+        const issued = issueLicenseKeys(db, {
+          productId: product.id,
+          policyId: policy.id,
+          prefix,
+          count,
+          batchCode,
+          notes: String(body.notes ?? ""),
+          issuedAt
+        });
+        if (expiresAt) {
+          for (const entry of issued) {
+            upsertLicenseKeyControl(db, entry.licenseKeyId, {
+              status: "active",
+              expiresAt,
+              notes: body.notes
+            }, issuedAt);
+          }
+        }
+        return issued;
+      });
+
+      audit(db, "developer", session.developer_id, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
         batchCode,
         count,
@@ -7207,66 +7835,18 @@ export function createServices(db, config, runtimeState = null) {
 
     listClientVersions(token, filters = {}) {
       requireAdminSession(db, token);
+      return queryClientVersionRows(db, filters);
+    },
 
-      const conditions = [];
-      const params = [];
-      const normalizedFilters = {
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        channel: normalizeOptionalChannel(filters.channel),
-        status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
+    developerListClientVersions(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
       }
-
-      if (normalizedFilters.channel) {
-        conditions.push("v.channel = ?");
-        params.push(normalizedFilters.channel);
-      }
-
-      if (normalizedFilters.status) {
-        if (!["active", "disabled"].includes(normalizedFilters.status)) {
-          throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
-        }
-        conditions.push("v.status = ?");
-        params.push(normalizedFilters.status);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push(
-          "(v.version LIKE ? ESCAPE '\\' OR COALESCE(v.notice_title, '') LIKE ? ESCAPE '\\' OR COALESCE(v.release_notes, '') LIKE ? ESCAPE '\\')"
-        );
-        params.push(pattern, pattern, pattern);
-      }
-
-      const items = many(
-        db,
-        `
-          SELECT v.id, v.channel, v.version, v.status, v.force_update, v.download_url, v.release_notes,
-                 v.notice_title, v.notice_body, v.released_at, v.created_at, v.updated_at,
-                 pr.code AS product_code, pr.name AS product_name
-          FROM client_versions v
-          JOIN products pr ON pr.id = v.product_id
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY pr.code ASC, v.channel ASC, v.released_at DESC, v.created_at DESC
-          LIMIT 100
-        `,
-        ...params
-      ).map((row) => ({
-        ...row,
-        force_update: Boolean(row.force_update),
-        forceUpdate: Boolean(row.force_update)
-      }));
-
-      return {
-        items,
-        total: items.length,
-        filters: normalizedFilters
-      };
+      return queryClientVersionRows(db, {
+        ...filters,
+        ownerDeveloperId: session.developer_id
+      });
     },
 
     createClientVersion(token, body = {}) {
@@ -7327,6 +7907,86 @@ export function createServices(db, config, runtimeState = null) {
       );
 
       audit(db, "admin", admin.admin_id, "client-version.create", "client_version", id, {
+        productCode: product.code,
+        channel,
+        version,
+        status,
+        forceUpdate: Boolean(forceUpdate)
+      });
+
+      return {
+        id,
+        productCode: product.code,
+        channel,
+        version,
+        status,
+        forceUpdate: Boolean(forceUpdate),
+        downloadUrl: downloadUrl || null,
+        noticeTitle: noticeTitle || null,
+        noticeBody: noticeBody || null,
+        releaseNotes: releaseNotes || null,
+        releasedAt
+      };
+    },
+
+    developerCreateClientVersion(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireField(body, "version");
+
+      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const version = String(body.version).trim();
+      const channel = normalizeChannel(body.channel);
+      const status = String(body.status ?? "active").trim().toLowerCase();
+      const forceUpdate = body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true" ? 1 : 0;
+      const downloadUrl = String(body.downloadUrl ?? "").trim();
+      const releaseNotes = String(body.releaseNotes ?? "").trim();
+      const noticeTitle = String(body.noticeTitle ?? "").trim();
+      const noticeBody = String(body.noticeBody ?? "").trim();
+      const releasedAt = body.releasedAt ? new Date(body.releasedAt).toISOString() : nowIso();
+
+      if (!/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/.test(version)) {
+        throw new AppError(400, "INVALID_CLIENT_VERSION", "Version must be 1-32 chars using letters, digits, dot, underscore, or hyphen.");
+      }
+
+      if (!["active", "disabled"].includes(status)) {
+        throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
+      }
+
+      if (one(
+        db,
+        "SELECT id FROM client_versions WHERE product_id = ? AND channel = ? AND version = ?",
+        product.id,
+        channel,
+        version
+      )) {
+        throw new AppError(409, "CLIENT_VERSION_EXISTS", "This version already exists for the product channel.");
+      }
+
+      const timestamp = nowIso();
+      const id = generateId("ver");
+      run(
+        db,
+        `
+          INSERT INTO client_versions
+          (id, product_id, channel, version, status, force_update, download_url, release_notes, notice_title, notice_body, released_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        id,
+        product.id,
+        channel,
+        version,
+        status,
+        forceUpdate,
+        downloadUrl || null,
+        releaseNotes || null,
+        noticeTitle || null,
+        noticeBody || null,
+        releasedAt,
+        timestamp,
+        timestamp
+      );
+
+      audit(db, "developer", session.developer_id, "client-version.create", "client_version", id, {
         productCode: product.code,
         channel,
         version,
@@ -7411,71 +8071,69 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
-    listNotices(token, filters = {}) {
-      requireAdminSession(db, token);
+    developerUpdateClientVersionStatus(token, versionId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const row = requireDeveloperOwnedClientVersion(db, session.developer_id, versionId);
 
-      const conditions = [];
-      const params = [];
-      const normalizedFilters = {
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        channel: normalizeOptionalChannel(filters.channel) ?? "all",
-        kind: filters.kind ? String(filters.kind).trim().toLowerCase() : null,
-        status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
+      const nextStatus = String(body.status ?? "").trim().toLowerCase();
+      if (!["active", "disabled"].includes(nextStatus)) {
+        throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
       }
 
-      if (filters.channel !== undefined && filters.channel !== null && String(filters.channel).trim() !== "") {
-        conditions.push("n.channel = ?");
-        params.push(normalizedFilters.channel);
-      }
+      const forceUpdate = body.forceUpdate === undefined
+        ? Number(row.force_update)
+        : body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true"
+          ? 1
+          : 0;
 
-      if (normalizedFilters.kind) {
-        if (!["announcement", "maintenance"].includes(normalizedFilters.kind)) {
-          throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
-        }
-        conditions.push("n.kind = ?");
-        params.push(normalizedFilters.kind);
-      }
-
-      if (normalizedFilters.status) {
-        if (!["active", "archived"].includes(normalizedFilters.status)) {
-          throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
-        }
-        conditions.push("n.status = ?");
-        params.push(normalizedFilters.status);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push(
-          "(n.title LIKE ? ESCAPE '\\' OR n.body LIKE ? ESCAPE '\\' OR COALESCE(pr.code, '') LIKE ? ESCAPE '\\')"
-        );
-        params.push(pattern, pattern, pattern);
-      }
-
-      const items = many(
+      const timestamp = nowIso();
+      run(
         db,
         `
-          SELECT n.*, pr.code AS product_code, pr.name AS product_name
-          FROM notices n
-          LEFT JOIN products pr ON pr.id = n.product_id
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY n.starts_at DESC, n.created_at DESC
-          LIMIT 100
+          UPDATE client_versions
+          SET status = ?, force_update = ?, updated_at = ?
+          WHERE id = ?
         `,
-        ...params
-      ).map(formatNotice);
+        nextStatus,
+        forceUpdate,
+        timestamp,
+        row.id
+      );
+
+      audit(db, "developer", session.developer_id, "client-version.status", "client_version", row.id, {
+        productCode: row.product_code,
+        version: row.version,
+        channel: row.channel,
+        status: nextStatus,
+        forceUpdate: Boolean(forceUpdate)
+      });
 
       return {
-        items,
-        total: items.length,
-        filters: normalizedFilters
+        id: row.id,
+        productCode: row.product_code,
+        channel: row.channel,
+        version: row.version,
+        status: nextStatus,
+        forceUpdate: Boolean(forceUpdate),
+        changed: nextStatus !== row.status || forceUpdate !== Number(row.force_update),
+        updatedAt: timestamp
       };
+    },
+
+    listNotices(token, filters = {}) {
+      requireAdminSession(db, token);
+      return queryNoticeRows(db, filters);
+    },
+
+    developerListNotices(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+      }
+      return queryNoticeRows(db, {
+        ...filters,
+        ownerDeveloperId: session.developer_id
+      });
     },
 
     createNotice(token, body = {}) {
@@ -7559,6 +8217,86 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
+    developerCreateNotice(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireField(body, "title");
+      requireField(body, "body");
+
+      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const kind = String(body.kind ?? "announcement").trim().toLowerCase();
+      const severity = String(body.severity ?? "info").trim().toLowerCase();
+      const status = String(body.status ?? "active").trim().toLowerCase();
+      const channel = normalizeNoticeChannel(body.channel, "all");
+      const blockLogin = body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true" ? 1 : 0;
+      const title = String(body.title).trim();
+      const content = String(body.body).trim();
+      const actionUrl = String(body.actionUrl ?? "").trim();
+      const startsAt = body.startsAt ? new Date(body.startsAt).toISOString() : nowIso();
+      const endsAt = body.endsAt ? new Date(body.endsAt).toISOString() : null;
+
+      if (!["announcement", "maintenance"].includes(kind)) {
+        throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
+      }
+      if (!["info", "warning", "critical"].includes(severity)) {
+        throw new AppError(400, "INVALID_NOTICE_SEVERITY", "Notice severity must be info, warning, or critical.");
+      }
+      if (!["active", "archived"].includes(status)) {
+        throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+      }
+      if (endsAt && endsAt <= startsAt) {
+        throw new AppError(400, "INVALID_NOTICE_WINDOW", "Notice end time must be later than start time.");
+      }
+
+      const timestamp = nowIso();
+      const id = generateId("notice");
+      run(
+        db,
+        `
+          INSERT INTO notices
+          (id, product_id, channel, kind, severity, title, body, action_url, status, block_login, starts_at, ends_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        id,
+        product.id,
+        channel,
+        kind,
+        severity,
+        title,
+        content,
+        actionUrl || null,
+        status,
+        blockLogin,
+        startsAt,
+        endsAt,
+        timestamp,
+        timestamp
+      );
+
+      audit(db, "developer", session.developer_id, "notice.create", "notice", id, {
+        productCode: product.code,
+        channel,
+        kind,
+        severity,
+        status,
+        blockLogin: Boolean(blockLogin)
+      });
+
+      return {
+        id,
+        productCode: product.code,
+        channel,
+        kind,
+        severity,
+        title,
+        body: content,
+        actionUrl: actionUrl || null,
+        status,
+        blockLogin: Boolean(blockLogin),
+        startsAt,
+        endsAt
+      };
+    },
+
     updateNoticeStatus(token, noticeId, body = {}) {
       const admin = requireAdminSession(db, token);
       const row = one(
@@ -7602,6 +8340,53 @@ export function createServices(db, config, runtimeState = null) {
       );
 
       audit(db, "admin", admin.admin_id, "notice.status", "notice", row.id, {
+        productCode: row.product_code ?? null,
+        channel: row.channel,
+        status,
+        blockLogin: Boolean(blockLogin)
+      });
+
+      return {
+        id: row.id,
+        productCode: row.product_code ?? null,
+        channel: row.channel,
+        status,
+        blockLogin: Boolean(blockLogin),
+        changed: status !== row.status || blockLogin !== Number(row.block_login),
+        updatedAt: timestamp
+      };
+    },
+
+    developerUpdateNoticeStatus(token, noticeId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const row = requireDeveloperOwnedNotice(db, session.developer_id, noticeId);
+
+      const status = String(body.status ?? "").trim().toLowerCase();
+      if (!["active", "archived"].includes(status)) {
+        throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+      }
+
+      const blockLogin = body.blockLogin === undefined
+        ? Number(row.block_login)
+        : body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true"
+          ? 1
+          : 0;
+
+      const timestamp = nowIso();
+      run(
+        db,
+        `
+          UPDATE notices
+          SET status = ?, block_login = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        status,
+        blockLogin,
+        timestamp,
+        row.id
+      );
+
+      audit(db, "developer", session.developer_id, "notice.status", "notice", row.id, {
         productCode: row.product_code ?? null,
         channel: row.channel,
         status,

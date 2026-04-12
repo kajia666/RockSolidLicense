@@ -4026,6 +4026,311 @@ test("developer accounts can manage only their own projects", async () => {
   }
 });
 
+test("developer-owned projects can manage policies, cards, versions, and notices within scope", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const alice = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "alice.ops",
+        password: "AliceOps123!",
+        displayName: "Alice Ops"
+      },
+      adminSession.token
+    );
+
+    const bob = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "bob.ops",
+        password: "BobOps123!",
+        displayName: "Bob Ops"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "ALICE_OPS_APP",
+        name: "Alice Ops App",
+        ownerDeveloperId: alice.id
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "BOB_OPS_APP",
+        name: "Bob Ops App",
+        ownerDeveloperId: bob.id
+      },
+      adminSession.token
+    );
+
+    const aliceSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "alice.ops",
+      password: "AliceOps123!"
+    });
+
+    const alicePolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "ALICE_OPS_APP",
+        name: "Alice Policy",
+        durationDays: 31,
+        maxDevices: 2,
+        bindMode: "selected_fields",
+        bindFields: ["machineGuid"],
+        allowConcurrentSessions: true,
+        allowClientUnbind: true,
+        clientUnbindLimit: 2,
+        clientUnbindWindowDays: 30
+      },
+      aliceSession.token
+    );
+    assert.equal(alicePolicy.productCode, "ALICE_OPS_APP");
+    assert.equal(alicePolicy.bindMode, "selected_fields");
+
+    const bobPolicy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "BOB_OPS_APP",
+        name: "Bob Policy",
+        durationDays: 15,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const alicePolicies = await getJson(baseUrl, "/api/developer/policies", aliceSession.token);
+    assert.equal(alicePolicies.length, 1);
+    assert.equal(alicePolicies[0].productCode, "ALICE_OPS_APP");
+    assert.equal(alicePolicies[0].name, "Alice Policy");
+
+    const aliceRuntime = await postJson(
+      baseUrl,
+      `/api/developer/policies/${alicePolicy.id}/runtime-config`,
+      {
+        allowConcurrentSessions: false,
+        bindMode: "selected_fields",
+        bindFields: ["machineGuid", "requestIp"]
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceRuntime.allowConcurrentSessions, false);
+    assert.deepEqual(aliceRuntime.bindFields, ["machineGuid", "requestIp"]);
+
+    const aliceUnbind = await postJson(
+      baseUrl,
+      `/api/developer/policies/${alicePolicy.id}/unbind-config`,
+      {
+        allowClientUnbind: true,
+        clientUnbindLimit: 3,
+        clientUnbindWindowDays: 60,
+        clientUnbindDeductDays: 1
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceUnbind.clientUnbindLimit, 3);
+
+    const forbiddenPolicyRuntime = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/policies/${bobPolicy.id}/runtime-config`,
+      {
+        allowConcurrentSessions: false
+      },
+      aliceSession.token
+    );
+    assert.equal(forbiddenPolicyRuntime.status, 403);
+    assert.equal(forbiddenPolicyRuntime.error.code, "DEVELOPER_POLICY_FORBIDDEN");
+
+    const aliceBatch = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "ALICE_OPS_APP",
+        policyId: alicePolicy.id,
+        count: 2,
+        prefix: "ALOPS"
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceBatch.count, 2);
+    assert.equal(aliceBatch.keys.length, 2);
+
+    await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "BOB_OPS_APP",
+        policyId: bobPolicy.id,
+        count: 1,
+        prefix: "BOBOPS"
+      },
+      adminSession.token
+    );
+
+    const aliceCards = await getJson(baseUrl, "/api/developer/cards?productCode=ALICE_OPS_APP", aliceSession.token);
+    assert.equal(aliceCards.items.length, 2);
+    assert.ok(aliceCards.items.every((item) => item.productCode === "ALICE_OPS_APP"));
+
+    const aliceCardStatus = await postJson(
+      baseUrl,
+      `/api/developer/cards/${aliceCards.items[0].id}/status`,
+      {
+        status: "frozen",
+        notes: "developer_test"
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceCardStatus.controlStatus, "frozen");
+
+    const bobCards = await getJson(baseUrl, "/api/admin/cards?productCode=BOB_OPS_APP", adminSession.token);
+    const forbiddenCardStatus = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/cards/${bobCards.items[0].id}/status`,
+      {
+        status: "frozen"
+      },
+      aliceSession.token
+    );
+    assert.equal(forbiddenCardStatus.status, 403);
+    assert.equal(forbiddenCardStatus.error.code, "DEVELOPER_CARD_FORBIDDEN");
+
+    const csvResponse = await fetch(`${baseUrl}/api/developer/cards/export?productCode=ALICE_OPS_APP`, {
+      headers: { Authorization: `Bearer ${aliceSession.token}` }
+    });
+    const csvText = await csvResponse.text();
+    assert.equal(csvResponse.ok, true);
+    assert.match(csvText, /ALICE_OPS_APP/);
+    assert.doesNotMatch(csvText, /BOB_OPS_APP/);
+
+    const aliceVersion = await postJson(
+      baseUrl,
+      "/api/developer/client-versions",
+      {
+        productCode: "ALICE_OPS_APP",
+        version: "1.0.0",
+        channel: "stable",
+        forceUpdate: false,
+        downloadUrl: "https://example.invalid/alice"
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceVersion.productCode, "ALICE_OPS_APP");
+
+    const bobVersion = await postJson(
+      baseUrl,
+      "/api/admin/client-versions",
+      {
+        productCode: "BOB_OPS_APP",
+        version: "2.0.0",
+        channel: "stable",
+        forceUpdate: true
+      },
+      adminSession.token
+    );
+
+    const aliceVersions = await getJson(baseUrl, "/api/developer/client-versions", aliceSession.token);
+    assert.equal(aliceVersions.items.length, 1);
+    assert.equal(aliceVersions.items[0].product_code, "ALICE_OPS_APP");
+
+    const updatedAliceVersion = await postJson(
+      baseUrl,
+      `/api/developer/client-versions/${aliceVersion.id}/status`,
+      {
+        status: "disabled",
+        forceUpdate: true
+      },
+      aliceSession.token
+    );
+    assert.equal(updatedAliceVersion.status, "disabled");
+    assert.equal(updatedAliceVersion.forceUpdate, true);
+
+    const forbiddenVersion = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/client-versions/${bobVersion.id}/status`,
+      {
+        status: "disabled"
+      },
+      aliceSession.token
+    );
+    assert.equal(forbiddenVersion.status, 403);
+    assert.equal(forbiddenVersion.error.code, "DEVELOPER_CLIENT_VERSION_FORBIDDEN");
+
+    const aliceNotice = await postJson(
+      baseUrl,
+      "/api/developer/notices",
+      {
+        productCode: "ALICE_OPS_APP",
+        title: "Alice Maintenance",
+        body: "Alice maintenance window.",
+        kind: "maintenance",
+        channel: "stable",
+        blockLogin: true
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceNotice.productCode, "ALICE_OPS_APP");
+
+    const bobNotice = await postJson(
+      baseUrl,
+      "/api/admin/notices",
+      {
+        productCode: "BOB_OPS_APP",
+        title: "Bob Notice",
+        body: "Bob side notice.",
+        kind: "announcement"
+      },
+      adminSession.token
+    );
+
+    const aliceNotices = await getJson(baseUrl, "/api/developer/notices", aliceSession.token);
+    assert.equal(aliceNotices.items.length, 1);
+    assert.equal(aliceNotices.items[0].productCode, "ALICE_OPS_APP");
+
+    const updatedAliceNotice = await postJson(
+      baseUrl,
+      `/api/developer/notices/${aliceNotice.id}/status`,
+      {
+        status: "archived",
+        blockLogin: false
+      },
+      aliceSession.token
+    );
+    assert.equal(updatedAliceNotice.status, "archived");
+    assert.equal(updatedAliceNotice.blockLogin, false);
+
+    const forbiddenNotice = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/notices/${bobNotice.id}/status`,
+      {
+        status: "archived"
+      },
+      aliceSession.token
+    );
+    assert.equal(forbiddenNotice.status, 403);
+    assert.equal(forbiddenNotice.error.code, "DEVELOPER_NOTICE_FORBIDDEN");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -4054,6 +4359,7 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(response.headers.get("content-type") || "", /^text\/html/);
     assert.match(html, /Developer Project Center/);
     assert.match(html, /api\/developer\/products/);
+    assert.match(html, /api\/developer\/policies/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

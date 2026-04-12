@@ -905,6 +905,189 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/policies") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListPolicies(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/policies") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, { ok: true, data: services.developerCreatePolicy(getBearerToken(req), body) });
+        return;
+      }
+
+      const developerPolicyRuntimeRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/policies/:policyId/runtime-config")
+        : null;
+      if (developerPolicyRuntimeRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdatePolicyRuntimeConfig(
+            getBearerToken(req),
+            developerPolicyRuntimeRoute.policyId,
+            body
+          )
+        });
+        return;
+      }
+
+      const developerPolicyUnbindRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/policies/:policyId/unbind-config")
+        : null;
+      if (developerPolicyUnbindRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdatePolicyUnbindConfig(
+            getBearerToken(req),
+            developerPolicyUnbindRoute.policyId,
+            body
+          )
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/cards") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListCards(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            policyId: url.searchParams.get("policyId"),
+            batchCode: url.searchParams.get("batchCode"),
+            usageStatus: url.searchParams.get("usageStatus"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/cards/export") {
+        const csv = services.developerExportCardsCsv(getBearerToken(req), {
+          productCode: url.searchParams.get("productCode"),
+          policyId: url.searchParams.get("policyId"),
+          batchCode: url.searchParams.get("batchCode"),
+          usageStatus: url.searchParams.get("usageStatus"),
+          status: url.searchParams.get("status"),
+          search: url.searchParams.get("search")
+        });
+        sendText(
+          res,
+          200,
+          csv,
+          "text/csv; charset=utf-8",
+          {
+            "content-disposition": `attachment; filename="developer-cards-${Date.now()}.csv"`
+          }
+        );
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/cards/batch") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, { ok: true, data: services.developerCreateCardBatch(getBearerToken(req), body) });
+        return;
+      }
+
+      const developerCardStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/cards/:cardId/status")
+        : null;
+      if (developerCardStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateCardStatus(
+            getBearerToken(req),
+            developerCardStatusRoute.cardId,
+            body
+          )
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/client-versions") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListClientVersions(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            channel: url.searchParams.get("channel"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/client-versions") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.developerCreateClientVersion(getBearerToken(req), body)
+        });
+        return;
+      }
+
+      const developerClientVersionStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/client-versions/:versionId/status")
+        : null;
+      if (developerClientVersionStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateClientVersionStatus(
+            getBearerToken(req),
+            developerClientVersionStatusRoute.versionId,
+            body
+          )
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/notices") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListNotices(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            channel: url.searchParams.get("channel"),
+            kind: url.searchParams.get("kind"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/notices") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.developerCreateNotice(getBearerToken(req), body)
+        });
+        return;
+      }
+
+      const developerNoticeStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/notices/:noticeId/status")
+        : null;
+      if (developerNoticeStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateNoticeStatus(
+            getBearerToken(req),
+            developerNoticeStatusRoute.noticeId,
+            body
+          )
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/reseller/me") {
         sendJson(res, 200, { ok: true, data: services.resellerMe(getBearerToken(req)) });
         return;

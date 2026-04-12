@@ -221,8 +221,22 @@ TCP：
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/feature-config`
+- `GET /api/developer/policies`
+- `POST /api/developer/policies`
+- `POST /api/developer/policies/:policyId/runtime-config`
+- `POST /api/developer/policies/:policyId/unbind-config`
+- `GET /api/developer/cards`
+- `GET /api/developer/cards/export`
+- `POST /api/developer/cards/batch`
+- `POST /api/developer/cards/:cardId/status`
+- `GET /api/developer/client-versions`
+- `POST /api/developer/client-versions`
+- `POST /api/developer/client-versions/:versionId/status`
+- `GET /api/developer/notices`
+- `POST /api/developer/notices`
+- `POST /api/developer/notices/:noticeId/status`
 
-这组接口用于“一个开发者管理多个项目”的场景。开发者只会看到和修改归属到自己账号名下的项目。
+这组接口用于“一个开发者管理多个项目”的场景。开发者只会看到和修改归属到自己账号名下的项目，以及这些项目下的策略、卡密批次、版本规则和公告。
 
 ## Windows C/C++ SDK
 

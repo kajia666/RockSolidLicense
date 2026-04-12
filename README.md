@@ -105,6 +105,10 @@ RSL_TCP_ENABLED=true
 RSL_TCP_HOST=0.0.0.0
 RSL_TCP_PORT=4000
 RSL_DB_PATH=./data/rocksolid.db
+RSL_STATE_STORE_DRIVER=sqlite
+RSL_POSTGRES_URL=
+RSL_REDIS_URL=
+RSL_REDIS_KEY_PREFIX=rsl
 RSL_LICENSE_PRIVATE_KEY_PATH=./data/license_private.pem
 RSL_LICENSE_PUBLIC_KEY_PATH=./data/license_public.pem
 RSL_TOKEN_ISSUER=RockSolidLicense
@@ -287,6 +291,7 @@ cl /EHsc /std:c++17 ^
 
 - Windows Server 可直接运行当前 Node.js 服务和 Windows SDK 配套体系
 - Linux 更适合作为长期生产主环境，仓库也已提供 Docker / Nginx / systemd 部署骨架
+- 当前已经把 nonce 防重放和在线会话计数抽成 runtime state store，后续接 Redis 时会更平滑
 - 真正上线前建议继续补齐 PostgreSQL、Redis、TLS、RBAC、限流、监控和备份策略
 
 ## 重点文档
@@ -299,6 +304,7 @@ cl /EHsc /std:c++17 ^
 - `docs/notice-center.md`
 - `docs/license-ops.md`
 - `docs/admin-operations.md`
+- `docs/production-storage.md`
 - `docs/linux-deployment.md`
 - `docs/windows-server-deployment.md`
 

@@ -6,6 +6,7 @@ import { loadConfig } from "./config.js";
 import { createDatabase } from "./database.js";
 import { AppError, getBearerToken, readJsonBody, requestMeta, sendHtml, sendJson, sendText } from "./http.js";
 import { loadOrCreateLicenseKeyStore } from "./license-keys.js";
+import { createRuntimeStateStore } from "./runtime-state.js";
 import { createServices } from "./services.js";
 import { createTcpServer } from "./tcp-server.js";
 
@@ -44,7 +45,8 @@ export function createApp(overrides = {}) {
   const config = loadConfig(overrides);
   config.licenseKeys = loadOrCreateLicenseKeyStore(config);
   const db = createDatabase(config);
-  const services = createServices(db, config);
+  const runtimeState = createRuntimeStateStore({ db, config });
+  const services = createServices(db, config, runtimeState);
   const tcpServer = createTcpServer({ services, config });
 
   const server = http.createServer(async (req, res) => {
@@ -1031,6 +1033,7 @@ export function createApp(overrides = {}) {
   return {
     config,
     db,
+    runtimeState,
     services,
     server,
     tcpServer,
@@ -1060,6 +1063,7 @@ export function createApp(overrides = {}) {
         }).catch(() => {});
       }
 
+      runtimeState.close();
       db.close();
     }
   };

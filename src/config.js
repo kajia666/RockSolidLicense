@@ -1,5 +1,21 @@
 import path from "node:path";
 
+function optionalString(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeStateStoreDriver(value) {
+  const normalized = String(value ?? "sqlite").trim().toLowerCase();
+  if (!["sqlite", "memory"].includes(normalized)) {
+    throw new Error("RSL_STATE_STORE_DRIVER must be sqlite or memory.");
+  }
+  return normalized;
+}
+
 export function loadConfig(overrides = {}) {
   const cwd = overrides.cwd ?? process.cwd();
   const dataDir = process.env.RSL_DATA_DIR ?? path.join(cwd, "data");
@@ -15,6 +31,13 @@ export function loadConfig(overrides = {}) {
       overrides.dbPath ??
       process.env.RSL_DB_PATH ??
       path.join(dataDir, "rocksolid.db"),
+    postgresUrl: optionalString(overrides.postgresUrl ?? process.env.RSL_POSTGRES_URL),
+    stateStoreDriver: normalizeStateStoreDriver(
+      overrides.stateStoreDriver ?? process.env.RSL_STATE_STORE_DRIVER ?? "sqlite"
+    ),
+    redisUrl: optionalString(overrides.redisUrl ?? process.env.RSL_REDIS_URL),
+    redisKeyPrefix:
+      optionalString(overrides.redisKeyPrefix ?? process.env.RSL_REDIS_KEY_PREFIX) ?? "rsl",
     licensePrivateKeyPath:
       overrides.licensePrivateKeyPath ??
       process.env.RSL_LICENSE_PRIVATE_KEY_PATH ??

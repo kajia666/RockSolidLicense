@@ -42,11 +42,35 @@ Current recommendation:
 
 - full C++ SDK: distribute `rocksolid_sdk_static.lib`
 - low-level C API only: optionally distribute `rocksolid_sdk.dll` + `rocksolid_sdk.lib`
+- full C++ static-lib consumers should define `RS_SDK_STATIC`
 
 Reason:
 
 - the C++ wrapper is easier and safer to consume as source/static lib
 - the C API is the most stable surface for DLL publishing on Windows
+
+Recommended packaging flow in this repository:
+
+```bat
+call sdk\package_release.bat
+```
+
+You can optionally pass a different output directory, for example:
+
+```bat
+call sdk\package_release.bat build\my-sdk-dist
+```
+
+This produces:
+
+- `build\win-sdk-package\rocksolid-sdk-cpp\`
+- `build\win-sdk-package\rocksolid-sdk-cpp.zip`
+- `build\win-sdk-package\rocksolid-sdk-capi\`
+- `build\win-sdk-package\rocksolid-sdk-capi.zip`
+
+Use the `cpp` package when the integrator wants the full `LicenseClientWin` feature set.
+
+Use the `capi` package when the integrator only needs the stable low-level C binary interface.
 
 ## High-level usage
 

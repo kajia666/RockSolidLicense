@@ -191,6 +191,26 @@ TCP：
 - 如果需要二进制替换能力，再额外提供 `DLL + import lib + 头文件`
 - 当前仓库里，完整 C++ SDK 更适合发 `rocksolid_sdk_static.lib`
 - `DLL` 形态当前更适合作为底层 C API 发布
+- 如果发完整 C++ 静态库，接入方工程里记得定义 `RS_SDK_STATIC`
+
+仓库已经内置一键打包脚本：
+
+```bat
+call sdk\package_release.bat
+```
+
+也可以显式指定输出目录，例如：
+
+```bat
+call sdk\package_release.bat build\my-sdk-dist
+```
+
+会输出：
+
+- `build/win-sdk-package/rocksolid-sdk-cpp/`
+- `build/win-sdk-package/rocksolid-sdk-cpp.zip`
+- `build/win-sdk-package/rocksolid-sdk-capi/`
+- `build/win-sdk-package/rocksolid-sdk-capi.zip`
 
 主要文件：
 
@@ -207,6 +227,7 @@ TCP：
 
 ```bat
 cl /EHsc /std:c++17 ^
+  /DRS_SDK_STATIC ^
   sdk\src\rocksolid_crypto_win.cpp ^
   sdk\src\rocksolid_transport_win.cpp ^
   sdk\examples\windows_client_demo.cpp ^

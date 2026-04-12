@@ -25,13 +25,22 @@ Why:
 - static lib avoids C++ ABI and CRT mismatch issues across different Visual Studio setups
 - DLL is still useful if you want easier binary replacement or a thinner C-only integration story
 
+For the full C++ static library package, define `RS_SDK_STATIC` in your consuming project.
+
 ## Compile the demo with MSVC
 
-From a "Developer Command Prompt for VS":
+Fastest option from PowerShell or `cmd`:
+
+```bat
+call sdk\build_demo.bat
+```
+
+From a "Developer Command Prompt for VS", the equivalent manual steps are:
 
 ```bat
 mkdir build\win-sdk-demo 2>nul
 cl /EHsc /std:c++17 ^
+  /DRS_SDK_STATIC ^
   sdk\src\rocksolid_crypto_win.cpp ^
   sdk\src\rocksolid_transport_win.cpp ^
   sdk\examples\windows_client_demo.cpp ^
@@ -46,7 +55,7 @@ This produces `build\win-sdk-demo\windows_client_demo.exe` and keeps intermediat
 
 ## Build the release libraries
 
-From a "Developer Command Prompt for VS":
+The batch scripts can now locate Visual Studio C++ tools automatically. You can run them from PowerShell, `cmd`, or a Developer Command Prompt.
 
 ### Full C++ static library
 
@@ -63,6 +72,8 @@ This package is intended for:
 - `rocksolid_sdk.h`
 - `rocksolid_client.hpp`
 - `rocksolid_transport_win.hpp`
+
+Consumers of this package should compile with `RS_SDK_STATIC`.
 
 ### C API DLL package
 
@@ -81,15 +92,41 @@ This package is intended for:
 
 The current DLL export surface is the C API only. The higher-level C++ wrapper is still best distributed as source or static lib.
 
+## Build the distributable release packages
+
+```bat
+call sdk\package_release.bat
+```
+
+You can also pass a custom output directory:
+
+```bat
+call sdk\package_release.bat build\my-sdk-dist
+```
+
+Outputs:
+
+- `build\win-sdk-package\rocksolid-sdk-cpp\`
+- `build\win-sdk-package\rocksolid-sdk-capi\`
+- `build\win-sdk-package\rocksolid-sdk-cpp.zip`
+- `build\win-sdk-package\rocksolid-sdk-capi.zip`
+
+The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, and C++ demo source.
+
+The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, import library, docs, and a C demo source.
+
 ## Files to embed in your own project
 
 - `sdk/include/rocksolid_sdk.h`
 - `sdk/include/rocksolid_client.hpp`
 - `sdk/include/rocksolid_transport_win.hpp`
+- `sdk/include/rocksolid_json.hpp`
 - `sdk/src/rocksolid_crypto_win.cpp`
 - `sdk/src/rocksolid_transport_win.cpp`
+- `sdk/build_demo.bat`
 - `sdk/build_static_lib.bat`
 - `sdk/build_c_api_dll.bat`
+- `sdk/package_release.bat`
 
 ## Suggested integration pattern
 

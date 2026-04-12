@@ -127,6 +127,12 @@ int main() {
     std::cout << "[Token validation local] kid=" << validation.key_id
               << " valid=" << (validation.valid ? "true" : "false") << std::endl;
     std::cout << validation.payload_json << std::endl;
+  } catch (const rocksolid::ApiException& error) {
+    std::cerr << "RockSolid API failed: code=" << error.code()
+              << " status=" << error.status()
+              << " transportStatus=" << error.transport_status()
+              << " message=" << error.what() << std::endl;
+    return 1;
   } catch (const std::exception& error) {
     std::cerr << "RockSolid demo failed: " << error.what() << std::endl;
     return 1;

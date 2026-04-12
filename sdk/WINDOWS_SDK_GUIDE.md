@@ -17,6 +17,7 @@ This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 - Point-quota awareness: parsed recharge/login responses expose remaining points
 - Startup bootstrap helpers: version-check and active notice polling
 - Local startup decision and offline token verification helpers
+- Structured API exceptions with `code/status/details`
 
 ## Main headers
 
@@ -78,6 +79,8 @@ const rocksolid::TokenValidationResult validation =
     login.license_token,
     startup.token_keys
   );
+
+// When the server returns ok=false, parsed helpers throw rocksolid::ApiException.
 ```
 
 Direct card login usage:
@@ -155,6 +158,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `ClientVersionManifestResponse` exposes `allowed/status/latest_version/minimum_allowed_version/latest_download_url`.
 - `ClientNoticesResponse` returns the currently active notice list with `block_login` and timing metadata.
 - `validate_license_token_with_key_set(...)` lets you validate `licenseToken` locally against keys fetched during startup, without an extra round trip.
+- `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.
 - `BindingsResponse.unbind_policy` tells you whether self-unbind is enabled and how many attempts remain in the current window.
 - `LoginRequest`, `CardLoginRequest`, and `HeartbeatRequest` can optionally carry `client_version/channel` for version enforcement, plus hardware/IP profile fields for configurable rebinding detection.

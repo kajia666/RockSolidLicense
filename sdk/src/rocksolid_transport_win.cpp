@@ -656,7 +656,7 @@ ApiEnvelope LicenseClientWin::parse_api_envelope(const TransportResult& result) 
 
 ApiError LicenseClientWin::parse_api_error(const JsonValue& error) {
   if (!error.is_object()) {
-    return ApiError{0, "INVALID_ERROR", "Malformed API error payload.", JsonValue()};
+    return ApiError{0, 0, "INVALID_ERROR", "Malformed API error payload.", JsonValue()};
   }
 
   ApiError parsed;
@@ -673,6 +673,21 @@ ApiError LicenseClientWin::parse_api_error(const JsonValue& error) {
     parsed.details = error.at("details");
   }
   return parsed;
+}
+
+void LicenseClientWin::throw_api_exception(const ApiEnvelope& envelope, const char* fallback_message) {
+  ApiError error = parse_api_error(envelope.error);
+  error.transport_status = envelope.transport_status;
+  if (error.status == 0) {
+    error.status = envelope.transport_status;
+  }
+  if (error.code.empty()) {
+    error.code = "API_REQUEST_FAILED";
+  }
+  if (error.message.empty()) {
+    error.message = fallback_message == nullptr ? "API request failed." : std::string(fallback_message);
+  }
+  throw ApiException(error);
 }
 
 std::string LicenseClientWin::require_json_string(const JsonValue& object, const char* key) {
@@ -721,8 +736,7 @@ TokenKeyInfo LicenseClientWin::parse_token_key_info(const JsonValue& object, con
 
 TokenKeySet LicenseClientWin::parse_token_key_set(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Token key request failed." : error.message);
+    throw_api_exception(envelope, "Token key request failed.");
   }
 
   if (!envelope.data.is_object()) {
@@ -771,8 +785,7 @@ TokenKeyInfo LicenseClientWin::select_active_token_key(const TokenKeySet& key_se
 
 RegisterResponse LicenseClientWin::parse_register_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Register request failed." : error.message);
+    throw_api_exception(envelope, "Register request failed.");
   }
 
   RegisterResponse response;
@@ -784,8 +797,7 @@ RegisterResponse LicenseClientWin::parse_register_response(const ApiEnvelope& en
 
 RechargeResponse LicenseClientWin::parse_recharge_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Recharge request failed." : error.message);
+    throw_api_exception(envelope, "Recharge request failed.");
   }
 
   RechargeResponse response;
@@ -812,8 +824,7 @@ RechargeResponse LicenseClientWin::parse_recharge_response(const ApiEnvelope& en
 
 BindingsResponse LicenseClientWin::parse_bindings_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Bindings request failed." : error.message);
+    throw_api_exception(envelope, "Bindings request failed.");
   }
   if (!envelope.data.is_object()) {
     throw std::runtime_error("Bindings response data must be an object.");
@@ -843,8 +854,7 @@ BindingsResponse LicenseClientWin::parse_bindings_response(const ApiEnvelope& en
 
 UnbindResponse LicenseClientWin::parse_unbind_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Unbind request failed." : error.message);
+    throw_api_exception(envelope, "Unbind request failed.");
   }
   if (!envelope.data.is_object()) {
     throw std::runtime_error("Unbind response data must be an object.");
@@ -874,8 +884,7 @@ UnbindResponse LicenseClientWin::parse_unbind_response(const ApiEnvelope& envelo
 
 ClientVersionManifestResponse LicenseClientWin::parse_version_check_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Version-check request failed." : error.message);
+    throw_api_exception(envelope, "Version-check request failed.");
   }
   if (!envelope.data.is_object()) {
     throw std::runtime_error("Version-check response data must be an object.");
@@ -916,8 +925,7 @@ ClientVersionManifestResponse LicenseClientWin::parse_version_check_response(con
 
 ClientNoticesResponse LicenseClientWin::parse_notices_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Client notices request failed." : error.message);
+    throw_api_exception(envelope, "Client notices request failed.");
   }
   if (!envelope.data.is_object()) {
     throw std::runtime_error("Client notices response data must be an object.");
@@ -940,8 +948,7 @@ ClientNoticesResponse LicenseClientWin::parse_notices_response(const ApiEnvelope
 
 LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Login request failed." : error.message);
+    throw_api_exception(envelope, "Login request failed.");
   }
 
   LoginResponse response;
@@ -987,8 +994,7 @@ LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope
 
 HeartbeatResponse LicenseClientWin::parse_heartbeat_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Heartbeat request failed." : error.message);
+    throw_api_exception(envelope, "Heartbeat request failed.");
   }
 
   HeartbeatResponse response;
@@ -1001,8 +1007,7 @@ HeartbeatResponse LicenseClientWin::parse_heartbeat_response(const ApiEnvelope& 
 
 LogoutResponse LicenseClientWin::parse_logout_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
-    const ApiError error = parse_api_error(envelope.error);
-    throw std::runtime_error(error.message.empty() ? "Logout request failed." : error.message);
+    throw_api_exception(envelope, "Logout request failed.");
   }
 
   LogoutResponse response;

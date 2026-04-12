@@ -39,10 +39,26 @@ struct TransportResult {
 };
 
 struct ApiError {
+  long transport_status = 0;
   long status = 0;
   std::string code;
   std::string message;
   JsonValue details;
+};
+
+class ApiException : public std::runtime_error {
+ public:
+  explicit ApiException(ApiError error)
+      : std::runtime_error(error.message.empty() ? "API request failed." : error.message), error_(error) {}
+
+  const ApiError& api_error() const { return error_; }
+  long status() const { return error_.status; }
+  long transport_status() const { return error_.transport_status; }
+  const std::string& code() const { return error_.code; }
+  const JsonValue& details() const { return error_.details; }
+
+ private:
+  ApiError error_;
 };
 
 struct ApiEnvelope {
@@ -505,6 +521,7 @@ class LicenseClientWin {
   static int require_json_int(const JsonValue& object, const char* key);
   static const JsonValue& require_json_object(const JsonValue& object, const char* key);
   static ApiError parse_api_error(const JsonValue& error);
+  static void throw_api_exception(const ApiEnvelope& envelope, const char* fallback_message);
   static TokenKeyInfo parse_token_key_info(const JsonValue& object, const std::string& issuer);
   static TokenKeySet parse_token_key_set(const ApiEnvelope& envelope);
   static TokenKeyInfo select_active_token_key(const TokenKeySet& key_set);

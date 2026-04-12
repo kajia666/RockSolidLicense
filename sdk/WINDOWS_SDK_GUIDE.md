@@ -18,6 +18,7 @@ This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 - Startup bootstrap helpers: version-check and active notice polling
 - Local startup decision and offline token verification helpers
 - Structured API exceptions with `code/status/details`
+- Startup bootstrap cache serialization and file helpers
 
 ## Main headers
 
@@ -71,13 +72,23 @@ const rocksolid::ClientStartupBootstrapResponse startup =
 const rocksolid::ClientStartupDecision decision =
   rocksolid::LicenseClientWin::evaluate_startup_decision(startup);
 
+const rocksolid::ClientStartupBootstrapCache cache{
+  1,
+  rocksolid::iso8601_now_utc(),
+  startup
+};
+rocksolid::LicenseClientWin::write_startup_bootstrap_cache_file(
+  "startup_cache.json",
+  cache
+);
+
 const rocksolid::LoginResponse login = client.login_tcp_parsed(request);
 const std::string binding_id = login.binding.id;
 const bool metered = login.quota.metered;
 const rocksolid::TokenValidationResult validation =
-  rocksolid::LicenseClientWin::validate_license_token_with_key_set(
+  rocksolid::LicenseClientWin::validate_license_token_with_bootstrap(
     login.license_token,
-    startup.token_keys
+    cache.bootstrap
   );
 
 // When the server returns ok=false, parsed helpers throw rocksolid::ApiException.
@@ -155,9 +166,11 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `ClientVersionCheckRequest` and `ClientNoticesRequest` let the SDK drive the same startup flow documented on the server side.
 - `ClientStartupBootstrapRequest` and `startup_bootstrap_http(...)` bundle version-check, active notices, and token-key fetch into one startup helper.
 - `ClientStartupDecision` and `evaluate_startup_decision(...)` turn startup payloads into a simple allow/block/update decision for your login UI.
+- `ClientStartupBootstrapCache` plus `serialize_* / parse_* / read_* / write_*` helpers let you persist startup payloads locally for offline startup and short outage recovery.
 - `ClientVersionManifestResponse` exposes `allowed/status/latest_version/minimum_allowed_version/latest_download_url`.
 - `ClientNoticesResponse` returns the currently active notice list with `block_login` and timing metadata.
 - `validate_license_token_with_key_set(...)` lets you validate `licenseToken` locally against keys fetched during startup, without an extra round trip.
+- `validate_license_token_with_bootstrap(...)` reuses the cached bootstrap payload directly, so the caller does not need to manage key selection.
 - `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.
 - `BindingsResponse.unbind_policy` tells you whether self-unbind is enabled and how many attempts remain in the current window.

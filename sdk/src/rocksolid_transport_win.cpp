@@ -8,6 +8,7 @@
 
 #include "../include/rocksolid_transport_win.hpp"
 
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <type_traits>
@@ -427,6 +428,268 @@ ClientVersionSummary parse_client_version_summary(const JsonValue& object) {
   return version;
 }
 
+TokenKeyInfo parse_token_key_info_payload(const JsonValue& object, const std::string& issuer) {
+  if (!object.is_object()) {
+    throw std::runtime_error("Token key payload must be an object.");
+  }
+
+  TokenKeyInfo info;
+  info.key_id = require_object_string(object, "keyId");
+  info.algorithm = require_object_string(object, "algorithm");
+  info.issuer = issuer.empty() ? optional_object_string(object, "issuer") : issuer;
+  info.public_key_fingerprint = require_object_string(object, "publicKeyFingerprint");
+  info.public_key_pem = require_object_string(object, "publicKeyPem");
+  info.status = optional_object_string(object, "status", "active");
+  info.created_at = optional_object_string(object, "createdAt");
+  return info;
+}
+
+TokenKeySet parse_token_key_set_object(const JsonValue& object) {
+  if (!object.is_object()) {
+    throw std::runtime_error("Token key data must be an object.");
+  }
+
+  TokenKeySet key_set;
+  key_set.algorithm = require_object_string(object, "algorithm");
+  key_set.issuer = require_object_string(object, "issuer");
+  key_set.active_key_id = object.has("activeKeyId") && object.at("activeKeyId").is_string()
+    ? object.at("activeKeyId").as_string()
+    : object.has("keyId") && object.at("keyId").is_string()
+      ? object.at("keyId").as_string()
+      : "";
+
+  if (object.has("keys")) {
+    const JsonValue& keys = object.at("keys");
+    if (!keys.is_array()) {
+      throw std::runtime_error("Token key set 'keys' must be an array.");
+    }
+    for (const JsonValue& item : keys.as_array()) {
+      key_set.keys.push_back(parse_token_key_info_payload(item, key_set.issuer));
+    }
+  } else {
+    key_set.keys.push_back(parse_token_key_info_payload(object, key_set.issuer));
+  }
+
+  return key_set;
+}
+
+ClientVersionManifestResponse parse_client_version_manifest_object(const JsonValue& object) {
+  if (!object.is_object()) {
+    throw std::runtime_error("Version-check response data must be an object.");
+  }
+
+  ClientVersionManifestResponse response;
+  response.product_code = require_object_string(object, "productCode");
+  response.channel = require_object_string(object, "channel");
+  response.client_version = optional_object_string(object, "clientVersion");
+  response.allowed = optional_object_bool(object, "allowed", false);
+  response.status = require_object_string(object, "status");
+  response.message = require_object_string(object, "message");
+  response.latest_version = optional_object_string(object, "latestVersion");
+  response.minimum_allowed_version = optional_object_string(object, "minimumAllowedVersion");
+  response.latest_download_url = optional_object_string(object, "latestDownloadUrl");
+
+  if (const JsonValue* notice = optional_object_value(object, "notice")) {
+    if (!notice->is_object()) {
+      throw std::runtime_error("Version-check notice payload must be an object.");
+    }
+    response.notice = parse_client_version_notice_info(*notice);
+  }
+
+  if (const JsonValue* versions = optional_object_value(object, "versions")) {
+    if (!versions->is_array()) {
+      throw std::runtime_error("Version-check versions payload must be an array.");
+    }
+    for (const JsonValue& item : versions->as_array()) {
+      if (!item.is_object()) {
+        throw std::runtime_error("Version-check versions items must be objects.");
+      }
+      response.versions.push_back(parse_client_version_summary(item));
+    }
+  }
+
+  return response;
+}
+
+ClientNoticesResponse parse_client_notices_object(const JsonValue& object) {
+  if (!object.is_object()) {
+    throw std::runtime_error("Client notices response data must be an object.");
+  }
+
+  ClientNoticesResponse response;
+  response.product_code = require_object_string(object, "productCode");
+  response.channel = require_object_string(object, "channel");
+
+  const JsonValue& notices = require_object_field(object, "notices", JsonType::array);
+  for (const JsonValue& item : notices.as_array()) {
+    if (!item.is_object()) {
+      throw std::runtime_error("Client notices items must be objects.");
+    }
+    response.notices.push_back(parse_notice_info(item));
+  }
+
+  return response;
+}
+
+std::string json_string_literal(const std::string& value) {
+  return "\"" + escape_json(value) + "\"";
+}
+
+std::string json_string_or_null(const std::string& value) {
+  return value.empty() ? "null" : json_string_literal(value);
+}
+
+std::string json_bool_literal(bool value) {
+  return value ? "true" : "false";
+}
+
+std::string json_int_literal(int value) {
+  return std::to_string(value);
+}
+
+std::string serialize_notice_info_json(const NoticeInfo& notice) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"id\":" << json_string_literal(notice.id) << ","
+    << "\"productCode\":" << json_string_or_null(notice.product_code) << ","
+    << "\"productName\":" << json_string_or_null(notice.product_name) << ","
+    << "\"channel\":" << json_string_literal(notice.channel) << ","
+    << "\"kind\":" << json_string_literal(notice.kind) << ","
+    << "\"severity\":" << json_string_literal(notice.severity) << ","
+    << "\"title\":" << json_string_literal(notice.title) << ","
+    << "\"body\":" << json_string_literal(notice.body) << ","
+    << "\"actionUrl\":" << json_string_or_null(notice.action_url) << ","
+    << "\"status\":" << json_string_literal(notice.status) << ","
+    << "\"blockLogin\":" << json_bool_literal(notice.block_login) << ","
+    << "\"startsAt\":" << json_string_literal(notice.starts_at) << ","
+    << "\"endsAt\":" << json_string_or_null(notice.ends_at) << ","
+    << "\"createdAt\":" << json_string_literal(notice.created_at) << ","
+    << "\"updatedAt\":" << json_string_literal(notice.updated_at)
+    << "}";
+  return stream.str();
+}
+
+std::string serialize_token_key_info_json(const TokenKeyInfo& key) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"keyId\":" << json_string_literal(key.key_id) << ","
+    << "\"algorithm\":" << json_string_literal(key.algorithm) << ","
+    << "\"issuer\":" << json_string_or_null(key.issuer) << ","
+    << "\"publicKeyFingerprint\":" << json_string_literal(key.public_key_fingerprint) << ","
+    << "\"publicKeyPem\":" << json_string_literal(key.public_key_pem) << ","
+    << "\"status\":" << json_string_or_null(key.status) << ","
+    << "\"createdAt\":" << json_string_or_null(key.created_at)
+    << "}";
+  return stream.str();
+}
+
+std::string serialize_token_key_set_json(const TokenKeySet& key_set) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"algorithm\":" << json_string_literal(key_set.algorithm) << ","
+    << "\"issuer\":" << json_string_literal(key_set.issuer) << ","
+    << "\"activeKeyId\":" << json_string_or_null(key_set.active_key_id) << ","
+    << "\"keys\":[";
+  for (size_t index = 0; index < key_set.keys.size(); index += 1) {
+    if (index > 0) {
+      stream << ",";
+    }
+    stream << serialize_token_key_info_json(key_set.keys[index]);
+  }
+  stream << "]}";
+  return stream.str();
+}
+
+std::string serialize_client_version_notice_json(const ClientVersionNoticeInfo& notice) {
+  if (!notice.present) {
+    return "null";
+  }
+
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"version\":" << json_string_literal(notice.version) << ","
+    << "\"title\":" << json_string_or_null(notice.title) << ","
+    << "\"body\":" << json_string_or_null(notice.body) << ","
+    << "\"releaseNotes\":" << json_string_or_null(notice.release_notes)
+    << "}";
+  return stream.str();
+}
+
+std::string serialize_client_version_summary_json(const ClientVersionSummary& version) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"id\":" << json_string_literal(version.id) << ","
+    << "\"version\":" << json_string_literal(version.version) << ","
+    << "\"channel\":" << json_string_literal(version.channel) << ","
+    << "\"status\":" << json_string_literal(version.status) << ","
+    << "\"forceUpdate\":" << json_bool_literal(version.force_update) << ","
+    << "\"downloadUrl\":" << json_string_or_null(version.download_url) << ","
+    << "\"releasedAt\":" << json_string_or_null(version.released_at) << ","
+    << "\"noticeTitle\":" << json_string_or_null(version.notice_title)
+    << "}";
+  return stream.str();
+}
+
+std::string serialize_client_version_manifest_json(const ClientVersionManifestResponse& manifest) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"productCode\":" << json_string_literal(manifest.product_code) << ","
+    << "\"channel\":" << json_string_literal(manifest.channel) << ","
+    << "\"clientVersion\":" << json_string_or_null(manifest.client_version) << ","
+    << "\"allowed\":" << json_bool_literal(manifest.allowed) << ","
+    << "\"status\":" << json_string_literal(manifest.status) << ","
+    << "\"message\":" << json_string_literal(manifest.message) << ","
+    << "\"latestVersion\":" << json_string_or_null(manifest.latest_version) << ","
+    << "\"minimumAllowedVersion\":" << json_string_or_null(manifest.minimum_allowed_version) << ","
+    << "\"latestDownloadUrl\":" << json_string_or_null(manifest.latest_download_url) << ","
+    << "\"notice\":" << serialize_client_version_notice_json(manifest.notice) << ","
+    << "\"versions\":[";
+  for (size_t index = 0; index < manifest.versions.size(); index += 1) {
+    if (index > 0) {
+      stream << ",";
+    }
+    stream << serialize_client_version_summary_json(manifest.versions[index]);
+  }
+  stream << "]}";
+  return stream.str();
+}
+
+std::string serialize_client_notices_response_json(const ClientNoticesResponse& notices) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"productCode\":" << json_string_literal(notices.product_code) << ","
+    << "\"channel\":" << json_string_literal(notices.channel) << ","
+    << "\"notices\":[";
+  for (size_t index = 0; index < notices.notices.size(); index += 1) {
+    if (index > 0) {
+      stream << ",";
+    }
+    stream << serialize_notice_info_json(notices.notices[index]);
+  }
+  stream << "]}";
+  return stream.str();
+}
+
+std::string serialize_client_startup_bootstrap_json(const ClientStartupBootstrapResponse& bootstrap) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"versionManifest\":" << serialize_client_version_manifest_json(bootstrap.version_manifest) << ","
+    << "\"notices\":" << serialize_client_notices_response_json(bootstrap.notices) << ","
+    << "\"activeTokenKey\":" << serialize_token_key_info_json(bootstrap.active_token_key) << ","
+    << "\"tokenKeys\":" << serialize_token_key_set_json(bootstrap.token_keys) << ","
+    << "\"hasTokenKeys\":" << json_bool_literal(bootstrap.has_token_keys)
+    << "}";
+  return stream.str();
+}
+
 TokenValidationResult prepare_token_validation_result(const std::string& token) {
   TokenValidationResult result;
   result.payload_json = decode_license_token_payload(token);
@@ -715,56 +978,14 @@ const JsonValue& LicenseClientWin::require_json_object(const JsonValue& object, 
 }
 
 TokenKeyInfo LicenseClientWin::parse_token_key_info(const JsonValue& object, const std::string& issuer) {
-  if (!object.is_object()) {
-    throw std::runtime_error("Token key payload must be an object.");
-  }
-
-  TokenKeyInfo info;
-  info.key_id = require_json_string(object, "keyId");
-  info.algorithm = require_json_string(object, "algorithm");
-  info.issuer = issuer;
-  info.public_key_fingerprint = require_json_string(object, "publicKeyFingerprint");
-  info.public_key_pem = require_json_string(object, "publicKeyPem");
-  info.status = object.has("status") && object.at("status").is_string()
-    ? object.at("status").as_string()
-    : "active";
-  info.created_at = object.has("createdAt") && object.at("createdAt").is_string()
-    ? object.at("createdAt").as_string()
-    : "";
-  return info;
+  return parse_token_key_info_payload(object, issuer);
 }
 
 TokenKeySet LicenseClientWin::parse_token_key_set(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
     throw_api_exception(envelope, "Token key request failed.");
   }
-
-  if (!envelope.data.is_object()) {
-    throw std::runtime_error("Token key data must be an object.");
-  }
-
-  TokenKeySet key_set;
-  key_set.algorithm = require_json_string(envelope.data, "algorithm");
-  key_set.issuer = require_json_string(envelope.data, "issuer");
-  key_set.active_key_id = envelope.data.has("activeKeyId") && envelope.data.at("activeKeyId").is_string()
-    ? envelope.data.at("activeKeyId").as_string()
-    : envelope.data.has("keyId") && envelope.data.at("keyId").is_string()
-      ? envelope.data.at("keyId").as_string()
-      : "";
-
-  if (envelope.data.has("keys")) {
-    const JsonValue& keys = envelope.data.at("keys");
-    if (!keys.is_array()) {
-      throw std::runtime_error("Token key set 'keys' must be an array.");
-    }
-    for (const JsonValue& item : keys.as_array()) {
-      key_set.keys.push_back(parse_token_key_info(item, key_set.issuer));
-    }
-  } else {
-    key_set.keys.push_back(parse_token_key_info(envelope.data, key_set.issuer));
-  }
-
-  return key_set;
+  return parse_token_key_set_object(envelope.data);
 }
 
 TokenKeyInfo LicenseClientWin::select_active_token_key(const TokenKeySet& key_set) {
@@ -886,64 +1107,14 @@ ClientVersionManifestResponse LicenseClientWin::parse_version_check_response(con
   if (!envelope.ok) {
     throw_api_exception(envelope, "Version-check request failed.");
   }
-  if (!envelope.data.is_object()) {
-    throw std::runtime_error("Version-check response data must be an object.");
-  }
-
-  ClientVersionManifestResponse response;
-  response.product_code = require_object_string(envelope.data, "productCode");
-  response.channel = require_object_string(envelope.data, "channel");
-  response.client_version = optional_object_string(envelope.data, "clientVersion");
-  response.allowed = optional_object_bool(envelope.data, "allowed", false);
-  response.status = require_object_string(envelope.data, "status");
-  response.message = require_object_string(envelope.data, "message");
-  response.latest_version = optional_object_string(envelope.data, "latestVersion");
-  response.minimum_allowed_version = optional_object_string(envelope.data, "minimumAllowedVersion");
-  response.latest_download_url = optional_object_string(envelope.data, "latestDownloadUrl");
-
-  if (const JsonValue* notice = optional_object_value(envelope.data, "notice")) {
-    if (!notice->is_object()) {
-      throw std::runtime_error("Version-check notice payload must be an object.");
-    }
-    response.notice = parse_client_version_notice_info(*notice);
-  }
-
-  if (const JsonValue* versions = optional_object_value(envelope.data, "versions")) {
-    if (!versions->is_array()) {
-      throw std::runtime_error("Version-check versions payload must be an array.");
-    }
-    for (const JsonValue& item : versions->as_array()) {
-      if (!item.is_object()) {
-        throw std::runtime_error("Version-check versions items must be objects.");
-      }
-      response.versions.push_back(parse_client_version_summary(item));
-    }
-  }
-
-  return response;
+  return parse_client_version_manifest_object(envelope.data);
 }
 
 ClientNoticesResponse LicenseClientWin::parse_notices_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
     throw_api_exception(envelope, "Client notices request failed.");
   }
-  if (!envelope.data.is_object()) {
-    throw std::runtime_error("Client notices response data must be an object.");
-  }
-
-  ClientNoticesResponse response;
-  response.product_code = require_object_string(envelope.data, "productCode");
-  response.channel = require_object_string(envelope.data, "channel");
-
-  const JsonValue& notices = require_object_field(envelope.data, "notices", JsonType::array);
-  for (const JsonValue& item : notices.as_array()) {
-    if (!item.is_object()) {
-      throw std::runtime_error("Client notices items must be objects.");
-    }
-    response.notices.push_back(parse_notice_info(item));
-  }
-
-  return response;
+  return parse_client_notices_object(envelope.data);
 }
 
 LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope) {
@@ -1240,6 +1411,16 @@ TokenValidationResult LicenseClientWin::validate_license_token_with_key(
   return result;
 }
 
+TokenValidationResult LicenseClientWin::validate_license_token_with_bootstrap(
+  const std::string& token,
+  const ClientStartupBootstrapResponse& bootstrap
+) {
+  if (bootstrap.has_token_keys && !bootstrap.token_keys.keys.empty()) {
+    return validate_license_token_with_key_set(token, bootstrap.token_keys);
+  }
+  return validate_license_token_with_key(token, bootstrap.active_token_key);
+}
+
 ClientStartupDecision LicenseClientWin::evaluate_startup_decision(
   const ClientStartupBootstrapResponse& bootstrap
 ) {
@@ -1306,6 +1487,113 @@ ClientStartupDecision LicenseClientWin::evaluate_startup_decision(
   decision.primary_title = "Ready";
   decision.primary_message = bootstrap.version_manifest.message;
   return decision;
+}
+
+std::string LicenseClientWin::serialize_startup_bootstrap(
+  const ClientStartupBootstrapResponse& bootstrap
+) {
+  return serialize_client_startup_bootstrap_json(bootstrap);
+}
+
+ClientStartupBootstrapResponse LicenseClientWin::parse_startup_bootstrap(
+  const std::string& json_text
+) {
+  const JsonValue root = JsonValue::parse(json_text);
+  if (!root.is_object()) {
+    throw std::runtime_error("Startup bootstrap cache root must be a JSON object.");
+  }
+
+  ClientStartupBootstrapResponse bootstrap;
+  bootstrap.version_manifest = parse_client_version_manifest_object(
+    require_object_field(root, "versionManifest", JsonType::object)
+  );
+  bootstrap.notices = parse_client_notices_object(
+    require_object_field(root, "notices", JsonType::object)
+  );
+  bootstrap.active_token_key = parse_token_key_info_payload(
+    require_object_field(root, "activeTokenKey", JsonType::object),
+    ""
+  );
+  if (const JsonValue* token_keys = optional_object_value(root, "tokenKeys")) {
+    bootstrap.token_keys = parse_token_key_set_object(*token_keys);
+  }
+  bootstrap.has_token_keys = optional_object_bool(root, "hasTokenKeys", false);
+  return bootstrap;
+}
+
+std::string LicenseClientWin::serialize_startup_bootstrap_cache(
+  const ClientStartupBootstrapCache& cache
+) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"schemaVersion\":" << json_int_literal(cache.schema_version) << ","
+    << "\"cachedAt\":" << json_string_or_null(cache.cached_at) << ","
+    << "\"bootstrap\":" << serialize_startup_bootstrap(cache.bootstrap)
+    << "}";
+  return stream.str();
+}
+
+ClientStartupBootstrapCache LicenseClientWin::parse_startup_bootstrap_cache(
+  const std::string& json_text
+) {
+  const JsonValue root = JsonValue::parse(json_text);
+  if (!root.is_object()) {
+    throw std::runtime_error("Startup bootstrap cache root must be a JSON object.");
+  }
+
+  ClientStartupBootstrapCache cache;
+  cache.schema_version = optional_object_int(root, "schemaVersion", 1);
+  cache.cached_at = optional_object_string(root, "cachedAt");
+  const JsonValue& bootstrap = require_object_field(root, "bootstrap", JsonType::object);
+  cache.bootstrap.version_manifest = parse_client_version_manifest_object(
+    require_object_field(bootstrap, "versionManifest", JsonType::object)
+  );
+  cache.bootstrap.notices = parse_client_notices_object(
+    require_object_field(bootstrap, "notices", JsonType::object)
+  );
+  cache.bootstrap.active_token_key = parse_token_key_info_payload(
+    require_object_field(bootstrap, "activeTokenKey", JsonType::object),
+    ""
+  );
+  if (const JsonValue* token_keys = optional_object_value(bootstrap, "tokenKeys")) {
+    cache.bootstrap.token_keys = parse_token_key_set_object(*token_keys);
+  }
+  cache.bootstrap.has_token_keys = optional_object_bool(bootstrap, "hasTokenKeys", false);
+  return cache;
+}
+
+void LicenseClientWin::write_startup_bootstrap_cache_file(
+  const std::string& path,
+  const ClientStartupBootstrapCache& cache
+) {
+  std::ofstream output(path, std::ios::binary | std::ios::trunc);
+  if (!output) {
+    throw std::runtime_error("Unable to open startup bootstrap cache file for writing.");
+  }
+
+  const std::string json_text = serialize_startup_bootstrap_cache(cache);
+  output.write(json_text.data(), static_cast<std::streamsize>(json_text.size()));
+  if (!output.good()) {
+    throw std::runtime_error("Unable to write startup bootstrap cache file.");
+  }
+}
+
+ClientStartupBootstrapCache LicenseClientWin::read_startup_bootstrap_cache_file(
+  const std::string& path
+) {
+  std::ifstream input(path, std::ios::binary);
+  if (!input) {
+    throw std::runtime_error("Unable to open startup bootstrap cache file for reading.");
+  }
+
+  std::ostringstream buffer;
+  buffer << input.rdbuf();
+  if (!input.good() && !input.eof()) {
+    throw std::runtime_error("Unable to read startup bootstrap cache file.");
+  }
+
+  return parse_startup_bootstrap_cache(buffer.str());
 }
 
 SignedRequest LicenseClientWin::make_signed_http_request(

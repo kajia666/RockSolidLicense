@@ -396,6 +396,12 @@ struct ClientStartupDecision {
   std::vector<NoticeInfo> announcements;
 };
 
+struct ClientStartupBootstrapCache {
+  int schema_version = 1;
+  std::string cached_at;
+  ClientStartupBootstrapResponse bootstrap;
+};
+
 struct TokenValidationResult {
   bool valid = false;
   std::string key_id;
@@ -484,8 +490,31 @@ class LicenseClientWin {
     const std::string& token,
     const TokenKeyInfo& key
   );
+  static TokenValidationResult validate_license_token_with_bootstrap(
+    const std::string& token,
+    const ClientStartupBootstrapResponse& bootstrap
+  );
   static ClientStartupDecision evaluate_startup_decision(
     const ClientStartupBootstrapResponse& bootstrap
+  );
+  static std::string serialize_startup_bootstrap(
+    const ClientStartupBootstrapResponse& bootstrap
+  );
+  static ClientStartupBootstrapResponse parse_startup_bootstrap(
+    const std::string& json_text
+  );
+  static std::string serialize_startup_bootstrap_cache(
+    const ClientStartupBootstrapCache& cache
+  );
+  static ClientStartupBootstrapCache parse_startup_bootstrap_cache(
+    const std::string& json_text
+  );
+  static void write_startup_bootstrap_cache_file(
+    const std::string& path,
+    const ClientStartupBootstrapCache& cache
+  );
+  static ClientStartupBootstrapCache read_startup_bootstrap_cache_file(
+    const std::string& path
   );
 
   SignedRequest make_signed_http_request(

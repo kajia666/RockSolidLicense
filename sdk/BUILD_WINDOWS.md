@@ -45,3 +45,4 @@ This produces `build\win-sdk-demo\windows_client_demo.exe` and keeps intermediat
 7. Use `evaluate_startup_decision(...)` to decide whether the local login UI should be blocked for maintenance or update requirements before hitting the login endpoint.
 8. Persist `sessionToken` for heartbeats, and for point-based policies also cache the latest `LoginResponse.quota` snapshot for your UI.
 9. Catch `rocksolid::ApiException` around parsed helper calls if your host application needs stable `error.code` branching.
+10. Persist `ClientStartupBootstrapCache` if you want offline startup decisions or local token verification during short network outages.

@@ -181,6 +181,7 @@ TCP：
 - 启动聚合助手 `startup_bootstrap_http(...)`
 - 本地启动决策 `evaluate_startup_decision(...)`
 - 基于已拉取公钥集的本地离线验签
+- 启动快照缓存，支持短时离线启动判断
 - 结构化 `ApiException`，便于按错误码控制客户端流程
 - `licenseToken` 解码与 RSA 公钥验签
 

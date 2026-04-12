@@ -48,6 +48,20 @@ int main() {
               << " message=" << startup_decision.primary_message
               << std::endl;
 
+    const rocksolid::ClientStartupBootstrapCache startup_cache{
+      1,
+      rocksolid::iso8601_now_utc(),
+      startup
+    };
+    rocksolid::LicenseClientWin::write_startup_bootstrap_cache_file(
+      "build/win-sdk-demo/startup_cache.json",
+      startup_cache
+    );
+    const rocksolid::ClientStartupBootstrapCache restored_cache =
+      rocksolid::LicenseClientWin::read_startup_bootstrap_cache_file(
+        "build/win-sdk-demo/startup_cache.json"
+      );
+
     rocksolid::RegisterRequest register_request{
       "MY_SOFTWARE",
       "alice",
@@ -120,9 +134,9 @@ int main() {
     }
 
     const rocksolid::TokenValidationResult validation =
-      rocksolid::LicenseClientWin::validate_license_token_with_key_set(
+      rocksolid::LicenseClientWin::validate_license_token_with_bootstrap(
         login_result.license_token,
-        startup.token_keys
+        restored_cache.bootstrap
       );
     std::cout << "[Token validation local] kid=" << validation.key_id
               << " valid=" << (validation.valid ? "true" : "false") << std::endl;

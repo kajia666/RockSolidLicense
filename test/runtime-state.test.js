@@ -46,11 +46,24 @@ async function postJson(baseUrl, requestPath, body, token = null) {
   return json.data;
 }
 
-async function getJson(baseUrl, requestPath) {
-  const response = await fetch(`${baseUrl}${requestPath}`);
+async function getJson(baseUrl, requestPath, token = null) {
+  const headers = token ? { authorization: `Bearer ${token}` } : {};
+  const response = await fetch(`${baseUrl}${requestPath}`, { headers });
   const json = await response.json();
   assert.equal(response.ok, true, JSON.stringify(json));
   return json.data;
+}
+
+async function waitFor(check, { timeoutMs = 2000, intervalMs = 25 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start <= timeoutMs) {
+    const result = await check();
+    if (result) {
+      return result;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error("Timed out while waiting for condition.");
 }
 
 async function signedClientRequest(baseUrl, requestPath, appId, secret, payload, { nonce, timestamp } = {}) {
@@ -200,6 +213,54 @@ async function startFakeRedisServer() {
             }
           }
           socket.write(`:${removed}\r\n`);
+        } else if (command === "ZADD") {
+          const [key, score, member] = args;
+          const existing = keyStore.get(key);
+          const zset = existing?.type === "zset" ? new Map(existing.value) : new Map();
+          const wasNew = !zset.has(member);
+          zset.set(member, Number(score));
+          keyStore.set(key, {
+            type: "zset",
+            value: zset,
+            expiresAt: existing?.expiresAt ?? null
+          });
+          socket.write(`:${wasNew ? 1 : 0}\r\n`);
+        } else if (command === "ZREM") {
+          const [key, member] = args;
+          const existing = keyStore.get(key);
+          if (!existing || existing.type !== "zset") {
+            socket.write(":0\r\n");
+          } else {
+            const removed = existing.value.delete(member) ? 1 : 0;
+            keyStore.set(key, existing);
+            socket.write(`:${removed}\r\n`);
+          }
+        } else if (command === "ZREMRANGEBYSCORE") {
+          const [key, minValue, maxValue] = args;
+          const existing = keyStore.get(key);
+          if (!existing || existing.type !== "zset") {
+            socket.write(":0\r\n");
+          } else {
+            const min = minValue === "-inf" ? Number.NEGATIVE_INFINITY : Number(minValue);
+            const max = maxValue === "+inf" ? Number.POSITIVE_INFINITY : Number(maxValue);
+            let removed = 0;
+            for (const [member, score] of existing.value.entries()) {
+              if (score >= min && score <= max) {
+                existing.value.delete(member);
+                removed += 1;
+              }
+            }
+            keyStore.set(key, existing);
+            socket.write(`:${removed}\r\n`);
+          }
+        } else if (command === "ZCARD") {
+          const [key] = args;
+          const existing = keyStore.get(key);
+          if (!existing || existing.type !== "zset") {
+            socket.write(":0\r\n");
+          } else {
+            socket.write(`:${existing.value.size}\r\n`);
+          }
         } else {
           socket.write(`-ERR unsupported command ${command}\r\n`);
         }
@@ -361,6 +422,102 @@ test("redis runtime state uses external nonce replay protection", async () => {
 
     assert.ok(
       fakeRedis.commandLog.some((entry) => entry[0] === "SET" && entry[1].includes(":nonce:")),
+      JSON.stringify(fakeRedis.commandLog)
+    );
+  } finally {
+    await app.close();
+    await fakeRedis.close();
+  }
+});
+
+test("redis runtime state tracks active sessions in the runtime index", async () => {
+  const fakeRedis = await startFakeRedisServer();
+  const { app, baseUrl } = await startServer({
+    stateStoreDriver: "redis",
+    redisUrl: fakeRedis.url,
+    redisKeyPrefix: "rocksolid:test:sessions"
+  });
+
+  try {
+    const adminLogin = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(baseUrl, "/api/admin/products", {
+      code: "RUNTIMESESS",
+      name: "Runtime Session Product"
+    }, adminLogin.token);
+
+    const policy = await postJson(baseUrl, "/api/admin/policies", {
+      productCode: product.code,
+      name: "Default Policy",
+      durationDays: 30,
+      bindMode: "strict"
+    }, adminLogin.token);
+
+    await postJson(baseUrl, "/api/admin/cards/batch", {
+      productCode: product.code,
+      policyId: policy.id,
+      prefix: "RTS",
+      count: 1
+    }, adminLogin.token);
+
+    const cards = await getJson(baseUrl, `/api/admin/cards?productCode=${product.code}`, adminLogin.token);
+    const cardKey = cards.items[0].cardKey;
+
+    await signedClientRequest(
+      baseUrl,
+      "/api/client/register",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "runtime_user",
+        password: "Pass123!abc",
+        deviceFingerprint: "runtime-device-001"
+      },
+      { nonce: "runtime-register-001", timestamp: new Date().toISOString() }
+    );
+
+    await signedClientRequest(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "runtime_user",
+        password: "Pass123!abc",
+        cardKey
+      },
+      { nonce: "runtime-recharge-001", timestamp: new Date().toISOString() }
+    );
+
+    const loginResult = await signedClientRequest(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "runtime_user",
+        password: "Pass123!abc",
+        deviceFingerprint: "runtime-device-001"
+      },
+      { nonce: "runtime-login-001", timestamp: new Date().toISOString() }
+    );
+    assert.equal(loginResult.status, 200, JSON.stringify(loginResult.json));
+
+    await waitFor(async () => {
+      const health = await getJson(baseUrl, "/api/health");
+      return health.storage.runtimeState.activeSessions === 1 ? health : null;
+    });
+
+    const dashboard = await getJson(baseUrl, "/api/admin/dashboard", adminLogin.token);
+    assert.equal(dashboard.summary.onlineSessions, 1);
+    assert.ok(
+      fakeRedis.commandLog.some((entry) => entry[0] === "ZADD" && entry[1].includes(":sessions:active")),
       JSON.stringify(fakeRedis.commandLog)
     );
   } finally {

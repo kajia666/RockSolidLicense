@@ -248,17 +248,17 @@ function createSqliteRuntimeStateStore(db, config) {
 
     expireSession() {},
 
-    countActiveSessions() {
+    async countActiveSessions() {
       return countSqliteActiveSessions(db);
     },
 
-    health() {
+    async health() {
       return {
         driver: "sqlite",
         nonceReplayStore: "sqlite_table",
         sessionPresenceStore: "database",
         persistence: "database",
-        activeSessions: this.countActiveSessions(),
+        activeSessions: await this.countActiveSessions(),
         redisUrlConfigured: Boolean(config.redisUrl),
         redisKeyPrefix: config.redisKeyPrefix,
         externalReady: false
@@ -342,7 +342,7 @@ function createMemoryRuntimeStateStore(db, config) {
       });
     },
 
-    countActiveSessions() {
+    async countActiveSessions() {
       pruneExpiredSessions();
       let count = 0;
       for (const session of sessions.values()) {
@@ -353,7 +353,7 @@ function createMemoryRuntimeStateStore(db, config) {
       return count;
     },
 
-    health() {
+    async health() {
       pruneExpiredNonces();
       pruneExpiredSessions();
       return {
@@ -361,7 +361,7 @@ function createMemoryRuntimeStateStore(db, config) {
         nonceReplayStore: "process_memory",
         sessionPresenceStore: "process_memory",
         persistence: "ephemeral",
-        activeSessions: this.countActiveSessions(),
+        activeSessions: await this.countActiveSessions(),
         trackedNonces: nonces.size,
         redisUrlConfigured: Boolean(config.redisUrl),
         redisKeyPrefix: config.redisKeyPrefix,
@@ -395,6 +395,10 @@ function createRedisRuntimeStateStore(db, config) {
 
   function sessionKey(sessionToken) {
     return `${config.redisKeyPrefix}:session:${sessionToken}`;
+  }
+
+  function activeSessionsKey() {
+    return `${config.redisKeyPrefix}:sessions:active`;
   }
 
   async function execute(commands, { background = false } = {}) {
@@ -461,7 +465,8 @@ function createRedisRuntimeStateStore(db, config) {
           "lastSeenIp", session.lastSeenIp ?? "",
           "userAgent", session.userAgent ?? ""
         ],
-        ["EXPIRE", sessionKey(session.sessionToken), ttlSeconds]
+        ["EXPIRE", sessionKey(session.sessionToken), ttlSeconds],
+        ["ZADD", activeSessionsKey(), expiresAtMs ?? Date.now(), session.sessionToken]
       ]);
     },
 
@@ -491,6 +496,7 @@ function createRedisRuntimeStateStore(db, config) {
           Math.ceil(((expiresAtMs ?? Date.now()) - Date.now()) / 1000)
         );
         commands.push(["EXPIRE", sessionKey(sessionToken), ttlSeconds]);
+        commands.push(["ZADD", activeSessionsKey(), expiresAtMs ?? Date.now(), sessionToken]);
       }
       dispatchSessionMirror(commands);
     },
@@ -498,21 +504,26 @@ function createRedisRuntimeStateStore(db, config) {
     expireSession(sessionToken, reason) {
       dispatchSessionMirror([
         ["HSET", sessionKey(sessionToken), "status", "expired", "revokedReason", reason],
-        ["EXPIRE", sessionKey(sessionToken), 60]
+        ["EXPIRE", sessionKey(sessionToken), 60],
+        ["ZREM", activeSessionsKey(), sessionToken]
       ]);
     },
 
-    countActiveSessions() {
-      return countSqliteActiveSessions(db);
+    async countActiveSessions() {
+      const [, activeCount] = await execute([
+        ["ZREMRANGEBYSCORE", activeSessionsKey(), "-inf", Date.now()],
+        ["ZCARD", activeSessionsKey()]
+      ], { background: false });
+      return Number(activeCount ?? 0);
     },
 
-    health() {
+    async health() {
       return {
         driver: "redis",
         nonceReplayStore: "redis",
         sessionPresenceStore: "redis_mirror",
         persistence: "external_runtime",
-        activeSessions: this.countActiveSessions(),
+        activeSessions: await this.countActiveSessions(),
         redisUrlConfigured: true,
         redisKeyPrefix: config.redisKeyPrefix,
         externalReady: state.externalReady,

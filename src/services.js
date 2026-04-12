@@ -3508,16 +3508,16 @@ export function createServices(db, config, runtimeState = null) {
     recordSession() {},
     touchSession() {},
     expireSession() {},
-    countActiveSessions() {
+    async countActiveSessions() {
       return Number(one(db, "SELECT COUNT(*) AS count FROM sessions WHERE status = 'active'")?.count ?? 0);
     },
-    health() {
+    async health() {
       return {
         driver: "sqlite",
         nonceReplayStore: "sqlite_table",
         sessionPresenceStore: "database",
         persistence: "database",
-        activeSessions: this.countActiveSessions(),
+        activeSessions: await this.countActiveSessions(),
         redisUrlConfigured: Boolean(config.redisUrl),
         redisKeyPrefix: config.redisKeyPrefix,
         externalReady: false
@@ -3527,7 +3527,7 @@ export function createServices(db, config, runtimeState = null) {
   };
 
   return {
-    health() {
+    async health() {
       expireStaleSessions(db, stateStore);
       return {
         status: "ok",
@@ -3539,7 +3539,7 @@ export function createServices(db, config, runtimeState = null) {
             location: config.dbPath,
             postgresUrlConfigured: Boolean(config.postgresUrl)
           },
-          runtimeState: stateStore.health()
+          runtimeState: await stateStore.health()
         }
       };
     },
@@ -5939,7 +5939,7 @@ export function createServices(db, config, runtimeState = null) {
       return lines.join("\r\n");
     },
 
-    dashboard(token) {
+    async dashboard(token) {
       requireAdminSession(db, token);
       expireStaleSessions(db, stateStore);
 
@@ -5993,7 +5993,7 @@ export function createServices(db, config, runtimeState = null) {
           db,
           "SELECT COUNT(*) AS count FROM reseller_inventory WHERE status = 'active'"
         ).count,
-        onlineSessions: stateStore.countActiveSessions()
+        onlineSessions: await stateStore.countActiveSessions()
       };
 
       const sessions = many(

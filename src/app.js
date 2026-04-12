@@ -89,7 +89,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/health") {
-        sendJson(res, 200, { ok: true, data: services.health() });
+        sendJson(res, 200, { ok: true, data: await services.health() });
         return;
       }
 
@@ -391,7 +391,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/dashboard") {
-        sendJson(res, 200, { ok: true, data: services.dashboard(getBearerToken(req)) });
+        sendJson(res, 200, { ok: true, data: await services.dashboard(getBearerToken(req)) });
         return;
       }
 

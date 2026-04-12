@@ -796,7 +796,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.registerClient(
+          data: await services.registerClient(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,
@@ -885,7 +885,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.checkClientVersion(
+          data: await services.checkClientVersion(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw
@@ -898,7 +898,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.clientNotices(
+          data: await services.clientNotices(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw
@@ -911,7 +911,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.clientBindings(
+          data: await services.clientBindings(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,
@@ -925,7 +925,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.redeemCard(
+          data: await services.redeemCard(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,
@@ -939,7 +939,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.clientUnbind(
+          data: await services.clientUnbind(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,
@@ -953,7 +953,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.cardLoginClient(
+          data: await services.cardLoginClient(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,
@@ -967,7 +967,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.loginClient(
+          data: await services.loginClient(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,
@@ -981,7 +981,7 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.heartbeatClient(
+          data: await services.heartbeatClient(
             { headers: req.headers, method: req.method, path: url.pathname },
             body,
             raw,
@@ -995,7 +995,11 @@ export function createApp(overrides = {}) {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.logoutClient({ headers: req.headers, method: req.method, path: url.pathname }, body, raw)
+          data: await services.logoutClient(
+            { headers: req.headers, method: req.method, path: url.pathname },
+            body,
+            raw
+          )
         });
         return;
       }

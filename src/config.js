@@ -10,8 +10,8 @@ function optionalString(value) {
 
 function normalizeStateStoreDriver(value) {
   const normalized = String(value ?? "sqlite").trim().toLowerCase();
-  if (!["sqlite", "memory"].includes(normalized)) {
-    throw new Error("RSL_STATE_STORE_DRIVER must be sqlite or memory.");
+  if (!["sqlite", "memory", "redis"].includes(normalized)) {
+    throw new Error("RSL_STATE_STORE_DRIVER must be sqlite, memory, or redis.");
   }
   return normalized;
 }

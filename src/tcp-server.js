@@ -102,25 +102,11 @@ function errorPayload(error) {
 export function createTcpServer({ services }) {
   return net.createServer((socket) => {
     let buffer = "";
+    let processing = Promise.resolve();
 
     socket.setEncoding("utf8");
 
-    socket.on("data", (chunk) => {
-      buffer += chunk;
-      if (buffer.length > 2 * 1024 * 1024) {
-        writeFrame(socket, {
-          id: null,
-          ok: false,
-          error: {
-            status: 413,
-            code: "TCP_FRAME_TOO_LARGE",
-            message: "TCP frame buffer exceeded 2 MB."
-          }
-        });
-        socket.destroy();
-        return;
-      }
-
+    async function processBuffer() {
       let newlineIndex = buffer.indexOf("\n");
       while (newlineIndex >= 0) {
         const line = buffer.slice(0, newlineIndex).trim();
@@ -136,12 +122,13 @@ export function createTcpServer({ services }) {
           frame = parseEnvelope(line);
 
           if (frame.action === "system.ping") {
+            const health = await services.health();
             writeFrame(socket, {
               id: frame.id ?? null,
               ok: true,
               data: {
                 status: "ok",
-                time: services.health().time
+                time: health.time
               }
             });
             continue;
@@ -159,7 +146,7 @@ export function createTcpServer({ services }) {
           };
           const rawBody = frame.bodyText;
           const body = parseBodyText(rawBody);
-          const result = action.execute(services, reqLike, body, rawBody, socketMeta(socket));
+          const result = await action.execute(services, reqLike, body, rawBody, socketMeta(socket));
 
           writeFrame(socket, {
             id: frame.id ?? null,
@@ -178,6 +165,29 @@ export function createTcpServer({ services }) {
           });
         }
       }
+    }
+
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      if (buffer.length > 2 * 1024 * 1024) {
+        writeFrame(socket, {
+          id: null,
+          ok: false,
+          error: {
+            status: 413,
+            code: "TCP_FRAME_TOO_LARGE",
+            message: "TCP frame buffer exceeded 2 MB."
+          }
+        });
+        socket.destroy();
+        return;
+      }
+
+      processing = processing
+        .then(() => processBuffer())
+        .catch((error) => {
+          console.error("TCP processing error", error);
+        });
     });
 
     socket.on("error", (error) => {

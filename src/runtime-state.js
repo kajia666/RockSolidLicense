@@ -1,3 +1,5 @@
+import net from "node:net";
+
 function isoNow() {
   return new Date().toISOString();
 }
@@ -9,10 +11,197 @@ function parseIso(value) {
 
 function normalizeStateStoreDriver(value) {
   const normalized = String(value ?? "sqlite").trim().toLowerCase();
-  if (!["sqlite", "memory"].includes(normalized)) {
-    throw new Error("RSL_STATE_STORE_DRIVER must be sqlite or memory.");
+  if (!["sqlite", "memory", "redis"].includes(normalized)) {
+    throw new Error("RSL_STATE_STORE_DRIVER must be sqlite, memory, or redis.");
   }
   return normalized;
+}
+
+function countSqliteActiveSessions(db) {
+  const row = db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE status = 'active'").get();
+  return Number(row?.count ?? 0);
+}
+
+function parseRedisUrl(redisUrl) {
+  const parsed = new URL(redisUrl);
+  if (!["redis:", "rediss:"].includes(parsed.protocol)) {
+    throw new Error("RSL_REDIS_URL must use redis:// or rediss://.");
+  }
+  if (parsed.protocol === "rediss:") {
+    throw new Error("rediss:// is not supported yet. Use redis:// behind a trusted private network.");
+  }
+
+  return {
+    host: parsed.hostname || "127.0.0.1",
+    port: Number(parsed.port || 6379),
+    password: parsed.password ? decodeURIComponent(parsed.password) : null,
+    database: parsed.pathname && parsed.pathname !== "/"
+      ? Number(parsed.pathname.slice(1))
+      : 0
+  };
+}
+
+function encodeRedisCommand(parts) {
+  const segments = [`*${parts.length}\r\n`];
+  for (const part of parts) {
+    const value = String(part);
+    segments.push(`$${Buffer.byteLength(value, "utf8")}\r\n${value}\r\n`);
+  }
+  return segments.join("");
+}
+
+function parseRedisResponse(buffer, offset = 0) {
+  if (offset >= buffer.length) {
+    return null;
+  }
+
+  const prefix = String.fromCharCode(buffer[offset]);
+  if (prefix === "+" || prefix === "-" || prefix === ":") {
+    const end = buffer.indexOf("\r\n", offset);
+    if (end < 0) {
+      return null;
+    }
+    const raw = buffer.toString("utf8", offset + 1, end);
+    return {
+      value:
+        prefix === "+" ? raw :
+        prefix === "-" ? { error: raw } :
+        Number(raw),
+      nextOffset: end + 2
+    };
+  }
+
+  if (prefix === "$") {
+    const end = buffer.indexOf("\r\n", offset);
+    if (end < 0) {
+      return null;
+    }
+    const length = Number(buffer.toString("utf8", offset + 1, end));
+    if (length === -1) {
+      return {
+        value: null,
+        nextOffset: end + 2
+      };
+    }
+    const bodyStart = end + 2;
+    const bodyEnd = bodyStart + length;
+    if (buffer.length < bodyEnd + 2) {
+      return null;
+    }
+    return {
+      value: buffer.toString("utf8", bodyStart, bodyEnd),
+      nextOffset: bodyEnd + 2
+    };
+  }
+
+  if (prefix === "*") {
+    const end = buffer.indexOf("\r\n", offset);
+    if (end < 0) {
+      return null;
+    }
+    const count = Number(buffer.toString("utf8", offset + 1, end));
+    if (count === -1) {
+      return {
+        value: null,
+        nextOffset: end + 2
+      };
+    }
+
+    const values = [];
+    let nextOffset = end + 2;
+    for (let index = 0; index < count; index += 1) {
+      const result = parseRedisResponse(buffer, nextOffset);
+      if (!result) {
+        return null;
+      }
+      values.push(result.value);
+      nextOffset = result.nextOffset;
+    }
+    return {
+      value: values,
+      nextOffset
+    };
+  }
+
+  throw new Error(`Unsupported Redis RESP prefix: ${prefix}`);
+}
+
+function runRedisCommands(connection, commands) {
+  const preparedCommands = [];
+  if (connection.password) {
+    preparedCommands.push(["AUTH", connection.password]);
+  }
+  if (connection.database > 0) {
+    preparedCommands.push(["SELECT", connection.database]);
+  }
+  preparedCommands.push(...commands);
+
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection({
+      host: connection.host,
+      port: connection.port
+    });
+    const expectedResponses = preparedCommands.length;
+    const responses = [];
+    let buffer = Buffer.alloc(0);
+    let settled = false;
+
+    function finishWithError(error) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      socket.destroy();
+      reject(error);
+    }
+
+    function finishWithSuccess(value) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      socket.end();
+      resolve(value);
+    }
+
+    socket.setNoDelay(true);
+
+    socket.on("connect", () => {
+      const payload = preparedCommands.map((command) => encodeRedisCommand(command)).join("");
+      socket.write(payload);
+    });
+
+    socket.on("data", (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (responses.length < expectedResponses) {
+        const parsed = parseRedisResponse(buffer, 0);
+        if (!parsed) {
+          break;
+        }
+        buffer = buffer.subarray(parsed.nextOffset);
+        if (parsed.value && typeof parsed.value === "object" && "error" in parsed.value) {
+          finishWithError(new Error(`Redis error: ${parsed.value.error}`));
+          return;
+        }
+        responses.push(parsed.value);
+      }
+
+      if (responses.length >= expectedResponses) {
+        const offset = expectedResponses - commands.length;
+        finishWithSuccess(responses.slice(offset));
+      }
+    });
+
+    socket.on("error", (error) => {
+      finishWithError(error);
+    });
+
+    socket.on("end", () => {
+      if (!settled && responses.length < expectedResponses) {
+        finishWithError(new Error("Redis connection closed before all responses were received."));
+      }
+    });
+  });
 }
 
 export class NonceReplayError extends Error {
@@ -27,7 +216,10 @@ export class NonceReplayError extends Error {
 export function createRuntimeStateStore({ db, config }) {
   const driver = normalizeStateStoreDriver(config.stateStoreDriver);
   if (driver === "memory") {
-    return createMemoryRuntimeStateStore(config);
+    return createMemoryRuntimeStateStore(db, config);
+  }
+  if (driver === "redis") {
+    return createRedisRuntimeStateStore(db, config);
   }
   return createSqliteRuntimeStateStore(db, config);
 }
@@ -57,8 +249,7 @@ function createSqliteRuntimeStateStore(db, config) {
     expireSession() {},
 
     countActiveSessions() {
-      const row = db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE status = 'active'").get();
-      return Number(row?.count ?? 0);
+      return countSqliteActiveSessions(db);
     },
 
     health() {
@@ -78,7 +269,7 @@ function createSqliteRuntimeStateStore(db, config) {
   };
 }
 
-function createMemoryRuntimeStateStore(config) {
+function createMemoryRuntimeStateStore(db, config) {
   const nonces = new Map();
   const sessions = new Map();
 
@@ -181,6 +372,157 @@ function createMemoryRuntimeStateStore(config) {
     close() {
       nonces.clear();
       sessions.clear();
+    }
+  };
+}
+
+function createRedisRuntimeStateStore(db, config) {
+  if (!config.redisUrl) {
+    throw new Error("RSL_REDIS_URL is required when RSL_STATE_STORE_DRIVER=redis.");
+  }
+
+  const connection = parseRedisUrl(config.redisUrl);
+  const state = {
+    externalReady: false,
+    lastError: null,
+    lastSyncAt: null,
+    closed: false
+  };
+
+  function nonceKey(appId, nonce) {
+    return `${config.redisKeyPrefix}:nonce:${appId}:${nonce}`;
+  }
+
+  function sessionKey(sessionToken) {
+    return `${config.redisKeyPrefix}:session:${sessionToken}`;
+  }
+
+  async function execute(commands, { background = false } = {}) {
+    if (state.closed) {
+      return [];
+    }
+
+    try {
+      const result = await runRedisCommands(connection, commands);
+      state.externalReady = true;
+      state.lastError = null;
+      state.lastSyncAt = isoNow();
+      return result;
+    } catch (error) {
+      state.externalReady = false;
+      state.lastError = error.message;
+      if (!background) {
+        throw error;
+      }
+      return [];
+    }
+  }
+
+  function dispatchSessionMirror(commands) {
+    void execute(commands, { background: true });
+  }
+
+  void execute([["PING"]], { background: true });
+
+  return {
+    driver: "redis",
+
+    async registerNonceOrThrow(appId, nonce, expiresAt) {
+      const expiresAtMs = parseIso(expiresAt);
+      const ttlMs = Math.max(1000, (expiresAtMs ?? Date.now()) - Date.now());
+      const [reply] = await execute([
+        ["SET", nonceKey(appId, nonce), "1", "NX", "PX", ttlMs]
+      ]);
+
+      if (reply !== "OK") {
+        throw new NonceReplayError(appId, nonce);
+      }
+    },
+
+    recordSession(session) {
+      const expiresAtMs = parseIso(session.expiresAt);
+      const ttlSeconds = Math.max(
+        1,
+        Math.ceil(((expiresAtMs ?? Date.now()) - Date.now()) / 1000)
+      );
+      dispatchSessionMirror([
+        [
+          "HSET",
+          sessionKey(session.sessionToken),
+          "sessionId", session.sessionId,
+          "productId", session.productId,
+          "accountId", session.accountId,
+          "entitlementId", session.entitlementId,
+          "deviceId", session.deviceId,
+          "status", session.status ?? "active",
+          "issuedAt", session.issuedAt,
+          "expiresAt", session.expiresAt,
+          "lastHeartbeatAt", session.lastHeartbeatAt,
+          "lastSeenIp", session.lastSeenIp ?? "",
+          "userAgent", session.userAgent ?? ""
+        ],
+        ["EXPIRE", sessionKey(session.sessionToken), ttlSeconds]
+      ]);
+    },
+
+    touchSession(sessionToken, patch = {}) {
+      const updates = [];
+      if (patch.expiresAt) {
+        updates.push("expiresAt", patch.expiresAt);
+      }
+      if (patch.lastHeartbeatAt) {
+        updates.push("lastHeartbeatAt", patch.lastHeartbeatAt);
+      }
+      if (patch.lastSeenIp) {
+        updates.push("lastSeenIp", patch.lastSeenIp);
+      }
+      if (patch.userAgent) {
+        updates.push("userAgent", patch.userAgent);
+      }
+      if (!updates.length) {
+        return;
+      }
+
+      const commands = [["HSET", sessionKey(sessionToken), ...updates]];
+      if (patch.expiresAt) {
+        const expiresAtMs = parseIso(patch.expiresAt);
+        const ttlSeconds = Math.max(
+          1,
+          Math.ceil(((expiresAtMs ?? Date.now()) - Date.now()) / 1000)
+        );
+        commands.push(["EXPIRE", sessionKey(sessionToken), ttlSeconds]);
+      }
+      dispatchSessionMirror(commands);
+    },
+
+    expireSession(sessionToken, reason) {
+      dispatchSessionMirror([
+        ["HSET", sessionKey(sessionToken), "status", "expired", "revokedReason", reason],
+        ["EXPIRE", sessionKey(sessionToken), 60]
+      ]);
+    },
+
+    countActiveSessions() {
+      return countSqliteActiveSessions(db);
+    },
+
+    health() {
+      return {
+        driver: "redis",
+        nonceReplayStore: "redis",
+        sessionPresenceStore: "redis_mirror",
+        persistence: "external_runtime",
+        activeSessions: this.countActiveSessions(),
+        redisUrlConfigured: true,
+        redisKeyPrefix: config.redisKeyPrefix,
+        externalReady: state.externalReady,
+        lastSyncAt: state.lastSyncAt,
+        lastError: state.lastError
+      };
+    },
+
+    close() {
+      state.closed = true;
     }
   };
 }

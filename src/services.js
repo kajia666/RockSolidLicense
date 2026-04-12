@@ -3429,7 +3429,7 @@ function enforceNetworkRules(db, product, ip, actionScope) {
   });
 }
 
-function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
+async function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
   const appId = reqLike.headers["x-rs-app-id"];
   const timestamp = reqLike.headers["x-rs-timestamp"];
   const nonce = reqLike.headers["x-rs-nonce"];
@@ -3471,7 +3471,7 @@ function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
   }
 
   try {
-    stateStore.registerNonceOrThrow(
+    await stateStore.registerNonceOrThrow(
       appId,
       nonce,
       addSeconds(nowIso(), config.requestSkewSeconds)
@@ -6965,8 +6965,8 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
-    clientNotices(reqLike, body, rawBody) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async clientNotices(reqLike, body, rawBody) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
 
       if (String(body.productCode).trim().toUpperCase() !== product.code) {
@@ -7365,8 +7365,8 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
-    checkClientVersion(reqLike, body, rawBody) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async checkClientVersion(reqLike, body, rawBody) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "clientVersion");
 
@@ -7382,8 +7382,8 @@ export function createServices(db, config, runtimeState = null) {
       );
     },
 
-    clientBindings(reqLike, body, rawBody, meta = {}) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async clientBindings(reqLike, body, rawBody, meta = {}) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
 
       if (String(body.productCode).trim().toUpperCase() !== product.code) {
@@ -7429,8 +7429,8 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
-    clientUnbind(reqLike, body, rawBody, meta = {}) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async clientUnbind(reqLike, body, rawBody, meta = {}) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
 
       if (String(body.productCode).trim().toUpperCase() !== product.code) {
@@ -7579,8 +7579,8 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
-    registerClient(reqLike, body, rawBody, meta = {}) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async registerClient(reqLike, body, rawBody, meta = {}) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "username");
       requireField(body, "password");
@@ -7637,8 +7637,8 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
-    redeemCard(reqLike, body, rawBody, meta = {}) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async redeemCard(reqLike, body, rawBody, meta = {}) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "username");
       requireField(body, "password");
@@ -7679,8 +7679,8 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
-    cardLoginClient(reqLike, body, rawBody, meta = {}) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async cardLoginClient(reqLike, body, rawBody, meta = {}) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "cardKey");
       requireField(body, "deviceFingerprint");
@@ -7767,8 +7767,8 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
-    loginClient(reqLike, body, rawBody, meta = {}) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async loginClient(reqLike, body, rawBody, meta = {}) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "username");
       requireField(body, "password");
@@ -7827,8 +7827,8 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
-    heartbeatClient(reqLike, body, rawBody, meta) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async heartbeatClient(reqLike, body, rawBody, meta) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "sessionToken");
       requireField(body, "deviceFingerprint");
@@ -7930,8 +7930,8 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
-    logoutClient(reqLike, body, rawBody) {
-      const product = requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+    async logoutClient(reqLike, body, rawBody) {
+      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
       requireField(body, "productCode");
       requireField(body, "sessionToken");
 

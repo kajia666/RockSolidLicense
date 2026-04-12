@@ -164,6 +164,35 @@ function requireField(body, field, message) {
   }
 }
 
+const PRODUCT_CODE_FIELD_CANDIDATES = ["productCode", "projectCode", "softwareCode"];
+
+function readProductCodeInput(body = {}, required = true) {
+  for (const fieldName of PRODUCT_CODE_FIELD_CANDIDATES) {
+    const value = body?.[fieldName];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value).trim().toUpperCase();
+    }
+  }
+
+  if (required) {
+    throw new AppError(
+      400,
+      "VALIDATION_ERROR",
+      "productCode is required. projectCode or softwareCode are also accepted."
+    );
+  }
+
+  return null;
+}
+
+function requireSignedProductCodeMatch(product, body = {}) {
+  const requestedCode = readProductCodeInput(body, true);
+  if (requestedCode !== product.code) {
+    throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
+  }
+  return requestedCode;
+}
+
 function requireAdminSession(db, token) {
   if (!token) {
     throw new AppError(401, "ADMIN_AUTH_REQUIRED", "Missing admin bearer token.");
@@ -478,6 +507,8 @@ function formatProductRow(row) {
   return {
     id: row.id,
     code: row.code,
+    projectCode: row.code,
+    softwareCode: row.code,
     name: row.name,
     description: row.description ?? "",
     status: row.status,
@@ -3919,6 +3950,8 @@ export function createServices(db, config, runtimeState = null) {
       });
       return {
         ...product,
+        projectCode: product.code,
+        softwareCode: product.code,
         featureConfig
       };
     },
@@ -4007,10 +4040,9 @@ export function createServices(db, config, runtimeState = null) {
 
     createPolicy(token, body) {
       const admin = requireAdminSession(db, token);
-      requireField(body, "productCode");
       requireField(body, "name");
 
-      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const product = requireProductByCode(db, readProductCodeInput(body));
       const now = nowIso();
       const grantType = normalizeGrantType(body.grantType ?? "duration");
       const grantPoints = normalizeNonNegativeInteger(body.grantPoints, "grantPoints", 0, 1000000);
@@ -4358,10 +4390,9 @@ export function createServices(db, config, runtimeState = null) {
 
     createCardBatch(token, body) {
       const admin = requireAdminSession(db, token);
-      requireField(body, "productCode");
       requireField(body, "policyId");
 
-      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const product = requireProductByCode(db, readProductCodeInput(body));
       const policy = one(
         db,
         `
@@ -5217,7 +5248,6 @@ export function createServices(db, config, runtimeState = null) {
     transferResellerInventory(token, body = {}) {
       const session = requireResellerSession(db, token);
       requireField(body, "targetResellerId");
-      requireField(body, "productCode");
       requireField(body, "policyId");
 
       const targetResellerId = String(body.targetResellerId).trim();
@@ -5233,7 +5263,7 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(409, "RESELLER_DISABLED", "Target reseller is disabled.");
       }
 
-      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const product = requireProductByCode(db, readProductCodeInput(body));
       const policy = one(
         db,
         "SELECT * FROM policies WHERE id = ? AND product_id = ?",
@@ -5388,7 +5418,6 @@ export function createServices(db, config, runtimeState = null) {
     createResellerPriceRule(token, body = {}) {
       const admin = requireAdminSession(db, token);
       requireField(body, "resellerId");
-      requireField(body, "productCode");
       requireField(body, "unitPrice");
 
       const reseller = one(db, "SELECT * FROM resellers WHERE id = ?", String(body.resellerId).trim());
@@ -5396,7 +5425,7 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(404, "RESELLER_NOT_FOUND", "Reseller does not exist.");
       }
 
-      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const product = requireProductByCode(db, readProductCodeInput(body));
       const policyId = body.policyId ? String(body.policyId).trim() : null;
       const policy = policyId
         ? one(db, "SELECT * FROM policies WHERE id = ? AND product_id = ?", policyId, product.id)
@@ -5561,7 +5590,6 @@ export function createServices(db, config, runtimeState = null) {
 
     allocateResellerInventory(token, resellerId, body) {
       const admin = requireAdminSession(db, token);
-      requireField(body, "productCode");
       requireField(body, "policyId");
 
       const reseller = one(db, "SELECT * FROM resellers WHERE id = ?", resellerId);
@@ -5572,7 +5600,7 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(409, "RESELLER_DISABLED", "Reseller is disabled and cannot receive inventory.");
       }
 
-      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const product = requireProductByCode(db, readProductCodeInput(body));
       const policy = one(
         db,
         `
@@ -6004,7 +6032,7 @@ export function createServices(db, config, runtimeState = null) {
       }
 
       const currency = normalizeCurrency(body.currency);
-      const productCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null;
+      const productCode = readProductCodeInput(body, false);
       const product = productCode ? requireProductByCode(db, productCode) : null;
       const eligible = listEligibleResellerStatementSnapshots(db, {
         resellerId: reseller.id,
@@ -6668,10 +6696,9 @@ export function createServices(db, config, runtimeState = null) {
 
     blockDevice(token, body = {}) {
       const admin = requireAdminSession(db, token);
-      requireField(body, "productCode");
       requireField(body, "deviceFingerprint");
 
-      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const product = requireProductByCode(db, readProductCodeInput(body));
       const fingerprint = String(body.deviceFingerprint).trim();
       if (fingerprint.length < 6) {
         throw new AppError(400, "INVALID_DEVICE_FINGERPRINT", "Device fingerprint must be at least 6 characters.");
@@ -6914,10 +6941,9 @@ export function createServices(db, config, runtimeState = null) {
 
     createClientVersion(token, body = {}) {
       const admin = requireAdminSession(db, token);
-      requireField(body, "productCode");
       requireField(body, "version");
 
-      const product = requireProductByCode(db, String(body.productCode).trim().toUpperCase());
+      const product = requireProductByCode(db, readProductCodeInput(body));
       const version = String(body.version).trim();
       const channel = normalizeChannel(body.channel);
       const status = String(body.status ?? "active").trim().toLowerCase();
@@ -7127,7 +7153,7 @@ export function createServices(db, config, runtimeState = null) {
       requireField(body, "title");
       requireField(body, "body");
 
-      const productCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null;
+      const productCode = readProductCodeInput(body, false);
       const product = productCode ? requireProductByCode(db, productCode) : null;
       const kind = String(body.kind ?? "announcement").trim().toLowerCase();
       const severity = String(body.severity ?? "info").trim().toLowerCase();
@@ -7265,11 +7291,7 @@ export function createServices(db, config, runtimeState = null) {
 
     async clientNotices(reqLike, body, rawBody) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
       if (!featureConfig.allowNotices) {
@@ -7359,7 +7381,7 @@ export function createServices(db, config, runtimeState = null) {
       const admin = requireAdminSession(db, token);
       requireField(body, "pattern");
 
-      const productCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null;
+      const productCode = readProductCodeInput(body, false);
       const product = productCode ? requireProductByCode(db, productCode) : null;
       const targetType = String(body.targetType ?? (String(body.pattern).includes("/") ? "cidr" : "ip"))
         .trim()
@@ -7671,12 +7693,8 @@ export function createServices(db, config, runtimeState = null) {
 
     async checkClientVersion(reqLike, body, rawBody) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
       requireField(body, "clientVersion");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
       if (!featureConfig.allowVersionCheck) {
@@ -7693,11 +7711,7 @@ export function createServices(db, config, runtimeState = null) {
 
     async clientBindings(reqLike, body, rawBody, meta = {}) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       const productFeatureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
       enforceNetworkRules(db, product, meta.ip, "login");
@@ -7743,11 +7757,7 @@ export function createServices(db, config, runtimeState = null) {
 
     async clientUnbind(reqLike, body, rawBody, meta = {}) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       requireProductFeatureEnabled(
         db,
@@ -7901,13 +7911,9 @@ export function createServices(db, config, runtimeState = null) {
 
     async registerClient(reqLike, body, rawBody, meta = {}) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
       requireField(body, "username");
       requireField(body, "password");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       requireProductFeatureEnabled(
         db,
@@ -7967,14 +7973,10 @@ export function createServices(db, config, runtimeState = null) {
 
     async redeemCard(reqLike, body, rawBody, meta = {}) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
       requireField(body, "username");
       requireField(body, "password");
       requireField(body, "cardKey");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       requireProductFeatureEnabled(
         db,
@@ -8017,13 +8019,9 @@ export function createServices(db, config, runtimeState = null) {
 
     async cardLoginClient(reqLike, body, rawBody, meta = {}) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
       requireField(body, "cardKey");
       requireField(body, "deviceFingerprint");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       const featureConfig = requireProductFeatureEnabled(
         db,
@@ -8118,14 +8116,10 @@ export function createServices(db, config, runtimeState = null) {
 
     async loginClient(reqLike, body, rawBody, meta = {}) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
       requireField(body, "username");
       requireField(body, "password");
       requireField(body, "deviceFingerprint");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       const featureConfig = requireProductFeatureEnabled(
         db,
@@ -8191,14 +8185,10 @@ export function createServices(db, config, runtimeState = null) {
 
     async heartbeatClient(reqLike, body, rawBody, meta) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
       requireField(body, "sessionToken");
       requireField(body, "deviceFingerprint");
       const sessionToken = String(body.sessionToken).trim();
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       enforceNetworkRules(db, product, meta.ip, "heartbeat");
       const runtimeSession = await stateStore.getSessionState(sessionToken);
@@ -8301,12 +8291,8 @@ export function createServices(db, config, runtimeState = null) {
 
     async logoutClient(reqLike, body, rawBody) {
       const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
-      requireField(body, "productCode");
       requireField(body, "sessionToken");
-
-      if (String(body.productCode).trim().toUpperCase() !== product.code) {
-        throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
-      }
+      requireSignedProductCodeMatch(product, body);
 
       const session = one(
         db,

@@ -296,8 +296,8 @@
       <section class="hero">
         <h1>Product Center</h1>
         <p class="sub">
-          Create products, review SDK credentials, and decide which client capabilities each software author wants to expose:
-          register, account login, card login, card recharge, version check, notices, and client self-unbind.
+          Create products, review SDK credentials, and decide which client capabilities each software author wants to expose.
+          In this system, one product is one software title or one project.
         </p>
         <div class="nav">
           <a href="/admin">Legacy Console</a>
@@ -310,6 +310,7 @@
         </div>
         <div class="pill-row">
           <div class="pill">Route: <code>/admin/products</code></div>
+          <div class="pill">Product code = projectCode = softwareCode</div>
           <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
           <div class="pill">Client-side switches are evaluated per product</div>
         </div>
@@ -330,7 +331,7 @@
 
         <article class="card">
           <h2>Create Product</h2>
-          <label>Product Code<input id="create-code" placeholder="MY_SOFTWARE" /></label>
+          <label>Product / Project Code<input id="create-code" placeholder="MY_SOFTWARE" /></label>
           <label>Product Name<input id="create-name" placeholder="My Software" /></label>
           <label>Description<textarea id="create-description" placeholder="Short description for the software author."></textarea></label>
           <div class="toggle-grid">
@@ -384,7 +385,7 @@
         <article class="card">
           <h2>Selected Product</h2>
           <label>Product ID<input id="edit-product-id" placeholder="Click a row below to auto-fill" /></label>
-          <label>Product Code<input id="edit-product-code" placeholder="Selected product code" readonly /></label>
+          <label>Product / Project Code<input id="edit-product-code" placeholder="Selected product code" readonly /></label>
           <div class="toggle-grid">
             <label>allowRegister
               <select id="edit-allow-register">

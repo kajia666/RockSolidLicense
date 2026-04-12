@@ -3783,6 +3783,100 @@ test("product feature config can selectively disable client-facing capabilities"
   }
 });
 
+test("product code can also be addressed as projectCode or softwareCode", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "ALIAS_APP",
+        name: "Alias App",
+        description: "Project/software code alias coverage"
+      },
+      adminSession.token
+    );
+    assert.equal(product.code, "ALIAS_APP");
+    assert.equal(product.projectCode, "ALIAS_APP");
+    assert.equal(product.softwareCode, "ALIAS_APP");
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        projectCode: "ALIAS_APP",
+        name: "Alias Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        softwareCode: "ALIAS_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "ALIASX"
+      },
+      adminSession.token
+    );
+
+    const registration = await signedClientPost(
+      baseUrl,
+      "/api/client/register",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        softwareCode: "ALIAS_APP",
+        username: "aliasuser",
+        password: "StrongPass123"
+      }
+    );
+    assert.equal(registration.productCode, "ALIAS_APP");
+
+    const recharge = await signedClientPost(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        projectCode: "ALIAS_APP",
+        username: "aliasuser",
+        password: "StrongPass123",
+        cardKey: batch.keys[0]
+      }
+    );
+    assert.equal(recharge.policyName, "Alias Policy");
+
+    const login = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        projectCode: "ALIAS_APP",
+        username: "aliasuser",
+        password: "StrongPass123",
+        deviceFingerprint: "alias-device-01",
+        deviceName: "Alias Desktop"
+      }
+    );
+    assert.ok(login.sessionToken);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

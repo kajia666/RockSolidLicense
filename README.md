@@ -12,6 +12,13 @@
 
 这套系统现在更偏向“网络验证 / 软件授权平台”，而不是账单结算系统。代理、库存和结算相关能力保留为辅助运营模块，不是当前仓库的唯一重心。
 
+建模说明：
+
+- 仓库里的 `product` 就是“软件作者的一个软件 / 一个项目”
+- `products.id` 是内部主键
+- `products.code` 是对外稳定的项目编码，也可以理解成 `projectCode` 或 `softwareCode`
+- `sdkAppId` / `sdkAppSecret` 是 SDK 请求签名凭据，不等同于项目编码
+
 ## 核心能力
 
 ### 卡密管理
@@ -164,6 +171,11 @@ HTTP：
 - `GET /api/admin/products`
 - `POST /api/admin/products`
 - `POST /api/admin/products/:productId/feature-config`
+
+说明：
+
+- 绝大多数写接口仍然兼容 `productCode`
+- 现在也接受 `projectCode`、`softwareCode` 作为同义字段
 
 TCP：
 

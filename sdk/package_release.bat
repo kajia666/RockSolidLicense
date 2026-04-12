@@ -33,17 +33,22 @@ mkdir "%CPP_ROOT%\include" 2>nul
 mkdir "%CPP_ROOT%\lib" 2>nul
 mkdir "%CPP_ROOT%\examples" 2>nul
 mkdir "%CPP_ROOT%\docs" 2>nul
+mkdir "%CPP_ROOT%\cmake" 2>nul
 
 xcopy /Y /I sdk\include\* "%CPP_ROOT%\include\" >nul
 copy /Y sdk\CPP_SDK_PACKAGE_README.md "%CPP_ROOT%\README.md" >nul
 copy /Y sdk\VERSION "%CPP_ROOT%\VERSION.txt" >nul
 copy /Y "%RELEASE_DIR%\rocksolid_sdk_static.lib" "%CPP_ROOT%\lib\" >nul
 copy /Y sdk\examples\windows_client_demo.cpp "%CPP_ROOT%\examples\" >nul
+if exist "%CPP_ROOT%\examples\cmake_cpp_consumer" rmdir /s /q "%CPP_ROOT%\examples\cmake_cpp_consumer"
+xcopy /E /I /Y sdk\examples\cmake_cpp_consumer "%CPP_ROOT%\examples\cmake_cpp_consumer\" >nul
 copy /Y sdk\WINDOWS_SDK_GUIDE.md "%CPP_ROOT%\docs\" >nul
 copy /Y sdk\BUILD_WINDOWS.md "%CPP_ROOT%\docs\" >nul
 copy /Y sdk\CHANGELOG.md "%CPP_ROOT%\docs\" >nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "sdk\generate_cmake_package.ps1" -PackageRoot "%CPP_ROOT%" -PackageKind cpp -Version "%RS_SDK_VERSION%"
+if errorlevel 1 goto :fail
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$manifest = [ordered]@{ packageName = '%CPP_NAME%'; sdkVersion = '%RS_SDK_VERSION%'; packageKind = 'cpp'; libraryFile = 'lib/rocksolid_sdk_static.lib'; versionFile = 'VERSION.txt'; changelogFile = 'docs/CHANGELOG.md'; generatedBy = 'sdk/package_release.bat' }; $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath '%CPP_ROOT%\manifest.json' -Encoding ascii"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$manifest = [ordered]@{ packageName = '%CPP_NAME%'; sdkVersion = '%RS_SDK_VERSION%'; packageKind = 'cpp'; libraryFile = 'lib/rocksolid_sdk_static.lib'; versionFile = 'VERSION.txt'; changelogFile = 'docs/CHANGELOG.md'; cmakeConfigDir = 'cmake'; generatedBy = 'sdk/package_release.bat' }; $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath '%CPP_ROOT%\manifest.json' -Encoding ascii"
 if errorlevel 1 goto :fail
 
 mkdir "%CAPI_ROOT%\include" 2>nul
@@ -51,6 +56,7 @@ mkdir "%CAPI_ROOT%\lib" 2>nul
 mkdir "%CAPI_ROOT%\bin" 2>nul
 mkdir "%CAPI_ROOT%\examples" 2>nul
 mkdir "%CAPI_ROOT%\docs" 2>nul
+mkdir "%CAPI_ROOT%\cmake" 2>nul
 
 copy /Y sdk\C_API_SDK_PACKAGE_README.md "%CAPI_ROOT%\README.md" >nul
 copy /Y sdk\VERSION "%CAPI_ROOT%\VERSION.txt" >nul
@@ -59,10 +65,14 @@ copy /Y sdk\include\rocksolid_sdk_version.h "%CAPI_ROOT%\include\" >nul
 copy /Y "%RELEASE_DIR%\rocksolid_sdk.dll" "%CAPI_ROOT%\bin\" >nul
 copy /Y "%RELEASE_DIR%\rocksolid_sdk.lib" "%CAPI_ROOT%\lib\" >nul
 copy /Y sdk\examples\c_api_demo.c "%CAPI_ROOT%\examples\" >nul
+if exist "%CAPI_ROOT%\examples\cmake_capi_consumer" rmdir /s /q "%CAPI_ROOT%\examples\cmake_capi_consumer"
+xcopy /E /I /Y sdk\examples\cmake_capi_consumer "%CAPI_ROOT%\examples\cmake_capi_consumer\" >nul
 copy /Y sdk\BUILD_WINDOWS.md "%CAPI_ROOT%\docs\" >nul
 copy /Y sdk\CHANGELOG.md "%CAPI_ROOT%\docs\" >nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "sdk\generate_cmake_package.ps1" -PackageRoot "%CAPI_ROOT%" -PackageKind capi -Version "%RS_SDK_VERSION%"
+if errorlevel 1 goto :fail
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$manifest = [ordered]@{ packageName = '%CAPI_NAME%'; sdkVersion = '%RS_SDK_VERSION%'; packageKind = 'capi'; libraryFile = 'lib/rocksolid_sdk.lib'; runtimeFile = 'bin/rocksolid_sdk.dll'; versionFile = 'VERSION.txt'; changelogFile = 'docs/CHANGELOG.md'; generatedBy = 'sdk/package_release.bat' }; $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath '%CAPI_ROOT%\manifest.json' -Encoding ascii"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$manifest = [ordered]@{ packageName = '%CAPI_NAME%'; sdkVersion = '%RS_SDK_VERSION%'; packageKind = 'capi'; libraryFile = 'lib/rocksolid_sdk.lib'; runtimeFile = 'bin/rocksolid_sdk.dll'; versionFile = 'VERSION.txt'; changelogFile = 'docs/CHANGELOG.md'; cmakeConfigDir = 'cmake'; generatedBy = 'sdk/package_release.bat' }; $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath '%CAPI_ROOT%\manifest.json' -Encoding ascii"
 if errorlevel 1 goto :fail
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%CPP_ROOT%\*' -DestinationPath '%PKG_ROOT%\%CPP_NAME%.zip' -Force"

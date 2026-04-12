@@ -10,6 +10,7 @@ This package is for software authors who want the full Windows C++ SDK.
 - `docs/WINDOWS_SDK_GUIDE.md`: SDK guide
 - `docs/BUILD_WINDOWS.md`: build instructions
 - `docs/CHANGELOG.md`: SDK release notes
+- `cmake/`: prebuilt package config for `find_package(...)`
 - `VERSION.txt`: package version
 - `manifest.json`: package metadata
 
@@ -40,3 +41,4 @@ cl /nologo /EHsc /std:c++17 /DRS_SDK_STATIC ^
 - Integrate `LicenseClientWin` directly.
 - Use the high-level HTTP and TCP flows for login, heartbeat, notices, version checks, bindings, and self-unbind.
 - Validate `licenseToken` locally and optionally persist startup cache data for short outage recovery.
+- If you use CMake, point `find_package(RockSolidSDK CONFIG REQUIRED)` at the packaged `cmake/` directory and link `RockSolidSDK::cpp_static`.

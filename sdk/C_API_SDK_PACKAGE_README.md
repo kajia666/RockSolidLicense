@@ -10,6 +10,7 @@ This package is for software authors who only need the low-level C interface.
 - `examples/c_api_demo.c`: minimal C example
 - `docs/BUILD_WINDOWS.md`: build instructions
 - `docs/CHANGELOG.md`: SDK release notes
+- `cmake/`: prebuilt package config for `find_package(...)`
 - `VERSION.txt`: package version
 - `manifest.json`: package metadata
 
@@ -37,3 +38,4 @@ Place `bin\rocksolid_sdk.dll` next to `c_api_demo.exe`, or in a directory availa
 
 - Use this package when you want a stable C binary interface.
 - Build your own higher-level HTTP and TCP integration layer on top of the exported primitives.
+- If you use CMake, point `find_package(RockSolidSDK CONFIG REQUIRED)` at the packaged `cmake/` directory and link `RockSolidSDK::capi`.

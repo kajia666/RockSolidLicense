@@ -73,9 +73,11 @@ This produces:
 - `build\win-sdk-package\rocksolid-sdk-capi\`
 - `build\win-sdk-package\rocksolid-sdk-capi.zip`
 
-Actual package names include the SDK version from `sdk/VERSION`, for example `rocksolid-sdk-cpp-0.2.1.zip`.
+Actual package names include the SDK version from `sdk/VERSION`, for example `rocksolid-sdk-cpp-0.2.2.zip`.
 
 Each release directory also includes `SHA256SUMS.txt`, `checksums.json`, and `release-manifest.json` so you can distribute signed-off release metadata together with the SDK archives.
+
+Each package root also includes a `cmake/` folder with `RockSolidSDKConfig.cmake`, so prebuilt package consumers can use CMake `find_package(...)`.
 
 Recommended maintainer workflow:
 
@@ -89,9 +91,27 @@ If you only want to verify an already-packaged release directory:
 call sdk\verify_release_package.bat build\win-sdk-package
 ```
 
+This validation flow checks the packaged C++ and C examples directly, and if `cmake.exe` is available it also validates the packaged `RockSolidSDKConfig.cmake` files.
+
 Use the `cpp` package when the integrator wants the full `LicenseClientWin` feature set.
 
 Use the `capi` package when the integrator only needs the stable low-level C binary interface.
+
+Prebuilt-package CMake example for the C++ SDK:
+
+```cmake
+find_package(RockSolidSDK CONFIG REQUIRED PATHS "path/to/rocksolid-sdk-cpp-0.2.2/cmake" NO_DEFAULT_PATH)
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE RockSolidSDK::cpp_static)
+```
+
+Prebuilt-package CMake example for the C API package:
+
+```cmake
+find_package(RockSolidSDK CONFIG REQUIRED PATHS "path/to/rocksolid-sdk-capi-0.2.2/cmake" NO_DEFAULT_PATH)
+add_executable(my_c_app main.c)
+target_link_libraries(my_c_app PRIVATE RockSolidSDK::capi)
+```
 
 ## High-level usage
 

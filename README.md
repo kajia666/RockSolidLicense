@@ -221,6 +221,8 @@ SDK 版本源文件在 `sdk/VERSION`，构建脚本会自动生成 `sdk/include/
 - `checksums.json`
 - `release-manifest.json`
 
+每个 SDK 包目录里还会带一个 `cmake/` 目录，软件作者可以直接用 `find_package(RockSolidSDK CONFIG REQUIRED)` 接入预编译包。
+
 如果你要走完整的“打包 + 校验”流程，可以直接运行：
 
 ```bat
@@ -233,7 +235,7 @@ call sdk\release_sdk.bat
 call sdk\verify_release_package.bat build\win-sdk-package
 ```
 
-当前这轮 SDK 版本是 `0.2.1`。
+当前这轮 SDK 版本是 `0.2.2`。
 
 主要文件：
 

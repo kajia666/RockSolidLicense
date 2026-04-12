@@ -1,5 +1,11 @@
 # RockSolid Windows SDK Changelog
 
+## 0.2.2 - 2026-04-12
+
+- Added packaged `cmake/` config files so software authors can consume the prebuilt SDK with `find_package(RockSolidSDK CONFIG REQUIRED)`.
+- Added packaged CMake consumer examples for both the full C++ SDK and the low-level C API package.
+- Extended `sdk/verify_release_package.bat` to validate packaged CMake config files and imported targets when `cmake.exe` is available.
+
 ## 0.2.1 - 2026-04-12
 
 - Added `SHA256SUMS.txt` and `checksums.json` generation for versioned SDK release bundles.

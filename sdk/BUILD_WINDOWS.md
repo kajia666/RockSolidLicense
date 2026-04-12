@@ -115,10 +115,10 @@ Outputs:
 
 Actual package names include the SDK version from `sdk/VERSION`, for example:
 
-- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.1\`
-- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.1.zip`
-- `build\win-sdk-package\rocksolid-sdk-capi-0.2.1\`
-- `build\win-sdk-package\rocksolid-sdk-capi-0.2.1.zip`
+- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.2\`
+- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.2.zip`
+- `build\win-sdk-package\rocksolid-sdk-capi-0.2.2\`
+- `build\win-sdk-package\rocksolid-sdk-capi-0.2.2.zip`
 
 The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, and C++ demo source.
 
@@ -130,6 +130,8 @@ Each release output directory now also includes:
 - `checksums.json`
 - `release-manifest.json`
 
+Each package root also includes a `cmake/` directory with `RockSolidSDKConfig.cmake`, so consumers can use `find_package(RockSolidSDK CONFIG REQUIRED)`.
+
 ## Run the release smoke test
 
 ```bat
@@ -137,6 +139,8 @@ call sdk\verify_release_package.bat
 ```
 
 This script compiles the packaged C++ and C examples from the versioned release bundles and runs the C API demo to verify the packaged DLL reports the expected SDK version.
+
+If `cmake.exe` is available, it also validates the packaged `RockSolidSDKConfig.cmake` files and imported targets.
 
 ## Run the full release workflow
 

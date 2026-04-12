@@ -34,11 +34,18 @@ int main() {
       channel,
       true
     });
+    const rocksolid::ClientStartupDecision startup_decision =
+      rocksolid::LicenseClientWin::evaluate_startup_decision(startup);
     std::cout << "[HTTP startup] versionStatus=" << startup.version_manifest.status
               << " allowed=" << (startup.version_manifest.allowed ? "true" : "false")
               << " latestVersion=" << startup.version_manifest.latest_version
               << " notices=" << startup.notices.notices.size()
               << " activeKid=" << startup.active_token_key.key_id
+              << std::endl;
+    std::cout << "[Startup decision] allowLogin="
+              << (startup_decision.allow_login ? "true" : "false")
+              << " code=" << startup_decision.primary_code
+              << " message=" << startup_decision.primary_message
               << std::endl;
 
     rocksolid::RegisterRequest register_request{
@@ -113,8 +120,11 @@ int main() {
     }
 
     const rocksolid::TokenValidationResult validation =
-      client.validate_license_token_online(login_result.license_token);
-    std::cout << "[Token validation] kid=" << validation.key_id
+      rocksolid::LicenseClientWin::validate_license_token_with_key_set(
+        login_result.license_token,
+        startup.token_keys
+      );
+    std::cout << "[Token validation local] kid=" << validation.key_id
               << " valid=" << (validation.valid ? "true" : "false") << std::endl;
     std::cout << validation.payload_json << std::endl;
   } catch (const std::exception& error) {

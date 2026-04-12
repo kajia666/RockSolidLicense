@@ -41,5 +41,6 @@ This produces `build\win-sdk-demo\windows_client_demo.exe` and keeps intermediat
 3. Use HTTP startup calls such as `startup_bootstrap_http`, `version_check_http_parsed`, and `notices_http_parsed` before showing the login UI.
 4. Use HTTP for first-time registration or account operations if that fits your deployment model.
 5. Use TCP for long-lived login and heartbeat flows if you want a persistent or socket-friendly transport.
-6. Prefer the parsed helpers such as `login_tcp_parsed`, `bindings_http_parsed`, and `unbind_tcp_parsed` so your host app can directly consume quota, binding, notice, and self-unbind metadata.
-7. Persist `sessionToken` for heartbeats, and for point-based policies also cache the latest `LoginResponse.quota` snapshot for your UI.
+6. Prefer the parsed helpers such as `login_tcp_parsed`, `bindings_http_parsed`, `unbind_tcp_parsed`, and `startup_bootstrap_http` so your host app can directly consume quota, binding, notice, and self-unbind metadata.
+7. Use `evaluate_startup_decision(...)` to decide whether the local login UI should be blocked for maintenance or update requirements before hitting the login endpoint.
+8. Persist `sessionToken` for heartbeats, and for point-based policies also cache the latest `LoginResponse.quota` snapshot for your UI.

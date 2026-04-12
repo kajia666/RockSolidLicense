@@ -16,6 +16,7 @@ This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 - Binding inspection and self-unbind: account mode and direct card mode
 - Point-quota awareness: parsed recharge/login responses expose remaining points
 - Startup bootstrap helpers: version-check and active notice polling
+- Local startup decision and offline token verification helpers
 
 ## Main headers
 
@@ -66,11 +67,17 @@ Parsed high-level usage:
 const rocksolid::ClientStartupBootstrapResponse startup =
   client.startup_bootstrap_http({"MY_SOFTWARE", "1.0.0", "stable", true});
 
+const rocksolid::ClientStartupDecision decision =
+  rocksolid::LicenseClientWin::evaluate_startup_decision(startup);
+
 const rocksolid::LoginResponse login = client.login_tcp_parsed(request);
 const std::string binding_id = login.binding.id;
 const bool metered = login.quota.metered;
 const rocksolid::TokenValidationResult validation =
-  client.validate_license_token_online(login.license_token);
+  rocksolid::LicenseClientWin::validate_license_token_with_key_set(
+    login.license_token,
+    startup.token_keys
+  );
 ```
 
 Direct card login usage:
@@ -144,8 +151,10 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `RechargeResponse.grant_type` and `RechargeResponse.remaining_points` help distinguish duration cards from point cards.
 - `ClientVersionCheckRequest` and `ClientNoticesRequest` let the SDK drive the same startup flow documented on the server side.
 - `ClientStartupBootstrapRequest` and `startup_bootstrap_http(...)` bundle version-check, active notices, and token-key fetch into one startup helper.
+- `ClientStartupDecision` and `evaluate_startup_decision(...)` turn startup payloads into a simple allow/block/update decision for your login UI.
 - `ClientVersionManifestResponse` exposes `allowed/status/latest_version/minimum_allowed_version/latest_download_url`.
 - `ClientNoticesResponse` returns the currently active notice list with `block_login` and timing metadata.
+- `validate_license_token_with_key_set(...)` lets you validate `licenseToken` locally against keys fetched during startup, without an extra round trip.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.
 - `BindingsResponse.unbind_policy` tells you whether self-unbind is enabled and how many attempts remain in the current window.
 - `LoginRequest`, `CardLoginRequest`, and `HeartbeatRequest` can optionally carry `client_version/channel` for version enforcement, plus hardware/IP profile fields for configurable rebinding detection.

@@ -427,6 +427,22 @@ ClientVersionSummary parse_client_version_summary(const JsonValue& object) {
   return version;
 }
 
+TokenValidationResult prepare_token_validation_result(const std::string& token) {
+  TokenValidationResult result;
+  result.payload_json = decode_license_token_payload(token);
+  result.payload = JsonValue::parse(result.payload_json);
+  if (!result.payload.is_object() || !result.payload.has("kid")) {
+    throw std::runtime_error("License token payload does not contain a kid.");
+  }
+
+  if (!result.payload.at("kid").is_string()) {
+    throw std::runtime_error("License token payload kid must be a string.");
+  }
+
+  result.key_id = result.payload.at("kid").as_string();
+  return result;
+}
+
 TransportResult perform_http_request(
   const HttpEndpoint& endpoint,
   const wchar_t* method,
@@ -1186,15 +1202,14 @@ TokenKeySet LicenseClientWin::fetch_token_keys() const {
 }
 
 TokenValidationResult LicenseClientWin::validate_license_token_online(const std::string& token) const {
-  TokenValidationResult result;
-  result.payload_json = decode_license_token_payload(token);
-  result.payload = JsonValue::parse(result.payload_json);
-  if (!result.payload.is_object() || !result.payload.has("kid")) {
-    throw std::runtime_error("License token payload does not contain a kid.");
-  }
+  return validate_license_token_with_key_set(token, fetch_token_keys());
+}
 
-  result.key_id = require_json_string(result.payload, "kid");
-  const TokenKeySet key_set = fetch_token_keys();
+TokenValidationResult LicenseClientWin::validate_license_token_with_key_set(
+  const std::string& token,
+  const TokenKeySet& key_set
+) {
+  TokenValidationResult result = prepare_token_validation_result(token);
   for (const TokenKeyInfo& key : key_set.keys) {
     if (key.key_id == result.key_id) {
       result.valid = verify_license_token(key.public_key_pem, token);
@@ -1204,6 +1219,88 @@ TokenValidationResult LicenseClientWin::validate_license_token_online(const std:
 
   result.valid = false;
   return result;
+}
+
+TokenValidationResult LicenseClientWin::validate_license_token_with_key(
+  const std::string& token,
+  const TokenKeyInfo& key
+) {
+  TokenValidationResult result = prepare_token_validation_result(token);
+  if (!result.key_id.empty() && !key.key_id.empty() && result.key_id != key.key_id) {
+    result.valid = false;
+    return result;
+  }
+
+  result.valid = verify_license_token(key.public_key_pem, token);
+  return result;
+}
+
+ClientStartupDecision LicenseClientWin::evaluate_startup_decision(
+  const ClientStartupBootstrapResponse& bootstrap
+) {
+  ClientStartupDecision decision;
+  decision.latest_version = bootstrap.version_manifest.latest_version;
+  decision.minimum_allowed_version = bootstrap.version_manifest.minimum_allowed_version;
+  decision.latest_download_url = bootstrap.version_manifest.latest_download_url;
+  decision.force_update_required = bootstrap.version_manifest.status == "force_update_required";
+  decision.disabled_version = bootstrap.version_manifest.status == "disabled_version";
+  decision.upgrade_recommended = bootstrap.version_manifest.status == "upgrade_recommended";
+  decision.version_blocked = !bootstrap.version_manifest.allowed;
+
+  for (const NoticeInfo& notice : bootstrap.notices.notices) {
+    if (notice.block_login) {
+      decision.blocking_notices.push_back(notice);
+    } else {
+      decision.announcements.push_back(notice);
+    }
+  }
+
+  decision.maintenance_blocking = !decision.blocking_notices.empty();
+  decision.has_announcements = !decision.announcements.empty();
+  decision.allow_login = !decision.maintenance_blocking && !decision.version_blocked;
+
+  if (decision.maintenance_blocking) {
+    const NoticeInfo& notice = decision.blocking_notices.front();
+    decision.primary_code = "notice_blocked";
+    decision.primary_title = notice.title;
+    decision.primary_message = notice.body;
+    return decision;
+  }
+
+  if (decision.version_blocked) {
+    decision.primary_code = bootstrap.version_manifest.status.empty()
+      ? "version_blocked"
+      : bootstrap.version_manifest.status;
+    decision.primary_title = bootstrap.version_manifest.notice.present &&
+        !bootstrap.version_manifest.notice.title.empty()
+      ? bootstrap.version_manifest.notice.title
+      : "Client update required";
+    decision.primary_message = bootstrap.version_manifest.message;
+    return decision;
+  }
+
+  if (decision.upgrade_recommended) {
+    decision.primary_code = "upgrade_recommended";
+    decision.primary_title = bootstrap.version_manifest.notice.present &&
+        !bootstrap.version_manifest.notice.title.empty()
+      ? bootstrap.version_manifest.notice.title
+      : "Upgrade recommended";
+    decision.primary_message = bootstrap.version_manifest.message;
+    return decision;
+  }
+
+  if (decision.has_announcements) {
+    const NoticeInfo& notice = decision.announcements.front();
+    decision.primary_code = "announcement";
+    decision.primary_title = notice.title;
+    decision.primary_message = notice.body;
+    return decision;
+  }
+
+  decision.primary_code = "allowed";
+  decision.primary_title = "Ready";
+  decision.primary_message = bootstrap.version_manifest.message;
+  return decision;
 }
 
 SignedRequest LicenseClientWin::make_signed_http_request(

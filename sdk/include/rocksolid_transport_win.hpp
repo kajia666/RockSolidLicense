@@ -362,6 +362,24 @@ struct ClientStartupBootstrapResponse {
   bool has_token_keys = false;
 };
 
+struct ClientStartupDecision {
+  bool allow_login = true;
+  bool maintenance_blocking = false;
+  bool version_blocked = false;
+  bool force_update_required = false;
+  bool disabled_version = false;
+  bool upgrade_recommended = false;
+  bool has_announcements = false;
+  std::string primary_code = "allowed";
+  std::string primary_title;
+  std::string primary_message;
+  std::string latest_version;
+  std::string minimum_allowed_version;
+  std::string latest_download_url;
+  std::vector<NoticeInfo> blocking_notices;
+  std::vector<NoticeInfo> announcements;
+};
+
 struct TokenValidationResult {
   bool valid = false;
   std::string key_id;
@@ -442,6 +460,17 @@ class LicenseClientWin {
   TokenKeyInfo fetch_active_token_key() const;
   TokenKeySet fetch_token_keys() const;
   TokenValidationResult validate_license_token_online(const std::string& token) const;
+  static TokenValidationResult validate_license_token_with_key_set(
+    const std::string& token,
+    const TokenKeySet& key_set
+  );
+  static TokenValidationResult validate_license_token_with_key(
+    const std::string& token,
+    const TokenKeyInfo& key
+  );
+  static ClientStartupDecision evaluate_startup_decision(
+    const ClientStartupBootstrapResponse& bootstrap
+  );
 
   SignedRequest make_signed_http_request(
     const std::string& path,

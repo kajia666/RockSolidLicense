@@ -3877,6 +3877,155 @@ test("product code can also be addressed as projectCode or softwareCode", async 
   }
 });
 
+test("developer accounts can manage only their own projects", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const alice = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "alice.dev",
+        password: "AlicePass123!",
+        displayName: "Alice"
+      },
+      adminSession.token
+    );
+
+    const bob = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "bob.dev",
+        password: "BobPass123!",
+        displayName: "Bob"
+      },
+      adminSession.token
+    );
+
+    const developers = await getJson(baseUrl, "/api/admin/developers", adminSession.token);
+    assert.equal(developers.total, 2);
+    assert.ok(developers.items.some((item) => item.username === "alice.dev"));
+    assert.ok(developers.items.some((item) => item.username === "bob.dev"));
+
+    const assignedByAdmin = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "ALICE_ASSIGNED",
+        name: "Alice Assigned Project",
+        ownerDeveloperId: alice.id
+      },
+      adminSession.token
+    );
+    assert.equal(assignedByAdmin.ownerDeveloper.id, alice.id);
+
+    const aliceSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "alice.dev",
+      password: "AlicePass123!"
+    });
+    const bobSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "bob.dev",
+      password: "BobPass123!"
+    });
+
+    const aliceMe = await getJson(baseUrl, "/api/developer/me", aliceSession.token);
+    assert.equal(aliceMe.developer.username, "alice.dev");
+
+    const aliceOwned = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "ALICE_SELF",
+        name: "Alice Self Project",
+        description: "Owned by Alice",
+        featureConfig: {
+          allowCardLogin: false
+        }
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceOwned.ownerDeveloper.id, alice.id);
+    assert.equal(aliceOwned.featureConfig.allowCardLogin, false);
+
+    const bobOwned = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "BOB_SELF",
+        name: "Bob Self Project"
+      },
+      bobSession.token
+    );
+    assert.equal(bobOwned.ownerDeveloper.id, bob.id);
+
+    const aliceProjects = await getJson(baseUrl, "/api/developer/products", aliceSession.token);
+    assert.equal(aliceProjects.length, 2);
+    assert.ok(aliceProjects.some((item) => item.code === "ALICE_ASSIGNED"));
+    assert.ok(aliceProjects.some((item) => item.code === "ALICE_SELF"));
+    assert.ok(!aliceProjects.some((item) => item.code === "BOB_SELF"));
+
+    const bobProjects = await getJson(baseUrl, "/api/developer/products", bobSession.token);
+    assert.equal(bobProjects.length, 1);
+    assert.equal(bobProjects[0].code, "BOB_SELF");
+
+    const aliceToggleUpdate = await postJson(
+      baseUrl,
+      `/api/developer/products/${aliceOwned.id}/feature-config`,
+      {
+        allowNotices: false,
+        allowVersionCheck: false
+      },
+      aliceSession.token
+    );
+    assert.equal(aliceToggleUpdate.featureConfig.allowNotices, false);
+    assert.equal(aliceToggleUpdate.featureConfig.allowVersionCheck, false);
+
+    const forbiddenUpdate = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/products/${aliceOwned.id}/feature-config`,
+      {
+        allowRegister: false
+      },
+      bobSession.token
+    );
+    assert.equal(forbiddenUpdate.status, 403);
+    assert.equal(forbiddenUpdate.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const transferred = await postJson(
+      baseUrl,
+      `/api/admin/products/${assignedByAdmin.id}/owner`,
+      {
+        ownerDeveloperId: bob.id
+      },
+      adminSession.token
+    );
+    assert.equal(transferred.ownerDeveloper.id, bob.id);
+
+    const aliceProjectsAfterTransfer = await getJson(baseUrl, "/api/developer/products", aliceSession.token);
+    assert.equal(aliceProjectsAfterTransfer.length, 1);
+    assert.equal(aliceProjectsAfterTransfer[0].code, "ALICE_SELF");
+
+    const bobProjectsAfterTransfer = await getJson(baseUrl, "/api/developer/products", bobSession.token);
+    assert.equal(bobProjectsAfterTransfer.length, 2);
+    assert.ok(bobProjectsAfterTransfer.some((item) => item.code === "ALICE_ASSIGNED"));
+    assert.ok(bobProjectsAfterTransfer.some((item) => item.code === "BOB_SELF"));
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=60", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("developer.create"));
+    assert.ok(eventTypes.includes("product.owner.update"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -3887,6 +4036,24 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(response.headers.get("content-type") || "", /^text\/html/);
     assert.match(html, /Product Center/);
     assert.match(html, /feature-config/);
+    assert.match(html, /Developer Accounts/);
+    assert.match(html, /api\/admin\/developers/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer center page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Project Center/);
+    assert.match(html, /api\/developer\/products/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

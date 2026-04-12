@@ -218,6 +218,50 @@ function requireAdminSession(db, token) {
   return session;
 }
 
+function normalizeDeveloperUsername(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function formatDeveloperRow(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name ?? "",
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lastLoginAt: row.last_login_at ?? null
+  };
+}
+
+function requireDeveloperSession(db, token) {
+  if (!token) {
+    throw new AppError(401, "DEVELOPER_AUTH_REQUIRED", "Missing developer bearer token.");
+  }
+
+  const session = one(
+    db,
+    `
+      SELECT ds.*, da.username, da.display_name, da.status AS developer_status
+      FROM developer_sessions ds
+      JOIN developer_accounts da ON da.id = ds.developer_id
+      WHERE ds.token = ? AND ds.expires_at > ?
+    `,
+    token,
+    nowIso()
+  );
+
+  if (!session || session.developer_status !== "active") {
+    throw new AppError(401, "DEVELOPER_AUTH_INVALID", "Developer session is invalid or expired.");
+  }
+
+  run(db, "UPDATE developer_sessions SET last_seen_at = ? WHERE id = ?", nowIso(), session.id);
+  return session;
+}
+
 function requireProductByCode(db, code) {
   const product = one(db, "SELECT * FROM products WHERE code = ? AND status = 'active'", code);
   if (!product) {
@@ -509,9 +553,18 @@ function formatProductRow(row) {
     code: row.code,
     projectCode: row.code,
     softwareCode: row.code,
+    ownerDeveloperId: row.owner_developer_id ?? null,
     name: row.name,
     description: row.description ?? "",
     status: row.status,
+    ownerDeveloper: row.owner_developer_id
+      ? {
+          id: row.owner_developer_id,
+          username: row.owner_developer_username ?? null,
+          displayName: row.owner_developer_display_name ?? "",
+          status: row.owner_developer_status ?? null
+        }
+      : null,
     sdkAppId: row.sdk_app_id,
     sdkAppSecret: row.sdk_app_secret,
     createdAt: row.created_at,
@@ -522,6 +575,169 @@ function formatProductRow(row) {
     created_at: row.created_at,
     updated_at: row.updated_at
   };
+}
+
+function productSelectSql(whereClause = "") {
+  return `
+    SELECT p.*, pfc.allow_register, pfc.allow_account_login, pfc.allow_card_login, pfc.allow_card_recharge,
+           pfc.allow_version_check, pfc.allow_notices, pfc.allow_client_unbind,
+           pfc.created_at AS feature_created_at, pfc.updated_at AS feature_updated_at,
+           da.id AS owner_developer_id,
+           da.username AS owner_developer_username,
+           da.display_name AS owner_developer_display_name,
+           da.status AS owner_developer_status
+    FROM products p
+    LEFT JOIN product_feature_configs pfc ON pfc.product_id = p.id
+    LEFT JOIN developer_accounts da ON da.id = p.owner_developer_id
+    ${whereClause}
+  `;
+}
+
+function queryProductRows(db, filters = {}) {
+  const conditions = [];
+  const params = [];
+
+  if (filters.ownerDeveloperId) {
+    conditions.push("p.owner_developer_id = ?");
+    params.push(filters.ownerDeveloperId);
+  }
+  if (filters.productId) {
+    conditions.push("p.id = ?");
+    params.push(filters.productId);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = many(
+    db,
+    `${productSelectSql(whereClause)} ORDER BY p.created_at DESC`,
+    ...params
+  );
+
+  return rows.map((row) => formatProductRow({
+    ...row,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    feature_created_at: row.feature_created_at,
+    feature_updated_at: row.feature_updated_at
+  }));
+}
+
+function getProductRowById(db, productId) {
+  return queryProductRows(db, { productId })[0] ?? null;
+}
+
+function resolveProductOwnerDeveloperId(db, ownerDeveloperId, allowNull = true) {
+  const normalizedId = String(ownerDeveloperId ?? "").trim();
+  if (!normalizedId) {
+    if (allowNull) {
+      return null;
+    }
+    throw new AppError(400, "OWNER_DEVELOPER_REQUIRED", "ownerDeveloperId is required.");
+  }
+
+  const developer = one(
+    db,
+    "SELECT * FROM developer_accounts WHERE id = ?",
+    normalizedId
+  );
+  if (!developer) {
+    throw new AppError(404, "DEVELOPER_NOT_FOUND", "Developer account does not exist.");
+  }
+  if (developer.status !== "active") {
+    throw new AppError(409, "DEVELOPER_DISABLED", "Developer account is disabled.");
+  }
+  return developer.id;
+}
+
+function createProductRecord(db, body = {}, ownerDeveloperId = null) {
+  requireField(body, "code");
+  requireField(body, "name");
+
+  const code = String(body.code).trim().toUpperCase();
+  if (!/^[A-Z0-9_]{3,32}$/.test(code)) {
+    throw new AppError(400, "INVALID_PRODUCT_CODE", "Product code must be 3-32 chars: A-Z, 0-9 or underscore.");
+  }
+
+  if (one(db, "SELECT id FROM products WHERE code = ?", code)) {
+    throw new AppError(409, "PRODUCT_EXISTS", "Product code already exists.");
+  }
+
+  const now = nowIso();
+  const product = {
+    id: generateId("prod"),
+    code,
+    name: String(body.name).trim(),
+    description: String(body.description ?? "").trim(),
+    status: "active",
+    ownerDeveloperId,
+    sdkAppId: randomAppId(),
+    sdkAppSecret: randomToken(24),
+    createdAt: now,
+    updatedAt: now
+  };
+
+  run(
+    db,
+    `
+      INSERT INTO products
+      (id, code, name, description, status, owner_developer_id, sdk_app_id, sdk_app_secret, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    product.id,
+    product.code,
+    product.name,
+    product.description,
+    product.status,
+    product.ownerDeveloperId,
+    product.sdkAppId,
+    product.sdkAppSecret,
+    product.createdAt,
+    product.updatedAt
+  );
+  persistProductFeatureConfig(db, product.id, body, now);
+
+  return getProductRowById(db, product.id);
+}
+
+function updateProductOwnerRecord(db, productId, ownerDeveloperId, timestamp = nowIso()) {
+  run(
+    db,
+    `
+      UPDATE products
+      SET owner_developer_id = ?, updated_at = ?
+      WHERE id = ?
+    `,
+    ownerDeveloperId,
+    timestamp,
+    productId
+  );
+  return getProductRowById(db, productId);
+}
+
+function updateProductFeatureConfigRecord(db, productId, body = {}, timestamp = nowIso()) {
+  const product = one(db, "SELECT * FROM products WHERE id = ?", productId);
+  if (!product) {
+    throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+  }
+
+  const featureConfig = persistProductFeatureConfig(db, product.id, body, timestamp);
+  run(db, "UPDATE products SET updated_at = ? WHERE id = ?", timestamp, product.id);
+
+  return {
+    product: getProductRowById(db, product.id),
+    featureConfig
+  };
+}
+
+function requireDeveloperOwnedProduct(db, developerId, productId) {
+  const product = getProductRowById(db, productId);
+  if (!product) {
+    throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+  }
+  if (product.ownerDeveloper?.id !== developerId) {
+    throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only manage products owned by your developer account.");
+  }
+  return product;
 }
 
 function requireProductFeatureEnabled(db, product, featureKey, code, message, status = 403) {
@@ -3877,51 +4093,123 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
-    listProducts(token) {
-      requireAdminSession(db, token);
-      const rows = many(
+    developerLogin(body = {}) {
+      requireField(body, "username");
+      requireField(body, "password");
+
+      const username = normalizeDeveloperUsername(body.username);
+      const developer = one(
         db,
-        `
-          SELECT p.*, pfc.allow_register, pfc.allow_account_login, pfc.allow_card_login, pfc.allow_card_recharge,
-                 pfc.allow_version_check, pfc.allow_notices, pfc.allow_client_unbind,
-                 pfc.created_at AS feature_created_at, pfc.updated_at AS feature_updated_at
-          FROM products p
-          LEFT JOIN product_feature_configs pfc ON pfc.product_id = p.id
-          ORDER BY created_at DESC
-        `
+        "SELECT * FROM developer_accounts WHERE username = ?",
+        username
       );
-      return rows.map((row) => formatProductRow({
-        ...row,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        feature_created_at: row.feature_created_at,
-        feature_updated_at: row.feature_updated_at
-      }));
-    },
-
-    createProduct(token, body) {
-      const admin = requireAdminSession(db, token);
-      requireField(body, "code");
-      requireField(body, "name");
-
-      const code = String(body.code).trim().toUpperCase();
-      if (!/^[A-Z0-9_]{3,32}$/.test(code)) {
-        throw new AppError(400, "INVALID_PRODUCT_CODE", "Product code must be 3-32 chars: A-Z, 0-9 or underscore.");
+      if (!developer || !verifyPassword(String(body.password), developer.password_hash)) {
+        throw new AppError(401, "DEVELOPER_LOGIN_FAILED", "Username or password is incorrect.");
       }
-
-      if (one(db, "SELECT id FROM products WHERE code = ?", code)) {
-        throw new AppError(409, "PRODUCT_EXISTS", "Product code already exists.");
+      if (developer.status !== "active") {
+        throw new AppError(403, "DEVELOPER_LOGIN_DISABLED", "This developer account has been disabled.");
       }
 
       const now = nowIso();
-      const product = {
-        id: generateId("prod"),
-        code,
-        name: String(body.name).trim(),
-        description: String(body.description ?? "").trim(),
+      const token = randomToken(32);
+      const expiresAt = addSeconds(now, config.developerSessionHours * 3600);
+      run(
+        db,
+        `
+          INSERT INTO developer_sessions (id, developer_id, token, expires_at, created_at, last_seen_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+        generateId("devsess"),
+        developer.id,
+        token,
+        expiresAt,
+        now,
+        now
+      );
+      run(
+        db,
+        "UPDATE developer_accounts SET last_login_at = ?, updated_at = ? WHERE id = ?",
+        now,
+        now,
+        developer.id
+      );
+
+      audit(db, "developer", developer.id, "developer.login", "developer", developer.id, {
+        username: developer.username
+      });
+
+      return {
+        token,
+        expiresAt,
+        developer: formatDeveloperRow({
+          ...developer,
+          last_login_at: now,
+          updated_at: now
+        })
+      };
+    },
+
+    developerMe(token) {
+      const session = requireDeveloperSession(db, token);
+      return {
+        developer: {
+          id: session.developer_id,
+          username: session.username,
+          displayName: session.display_name ?? ""
+        },
+        session: {
+          id: session.id,
+          expiresAt: session.expires_at
+        }
+      };
+    },
+
+    listDevelopers(token) {
+      requireAdminSession(db, token);
+      const items = many(
+        db,
+        `
+          SELECT *
+          FROM developer_accounts
+          ORDER BY created_at DESC
+        `
+      ).map(formatDeveloperRow);
+
+      return {
+        items,
+        total: items.length
+      };
+    },
+
+    createDeveloper(token, body = {}) {
+      const admin = requireAdminSession(db, token);
+      requireField(body, "username");
+      requireField(body, "password");
+
+      const username = normalizeDeveloperUsername(body.username);
+      if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) {
+        throw new AppError(
+          400,
+          "INVALID_DEVELOPER_USERNAME",
+          "Developer username must be 3-32 chars and use letters, digits, dot, underscore, or dash."
+        );
+      }
+
+      const password = String(body.password ?? "");
+      if (password.length < 8) {
+        throw new AppError(400, "INVALID_DEVELOPER_PASSWORD", "Developer password must be at least 8 characters.");
+      }
+
+      if (one(db, "SELECT id FROM developer_accounts WHERE username = ?", username)) {
+        throw new AppError(409, "DEVELOPER_EXISTS", "Developer username already exists.");
+      }
+
+      const now = nowIso();
+      const developer = {
+        id: generateId("dev"),
+        username,
+        displayName: String(body.displayName ?? body.name ?? "").trim(),
         status: "active",
-        sdkAppId: randomAppId(),
-        sdkAppSecret: randomToken(24),
         createdAt: now,
         updatedAt: now
       };
@@ -3929,78 +4217,120 @@ export function createServices(db, config, runtimeState = null) {
       run(
         db,
         `
-          INSERT INTO products (id, code, name, description, status, sdk_app_id, sdk_app_secret, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO developer_accounts
+          (id, username, display_name, password_hash, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `,
-        product.id,
-        product.code,
-        product.name,
-        product.description,
-        product.status,
-        product.sdkAppId,
-        product.sdkAppSecret,
-        product.createdAt,
-        product.updatedAt
+        developer.id,
+        developer.username,
+        developer.displayName || null,
+        hashPassword(password),
+        developer.status,
+        developer.createdAt,
+        developer.updatedAt
       );
-      const featureConfig = persistProductFeatureConfig(db, product.id, body, now);
+
+      audit(db, "admin", admin.admin_id, "developer.create", "developer", developer.id, {
+        username: developer.username
+      });
+
+      return formatDeveloperRow({
+        id: developer.id,
+        username: developer.username,
+        display_name: developer.displayName || null,
+        status: developer.status,
+        created_at: developer.createdAt,
+        updated_at: developer.updatedAt,
+        last_login_at: null
+      });
+    },
+
+    listProducts(token) {
+      requireAdminSession(db, token);
+      return queryProductRows(db);
+    },
+
+    createProduct(token, body) {
+      const admin = requireAdminSession(db, token);
+      const ownerDeveloperId = body.ownerDeveloperId === undefined
+        ? null
+        : resolveProductOwnerDeveloperId(db, body.ownerDeveloperId, true);
+      const product = createProductRecord(db, body, ownerDeveloperId);
 
       audit(db, "admin", admin.admin_id, "product.create", "product", product.id, {
         code: product.code,
-        sdkAppId: product.sdkAppId
+        sdkAppId: product.sdkAppId,
+        ownerDeveloperId
       });
-      return {
-        ...product,
-        projectCode: product.code,
-        softwareCode: product.code,
-        featureConfig
-      };
+      return product;
     },
 
     updateProductFeatureConfig(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const product = one(
-        db,
-        `
-          SELECT *
-          FROM products
-          WHERE id = ?
-        `,
-        productId
-      );
+      const timestamp = nowIso();
+      const result = updateProductFeatureConfigRecord(db, productId, body, timestamp);
 
+      audit(db, "admin", admin.admin_id, "product.feature-config", "product", result.product.id, {
+        code: result.product.code,
+        featureConfig: result.featureConfig
+      });
+
+      return {
+        ...result.product,
+        featureConfig: result.featureConfig
+      };
+    },
+
+    updateProductOwner(token, productId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const product = getProductRowById(db, productId);
       if (!product) {
         throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
       }
 
-      const timestamp = nowIso();
-      const featureConfig = persistProductFeatureConfig(db, product.id, body, timestamp);
-      run(
-        db,
-        "UPDATE products SET updated_at = ? WHERE id = ?",
-        timestamp,
-        product.id
-      );
+      const ownerDeveloperId = body.ownerDeveloperId === undefined
+        ? product.ownerDeveloper?.id ?? null
+        : resolveProductOwnerDeveloperId(db, body.ownerDeveloperId, true);
+      const nextProduct = updateProductOwnerRecord(db, productId, ownerDeveloperId, nowIso());
 
-      audit(db, "admin", admin.admin_id, "product.feature-config", "product", product.id, {
+      audit(db, "admin", admin.admin_id, "product.owner.update", "product", productId, {
+        code: nextProduct.code,
+        ownerDeveloperId
+      });
+
+      return nextProduct;
+    },
+
+    developerListProducts(token) {
+      const session = requireDeveloperSession(db, token);
+      return queryProductRows(db, { ownerDeveloperId: session.developer_id });
+    },
+
+    developerCreateProduct(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const product = createProductRecord(db, body, session.developer_id);
+
+      audit(db, "developer", session.developer_id, "product.create", "product", product.id, {
         code: product.code,
-        featureConfig
+        sdkAppId: product.sdkAppId
+      });
+
+      return product;
+    },
+
+    developerUpdateProductFeatureConfig(token, productId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const ownedProduct = requireDeveloperOwnedProduct(db, session.developer_id, productId);
+      const result = updateProductFeatureConfigRecord(db, ownedProduct.id, body, nowIso());
+
+      audit(db, "developer", session.developer_id, "product.feature-config", "product", ownedProduct.id, {
+        code: result.product.code,
+        featureConfig: result.featureConfig
       });
 
       return {
-        ...formatProductRow({
-          ...product,
-          updated_at: timestamp,
-          sdk_app_id: product.sdk_app_id,
-          sdk_app_secret: product.sdk_app_secret,
-          allow_register: featureConfig.allowRegister ? 1 : 0,
-          allow_account_login: featureConfig.allowAccountLogin ? 1 : 0,
-          allow_card_login: featureConfig.allowCardLogin ? 1 : 0,
-          allow_card_recharge: featureConfig.allowCardRecharge ? 1 : 0,
-          allow_version_check: featureConfig.allowVersionCheck ? 1 : 0,
-          allow_notices: featureConfig.allowNotices ? 1 : 0,
-          allow_client_unbind: featureConfig.allowClientUnbind ? 1 : 0
-        }),
-        featureConfig
+        ...result.product,
+        featureConfig: result.featureConfig
       };
     },
 

@@ -25,12 +25,33 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS developer_accounts (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  display_name TEXT,
+  password_hash TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_login_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS developer_sessions (
+  id TEXT PRIMARY KEY,
+  developer_id TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   code TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
   status TEXT NOT NULL,
+  owner_developer_id TEXT,
   sdk_app_id TEXT NOT NULL UNIQUE,
   sdk_app_secret TEXT NOT NULL,
   created_at TEXT NOT NULL,
@@ -496,6 +517,12 @@ CREATE INDEX IF NOT EXISTS idx_notices_status_window
   ON notices(status, starts_at, ends_at, channel, block_login);
 CREATE INDEX IF NOT EXISTS idx_network_rules_lookup
   ON network_rules(status, action_scope, target_type, product_id);
+CREATE INDEX IF NOT EXISTS idx_products_owner
+  ON products(owner_developer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_developer_accounts_lookup
+  ON developer_accounts(username, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_developer_sessions_lookup
+  ON developer_sessions(developer_id, expires_at, last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_relations_parent
   ON reseller_relations(parent_reseller_id, can_view_descendants, updated_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_users_reseller
@@ -521,10 +548,28 @@ export function createDatabase(config) {
 
   const db = new DatabaseSync(config.dbPath);
   db.exec(schema);
+  migrateDatabase(db);
   seedAdmin(db, config);
   seedProductFeatureConfigs(db);
   seedResellerRelations(db);
   return db;
+}
+
+function migrateDatabase(db) {
+  ensureColumn(
+    db,
+    "products",
+    "owner_developer_id",
+    "ALTER TABLE products ADD COLUMN owner_developer_id TEXT"
+  );
+}
+
+function ensureColumn(db, tableName, columnName, alterSql) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (columns.some((column) => column.name === columnName)) {
+    return;
+  }
+  db.exec(alterSql);
 }
 
 function seedAdmin(db, config) {

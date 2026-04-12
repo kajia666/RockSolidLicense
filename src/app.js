@@ -12,7 +12,8 @@ import { createTcpServer } from "./tcp-server.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), "utf8");
-const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center.html"), "utf8");
+const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center-v2.html"), "utf8");
+const developerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "developer-center.html"), "utf8");
 const noticeCenterHtml = fs.readFileSync(path.join(currentDir, "web", "notice-center.html"), "utf8");
 const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-ops.html"), "utf8");
 const resellerFinanceHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-finance.html"), "utf8");
@@ -74,6 +75,11 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/developer") {
+        sendHtml(res, 200, developerCenterHtml);
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/admin/notices") {
         sendHtml(res, 200, noticeCenterHtml);
         return;
@@ -115,6 +121,17 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/admin/developers") {
+        sendJson(res, 200, { ok: true, data: services.listDevelopers(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/admin/developers") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, { ok: true, data: services.createDeveloper(getBearerToken(req), body) });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/admin/products") {
         sendJson(res, 200, { ok: true, data: services.listProducts(getBearerToken(req)) });
         return;
@@ -136,6 +153,22 @@ export function createApp(overrides = {}) {
           data: services.updateProductFeatureConfig(
             getBearerToken(req),
             productFeatureRoute.productId,
+            body
+          )
+        });
+        return;
+      }
+
+      const productOwnerRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/products/:productId/owner")
+        : null;
+      if (productOwnerRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updateProductOwner(
+            getBearerToken(req),
+            productOwnerRoute.productId,
             body
           )
         });
@@ -831,6 +864,44 @@ export function createApp(overrides = {}) {
       if (req.method === "POST" && url.pathname === "/api/reseller/login") {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, { ok: true, data: services.resellerLogin(body) });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/login") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, { ok: true, data: services.developerLogin(body) });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/me") {
+        sendJson(res, 200, { ok: true, data: services.developerMe(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/products") {
+        sendJson(res, 200, { ok: true, data: services.developerListProducts(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/products") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, { ok: true, data: services.developerCreateProduct(getBearerToken(req), body) });
+        return;
+      }
+
+      const developerProductFeatureRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/products/:productId/feature-config")
+        : null;
+      if (developerProductFeatureRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateProductFeatureConfig(
+            getBearerToken(req),
+            developerProductFeatureRoute.productId,
+            body
+          )
+        });
         return;
       }
 

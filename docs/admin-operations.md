@@ -7,6 +7,7 @@ Terminology:
 - in this repository, a `product` is the same logical unit as one software title or one project owned by a software author
 - `products.id` is the internal identifier
 - `products.code` is the stable external code and can be treated as `productCode`, `projectCode`, or `softwareCode`
+- one developer account can own many products, but each product belongs to at most one developer account at a time
 - `sdkAppId` is the SDK signing app id and should not be confused with the project code
 
 ## What operators can do now
@@ -25,6 +26,8 @@ Terminology:
 - disable a client version or mark it for force update
 - publish client announcements and maintenance notices
 - temporarily block login with an active maintenance notice
+- create developer accounts for software authors
+- assign a project to a specific developer account
 - create resellers and allocate card-key inventory by channel
 - trace whether reseller-allocated cards remain fresh or have been redeemed
 - create IP / CIDR access rules for login, register, recharge, or heartbeat
@@ -37,10 +40,14 @@ Terminology:
 - `GET /api/admin/products`
 - `POST /api/admin/products`
 - `POST /api/admin/products/:productId/feature-config`
+- `POST /api/admin/products/:productId/owner`
+- `GET /api/admin/developers`
+- `POST /api/admin/developers`
 
 Dedicated UI:
 
 - `/admin/products`
+- `/developer`
 
 Product create requests can optionally include a `featureConfig` object:
 
@@ -48,6 +55,7 @@ Product create requests can optionally include a `featureConfig` object:
 {
   "code": "MY_SOFTWARE",
   "name": "My Software",
+  "ownerDeveloperId": "dev_123",
   "featureConfig": {
     "allowRegister": true,
     "allowAccountLogin": true,
@@ -71,16 +79,51 @@ Feature config update example:
 }
 ```
 
+Owner assignment example:
+
+```json
+{
+  "ownerDeveloperId": "dev_123"
+}
+```
+
+Developer create example:
+
+```json
+{
+  "username": "alice.dev",
+  "displayName": "Alice Studio",
+  "password": "ChangeMe!123"
+}
+```
+
 Effects:
 
 - software authors can decide which client capabilities are exposed for a given product
-- `/admin/products` provides a cleaner product-focused page for creating products and editing feature toggles without relying on the legacy `/admin` console
+- `/admin/products` provides a cleaner product-focused page for creating products, creating developer accounts, assigning project owners, and editing feature toggles without relying on the legacy `/admin` console
 - write requests can use `productCode`, `projectCode`, or `softwareCode` to point at the same product
+- if `ownerDeveloperId` is set, that project becomes visible to the matching developer account in `/developer`
+- if `ownerDeveloperId` is `null`, the project remains admin-managed and does not appear in a developer's project list
 - disabling `allowVersionCheck` makes `POST /api/client/version-check` return `disabled_by_product`
 - disabling `allowNotices` makes `POST /api/client/notices` return `disabled_by_product`
 - when `allowVersionCheck` or `allowNotices` is off, login no longer applies version rejection or maintenance blocking for that product
 - disabling `allowRegister`, `allowAccountLogin`, `allowCardLogin`, `allowCardRecharge`, or `allowClientUnbind` blocks the corresponding signed client endpoint
 - `POST /api/client/bindings` still works when self-unbind is disabled, but the returned `unbindPolicy` will reflect that the product-level switch is off
+
+### Developer project management
+
+- `POST /api/developer/login`
+- `GET /api/developer/me`
+- `GET /api/developer/products`
+- `POST /api/developer/products`
+- `POST /api/developer/products/:productId/feature-config`
+
+Effects:
+
+- a developer account can create multiple projects under its own ownership
+- developers only see projects where `products.owner_developer_id` matches their own account
+- developers can edit feature toggles for their own projects, but cannot reassign ownership
+- ownership transfers made by the admin take effect immediately in the developer project list
 
 ### Accounts
 

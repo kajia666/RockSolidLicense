@@ -54,6 +54,7 @@ export function loadConfig(overrides = {}) {
     adminUsername: process.env.RSL_ADMIN_USERNAME ?? "admin",
     adminPassword: process.env.RSL_ADMIN_PASSWORD ?? "ChangeMe!123",
     adminSessionHours: Number(process.env.RSL_ADMIN_SESSION_HOURS ?? 12),
+    developerSessionHours: Number(process.env.RSL_DEVELOPER_SESSION_HOURS ?? 24),
     requestSkewSeconds: Number(process.env.RSL_REQUEST_SKEW_SECONDS ?? 300),
     serverTokenSecret:
       process.env.RSL_SERVER_TOKEN_SECRET ??

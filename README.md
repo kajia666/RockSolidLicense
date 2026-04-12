@@ -17,6 +17,7 @@
 - 仓库里的 `product` 就是“软件作者的一个软件 / 一个项目”
 - `products.id` 是内部主键
 - `products.code` 是对外稳定的项目编码，也可以理解成 `projectCode` 或 `softwareCode`
+- `products.owner_developer_id` 表示这个项目归属的开发者账号
 - `sdkAppId` / `sdkAppSecret` 是 SDK 请求签名凭据，不等同于项目编码
 
 ## 核心能力
@@ -43,6 +44,7 @@
 ### 软件管理
 
 - 产品级功能开关
+- 开发者多项目归属
 - 客户端版本规则
 - 强制升级与升级建议
 - 客户端公告与维护通知
@@ -96,6 +98,7 @@ node src/server.js
 
 - 管理后台：`http://127.0.0.1:3000/admin`
 - 产品中心：`http://127.0.0.1:3000/admin/products`
+- 开发者中心：`http://127.0.0.1:3000/developer`
 - 公告中心：`http://127.0.0.1:3000/admin/notices`
 - 健康检查：`http://127.0.0.1:3000/api/health`
 - TCP Gateway：`tcp://127.0.0.1:4000`
@@ -123,6 +126,7 @@ RSL_LICENSE_PUBLIC_KEY_PATH=./data/license_public.pem
 RSL_TOKEN_ISSUER=RockSolidLicense
 RSL_ADMIN_USERNAME=admin
 RSL_ADMIN_PASSWORD=PleaseChangeThisNow
+RSL_DEVELOPER_SESSION_HOURS=24
 ```
 
 ### 运行测试
@@ -171,11 +175,15 @@ HTTP：
 - `GET /api/admin/products`
 - `POST /api/admin/products`
 - `POST /api/admin/products/:productId/feature-config`
+- `POST /api/admin/products/:productId/owner`
+- `GET /api/admin/developers`
+- `POST /api/admin/developers`
 
 说明：
 
 - 绝大多数写接口仍然兼容 `productCode`
 - 现在也接受 `projectCode`、`softwareCode` 作为同义字段
+- 管理员现在可以创建开发者账号，并把项目归属到某个开发者名下
 
 TCP：
 
@@ -204,7 +212,17 @@ TCP：
 - `allowClientUnbind`
 
 软件作者可以按产品维度选择是否开放这些终端能力。关闭 `allowVersionCheck` 或 `allowNotices` 后，客户端对应接口会返回“disabled by product”，登录链路也不会再继续应用该产品的版本限制或维护公告阻断。
-仓库现在还提供了一个专门的产品功能开关页面：`/admin/products`。
+仓库现在还提供了一个专门的产品中心页面：`/admin/products`，可直接创建开发者账号、分配项目归属并调整产品级功能开关。
+
+开发者项目管理接口：
+
+- `POST /api/developer/login`
+- `GET /api/developer/me`
+- `GET /api/developer/products`
+- `POST /api/developer/products`
+- `POST /api/developer/products/:productId/feature-config`
+
+这组接口用于“一个开发者管理多个项目”的场景。开发者只会看到和修改归属到自己账号名下的项目。
 
 ## Windows C/C++ SDK
 

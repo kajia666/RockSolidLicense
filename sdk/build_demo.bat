@@ -1,6 +1,9 @@
 @echo off
 setlocal
 
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0build_version_header.ps1"
+if errorlevel 1 exit /b 1
+
 call "%~dp0setup_msvc_env.bat"
 if errorlevel 1 exit /b 1
 

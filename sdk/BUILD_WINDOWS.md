@@ -7,6 +7,8 @@ The SDK currently targets native Windows system libraries only:
 - `ws2_32.lib`
 - `crypt32.lib`
 
+The SDK release version lives in `sdk/VERSION`. The build scripts regenerate `sdk/include/rocksolid_sdk_version.h` automatically before compiling.
+
 ## Recommended release formats
 
 For external software authors, the safest release strategy is:
@@ -111,6 +113,13 @@ Outputs:
 - `build\win-sdk-package\rocksolid-sdk-cpp.zip`
 - `build\win-sdk-package\rocksolid-sdk-capi.zip`
 
+Actual package names include the SDK version from `sdk/VERSION`, for example:
+
+- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.0\`
+- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.0.zip`
+- `build\win-sdk-package\rocksolid-sdk-capi-0.2.0\`
+- `build\win-sdk-package\rocksolid-sdk-capi-0.2.0.zip`
+
 The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, and C++ demo source.
 
 The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, import library, docs, and a C demo source.
@@ -118,6 +127,7 @@ The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, impor
 ## Files to embed in your own project
 
 - `sdk/include/rocksolid_sdk.h`
+- `sdk/include/rocksolid_sdk_version.h`
 - `sdk/include/rocksolid_client.hpp`
 - `sdk/include/rocksolid_transport_win.hpp`
 - `sdk/include/rocksolid_json.hpp`

@@ -110,6 +110,11 @@ inline bool verify_license_token(const std::string& public_key_pem, const std::s
   return rs_verify_license_token(public_key_pem.c_str(), token.c_str()) == RS_OK;
 }
 
+inline std::string sdk_version_string() {
+  const char* version = rs_sdk_version_string();
+  return version ? std::string(version) : std::string();
+}
+
 inline std::string sign_request(
   const std::string& secret,
   const std::string& method,

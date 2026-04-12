@@ -1,6 +1,8 @@
 #ifndef ROCKSOLID_SDK_H
 #define ROCKSOLID_SDK_H
 
+#include "rocksolid_sdk_version.h"
+
 #include <stddef.h>
 
 #if defined(_WIN32) && !defined(RS_SDK_STATIC)
@@ -47,6 +49,7 @@ RS_SDK_API int rs_sign_request(
 );
 RS_SDK_API int rs_decode_license_token_payload(const char* token, char* out_json, size_t out_len);
 RS_SDK_API int rs_verify_license_token(const char* public_key_pem, const char* token);
+RS_SDK_API const char* rs_sdk_version_string(void);
 
 #ifdef __cplusplus
 }

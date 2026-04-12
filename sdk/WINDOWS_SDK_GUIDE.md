@@ -2,6 +2,11 @@
 
 This guide covers the current Windows-native SDK pieces for RockSolidLicense.
 
+Current SDK version source:
+
+- `sdk/VERSION`
+- generated header: `sdk/include/rocksolid_sdk_version.h`
+
 ## Implemented layers
 
 - Cryptography: SHA256, HMAC-SHA256, nonce generation
@@ -67,6 +72,8 @@ This produces:
 - `build\win-sdk-package\rocksolid-sdk-cpp.zip`
 - `build\win-sdk-package\rocksolid-sdk-capi\`
 - `build\win-sdk-package\rocksolid-sdk-capi.zip`
+
+Actual package names include the SDK version from `sdk/VERSION`, for example `rocksolid-sdk-cpp-0.2.0.zip`.
 
 Use the `cpp` package when the integrator wants the full `LicenseClientWin` feature set.
 
@@ -213,6 +220,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `validate_license_token_with_key_set(...)` lets you validate `licenseToken` locally against keys fetched during startup, without an extra round trip.
 - `validate_license_token_with_bootstrap(...)` reuses the cached bootstrap payload directly, so the caller does not need to manage key selection.
 - `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
+- `rs_sdk_version_string()` and `rocksolid::sdk_version_string()` let your host application report the exact SDK build it is using.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.
 - `BindingsResponse.unbind_policy` tells you whether self-unbind is enabled and how many attempts remain in the current window.
 - `LoginRequest`, `CardLoginRequest`, and `HeartbeatRequest` can optionally carry `client_version/channel` for version enforcement, plus hardware/IP profile fields for configurable rebinding detection.

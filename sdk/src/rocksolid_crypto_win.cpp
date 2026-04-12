@@ -474,6 +474,10 @@ int rs_verify_license_token(const char* public_key_pem, const char* token) {
   return status == 0 ? RS_OK : RS_ERROR_CRYPTO;
 }
 
+const char* rs_sdk_version_string(void) {
+  return RS_SDK_VERSION_STRING;
+}
+
 }  // extern "C"
 
 #endif

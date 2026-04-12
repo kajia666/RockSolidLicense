@@ -23,6 +23,8 @@ int main() {
 
     rocksolid::LicenseClientWin client(identity, http_endpoint, tcp_endpoint);
 
+    std::cout << "SDK version: " << rocksolid::sdk_version_string() << std::endl;
+
     const std::string fingerprint = client.generate_device_fingerprint();
     std::cout << "Device fingerprint: " << fingerprint << std::endl;
     const std::string client_version = "1.0.0";

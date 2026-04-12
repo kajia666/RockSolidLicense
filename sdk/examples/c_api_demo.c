@@ -9,6 +9,8 @@ int main(void) {
   char signature[RS_HMAC_SHA256_HEX_LEN + 1] = {0};
   const char* body = "{\"productCode\":\"MY_SOFTWARE\"}";
 
+  printf("sdk_version=%s\n", rs_sdk_version_string());
+
   if (rs_generate_nonce(nonce, sizeof(nonce)) != RS_OK) {
     fprintf(stderr, "rs_generate_nonce failed.\n");
     return 1;

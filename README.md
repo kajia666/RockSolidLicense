@@ -184,6 +184,7 @@ TCP：
 - 启动快照缓存，支持短时离线启动判断
 - 结构化 `ApiException`，便于按错误码控制客户端流程
 - `licenseToken` 解码与 RSA 公钥验签
+- SDK 版本号、版本头文件和发布 changelog
 
 发布建议：
 
@@ -207,14 +208,17 @@ call sdk\package_release.bat build\my-sdk-dist
 
 会输出：
 
-- `build/win-sdk-package/rocksolid-sdk-cpp/`
-- `build/win-sdk-package/rocksolid-sdk-cpp.zip`
-- `build/win-sdk-package/rocksolid-sdk-capi/`
-- `build/win-sdk-package/rocksolid-sdk-capi.zip`
+- `build/win-sdk-package/rocksolid-sdk-cpp-<version>/`
+- `build/win-sdk-package/rocksolid-sdk-cpp-<version>.zip`
+- `build/win-sdk-package/rocksolid-sdk-capi-<version>/`
+- `build/win-sdk-package/rocksolid-sdk-capi-<version>.zip`
+
+SDK 版本源文件在 `sdk/VERSION`，构建脚本会自动生成 `sdk/include/rocksolid_sdk_version.h`，并把 `VERSION.txt`、`manifest.json`、`docs/CHANGELOG.md` 一起打进发布包。
 
 主要文件：
 
 - `sdk/include/rocksolid_sdk.h`
+- `sdk/include/rocksolid_sdk_version.h`
 - `sdk/include/rocksolid_client.hpp`
 - `sdk/include/rocksolid_transport_win.hpp`
 - `sdk/src/rocksolid_crypto_win.cpp`

@@ -1,34 +1,39 @@
 # RockSolid Windows C API Package
 
-这个发布包面向只需要底层 C 接口的软件作者。
+This package is for software authors who only need the low-level C interface.
 
-## 包内容
+## Package contents
 
-- `include/rocksolid_sdk.h`：C API 头文件
-- `bin/rocksolid_sdk.dll`：运行时 DLL
-- `lib/rocksolid_sdk.lib`：DLL import library
-- `examples/c_api_demo.c`：最小 C 接入示例
-- `docs/BUILD_WINDOWS.md`：Windows 构建说明
+- `include/rocksolid_sdk.h`: C API header
+- `bin/rocksolid_sdk.dll`: runtime DLL
+- `lib/rocksolid_sdk.lib`: import library
+- `examples/c_api_demo.c`: minimal C example
+- `docs/BUILD_WINDOWS.md`: build instructions
+- `docs/CHANGELOG.md`: SDK release notes
+- `VERSION.txt`: package version
+- `manifest.json`: package metadata
 
-## 接入要点
+## Integration notes
 
-- 使用 DLL 包时，不要定义 `RS_SDK_STATIC`
-- 你的程序运行时需要能找到 `bin/rocksolid_sdk.dll`
-- 当前 DLL 暴露的是底层 C API，适合做：
-  - 随机数和设备指纹
-  - HMAC 请求签名
-  - `licenseToken` 载荷解码
-  - `licenseToken` 公钥验签
+- Do not define `RS_SDK_STATIC` when using the DLL package.
+- Your application must be able to load `bin/rocksolid_sdk.dll` at runtime.
+- The current DLL exports the low-level C API for:
+  - nonce generation
+  - device fingerprint generation
+  - HMAC request signing
+  - `licenseToken` payload decoding
+  - `licenseToken` public-key verification
+  - runtime SDK version lookup
 
-## 最小接入示例
+## Minimal compile example
 
 ```bat
 cl /nologo examples\c_api_demo.c /I include lib\rocksolid_sdk.lib /Fe:c_api_demo.exe
 ```
 
-生成的 `c_api_demo.exe` 旁边需要放 `bin\rocksolid_sdk.dll`，或者把 DLL 放进系统 `PATH` 能找到的位置。
+Place `bin\rocksolid_sdk.dll` next to `c_api_demo.exe`, or in a directory available through the system `PATH`.
 
-## 推荐用途
+## Recommended usage
 
-- 给非 C++ 项目或自定义封装层提供稳定的底层二进制接口
-- 自己在上层实现 HTTP/TCP 通信、登录和心跳流程
+- Use this package when you want a stable C binary interface.
+- Build your own higher-level HTTP and TCP integration layer on top of the exported primitives.

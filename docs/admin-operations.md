@@ -25,6 +25,50 @@ This document describes the new backoffice operations endpoints and the `/admin`
 
 ## HTTP endpoints
 
+### Products
+
+- `GET /api/admin/products`
+- `POST /api/admin/products`
+- `POST /api/admin/products/:productId/feature-config`
+
+Product create requests can optionally include a `featureConfig` object:
+
+```json
+{
+  "code": "MY_SOFTWARE",
+  "name": "My Software",
+  "featureConfig": {
+    "allowRegister": true,
+    "allowAccountLogin": true,
+    "allowCardLogin": true,
+    "allowCardRecharge": true,
+    "allowVersionCheck": true,
+    "allowNotices": true,
+    "allowClientUnbind": true
+  }
+}
+```
+
+Feature config update example:
+
+```json
+{
+  "allowRegister": false,
+  "allowCardRecharge": false,
+  "allowVersionCheck": false,
+  "allowNotices": false
+}
+```
+
+Effects:
+
+- software authors can decide which client capabilities are exposed for a given product
+- disabling `allowVersionCheck` makes `POST /api/client/version-check` return `disabled_by_product`
+- disabling `allowNotices` makes `POST /api/client/notices` return `disabled_by_product`
+- when `allowVersionCheck` or `allowNotices` is off, login no longer applies version rejection or maintenance blocking for that product
+- disabling `allowRegister`, `allowAccountLogin`, `allowCardLogin`, `allowCardRecharge`, or `allowClientUnbind` blocks the corresponding signed client endpoint
+- `POST /api/client/bindings` still works when self-unbind is disabled, but the returned `unbindPolicy` will reflect that the product-level switch is off
+
 ### Accounts
 
 - `GET /api/admin/accounts`

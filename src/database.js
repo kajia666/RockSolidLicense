@@ -37,6 +37,20 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS product_feature_configs (
+  product_id TEXT PRIMARY KEY,
+  allow_register INTEGER NOT NULL DEFAULT 1,
+  allow_account_login INTEGER NOT NULL DEFAULT 1,
+  allow_card_login INTEGER NOT NULL DEFAULT 1,
+  allow_card_recharge INTEGER NOT NULL DEFAULT 1,
+  allow_version_check INTEGER NOT NULL DEFAULT 1,
+  allow_notices INTEGER NOT NULL DEFAULT 1,
+  allow_client_unbind INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS policies (
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
@@ -508,6 +522,7 @@ export function createDatabase(config) {
   const db = new DatabaseSync(config.dbPath);
   db.exec(schema);
   seedAdmin(db, config);
+  seedProductFeatureConfigs(db);
   seedResellerRelations(db);
   return db;
 }
@@ -549,6 +564,41 @@ function seedResellerRelations(db) {
       INSERT INTO reseller_relations
       (reseller_id, parent_reseller_id, can_view_descendants, created_at, updated_at)
       VALUES (?, NULL, 1, ?, ?)
+    `
+  );
+
+  for (const row of rows) {
+    insert.run(row.id, now, now);
+  }
+}
+
+function seedProductFeatureConfigs(db) {
+  const now = nowIso();
+  const rows = db.prepare(
+    `
+      SELECT p.id
+      FROM products p
+      LEFT JOIN product_feature_configs pfc ON pfc.product_id = p.id
+      WHERE pfc.product_id IS NULL
+    `
+  ).all();
+
+  const insert = db.prepare(
+    `
+      INSERT INTO product_feature_configs
+      (
+        product_id,
+        allow_register,
+        allow_account_login,
+        allow_card_login,
+        allow_card_recharge,
+        allow_version_check,
+        allow_notices,
+        allow_client_unbind,
+        created_at,
+        updated_at
+      )
+      VALUES (?, 1, 1, 1, 1, 1, 1, 1, ?, ?)
     `
   );
 

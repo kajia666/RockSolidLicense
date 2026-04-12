@@ -120,6 +120,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      const productFeatureRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/products/:productId/feature-config")
+        : null;
+      if (productFeatureRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updateProductFeatureConfig(
+            getBearerToken(req),
+            productFeatureRoute.productId,
+            body
+          )
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/admin/policies") {
         sendJson(
           res,

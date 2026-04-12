@@ -16,6 +16,16 @@ import {
   verifyPassword
 } from "./security.js";
 
+const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze({
+  allowRegister: true,
+  allowAccountLogin: true,
+  allowCardLogin: true,
+  allowCardRecharge: true,
+  allowVersionCheck: true,
+  allowNotices: true,
+  allowClientUnbind: true
+});
+
 function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
 }
@@ -345,6 +355,182 @@ function parseOptionalBoolean(value, fieldName) {
   }
 
   throw new AppError(400, "INVALID_BOOLEAN", `${fieldName} must be a boolean value.`);
+}
+
+function extractProductFeatureConfigInput(body = {}) {
+  if (
+    body &&
+    typeof body === "object" &&
+    body.featureConfig &&
+    typeof body.featureConfig === "object" &&
+    !Array.isArray(body.featureConfig)
+  ) {
+    return body.featureConfig;
+  }
+  return body ?? {};
+}
+
+function parseProductFeatureConfigRow(row, fallbackUpdatedAt = null) {
+  return {
+    allowRegister: row ? Boolean(row.allow_register) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowRegister,
+    allowAccountLogin: row ? Boolean(row.allow_account_login) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowAccountLogin,
+    allowCardLogin: row ? Boolean(row.allow_card_login) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowCardLogin,
+    allowCardRecharge: row ? Boolean(row.allow_card_recharge) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowCardRecharge,
+    allowVersionCheck: row ? Boolean(row.allow_version_check) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowVersionCheck,
+    allowNotices: row ? Boolean(row.allow_notices) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowNotices,
+    allowClientUnbind: row ? Boolean(row.allow_client_unbind) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowClientUnbind,
+    createdAt: row?.feature_created_at ?? row?.created_at ?? fallbackUpdatedAt ?? null,
+    updatedAt: row?.feature_updated_at ?? row?.updated_at ?? fallbackUpdatedAt ?? null
+  };
+}
+
+function loadProductFeatureConfig(db, productId, fallbackUpdatedAt = null) {
+  const row = one(db, "SELECT * FROM product_feature_configs WHERE product_id = ?", productId);
+  return parseProductFeatureConfigRow(row, fallbackUpdatedAt);
+}
+
+function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIso()) {
+  const source = extractProductFeatureConfigInput(body);
+  const config = {
+    allowRegister: parseOptionalBoolean(source.allowRegister, "allowRegister"),
+    allowAccountLogin: parseOptionalBoolean(source.allowAccountLogin, "allowAccountLogin"),
+    allowCardLogin: parseOptionalBoolean(source.allowCardLogin, "allowCardLogin"),
+    allowCardRecharge: parseOptionalBoolean(source.allowCardRecharge, "allowCardRecharge"),
+    allowVersionCheck: parseOptionalBoolean(source.allowVersionCheck, "allowVersionCheck"),
+    allowNotices: parseOptionalBoolean(source.allowNotices, "allowNotices"),
+    allowClientUnbind: parseOptionalBoolean(source.allowClientUnbind, "allowClientUnbind")
+  };
+
+  const existing = one(db, "SELECT * FROM product_feature_configs WHERE product_id = ?", productId);
+  const current = existing
+    ? parseProductFeatureConfigRow(existing, timestamp)
+    : DEFAULT_PRODUCT_FEATURE_CONFIG;
+  const resolved = {
+    allowRegister: config.allowRegister ?? current.allowRegister,
+    allowAccountLogin: config.allowAccountLogin ?? current.allowAccountLogin,
+    allowCardLogin: config.allowCardLogin ?? current.allowCardLogin,
+    allowCardRecharge: config.allowCardRecharge ?? current.allowCardRecharge,
+    allowVersionCheck: config.allowVersionCheck ?? current.allowVersionCheck,
+    allowNotices: config.allowNotices ?? current.allowNotices,
+    allowClientUnbind: config.allowClientUnbind ?? current.allowClientUnbind
+  };
+
+  if (existing) {
+    run(
+      db,
+      `
+        UPDATE product_feature_configs
+        SET allow_register = ?, allow_account_login = ?, allow_card_login = ?, allow_card_recharge = ?,
+            allow_version_check = ?, allow_notices = ?, allow_client_unbind = ?, updated_at = ?
+        WHERE product_id = ?
+      `,
+      resolved.allowRegister ? 1 : 0,
+      resolved.allowAccountLogin ? 1 : 0,
+      resolved.allowCardLogin ? 1 : 0,
+      resolved.allowCardRecharge ? 1 : 0,
+      resolved.allowVersionCheck ? 1 : 0,
+      resolved.allowNotices ? 1 : 0,
+      resolved.allowClientUnbind ? 1 : 0,
+      timestamp,
+      productId
+    );
+  } else {
+    run(
+      db,
+      `
+        INSERT INTO product_feature_configs
+        (
+          product_id,
+          allow_register,
+          allow_account_login,
+          allow_card_login,
+          allow_card_recharge,
+          allow_version_check,
+          allow_notices,
+          allow_client_unbind,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      productId,
+      resolved.allowRegister ? 1 : 0,
+      resolved.allowAccountLogin ? 1 : 0,
+      resolved.allowCardLogin ? 1 : 0,
+      resolved.allowCardRecharge ? 1 : 0,
+      resolved.allowVersionCheck ? 1 : 0,
+      resolved.allowNotices ? 1 : 0,
+      resolved.allowClientUnbind ? 1 : 0,
+      timestamp,
+      timestamp
+    );
+  }
+
+  return {
+    ...resolved,
+    createdAt: existing?.created_at ?? timestamp,
+    updatedAt: timestamp
+  };
+}
+
+function formatProductRow(row) {
+  const featureConfig = parseProductFeatureConfigRow(row, row.updated_at ?? null);
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    description: row.description ?? "",
+    status: row.status,
+    sdkAppId: row.sdk_app_id,
+    sdkAppSecret: row.sdk_app_secret,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    featureConfig,
+    sdk_app_id: row.sdk_app_id,
+    sdk_app_secret: row.sdk_app_secret,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+function requireProductFeatureEnabled(db, product, featureKey, code, message, status = 403) {
+  const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
+  if (featureConfig[featureKey] !== false) {
+    return featureConfig;
+  }
+
+  throw new AppError(status, code, message, {
+    productCode: product.code,
+    featureKey
+  });
+}
+
+function buildDisabledVersionManifest(product, clientVersion, channel = "stable") {
+  return {
+    productCode: product.code,
+    channel: normalizeChannel(channel),
+    clientVersion: clientVersion ?? null,
+    enabled: false,
+    allowed: true,
+    status: "disabled_by_product",
+    message: "Version check is disabled for this product.",
+    latestVersion: null,
+    minimumAllowedVersion: null,
+    latestDownloadUrl: null,
+    notice: null,
+    versions: []
+  };
+}
+
+function buildDisabledNoticeManifest(product, channel = "stable") {
+  return {
+    productCode: product.code,
+    channel: normalizeNoticeChannel(channel, "stable"),
+    enabled: false,
+    status: "disabled_by_product",
+    message: "Client notices are disabled for this product.",
+    notices: []
+  };
 }
 
 function normalizeCardControlStatus(value = "active") {
@@ -3662,14 +3848,24 @@ export function createServices(db, config, runtimeState = null) {
 
     listProducts(token) {
       requireAdminSession(db, token);
-      return many(
+      const rows = many(
         db,
         `
-          SELECT id, code, name, description, status, sdk_app_id, sdk_app_secret, created_at, updated_at
-          FROM products
+          SELECT p.*, pfc.allow_register, pfc.allow_account_login, pfc.allow_card_login, pfc.allow_card_recharge,
+                 pfc.allow_version_check, pfc.allow_notices, pfc.allow_client_unbind,
+                 pfc.created_at AS feature_created_at, pfc.updated_at AS feature_updated_at
+          FROM products p
+          LEFT JOIN product_feature_configs pfc ON pfc.product_id = p.id
           ORDER BY created_at DESC
         `
       );
+      return rows.map((row) => formatProductRow({
+        ...row,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        feature_created_at: row.feature_created_at,
+        feature_updated_at: row.feature_updated_at
+      }));
     },
 
     createProduct(token, body) {
@@ -3715,12 +3911,64 @@ export function createServices(db, config, runtimeState = null) {
         product.createdAt,
         product.updatedAt
       );
+      const featureConfig = persistProductFeatureConfig(db, product.id, body, now);
 
       audit(db, "admin", admin.admin_id, "product.create", "product", product.id, {
         code: product.code,
         sdkAppId: product.sdkAppId
       });
-      return product;
+      return {
+        ...product,
+        featureConfig
+      };
+    },
+
+    updateProductFeatureConfig(token, productId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const product = one(
+        db,
+        `
+          SELECT *
+          FROM products
+          WHERE id = ?
+        `,
+        productId
+      );
+
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+
+      const timestamp = nowIso();
+      const featureConfig = persistProductFeatureConfig(db, product.id, body, timestamp);
+      run(
+        db,
+        "UPDATE products SET updated_at = ? WHERE id = ?",
+        timestamp,
+        product.id
+      );
+
+      audit(db, "admin", admin.admin_id, "product.feature-config", "product", product.id, {
+        code: product.code,
+        featureConfig
+      });
+
+      return {
+        ...formatProductRow({
+          ...product,
+          updated_at: timestamp,
+          sdk_app_id: product.sdk_app_id,
+          sdk_app_secret: product.sdk_app_secret,
+          allow_register: featureConfig.allowRegister ? 1 : 0,
+          allow_account_login: featureConfig.allowAccountLogin ? 1 : 0,
+          allow_card_login: featureConfig.allowCardLogin ? 1 : 0,
+          allow_card_recharge: featureConfig.allowCardRecharge ? 1 : 0,
+          allow_version_check: featureConfig.allowVersionCheck ? 1 : 0,
+          allow_notices: featureConfig.allowNotices ? 1 : 0,
+          allow_client_unbind: featureConfig.allowClientUnbind ? 1 : 0
+        }),
+        featureConfig
+      };
     },
 
     listPolicies(token, productCode = null) {
@@ -7023,10 +7271,16 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
+      const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
+      if (!featureConfig.allowNotices) {
+        return buildDisabledNoticeManifest(product, body.channel);
+      }
+
       const notices = activeNoticesForProduct(db, product.id, body.channel).map(formatNotice);
       return {
         productCode: product.code,
         channel: normalizeNoticeChannel(body.channel, "stable"),
+        enabled: true,
         notices
       };
     },
@@ -7424,6 +7678,11 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
+      const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
+      if (!featureConfig.allowVersionCheck) {
+        return buildDisabledVersionManifest(product, String(body.clientVersion).trim(), body.channel);
+      }
+
       return buildVersionManifest(
         db,
         product,
@@ -7440,6 +7699,7 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
+      const productFeatureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
       enforceNetworkRules(db, product, meta.ip, "login");
 
       return withTransaction(db, () => {
@@ -7451,6 +7711,7 @@ export function createServices(db, config, runtimeState = null) {
           subject.entitlement.id,
           unbindConfig.clientUnbindWindowDays
         );
+        const allowClientUnbind = productFeatureConfig.allowClientUnbind && unbindConfig.allowClientUnbind;
 
         return {
           authMode: subject.authMode,
@@ -7466,7 +7727,8 @@ export function createServices(db, config, runtimeState = null) {
           },
           bindings,
           unbindPolicy: {
-            allowClientUnbind: unbindConfig.allowClientUnbind,
+            allowClientUnbind,
+            productFeatureEnabled: productFeatureConfig.allowClientUnbind,
             clientUnbindLimit: unbindConfig.clientUnbindLimit,
             clientUnbindWindowDays: unbindConfig.clientUnbindWindowDays,
             clientUnbindDeductDays: unbindConfig.clientUnbindDeductDays,
@@ -7486,6 +7748,14 @@ export function createServices(db, config, runtimeState = null) {
       if (String(body.productCode).trim().toUpperCase() !== product.code) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
+
+      requireProductFeatureEnabled(
+        db,
+        product,
+        "allowClientUnbind",
+        "CLIENT_UNBIND_DISABLED_BY_PRODUCT",
+        "Client self-unbind is disabled for this product."
+      );
 
       enforceNetworkRules(db, product, meta.ip, "login");
 
@@ -7639,6 +7909,14 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
+      requireProductFeatureEnabled(
+        db,
+        product,
+        "allowRegister",
+        "ACCOUNT_REGISTER_DISABLED",
+        "Account registration is disabled for this product."
+      );
+
       enforceNetworkRules(db, product, meta.ip, "register");
 
       const username = String(body.username).trim();
@@ -7698,6 +7976,14 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
+      requireProductFeatureEnabled(
+        db,
+        product,
+        "allowCardRecharge",
+        "CARD_RECHARGE_DISABLED",
+        "Card recharge is disabled for this product."
+      );
+
       enforceNetworkRules(db, product, meta.ip, "recharge");
 
       return withTransaction(db, () => {
@@ -7739,14 +8025,26 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
-      enforceNetworkRules(db, product, meta.ip, "login");
-      requireNoBlockingNotices(db, product, body.channel);
-      requireClientVersionAllowed(
+      const featureConfig = requireProductFeatureEnabled(
         db,
         product,
-        body.clientVersion ? String(body.clientVersion).trim() : null,
-        body.channel
+        "allowCardLogin",
+        "CARD_LOGIN_DISABLED_BY_PRODUCT",
+        "Card direct login is disabled for this product."
       );
+
+      enforceNetworkRules(db, product, meta.ip, "login");
+      if (featureConfig.allowNotices) {
+        requireNoBlockingNotices(db, product, body.channel);
+      }
+      if (featureConfig.allowVersionCheck) {
+        requireClientVersionAllowed(
+          db,
+          product,
+          body.clientVersion ? String(body.clientVersion).trim() : null,
+          body.channel
+        );
+      }
 
       const sessionResult = withTransaction(db, () => {
         expireStaleSessions(db, stateStore);
@@ -7829,14 +8127,26 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "PRODUCT_MISMATCH", "Signed app id does not match the product code.");
       }
 
-      enforceNetworkRules(db, product, meta.ip, "login");
-      requireNoBlockingNotices(db, product, body.channel);
-      requireClientVersionAllowed(
+      const featureConfig = requireProductFeatureEnabled(
         db,
         product,
-        body.clientVersion ? String(body.clientVersion).trim() : null,
-        body.channel
+        "allowAccountLogin",
+        "ACCOUNT_LOGIN_DISABLED_BY_PRODUCT",
+        "Account login is disabled for this product."
       );
+
+      enforceNetworkRules(db, product, meta.ip, "login");
+      if (featureConfig.allowNotices) {
+        requireNoBlockingNotices(db, product, body.channel);
+      }
+      if (featureConfig.allowVersionCheck) {
+        requireClientVersionAllowed(
+          db,
+          product,
+          body.clientVersion ? String(body.clientVersion).trim() : null,
+          body.channel
+        );
+      }
 
       const sessionResult = withTransaction(db, () => {
         expireStaleSessions(db, stateStore);

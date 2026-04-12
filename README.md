@@ -35,6 +35,7 @@
 
 ### 软件管理
 
+- 产品级功能开关
 - 客户端版本规则
 - 强制升级与升级建议
 - 客户端公告与维护通知
@@ -157,6 +158,12 @@ HTTP：
 - `POST /api/client/heartbeat`
 - `POST /api/client/logout`
 
+后台产品配置：
+
+- `GET /api/admin/products`
+- `POST /api/admin/products`
+- `POST /api/admin/products/:productId/feature-config`
+
 TCP：
 
 - `client.register`
@@ -172,6 +179,18 @@ TCP：
 
 - `GET /api/system/token-key`
 - `GET /api/system/token-keys`
+
+产品级功能开关当前支持：
+
+- `allowRegister`
+- `allowAccountLogin`
+- `allowCardLogin`
+- `allowCardRecharge`
+- `allowVersionCheck`
+- `allowNotices`
+- `allowClientUnbind`
+
+软件作者可以按产品维度选择是否开放这些终端能力。关闭 `allowVersionCheck` 或 `allowNotices` 后，客户端对应接口会返回“disabled by product”，登录链路也不会再继续应用该产品的版本限制或维护公告阻断。
 
 ## Windows C/C++ SDK
 

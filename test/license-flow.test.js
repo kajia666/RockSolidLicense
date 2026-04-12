@@ -3483,3 +3483,302 @@ test("reseller hierarchy can create descendants, transfer inventory, and isolate
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("product feature config can selectively disable client-facing capabilities", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "FEATURE_APP",
+        name: "Feature App",
+        description: "Product-level capability toggles"
+      },
+      adminSession.token
+    );
+    assert.equal(product.featureConfig.allowRegister, true);
+    assert.equal(product.featureConfig.allowAccountLogin, true);
+    assert.equal(product.featureConfig.allowCardLogin, true);
+    assert.equal(product.featureConfig.allowCardRecharge, true);
+    assert.equal(product.featureConfig.allowVersionCheck, true);
+    assert.equal(product.featureConfig.allowNotices, true);
+    assert.equal(product.featureConfig.allowClientUnbind, true);
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "FEATURE_APP",
+        name: "Feature Policy",
+        durationDays: 30,
+        maxDevices: 1,
+        heartbeatIntervalSeconds: 30,
+        heartbeatTimeoutSeconds: 90,
+        tokenTtlSeconds: 180
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      `/api/admin/policies/${policy.id}/unbind-config`,
+      {
+        allowClientUnbind: true,
+        clientUnbindLimit: 2,
+        clientUnbindWindowDays: 30,
+        clientUnbindDeductDays: 0
+      },
+      adminSession.token
+    );
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "FEATURE_APP",
+        policyId: policy.id,
+        count: 3,
+        prefix: "FEATOG"
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "FEATURE_APP",
+      username: "featureuser",
+      password: "StrongPass123"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "FEATURE_APP",
+      username: "featureuser",
+      password: "StrongPass123",
+      cardKey: batch.keys[0]
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/admin/client-versions",
+      {
+        productCode: "FEATURE_APP",
+        version: "2.0.0",
+        channel: "stable",
+        status: "active",
+        forceUpdate: true,
+        downloadUrl: "https://example.com/feature-app-2.0.0.zip",
+        noticeTitle: "Upgrade Required",
+        noticeBody: "Please update to continue."
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/notices",
+      {
+        productCode: "FEATURE_APP",
+        channel: "stable",
+        kind: "maintenance",
+        severity: "critical",
+        title: "Maintenance Window",
+        body: "Login should be blocked while notices are enabled.",
+        status: "active",
+        blockLogin: true
+      },
+      adminSession.token
+    );
+
+    const passiveToggleUpdate = await postJson(
+      baseUrl,
+      `/api/admin/products/${product.id}/feature-config`,
+      {
+        allowVersionCheck: false,
+        allowNotices: false
+      },
+      adminSession.token
+    );
+    assert.equal(passiveToggleUpdate.featureConfig.allowVersionCheck, false);
+    assert.equal(passiveToggleUpdate.featureConfig.allowNotices, false);
+    assert.equal(passiveToggleUpdate.featureConfig.allowAccountLogin, true);
+
+    const manifest = await signedClientPost(
+      baseUrl,
+      "/api/client/version-check",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        clientVersion: "1.0.0",
+        channel: "stable"
+      }
+    );
+    assert.equal(manifest.enabled, false);
+    assert.equal(manifest.allowed, true);
+    assert.equal(manifest.status, "disabled_by_product");
+
+    const notices = await signedClientPost(
+      baseUrl,
+      "/api/client/notices",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        channel: "stable"
+      }
+    );
+    assert.equal(notices.enabled, false);
+    assert.equal(notices.status, "disabled_by_product");
+    assert.equal(notices.notices.length, 0);
+
+    const loginWhileChecksDisabled = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        username: "featureuser",
+        password: "StrongPass123",
+        clientVersion: "1.0.0",
+        channel: "stable",
+        deviceFingerprint: "feature-device-01",
+        deviceName: "Feature PC"
+      }
+    );
+    assert.ok(loginWhileChecksDisabled.sessionToken);
+
+    const restrictiveToggleUpdate = await postJson(
+      baseUrl,
+      `/api/admin/products/${product.id}/feature-config`,
+      {
+        allowRegister: false,
+        allowAccountLogin: false,
+        allowCardLogin: false,
+        allowCardRecharge: false,
+        allowClientUnbind: false
+      },
+      adminSession.token
+    );
+    assert.equal(restrictiveToggleUpdate.featureConfig.allowRegister, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.allowAccountLogin, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.allowCardLogin, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.allowCardRecharge, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.allowClientUnbind, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.allowVersionCheck, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.allowNotices, false);
+
+    const productList = await getJson(baseUrl, "/api/admin/products", adminSession.token);
+    const listedProduct = productList.find((item) => item.code === "FEATURE_APP");
+    assert.ok(listedProduct);
+    assert.equal(listedProduct.featureConfig.allowRegister, false);
+    assert.equal(listedProduct.featureConfig.allowVersionCheck, false);
+    assert.equal(listedProduct.featureConfig.allowNotices, false);
+
+    const registerDisabled = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/register",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        username: "blockeduser",
+        password: "StrongPass123"
+      }
+    );
+    assert.equal(registerDisabled.status, 403);
+    assert.equal(registerDisabled.error.code, "ACCOUNT_REGISTER_DISABLED");
+
+    const rechargeDisabled = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        username: "featureuser",
+        password: "StrongPass123",
+        cardKey: batch.keys[1]
+      }
+    );
+    assert.equal(rechargeDisabled.status, 403);
+    assert.equal(rechargeDisabled.error.code, "CARD_RECHARGE_DISABLED");
+
+    const accountLoginDisabled = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        username: "featureuser",
+        password: "StrongPass123",
+        clientVersion: "1.0.0",
+        channel: "stable",
+        deviceFingerprint: "feature-device-02",
+        deviceName: "Feature Laptop"
+      }
+    );
+    assert.equal(accountLoginDisabled.status, 403);
+    assert.equal(accountLoginDisabled.error.code, "ACCOUNT_LOGIN_DISABLED_BY_PRODUCT");
+
+    const cardLoginDisabled = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/card-login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        cardKey: batch.keys[2],
+        clientVersion: "1.0.0",
+        channel: "stable",
+        deviceFingerprint: "feature-card-device-01",
+        deviceName: "Card Login PC"
+      }
+    );
+    assert.equal(cardLoginDisabled.status, 403);
+    assert.equal(cardLoginDisabled.error.code, "CARD_LOGIN_DISABLED_BY_PRODUCT");
+
+    const bindings = await signedClientPost(
+      baseUrl,
+      "/api/client/bindings",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        username: "featureuser",
+        password: "StrongPass123"
+      }
+    );
+    assert.equal(bindings.unbindPolicy.allowClientUnbind, false);
+    assert.equal(bindings.unbindPolicy.productFeatureEnabled, false);
+
+    const unbindDisabled = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/unbind",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        username: "featureuser",
+        password: "StrongPass123",
+        bindingId: loginWhileChecksDisabled.binding.id
+      }
+    );
+    assert.equal(unbindDisabled.status, 403);
+    assert.equal(unbindDisabled.error.code, "CLIENT_UNBIND_DISABLED_BY_PRODUCT");
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=80", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("product.feature-config"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

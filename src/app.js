@@ -12,6 +12,7 @@ import { createTcpServer } from "./tcp-server.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), "utf8");
+const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center.html"), "utf8");
 const noticeCenterHtml = fs.readFileSync(path.join(currentDir, "web", "notice-center.html"), "utf8");
 const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-ops.html"), "utf8");
 const resellerFinanceHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-finance.html"), "utf8");
@@ -65,6 +66,11 @@ export function createApp(overrides = {}) {
     try {
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/admin")) {
         sendHtml(res, 200, adminHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/admin/products") {
+        sendHtml(res, 200, productCenterHtml);
         return;
       }
 

@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Product Center</title>
+    <style>
+      :root {
+        --bg: #f5efe5;
+        --surface: rgba(255, 252, 246, 0.94);
+        --surface-strong: rgba(255, 255, 255, 0.84);
+        --line: rgba(24, 31, 27, 0.1);
+        --ink: #18201b;
+        --muted: #647067;
+        --accent: #0f7c68;
+        --accent-soft: rgba(15, 124, 104, 0.12);
+        --danger: #a0422c;
+        --danger-soft: rgba(160, 66, 44, 0.12);
+        --shadow: 0 24px 60px rgba(58, 52, 45, 0.14);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 124, 104, 0.14), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(196, 134, 74, 0.18), transparent 30%),
+          linear-gradient(135deg, #f4ede2 0%, #f9f4eb 52%, #efe5d5 100%);
+      }
+
+      code,
+      pre,
+      .mono {
+        font-family: "Cascadia Code", "Consolas", monospace;
+      }
+
+      .shell {
+        width: min(1440px, calc(100vw - 28px));
+        margin: 20px auto 36px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero,
+      .card {
+        padding: 22px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+      }
+
+      .table-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 18px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(30px, 5vw, 46px);
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      .sub,
+      .hint,
+      .nav {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .hint,
+      .nav {
+        font-size: 13px;
+      }
+
+      .nav a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      .pill-row,
+      .actions,
+      .toggle-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.64);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(24, 31, 27, 0.08);
+        background: var(--surface-strong);
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 26px;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .toggle-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 104px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        color: #fff;
+        background: var(--ink);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.secondary { background: var(--accent); }
+      button.danger { background: var(--danger); }
+
+      .status {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+      }
+
+      .status.warn {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(24, 31, 27, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        background: rgba(247, 242, 234, 0.98);
+        color: var(--muted);
+      }
+
+      tbody tr {
+        cursor: pointer;
+      }
+
+      tbody tr:hover {
+        background: rgba(15, 124, 104, 0.06);
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(24, 31, 27, 0.08);
+        color: var(--muted);
+        margin: 0 6px 6px 0;
+      }
+
+      .tag.ok {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tag.danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .split-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .split-line span:last-child {
+        color: var(--ink);
+      }
+
+      pre {
+        margin: 0;
+        min-height: 220px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef7f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1180px) {
+        .table-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .toggle-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Product Center</h1>
+        <p class="sub">
+          Create products, review SDK credentials, and decide which client capabilities each software author wants to expose:
+          register, account login, card login, card recharge, version check, notices, and client self-unbind.
+        </p>
+        <div class="nav">
+          <a href="/admin">Legacy Console</a>
+          ·
+          <a href="/admin/notices">Notice Center</a>
+          ·
+          <a href="/admin/security">Security Center</a>
+          ·
+          <a href="/admin/resellers">Reseller Center</a>
+        </div>
+        <div class="pill-row">
+          <div class="pill">Route: <code>/admin/products</code></div>
+          <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
+          <div class="pill">Client-side switches are evaluated per product</div>
+        </div>
+        <div class="stats" id="stats-box"></div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Admin Session</h2>
+          <label>Username<input id="username" value="admin" /></label>
+          <label>Password<input id="password" type="password" value="ChangeMe!123" /></label>
+          <div class="actions">
+            <button id="login-btn">Sign In</button>
+            <button class="secondary" id="refresh-btn">Refresh Products</button>
+          </div>
+          <div class="status" id="status-box">Sign in to load products and manage feature toggles.</div>
+        </article>
+
+        <article class="card">
+          <h2>Create Product</h2>
+          <label>Product Code<input id="create-code" placeholder="MY_SOFTWARE" /></label>
+          <label>Product Name<input id="create-name" placeholder="My Software" /></label>
+          <label>Description<textarea id="create-description" placeholder="Short description for the software author."></textarea></label>
+          <div class="toggle-grid">
+            <label>allowRegister
+              <select id="create-allow-register">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowAccountLogin
+              <select id="create-allow-account-login">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowCardLogin
+              <select id="create-allow-card-login">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowCardRecharge
+              <select id="create-allow-card-recharge">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowVersionCheck
+              <select id="create-allow-version-check">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowNotices
+              <select id="create-allow-notices">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowClientUnbind
+              <select id="create-allow-client-unbind">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+          </div>
+          <button class="secondary" id="create-btn">Create Product</button>
+          <div class="hint">The product is created with SDK app credentials and an initial featureConfig snapshot.</div>
+        </article>
+
+        <article class="card">
+          <h2>Selected Product</h2>
+          <label>Product ID<input id="edit-product-id" placeholder="Click a row below to auto-fill" /></label>
+          <label>Product Code<input id="edit-product-code" placeholder="Selected product code" readonly /></label>
+          <div class="toggle-grid">
+            <label>allowRegister
+              <select id="edit-allow-register">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowAccountLogin
+              <select id="edit-allow-account-login">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowCardLogin
+              <select id="edit-allow-card-login">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowCardRecharge
+              <select id="edit-allow-card-recharge">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowVersionCheck
+              <select id="edit-allow-version-check">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowNotices
+              <select id="edit-allow-notices">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>allowClientUnbind
+              <select id="edit-allow-client-unbind">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="secondary" id="update-btn">Save Feature Config</button>
+            <button class="danger" id="clear-selection-btn">Clear Selection</button>
+          </div>
+          <div class="hint">Partial updates are supported by the API, but this page always writes the full toggle set for clarity.</div>
+        </article>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
+          <h2>Products</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>SDK App</th>
+                  <th>Access</th>
+                  <th>Client Ops</th>
+                  <th>Lifecycle</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody id="products-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Selection Details</h2>
+          <div id="details-box" class="hint">Select a product row to inspect SDK credentials and toggle summary.</div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>API Output</h2>
+        <pre id="output">Waiting for actions...</pre>
+      </section>
+    </main>
+
+    <script>
+      const FEATURE_KEYS = [
+        "allowRegister",
+        "allowAccountLogin",
+        "allowCardLogin",
+        "allowCardRecharge",
+        "allowVersionCheck",
+        "allowNotices",
+        "allowClientUnbind"
+      ];
+
+      let adminToken = "";
+      let productsCache = [];
+
+      function el(id) {
+        return document.getElementById(id);
+      }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = JSON.stringify(value, null, 2);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function formatTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function renderTag(label, enabled) {
+        return `<span class="tag ${enabled ? "ok" : "danger"}">${escapeHtml(label)}: ${enabled ? "on" : "off"}</span>`;
+      }
+
+      function renderStats(items) {
+        const stats = {
+          total: items.length,
+          registerOpen: items.filter((item) => item.featureConfig?.allowRegister).length,
+          directCardOpen: items.filter((item) => item.featureConfig?.allowCardLogin).length,
+          noticesOpen: items.filter((item) => item.featureConfig?.allowNotices).length
+        };
+
+        el("stats-box").innerHTML = `
+          <div class="stat"><strong>${stats.total}</strong><span>Products</span></div>
+          <div class="stat"><strong>${stats.registerOpen}</strong><span>Register Enabled</span></div>
+          <div class="stat"><strong>${stats.directCardOpen}</strong><span>Card Login Enabled</span></div>
+          <div class="stat"><strong>${stats.noticesOpen}</strong><span>Notices Enabled</span></div>
+        `;
+      }
+
+      function readFeatureConfig(prefix) {
+        return {
+          allowRegister: el(`${prefix}-allow-register`).value === "true",
+          allowAccountLogin: el(`${prefix}-allow-account-login`).value === "true",
+          allowCardLogin: el(`${prefix}-allow-card-login`).value === "true",
+          allowCardRecharge: el(`${prefix}-allow-card-recharge`).value === "true",
+          allowVersionCheck: el(`${prefix}-allow-version-check`).value === "true",
+          allowNotices: el(`${prefix}-allow-notices`).value === "true",
+          allowClientUnbind: el(`${prefix}-allow-client-unbind`).value === "true"
+        };
+      }
+
+      function writeFeatureConfig(prefix, featureConfig = {}) {
+        for (const key of FEATURE_KEYS) {
+          const element = el(`${prefix}-${key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`)}`);
+          if (element) {
+            element.value = String(featureConfig[key] !== false);
+          }
+        }
+      }
+
+      function setSelection(product = null) {
+        if (!product) {
+          el("edit-product-id").value = "";
+          el("edit-product-code").value = "";
+          writeFeatureConfig("edit", {});
+          el("details-box").innerHTML = '<div class="hint">Select a product row to inspect SDK credentials and toggle summary.</div>';
+          return;
+        }
+
+        el("edit-product-id").value = product.id;
+        el("edit-product-code").value = product.code;
+        writeFeatureConfig("edit", product.featureConfig || {});
+        renderDetails(product);
+      }
+
+      function renderDetails(product) {
+        const featureConfig = product.featureConfig || {};
+        el("details-box").innerHTML = `
+          <div class="split-line"><span>Product</span><span><strong>${escapeHtml(product.code)}</strong> · ${escapeHtml(product.name)}</span></div>
+          <div class="split-line"><span>Status</span><span>${escapeHtml(product.status)}</span></div>
+          <div class="split-line"><span>SDK App ID</span><span class="mono">${escapeHtml(product.sdkAppId)}</span></div>
+          <div class="split-line"><span>SDK App Secret</span><span class="mono">${escapeHtml(product.sdkAppSecret)}</span></div>
+          <div class="split-line"><span>Updated</span><span>${escapeHtml(formatTime(product.updatedAt))}</span></div>
+          <div class="hint" style="margin-top: 14px;">Current featureConfig</div>
+          <div style="margin-top: 8px;">
+            ${FEATURE_KEYS.map((key) => renderTag(key, featureConfig[key] !== false)).join("")}
+          </div>
+        `;
+      }
+
+      function renderProducts(items) {
+        const body = el("products-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="6">No products yet.</td></tr>';
+          renderStats([]);
+          setSelection(null);
+          return;
+        }
+
+        body.innerHTML = items.map((item) => {
+          const features = item.featureConfig || {};
+          return `
+            <tr data-id="${escapeHtml(item.id)}">
+              <td>
+                <strong>${escapeHtml(item.code)}</strong>
+                <div>${escapeHtml(item.name)}</div>
+                <div class="hint">${escapeHtml(item.description || "No description")}</div>
+              </td>
+              <td>
+                <div class="mono">${escapeHtml(item.sdkAppId)}</div>
+                <div class="hint">${escapeHtml(item.status)}</div>
+              </td>
+              <td>
+                ${renderTag("register", features.allowRegister !== false)}
+                ${renderTag("account", features.allowAccountLogin !== false)}
+                ${renderTag("card", features.allowCardLogin !== false)}
+              </td>
+              <td>
+                ${renderTag("recharge", features.allowCardRecharge !== false)}
+                ${renderTag("unbind", features.allowClientUnbind !== false)}
+              </td>
+              <td>
+                ${renderTag("version", features.allowVersionCheck !== false)}
+                ${renderTag("notices", features.allowNotices !== false)}
+              </td>
+              <td>${escapeHtml(formatTime(item.updatedAt))}</td>
+            </tr>
+          `;
+        }).join("");
+
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            const product = productsCache.find((item) => item.id === row.dataset.id);
+            if (product) {
+              setSelection(product);
+              setStatus(`Loaded product ${product.code} into the feature editor.`);
+            }
+          });
+        }
+
+        renderStats(items);
+      }
+
+      async function callApi(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        let body = options.body;
+
+        if (body && typeof body !== "string") {
+          headers["Content-Type"] = "application/json";
+          body = JSON.stringify(body);
+        } else if (body) {
+          headers["Content-Type"] = "application/json";
+        }
+
+        if (adminToken) {
+          headers.Authorization = `Bearer ${adminToken}`;
+        }
+
+        const response = await fetch(path, { ...options, headers, body });
+        const json = await response.json();
+        if (!response.ok || !json.ok) {
+          throw new Error(json.error?.message || `Request failed: ${response.status}`);
+        }
+        return json.data;
+      }
+
+      async function refreshProducts() {
+        const data = await callApi("/api/admin/products");
+        productsCache = Array.isArray(data) ? data : [];
+        renderProducts(productsCache);
+        setOutput(productsCache);
+        setStatus(`Loaded ${productsCache.length} products.`);
+      }
+
+      async function guarded(action) {
+        try {
+          await action();
+        } catch (error) {
+          setOutput({ error: error.message });
+          setStatus(error.message, true);
+        }
+      }
+
+      el("login-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/login", {
+          method: "POST",
+          body: {
+            username: el("username").value.trim(),
+            password: el("password").value
+          }
+        });
+        adminToken = data.token;
+        setOutput(data);
+        setStatus(`Admin ${data.admin.username} is connected.`);
+        await refreshProducts();
+      }));
+
+      el("refresh-btn").addEventListener("click", () => guarded(refreshProducts));
+
+      el("create-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/admin/products", {
+          method: "POST",
+          body: {
+            code: el("create-code").value.trim(),
+            name: el("create-name").value.trim(),
+            description: el("create-description").value.trim(),
+            featureConfig: readFeatureConfig("create")
+          }
+        });
+        setOutput(data);
+        setStatus(`Created product ${data.code}.`);
+        await refreshProducts();
+        const created = productsCache.find((item) => item.id === data.id) || data;
+        setSelection(created);
+      }));
+
+      el("update-btn").addEventListener("click", () => guarded(async () => {
+        const productId = el("edit-product-id").value.trim();
+        if (!productId) {
+          throw new Error("Select a product before saving feature toggles.");
+        }
+
+        const data = await callApi(`/api/admin/products/${encodeURIComponent(productId)}/feature-config`, {
+          method: "POST",
+          body: readFeatureConfig("edit")
+        });
+        setOutput(data);
+        setStatus(`Saved feature config for ${data.code}.`);
+        await refreshProducts();
+        const updated = productsCache.find((item) => item.id === productId) || data;
+        setSelection(updated);
+      }));
+
+      el("clear-selection-btn").addEventListener("click", () => {
+        setSelection(null);
+        setStatus("Selection cleared.");
+      });
+
+      renderStats([]);
+      renderProducts([]);
+    </script>
+  </body>
+</html>

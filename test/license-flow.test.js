@@ -3782,3 +3782,19 @@ test("product feature config can selectively disable client-facing capabilities"
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("product center page is served from the dedicated admin route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/admin/products`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Product Center/);
+    assert.match(html, /feature-config/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

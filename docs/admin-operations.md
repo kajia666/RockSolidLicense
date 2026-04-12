@@ -31,6 +31,10 @@ This document describes the new backoffice operations endpoints and the `/admin`
 - `POST /api/admin/products`
 - `POST /api/admin/products/:productId/feature-config`
 
+Dedicated UI:
+
+- `/admin/products`
+
 Product create requests can optionally include a `featureConfig` object:
 
 ```json
@@ -63,6 +67,7 @@ Feature config update example:
 Effects:
 
 - software authors can decide which client capabilities are exposed for a given product
+- `/admin/products` provides a cleaner product-focused page for creating products and editing feature toggles without relying on the legacy `/admin` console
 - disabling `allowVersionCheck` makes `POST /api/client/version-check` return `disabled_by_product`
 - disabling `allowNotices` makes `POST /api/client/notices` return `disabled_by_product`
 - when `allowVersionCheck` or `allowNotices` is off, login no longer applies version rejection or maintenance blocking for that product

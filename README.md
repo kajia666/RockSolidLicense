@@ -88,6 +88,7 @@ node src/server.js
 默认入口：
 
 - 管理后台：`http://127.0.0.1:3000/admin`
+- 产品中心：`http://127.0.0.1:3000/admin/products`
 - 公告中心：`http://127.0.0.1:3000/admin/notices`
 - 健康检查：`http://127.0.0.1:3000/api/health`
 - TCP Gateway：`tcp://127.0.0.1:4000`
@@ -191,6 +192,7 @@ TCP：
 - `allowClientUnbind`
 
 软件作者可以按产品维度选择是否开放这些终端能力。关闭 `allowVersionCheck` 或 `allowNotices` 后，客户端对应接口会返回“disabled by product”，登录链路也不会再继续应用该产品的版本限制或维护公告阻断。
+仓库现在还提供了一个专门的产品功能开关页面：`/admin/products`。
 
 ## Windows C/C++ SDK
 

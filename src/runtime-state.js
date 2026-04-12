@@ -260,6 +260,10 @@ function createSqliteRuntimeStateStore(db, config) {
 
     recordSession() {},
 
+    async commitSessionRuntime() {
+      return { previousSessionToken: null };
+    },
+
     touchSession() {},
 
     expireSession() {},
@@ -308,6 +312,11 @@ function createSqliteRuntimeStateStore(db, config) {
 function createMemoryRuntimeStateStore(db, config) {
   const nonces = new Map();
   const sessions = new Map();
+  const singleSessionOwners = new Map();
+
+  function ownerKey(productId, accountId) {
+    return `${productId}:${accountId}`;
+  }
 
   function pruneExpiredNonces(now = Date.now()) {
     for (const [key, expiresAt] of nonces.entries()) {
@@ -354,6 +363,27 @@ function createMemoryRuntimeStateStore(db, config) {
       });
     },
 
+    async commitSessionRuntime(session, options = {}) {
+      this.recordSession(session);
+      if (!options.claimSingleOwner) {
+        return { previousSessionToken: null };
+      }
+
+      const key = ownerKey(session.productId, session.accountId);
+      const previousSessionToken = singleSessionOwners.get(key) ?? null;
+      singleSessionOwners.set(key, session.sessionToken);
+      if (previousSessionToken && previousSessionToken !== session.sessionToken) {
+        this.expireSession(previousSessionToken, "single_session_runtime");
+      }
+
+      return {
+        previousSessionToken:
+          previousSessionToken && previousSessionToken !== session.sessionToken
+            ? previousSessionToken
+            : null
+      };
+    },
+
     touchSession(sessionToken, patch = {}) {
       pruneExpiredSessions();
       const existing = sessions.get(sessionToken);
@@ -376,6 +406,12 @@ function createMemoryRuntimeStateStore(db, config) {
         status: "expired",
         revokedReason: reason
       });
+
+      for (const [key, ownerToken] of singleSessionOwners.entries()) {
+        if (ownerToken === sessionToken) {
+          singleSessionOwners.delete(key);
+        }
+      }
     },
 
     async getSessionState(sessionToken) {
@@ -451,6 +487,10 @@ function createRedisRuntimeStateStore(db, config) {
     return `${config.redisKeyPrefix}:sessions:active`;
   }
 
+  function ownerKey(productId, accountId) {
+    return `${config.redisKeyPrefix}:owner:${productId}:${accountId}`;
+  }
+
   async function execute(commands, { background = false } = {}) {
     if (state.closed) {
       return [];
@@ -518,6 +558,60 @@ function createRedisRuntimeStateStore(db, config) {
         ["EXPIRE", sessionKey(session.sessionToken), ttlSeconds],
         ["ZADD", activeSessionsKey(), expiresAtMs ?? Date.now(), session.sessionToken]
       ]);
+    },
+
+    async commitSessionRuntime(session, options = {}) {
+      const expiresAtMs = parseIso(session.expiresAt);
+      const ttlSeconds = Math.max(
+        1,
+        Math.ceil(((expiresAtMs ?? Date.now()) - Date.now()) / 1000)
+      );
+      const commands = [
+        [
+          "HSET",
+          sessionKey(session.sessionToken),
+          "sessionId", session.sessionId,
+          "productId", session.productId,
+          "accountId", session.accountId,
+          "entitlementId", session.entitlementId,
+          "deviceId", session.deviceId,
+          "status", session.status ?? "active",
+          "issuedAt", session.issuedAt,
+          "expiresAt", session.expiresAt,
+          "lastHeartbeatAt", session.lastHeartbeatAt,
+          "lastSeenIp", session.lastSeenIp ?? "",
+          "userAgent", session.userAgent ?? ""
+        ],
+        ["EXPIRE", sessionKey(session.sessionToken), ttlSeconds],
+        ["ZADD", activeSessionsKey(), expiresAtMs ?? Date.now(), session.sessionToken]
+      ];
+
+      let previousOwnerOffset = -1;
+      if (options.claimSingleOwner) {
+        previousOwnerOffset = commands.length;
+        commands.push(["GETSET", ownerKey(session.productId, session.accountId), session.sessionToken]);
+        commands.push(["EXPIRE", ownerKey(session.productId, session.accountId), ttlSeconds]);
+      }
+
+      const replies = await execute(commands, { background: false });
+      const previousSessionToken = previousOwnerOffset >= 0
+        ? replies[previousOwnerOffset]
+        : null;
+
+      if (previousSessionToken && previousSessionToken !== session.sessionToken) {
+        await execute([
+          ["HSET", sessionKey(previousSessionToken), "status", "expired", "revokedReason", "single_session_runtime"],
+          ["EXPIRE", sessionKey(previousSessionToken), 60],
+          ["ZREM", activeSessionsKey(), previousSessionToken]
+        ], { background: false });
+      }
+
+      return {
+        previousSessionToken:
+          previousSessionToken && previousSessionToken !== session.sessionToken
+            ? previousSessionToken
+            : null
+      };
     },
 
     touchSession(sessionToken, patch = {}) {

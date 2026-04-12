@@ -65,6 +65,31 @@ function expireSessionById(db, stateStore, sessionId, reason) {
   return expireActiveSessions(db, stateStore, "id = ?", [sessionId], reason);
 }
 
+function expireSessionByToken(db, stateStore, sessionToken, reason) {
+  return expireActiveSessions(db, stateStore, "session_token = ?", [sessionToken], reason);
+}
+
+async function finalizeIssuedSessionRuntime(db, stateStore, payload) {
+  if (!payload?.runtime) {
+    return payload;
+  }
+
+  const runtime = payload.runtime;
+  if (stateStore?.commitSessionRuntime) {
+    const result = await stateStore.commitSessionRuntime(runtime.session, {
+      claimSingleOwner: runtime.claimSingleOwner
+    });
+    if (result?.previousSessionToken) {
+      expireSessionByToken(db, stateStore, result.previousSessionToken, "single_session_runtime");
+    }
+  } else if (stateStore?.recordSession) {
+    stateStore.recordSession(runtime.session);
+  }
+
+  const { runtime: _runtime, ...publicPayload } = payload;
+  return publicPayload;
+}
+
 function withTransaction(db, action) {
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -2332,21 +2357,6 @@ function issueClientSession(
     account.id
   );
 
-  stateStore?.recordSession({
-    sessionId,
-    sessionToken,
-    productId: product.id,
-    accountId: account.id,
-    entitlementId: entitlement.id,
-    deviceId: device.id,
-    status: "active",
-    issuedAt,
-    expiresAt,
-    lastHeartbeatAt: issuedAt,
-    lastSeenIp: meta.ip,
-    userAgent: meta.userAgent
-  });
-
   audit(db, "account", account.id, "session.login", "session", sessionId, {
     productCode: product.code,
     deviceFingerprint: device.fingerprint,
@@ -2384,6 +2394,23 @@ function issueClientSession(
     account: {
       id: account.id,
       username: account.username
+    },
+    runtime: {
+      session: {
+        sessionId,
+        sessionToken,
+        productId: product.id,
+        accountId: account.id,
+        entitlementId: entitlement.id,
+        deviceId: device.id,
+        status: "active",
+        issuedAt,
+        expiresAt,
+        lastHeartbeatAt: issuedAt,
+        lastSeenIp: meta.ip,
+        userAgent: meta.userAgent
+      },
+      claimSingleOwner: !entitlement.allow_concurrent_sessions
     }
   };
 }
@@ -3506,6 +3533,9 @@ export function createServices(db, config, runtimeState = null) {
       }
     },
     recordSession() {},
+    async commitSessionRuntime() {
+      return { previousSessionToken: null };
+    },
     touchSession() {},
     expireSession() {},
     async getSessionState(sessionToken) {
@@ -7718,7 +7748,7 @@ export function createServices(db, config, runtimeState = null) {
         body.channel
       );
 
-      return withTransaction(db, () => {
+      const sessionResult = withTransaction(db, () => {
         expireStaleSessions(db, stateStore);
 
         const card = findClientCardByKey(db, product.id, body.cardKey);
@@ -7785,6 +7815,7 @@ export function createServices(db, config, runtimeState = null) {
           }
         };
       });
+      return finalizeIssuedSessionRuntime(db, stateStore, sessionResult);
     },
 
     async loginClient(reqLike, body, rawBody, meta = {}) {
@@ -7807,7 +7838,7 @@ export function createServices(db, config, runtimeState = null) {
         body.channel
       );
 
-      return withTransaction(db, () => {
+      const sessionResult = withTransaction(db, () => {
         expireStaleSessions(db, stateStore);
 
         const account = one(
@@ -7845,6 +7876,7 @@ export function createServices(db, config, runtimeState = null) {
           bindConfig
         });
       });
+      return finalizeIssuedSessionRuntime(db, stateStore, sessionResult);
     },
 
     async heartbeatClient(reqLike, body, rawBody, meta) {

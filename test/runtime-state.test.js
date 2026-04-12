@@ -176,6 +176,20 @@ async function startFakeRedisServer() {
             });
             socket.write("+OK\r\n");
           }
+        } else if (command === "GETSET") {
+          const [key, value] = args;
+          const existing = keyStore.get(key);
+          if (!existing || existing.type !== "string") {
+            socket.write("$-1\r\n");
+          } else {
+            const previous = String(existing.value ?? "");
+            socket.write(`$${Buffer.byteLength(previous, "utf8")}\r\n${previous}\r\n`);
+          }
+          keyStore.set(key, {
+            type: "string",
+            value,
+            expiresAt: existing?.expiresAt ?? null
+          });
         } else if (command === "HSET") {
           const [key, ...fields] = args;
           const existing = keyStore.get(key);
@@ -667,6 +681,138 @@ test("redis runtime state can invalidate heartbeat even if database session is m
       fakeRedis.commandLog.some((entry) => entry[0] === "HGETALL"),
       JSON.stringify(fakeRedis.commandLog)
     );
+  } finally {
+    await app.close();
+    await fakeRedis.close();
+  }
+});
+
+test("redis single-session ownership invalidates the previous runtime owner", async () => {
+  const fakeRedis = await startFakeRedisServer();
+  const { app, baseUrl } = await startServer({
+    stateStoreDriver: "redis",
+    redisUrl: fakeRedis.url,
+    redisKeyPrefix: "rocksolid:test:single-owner"
+  });
+
+  try {
+    const adminLogin = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await postJson(baseUrl, "/api/admin/products", {
+      code: "SINGLEOWN",
+      name: "Single Owner Product"
+    }, adminLogin.token);
+
+    const policy = await postJson(baseUrl, "/api/admin/policies", {
+      productCode: product.code,
+      name: "Single Policy",
+      durationDays: 30,
+      bindMode: "strict",
+      allowConcurrentSessions: false
+    }, adminLogin.token);
+
+    await postJson(baseUrl, "/api/admin/cards/batch", {
+      productCode: product.code,
+      policyId: policy.id,
+      prefix: "SGO",
+      count: 1
+    }, adminLogin.token);
+
+    const cards = await getJson(baseUrl, `/api/admin/cards?productCode=${product.code}`, adminLogin.token);
+    const cardKey = cards.items[0].cardKey;
+
+    await signedClientRequest(
+      baseUrl,
+      "/api/client/register",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "owner_user",
+        password: "Pass123!abc",
+        deviceFingerprint: "owner-device"
+      },
+      { nonce: "single-owner-register", timestamp: new Date().toISOString() }
+    );
+
+    await signedClientRequest(
+      baseUrl,
+      "/api/client/recharge",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "owner_user",
+        password: "Pass123!abc",
+        cardKey
+      },
+      { nonce: "single-owner-recharge", timestamp: new Date().toISOString() }
+    );
+
+    const firstLogin = await signedClientRequest(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "owner_user",
+        password: "Pass123!abc",
+        deviceFingerprint: "owner-device"
+      },
+      { nonce: "single-owner-login-1", timestamp: new Date().toISOString() }
+    );
+    assert.equal(firstLogin.status, 200, JSON.stringify(firstLogin.json));
+    const firstSessionToken = firstLogin.json.data.sessionToken;
+
+    const secondLogin = await signedClientRequest(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        username: "owner_user",
+        password: "Pass123!abc",
+        deviceFingerprint: "owner-device"
+      },
+      { nonce: "single-owner-login-2", timestamp: new Date().toISOString() }
+    );
+    assert.equal(secondLogin.status, 200, JSON.stringify(secondLogin.json));
+
+    await waitFor(() =>
+      fakeRedis.commandLog.some(
+        (entry) => entry[0] === "GETSET" && entry[1].includes(":owner:")
+      )
+    );
+
+    app.db.prepare(
+      `
+        UPDATE sessions
+        SET status = 'active', revoked_reason = NULL
+        WHERE session_token = ?
+      `
+    ).run(firstSessionToken);
+
+    const heartbeatResult = await signedClientRequest(
+      baseUrl,
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: product.code,
+        sessionToken: firstSessionToken,
+        deviceFingerprint: "owner-device"
+      },
+      { nonce: "single-owner-heartbeat-old", timestamp: new Date().toISOString() }
+    );
+    assert.equal(heartbeatResult.status, 401, JSON.stringify(heartbeatResult.json));
+    assert.equal(heartbeatResult.json.ok, false);
+    assert.equal(heartbeatResult.json.error.code, "SESSION_INVALID");
+    assert.equal(heartbeatResult.json.error.details.runtimeRevokedReason, "single_session_runtime");
   } finally {
     await app.close();
     await fakeRedis.close();

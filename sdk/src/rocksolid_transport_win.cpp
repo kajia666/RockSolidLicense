@@ -737,6 +737,22 @@ TokenKeySet LicenseClientWin::parse_token_key_set(const ApiEnvelope& envelope) {
   return key_set;
 }
 
+TokenKeyInfo LicenseClientWin::select_active_token_key(const TokenKeySet& key_set) {
+  if (key_set.keys.empty()) {
+    throw std::runtime_error("Token key set did not contain any keys.");
+  }
+
+  if (!key_set.active_key_id.empty()) {
+    for (const TokenKeyInfo& key : key_set.keys) {
+      if (key.key_id == key_set.active_key_id) {
+        return key;
+      }
+    }
+  }
+
+  return key_set.keys.front();
+}
+
 RegisterResponse LicenseClientWin::parse_register_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
     const ApiError error = parse_api_error(envelope.error);
@@ -1087,6 +1103,32 @@ ClientNoticesResponse LicenseClientWin::notices_http_parsed(const ClientNoticesR
   return parse_notices_response(parse_api_envelope(notices_http(request)));
 }
 
+ClientStartupBootstrapResponse LicenseClientWin::startup_bootstrap_http(
+  const ClientStartupBootstrapRequest& request
+) const {
+  ClientStartupBootstrapResponse response;
+  response.version_manifest = version_check_http_parsed(ClientVersionCheckRequest{
+    request.product_code,
+    request.client_version,
+    request.channel
+  });
+  response.notices = notices_http_parsed(ClientNoticesRequest{
+    request.product_code,
+    request.channel
+  });
+
+  if (request.include_token_keys) {
+    response.token_keys = fetch_token_keys();
+    response.active_token_key = select_active_token_key(response.token_keys);
+    response.has_token_keys = true;
+  } else {
+    response.active_token_key = fetch_active_token_key();
+    response.has_token_keys = false;
+  }
+
+  return response;
+}
+
 LoginResponse LicenseClientWin::card_login_http_parsed(const CardLoginRequest& request) const {
   return parse_login_response(parse_api_envelope(card_login_http(request)));
 }
@@ -1136,11 +1178,7 @@ LogoutResponse LicenseClientWin::logout_tcp_parsed(const LogoutRequest& request)
 }
 
 TokenKeyInfo LicenseClientWin::fetch_active_token_key() const {
-  const TokenKeySet key_set = parse_token_key_set(parse_api_envelope(http_.get_json("/api/system/token-key")));
-  if (key_set.keys.empty()) {
-    throw std::runtime_error("Active token key response did not contain a key.");
-  }
-  return key_set.keys.front();
+  return select_active_token_key(parse_token_key_set(parse_api_envelope(http_.get_json("/api/system/token-key"))));
 }
 
 TokenKeySet LicenseClientWin::fetch_token_keys() const {

@@ -38,7 +38,7 @@ This produces `build\win-sdk-demo\windows_client_demo.exe` and keeps intermediat
 
 1. Create one `LicenseClientWin` instance during application startup.
 2. Generate a device fingerprint once and cache it per installation.
-3. Use HTTP startup calls such as `version_check_http_parsed` and `notices_http_parsed` before showing the login UI.
+3. Use HTTP startup calls such as `startup_bootstrap_http`, `version_check_http_parsed`, and `notices_http_parsed` before showing the login UI.
 4. Use HTTP for first-time registration or account operations if that fits your deployment model.
 5. Use TCP for long-lived login and heartbeat flows if you want a persistent or socket-friendly transport.
 6. Prefer the parsed helpers such as `login_tcp_parsed`, `bindings_http_parsed`, and `unbind_tcp_parsed` so your host app can directly consume quota, binding, notice, and self-unbind metadata.

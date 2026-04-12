@@ -63,11 +63,8 @@ const auto result = client.login_tcp(request);
 Parsed high-level usage:
 
 ```cpp
-const rocksolid::ClientVersionManifestResponse manifest =
-  client.version_check_http_parsed({"MY_SOFTWARE", "1.0.0", "stable"});
-
-const rocksolid::ClientNoticesResponse notices =
-  client.notices_http_parsed({"MY_SOFTWARE", "stable"});
+const rocksolid::ClientStartupBootstrapResponse startup =
+  client.startup_bootstrap_http({"MY_SOFTWARE", "1.0.0", "stable", true});
 
 const rocksolid::LoginResponse login = client.login_tcp_parsed(request);
 const std::string binding_id = login.binding.id;
@@ -146,6 +143,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `LoginResponse.quota` exposes point-based quota consumption after each successful login.
 - `RechargeResponse.grant_type` and `RechargeResponse.remaining_points` help distinguish duration cards from point cards.
 - `ClientVersionCheckRequest` and `ClientNoticesRequest` let the SDK drive the same startup flow documented on the server side.
+- `ClientStartupBootstrapRequest` and `startup_bootstrap_http(...)` bundle version-check, active notices, and token-key fetch into one startup helper.
 - `ClientVersionManifestResponse` exposes `allowed/status/latest_version/minimum_allowed_version/latest_download_url`.
 - `ClientNoticesResponse` returns the currently active notice list with `block_login` and timing metadata.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.

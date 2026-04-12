@@ -347,6 +347,21 @@ struct ClientNoticesResponse {
   std::vector<NoticeInfo> notices;
 };
 
+struct ClientStartupBootstrapRequest {
+  std::string product_code;
+  std::string client_version;
+  std::string channel;
+  bool include_token_keys = true;
+};
+
+struct ClientStartupBootstrapResponse {
+  ClientVersionManifestResponse version_manifest;
+  ClientNoticesResponse notices;
+  TokenKeyInfo active_token_key;
+  TokenKeySet token_keys;
+  bool has_token_keys = false;
+};
+
 struct TokenValidationResult {
   bool valid = false;
   std::string key_id;
@@ -407,6 +422,9 @@ class LicenseClientWin {
   UnbindResponse unbind_http_parsed(const UnbindRequest& request) const;
   ClientVersionManifestResponse version_check_http_parsed(const ClientVersionCheckRequest& request) const;
   ClientNoticesResponse notices_http_parsed(const ClientNoticesRequest& request) const;
+  ClientStartupBootstrapResponse startup_bootstrap_http(
+    const ClientStartupBootstrapRequest& request
+  ) const;
   LoginResponse card_login_http_parsed(const CardLoginRequest& request) const;
   LoginResponse login_http_parsed(const LoginRequest& request) const;
   HeartbeatResponse heartbeat_http_parsed(const HeartbeatRequest& request) const;
@@ -460,6 +478,7 @@ class LicenseClientWin {
   static ApiError parse_api_error(const JsonValue& error);
   static TokenKeyInfo parse_token_key_info(const JsonValue& object, const std::string& issuer);
   static TokenKeySet parse_token_key_set(const ApiEnvelope& envelope);
+  static TokenKeyInfo select_active_token_key(const TokenKeySet& key_set);
   static RegisterResponse parse_register_response(const ApiEnvelope& envelope);
   static RechargeResponse parse_recharge_response(const ApiEnvelope& envelope);
   static BindingsResponse parse_bindings_response(const ApiEnvelope& envelope);

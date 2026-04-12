@@ -28,24 +28,18 @@ int main() {
     const std::string client_version = "1.0.0";
     const std::string channel = "stable";
 
-    rocksolid::ClientVersionCheckRequest version_request{
+    const rocksolid::ClientStartupBootstrapResponse startup = client.startup_bootstrap_http({
       "MY_SOFTWARE",
       client_version,
-      channel
-    };
-    const rocksolid::ClientVersionManifestResponse version_manifest =
-      client.version_check_http_parsed(version_request);
-    std::cout << "[HTTP version-check] status=" << version_manifest.status
-              << " allowed=" << (version_manifest.allowed ? "true" : "false")
-              << " latestVersion=" << version_manifest.latest_version
+      channel,
+      true
+    });
+    std::cout << "[HTTP startup] versionStatus=" << startup.version_manifest.status
+              << " allowed=" << (startup.version_manifest.allowed ? "true" : "false")
+              << " latestVersion=" << startup.version_manifest.latest_version
+              << " notices=" << startup.notices.notices.size()
+              << " activeKid=" << startup.active_token_key.key_id
               << std::endl;
-
-    rocksolid::ClientNoticesRequest notices_request{
-      "MY_SOFTWARE",
-      channel
-    };
-    const rocksolid::ClientNoticesResponse notices = client.notices_http_parsed(notices_request);
-    std::cout << "[HTTP notices] count=" << notices.notices.size() << std::endl;
 
     rocksolid::RegisterRequest register_request{
       "MY_SOFTWARE",

@@ -1,16 +1,84 @@
-# RockSolidLicense
+﻿# RockSolidLicense
 
-一个面向商业软件授权场景的网络验证系统起步版，覆盖这些核心链路：
+面向商业软件授权、网络验证与终端分发的服务端 + Web 后台 + Windows C/C++ SDK 项目。
 
-- 作者后台创建产品、策略、卡密批次
-- 终端用户注册账号、卡密充值、设备登录
-- 服务端基于数据库权限、设备绑定与会话状态下发授权令牌
-- 客户端通过心跳维持在线状态，后台可实时查看在线会话
-- C/C++ SDK 提供签名、随机数和机器码摘要能力，便于嵌入桌面客户端
+当前仓库已经覆盖一条可运行的主链路：
 
-这是一版“商业级骨架”。重点先把系统边界、协议、安全基线和可运行主链路搭起来。真正上线前，还需要补齐 TLS 终止、RBAC、多租户、限流、告警和高可用部署。
+- 软件作者在后台创建产品、授权策略、卡密和版本规则
+- 终端用户可以注册账号后充值卡密，也可以直接使用卡密登录
+- 服务端按策略校验机器绑定、会话状态、版本规则、公告维护窗口与网络规则
+- 登录成功后签发 RSA `licenseToken`，并通过心跳维持在线状态
+- Windows C/C++ SDK 已支持 HTTP/TCP 通信、签名、令牌验签、版本检查、公告拉取、绑定查询和自助解绑
+
+这套系统现在更偏向“网络验证 / 软件授权平台”，而不是账单结算系统。代理、库存和结算相关能力保留为辅助运营模块，不是当前仓库的唯一重心。
+
+## 核心能力
+
+### 卡密管理
+
+- 批量生成卡密
+- 支持时长卡与点数卡
+- 卡密导出与状态区分
+- 卡密冻结、过期、撤销控制
+- 账号充值卡密
+- 卡密直接登录
+
+### 用户授权
+
+- 账号注册、登录、退出
+- 卡密直登与账号模式双认证
+- 机器绑定、换绑检测、手动解绑
+- 软件作者自定义硬件/IP 绑定字段
+- 是否允许多开由策略控制
+- 授权冻结、恢复、续期
+- 点数授权登录扣点
+
+### 软件管理
+
+- 客户端版本规则
+- 强制升级与升级建议
+- 客户端公告与维护通知
+- 维护期间阻断登录
+- SDK 启动期版本检查和公告拉取
+
+### 验证接口
+
+- HTTP 客户端接口
+- TCP 客户端接口
+- 登录验证
+- 心跳保活
+- 卡密充值
+- 绑定查询
+- 自助解绑
+
+### 安全与控制
+
+- HMAC-SHA256 SDK 请求签名
+- RSA 授权令牌签发与公钥验签
+- 多公钥 `kid` 发布与轮换
+- 设备封禁
+- IP / CIDR 网络规则
+- 在线会话控制与强制下线
+- 审计日志
+
+### 代理与隔离
+
+- 无限级代理基础模型
+- 库存下发与层级隔离
+- 可选查看下级范围
+- 代理价格与结算能力保留，但不是当前主要开发重点
+
+## 项目结构
+
+- `src/`：服务端、HTTP/TCP 网关、后台页面
+- `sdk/`：Windows C/C++ SDK、示例和构建说明
+- `docs/`：架构、协议、部署和运营文档
+- `test/`：Node 端到端回归测试
+- `deploy/`：Windows / Linux 部署骨架
 
 ## 本地运行
+
+### 启动服务端
 
 ```bash
 node src/server.js
@@ -18,16 +86,17 @@ node src/server.js
 
 默认入口：
 
-- 控制台: `http://127.0.0.1:3000/admin`
-- 健康检查: `http://127.0.0.1:3000/api/health`
-- TCP Gateway: `tcp://127.0.0.1:4000`
+- 管理后台：`http://127.0.0.1:3000/admin`
+- 公告中心：`http://127.0.0.1:3000/admin/notices`
+- 健康检查：`http://127.0.0.1:3000/api/health`
+- TCP Gateway：`tcp://127.0.0.1:4000`
 
 默认管理员账号：
 
-- 用户名: `admin`
-- 密码: `ChangeMe!123`
+- 用户名：`admin`
+- 密码：`ChangeMe!123`
 
-生产环境建议覆盖：
+建议通过环境变量覆盖生产配置：
 
 ```bash
 RSL_HOST=0.0.0.0
@@ -43,105 +112,143 @@ RSL_ADMIN_USERNAME=admin
 RSL_ADMIN_PASSWORD=PleaseChangeThisNow
 ```
 
-## 已实现能力
+### 运行测试
 
-### 管理后台
+```bash
+npm test
+```
 
-- 管理员登录
-- 创建产品并生成 `sdkAppId` / `sdkAppSecret`
-- 创建授权策略
-- 批量生成卡密
-- 查看在线会话与基础统计
+## 终端用户主流程
 
-### 客户端接口
+### 账号模式
+
+1. 客户端启动后调用版本检查和公告接口
+2. 用户注册账号
+3. 用户使用卡密充值到账号
+4. 客户端携带机器指纹登录
+5. 服务端校验授权、绑定、版本、公告和网络规则
+6. 服务端返回 `sessionToken`、`licenseToken`
+7. 客户端按策略发送心跳
+
+### 卡密直登模式
+
+1. 客户端启动后调用版本检查和公告接口
+2. 用户直接输入卡密登录
+3. 服务端创建卡密直登身份并绑定设备
+4. 返回 `sessionToken`、`licenseToken`
+5. 客户端持续心跳
+
+## 主要客户端接口
+
+HTTP：
 
 - `POST /api/client/register`
 - `POST /api/client/recharge`
+- `POST /api/client/card-login`
 - `POST /api/client/login`
+- `POST /api/client/bindings`
+- `POST /api/client/unbind`
+- `POST /api/client/version-check`
+- `POST /api/client/notices`
 - `POST /api/client/heartbeat`
 - `POST /api/client/logout`
-- `TCP client.register / client.recharge / client.login / client.heartbeat / client.logout`
-- `GET /api/system/token-key`
 
-### 安全基线
+TCP：
 
-- 管理员 / 终端账户密码使用 `scrypt`
-- 客户端请求使用 `x-rs-*` 头做 HMAC-SHA256 签名
-- 服务端校验时间戳窗口与 nonce 防重放
-- 登录后签发 RSA 签名的 `licenseToken`
-- 设备按授权窗口绑定，支持设备数限制与单会话策略
-- 心跳超时和令牌过期会被自动踢下线
+- `client.register`
+- `client.recharge`
+- `client.card-login`
+- `client.login`
+- `client.bindings`
+- `client.unbind`
+- `client.heartbeat`
+- `client.logout`
 
-## 核心数据模型
-
-- `products`: 软件产品
-- `policies`: 授权策略，定义有效期、最大设备数、心跳与 token 规则
-- `license_keys`: 卡密库存
-- `customer_accounts`: 终端用户账号
-- `entitlements`: 卡密兑换后形成的授权窗口
-- `devices`: 机器码 / 设备指纹
-- `device_bindings`: 授权窗口和设备的绑定关系
-- `sessions`: 在线会话与实时心跳状态
-- `request_nonces`: SDK 请求防重放
-- `audit_logs`: 审计日志
-
-更多设计见 [docs/architecture.md](/D:/code/OnlineVerification/docs/architecture.md)。
-
-## SDK 签名协议
-
-客户端在每个 `/api/client/*` 请求上附加：
-
-- `x-rs-app-id`
-- `x-rs-timestamp`
-- `x-rs-nonce`
-- `x-rs-signature`
-
-签名串格式：
-
-```text
-HTTP_METHOD
-/api/client/login
-2026-04-11T12:00:00.000Z
-random_nonce
-sha256_hex(body)
-```
-
-签名算法：
-
-```text
-signature = HMAC_SHA256_HEX(sdkAppSecret, canonical_string)
-```
-
-SDK 示例和 Windows 加密实现见：
-
-- [sdk/include/rocksolid_sdk.h](/D:/code/OnlineVerification/sdk/include/rocksolid_sdk.h)
-- [sdk/include/rocksolid_client.hpp](/D:/code/OnlineVerification/sdk/include/rocksolid_client.hpp)
-- [sdk/include/rocksolid_transport_win.hpp](/D:/code/OnlineVerification/sdk/include/rocksolid_transport_win.hpp)
-- [sdk/src/rocksolid_crypto_win.cpp](/D:/code/OnlineVerification/sdk/src/rocksolid_crypto_win.cpp)
-- [sdk/src/rocksolid_transport_win.cpp](/D:/code/OnlineVerification/sdk/src/rocksolid_transport_win.cpp)
-- [sdk/README.md](/D:/code/OnlineVerification/sdk/README.md)
-- [sdk/WINDOWS_SDK_GUIDE.md](/D:/code/OnlineVerification/sdk/WINDOWS_SDK_GUIDE.md)
-- [sdk/BUILD_WINDOWS.md](/D:/code/OnlineVerification/sdk/BUILD_WINDOWS.md)
-- [docs/tcp-protocol.md](/D:/code/OnlineVerification/docs/tcp-protocol.md)
-
-授权令牌验证公钥可通过以下接口获取：
+系统接口：
 
 - `GET /api/system/token-key`
+- `GET /api/system/token-keys`
 
-## 快速演示流程
+## Windows C/C++ SDK
 
-1. 管理员登录并创建产品，例如 `MY_SOFTWARE`
-2. 创建一个 30 天策略
-3. 批量生成一组卡密
-4. 客户端拿到 `sdkAppId` / `sdkAppSecret`
-5. 客户端先注册账号，再用卡密充值
-6. 客户端携带机器码登录并拿到 `sessionToken` 与 `licenseToken`
-7. 客户端按策略要求定时发送心跳
+当前 Windows SDK 已支持：
 
-## 下一步建议
+- 请求签名
+- WinHTTP / Winsock 传输
+- 账号登录与卡密直登
+- 绑定查询与自助解绑
+- 版本检查与公告拉取
+- 启动聚合助手 `startup_bootstrap_http(...)`
+- `licenseToken` 解码与 RSA 公钥验签
 
-- 补后台 RBAC 与操作审计检索
-- 增加 PostgreSQL / Redis / MQ 存储适配
-- 心跳在线状态推送到 WebSocket 面板
-- 补 TCP 二进制协议和分布式会话协调
-- 为 SDK 加入离线缓存、签名公钥校验和多平台机器码采集
+主要文件：
+
+- `sdk/include/rocksolid_sdk.h`
+- `sdk/include/rocksolid_client.hpp`
+- `sdk/include/rocksolid_transport_win.hpp`
+- `sdk/src/rocksolid_crypto_win.cpp`
+- `sdk/src/rocksolid_transport_win.cpp`
+- `sdk/examples/windows_client_demo.cpp`
+- `sdk/WINDOWS_SDK_GUIDE.md`
+- `sdk/BUILD_WINDOWS.md`
+
+编译示例：
+
+```bat
+cl /EHsc /std:c++17 ^
+  sdk\src\rocksolid_crypto_win.cpp ^
+  sdk\src\rocksolid_transport_win.cpp ^
+  sdk\examples\windows_client_demo.cpp ^
+  /I sdk\include ^
+  bcrypt.lib winhttp.lib ws2_32.lib crypt32.lib
+```
+
+更完整的 Windows 构建步骤请看 `sdk/BUILD_WINDOWS.md`。
+
+## 数据模型摘要
+
+- `products`：软件产品
+- `policies`：授权策略
+- `policy_grant_configs`：时长卡 / 点数卡配置
+- `license_keys`：卡密库存
+- `license_key_controls`：卡密冻结 / 过期控制
+- `customer_accounts`：终端用户账号
+- `entitlements`：授权主体
+- `entitlement_metering`：点数授权计量
+- `devices`：设备指纹
+- `device_bindings`：授权与设备绑定
+- `sessions`：在线会话
+- `device_blocks`：设备封禁
+- `network_rules`：IP / CIDR 规则
+- `client_versions`：版本规则
+- `notices`：公告和维护通知
+- `request_nonces`：请求防重放
+- `audit_logs`：审计日志
+
+## 部署建议
+
+- Windows Server 可直接运行当前 Node.js 服务和 Windows SDK 配套体系
+- Linux 更适合作为长期生产主环境，仓库也已提供 Docker / Nginx / systemd 部署骨架
+- 真正上线前建议继续补齐 PostgreSQL、Redis、TLS、RBAC、限流、监控和备份策略
+
+## 重点文档
+
+- `docs/architecture.md`
+- `docs/tcp-protocol.md`
+- `docs/client-auth-modes.md`
+- `docs/client-unbind.md`
+- `docs/client-versioning.md`
+- `docs/notice-center.md`
+- `docs/license-ops.md`
+- `docs/admin-operations.md`
+- `docs/linux-deployment.md`
+- `docs/windows-server-deployment.md`
+
+## 当前状态
+
+仓库已经具备“商业级网络验证系统”的第一阶段骨架，适合继续往这些方向推进：
+
+- PostgreSQL + Redis 多实例部署底座
+- 更完整的客户端缓存、公钥轮换与离线校验策略
+- 更成熟的后台前端
+- 更细粒度的 RBAC、限流和告警

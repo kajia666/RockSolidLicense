@@ -1,5 +1,12 @@
 # RockSolid Windows SDK Changelog
 
+## 0.2.1 - 2026-04-12
+
+- Added `SHA256SUMS.txt` and `checksums.json` generation for versioned SDK release bundles.
+- Added `sdk/verify_release_package.bat` to smoke-test release packages by compiling the packaged C++ and C examples.
+- Added `sdk/release_sdk.bat` to run packaging and smoke tests as a single release workflow.
+- Added a root `release-manifest.json` to each release output directory.
+
 ## 0.2.0 - 2026-04-12
 
 - Added a formal SDK version file and generated version header.

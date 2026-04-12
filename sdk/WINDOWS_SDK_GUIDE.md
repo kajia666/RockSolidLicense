@@ -73,7 +73,21 @@ This produces:
 - `build\win-sdk-package\rocksolid-sdk-capi\`
 - `build\win-sdk-package\rocksolid-sdk-capi.zip`
 
-Actual package names include the SDK version from `sdk/VERSION`, for example `rocksolid-sdk-cpp-0.2.0.zip`.
+Actual package names include the SDK version from `sdk/VERSION`, for example `rocksolid-sdk-cpp-0.2.1.zip`.
+
+Each release directory also includes `SHA256SUMS.txt`, `checksums.json`, and `release-manifest.json` so you can distribute signed-off release metadata together with the SDK archives.
+
+Recommended maintainer workflow:
+
+```bat
+call sdk\release_sdk.bat
+```
+
+If you only want to verify an already-packaged release directory:
+
+```bat
+call sdk\verify_release_package.bat build\win-sdk-package
+```
 
 Use the `cpp` package when the integrator wants the full `LicenseClientWin` feature set.
 

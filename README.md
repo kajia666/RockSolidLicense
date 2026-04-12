@@ -215,6 +215,26 @@ call sdk\package_release.bat build\my-sdk-dist
 
 SDK 版本源文件在 `sdk/VERSION`，构建脚本会自动生成 `sdk/include/rocksolid_sdk_version.h`，并把 `VERSION.txt`、`manifest.json`、`docs/CHANGELOG.md` 一起打进发布包。
 
+发布目录还会额外生成：
+
+- `SHA256SUMS.txt`
+- `checksums.json`
+- `release-manifest.json`
+
+如果你要走完整的“打包 + 校验”流程，可以直接运行：
+
+```bat
+call sdk\release_sdk.bat
+```
+
+如果你只是想对已经打好的发布包做 smoke test：
+
+```bat
+call sdk\verify_release_package.bat build\win-sdk-package
+```
+
+当前这轮 SDK 版本是 `0.2.1`。
+
 主要文件：
 
 - `sdk/include/rocksolid_sdk.h`

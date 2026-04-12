@@ -16,6 +16,8 @@ set "CAPI_NAME=rocksolid-sdk-capi-%RS_SDK_VERSION%"
 set "CPP_ROOT=%PKG_ROOT%\%CPP_NAME%"
 set "CAPI_ROOT=%PKG_ROOT%\%CAPI_NAME%"
 
+if not exist "%PKG_ROOT%" mkdir "%PKG_ROOT%"
+
 call sdk\build_static_lib.bat "%RELEASE_DIR%"
 if errorlevel 1 goto :fail
 
@@ -69,10 +71,19 @@ if errorlevel 1 goto :fail
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%CAPI_ROOT%\*' -DestinationPath '%PKG_ROOT%\%CAPI_NAME%.zip' -Force"
 if errorlevel 1 goto :fail
 
+powershell -NoProfile -ExecutionPolicy Bypass -File "sdk\generate_release_checksums.ps1" -ReleaseRoot "%PKG_ROOT%" -Version "%RS_SDK_VERSION%"
+if errorlevel 1 goto :fail
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$manifest = [ordered]@{ sdkVersion = '%RS_SDK_VERSION%'; cppPackageName = '%CPP_NAME%'; capiPackageName = '%CAPI_NAME%'; cppPackageDir = '%CPP_NAME%'; capiPackageDir = '%CAPI_NAME%'; cppZip = '%CPP_NAME%.zip'; capiZip = '%CAPI_NAME%.zip'; checksumFile = 'SHA256SUMS.txt'; checksumJson = 'checksums.json'; generatedBy = 'sdk/package_release.bat' }; $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath '%PKG_ROOT%\release-manifest.json' -Encoding ascii"
+if errorlevel 1 goto :fail
+
 echo Packaged %CPP_ROOT%
 echo Packaged %CAPI_ROOT%
 echo Packaged %PKG_ROOT%\%CPP_NAME%.zip
 echo Packaged %PKG_ROOT%\%CAPI_NAME%.zip
+echo Packaged %PKG_ROOT%\SHA256SUMS.txt
+echo Packaged %PKG_ROOT%\checksums.json
+echo Packaged %PKG_ROOT%\release-manifest.json
 popd
 exit /b 0
 

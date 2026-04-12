@@ -115,14 +115,36 @@ Outputs:
 
 Actual package names include the SDK version from `sdk/VERSION`, for example:
 
-- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.0\`
-- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.0.zip`
-- `build\win-sdk-package\rocksolid-sdk-capi-0.2.0\`
-- `build\win-sdk-package\rocksolid-sdk-capi-0.2.0.zip`
+- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.1\`
+- `build\win-sdk-package\rocksolid-sdk-cpp-0.2.1.zip`
+- `build\win-sdk-package\rocksolid-sdk-capi-0.2.1\`
+- `build\win-sdk-package\rocksolid-sdk-capi-0.2.1.zip`
 
 The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, and C++ demo source.
 
 The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, import library, docs, and a C demo source.
+
+Each release output directory now also includes:
+
+- `SHA256SUMS.txt`
+- `checksums.json`
+- `release-manifest.json`
+
+## Run the release smoke test
+
+```bat
+call sdk\verify_release_package.bat
+```
+
+This script compiles the packaged C++ and C examples from the versioned release bundles and runs the C API demo to verify the packaged DLL reports the expected SDK version.
+
+## Run the full release workflow
+
+```bat
+call sdk\release_sdk.bat
+```
+
+This runs packaging plus the smoke test in one command.
 
 ## Files to embed in your own project
 
@@ -136,6 +158,8 @@ The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, impor
 - `sdk/build_demo.bat`
 - `sdk/build_static_lib.bat`
 - `sdk/build_c_api_dll.bat`
+- `sdk/verify_release_package.bat`
+- `sdk/release_sdk.bat`
 - `sdk/package_release.bat`
 
 ## Suggested integration pattern

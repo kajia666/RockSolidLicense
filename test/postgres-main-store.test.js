@@ -73,7 +73,7 @@ test("health reports configured postgres main store and sqlite fallback stage", 
   }
 });
 
-test("postgres main store can serve product and policy read-side queries through adapter", async () => {
+test("postgres main store can serve all main-store read-side queries through adapter", async () => {
   const queries = [];
   const adapter = {
     query(sql, params, meta) {
@@ -141,6 +141,67 @@ test("postgres main store can serve product and policy read-side queries through
         ];
       }
 
+      if (meta.repository === "cards") {
+        return [
+          {
+            id: "card_pg_1",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            policy_id: "policy_pg_1",
+            policy_name: "PG Policy",
+            grant_type: "points",
+            grant_points: 25,
+            batch_code: "BATCH-PG-001",
+            card_key: "PGAPP-123456-ABCD",
+            status: "fresh",
+            notes: "postgres card",
+            issued_at: "2026-01-01T00:00:00.000Z",
+            redeemed_at: null,
+            redeemed_username: null,
+            redeemed_by_account_id: null,
+            entitlement_id: "ent_pg_1",
+            entitlement_status: "active",
+            entitlement_ends_at: "2026-02-01T00:00:00.000Z",
+            control_status: "active",
+            expires_at: null,
+            control_notes: null,
+            reseller_id: null,
+            reseller_code: null,
+            reseller_name: null
+          }
+        ];
+      }
+
+      if (meta.repository === "entitlements") {
+        return [
+          {
+            id: "ent_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            account_id: "acct_pg_1",
+            username: "pguser",
+            policy_id: "policy_pg_1",
+            policy_name: "PG Policy",
+            source_license_key_id: "card_pg_1",
+            card_key: "PGAPP-123456-ABCD",
+            status: "active",
+            starts_at: "2026-01-01T00:00:00.000Z",
+            ends_at: "2026-02-01T00:00:00.000Z",
+            grant_type: "points",
+            grant_points: 25,
+            total_points: 25,
+            remaining_points: 17,
+            consumed_points: 8,
+            active_session_count: 2,
+            card_control_status: "active",
+            card_expires_at: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-02T00:00:00.000Z"
+          }
+        ];
+      }
+
       return [];
     }
   };
@@ -157,8 +218,8 @@ test("postgres main store can serve product and policy read-side queries through
     assert.deepEqual(app.mainStore.repositoryDrivers, {
       products: "postgres",
       policies: "postgres",
-      cards: "sqlite",
-      entitlements: "sqlite"
+      cards: "postgres",
+      entitlements: "postgres"
     });
 
     const admin = app.services.adminLogin({
@@ -176,11 +237,31 @@ test("postgres main store can serve product and policy read-side queries through
     assert.equal(policies[0].productCode, "PGAPP");
     assert.deepEqual(policies[0].bindFields, ["deviceFingerprint", "machineGuid"]);
 
-    assert.equal(queries.length, 2);
+    const cards = app.services.listCards(admin.token, { productCode: "PGAPP" });
+    assert.equal(cards.items.length, 1);
+    assert.equal(cards.items[0].cardKey, "PGAPP-123456-ABCD");
+    assert.equal(cards.items[0].grantType, "points");
+
+    const cardById = app.mainStore.cards.getCardRowById(app.db, "card_pg_1");
+    assert.equal(cardById.id, "card_pg_1");
+    assert.equal(cardById.maskedKey, "PGAPP-******-ABCD");
+
+    const entitlements = app.services.listEntitlements(admin.token, { productCode: "PGAPP" });
+    assert.equal(entitlements.items.length, 1);
+    assert.equal(entitlements.items[0].username, "pguser");
+    assert.equal(entitlements.items[0].remainingPoints, 17);
+
+    assert.equal(queries.length, 5);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.repository, "policies");
     assert.match(queries[1].sql, /FROM policies p/i);
+    assert.equal(queries[2].meta.repository, "cards");
+    assert.match(queries[2].sql, /FROM license_keys lk/i);
+    assert.equal(queries[3].meta.repository, "cards");
+    assert.match(queries[3].sql, /WHERE lk\.id = \$1/i);
+    assert.equal(queries[4].meta.repository, "entitlements");
+    assert.match(queries[4].sql, /FROM entitlements e/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -189,8 +270,8 @@ test("postgres main store can serve product and policy read-side queries through
     assert.deepEqual(health.storage.mainStore.repositoryDrivers, {
       products: "postgres",
       policies: "postgres",
-      cards: "sqlite",
-      entitlements: "sqlite"
+      cards: "postgres",
+      entitlements: "postgres"
     });
   } finally {
     await app.close();

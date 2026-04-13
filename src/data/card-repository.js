@@ -121,7 +121,7 @@ function buildCardDisplayStatus(usageStatus, controlState) {
   return usageStatus === "redeemed" ? "used" : "unused";
 }
 
-function formatCardRow(row, referenceTime = nowIso()) {
+export function formatCardRow(row, referenceTime = nowIso()) {
   const control = describeLicenseKeyControl({
     status: row.control_status,
     expires_at: row.expires_at,

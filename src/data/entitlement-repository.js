@@ -170,6 +170,41 @@ export function formatEntitlementGrant(row) {
   };
 }
 
+export function formatEntitlementRow(row, referenceTime = nowIso()) {
+  const control = describeLicenseKeyControl({
+    status: row.card_control_status,
+    expires_at: row.card_expires_at
+  }, referenceTime);
+  const grant = formatEntitlementGrant(row);
+
+  return {
+    id: row.id,
+    productCode: row.product_code,
+    productName: row.product_name,
+    accountId: row.account_id,
+    username: row.username,
+    policyId: row.policy_id,
+    policyName: row.policy_name,
+    sourceLicenseKeyId: row.source_license_key_id,
+    sourceCardKey: row.card_key,
+    status: row.status,
+    lifecycleStatus: entitlementLifecycleStatus(row, referenceTime),
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    grantType: grant.grantType,
+    grantPoints: grant.grantPoints,
+    totalPoints: grant.totalPoints,
+    remainingPoints: grant.remainingPoints,
+    consumedPoints: grant.consumedPoints,
+    activeSessionCount: Number(row.active_session_count ?? 0),
+    cardControlStatus: control.status,
+    cardEffectiveStatus: control.effectiveStatus,
+    cardExpiresAt: control.expiresAt,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 export function queryEntitlementRows(db, filters = {}, options = {}) {
   const now = nowIso();
   const normalizedFilters = {
@@ -240,39 +275,7 @@ export function queryEntitlementRows(db, filters = {}, options = {}) {
       LIMIT ${limit}
     `,
     ...params
-  ).map((row) => {
-    const control = describeLicenseKeyControl({
-      status: row.card_control_status,
-      expires_at: row.card_expires_at
-    }, now);
-    const grant = formatEntitlementGrant(row);
-    return {
-      id: row.id,
-      productCode: row.product_code,
-      productName: row.product_name,
-      accountId: row.account_id,
-      username: row.username,
-      policyId: row.policy_id,
-      policyName: row.policy_name,
-      sourceLicenseKeyId: row.source_license_key_id,
-      sourceCardKey: row.card_key,
-      status: row.status,
-      lifecycleStatus: entitlementLifecycleStatus(row, now),
-      startsAt: row.starts_at,
-      endsAt: row.ends_at,
-      grantType: grant.grantType,
-      grantPoints: grant.grantPoints,
-      totalPoints: grant.totalPoints,
-      remainingPoints: grant.remainingPoints,
-      consumedPoints: grant.consumedPoints,
-      activeSessionCount: Number(row.active_session_count ?? 0),
-      cardControlStatus: control.status,
-      cardEffectiveStatus: control.effectiveStatus,
-      cardExpiresAt: control.expiresAt,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
-  }).filter((item) => {
+  ).map((row) => formatEntitlementRow(row, now)).filter((item) => {
     if (!normalizedFilters.status) {
       return true;
     }

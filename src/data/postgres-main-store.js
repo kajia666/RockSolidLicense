@@ -1,4 +1,6 @@
 import path from "node:path";
+import { createPostgresCardRepository } from "./postgres-card-repository.js";
+import { createPostgresEntitlementRepository } from "./postgres-entitlement-repository.js";
 import { createPostgresPolicyRepository } from "./postgres-policy-repository.js";
 import { createPostgresProductRepository } from "./postgres-product-repository.js";
 import { createSqliteMainStore } from "./sqlite-main-store.js";
@@ -12,8 +14,8 @@ export function createPostgresMainStore({ db, config }) {
     const repositories = {
       products: createPostgresProductRepository(adapter),
       policies: createPostgresPolicyRepository(adapter),
-      cards: fallbackStore.cards,
-      entitlements: fallbackStore.entitlements
+      cards: createPostgresCardRepository(adapter),
+      entitlements: createPostgresEntitlementRepository(adapter)
     };
 
     const metadata = {
@@ -21,7 +23,7 @@ export function createPostgresMainStore({ db, config }) {
       configuredDriver: "postgres",
       targetDriver: "postgres",
       implementationStage: "read_side_preview",
-      fallbackReason: "cards_and_entitlements_still_use_sqlite",
+      fallbackReason: "writes_still_use_sqlite",
       adapterReady,
       postgresUrlConfigured: Boolean(config.postgresUrl),
       schemaScriptPath: path.join(config.cwd, "deploy", "postgres", "init.sql"),
@@ -29,8 +31,8 @@ export function createPostgresMainStore({ db, config }) {
       repositoryDrivers: {
         products: "postgres",
         policies: "postgres",
-        cards: "sqlite",
-        entitlements: "sqlite"
+        cards: "postgres",
+        entitlements: "postgres"
       }
     };
 

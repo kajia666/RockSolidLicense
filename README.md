@@ -175,7 +175,7 @@ npm run db:postgres:check
 当前 `RSL_MAIN_STORE_DRIVER` 支持：
 
 - `sqlite`：默认主数据访问层，直接使用当前 SQLite 主库
-- `postgres`：当前支持 `products / policies` 的 PostgreSQL 读侧 adapter 骨架；如果没有接入 adapter，运行时仍会安全回退到 SQLite，并继续在健康检查里明确显示当前阶段
+- `postgres`：当前支持 `products / policies / cards / entitlements` 的 PostgreSQL 读侧 adapter 预览；如果没有接入 adapter，运行时仍会安全回退到 SQLite，并继续在健康检查里明确显示当前阶段
 
 ## 终端用户主流程
 

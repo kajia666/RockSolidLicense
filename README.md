@@ -228,6 +228,7 @@ TCP：
 
 - `POST /api/developer/login`
 - `GET /api/developer/me`
+- `GET /api/developer/dashboard`
 - `POST /api/developer/logout`
 - `POST /api/developer/profile`
 - `POST /api/developer/change-password`
@@ -278,7 +279,7 @@ TCP：
 - `operator`：可管理已分配项目的策略、卡密、版本、公告和终端用户授权运营动作，但不能改产品功能开关
 - `viewer`：只读查看已分配项目及其策略、卡密、版本、公告，以及授权运营数据
 
-开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者发版中心位于 `/developer/releases`，适合软件作者维护客户端版本、强更规则和启动公告。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
+开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者中心现在还会通过 `GET /api/developer/dashboard` 拉取按项目范围隔离的总览统计，直接展示项目数、在线会话、卡密、强更规则、阻断公告和网络规则概况。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者发版中心位于 `/developer/releases`，适合软件作者维护客户端版本、强更规则和启动公告。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
 
 ## Windows C/C++ SDK
 

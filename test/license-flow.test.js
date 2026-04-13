@@ -4530,6 +4530,284 @@ test("developer-owned projects can manage policies, cards, versions, and notices
   }
 });
 
+test("developer dashboard summarizes only scoped project operations", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "dash.owner",
+        password: "DashOwner123!",
+        displayName: "Dash Owner"
+      },
+      adminSession.token
+    );
+
+    const other = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "dash.other",
+        password: "DashOther123!",
+        displayName: "Dash Other"
+      },
+      adminSession.token
+    );
+
+    const scopedProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "DASH_SCOPE_APP",
+        name: "Dash Scope App",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "DASH_OTHER_APP",
+        name: "Dash Other App",
+        ownerDeveloperId: other.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "dash.owner",
+      password: "DashOwner123!"
+    });
+
+    const scopedPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "DASH_SCOPE_APP",
+        name: "Dashboard Policy",
+        durationDays: 30,
+        maxDevices: 2,
+        heartbeatIntervalSeconds: 30,
+        heartbeatTimeoutSeconds: 90,
+        tokenTtlSeconds: 180
+      },
+      ownerSession.token
+    );
+
+    const scopedBatch = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "DASH_SCOPE_APP",
+        policyId: scopedPolicy.id,
+        count: 2,
+        prefix: "DASH"
+      },
+      ownerSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", scopedProduct.sdkAppId, scopedProduct.sdkAppSecret, {
+      productCode: "DASH_SCOPE_APP",
+      username: "dash_user",
+      password: "DashUser123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", scopedProduct.sdkAppId, scopedProduct.sdkAppSecret, {
+      productCode: "DASH_SCOPE_APP",
+      username: "dash_user",
+      password: "DashUser123!",
+      cardKey: scopedBatch.keys[0]
+    });
+
+    await signedClientPost(baseUrl, "/api/client/login", scopedProduct.sdkAppId, scopedProduct.sdkAppSecret, {
+      productCode: "DASH_SCOPE_APP",
+      username: "dash_user",
+      password: "DashUser123!",
+      clientVersion: "2.0.0",
+      channel: "stable",
+      deviceFingerprint: "dash-device-001",
+      machineGuid: "dash-guid-001"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/client-versions",
+      {
+        productCode: "DASH_SCOPE_APP",
+        version: "2.0.0",
+        channel: "stable",
+        forceUpdate: true,
+        downloadUrl: "https://example.invalid/dash-scope/2.0.0"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/notices",
+      {
+        productCode: "DASH_SCOPE_APP",
+        title: "Scoped maintenance",
+        body: "Scoped maintenance body",
+        kind: "maintenance",
+        channel: "stable",
+        blockLogin: true
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/network-rules",
+      {
+        productCode: "DASH_SCOPE_APP",
+        targetType: "cidr",
+        pattern: "10.0.0.0/24",
+        actionScope: "login",
+        status: "active",
+        notes: "dashboard scoped rule"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/device-blocks",
+      {
+        productCode: "DASH_SCOPE_APP",
+        deviceFingerprint: "blocked-device-001",
+        reason: "dashboard scoped block"
+      },
+      ownerSession.token
+    );
+
+    const otherPolicy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "DASH_OTHER_APP",
+        name: "Other Policy",
+        durationDays: 15,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "DASH_OTHER_APP",
+        policyId: otherPolicy.id,
+        count: 1,
+        prefix: "OTHER"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/client-versions",
+      {
+        productCode: "DASH_OTHER_APP",
+        version: "9.9.9",
+        channel: "stable",
+        forceUpdate: true
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/notices",
+      {
+        productCode: "DASH_OTHER_APP",
+        title: "Other notice",
+        body: "Other notice body",
+        kind: "maintenance",
+        blockLogin: true
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/network-rules",
+      {
+        productCode: "DASH_OTHER_APP",
+        targetType: "cidr",
+        pattern: "192.168.0.0/24",
+        actionScope: "login",
+        status: "active"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "dash.viewer",
+        password: "DashViewer123!",
+        displayName: "Dash Viewer",
+        role: "viewer",
+        productCodes: ["DASH_SCOPE_APP"]
+      },
+      ownerSession.token
+    );
+
+    const viewerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "dash.viewer",
+      password: "DashViewer123!"
+    });
+
+    const ownerDashboard = await getJson(baseUrl, "/api/developer/dashboard", ownerSession.token);
+    assert.equal(ownerDashboard.summary.projects, 1);
+    assert.equal(ownerDashboard.summary.registerEnabledProjects, 1);
+    assert.equal(ownerDashboard.summary.cardsFresh, 1);
+    assert.equal(ownerDashboard.summary.cardsRedeemed, 1);
+    assert.equal(ownerDashboard.summary.accounts, 1);
+    assert.equal(ownerDashboard.summary.activeEntitlements, 1);
+    assert.equal(ownerDashboard.summary.activeSessions, 1);
+    assert.equal(ownerDashboard.summary.blockedDevices, 1);
+    assert.equal(ownerDashboard.summary.activeClientVersions, 1);
+    assert.equal(ownerDashboard.summary.forceUpdateVersions, 1);
+    assert.equal(ownerDashboard.summary.activeNotices, 1);
+    assert.equal(ownerDashboard.summary.blockingNotices, 1);
+    assert.equal(ownerDashboard.summary.activeNetworkRules, 1);
+    assert.equal(ownerDashboard.summary.teamMembers, 1);
+    assert.equal(ownerDashboard.projects.length, 1);
+    assert.equal(ownerDashboard.projects[0].code, "DASH_SCOPE_APP");
+    assert.equal(ownerDashboard.projects[0].metrics.cardsFresh, 1);
+    assert.equal(ownerDashboard.projects[0].metrics.cardsRedeemed, 1);
+    assert.equal(ownerDashboard.projects[0].metrics.activeSessions, 1);
+    assert.equal(ownerDashboard.projects[0].metrics.forceUpdateVersions, 1);
+    assert.equal(ownerDashboard.projects[0].metrics.blockingNotices, 1);
+    assert.equal(ownerDashboard.projects[0].metrics.activeNetworkRules, 1);
+
+    const viewerDashboard = await getJson(baseUrl, "/api/developer/dashboard", viewerSession.token);
+    assert.equal(viewerDashboard.summary.projects, 1);
+    assert.equal(viewerDashboard.summary.cardsFresh, 1);
+    assert.equal(viewerDashboard.summary.cardsRedeemed, 1);
+    assert.equal(viewerDashboard.summary.activeSessions, 1);
+    assert.equal(viewerDashboard.summary.teamMembers, 0);
+    assert.equal(viewerDashboard.projects.length, 1);
+    assert.equal(viewerDashboard.projects[0].code, "DASH_SCOPE_APP");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer release workspace keeps viewers read-only while owners manage scoped releases", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -5725,6 +6003,7 @@ test("developer center page is served from the dedicated route", async () => {
     assert.equal(response.ok, true);
     assert.match(response.headers.get("content-type") || "", /^text\/html/);
     assert.match(html, /Developer Project Center/);
+    assert.match(html, /api\/developer\/dashboard/);
     assert.match(html, /api\/developer\/products/);
     assert.match(html, /api\/developer\/policies/);
     assert.match(html, /api\/developer\/profile/);

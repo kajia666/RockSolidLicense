@@ -372,6 +372,7 @@
           </div>
           <div class="developer-list">
             <div class="split-line"><span>Profile</span><span class="mono">POST /api/developer/profile</span></div>
+            <div class="split-line"><span>Dashboard</span><span class="mono">GET /api/developer/dashboard</span></div>
             <div class="split-line"><span>Members</span><span class="mono">GET/POST /api/developer/members</span></div>
             <div class="split-line"><span>Policies</span><span class="mono">GET/POST /api/developer/policies</span></div>
             <div class="split-line"><span>Policy runtime</span><span class="mono">POST /api/developer/policies/:policyId/runtime-config</span></div>
@@ -523,6 +524,7 @@
       let currentActor = null;
       let productsCache = [];
       let membersCache = [];
+      let dashboardCache = { summary: null, projects: [], generatedAt: null };
 
       function el(id) { return document.getElementById(id); }
 
@@ -588,22 +590,48 @@
           .filter(Boolean);
       }
 
-      function renderStats(items) {
-        const stats = {
-          total: items.length,
-          registerOpen: items.filter((item) => item.featureConfig?.allowRegister).length,
-          directCardOpen: items.filter((item) => item.featureConfig?.allowCardLogin).length,
-          noticesOpen: items.filter((item) => item.featureConfig?.allowNotices).length
+      function emptyDashboardSummary(items = []) {
+        return {
+          projects: items.length,
+          registerEnabledProjects: items.filter((item) => item.featureConfig?.allowRegister !== false).length,
+          cardLoginEnabledProjects: items.filter((item) => item.featureConfig?.allowCardLogin !== false).length,
+          noticesEnabledProjects: items.filter((item) => item.featureConfig?.allowNotices !== false).length,
+          versionCheckEnabledProjects: items.filter((item) => item.featureConfig?.allowVersionCheck !== false).length,
+          policies: 0,
+          cardsFresh: 0,
+          cardsRedeemed: 0,
+          accounts: 0,
+          disabledAccounts: 0,
+          activeEntitlements: 0,
+          activeSessions: 0,
+          activeBindings: 0,
+          blockedDevices: 0,
+          activeClientVersions: 0,
+          forceUpdateVersions: 0,
+          activeNotices: 0,
+          blockingNotices: 0,
+          activeNetworkRules: 0,
+          teamMembers: currentActor?.type === "owner" ? membersCache.length : 0
         };
+      }
+
+      function findDashboardProjectSummary(productCode) {
+        return (dashboardCache.projects || []).find((item) => item.code === productCode) || null;
+      }
+
+      function renderStats(items) {
+        const stats = dashboardCache.summary || emptyDashboardSummary(items);
         const tail = currentActor?.type === "owner"
-          ? `<div class="stat"><strong>${membersCache.length}</strong><span>Team Members</span></div>`
+          ? `<div class="stat"><strong>${stats.teamMembers ?? membersCache.length}</strong><span>Team Members</span></div>`
           : `<div class="stat"><strong>${escapeHtml(currentActor?.role || "-")}</strong><span>Actor Role</span></div>`;
 
         el("stats-box").innerHTML = `
-          <div class="stat"><strong>${stats.total}</strong><span>My Projects</span></div>
-          <div class="stat"><strong>${stats.registerOpen}</strong><span>Register Enabled</span></div>
-          <div class="stat"><strong>${stats.directCardOpen}</strong><span>Card Login Enabled</span></div>
-          <div class="stat"><strong>${stats.noticesOpen}</strong><span>Notices Enabled</span></div>
+          <div class="stat"><strong>${stats.projects}</strong><span>My Projects</span></div>
+          <div class="stat"><strong>${stats.activeSessions}</strong><span>Active Sessions</span></div>
+          <div class="stat"><strong>${stats.cardsFresh}</strong><span>Fresh Cards</span></div>
+          <div class="stat"><strong>${stats.forceUpdateVersions}</strong><span>Force Updates</span></div>
+          <div class="stat"><strong>${stats.blockingNotices}</strong><span>Blocking Notices</span></div>
+          <div class="stat"><strong>${stats.activeNetworkRules}</strong><span>Active Net Rules</span></div>
           ${tail}
         `;
       }
@@ -631,12 +659,21 @@
 
       function renderDetails(product) {
         const featureConfig = product.featureConfig || {};
+        const metrics = findDashboardProjectSummary(product.code)?.metrics || {};
         el("details-box").innerHTML = `
           <div class="split-line"><span>Project</span><span><strong>${escapeHtml(product.code)}</strong> | ${escapeHtml(product.name)}</span></div>
           <div class="split-line"><span>Status</span><span>${escapeHtml(product.status)}</span></div>
           <div class="split-line"><span>SDK App ID</span><span class="mono">${escapeHtml(product.sdkAppId)}</span></div>
           <div class="split-line"><span>SDK App Secret</span><span class="mono">${escapeHtml(product.sdkAppSecret)}</span></div>
           <div class="split-line"><span>Updated</span><span>${escapeHtml(formatTime(product.updatedAt))}</span></div>
+          <div class="hint" style="margin-top: 14px;">Scoped dashboard</div>
+          <div class="split-line"><span>Policies</span><span>${escapeHtml(metrics.policies ?? 0)}</span></div>
+          <div class="split-line"><span>Cards</span><span>fresh ${escapeHtml(metrics.cardsFresh ?? 0)} | redeemed ${escapeHtml(metrics.cardsRedeemed ?? 0)}</span></div>
+          <div class="split-line"><span>Accounts</span><span>${escapeHtml(metrics.accounts ?? 0)} total | ${escapeHtml(metrics.disabledAccounts ?? 0)} disabled</span></div>
+          <div class="split-line"><span>Runtime</span><span>${escapeHtml(metrics.activeEntitlements ?? 0)} entitlements | ${escapeHtml(metrics.activeSessions ?? 0)} sessions</span></div>
+          <div class="split-line"><span>Bindings & Devices</span><span>${escapeHtml(metrics.activeBindings ?? 0)} bindings | ${escapeHtml(metrics.blockedDevices ?? 0)} blocked</span></div>
+          <div class="split-line"><span>Release</span><span>${escapeHtml(metrics.activeClientVersions ?? 0)} active versions | ${escapeHtml(metrics.forceUpdateVersions ?? 0)} force update</span></div>
+          <div class="split-line"><span>Notices & Rules</span><span>${escapeHtml(metrics.activeNotices ?? 0)} notices | ${escapeHtml(metrics.blockingNotices ?? 0)} blocking | ${escapeHtml(metrics.activeNetworkRules ?? 0)} rules</span></div>
           <div class="hint" style="margin-top: 14px;">Current featureConfig</div>
           <div style="margin-top: 8px;">
             ${FEATURE_KEYS.map((key) => renderTag(key, featureConfig[key] !== false)).join("")}
@@ -797,11 +834,15 @@
       }
 
       async function refreshProjects() {
-        const data = await callApi("/api/developer/products");
-        productsCache = Array.isArray(data) ? data : [];
+        const [products, dashboard] = await Promise.all([
+          callApi("/api/developer/products"),
+          callApi("/api/developer/dashboard")
+        ]);
+        productsCache = Array.isArray(products) ? products : [];
+        dashboardCache = dashboard || { summary: null, projects: [], generatedAt: null };
         renderProjects(productsCache);
-        setOutput(productsCache);
-        setStatus(`Loaded ${productsCache.length} accessible projects.`);
+        setOutput({ products: productsCache, dashboard: dashboardCache });
+        setStatus(`Loaded ${productsCache.length} accessible projects with scoped dashboard summary.`);
       }
 
       async function refreshDeveloperMe() {
@@ -830,6 +871,7 @@
         currentActor = null;
         productsCache = [];
         membersCache = [];
+        dashboardCache = { summary: null, projects: [], generatedAt: null };
         renderStats([]);
         renderProjects([]);
         renderMembers([], "Sign in to view team members.");

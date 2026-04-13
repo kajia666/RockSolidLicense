@@ -549,6 +549,262 @@ function listDeveloperAccessibleProductCodes(db, session) {
   return listDeveloperAccessibleProductRows(db, session).map((item) => item.code);
 }
 
+function numberCount(value) {
+  return Number(value ?? 0);
+}
+
+function buildMetricMap(rows, keyField = "product_id", valueField = "count") {
+  const map = new Map();
+  for (const row of rows) {
+    map.set(String(row[keyField]), numberCount(row[valueField]));
+  }
+  return map;
+}
+
+function queryDeveloperDashboardPayload(db, session, runtimeState) {
+  expireStaleSessions(db, runtimeState);
+
+  const products = listDeveloperAccessibleProductRows(db, session);
+  const summary = {
+    projects: products.length,
+    registerEnabledProjects: products.filter((item) => item.featureConfig?.allowRegister !== false).length,
+    cardLoginEnabledProjects: products.filter((item) => item.featureConfig?.allowCardLogin !== false).length,
+    noticesEnabledProjects: products.filter((item) => item.featureConfig?.allowNotices !== false).length,
+    versionCheckEnabledProjects: products.filter((item) => item.featureConfig?.allowVersionCheck !== false).length,
+    policies: 0,
+    cardsFresh: 0,
+    cardsRedeemed: 0,
+    accounts: 0,
+    disabledAccounts: 0,
+    activeEntitlements: 0,
+    activeSessions: 0,
+    activeBindings: 0,
+    blockedDevices: 0,
+    activeClientVersions: 0,
+    forceUpdateVersions: 0,
+    activeNotices: 0,
+    blockingNotices: 0,
+    activeNetworkRules: 0,
+    teamMembers: session.actor_scope === "owner"
+      ? numberCount(one(db, "SELECT COUNT(*) AS count FROM developer_members WHERE developer_id = ?", session.developer_id)?.count)
+      : 0
+  };
+
+  if (!products.length) {
+    return {
+      summary,
+      projects: [],
+      generatedAt: nowIso()
+    };
+  }
+
+  const productIds = products.map((item) => item.id);
+  const placeholders = makeSqlPlaceholders(productIds.length);
+  const now = nowIso();
+
+  const policyCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM policies
+      WHERE product_id IN (${placeholders})
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const freshCardCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM license_keys
+      WHERE product_id IN (${placeholders}) AND status = 'fresh'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const redeemedCardCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM license_keys
+      WHERE product_id IN (${placeholders}) AND status = 'redeemed'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const accountCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM customer_accounts
+      WHERE product_id IN (${placeholders})
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const disabledAccountCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM customer_accounts
+      WHERE product_id IN (${placeholders}) AND status = 'disabled'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const activeEntitlementCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM entitlements
+      WHERE product_id IN (${placeholders}) AND status = 'active' AND ends_at > ?
+      GROUP BY product_id
+    `,
+    ...productIds,
+    now
+  ));
+  const activeSessionCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM sessions
+      WHERE product_id IN (${placeholders}) AND status = 'active'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const activeBindingCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT e.product_id, COUNT(*) AS count
+      FROM device_bindings b
+      JOIN entitlements e ON e.id = b.entitlement_id
+      WHERE e.product_id IN (${placeholders}) AND b.status = 'active'
+      GROUP BY e.product_id
+    `,
+    ...productIds
+  ));
+  const blockedDeviceCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM device_blocks
+      WHERE product_id IN (${placeholders}) AND status = 'active'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const activeClientVersionCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM client_versions
+      WHERE product_id IN (${placeholders}) AND status = 'active'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const forceUpdateVersionCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM client_versions
+      WHERE product_id IN (${placeholders}) AND status = 'active' AND force_update = 1
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const activeNoticeCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM notices
+      WHERE product_id IN (${placeholders}) AND status = 'active'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const blockingNoticeCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM notices
+      WHERE product_id IN (${placeholders}) AND status = 'active' AND block_login = 1
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+  const activeNetworkRuleCounts = buildMetricMap(many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM network_rules
+      WHERE product_id IN (${placeholders}) AND status = 'active'
+      GROUP BY product_id
+    `,
+    ...productIds
+  ));
+
+  const projectSummaries = products.map((product) => {
+    const key = String(product.id);
+    const metrics = {
+      policies: policyCounts.get(key) ?? 0,
+      cardsFresh: freshCardCounts.get(key) ?? 0,
+      cardsRedeemed: redeemedCardCounts.get(key) ?? 0,
+      accounts: accountCounts.get(key) ?? 0,
+      disabledAccounts: disabledAccountCounts.get(key) ?? 0,
+      activeEntitlements: activeEntitlementCounts.get(key) ?? 0,
+      activeSessions: activeSessionCounts.get(key) ?? 0,
+      activeBindings: activeBindingCounts.get(key) ?? 0,
+      blockedDevices: blockedDeviceCounts.get(key) ?? 0,
+      activeClientVersions: activeClientVersionCounts.get(key) ?? 0,
+      forceUpdateVersions: forceUpdateVersionCounts.get(key) ?? 0,
+      activeNotices: activeNoticeCounts.get(key) ?? 0,
+      blockingNotices: blockingNoticeCounts.get(key) ?? 0,
+      activeNetworkRules: activeNetworkRuleCounts.get(key) ?? 0
+    };
+
+    summary.policies += metrics.policies;
+    summary.cardsFresh += metrics.cardsFresh;
+    summary.cardsRedeemed += metrics.cardsRedeemed;
+    summary.accounts += metrics.accounts;
+    summary.disabledAccounts += metrics.disabledAccounts;
+    summary.activeEntitlements += metrics.activeEntitlements;
+    summary.activeSessions += metrics.activeSessions;
+    summary.activeBindings += metrics.activeBindings;
+    summary.blockedDevices += metrics.blockedDevices;
+    summary.activeClientVersions += metrics.activeClientVersions;
+    summary.forceUpdateVersions += metrics.forceUpdateVersions;
+    summary.activeNotices += metrics.activeNotices;
+    summary.blockingNotices += metrics.blockingNotices;
+    summary.activeNetworkRules += metrics.activeNetworkRules;
+
+    return {
+      id: product.id,
+      code: product.code,
+      name: product.name,
+      status: product.status,
+      updatedAt: product.updatedAt,
+      featureConfig: product.featureConfig || {},
+      metrics
+    };
+  });
+
+  return {
+    summary,
+    projects: projectSummaries.sort((left, right) => {
+      if (right.metrics.activeSessions !== left.metrics.activeSessions) {
+        return right.metrics.activeSessions - left.metrics.activeSessions;
+      }
+      if (right.metrics.cardsRedeemed !== left.metrics.cardsRedeemed) {
+        return right.metrics.cardsRedeemed - left.metrics.cardsRedeemed;
+      }
+      return String(left.code).localeCompare(String(right.code));
+    }),
+    generatedAt: nowIso()
+  };
+}
+
 function ensureDeveloperCanAccessProduct(db, session, product, permission, code, message) {
   const ownerDeveloperId = product?.owner_developer_id ?? product?.ownerDeveloperId ?? product?.ownerDeveloper?.id ?? null;
   const productId = product?.id ?? null;
@@ -6071,6 +6327,17 @@ export function createServices(db, config, runtimeState = null) {
         "You can only view projects assigned to your developer account."
       );
       return listDeveloperAccessibleProductRows(db, session);
+    },
+
+    developerDashboard(token) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+      return queryDeveloperDashboardPayload(db, session, stateStore);
     },
 
     developerCreateProduct(token, body = {}) {

@@ -9,6 +9,7 @@ The platform now supports a two-layer developer backoffice model:
 
 - both owners and members log in through `POST /api/developer/login`
 - `GET /api/developer/me` returns both the root developer identity and the current actor
+- `GET /api/developer/dashboard` returns only the summary data for projects visible to the current actor
 - member sessions become invalid immediately if the member or the parent developer is disabled
 
 ## Supported member roles
@@ -19,6 +20,8 @@ The platform now supports a two-layer developer backoffice model:
   Can view assigned projects and can manage policies, cards, versions, notices, and developer authorization operations, but cannot edit product feature toggles.
 - `viewer`
   Read-only access to assigned projects and their policies, cards, versions, notices, and authorization operations data.
+
+All three roles can read the scoped dashboard summary, but the totals and project metrics are still limited to projects assigned to that actor.
 
 ## Owner-only endpoints
 

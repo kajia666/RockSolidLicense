@@ -137,6 +137,7 @@ Effects:
 
 - `POST /api/developer/login`
 - `GET /api/developer/me`
+- `GET /api/developer/dashboard`
 - `POST /api/developer/logout`
 - `POST /api/developer/profile`
 - `POST /api/developer/change-password`
@@ -184,6 +185,7 @@ Effects:
 - the primary developer account can update its own display name, create developer members, and assign those members to specific products
 - developer members use the same `/api/developer/login` entry, but only see products explicitly assigned to them
 - developers and developer members only see projects where `products.owner_developer_id` matches the parent developer account
+- `GET /api/developer/dashboard` returns a scoped summary for accessible projects, including cards, sessions, releases, notices, and network-rule counts
 - `/developer/ops` provides a dedicated authorization operations workspace for software authors
 - `/developer/releases` provides a dedicated client version and notice workspace for software authors
 - `/developer/security` provides a dedicated project network-rule workspace for software authors

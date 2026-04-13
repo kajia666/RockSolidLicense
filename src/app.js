@@ -928,6 +928,11 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/dashboard") {
+        sendJson(res, 200, { ok: true, data: services.developerDashboard(getBearerToken(req)) });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/developer/logout") {
         sendJson(res, 200, { ok: true, data: services.developerLogout(getBearerToken(req)) });
         return;

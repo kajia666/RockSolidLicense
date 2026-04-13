@@ -7,6 +7,7 @@ The goal is simple:
 - software authors can manage end-user authorization under their own projects
 - delegated developer members can perform the same operations inside their assigned project scope
 - no developer can inspect or modify another developer's customer data
+- project-level SDK signing credentials can still be rotated from the developer project center when needed
 
 ## Dedicated UI
 

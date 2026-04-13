@@ -181,6 +181,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      const productSdkRotateRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/products/:productId/sdk-credentials/rotate")
+        : null;
+      if (productSdkRotateRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.rotateProductSdkCredentials(
+            getBearerToken(req),
+            productSdkRotateRoute.productId,
+            body
+          )
+        });
+        return;
+      }
+
       const productOwnerRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/admin/products/:productId/owner")
         : null;
@@ -961,6 +977,22 @@ export function createApp(overrides = {}) {
           data: services.developerUpdateProductFeatureConfig(
             getBearerToken(req),
             developerProductFeatureRoute.productId,
+            body
+          )
+        });
+        return;
+      }
+
+      const developerProductSdkRotateRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/products/:productId/sdk-credentials/rotate")
+        : null;
+      if (developerProductSdkRotateRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerRotateProductSdkCredentials(
+            getBearerToken(req),
+            developerProductSdkRotateRoute.productId,
             body
           )
         });

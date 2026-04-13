@@ -319,6 +319,7 @@
           <div class="pill">Route: <code>/admin/products</code></div>
           <div class="pill">Product code = projectCode = softwareCode</div>
           <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
+          <div class="pill">Credential Rotate API: <code>POST /api/admin/products/:productId/sdk-credentials/rotate</code></div>
           <div class="pill">Owner API: <code>POST /api/admin/products/:productId/owner</code></div>
           <div class="pill">Developer Status API: <code>POST /api/admin/developers/:developerId/status</code></div>
           <div class="pill">One developer can own multiple projects</div>
@@ -452,8 +453,15 @@
           <div class="actions">
             <button id="assign-owner-btn">Save Owner</button>
             <button class="secondary" id="update-btn">Save Feature Config</button>
+            <button class="secondary" id="rotate-sdk-btn">Rotate SDK Credentials</button>
             <button class="danger" id="clear-selection-btn">Clear Selection</button>
           </div>
+          <label>Rotate SDK App ID Too
+            <select id="rotate-sdk-app-id">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
           <div class="hint">Each project can belong to one developer account. Feature toggles stay scoped to the project, not to the whole developer.</div>
         </article>
 
@@ -665,6 +673,7 @@
           el("edit-product-id").value = "";
           el("edit-product-code").value = "";
           el("edit-owner-developer-id").value = "";
+          el("rotate-sdk-app-id").value = "false";
           writeFeatureConfig("edit", {});
           el("details-box").innerHTML = '<div class="hint">Select a product row to inspect SDK credentials, project owner, and toggle summary.</div>';
           return;
@@ -913,6 +922,25 @@
         });
         setOutput(data);
         setStatus(`Saved feature config for ${data.code}.`);
+        await refreshAll();
+        const updated = productsCache.find((item) => item.id === productId) || data;
+        setSelection(updated);
+      }));
+
+      el("rotate-sdk-btn").addEventListener("click", () => guarded(async () => {
+        const productId = el("edit-product-id").value.trim();
+        if (!productId) {
+          throw new Error("Select a project before rotating SDK credentials.");
+        }
+
+        const data = await callApi(`/api/admin/products/${encodeURIComponent(productId)}/sdk-credentials/rotate`, {
+          method: "POST",
+          body: {
+            rotateAppId: el("rotate-sdk-app-id").value === "true"
+          }
+        });
+        setOutput(data);
+        setStatus(`Rotated SDK credentials for ${data.code}.`);
         await refreshAll();
         const updated = productsCache.find((item) => item.id === productId) || data;
         setSelection(updated);

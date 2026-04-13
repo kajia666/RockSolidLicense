@@ -76,6 +76,26 @@ Owners update the main developer profile. Members update only their own display 
 
 Write-capable roles can also freeze accounts, extend entitlements, adjust points, revoke sessions, release bindings, and block or unblock devices inside their assigned project scope.
 
+## SDK credential rotation
+
+- `POST /api/developer/products/:productId/sdk-credentials/rotate`
+
+Roles with `products.write` permission can rotate a project's SDK signing credentials. This is typically the owner account or a developer member with the `admin` role.
+
+Example request:
+
+```json
+{
+  "rotateAppId": true
+}
+```
+
+Effects:
+
+- a new `sdkAppSecret` is always generated
+- `sdkAppId` changes only when `rotateAppId=true`
+- old SDK credentials stop working immediately after the rotation succeeds
+
 ## Isolation rules
 
 - a member only sees products explicitly assigned to that member

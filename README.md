@@ -44,6 +44,7 @@
 ### 软件管理
 
 - 产品级功能开关
+- 项目 SDK 凭据轮换
 - 开发者多项目归属
 - 开发者主账号 + 子账号
 - 子账号按项目授权与角色控制
@@ -180,6 +181,7 @@ HTTP：
 - `GET /api/admin/products`
 - `POST /api/admin/products`
 - `POST /api/admin/products/:productId/feature-config`
+- `POST /api/admin/products/:productId/sdk-credentials/rotate`
 - `POST /api/admin/products/:productId/owner`
 - `GET /api/admin/developers`
 - `POST /api/admin/developers`
@@ -233,6 +235,7 @@ TCP：
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/feature-config`
+- `POST /api/developer/products/:productId/sdk-credentials/rotate`
 - `GET /api/developer/policies`
 - `POST /api/developer/policies`
 - `POST /api/developer/policies/:policyId/runtime-config`
@@ -270,7 +273,7 @@ TCP：
 - `operator`：可管理已分配项目的策略、卡密、版本、公告和终端用户授权运营动作，但不能改产品功能开关
 - `viewer`：只读查看已分配项目及其策略、卡密、版本、公告，以及授权运营数据
 
-开发者主账号可以自助改密、改资料、创建/禁用子账号和调整项目授权；管理员仍然可以禁用或恢复开发者主账号。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。
+开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。
 
 ## Windows C/C++ SDK
 

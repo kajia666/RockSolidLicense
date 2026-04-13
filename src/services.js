@@ -1211,6 +1211,42 @@ function updateProductFeatureConfigRecord(db, productId, body = {}, timestamp = 
   };
 }
 
+function rotateProductSdkCredentialsRecord(db, productId, body = {}, timestamp = nowIso()) {
+  const product = one(db, "SELECT * FROM products WHERE id = ?", productId);
+  if (!product) {
+    throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+  }
+
+  const rotateAppId = parseOptionalBoolean(body.rotateAppId, "rotateAppId") === true;
+  const nextSdkAppId = rotateAppId ? randomAppId() : product.sdk_app_id;
+  const nextSdkAppSecret = randomToken(24);
+
+  run(
+    db,
+    `
+      UPDATE products
+      SET sdk_app_id = ?, sdk_app_secret = ?, updated_at = ?
+      WHERE id = ?
+    `,
+    nextSdkAppId,
+    nextSdkAppSecret,
+    timestamp,
+    product.id
+  );
+
+  return {
+    product: getProductRowById(db, product.id),
+    rotated: {
+      rotateAppId,
+      previousSdkAppId: product.sdk_app_id,
+      previousSdkAppSecretMasked: maskToken(product.sdk_app_secret),
+      sdkAppId: nextSdkAppId,
+      sdkAppSecret: nextSdkAppSecret,
+      updatedAt: timestamp
+    }
+  };
+}
+
 function requireDeveloperOwnedProduct(db, session, productId, permission = "products.read") {
   const product = getProductRowById(db, productId);
   if (!product) {
@@ -1833,6 +1869,17 @@ function maskCardKey(cardKey) {
   }
 
   return `${normalized.slice(0, 2)}******${normalized.slice(-4)}`;
+}
+
+function maskToken(value) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= 8) {
+    return `${normalized.slice(0, 2)}...${normalized.slice(-2)}`;
+  }
+  return `${normalized.slice(0, 4)}...${normalized.slice(-4)}`;
 }
 
 function describeLicenseKeyControl(row, referenceTime = nowIso()) {
@@ -5908,6 +5955,23 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
+    rotateProductSdkCredentials(token, productId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const result = rotateProductSdkCredentialsRecord(db, productId, body, nowIso());
+
+      audit(db, "admin", admin.admin_id, "product.sdk-credentials.rotate", "product", result.product.id, {
+        code: result.product.code,
+        rotateAppId: result.rotated.rotateAppId,
+        previousSdkAppId: result.rotated.previousSdkAppId,
+        sdkAppId: result.rotated.sdkAppId
+      });
+
+      return {
+        ...result.product,
+        rotation: result.rotated
+      };
+    },
+
     updateProductOwner(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
       const product = getProductRowById(db, productId);
@@ -5964,6 +6028,24 @@ export function createServices(db, config, runtimeState = null) {
       return {
         ...result.product,
         featureConfig: result.featureConfig
+      };
+    },
+
+    developerRotateProductSdkCredentials(token, productId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const ownedProduct = requireDeveloperOwnedProduct(db, session, productId, "products.write");
+      const result = rotateProductSdkCredentialsRecord(db, ownedProduct.id, body, nowIso());
+
+      auditDeveloperSession(db, session, "product.sdk-credentials.rotate", "product", result.product.id, {
+        code: result.product.code,
+        rotateAppId: result.rotated.rotateAppId,
+        previousSdkAppId: result.rotated.previousSdkAppId,
+        sdkAppId: result.rotated.sdkAppId
+      });
+
+      return {
+        ...result.product,
+        rotation: result.rotated
       };
     },
 

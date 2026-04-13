@@ -40,6 +40,7 @@ Terminology:
 - `GET /api/admin/products`
 - `POST /api/admin/products`
 - `POST /api/admin/products/:productId/feature-config`
+- `POST /api/admin/products/:productId/sdk-credentials/rotate`
 - `POST /api/admin/products/:productId/owner`
 - `GET /api/admin/developers`
 - `POST /api/admin/developers`
@@ -81,6 +82,14 @@ Feature config update example:
 }
 ```
 
+SDK credential rotation example:
+
+```json
+{
+  "rotateAppId": true
+}
+```
+
 Owner assignment example:
 
 ```json
@@ -111,6 +120,7 @@ Effects:
 
 - software authors can decide which client capabilities are exposed for a given product
 - `/admin/products` provides a cleaner product-focused page for creating products, creating developer accounts, assigning project owners, and editing feature toggles without relying on the legacy `/admin` console
+- `/admin/products` can also rotate one project's SDK secret, or rotate both `sdkAppId` and `sdkAppSecret` together
 - write requests can use `productCode`, `projectCode`, or `softwareCode` to point at the same product
 - if `ownerDeveloperId` is set, that project becomes visible to the matching developer account in `/developer`
 - if `ownerDeveloperId` is `null`, the project remains admin-managed and does not appear in a developer's project list

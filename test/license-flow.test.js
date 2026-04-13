@@ -5204,6 +5204,155 @@ test("developer operators can manage scoped authorization operations for assigne
   }
 });
 
+test("admin and developers can rotate project sdk credentials with scoped permission checks", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "rotate.owner",
+        password: "RotateOwner123!",
+        displayName: "Rotate Owner"
+      },
+      adminSession.token
+    );
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "ROTATE_APP",
+        name: "Rotate App",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const originalAppId = product.sdkAppId;
+    const originalSecret = product.sdkAppSecret;
+
+    await signedClientPost(baseUrl, "/api/client/register", originalAppId, originalSecret, {
+      productCode: "ROTATE_APP",
+      username: "before_admin_rotate",
+      password: "RotateUser123!"
+    });
+
+    const adminRotation = await postJson(
+      baseUrl,
+      `/api/admin/products/${product.id}/sdk-credentials/rotate`,
+      {},
+      adminSession.token
+    );
+    assert.equal(adminRotation.sdkAppId, originalAppId);
+    assert.notEqual(adminRotation.sdkAppSecret, originalSecret);
+    assert.equal(adminRotation.rotation.rotateAppId, false);
+    assert.equal(adminRotation.rotation.previousSdkAppId, originalAppId);
+
+    const oldSecretFailure = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/register",
+      originalAppId,
+      originalSecret,
+      {
+        productCode: "ROTATE_APP",
+        username: "old_secret_user",
+        password: "RotateUser123!"
+      }
+    );
+    assert.equal(oldSecretFailure.status, 401);
+    assert.equal(oldSecretFailure.error.code, "SDK_SIGNATURE_INVALID");
+
+    await signedClientPost(baseUrl, "/api/client/register", adminRotation.sdkAppId, adminRotation.sdkAppSecret, {
+      productCode: "ROTATE_APP",
+      username: "after_admin_rotate",
+      password: "RotateUser123!"
+    });
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "rotate.owner",
+      password: "RotateOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "rotate.operator",
+        password: "RotateOperator123!",
+        displayName: "Rotate Operator",
+        role: "operator",
+        productCodes: ["ROTATE_APP"]
+      },
+      ownerSession.token
+    );
+
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "rotate.operator",
+      password: "RotateOperator123!"
+    });
+
+    const forbiddenDeveloperRotate = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/products/${product.id}/sdk-credentials/rotate`,
+      { rotateAppId: true },
+      operatorSession.token
+    );
+    assert.equal(forbiddenDeveloperRotate.status, 403);
+    assert.equal(forbiddenDeveloperRotate.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const developerRotation = await postJson(
+      baseUrl,
+      `/api/developer/products/${product.id}/sdk-credentials/rotate`,
+      { rotateAppId: true },
+      ownerSession.token
+    );
+    assert.equal(developerRotation.rotation.rotateAppId, true);
+    assert.notEqual(developerRotation.sdkAppId, adminRotation.sdkAppId);
+    assert.notEqual(developerRotation.sdkAppSecret, adminRotation.sdkAppSecret);
+
+    const oldAppIdFailure = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/register",
+      adminRotation.sdkAppId,
+      adminRotation.sdkAppSecret,
+      {
+        productCode: "ROTATE_APP",
+        username: "old_appid_user",
+        password: "RotateUser123!"
+      }
+    );
+    assert.equal(oldAppIdFailure.status, 401);
+    assert.equal(oldAppIdFailure.error.code, "SDK_APP_INVALID");
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/register",
+      developerRotation.sdkAppId,
+      developerRotation.sdkAppSecret,
+      {
+        productCode: "ROTATE_APP",
+        username: "after_developer_rotate",
+        password: "RotateUser123!"
+      }
+    );
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=120", adminSession.token);
+    const developerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=120", ownerSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.sdk-credentials.rotate"));
+    assert.ok(developerAuditLogs.items.some((entry) => entry.event_type === "product.sdk-credentials.rotate"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -5217,6 +5366,8 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /Developer Accounts/);
     assert.match(html, /api\/admin\/developers/);
     assert.match(html, /developers\/:developerId\/status/);
+    assert.match(html, /sdk-credentials\/rotate/);
+    assert.match(html, /Rotate SDK Credentials/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -5238,6 +5389,8 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/members/);
     assert.match(html, /change-password/);
     assert.match(html, /Create Team Member/);
+    assert.match(html, /sdk-credentials\/rotate/);
+    assert.match(html, /Rotate SDK Credentials/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

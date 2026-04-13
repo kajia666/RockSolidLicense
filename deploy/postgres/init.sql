@@ -1,27 +1,23 @@
-import fs from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { generateId, hashPassword, nowIso } from "./security.js";
-
-export const SQLITE_SCHEMA_SQL = `
-PRAGMA foreign_keys = ON;
+-- Generated from src/database.js
+-- Purpose: bootstrap a PostgreSQL main-store schema that mirrors the current SQLite model.
+-- Note: the application still runs its main store on SQLite today; this script prepares the next migration phase.
 
 CREATE TABLE IF NOT EXISTS admins (
   id TEXT PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  last_login_at TEXT
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  last_login_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS admin_sessions (
   id TEXT PRIMARY KEY,
   admin_id TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
 );
 
@@ -31,18 +27,18 @@ CREATE TABLE IF NOT EXISTS developer_accounts (
   display_name TEXT,
   password_hash TEXT NOT NULL,
   status TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  last_login_at TEXT
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  last_login_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS developer_sessions (
   id TEXT PRIMARY KEY,
   developer_id TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS developer_members (
@@ -53,9 +49,9 @@ CREATE TABLE IF NOT EXISTS developer_members (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL,
   status TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  last_login_at TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  last_login_at TIMESTAMPTZ,
   FOREIGN KEY (developer_id) REFERENCES developer_accounts(id) ON DELETE CASCADE
 );
 
@@ -64,9 +60,9 @@ CREATE TABLE IF NOT EXISTS developer_member_sessions (
   member_id TEXT NOT NULL,
   developer_id TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (member_id) REFERENCES developer_members(id) ON DELETE CASCADE,
   FOREIGN KEY (developer_id) REFERENCES developer_accounts(id) ON DELETE CASCADE
 );
@@ -75,8 +71,8 @@ CREATE TABLE IF NOT EXISTS developer_member_products (
   id TEXT PRIMARY KEY,
   member_id TEXT NOT NULL,
   product_id TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (member_id) REFERENCES developer_members(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   UNIQUE(member_id, product_id)
@@ -91,21 +87,21 @@ CREATE TABLE IF NOT EXISTS products (
   owner_developer_id TEXT,
   sdk_app_id TEXT NOT NULL UNIQUE,
   sdk_app_secret TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS product_feature_configs (
   product_id TEXT PRIMARY KEY,
-  allow_register INTEGER NOT NULL DEFAULT 1,
-  allow_account_login INTEGER NOT NULL DEFAULT 1,
-  allow_card_login INTEGER NOT NULL DEFAULT 1,
-  allow_card_recharge INTEGER NOT NULL DEFAULT 1,
-  allow_version_check INTEGER NOT NULL DEFAULT 1,
-  allow_notices INTEGER NOT NULL DEFAULT 1,
-  allow_client_unbind INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  allow_register BOOLEAN NOT NULL DEFAULT TRUE,
+  allow_account_login BOOLEAN NOT NULL DEFAULT TRUE,
+  allow_card_login BOOLEAN NOT NULL DEFAULT TRUE,
+  allow_card_recharge BOOLEAN NOT NULL DEFAULT TRUE,
+  allow_version_check BOOLEAN NOT NULL DEFAULT TRUE,
+  allow_notices BOOLEAN NOT NULL DEFAULT TRUE,
+  allow_client_unbind BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
@@ -115,34 +111,34 @@ CREATE TABLE IF NOT EXISTS policies (
   name TEXT NOT NULL,
   duration_days INTEGER NOT NULL,
   max_devices INTEGER NOT NULL,
-  allow_concurrent_sessions INTEGER NOT NULL DEFAULT 1,
+  allow_concurrent_sessions BOOLEAN NOT NULL DEFAULT TRUE,
   heartbeat_interval_seconds INTEGER NOT NULL DEFAULT 60,
   heartbeat_timeout_seconds INTEGER NOT NULL DEFAULT 180,
   token_ttl_seconds INTEGER NOT NULL DEFAULT 300,
   bind_mode TEXT NOT NULL DEFAULT 'strict',
   status TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS policy_bind_configs (
   policy_id TEXT PRIMARY KEY,
   bind_mode TEXT NOT NULL,
-  bind_fields_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  bind_fields_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS policy_unbind_configs (
   policy_id TEXT PRIMARY KEY,
-  allow_client_unbind INTEGER NOT NULL DEFAULT 0,
+  allow_client_unbind BOOLEAN NOT NULL DEFAULT FALSE,
   client_unbind_limit INTEGER NOT NULL DEFAULT 0,
   client_unbind_window_days INTEGER NOT NULL DEFAULT 30,
   client_unbind_deduct_days INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE
 );
 
@@ -150,8 +146,8 @@ CREATE TABLE IF NOT EXISTS policy_grant_configs (
   policy_id TEXT PRIMARY KEY,
   grant_type TEXT NOT NULL DEFAULT 'duration',
   grant_points INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE
 );
 
@@ -161,9 +157,9 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
   username TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   status TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  last_login_at TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  last_login_at TIMESTAMPTZ,
   UNIQUE(product_id, username),
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
@@ -176,8 +172,8 @@ CREATE TABLE IF NOT EXISTS license_keys (
   batch_code TEXT NOT NULL,
   status TEXT NOT NULL,
   notes TEXT,
-  issued_at TEXT NOT NULL,
-  redeemed_at TEXT,
+  issued_at TIMESTAMPTZ NOT NULL,
+  redeemed_at TIMESTAMPTZ,
   redeemed_by_account_id TEXT,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE,
@@ -187,10 +183,10 @@ CREATE TABLE IF NOT EXISTS license_keys (
 CREATE TABLE IF NOT EXISTS license_key_controls (
   license_key_id TEXT PRIMARY KEY,
   status TEXT NOT NULL,
-  expires_at TEXT,
+  expires_at TIMESTAMPTZ,
   notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE
 );
 
@@ -201,10 +197,10 @@ CREATE TABLE IF NOT EXISTS entitlements (
   account_id TEXT NOT NULL,
   source_license_key_id TEXT NOT NULL UNIQUE,
   status TEXT NOT NULL,
-  starts_at TEXT NOT NULL,
-  ends_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE,
   FOREIGN KEY (account_id) REFERENCES customer_accounts(id) ON DELETE CASCADE,
@@ -215,7 +211,7 @@ CREATE TABLE IF NOT EXISTS card_login_accounts (
   license_key_id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL UNIQUE,
   product_id TEXT NOT NULL,
-  created_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (license_key_id) REFERENCES license_keys(id) ON DELETE CASCADE,
   FOREIGN KEY (account_id) REFERENCES customer_accounts(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -226,10 +222,10 @@ CREATE TABLE IF NOT EXISTS devices (
   product_id TEXT NOT NULL,
   fingerprint TEXT NOT NULL,
   device_name TEXT,
-  first_seen_at TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL,
+  first_seen_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
   last_seen_ip TEXT,
-  metadata_json TEXT,
+  metadata_json JSONB,
   UNIQUE(product_id, fingerprint),
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
@@ -239,9 +235,9 @@ CREATE TABLE IF NOT EXISTS device_bindings (
   entitlement_id TEXT NOT NULL,
   device_id TEXT NOT NULL,
   status TEXT NOT NULL,
-  first_bound_at TEXT NOT NULL,
-  last_bound_at TEXT NOT NULL,
-  revoked_at TEXT,
+  first_bound_at TIMESTAMPTZ NOT NULL,
+  last_bound_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
   UNIQUE(entitlement_id, device_id),
   FOREIGN KEY (entitlement_id) REFERENCES entitlements(id) ON DELETE CASCADE,
   FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
@@ -252,11 +248,11 @@ CREATE TABLE IF NOT EXISTS device_binding_profiles (
   entitlement_id TEXT NOT NULL,
   device_id TEXT NOT NULL,
   identity_hash TEXT NOT NULL,
-  match_fields_json TEXT NOT NULL,
-  identity_json TEXT NOT NULL,
+  match_fields_json JSONB NOT NULL,
+  identity_json JSONB NOT NULL,
   request_ip TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (binding_id) REFERENCES device_bindings(id) ON DELETE CASCADE,
   FOREIGN KEY (entitlement_id) REFERENCES entitlements(id) ON DELETE CASCADE,
   FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
@@ -271,7 +267,7 @@ CREATE TABLE IF NOT EXISTS entitlement_unbind_logs (
   actor_id TEXT,
   reason TEXT NOT NULL,
   deducted_days INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (entitlement_id) REFERENCES entitlements(id) ON DELETE CASCADE,
   FOREIGN KEY (binding_id) REFERENCES device_bindings(id) ON DELETE CASCADE
 );
@@ -282,8 +278,8 @@ CREATE TABLE IF NOT EXISTS entitlement_metering (
   total_points INTEGER NOT NULL DEFAULT 0,
   remaining_points INTEGER NOT NULL DEFAULT 0,
   consumed_points INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (entitlement_id) REFERENCES entitlements(id) ON DELETE CASCADE
 );
 
@@ -294,9 +290,9 @@ CREATE TABLE IF NOT EXISTS device_blocks (
   status TEXT NOT NULL,
   reason TEXT NOT NULL,
   notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  released_at TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  released_at TIMESTAMPTZ,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   UNIQUE(product_id, fingerprint)
 );
@@ -307,14 +303,14 @@ CREATE TABLE IF NOT EXISTS client_versions (
   channel TEXT NOT NULL,
   version TEXT NOT NULL,
   status TEXT NOT NULL,
-  force_update INTEGER NOT NULL DEFAULT 0,
+  force_update BOOLEAN NOT NULL DEFAULT FALSE,
   download_url TEXT,
   release_notes TEXT,
   notice_title TEXT,
   notice_body TEXT,
-  released_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  released_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   UNIQUE(product_id, channel, version)
 );
@@ -329,11 +325,11 @@ CREATE TABLE IF NOT EXISTS notices (
   body TEXT NOT NULL,
   action_url TEXT,
   status TEXT NOT NULL,
-  block_login INTEGER NOT NULL DEFAULT 0,
-  starts_at TEXT NOT NULL,
-  ends_at TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  block_login BOOLEAN NOT NULL DEFAULT FALSE,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
@@ -346,8 +342,8 @@ CREATE TABLE IF NOT EXISTS network_rules (
   decision TEXT NOT NULL,
   status TEXT NOT NULL,
   notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
@@ -359,16 +355,16 @@ CREATE TABLE IF NOT EXISTS resellers (
   contact_email TEXT,
   status TEXT NOT NULL,
   notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS reseller_relations (
   reseller_id TEXT PRIMARY KEY,
   parent_reseller_id TEXT,
-  can_view_descendants INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  can_view_descendants BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
   FOREIGN KEY (parent_reseller_id) REFERENCES resellers(id) ON DELETE SET NULL
 );
@@ -379,9 +375,9 @@ CREATE TABLE IF NOT EXISTS reseller_users (
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   status TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  last_login_at TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  last_login_at TIMESTAMPTZ,
   FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE
 );
 
@@ -390,9 +386,9 @@ CREATE TABLE IF NOT EXISTS reseller_sessions (
   reseller_user_id TEXT NOT NULL,
   reseller_id TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (reseller_user_id) REFERENCES reseller_users(id) ON DELETE CASCADE,
   FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE
 );
@@ -405,7 +401,7 @@ CREATE TABLE IF NOT EXISTS reseller_inventory (
   license_key_id TEXT NOT NULL UNIQUE,
   allocation_batch_code TEXT NOT NULL,
   notes TEXT,
-  allocated_at TEXT NOT NULL,
+  allocated_at TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL,
   FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
@@ -423,8 +419,8 @@ CREATE TABLE IF NOT EXISTS reseller_price_rules (
   unit_price_cents INTEGER NOT NULL,
   unit_cost_cents INTEGER NOT NULL,
   notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE
@@ -443,8 +439,8 @@ CREATE TABLE IF NOT EXISTS reseller_settlement_snapshots (
   unit_price_cents INTEGER NOT NULL,
   unit_cost_cents INTEGER NOT NULL,
   commission_amount_cents INTEGER NOT NULL,
-  priced_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
+  priced_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (reseller_inventory_id) REFERENCES reseller_inventory(id) ON DELETE CASCADE,
   FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
@@ -460,16 +456,16 @@ CREATE TABLE IF NOT EXISTS reseller_statements (
   statement_code TEXT NOT NULL UNIQUE,
   status TEXT NOT NULL,
   product_id TEXT,
-  period_start TEXT,
-  period_end TEXT,
+  period_start TIMESTAMPTZ,
+  period_end TIMESTAMPTZ,
   item_count INTEGER NOT NULL,
   gross_amount_cents INTEGER NOT NULL,
   cost_amount_cents INTEGER NOT NULL,
   commission_amount_cents INTEGER NOT NULL,
   notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  paid_at TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  paid_at TIMESTAMPTZ,
   FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
 );
@@ -480,11 +476,11 @@ CREATE TABLE IF NOT EXISTS reseller_statement_items (
   settlement_snapshot_id TEXT NOT NULL UNIQUE,
   reseller_inventory_id TEXT NOT NULL UNIQUE,
   license_key_id TEXT NOT NULL UNIQUE,
-  redeemed_at TEXT NOT NULL,
+  redeemed_at TIMESTAMPTZ NOT NULL,
   gross_amount_cents INTEGER NOT NULL,
   cost_amount_cents INTEGER NOT NULL,
   commission_amount_cents INTEGER NOT NULL,
-  created_at TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (statement_id) REFERENCES reseller_statements(id) ON DELETE CASCADE,
   FOREIGN KEY (settlement_snapshot_id) REFERENCES reseller_settlement_snapshots(id) ON DELETE CASCADE,
   FOREIGN KEY (reseller_inventory_id) REFERENCES reseller_inventory(id) ON DELETE CASCADE,
@@ -500,9 +496,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   session_token TEXT NOT NULL UNIQUE,
   license_token TEXT NOT NULL,
   status TEXT NOT NULL,
-  issued_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL,
-  last_heartbeat_at TEXT NOT NULL,
+  issued_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  last_heartbeat_at TIMESTAMPTZ NOT NULL,
   last_seen_ip TEXT,
   user_agent TEXT,
   revoked_reason TEXT,
@@ -515,7 +511,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS request_nonces (
   app_id TEXT NOT NULL,
   nonce TEXT NOT NULL,
-  expires_at TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (app_id, nonce)
 );
 
@@ -526,8 +522,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   event_type TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id TEXT,
-  metadata_json TEXT,
-  created_at TEXT NOT NULL
+  metadata_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_license_keys_product_status ON license_keys(product_id, status);
@@ -584,115 +580,3 @@ CREATE INDEX IF NOT EXISTS idx_reseller_statements_lookup
   ON reseller_statements(reseller_id, currency, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_statement_items_lookup
   ON reseller_statement_items(statement_id, redeemed_at);
-`;
-
-export function createDatabase(config) {
-  if (config.dbPath !== ":memory:") {
-    fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
-  }
-
-  const db = new DatabaseSync(config.dbPath);
-  db.exec(SQLITE_SCHEMA_SQL);
-  migrateDatabase(db);
-  seedAdmin(db, config);
-  seedProductFeatureConfigs(db);
-  seedResellerRelations(db);
-  return db;
-}
-
-function migrateDatabase(db) {
-  ensureColumn(
-    db,
-    "products",
-    "owner_developer_id",
-    "ALTER TABLE products ADD COLUMN owner_developer_id TEXT"
-  );
-}
-
-function ensureColumn(db, tableName, columnName, alterSql) {
-  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
-  if (columns.some((column) => column.name === columnName)) {
-    return;
-  }
-  db.exec(alterSql);
-}
-
-function seedAdmin(db, config) {
-  const countRow = db.prepare("SELECT COUNT(*) AS count FROM admins").get();
-  if (countRow.count > 0) {
-    return;
-  }
-
-  const now = nowIso();
-  db.prepare(
-    `
-      INSERT INTO admins (id, username, password_hash, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-    `
-  ).run(
-    generateId("admin"),
-    config.adminUsername,
-    hashPassword(config.adminPassword),
-    now,
-    now
-  );
-}
-
-function seedResellerRelations(db) {
-  const now = nowIso();
-  const rows = db.prepare(
-    `
-      SELECT r.id
-      FROM resellers r
-      LEFT JOIN reseller_relations rr ON rr.reseller_id = r.id
-      WHERE rr.reseller_id IS NULL
-    `
-  ).all();
-
-  const insert = db.prepare(
-    `
-      INSERT INTO reseller_relations
-      (reseller_id, parent_reseller_id, can_view_descendants, created_at, updated_at)
-      VALUES (?, NULL, 1, ?, ?)
-    `
-  );
-
-  for (const row of rows) {
-    insert.run(row.id, now, now);
-  }
-}
-
-function seedProductFeatureConfigs(db) {
-  const now = nowIso();
-  const rows = db.prepare(
-    `
-      SELECT p.id
-      FROM products p
-      LEFT JOIN product_feature_configs pfc ON pfc.product_id = p.id
-      WHERE pfc.product_id IS NULL
-    `
-  ).all();
-
-  const insert = db.prepare(
-    `
-      INSERT INTO product_feature_configs
-      (
-        product_id,
-        allow_register,
-        allow_account_login,
-        allow_card_login,
-        allow_card_recharge,
-        allow_version_check,
-        allow_notices,
-        allow_client_unbind,
-        created_at,
-        updated_at
-      )
-      VALUES (?, 1, 1, 1, 1, 1, 1, 1, ?, ?)
-    `
-  );
-
-  for (const row of rows) {
-    insert.run(row.id, now, now);
-  }
-}

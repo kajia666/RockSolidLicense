@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "db:postgres:init": "node scripts/render-postgres-init.mjs",
+    "db:postgres:check": "node scripts/render-postgres-init.mjs --check",
     "test": "node --test --test-concurrency=1 --test-isolation=none"
   }
 }

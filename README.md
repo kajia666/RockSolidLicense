@@ -146,6 +146,21 @@ RSL_DEVELOPER_SESSION_HOURS=24
 npm test
 ```
 
+### PostgreSQL 引导脚本
+
+主业务数据当前仍然跑在 SQLite 上，但仓库已经提供了 PostgreSQL 主库初始化脚本，便于后续迁移：
+
+```bash
+npm run db:postgres:init
+npm run db:postgres:check
+```
+
+对应文件：
+
+- [init.sql](/D:/code/OnlineVerification/deploy/postgres/init.sql)
+- [render-postgres-init.mjs](/D:/code/OnlineVerification/scripts/render-postgres-init.mjs)
+- [storage-platform.md](/D:/code/OnlineVerification/docs/storage-platform.md)
+
 ## 终端用户主流程
 
 ### 账号模式
@@ -419,7 +434,7 @@ cl /EHsc /std:c++17 ^
 - `docs/developer-members.md`
 - `docs/developer-ops.md`
 - `docs/developer-release.md`
-- `docs/production-storage.md`
+- `docs/storage-platform.md`
 - `docs/linux-deployment.md`
 - `docs/windows-server-deployment.md`
 

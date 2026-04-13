@@ -79,6 +79,29 @@ function expireSessionByToken(db, stateStore, sessionToken, reason) {
   return expireActiveSessions(db, stateStore, "session_token = ?", [sessionToken], reason);
 }
 
+function revokeDeveloperSessions(db, whereSql, params = []) {
+  const rows = many(
+    db,
+    `
+      SELECT id, token
+      FROM developer_sessions
+      WHERE ${whereSql}
+    `,
+    ...params
+  );
+
+  if (!rows.length) {
+    return 0;
+  }
+
+  run(
+    db,
+    `DELETE FROM developer_sessions WHERE ${whereSql}`,
+    ...params
+  );
+  return rows.length;
+}
+
 async function finalizeIssuedSessionRuntime(db, stateStore, payload) {
   if (!payload?.runtime) {
     return payload;
@@ -4485,12 +4508,69 @@ export function createServices(db, config, runtimeState = null) {
         developer: {
           id: session.developer_id,
           username: session.username,
-          displayName: session.display_name ?? ""
+          displayName: session.display_name ?? "",
+          status: session.developer_status
         },
         session: {
           id: session.id,
           expiresAt: session.expires_at
         }
+      };
+    },
+
+    developerLogout(token) {
+      const session = requireDeveloperSession(db, token);
+      revokeDeveloperSessions(db, "id = ?", [session.id]);
+
+      audit(db, "developer", session.developer_id, "developer.logout", "developer", session.developer_id, {
+        username: session.username
+      });
+
+      return {
+        status: "logged_out"
+      };
+    },
+
+    developerChangePassword(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireField(body, "currentPassword");
+      requireField(body, "newPassword");
+
+      const developer = one(
+        db,
+        "SELECT * FROM developer_accounts WHERE id = ?",
+        session.developer_id
+      );
+      if (!developer || developer.status !== "active") {
+        throw new AppError(401, "DEVELOPER_AUTH_INVALID", "Developer session is invalid or expired.");
+      }
+      if (!verifyPassword(String(body.currentPassword), developer.password_hash)) {
+        throw new AppError(401, "DEVELOPER_PASSWORD_INVALID", "Current password is incorrect.");
+      }
+
+      const newPassword = String(body.newPassword ?? "");
+      if (newPassword.length < 8) {
+        throw new AppError(400, "INVALID_DEVELOPER_PASSWORD", "Developer password must be at least 8 characters.");
+      }
+
+      const timestamp = nowIso();
+      run(
+        db,
+        "UPDATE developer_accounts SET password_hash = ?, updated_at = ? WHERE id = ?",
+        hashPassword(newPassword),
+        timestamp,
+        developer.id
+      );
+      const revokedSessions = revokeDeveloperSessions(db, "developer_id = ?", [developer.id]);
+
+      audit(db, "developer", developer.id, "developer.password.change", "developer", developer.id, {
+        username: developer.username,
+        revokedSessions
+      });
+
+      return {
+        status: "password_changed",
+        revokedSessions
       };
     },
 
@@ -4572,6 +4652,49 @@ export function createServices(db, config, runtimeState = null) {
         created_at: developer.createdAt,
         updated_at: developer.updatedAt,
         last_login_at: null
+      });
+    },
+
+    updateDeveloperStatus(token, developerId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const developer = one(
+        db,
+        "SELECT * FROM developer_accounts WHERE id = ?",
+        developerId
+      );
+      if (!developer) {
+        throw new AppError(404, "DEVELOPER_NOT_FOUND", "Developer account does not exist.");
+      }
+
+      const status = String(body.status ?? "").trim().toLowerCase();
+      if (!["active", "disabled"].includes(status)) {
+        throw new AppError(400, "INVALID_DEVELOPER_STATUS", "Developer status must be active or disabled.");
+      }
+
+      const timestamp = nowIso();
+      run(
+        db,
+        "UPDATE developer_accounts SET status = ?, updated_at = ? WHERE id = ?",
+        status,
+        timestamp,
+        developer.id
+      );
+
+      let revokedSessions = 0;
+      if (status === "disabled") {
+        revokedSessions = revokeDeveloperSessions(db, "developer_id = ?", [developer.id]);
+      }
+
+      audit(db, "admin", admin.admin_id, "developer.status", "developer", developer.id, {
+        username: developer.username,
+        status,
+        revokedSessions
+      });
+
+      return formatDeveloperRow({
+        ...developer,
+        status,
+        updated_at: timestamp
       });
     },
 

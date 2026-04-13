@@ -178,6 +178,7 @@ HTTP：
 - `POST /api/admin/products/:productId/owner`
 - `GET /api/admin/developers`
 - `POST /api/admin/developers`
+- `POST /api/admin/developers/:developerId/status`
 
 说明：
 
@@ -218,6 +219,8 @@ TCP：
 
 - `POST /api/developer/login`
 - `GET /api/developer/me`
+- `POST /api/developer/logout`
+- `POST /api/developer/change-password`
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/feature-config`
@@ -236,7 +239,7 @@ TCP：
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
 
-这组接口用于“一个开发者管理多个项目”的场景。开发者只会看到和修改归属到自己账号名下的项目，以及这些项目下的策略、卡密批次、版本规则和公告。
+这组接口用于“一个开发者管理多个项目”的场景。开发者只会看到和修改归属到自己账号名下的项目，以及这些项目下的策略、卡密批次、版本规则和公告。开发者也可以自助改密和退出登录，管理员则可以禁用或恢复开发者账号。
 
 ## Windows C/C++ SDK
 

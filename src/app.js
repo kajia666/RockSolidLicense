@@ -132,6 +132,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      const developerStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/developers/:developerId/status")
+        : null;
+      if (developerStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.updateDeveloperStatus(
+            getBearerToken(req),
+            developerStatusRoute.developerId,
+            body
+          )
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/admin/products") {
         sendJson(res, 200, { ok: true, data: services.listProducts(getBearerToken(req)) });
         return;
@@ -875,6 +891,17 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/api/developer/me") {
         sendJson(res, 200, { ok: true, data: services.developerMe(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/logout") {
+        sendJson(res, 200, { ok: true, data: services.developerLogout(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/change-password") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, { ok: true, data: services.developerChangePassword(getBearerToken(req), body) });
         return;
       }
 

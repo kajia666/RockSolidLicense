@@ -266,6 +266,7 @@
         </p>
         <div class="nav">
           <a href="/developer">Developer Center</a>
+          |
           ·
           <a href="/admin/products">Admin Product Center</a>
         </div>
@@ -286,7 +287,9 @@
           <div class="actions">
             <button id="login-btn">Sign In</button>
             <button class="secondary" id="refresh-btn">Refresh My Projects</button>
+            <button class="danger" id="logout-btn">Sign Out</button>
           </div>
+          <div class="hint" id="session-meta">No developer session yet.</div>
           <div class="status" id="status-box">Sign in to manage your projects.</div>
         </article>
 
@@ -371,6 +374,16 @@
             These routes are automatically restricted to projects owned by your developer account.
           </div>
         </article>
+
+        <article class="card">
+          <h2>Account Security</h2>
+          <label>Current Password<input id="current-password" type="password" placeholder="Current password" /></label>
+          <label>New Password<input id="new-password" type="password" placeholder="At least 8 characters" /></label>
+          <div class="actions">
+            <button class="secondary" id="change-password-btn">Change Password</button>
+          </div>
+          <div class="hint">Changing the password will revoke current developer sessions and require signing in again.</div>
+        </article>
       </section>
 
       <section class="table-grid">
@@ -417,6 +430,7 @@
       ];
 
       let developerToken = "";
+      let developerProfile = null;
       let productsCache = [];
 
       function el(id) { return document.getElementById(id); }
@@ -429,6 +443,18 @@
 
       function setOutput(value) {
         el("output").textContent = JSON.stringify(value, null, 2);
+      }
+
+      function setSessionMeta() {
+        if (!developerProfile || !developerToken) {
+          el("session-meta").textContent = "No developer session yet.";
+          return;
+        }
+
+        const label = developerProfile.displayName
+          ? `${developerProfile.username} (${developerProfile.displayName})`
+          : developerProfile.username;
+        el("session-meta").textContent = `Signed in as ${label} | status: ${developerProfile.status || "active"}`;
       }
 
       function escapeHtml(value) {
@@ -602,6 +628,23 @@
         setStatus(`Loaded ${productsCache.length} owned projects.`);
       }
 
+      async function refreshDeveloperMe() {
+        const data = await callApi("/api/developer/me");
+        developerProfile = data.developer || null;
+        setSessionMeta();
+        return data;
+      }
+
+      function clearDeveloperSession() {
+        developerToken = "";
+        developerProfile = null;
+        productsCache = [];
+        renderStats([]);
+        renderProjects([]);
+        setSelection(null);
+        setSessionMeta();
+      }
+
       async function guarded(action) {
         try {
           await action();
@@ -620,12 +663,32 @@
           }
         });
         developerToken = data.token;
+        developerProfile = data.developer;
         setOutput(data);
         setStatus(`Developer ${data.developer.username} is connected.`);
+        setSessionMeta();
+        await refreshDeveloperMe();
         await refreshProjects();
       }));
 
-      el("refresh-btn").addEventListener("click", () => guarded(refreshProjects));
+      el("refresh-btn").addEventListener("click", () => guarded(async () => {
+        await refreshDeveloperMe();
+        await refreshProjects();
+      }));
+
+      el("logout-btn").addEventListener("click", () => guarded(async () => {
+        if (!developerToken) {
+          throw new Error("Sign in before logging out.");
+        }
+
+        const data = await callApi("/api/developer/logout", {
+          method: "POST",
+          body: {}
+        });
+        clearDeveloperSession();
+        setOutput(data);
+        setStatus("Developer session has been signed out.");
+      }));
 
       el("create-btn").addEventListener("click", () => guarded(async () => {
         const data = await callApi("/api/developer/products", {
@@ -661,6 +724,25 @@
         setSelection(updated);
       }));
 
+      el("change-password-btn").addEventListener("click", () => guarded(async () => {
+        if (!developerToken) {
+          throw new Error("Sign in before changing your password.");
+        }
+
+        const data = await callApi("/api/developer/change-password", {
+          method: "POST",
+          body: {
+            currentPassword: el("current-password").value,
+            newPassword: el("new-password").value
+          }
+        });
+        clearDeveloperSession();
+        el("current-password").value = "";
+        el("new-password").value = "";
+        setOutput(data);
+        setStatus("Password changed. Please sign in again with the new password.");
+      }));
+
       el("clear-btn").addEventListener("click", () => {
         setSelection(null);
         setStatus("Selection cleared.");
@@ -668,6 +750,7 @@
 
       renderStats([]);
       renderProjects([]);
+      setSessionMeta();
     </script>
   </body>
 </html>

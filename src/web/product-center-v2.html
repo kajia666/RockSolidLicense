@@ -320,6 +320,7 @@
           <div class="pill">Product code = projectCode = softwareCode</div>
           <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
           <div class="pill">Owner API: <code>POST /api/admin/products/:productId/owner</code></div>
+          <div class="pill">Developer Status API: <code>POST /api/admin/developers/:developerId/status</code></div>
           <div class="pill">One developer can own multiple projects</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -461,8 +462,16 @@
           <label>Username<input id="developer-username" placeholder="alice.dev" /></label>
           <label>Display Name<input id="developer-display-name" placeholder="Alice Studio" /></label>
           <label>Password<input id="developer-password" type="password" placeholder="At least 8 characters" /></label>
+          <label>Selected Developer ID<input id="developer-selected-id" placeholder="Click a developer below to auto-fill" readonly /></label>
+          <label>Developer Status
+            <select id="developer-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
           <div class="actions">
             <button class="secondary" id="create-developer-btn">Create Developer</button>
+            <button id="update-developer-status-btn">Save Developer Status</button>
           </div>
           <div class="hint">One developer can own many projects. Ownership controls which projects appear in `/developer` and which projects the developer can manage.</div>
           <div id="developers-box" class="developer-list hint">Sign in to load developer accounts.</div>
@@ -625,16 +634,30 @@
       function renderDevelopers(items) {
         const box = el("developers-box");
         if (!items.length) {
+          el("developer-selected-id").value = "";
+          el("developer-status").value = "active";
           box.innerHTML = "No developer accounts yet. Create one here, then assign projects to it.";
           return;
         }
 
         box.innerHTML = items.map((developer) => `
-          <div class="split-line">
+          <div class="split-line" data-developer-id="${escapeHtml(developer.id)}" style="cursor: pointer;">
             <span>${escapeHtml(developer.username)}${developer.displayName ? ` · ${escapeHtml(developer.displayName)}` : ""}</span>
             <span>${escapeHtml(developer.status)}</span>
           </div>
         `).join("");
+
+        for (const row of box.querySelectorAll("[data-developer-id]")) {
+          row.addEventListener("click", () => {
+            const developer = developersCache.find((item) => item.id === row.dataset.developerId);
+            if (!developer) {
+              return;
+            }
+            el("developer-selected-id").value = developer.id;
+            el("developer-status").value = developer.status || "active";
+            setStatus(`Loaded developer ${developer.username}.`);
+          });
+        }
       }
 
       function setSelection(product = null) {
@@ -838,6 +861,25 @@
         el("developer-display-name").value = "";
         el("developer-password").value = "";
         await refreshAll();
+      }));
+
+      el("update-developer-status-btn").addEventListener("click", () => guarded(async () => {
+        const developerId = el("developer-selected-id").value.trim();
+        if (!developerId) {
+          throw new Error("Select a developer before saving status.");
+        }
+
+        const data = await callApi(`/api/admin/developers/${encodeURIComponent(developerId)}/status`, {
+          method: "POST",
+          body: {
+            status: el("developer-status").value
+          }
+        });
+        setOutput(data);
+        setStatus(`Saved status for developer ${data.username}.`);
+        await refreshAll();
+        el("developer-selected-id").value = data.id;
+        el("developer-status").value = data.status;
       }));
 
       el("assign-owner-btn").addEventListener("click", () => guarded(async () => {

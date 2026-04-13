@@ -80,6 +80,18 @@ async function getJson(baseUrl, path, token) {
   return json.data;
 }
 
+async function getJsonExpectError(baseUrl, path, token = null) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+  const json = await response.json();
+  assert.equal(response.ok, false, JSON.stringify(json));
+  return {
+    status: response.status,
+    error: json.error
+  };
+}
+
 async function getText(baseUrl, path, token) {
   const response = await fetch(`${baseUrl}${path}`, {
     headers: token ? { authorization: `Bearer ${token}` } : {}
@@ -4331,6 +4343,144 @@ test("developer-owned projects can manage policies, cards, versions, and notices
   }
 });
 
+test("developer accounts can change password, logout, and be disabled by admin", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const developer = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "lifecycle.dev",
+        password: "LifeCycle123!",
+        displayName: "Lifecycle Dev"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "LIFECYCLE_APP",
+        name: "Lifecycle App",
+        ownerDeveloperId: developer.id
+      },
+      adminSession.token
+    );
+
+    const firstLogin = await postJson(baseUrl, "/api/developer/login", {
+      username: "lifecycle.dev",
+      password: "LifeCycle123!"
+    });
+    assert.ok(firstLogin.token);
+
+    const changed = await postJson(
+      baseUrl,
+      "/api/developer/change-password",
+      {
+        currentPassword: "LifeCycle123!",
+        newPassword: "LifeCycle456!"
+      },
+      firstLogin.token
+    );
+    assert.equal(changed.status, "password_changed");
+    assert.ok(changed.revokedSessions >= 1);
+
+    const meAfterPasswordChange = await getJsonExpectError(baseUrl, "/api/developer/me", firstLogin.token);
+    assert.equal(meAfterPasswordChange.status, 401);
+    assert.equal(meAfterPasswordChange.error.code, "DEVELOPER_AUTH_INVALID");
+
+    const oldPasswordLogin = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/login",
+      {
+        username: "lifecycle.dev",
+        password: "LifeCycle123!"
+      }
+    );
+    assert.equal(oldPasswordLogin.status, 401);
+    assert.equal(oldPasswordLogin.error.code, "DEVELOPER_LOGIN_FAILED");
+
+    const secondLogin = await postJson(baseUrl, "/api/developer/login", {
+      username: "lifecycle.dev",
+      password: "LifeCycle456!"
+    });
+    assert.ok(secondLogin.token);
+
+    const logoutResult = await postJson(baseUrl, "/api/developer/logout", {}, secondLogin.token);
+    assert.equal(logoutResult.status, "logged_out");
+
+    const meAfterLogout = await getJsonExpectError(baseUrl, "/api/developer/me", secondLogin.token);
+    assert.equal(meAfterLogout.status, 401);
+    assert.equal(meAfterLogout.error.code, "DEVELOPER_AUTH_INVALID");
+
+    const thirdLogin = await postJson(baseUrl, "/api/developer/login", {
+      username: "lifecycle.dev",
+      password: "LifeCycle456!"
+    });
+    assert.ok(thirdLogin.token);
+
+    const disabledDeveloper = await postJson(
+      baseUrl,
+      `/api/admin/developers/${developer.id}/status`,
+      {
+        status: "disabled"
+      },
+      adminSession.token
+    );
+    assert.equal(disabledDeveloper.status, "disabled");
+
+    const projectsAfterDisable = await getJsonExpectError(baseUrl, "/api/developer/products", thirdLogin.token);
+    assert.equal(projectsAfterDisable.status, 401);
+    assert.equal(projectsAfterDisable.error.code, "DEVELOPER_AUTH_INVALID");
+
+    const disabledLogin = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/login",
+      {
+        username: "lifecycle.dev",
+        password: "LifeCycle456!"
+      }
+    );
+    assert.equal(disabledLogin.status, 403);
+    assert.equal(disabledLogin.error.code, "DEVELOPER_LOGIN_DISABLED");
+
+    const reenabledDeveloper = await postJson(
+      baseUrl,
+      `/api/admin/developers/${developer.id}/status`,
+      {
+        status: "active"
+      },
+      adminSession.token
+    );
+    assert.equal(reenabledDeveloper.status, "active");
+
+    const fourthLogin = await postJson(baseUrl, "/api/developer/login", {
+      username: "lifecycle.dev",
+      password: "LifeCycle456!"
+    });
+    assert.ok(fourthLogin.token);
+
+    const meAfterReenable = await getJson(baseUrl, "/api/developer/me", fourthLogin.token);
+    assert.equal(meAfterReenable.developer.username, "lifecycle.dev");
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=80", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("developer.password.change"));
+    assert.ok(eventTypes.includes("developer.logout"));
+    assert.ok(eventTypes.includes("developer.status"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -4343,6 +4493,7 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /feature-config/);
     assert.match(html, /Developer Accounts/);
     assert.match(html, /api\/admin\/developers/);
+    assert.match(html, /developers\/:developerId\/status/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -4360,6 +4511,7 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /Developer Project Center/);
     assert.match(html, /api\/developer\/products/);
     assert.match(html, /api\/developer\/policies/);
+    assert.match(html, /change-password/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

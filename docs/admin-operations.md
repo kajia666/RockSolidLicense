@@ -43,6 +43,7 @@ Terminology:
 - `POST /api/admin/products/:productId/owner`
 - `GET /api/admin/developers`
 - `POST /api/admin/developers`
+- `POST /api/admin/developers/:developerId/status`
 
 Dedicated UI:
 
@@ -97,6 +98,14 @@ Developer create example:
 }
 ```
 
+Developer status update example:
+
+```json
+{
+  "status": "disabled"
+}
+```
+
 Effects:
 
 - software authors can decide which client capabilities are exposed for a given product
@@ -104,6 +113,7 @@ Effects:
 - write requests can use `productCode`, `projectCode`, or `softwareCode` to point at the same product
 - if `ownerDeveloperId` is set, that project becomes visible to the matching developer account in `/developer`
 - if `ownerDeveloperId` is `null`, the project remains admin-managed and does not appear in a developer's project list
+- setting a developer account to `disabled` immediately revokes the developer's existing backoffice sessions
 - disabling `allowVersionCheck` makes `POST /api/client/version-check` return `disabled_by_product`
 - disabling `allowNotices` makes `POST /api/client/notices` return `disabled_by_product`
 - when `allowVersionCheck` or `allowNotices` is off, login no longer applies version rejection or maintenance blocking for that product
@@ -114,6 +124,8 @@ Effects:
 
 - `POST /api/developer/login`
 - `GET /api/developer/me`
+- `POST /api/developer/logout`
+- `POST /api/developer/change-password`
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/feature-config`
@@ -139,6 +151,7 @@ Effects:
 - developers can edit feature toggles for their own projects, but cannot reassign ownership
 - developers can create and manage policies, card batches, client versions, and notices only under their own projects
 - developer card export is scoped to owned products, so exported CSV files never include another developer's inventory
+- changing the developer password revokes existing developer sessions and requires re-login
 - ownership transfers made by the admin take effect immediately in the developer project list
 
 ### Accounts

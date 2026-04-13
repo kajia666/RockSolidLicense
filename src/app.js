@@ -14,6 +14,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), "utf8");
 const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center-v2.html"), "utf8");
 const developerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "developer-center.html"), "utf8");
+const developerProjectsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-projects.html"), "utf8");
 const developerLicenseHtml = fs.readFileSync(path.join(currentDir, "web", "developer-license.html"), "utf8");
 const developerOpsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-ops.html"), "utf8");
 const developerReleaseHtml = fs.readFileSync(path.join(currentDir, "web", "developer-release.html"), "utf8");
@@ -81,6 +82,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/developer") {
         sendHtml(res, 200, developerCenterHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/developer/projects") {
+        sendHtml(res, 200, developerProjectsHtml);
         return;
       }
 

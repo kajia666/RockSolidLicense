@@ -6018,6 +6018,25 @@ test("developer center page is served from the dedicated route", async () => {
   }
 });
 
+test("developer projects page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/projects`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Project Workspace/);
+    assert.match(html, /api\/developer\/products/);
+    assert.match(html, /feature-config/);
+    assert.match(html, /sdk-credentials\/rotate/);
+    assert.match(html, /Create Project/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer operations page is served from the dedicated route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

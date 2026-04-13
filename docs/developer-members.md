@@ -67,6 +67,17 @@ Optional password reset during update:
 
 Owners update the main developer profile. Members update only their own display name and password.
 
+## Project workspace
+
+- `/developer/projects`
+- `GET /api/developer/products`
+- `POST /api/developer/products`
+- `POST /api/developer/products/:productId/feature-config`
+- `POST /api/developer/products/:productId/sdk-credentials/rotate`
+- `GET /api/developer/dashboard`
+
+The owner account can create new projects. Product feature toggles and SDK credential rotation require product write permission, which in the current role model means the owner account or an assigned `admin` member. `operator` and `viewer` members stay read-only for project settings.
+
 ## Authorization operations
 
 - `/developer/ops`

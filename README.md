@@ -89,7 +89,7 @@
 - `test/`：Node 端到端回归测试
 - `deploy/`：Windows / Linux 部署骨架
 
-开发者子账号和项目级权限说明见 [docs/developer-members.md](/D:/code/OnlineVerification/docs/developer-members.md)，开发者授权策略与卡密工作台说明见 [docs/developer-license.md](/D:/code/OnlineVerification/docs/developer-license.md)，开发者授权运营台说明见 [docs/developer-ops.md](/D:/code/OnlineVerification/docs/developer-ops.md)，开发者发版工作台说明见 [docs/developer-release.md](/D:/code/OnlineVerification/docs/developer-release.md)。
+开发者子账号和项目级权限说明见 [docs/developer-members.md](/D:/code/OnlineVerification/docs/developer-members.md)，开发者项目工作台说明见 [docs/developer-projects.md](/D:/code/OnlineVerification/docs/developer-projects.md)，开发者授权策略与卡密工作台说明见 [docs/developer-license.md](/D:/code/OnlineVerification/docs/developer-license.md)，开发者授权运营台说明见 [docs/developer-ops.md](/D:/code/OnlineVerification/docs/developer-ops.md)，开发者发版工作台说明见 [docs/developer-release.md](/D:/code/OnlineVerification/docs/developer-release.md)。
 
 ## 本地运行
 
@@ -104,6 +104,7 @@ node src/server.js
 - 管理后台：`http://127.0.0.1:3000/admin`
 - 产品中心：`http://127.0.0.1:3000/admin/products`
 - 开发者中心：`http://127.0.0.1:3000/developer`
+- 开发者项目中心：`http://127.0.0.1:3000/developer/projects`
 - 开发者授权中心：`http://127.0.0.1:3000/developer/licenses`
 - 开发者运营台：`http://127.0.0.1:3000/developer/ops`
 - 开发者发版中心：`http://127.0.0.1:3000/developer/releases`
@@ -280,7 +281,7 @@ TCP：
 - `operator`：可管理已分配项目的策略、卡密、版本、公告和终端用户授权运营动作，但不能改产品功能开关
 - `viewer`：只读查看已分配项目及其策略、卡密、版本、公告，以及授权运营数据
 
-开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者中心现在还会通过 `GET /api/developer/dashboard` 拉取按项目范围隔离的总览统计，直接展示项目数、在线会话、卡密、强更规则、阻断公告和网络规则概况。开发者授权中心位于 `/developer/licenses`，适合软件作者集中维护策略、卡密批次、卡密状态和卡密导出。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者发版中心位于 `/developer/releases`，适合软件作者维护客户端版本、强更规则和启动公告。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
+开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者中心现在还会通过 `GET /api/developer/dashboard` 拉取按项目范围隔离的总览统计，直接展示项目数、在线会话、卡密、强更规则、阻断公告和网络规则概况。开发者项目中心位于 `/developer/projects`，适合软件作者集中处理项目创建、产品级功能开关和 SDK 凭据轮换。开发者授权中心位于 `/developer/licenses`，适合软件作者集中维护策略、卡密批次、卡密状态和卡密导出。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者发版中心位于 `/developer/releases`，适合软件作者维护客户端版本、强更规则和启动公告。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
 
 ## Windows C/C++ SDK
 

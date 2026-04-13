@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Developer Projects</title>
+    <style>
+      :root{--bg:#f4efe4;--surface:rgba(255,252,246,.94);--line:rgba(23,32,27,.1);--ink:#17201b;--muted:#617066;--accent:#0f7c68;--danger:#a0422c;--accent-soft:rgba(15,124,104,.12);--danger-soft:rgba(160,66,44,.12);--shadow:0 24px 58px rgba(54,49,42,.14)}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--ink);font-family:"Bahnschrift","Segoe UI Variable","Segoe UI",sans-serif;background:radial-gradient(circle at top left,rgba(15,124,104,.15),transparent 24%),radial-gradient(circle at bottom right,rgba(201,126,78,.16),transparent 28%),linear-gradient(135deg,#f4ede0 0%,#f8f4ed 52%,#efe5d5 100%)}code,pre,.mono{font-family:"Cascadia Code","Consolas",monospace}.shell{width:min(1460px,calc(100vw - 28px));margin:20px auto 36px;display:grid;gap:18px}.hero,.card{background:var(--surface);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:20px}.hero{display:grid;gap:10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}.wide{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}h1,h2,p{margin:0}h1{font-size:clamp(28px,5vw,44px)}h2{font-size:20px}.sub,.hint,.nav{color:var(--muted);line-height:1.6}.hint,.nav{font-size:13px}.nav a{color:var(--accent);text-decoration:none}.pill-row,.actions,.stats{display:flex;flex-wrap:wrap;gap:10px}.pill,.stat{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.68);color:var(--muted);font-size:13px}.stat{flex-direction:column;align-items:flex-start;border-radius:18px;min-width:140px}.stat strong{font-size:24px;color:var(--ink)}label{display:grid;gap:8px;color:var(--muted);font-size:14px}.two,.three,.toggle-grid{display:grid;gap:12px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.toggle-grid{grid-template-columns:repeat(2,minmax(0,1fr))}input,select,textarea{width:100%;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.82);color:var(--ink);font:inherit}textarea{min-height:90px;resize:vertical}button{border:0;border-radius:999px;padding:12px 16px;color:white;background:var(--ink);font:inherit;cursor:pointer}button.secondary{background:var(--accent)}button.danger{background:var(--danger)}button:disabled{opacity:.55;cursor:not-allowed}.status{padding:12px 14px;border-radius:14px;background:var(--accent-soft);color:var(--accent);font-size:13px}.status.warn{background:var(--danger-soft);color:var(--danger)}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.78)}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:12px 14px;border-bottom:1px solid rgba(23,32,27,.08);text-align:left;vertical-align:top}th{background:rgba(247,243,235,.96);color:var(--muted)}tbody tr{cursor:pointer}tbody tr:hover{background:rgba(15,124,104,.06)}.tag{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(23,32,27,.08);color:var(--muted);margin:0 6px 6px 0}.tag.ok{background:var(--accent-soft);color:var(--accent)}.tag.danger{background:var(--danger-soft);color:var(--danger)}.split-line{display:flex;justify-content:space-between;gap:12px}pre{margin:0;min-height:220px;padding:16px;border-radius:18px;background:#101715;color:#eef7f2;overflow:auto;white-space:pre-wrap;word-break:break-word}@media (max-width:1180px){.wide{grid-template-columns:1fr}}@media (max-width:760px){.two,.three,.toggle-grid{grid-template-columns:1fr}}
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer Project Workspace</h1>
+        <p class="sub">Create projects, manage product-level feature toggles, inspect scoped metrics, and rotate SDK credentials from one dedicated workspace.</p>
+        <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
+        <div class="pill-row">
+          <div class="pill">Route: <code>/developer/projects</code></div>
+          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
+          <div class="pill">Owner creates projects. Owner and admin members can edit product settings.</div>
+        </div>
+        <div class="stats" id="stats-box"></div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username or member" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions"><button id="login-btn">Sign In</button><button class="secondary" id="refresh-btn">Refresh Workspace</button><button class="danger" id="logout-btn">Logout</button></div>
+          <div class="hint" id="session-meta">No developer session yet.</div>
+          <div class="status" id="status-box">Sign in to manage project settings.</div>
+        </article>
+
+        <article class="card">
+          <h2>Project Filter</h2>
+          <div class="two">
+            <label>Search<input id="filter-search" placeholder="project code or name" /></label>
+            <label>Rotate SDK App ID Too<select id="rotate-sdk-app-id"><option value="false">false</option><option value="true">true</option></select></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-filter-btn">Apply Filter</button><button id="clear-selection-btn">Clear Selection</button></div>
+          <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit feature toggles and rotate SDK credentials inside assigned projects.</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Create Project</h2>
+          <div class="three">
+            <label>Project Code<input id="create-code" placeholder="ALPHA_APP" /></label>
+            <label>Project Name<input id="create-name" placeholder="Alpha Desktop" /></label>
+            <label>Description<input id="create-description" placeholder="Optional project description" /></label>
+          </div>
+          <div class="hint" style="margin:12px 0 8px;">Initial featureConfig</div>
+          <div class="toggle-grid">
+            <label>Allow Register<select id="create-allow-register"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Account Login<select id="create-allow-account-login"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Card Login<select id="create-allow-card-login"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Card Recharge<select id="create-allow-card-recharge"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Version Check<select id="create-allow-version-check"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Notices<select id="create-allow-notices"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Client Unbind<select id="create-allow-client-unbind"><option value="true">true</option><option value="false">false</option></select></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="create-project-btn">Create Project</button></div>
+        </article>
+
+        <article class="card">
+          <h2>Selected Project Settings</h2>
+          <div class="three">
+            <label>Project ID<input id="edit-product-id" placeholder="Click a project row below" /></label>
+            <label>Project Code<input id="edit-product-code" placeholder="ALPHA_APP" /></label>
+            <label>SDK App ID<input id="edit-sdk-app-id" placeholder="Filled from selection" /></label>
+          </div>
+          <div class="hint" style="margin:12px 0 8px;">FeatureConfig</div>
+          <div class="toggle-grid">
+            <label>Allow Register<select id="edit-allow-register"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Account Login<select id="edit-allow-account-login"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Card Login<select id="edit-allow-card-login"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Card Recharge<select id="edit-allow-card-recharge"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Version Check<select id="edit-allow-version-check"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Notices<select id="edit-allow-notices"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Client Unbind<select id="edit-allow-client-unbind"><option value="true">true</option><option value="false">false</option></select></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="save-feature-btn">Save Feature Config</button><button class="danger" id="rotate-sdk-btn">Rotate SDK Credentials</button></div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Projects</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Project</th><th>SDK</th><th>Client Features</th><th>Updated</th></tr></thead>
+              <tbody id="projects-body"></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="card">
+          <h2>Project Detail</h2>
+          <div id="detail-box" class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card"><h2>Workspace Notes</h2><div class="hint"><p>Creating a new project is owner-only. The owner account automatically becomes the project owner developer.</p><p>Feature toggles and SDK credential rotation require product write permission. In the current role model that means the owner account or an assigned `admin` member.</p><p>The detail panel merges project settings with the scoped dashboard metrics already exposed by the developer summary API.</p></div></article>
+        <article class="card"><h2>API Output</h2><pre id="output">Waiting for actions...</pre></article>
+      </section>
+    </main>
+
+    <script>
+      const FEATURE_KEYS=["allowRegister","allowAccountLogin","allowCardLogin","allowCardRecharge","allowVersionCheck","allowNotices","allowClientUnbind"]; let token="",profile=null,actor=null,products=[],dashboard={summary:null,projects:[],generatedAt:null}; const el=(id)=>document.getElementById(id); const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;"); const setOutput=(v)=>{el("output").textContent=typeof v==="string"?v:JSON.stringify(v,null,2)}; const setStatus=(m,w=false)=>{const box=el("status-box");box.textContent=m;box.className=`status${w?" warn":""}`}; const fmt=(v)=>{if(!v)return"-";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString("zh-CN",{hour12:false})}; const tag=(v,t="")=>`<span class="tag${t?` ${t}`:""}">${esc(v)}</span>`;
+      const canCreateProjects=()=>!!token&&actor?.type!=="member"; const canWriteProducts=()=>!!token&&(actor?.type!=="member"||actor?.role==="admin"); const filteredProducts=()=>{const q=el("filter-search").value.trim().toLowerCase(); return q?products.filter((item)=>`${item.code} ${item.name} ${item.description||""}`.toLowerCase().includes(q)):products};
+      function featureFieldId(prefix,key){return `${prefix}-${key.replace(/[A-Z]/g,(m)=>`-${m.toLowerCase()}`)}`} function readFeatureConfig(prefix){return Object.fromEntries(FEATURE_KEYS.map((key)=>[key,el(featureFieldId(prefix,key)).value==="true"]))} function writeFeatureConfig(prefix,featureConfig={}){for(const key of FEATURE_KEYS){const node=el(featureFieldId(prefix,key)); if(node) node.value=String(featureConfig[key]!==false)}}
+      function findProjectMetrics(code){return (dashboard.projects||[]).find((item)=>item.code===code)?.metrics||{}}
+      function syncPermissions(){const createDisabled=!canCreateProjects(); const editDisabled=!canWriteProducts(); el("create-project-btn").disabled=createDisabled; for(const key of FEATURE_KEYS){el(featureFieldId("create",key)).disabled=createDisabled; el(featureFieldId("edit",key)).disabled=editDisabled} ["create-code","create-name","create-description"].forEach((id)=>el(id).disabled=createDisabled); el("save-feature-btn").disabled=editDisabled; el("rotate-sdk-btn").disabled=editDisabled; el("rotate-sdk-app-id").disabled=editDisabled; el("permission-hint").textContent=!token?"Sign in first.":"actor type="+(actor?.type||"unknown")+(actor?.type==="member"?` | role=${actor?.role}`:" | owner can create and edit projects");}
+      function setMeta(){if(!token||!profile){el("session-meta").textContent="No developer session yet.";syncPermissions();return} const actorLabel=actor?.type==="member"?`${actor.username} (${actor.role})`:profile.username; const scopeLabel=actor?.type==="member"?`member scope: ${(actor.productAccess||[]).map((i)=>i.productCode).join(", ")||"no projects"}`:"owner scope"; el("session-meta").textContent=`${actorLabel} | ${scopeLabel} | status=${profile.status||"active"}`; syncPermissions()}
+      async function api(path,options={}){const headers={...(options.headers||{})}; if(options.body!==undefined) headers["Content-Type"]="application/json"; if(token) headers.Authorization=`Bearer ${token}`; const response=await fetch(path,{method:options.method||"GET",headers,body:options.body!==undefined?JSON.stringify(options.body):undefined}); const payload=await response.json().catch(()=>({})); if(!response.ok||payload.ok===false){const error=new Error(payload?.error?.message||`Request failed: ${response.status}`); error.code=payload?.error?.code||"REQUEST_FAILED"; throw error} return payload.data}
+      function renderStats(){const visible=filteredProducts(); const summary=dashboard.summary||{}; el("stats-box").innerHTML=`<div class="stat"><strong>${visible.length}</strong><span>Visible Projects</span></div><div class="stat"><strong>${summary.activeSessions??0}</strong><span>Active Sessions</span></div><div class="stat"><strong>${summary.cardsFresh??0}</strong><span>Fresh Cards</span></div><div class="stat"><strong>${summary.forceUpdateVersions??0}</strong><span>Force Updates</span></div><div class="stat"><strong>${summary.blockingNotices??0}</strong><span>Blocking Notices</span></div><div class="stat"><strong>${summary.activeNetworkRules??0}</strong><span>Active Net Rules</span></div>`}
+      function renderDetail(product=null){if(!product){el("detail-box").innerHTML='<div class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>'; return} const metrics=findProjectMetrics(product.code); const features=product.featureConfig||{}; el("detail-box").innerHTML=`<div class="split-line"><span>Project</span><span><strong>${esc(product.code)}</strong> | ${esc(product.name)}</span></div><div class="split-line"><span>Status</span><span>${esc(product.status)}</span></div><div class="split-line"><span>SDK App ID</span><span class="mono">${esc(product.sdkAppId)}</span></div><div class="split-line"><span>SDK App Secret</span><span class="mono">${esc(product.sdkAppSecret)}</span></div><div class="split-line"><span>Updated</span><span>${esc(fmt(product.updatedAt))}</span></div><div class="hint" style="margin-top:14px;">Scoped dashboard</div><div class="split-line"><span>Policies</span><span>${esc(metrics.policies??0)}</span></div><div class="split-line"><span>Cards</span><span>fresh ${esc(metrics.cardsFresh??0)} | redeemed ${esc(metrics.cardsRedeemed??0)}</span></div><div class="split-line"><span>Accounts</span><span>${esc(metrics.accounts??0)} total | ${esc(metrics.disabledAccounts??0)} disabled</span></div><div class="split-line"><span>Runtime</span><span>${esc(metrics.activeEntitlements??0)} entitlements | ${esc(metrics.activeSessions??0)} sessions</span></div><div class="split-line"><span>Release</span><span>${esc(metrics.activeClientVersions??0)} active | ${esc(metrics.forceUpdateVersions??0)} force update</span></div><div class="split-line"><span>Notices & Rules</span><span>${esc(metrics.blockingNotices??0)} blocking | ${esc(metrics.activeNetworkRules??0)} rules</span></div><div class="hint" style="margin-top:14px;">Current featureConfig</div><div style="margin-top:8px;">${FEATURE_KEYS.map((key)=>tag(key,features[key]!==false?"ok":"danger")).join("")}</div>`}
+      function setSelection(product=null){if(!product){el("edit-product-id").value="";el("edit-product-code").value="";el("edit-sdk-app-id").value="";writeFeatureConfig("edit",{});renderDetail(null);return} el("edit-product-id").value=product.id; el("edit-product-code").value=product.code; el("edit-sdk-app-id").value=product.sdkAppId; writeFeatureConfig("edit",product.featureConfig||{}); renderDetail(product)}
+      function renderProjects(){const body=el("projects-body"); const items=filteredProducts(); if(!items.length){body.innerHTML='<tr><td colspan="4">No scoped projects found.</td></tr>'; renderStats(); setSelection(null); return} body.innerHTML=items.map((item)=>{const features=item.featureConfig||{}; return `<tr data-id="${esc(item.id)}"><td><strong>${esc(item.code)}</strong><div>${esc(item.name)}</div><div class="hint">${esc(item.description||"No description")}</div></td><td><div class="mono">${esc(item.sdkAppId)}</div><div class="hint">${esc(item.status)}</div></td><td>${tag("register",features.allowRegister!==false)}${tag("account",features.allowAccountLogin!==false)}${tag("card",features.allowCardLogin!==false)}${tag("recharge",features.allowCardRecharge!==false)}${tag("version",features.allowVersionCheck!==false)}${tag("notices",features.allowNotices!==false)}${tag("unbind",features.allowClientUnbind!==false)}</td><td>${esc(fmt(item.updatedAt))}</td></tr>`}).join(""); for(const row of body.querySelectorAll("tr[data-id]")){row.addEventListener("click",()=>{const product=products.find((item)=>item.id===row.dataset.id); if(product){setSelection(product); setStatus(`Loaded project ${product.code}.`)}})} renderStats()}
+      function clearSession(){token="";profile=null;actor=null;products=[];dashboard={summary:null,projects:[],generatedAt:null}; renderProjects(); setMeta(); setSelection(null)}
+      async function refreshProfile(){const data=await api("/api/developer/me"); profile=data.developer||null; actor=data.actor||null; setMeta()}
+      async function refreshProjects(){const [productItems,dashboardData]=await Promise.all([api("/api/developer/products"),api("/api/developer/dashboard")]); products=Array.isArray(productItems)?productItems:[]; dashboard=dashboardData||{summary:null,projects:[],generatedAt:null}; renderProjects(); setOutput({products,dashboard})}
+      async function refresh(){if(!token){clearSession(); setStatus("Sign in to manage project settings."); setOutput("Waiting for actions..."); return} await refreshProfile(); await refreshProjects()}
+      async function postAndRefresh(path,body,message){const data=await api(path,{method:"POST",body}); await refresh(); setStatus(message); setOutput(data); return data}
+      el("login-btn").addEventListener("click",async()=>{try{const data=await api("/api/developer/login",{method:"POST",body:{username:el("username").value.trim(),password:el("password").value}}); token=data.token; profile=data.developer||null; actor=data.actor||null; setMeta(); await refresh(); setStatus(`Workspace loaded for ${data.actor?.username||data.developer?.username}.`)}catch(error){clearSession(); setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
+      el("refresh-btn").addEventListener("click",async()=>{try{await refresh(); setStatus("Project workspace refreshed.")}catch(error){setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
+      el("logout-btn").addEventListener("click",async()=>{try{if(token) await api("/api/developer/logout",{method:"POST"}); clearSession(); setStatus("Developer session closed."); setOutput("Logged out.")}catch(error){setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
+      el("apply-filter-btn").addEventListener("click",()=>{renderProjects(); setStatus("Project filter applied."); setOutput({visibleProjects:filteredProducts().map((item)=>item.code)})});
+      el("clear-selection-btn").addEventListener("click",()=>{el("filter-search").value=""; renderProjects(); setSelection(null); setStatus("Project selection cleared.")});
+      el("create-project-btn").addEventListener("click",async()=>{try{await postAndRefresh("/api/developer/products",{code:el("create-code").value.trim(),name:el("create-name").value.trim(),description:el("create-description").value.trim(),featureConfig:readFeatureConfig("create")},"Project created."); el("create-code").value=""; el("create-name").value=""; el("create-description").value=""}catch(error){setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
+      el("save-feature-btn").addEventListener("click",async()=>{try{const productId=el("edit-product-id").value.trim(); if(!productId) throw new Error("Select a project before saving feature config."); await postAndRefresh(`/api/developer/products/${encodeURIComponent(productId)}/feature-config`,readFeatureConfig("edit"),"Feature config updated."); const updated=products.find((item)=>item.id===productId); if(updated) setSelection(updated)}catch(error){setStatus(`${error.code||"REQUEST_FAILED"}: ${error.message}`,true); setOutput({code:error.code||"REQUEST_FAILED",message:error.message})}});
+      el("rotate-sdk-btn").addEventListener("click",async()=>{try{const productId=el("edit-product-id").value.trim(); if(!productId) throw new Error("Select a project before rotating SDK credentials."); await postAndRefresh(`/api/developer/products/${encodeURIComponent(productId)}/sdk-credentials/rotate`,{rotateAppId:el("rotate-sdk-app-id").value==="true"},"SDK credentials rotated."); const updated=products.find((item)=>item.id===productId); if(updated) setSelection(updated)}catch(error){setStatus(`${error.code||"REQUEST_FAILED"}: ${error.message}`,true); setOutput({code:error.code||"REQUEST_FAILED",message:error.message})}});
+      writeFeatureConfig("create",{}); writeFeatureConfig("edit",{}); clearSession(); renderProjects(); renderStats(); setOutput("Waiting for actions...");
+    </script>
+  </body>
+</html>

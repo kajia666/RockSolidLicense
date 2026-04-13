@@ -16,9 +16,23 @@ function normalizeStateStoreDriver(value) {
   return normalized;
 }
 
+function normalizeMainStoreDriver(value) {
+  const normalized = String(value ?? "sqlite").trim().toLowerCase();
+  if (!["sqlite", "postgres"].includes(normalized)) {
+    throw new Error("RSL_MAIN_STORE_DRIVER must be sqlite or postgres.");
+  }
+  return normalized;
+}
+
 export function loadConfig(overrides = {}) {
   const cwd = overrides.cwd ?? process.cwd();
   const dataDir = process.env.RSL_DATA_DIR ?? path.join(cwd, "data");
+  const stateStoreDriver = normalizeStateStoreDriver(
+    overrides.stateStoreDriver ?? process.env.RSL_STATE_STORE_DRIVER ?? "sqlite"
+  );
+  const mainStoreDriver = normalizeMainStoreDriver(
+    overrides.mainStoreDriver ?? process.env.RSL_MAIN_STORE_DRIVER ?? "sqlite"
+  );
 
   return {
     env: process.env.NODE_ENV ?? "development",
@@ -32,9 +46,8 @@ export function loadConfig(overrides = {}) {
       process.env.RSL_DB_PATH ??
       path.join(dataDir, "rocksolid.db"),
     postgresUrl: optionalString(overrides.postgresUrl ?? process.env.RSL_POSTGRES_URL),
-    stateStoreDriver: normalizeStateStoreDriver(
-      overrides.stateStoreDriver ?? process.env.RSL_STATE_STORE_DRIVER ?? "sqlite"
-    ),
+    stateStoreDriver,
+    mainStoreDriver,
     redisUrl: optionalString(overrides.redisUrl ?? process.env.RSL_REDIS_URL),
     redisKeyPrefix:
       optionalString(overrides.redisKeyPrefix ?? process.env.RSL_REDIS_KEY_PREFIX) ?? "rsl",
@@ -59,6 +72,9 @@ export function loadConfig(overrides = {}) {
     serverTokenSecret:
       process.env.RSL_SERVER_TOKEN_SECRET ??
       "change-me-before-production-rocksolid",
-    ...overrides
+    ...overrides,
+    cwd,
+    stateStoreDriver,
+    mainStoreDriver
   };
 }

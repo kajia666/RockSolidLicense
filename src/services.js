@@ -4714,6 +4714,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
   return {
     async health() {
       expireStaleSessions(db, stateStore);
+      const mainStoreHealth = await Promise.resolve(
+        typeof store.health === "function"
+          ? store.health()
+          : {
+              driver: store.driver,
+              repositories: store.repositories
+            }
+      );
       return {
         status: "ok",
         time: nowIso(),
@@ -4724,10 +4732,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             location: config.dbPath,
             postgresUrlConfigured: Boolean(config.postgresUrl)
           },
-          mainStore: {
-            driver: store.driver,
-            repositories: store.repositories
-          },
+          mainStore: mainStoreHealth,
           runtimeState: await stateStore.health()
         }
       };

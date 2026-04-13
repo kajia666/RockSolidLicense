@@ -11,10 +11,20 @@ const SQLITE_MAIN_STORE_REPOSITORIES = Object.freeze({
 });
 
 export function createSqliteMainStore({ db }) {
-  return {
+  const metadata = {
     driver: "sqlite",
-    db,
     repositories: Object.keys(SQLITE_MAIN_STORE_REPOSITORIES),
-    ...SQLITE_MAIN_STORE_REPOSITORIES
+    configuredDriver: "sqlite",
+    targetDriver: "sqlite",
+    implementationStage: "native"
+  };
+
+  return {
+    ...metadata,
+    db,
+    ...SQLITE_MAIN_STORE_REPOSITORIES,
+    health() {
+      return { ...metadata };
+    }
   };
 }

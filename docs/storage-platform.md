@@ -23,10 +23,14 @@ RSL_DB_PATH=./data/rocksolid.db
 
 - [main-store.js](/D:/code/OnlineVerification/src/data/main-store.js)
 - [sqlite-main-store.js](/D:/code/OnlineVerification/src/data/sqlite-main-store.js)
+- [postgres-main-store.js](/D:/code/OnlineVerification/src/data/postgres-main-store.js)
 - [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
 - [policy-repository.js](/D:/code/OnlineVerification/src/data/policy-repository.js)
 - [card-repository.js](/D:/code/OnlineVerification/src/data/card-repository.js)
 - [entitlement-repository.js](/D:/code/OnlineVerification/src/data/entitlement-repository.js)
+
+`RSL_MAIN_STORE_DRIVER` 目前支持 `sqlite` 和 `postgres`。
+当前 `postgres` 仍是 capability-declaring fallback：会暴露 `configuredDriver=postgres`、`implementationStage=sqlite_fallback` 和 PostgreSQL schema 脚本路径，但运行时仍使用 SQLite main store，避免在正式接入 PostgreSQL 之前破坏现有 HTTP/TCP 链路。
 
 这一步的重点不是换库，而是先把“主数据访问层”收成可复用边界，并让运行中的服务开始感知统一的 `main store` 入口。后面接 PostgreSQL 时，就不需要直接在 [services.js](/D:/code/OnlineVerification/src/services.js) 里到处改 SQL。
 
@@ -95,6 +99,16 @@ npm run db:postgres:check
         "driver": "sqlite",
         "location": "./data/rocksolid.db",
         "postgresUrlConfigured": false
+      },
+      "mainStore": {
+        "driver": "sqlite",
+        "configuredDriver": "postgres",
+        "targetDriver": "postgres",
+        "implementationStage": "sqlite_fallback",
+        "fallbackReason": "postgres_runtime_not_implemented",
+        "postgresUrlConfigured": true,
+        "schemaScriptPath": "./deploy/postgres/init.sql",
+        "repositories": ["products", "policies", "cards", "entitlements"]
       },
       "runtimeState": {
         "driver": "redis",

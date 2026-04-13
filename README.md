@@ -128,6 +128,7 @@ RSL_TCP_ENABLED=true
 RSL_TCP_HOST=0.0.0.0
 RSL_TCP_PORT=4000
 RSL_DB_PATH=./data/rocksolid.db
+RSL_MAIN_STORE_DRIVER=sqlite
 RSL_STATE_STORE_DRIVER=sqlite
 RSL_POSTGRES_URL=
 RSL_REDIS_URL=
@@ -165,10 +166,16 @@ npm run db:postgres:check
 
 - [main-store.js](/D:/code/OnlineVerification/src/data/main-store.js)
 - [sqlite-main-store.js](/D:/code/OnlineVerification/src/data/sqlite-main-store.js)
+- [postgres-main-store.js](/D:/code/OnlineVerification/src/data/postgres-main-store.js)
 - [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
 - [policy-repository.js](/D:/code/OnlineVerification/src/data/policy-repository.js)
 - [card-repository.js](/D:/code/OnlineVerification/src/data/card-repository.js)
 - [entitlement-repository.js](/D:/code/OnlineVerification/src/data/entitlement-repository.js)
+
+当前 `RSL_MAIN_STORE_DRIVER` 支持：
+
+- `sqlite`：默认主数据访问层，直接使用当前 SQLite 主库
+- `postgres`：当前是“PostgreSQL 迁移占位模式”，会声明目标驱动和 schema 路径，但运行时仍安全回退到 SQLite，便于先把健康检查、配置和迁移边界接起来
 
 ## 终端用户主流程
 

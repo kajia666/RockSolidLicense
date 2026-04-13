@@ -19,6 +19,12 @@ RSL_DB_PATH=./data/rocksolid.db
 
 当前服务端的主业务数据驱动仍然是 SQLite，适合本地开发、单机调试和当前回归测试。
 
+当前已经开始把主库读写边界从大体量服务逻辑里抽出来。第一块抽离的是项目/产品查询仓储：
+
+- [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
+
+这一步的重点不是换库，而是先把“主数据访问层”收成可复用边界，后面接 PostgreSQL 时就不需要直接在 [services.js](/D:/code/OnlineVerification/src/services.js) 里到处改 SQL。
+
 ### 运行时状态
 
 运行时状态由 [runtime-state.js](/D:/code/OnlineVerification/src/runtime-state.js) 承接，覆盖这些高频数据：

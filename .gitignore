@@ -1,4 +1,6 @@
 data/
+!src/data/
+!src/data/**
 *.db
 *.db-shm
 *.db-wal

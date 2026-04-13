@@ -2,6 +2,19 @@ import { AppError } from "./http.js";
 import { rotateLicenseKeyStore } from "./license-keys.js";
 import { NonceReplayError } from "./runtime-state.js";
 import {
+  DEFAULT_PRODUCT_FEATURE_CONFIG,
+  findOwnedProductIdByCode,
+  getActiveProductRecordByCode,
+  getActiveProductRecordBySdkAppId,
+  getProductRecordById,
+  getProductRowById,
+  listAssignedDeveloperProductIds,
+  listOwnedProductIds,
+  parseProductFeatureConfigRow,
+  productCodeExists,
+  queryProductRows
+} from "./data/product-repository.js";
+import {
   addDays,
   addSeconds,
   generateId,
@@ -15,16 +28,6 @@ import {
   signClientRequest,
   verifyPassword
 } from "./security.js";
-
-const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze({
-  allowRegister: true,
-  allowAccountLogin: true,
-  allowCardLogin: true,
-  allowCardRecharge: true,
-  allowVersionCheck: true,
-  allowNotices: true,
-  allowClientUnbind: true
-});
 
 const DEVELOPER_MEMBER_ROLE_PERMISSIONS = Object.freeze({
   owner: [
@@ -515,25 +518,10 @@ function requireDeveloperOwnerSession(db, token) {
 
 function listDeveloperAccessibleProductIds(db, session) {
   if (session.actor_scope === "owner") {
-    return many(
-      db,
-      "SELECT id FROM products WHERE owner_developer_id = ? ORDER BY created_at DESC",
-      session.developer_id
-    ).map((row) => row.id);
+    return listOwnedProductIds(db, session.developer_id);
   }
 
-  return many(
-    db,
-    `
-      SELECT p.id
-      FROM developer_member_products dmp
-      JOIN products p ON p.id = dmp.product_id
-      WHERE dmp.member_id = ? AND p.owner_developer_id = ?
-      ORDER BY p.created_at DESC
-    `,
-    session.member_id,
-    session.developer_id
-  ).map((row) => row.id);
+  return listAssignedDeveloperProductIds(db, session.member_id, session.developer_id);
 }
 
 function listDeveloperAccessibleProductRows(db, session) {
@@ -975,16 +963,11 @@ function resolveDeveloperOwnedProductIdsInput(db, developerId, body = {}) {
 
   const resolved = new Set(normalizedIds);
   for (const productCode of normalizedCodes) {
-    const row = one(
-      db,
-      "SELECT id FROM products WHERE owner_developer_id = ? AND code = ?",
-      developerId,
-      productCode
-    );
-    if (!row) {
+    const productId = findOwnedProductIdByCode(db, developerId, productCode);
+    if (!productId) {
       throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only assign member access to your own projects.");
     }
-    resolved.add(row.id);
+    resolved.add(productId);
   }
 
   return [...resolved];
@@ -1000,7 +983,7 @@ function assertDeveloperUsernameAvailable(db, username, conflictCode = "DEVELOPE
 }
 
 function requireProductByCode(db, code) {
-  const product = one(db, "SELECT * FROM products WHERE code = ? AND status = 'active'", code);
+  const product = getActiveProductRecordByCode(db, code);
   if (!product) {
     throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist or is inactive.");
   }
@@ -1180,20 +1163,6 @@ function extractProductFeatureConfigInput(body = {}) {
   return body ?? {};
 }
 
-function parseProductFeatureConfigRow(row, fallbackUpdatedAt = null) {
-  return {
-    allowRegister: row ? Boolean(row.allow_register) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowRegister,
-    allowAccountLogin: row ? Boolean(row.allow_account_login) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowAccountLogin,
-    allowCardLogin: row ? Boolean(row.allow_card_login) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowCardLogin,
-    allowCardRecharge: row ? Boolean(row.allow_card_recharge) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowCardRecharge,
-    allowVersionCheck: row ? Boolean(row.allow_version_check) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowVersionCheck,
-    allowNotices: row ? Boolean(row.allow_notices) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowNotices,
-    allowClientUnbind: row ? Boolean(row.allow_client_unbind) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowClientUnbind,
-    createdAt: row?.feature_created_at ?? row?.created_at ?? fallbackUpdatedAt ?? null,
-    updatedAt: row?.feature_updated_at ?? row?.updated_at ?? fallbackUpdatedAt ?? null
-  };
-}
-
 function loadProductFeatureConfig(db, productId, fallbackUpdatedAt = null) {
   const row = one(db, "SELECT * FROM product_feature_configs WHERE product_id = ?", productId);
   return parseProductFeatureConfigRow(row, fallbackUpdatedAt);
@@ -1283,87 +1252,6 @@ function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIs
   };
 }
 
-function formatProductRow(row) {
-  const featureConfig = parseProductFeatureConfigRow(row, row.updated_at ?? null);
-  return {
-    id: row.id,
-    code: row.code,
-    projectCode: row.code,
-    softwareCode: row.code,
-    ownerDeveloperId: row.owner_developer_id ?? null,
-    name: row.name,
-    description: row.description ?? "",
-    status: row.status,
-    ownerDeveloper: row.owner_developer_id
-      ? {
-          id: row.owner_developer_id,
-          username: row.owner_developer_username ?? null,
-          displayName: row.owner_developer_display_name ?? "",
-          status: row.owner_developer_status ?? null
-        }
-      : null,
-    sdkAppId: row.sdk_app_id,
-    sdkAppSecret: row.sdk_app_secret,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    featureConfig,
-    sdk_app_id: row.sdk_app_id,
-    sdk_app_secret: row.sdk_app_secret,
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  };
-}
-
-function productSelectSql(whereClause = "") {
-  return `
-    SELECT p.*, pfc.allow_register, pfc.allow_account_login, pfc.allow_card_login, pfc.allow_card_recharge,
-           pfc.allow_version_check, pfc.allow_notices, pfc.allow_client_unbind,
-           pfc.created_at AS feature_created_at, pfc.updated_at AS feature_updated_at,
-           da.id AS owner_developer_id,
-           da.username AS owner_developer_username,
-           da.display_name AS owner_developer_display_name,
-           da.status AS owner_developer_status
-    FROM products p
-    LEFT JOIN product_feature_configs pfc ON pfc.product_id = p.id
-    LEFT JOIN developer_accounts da ON da.id = p.owner_developer_id
-    ${whereClause}
-  `;
-}
-
-function queryProductRows(db, filters = {}) {
-  const conditions = [];
-  const params = [];
-
-  if (filters.ownerDeveloperId) {
-    conditions.push("p.owner_developer_id = ?");
-    params.push(filters.ownerDeveloperId);
-  }
-  if (filters.productId) {
-    conditions.push("p.id = ?");
-    params.push(filters.productId);
-  }
-  appendInCondition("p.id", filters.productIds, conditions, params);
-
-  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const rows = many(
-    db,
-    `${productSelectSql(whereClause)} ORDER BY p.created_at DESC`,
-    ...params
-  );
-
-  return rows.map((row) => formatProductRow({
-    ...row,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    feature_created_at: row.feature_created_at,
-    feature_updated_at: row.feature_updated_at
-  }));
-}
-
-function getProductRowById(db, productId) {
-  return queryProductRows(db, { productId })[0] ?? null;
-}
-
 function resolveProductOwnerDeveloperId(db, ownerDeveloperId, allowNull = true) {
   const normalizedId = String(ownerDeveloperId ?? "").trim();
   if (!normalizedId) {
@@ -1396,7 +1284,7 @@ function createProductRecord(db, body = {}, ownerDeveloperId = null) {
     throw new AppError(400, "INVALID_PRODUCT_CODE", "Product code must be 3-32 chars: A-Z, 0-9 or underscore.");
   }
 
-  if (one(db, "SELECT id FROM products WHERE code = ?", code)) {
+  if (productCodeExists(db, code)) {
     throw new AppError(409, "PRODUCT_EXISTS", "Product code already exists.");
   }
 
@@ -1453,7 +1341,7 @@ function updateProductOwnerRecord(db, productId, ownerDeveloperId, timestamp = n
 }
 
 function updateProductFeatureConfigRecord(db, productId, body = {}, timestamp = nowIso()) {
-  const product = one(db, "SELECT * FROM products WHERE id = ?", productId);
+  const product = getProductRecordById(db, productId);
   if (!product) {
     throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
   }
@@ -1468,7 +1356,7 @@ function updateProductFeatureConfigRecord(db, productId, body = {}, timestamp = 
 }
 
 function rotateProductSdkCredentialsRecord(db, productId, body = {}, timestamp = nowIso()) {
-  const product = one(db, "SELECT * FROM products WHERE id = ?", productId);
+  const product = getProductRecordById(db, productId);
   if (!product) {
     throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
   }
@@ -5478,11 +5366,7 @@ async function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
     throw new AppError(401, "SDK_SIGNATURE_REQUIRED", "Missing signed SDK headers.");
   }
 
-  const product = one(
-    db,
-    "SELECT * FROM products WHERE sdk_app_id = ? AND status = 'active'",
-    appId
-  );
+  const product = getActiveProductRecordBySdkAppId(db, appId);
   if (!product) {
     throw new AppError(401, "SDK_APP_INVALID", "Unknown SDK app id.");
   }

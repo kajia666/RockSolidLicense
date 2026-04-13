@@ -161,6 +161,10 @@ npm run db:postgres:check
 - [render-postgres-init.mjs](/D:/code/OnlineVerification/scripts/render-postgres-init.mjs)
 - [storage-platform.md](/D:/code/OnlineVerification/docs/storage-platform.md)
 
+当前主数据访问层也已经开始抽边界，第一块仓储是：
+
+- [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
+
 ## 终端用户主流程
 
 ### 账号模式

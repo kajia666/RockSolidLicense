@@ -85,6 +85,18 @@ Write-capable roles can also freeze accounts, extend entitlements, adjust points
 
 These endpoints are project-scoped only. Developers and members can list rules only inside assigned products, while creating or archiving rules requires `products.write`. That typically means the owner account or an `admin` member. `operator` and `viewer` roles remain read-only for network-rule changes.
 
+## Release workspace
+
+- `/developer/releases`
+- `GET /api/developer/client-versions`
+- `POST /api/developer/client-versions`
+- `POST /api/developer/client-versions/:versionId/status`
+- `GET /api/developer/notices`
+- `POST /api/developer/notices`
+- `POST /api/developer/notices/:noticeId/status`
+
+This workspace is meant for version publishing, forced upgrade rules, and startup or maintenance notices. Owners and `admin` members have full access. `operator` members can also create and update release data inside assigned projects. `viewer` members remain read-only and can inspect release data without publishing changes.
+
 ## SDK credential rotation
 
 - `POST /api/developer/products/:productId/sdk-credentials/rotate`

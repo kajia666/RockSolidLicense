@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Developer Releases</title>
+    <style>
+      :root {
+        --bg: #f4efe4;
+        --surface: rgba(255, 252, 246, 0.94);
+        --line: rgba(23, 32, 27, 0.1);
+        --ink: #17201b;
+        --muted: #617066;
+        --accent: #0f7c68;
+        --danger: #a0422c;
+        --accent-soft: rgba(15, 124, 104, 0.12);
+        --danger-soft: rgba(160, 66, 44, 0.12);
+        --shadow: 0 24px 58px rgba(54, 49, 42, 0.14);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 124, 104, 0.15), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(201, 126, 78, 0.16), transparent 28%),
+          linear-gradient(135deg, #f4ede0 0%, #f8f4ed 52%, #efe5d5 100%);
+      }
+
+      code, pre, .mono { font-family: "Cascadia Code", "Consolas", monospace; }
+      .shell { width: min(1400px, calc(100vw - 28px)); margin: 20px auto 36px; display: grid; gap: 18px; }
+      .hero, .card { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); padding: 20px; }
+      .hero { display: grid; gap: 10px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+      .table-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+      h1, h2, p { margin: 0; }
+      h1 { font-size: clamp(28px, 5vw, 44px); }
+      h2 { font-size: 20px; }
+      .sub, .hint, .nav { color: var(--muted); line-height: 1.6; }
+      .hint, .nav { font-size: 13px; }
+      .nav a { color: var(--accent); text-decoration: none; }
+      .pill-row, .actions, .project-list { display: flex; flex-wrap: wrap; gap: 10px; }
+      .pill, .project-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.68);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .project-pill strong { color: var(--ink); }
+      label { display: grid; gap: 8px; color: var(--muted); font-size: 14px; }
+      input, select, textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--ink);
+        font: inherit;
+      }
+      textarea { min-height: 110px; resize: vertical; }
+      button { border: 0; border-radius: 999px; padding: 12px 16px; color: white; background: var(--ink); font: inherit; cursor: pointer; }
+      button.secondary { background: var(--accent); }
+      button.danger { background: var(--danger); }
+      .status {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+      }
+      .status.warn {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.78);
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(23, 32, 27, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: rgba(247, 243, 235, 0.96); color: var(--muted); }
+      tbody tr { cursor: pointer; }
+      tbody tr:hover { background: rgba(15, 124, 104, 0.06); }
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(23, 32, 27, 0.08);
+        color: var(--muted);
+      }
+      .tag.ok { background: var(--accent-soft); color: var(--accent); }
+      .tag.danger { background: var(--danger-soft); color: var(--danger); }
+      .split-line { display: flex; justify-content: space-between; gap: 12px; }
+      pre {
+        margin: 0;
+        min-height: 220px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef7f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1180px) {
+        .table-grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer Release Center</h1>
+        <p class="sub">Manage client version rules and startup notices inside your own project scope. This workspace is built for software authors who need to publish upgrades, drive forced updates, and coordinate maintenance windows without leaving the developer backoffice.</p>
+        <div class="nav">
+          <a href="/developer">Developer Center</a>
+          |
+          <a href="/developer/ops">Developer Ops</a>
+          |
+          <a href="/developer/releases">Developer Releases</a>
+          |
+          <a href="/developer/security">Developer Security</a>
+        </div>
+        <div class="pill-row">
+          <div class="pill">Route: <code>/developer/releases</code></div>
+          <div class="pill">APIs: <code>/api/developer/client-versions</code> and <code>/api/developer/notices</code></div>
+          <div class="pill">Scoped to assigned projects. Viewer members stay read-only.</div>
+        </div>
+        <div class="project-list" id="project-list"></div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username or member" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions">
+            <button id="login-btn">Sign In</button>
+            <button class="secondary" id="refresh-btn">Refresh Workspace</button>
+            <button class="danger" id="logout-btn">Logout</button>
+          </div>
+          <div class="hint" id="session-meta">No developer session yet.</div>
+          <div class="status" id="status-box">Sign in to manage versions and notices.</div>
+        </article>
+
+        <article class="card">
+          <h2>Scoped Filters</h2>
+          <label>Project Code<input id="filter-product-code" placeholder="ALPHA_APP" /></label>
+          <label>Channel<input id="filter-channel" value="stable" placeholder="stable" /></label>
+          <label>Search<input id="filter-search" placeholder="version, title, or release note" /></label>
+          <label>Version Status
+            <select id="filter-version-status">
+              <option value="">all</option>
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>Notice Status
+            <select id="filter-notice-status">
+              <option value="">all</option>
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <div class="actions">
+            <button class="secondary" id="apply-filters-btn">Apply Filters</button>
+            <button id="clear-filters-btn">Clear Filters</button>
+          </div>
+          <div class="hint">Filters stay inside the current developer scope. Leave a field blank to query everything you can access.</div>
+        </article>
+
+        <article class="card">
+          <h2>Create Version Rule</h2>
+          <label>Project Code<input id="version-product-code" placeholder="ALPHA_APP" /></label>
+          <label>Version<input id="version-value" placeholder="1.2.0" /></label>
+          <label>Channel<input id="version-channel" value="stable" placeholder="stable" /></label>
+          <label>Initial Status
+            <select id="version-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>Force Update
+            <select id="version-force-update">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+          <label>Download URL<input id="version-download-url" placeholder="https://example.com/download" /></label>
+          <label>Notice Title<input id="version-notice-title" placeholder="Upgrade now" /></label>
+          <label>Notice Body<textarea id="version-notice-body" placeholder="Why this release matters to end users"></textarea></label>
+          <label>Release Notes<textarea id="version-release-notes" placeholder="Detailed release notes for operators"></textarea></label>
+          <label>Released At<input id="version-released-at" placeholder="2026-04-13T20:00:00+08:00" /></label>
+          <button class="secondary" id="create-version-btn">Create Version Rule</button>
+        </article>
+
+        <article class="card">
+          <h2>Version Status</h2>
+          <label>Version ID<input id="version-id" placeholder="Click a version row below" /></label>
+          <label>Status
+            <select id="version-update-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>Force Update
+            <select id="version-update-force">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+          <button class="danger" id="update-version-btn">Save Version Status</button>
+          <div class="hint">Use this to raise the minimum allowed client version or retire an unstable build without deleting history.</div>
+        </article>
+
+        <article class="card">
+          <h2>Create Notice</h2>
+          <label>Project Code<input id="notice-product-code" placeholder="ALPHA_APP" /></label>
+          <label>Channel<input id="notice-channel" value="stable" placeholder="stable" /></label>
+          <label>Kind
+            <select id="notice-kind">
+              <option value="announcement">announcement</option>
+              <option value="maintenance">maintenance</option>
+            </select>
+          </label>
+          <label>Severity
+            <select id="notice-severity">
+              <option value="info">info</option>
+              <option value="warning">warning</option>
+              <option value="critical">critical</option>
+            </select>
+          </label>
+          <label>Title<input id="notice-title" placeholder="Maintenance window" /></label>
+          <label>Body<textarea id="notice-body" placeholder="This message is returned to client startup and login flows."></textarea></label>
+          <label>Action URL<input id="notice-action-url" placeholder="https://status.example.com" /></label>
+          <label>Starts At<input id="notice-starts-at" placeholder="2026-04-13T20:00:00+08:00" /></label>
+          <label>Ends At<input id="notice-ends-at" placeholder="2026-04-13T22:00:00+08:00" /></label>
+          <label>Initial Status
+            <select id="notice-status">
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <label>Block Login
+            <select id="notice-block-login">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+          <button class="secondary" id="create-notice-btn">Create Notice</button>
+        </article>
+
+        <article class="card">
+          <h2>Notice Status</h2>
+          <label>Notice ID<input id="notice-id" placeholder="Click a notice row below" /></label>
+          <label>Status
+            <select id="notice-update-status">
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <label>Block Login
+            <select id="notice-update-block-login">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+          <button class="danger" id="update-notice-btn">Save Notice Status</button>
+          <div class="hint">Archive expired notices once the maintenance window is over, especially if login blocking was enabled.</div>
+        </article>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
+          <h2>Version Rules</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>Project</th>
+                  <th>Channel</th>
+                  <th>Status</th>
+                  <th>Force</th>
+                  <th>Released</th>
+                </tr>
+              </thead>
+              <tbody id="version-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Notices</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Project</th>
+                  <th>Kind</th>
+                  <th>Status</th>
+                  <th>Block Login</th>
+                  <th>Starts</th>
+                </tr>
+              </thead>
+              <tbody id="notice-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>API Output</h2>
+        <pre id="output">Waiting for actions...</pre>
+      </section>
+    </main>
+
+    <script>
+      let token = "";
+      let actor = null;
+      let projects = [];
+      let snapshot = { versions: [], notices: [] };
+
+      function el(id) { return document.getElementById(id); }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+
+      function setMeta() {
+        el("session-meta").textContent = token
+          ? `Signed in as ${actor?.username || "-"} | role=${actor?.role || "owner"} | visible projects=${projects.length}`
+          : "No developer session yet.";
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function q(params) {
+        const search = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && String(value).trim() !== "") {
+            search.set(key, String(value).trim());
+          }
+        });
+        const query = search.toString();
+        return query ? `?${query}` : "";
+      }
+
+      function toBoolean(value) {
+        return value === true || value === 1 || value === "true";
+      }
+
+      function formatTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function renderTag(value, truthy = false) {
+        const text = String(value ?? "unknown");
+        const className = truthy || text === "active" ? "tag ok" : text === "disabled" || text === "archived" ? "tag danger" : "tag";
+        return `<span class="${className}">${escapeHtml(text)}</span>`;
+      }
+
+      async function api(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (options.body) {
+          headers["Content-Type"] = "application/json";
+        }
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers,
+          body: options.body ? JSON.stringify(options.body) : undefined
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.ok === false) {
+          const error = new Error(payload?.error?.message || `Request failed: ${response.status}`);
+          error.code = payload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        return payload.data;
+      }
+
+      function renderProjects() {
+        const host = el("project-list");
+        if (!projects.length) {
+          host.innerHTML = `<div class="project-pill">No scoped projects loaded yet.</div>`;
+          return;
+        }
+        host.innerHTML = projects.map((item) => `
+          <div class="project-pill">
+            <strong>${escapeHtml(item.code || item.productCode || "-")}</strong>
+            <span>${escapeHtml(item.name || "Unnamed Project")}</span>
+          </div>
+        `).join("");
+      }
+
+      function versionProductCode(item) {
+        return item.product_code || item.productCode || "-";
+      }
+
+      function renderVersions() {
+        const body = el("version-body");
+        if (!snapshot.versions.length) {
+          body.innerHTML = `<tr><td colspan="6">No version rules found inside the current scope.</td></tr>`;
+          return;
+        }
+
+        body.innerHTML = snapshot.versions.map((item) => `
+          <tr data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status)}" data-force="${escapeHtml(String(Boolean(item.forceUpdate || item.force_update)))}">
+            <td><strong>${escapeHtml(item.version)}</strong><div>${escapeHtml(item.notice_title || item.noticeTitle || "")}</div></td>
+            <td>${escapeHtml(versionProductCode(item))}</td>
+            <td>${escapeHtml(item.channel)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${renderTag(Boolean(item.forceUpdate || item.force_update), Boolean(item.forceUpdate || item.force_update))}</td>
+            <td>${escapeHtml(formatTime(item.released_at || item.releasedAt))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            el("version-id").value = row.dataset.id || "";
+            el("version-update-status").value = row.dataset.status || "active";
+            el("version-update-force").value = row.dataset.force === "true" ? "true" : "false";
+          });
+        }
+      }
+
+      function renderNotices() {
+        const body = el("notice-body");
+        if (!snapshot.notices.length) {
+          body.innerHTML = `<tr><td colspan="6">No notices found inside the current scope.</td></tr>`;
+          return;
+        }
+
+        body.innerHTML = snapshot.notices.map((item) => `
+          <tr data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status)}" data-block-login="${escapeHtml(String(Boolean(item.blockLogin)))}">
+            <td><strong>${escapeHtml(item.title)}</strong><div>${escapeHtml(item.body || "")}</div></td>
+            <td>${escapeHtml(item.productCode || "-")}</td>
+            <td>${escapeHtml(item.kind)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${renderTag(Boolean(item.blockLogin), Boolean(item.blockLogin))}</td>
+            <td>${escapeHtml(formatTime(item.startsAt))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            el("notice-id").value = row.dataset.id || "";
+            el("notice-update-status").value = row.dataset.status || "active";
+            el("notice-update-block-login").value = row.dataset.blockLogin === "true" ? "true" : "false";
+          });
+        }
+      }
+
+      function clearWorkspace() {
+        actor = null;
+        projects = [];
+        snapshot = { versions: [], notices: [] };
+        setMeta();
+        renderProjects();
+        renderVersions();
+        renderNotices();
+      }
+
+      async function refreshProfile() {
+        const me = await api("/api/developer/me");
+        actor = me.actor || null;
+        setMeta();
+      }
+
+      function currentFilters() {
+        return {
+          productCode: el("filter-product-code").value.trim(),
+          channel: el("filter-channel").value.trim(),
+          search: el("filter-search").value.trim(),
+          versionStatus: el("filter-version-status").value,
+          noticeStatus: el("filter-notice-status").value
+        };
+      }
+
+      async function refreshWorkspace() {
+        if (!token) {
+          clearWorkspace();
+          return;
+        }
+
+        await refreshProfile();
+        const filters = currentFilters();
+        const [productRows, versions, notices] = await Promise.all([
+          api("/api/developer/products"),
+          api(`/api/developer/client-versions${q({
+            productCode: filters.productCode,
+            channel: filters.channel,
+            search: filters.search,
+            status: filters.versionStatus
+          })}`),
+          api(`/api/developer/notices${q({
+            productCode: filters.productCode,
+            channel: filters.channel,
+            search: filters.search,
+            status: filters.noticeStatus
+          })}`)
+        ]);
+
+        projects = Array.isArray(productRows) ? productRows : [];
+        snapshot = {
+          versions: versions.items || [],
+          notices: notices.items || []
+        };
+        renderProjects();
+        renderVersions();
+        renderNotices();
+        setOutput({ products: productRows, versions, notices });
+      }
+
+      async function mutate(path, body, successMessage) {
+        const data = await api(path, { method: "POST", body });
+        await refreshWorkspace();
+        setStatus(successMessage);
+        setOutput(data);
+      }
+
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await api("/api/developer/login", {
+            method: "POST",
+            body: {
+              username: el("username").value.trim(),
+              password: el("password").value
+            }
+          });
+          token = data.token;
+          await refreshWorkspace();
+          setStatus("Developer release workspace loaded.");
+        } catch (error) {
+          token = "";
+          clearWorkspace();
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("refresh-btn").addEventListener("click", async () => {
+        try {
+          await refreshWorkspace();
+          setStatus("Release workspace refreshed.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("logout-btn").addEventListener("click", async () => {
+        try {
+          if (token) {
+            await api("/api/developer/logout", { method: "POST" });
+          }
+          token = "";
+          clearWorkspace();
+          setStatus("Developer session closed.");
+          setOutput("Logged out.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("apply-filters-btn").addEventListener("click", async () => {
+        try {
+          await refreshWorkspace();
+          setStatus("Filters applied.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("clear-filters-btn").addEventListener("click", async () => {
+        ["filter-product-code", "filter-channel", "filter-search"].forEach((id) => {
+          el(id).value = id === "filter-channel" ? "stable" : "";
+        });
+        el("filter-version-status").value = "";
+        el("filter-notice-status").value = "";
+        try {
+          await refreshWorkspace();
+          setStatus("Filters cleared.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("create-version-btn").addEventListener("click", async () => {
+        try {
+          await mutate("/api/developer/client-versions", {
+            productCode: el("version-product-code").value.trim(),
+            version: el("version-value").value.trim(),
+            channel: el("version-channel").value.trim(),
+            status: el("version-status").value,
+            forceUpdate: toBoolean(el("version-force-update").value),
+            downloadUrl: el("version-download-url").value.trim(),
+            noticeTitle: el("version-notice-title").value.trim(),
+            noticeBody: el("version-notice-body").value.trim(),
+            releaseNotes: el("version-release-notes").value.trim(),
+            releasedAt: el("version-released-at").value.trim() || undefined
+          }, "Version rule created.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("update-version-btn").addEventListener("click", async () => {
+        try {
+          await mutate(`/api/developer/client-versions/${encodeURIComponent(el("version-id").value.trim())}/status`, {
+            status: el("version-update-status").value,
+            forceUpdate: toBoolean(el("version-update-force").value)
+          }, "Version status updated.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("create-notice-btn").addEventListener("click", async () => {
+        try {
+          await mutate("/api/developer/notices", {
+            productCode: el("notice-product-code").value.trim(),
+            channel: el("notice-channel").value.trim(),
+            kind: el("notice-kind").value,
+            severity: el("notice-severity").value,
+            title: el("notice-title").value.trim(),
+            body: el("notice-body").value.trim(),
+            actionUrl: el("notice-action-url").value.trim(),
+            startsAt: el("notice-starts-at").value.trim() || undefined,
+            endsAt: el("notice-ends-at").value.trim() || undefined,
+            status: el("notice-status").value,
+            blockLogin: toBoolean(el("notice-block-login").value)
+          }, "Notice created.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("update-notice-btn").addEventListener("click", async () => {
+        try {
+          await mutate(`/api/developer/notices/${encodeURIComponent(el("notice-id").value.trim())}/status`, {
+            status: el("notice-update-status").value,
+            blockLogin: toBoolean(el("notice-update-block-login").value)
+          }, "Notice status updated.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      clearWorkspace();
+      setStatus("Sign in to manage versions and notices.");
+      setOutput("Waiting for actions...");
+    </script>
+  </body>
+</html>

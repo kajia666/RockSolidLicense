@@ -4530,6 +4530,161 @@ test("developer-owned projects can manage policies, cards, versions, and notices
   }
 });
 
+test("developer release workspace keeps viewers read-only while owners manage scoped releases", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "release.owner",
+        password: "ReleaseOwner123!",
+        displayName: "Release Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "RELEASE_SCOPE_APP",
+        name: "Release Scope App",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "release.owner",
+      password: "ReleaseOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "release.viewer",
+        password: "ReleaseViewer123!",
+        displayName: "Release Viewer",
+        role: "viewer",
+        productCodes: ["RELEASE_SCOPE_APP"]
+      },
+      ownerSession.token
+    );
+
+    const viewerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "release.viewer",
+      password: "ReleaseViewer123!"
+    });
+
+    const ownerVersion = await postJson(
+      baseUrl,
+      "/api/developer/client-versions",
+      {
+        productCode: "RELEASE_SCOPE_APP",
+        version: "2.3.0",
+        channel: "stable",
+        forceUpdate: true,
+        downloadUrl: "https://example.invalid/release-scope/2.3.0",
+        noticeTitle: "Mandatory upgrade",
+        noticeBody: "Viewer members should still stay read-only."
+      },
+      ownerSession.token
+    );
+    assert.equal(ownerVersion.productCode, "RELEASE_SCOPE_APP");
+
+    const ownerNotice = await postJson(
+      baseUrl,
+      "/api/developer/notices",
+      {
+        productCode: "RELEASE_SCOPE_APP",
+        title: "Scoped maintenance",
+        body: "Release viewers can inspect this notice but cannot edit it.",
+        kind: "maintenance",
+        channel: "stable",
+        blockLogin: true
+      },
+      ownerSession.token
+    );
+    assert.equal(ownerNotice.productCode, "RELEASE_SCOPE_APP");
+
+    const viewerVersions = await getJson(
+      baseUrl,
+      "/api/developer/client-versions?productCode=RELEASE_SCOPE_APP",
+      viewerSession.token
+    );
+    assert.equal(viewerVersions.items.length, 1);
+    assert.equal(viewerVersions.items[0].product_code, "RELEASE_SCOPE_APP");
+
+    const viewerNotices = await getJson(
+      baseUrl,
+      "/api/developer/notices?productCode=RELEASE_SCOPE_APP",
+      viewerSession.token
+    );
+    assert.equal(viewerNotices.items.length, 1);
+    assert.equal(viewerNotices.items[0].productCode, "RELEASE_SCOPE_APP");
+
+    const forbiddenVersionCreate = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/client-versions",
+      {
+        productCode: "RELEASE_SCOPE_APP",
+        version: "2.3.1",
+        channel: "stable"
+      },
+      viewerSession.token
+    );
+    assert.equal(forbiddenVersionCreate.status, 403);
+    assert.equal(forbiddenVersionCreate.error.code, "DEVELOPER_CLIENT_VERSION_FORBIDDEN");
+
+    const forbiddenVersionUpdate = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/client-versions/${ownerVersion.id}/status`,
+      {
+        status: "disabled"
+      },
+      viewerSession.token
+    );
+    assert.equal(forbiddenVersionUpdate.status, 403);
+    assert.equal(forbiddenVersionUpdate.error.code, "DEVELOPER_CLIENT_VERSION_FORBIDDEN");
+
+    const forbiddenNoticeCreate = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/notices",
+      {
+        productCode: "RELEASE_SCOPE_APP",
+        title: "Viewer cannot publish",
+        body: "This should be rejected.",
+        kind: "announcement"
+      },
+      viewerSession.token
+    );
+    assert.equal(forbiddenNoticeCreate.status, 403);
+    assert.equal(forbiddenNoticeCreate.error.code, "DEVELOPER_NOTICE_FORBIDDEN");
+
+    const forbiddenNoticeUpdate = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/notices/${ownerNotice.id}/status`,
+      {
+        status: "archived"
+      },
+      viewerSession.token
+    );
+    assert.equal(forbiddenNoticeUpdate.status, 403);
+    assert.equal(forbiddenNoticeUpdate.error.code, "DEVELOPER_NOTICE_FORBIDDEN");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -5597,6 +5752,24 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/entitlements/);
     assert.match(html, /api\/developer\/device-bindings/);
     assert.match(html, /api\/developer\/audit-logs/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer release page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/releases`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Release Center/);
+    assert.match(html, /api\/developer\/client-versions/);
+    assert.match(html, /api\/developer\/notices/);
+    assert.match(html, /Scoped to assigned projects/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

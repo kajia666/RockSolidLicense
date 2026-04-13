@@ -51,6 +51,8 @@ Dedicated UI:
 - `/admin/products`
 - `/developer`
 - `/developer/ops`
+- `/developer/releases`
+- `/developer/security`
 
 Product create requests can optionally include a `featureConfig` object:
 
@@ -183,6 +185,7 @@ Effects:
 - developer members use the same `/api/developer/login` entry, but only see products explicitly assigned to them
 - developers and developer members only see projects where `products.owner_developer_id` matches the parent developer account
 - `/developer/ops` provides a dedicated authorization operations workspace for software authors
+- `/developer/releases` provides a dedicated client version and notice workspace for software authors
 - `/developer/security` provides a dedicated project network-rule workspace for software authors
 - `admin` developer members can edit feature toggles for assigned products; `operator` members cannot; `viewer` members are read-only
 - developers can create and manage policies, card batches, client versions, and notices only under their own or assigned projects

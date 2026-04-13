@@ -15,6 +15,7 @@ const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), 
 const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center-v2.html"), "utf8");
 const developerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "developer-center.html"), "utf8");
 const developerOpsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-ops.html"), "utf8");
+const developerReleaseHtml = fs.readFileSync(path.join(currentDir, "web", "developer-release.html"), "utf8");
 const noticeCenterHtml = fs.readFileSync(path.join(currentDir, "web", "notice-center.html"), "utf8");
 const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-ops.html"), "utf8");
 const resellerFinanceHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-finance.html"), "utf8");
@@ -84,6 +85,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/developer/ops") {
         sendHtml(res, 200, developerOpsHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/developer/releases") {
+        sendHtml(res, 200, developerReleaseHtml);
         return;
       }
 

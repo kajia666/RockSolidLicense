@@ -165,6 +165,7 @@ npm run db:postgres:check
 
 - [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
 - [policy-repository.js](/D:/code/OnlineVerification/src/data/policy-repository.js)
+- [card-repository.js](/D:/code/OnlineVerification/src/data/card-repository.js)
 
 ## 终端用户主流程
 

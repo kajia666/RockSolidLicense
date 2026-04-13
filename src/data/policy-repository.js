@@ -215,7 +215,7 @@ export function parsePolicyGrantConfigRow(row, fallbackUpdatedAt = null) {
   };
 }
 
-function formatPolicyRow(row) {
+export function formatPolicyRow(row) {
   const bindConfig = parsePolicyBindConfigRow(row, row.bind_mode, row.updated_at);
   const unbindConfig = parsePolicyUnbindConfigRow(row, row.updated_at);
   const grantConfig = parsePolicyGrantConfigRow(row, row.updated_at);

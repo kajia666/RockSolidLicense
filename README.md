@@ -175,7 +175,7 @@ npm run db:postgres:check
 当前 `RSL_MAIN_STORE_DRIVER` 支持：
 
 - `sqlite`：默认主数据访问层，直接使用当前 SQLite 主库
-- `postgres`：当前是“PostgreSQL 迁移占位模式”，会声明目标驱动和 schema 路径，但运行时仍安全回退到 SQLite，便于先把健康检查、配置和迁移边界接起来
+- `postgres`：当前支持 `products / policies` 的 PostgreSQL 读侧 adapter 骨架；如果没有接入 adapter，运行时仍会安全回退到 SQLite，并继续在健康检查里明确显示当前阶段
 
 ## 终端用户主流程
 

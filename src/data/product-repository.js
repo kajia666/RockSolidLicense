@@ -56,7 +56,7 @@ export function parseProductFeatureConfigRow(row, fallbackUpdatedAt = null) {
   };
 }
 
-function formatProductRow(row) {
+export function formatProductRow(row) {
   const featureConfig = parseProductFeatureConfigRow(row, row.updated_at ?? null);
   return {
     id: row.id,

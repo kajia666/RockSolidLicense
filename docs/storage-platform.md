@@ -30,7 +30,12 @@ RSL_DB_PATH=./data/rocksolid.db
 - [entitlement-repository.js](/D:/code/OnlineVerification/src/data/entitlement-repository.js)
 
 `RSL_MAIN_STORE_DRIVER` 目前支持 `sqlite` 和 `postgres`。
-当前 `postgres` 仍是 capability-declaring fallback：会暴露 `configuredDriver=postgres`、`implementationStage=sqlite_fallback` 和 PostgreSQL schema 脚本路径，但运行时仍使用 SQLite main store，避免在正式接入 PostgreSQL 之前破坏现有 HTTP/TCP 链路。
+当前 `postgres` 已经进入第一阶段 read-side preview：
+- `products`
+- `policies`
+
+这两组读侧可以通过 `postgresMainStoreAdapter.query(sql, params, meta)` 走 PostgreSQL 风格 SQL；
+`cards / entitlements` 当前仍安全回退到 SQLite。没有接入 adapter 时，整个 `postgres` main store 会继续以 `sqlite_fallback` 模式运行，并在健康检查里明确暴露当前阶段。
 
 这一步的重点不是换库，而是先把“主数据访问层”收成可复用边界，并让运行中的服务开始感知统一的 `main store` 入口。后面接 PostgreSQL 时，就不需要直接在 [services.js](/D:/code/OnlineVerification/src/services.js) 里到处改 SQL。
 
@@ -101,14 +106,21 @@ npm run db:postgres:check
         "postgresUrlConfigured": false
       },
       "mainStore": {
-        "driver": "sqlite",
+        "driver": "postgres",
         "configuredDriver": "postgres",
         "targetDriver": "postgres",
-        "implementationStage": "sqlite_fallback",
-        "fallbackReason": "postgres_runtime_not_implemented",
+        "implementationStage": "read_side_preview",
+        "fallbackReason": "cards_and_entitlements_still_use_sqlite",
+        "adapterReady": true,
         "postgresUrlConfigured": true,
         "schemaScriptPath": "./deploy/postgres/init.sql",
-        "repositories": ["products", "policies", "cards", "entitlements"]
+        "repositories": ["products", "policies", "cards", "entitlements"],
+        "repositoryDrivers": {
+          "products": "postgres",
+          "policies": "postgres",
+          "cards": "sqlite",
+          "entitlements": "sqlite"
+        }
       },
       "runtimeState": {
         "driver": "redis",

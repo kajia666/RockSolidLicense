@@ -72,3 +72,128 @@ test("health reports configured postgres main store and sqlite fallback stage", 
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("postgres main store can serve product and policy read-side queries through adapter", async () => {
+  const queries = [];
+  const adapter = {
+    query(sql, params, meta) {
+      queries.push({
+        sql: sql.trim(),
+        params: [...params],
+        meta
+      });
+
+      if (meta.repository === "products") {
+        return [
+          {
+            id: "prod_pg_1",
+            code: "PGAPP",
+            owner_developer_id: "dev_pg_1",
+            name: "Postgres Product",
+            description: "Read-side preview",
+            status: "active",
+            sdk_app_id: "app_pg_1",
+            sdk_app_secret: "secret_pg_1",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-02T00:00:00.000Z",
+            allow_register: 1,
+            allow_account_login: 1,
+            allow_card_login: 1,
+            allow_card_recharge: 1,
+            allow_version_check: 1,
+            allow_notices: 1,
+            allow_client_unbind: 1,
+            feature_created_at: "2026-01-01T00:00:00.000Z",
+            feature_updated_at: "2026-01-02T00:00:00.000Z",
+            owner_developer_username: "pgdev",
+            owner_developer_display_name: "PG Dev",
+            owner_developer_status: "active"
+          }
+        ];
+      }
+
+      if (meta.repository === "policies") {
+        return [
+          {
+            id: "policy_pg_1",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            name: "PG Policy",
+            duration_days: 30,
+            max_devices: 2,
+            allow_concurrent_sessions: 1,
+            heartbeat_interval_seconds: 60,
+            heartbeat_timeout_seconds: 180,
+            token_ttl_seconds: 300,
+            bind_mode: "selected_fields",
+            bind_fields_json: "[\"deviceFingerprint\",\"machineGuid\"]",
+            allow_client_unbind: 1,
+            client_unbind_limit: 3,
+            client_unbind_window_days: 30,
+            client_unbind_deduct_days: 1,
+            grant_type: "duration",
+            grant_points: 0,
+            status: "active",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-02T00:00:00.000Z"
+          }
+        ];
+      }
+
+      return [];
+    }
+  };
+
+  const { app, tempDir } = createTestApp({
+    mainStoreDriver: "postgres",
+    postgresUrl: "postgres://rocksolid:secret@127.0.0.1:5432/rocksolid",
+    postgresMainStoreAdapter: adapter
+  });
+
+  try {
+    assert.equal(app.mainStore.driver, "postgres");
+    assert.equal(app.mainStore.implementationStage, "read_side_preview");
+    assert.deepEqual(app.mainStore.repositoryDrivers, {
+      products: "postgres",
+      policies: "postgres",
+      cards: "sqlite",
+      entitlements: "sqlite"
+    });
+
+    const admin = app.services.adminLogin({
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const products = app.services.listProducts(admin.token);
+    assert.equal(products.length, 1);
+    assert.equal(products[0].code, "PGAPP");
+    assert.equal(products[0].ownerDeveloper.username, "pgdev");
+
+    const policies = app.services.listPolicies(admin.token, { productCode: "PGAPP" });
+    assert.equal(policies.length, 1);
+    assert.equal(policies[0].productCode, "PGAPP");
+    assert.deepEqual(policies[0].bindFields, ["deviceFingerprint", "machineGuid"]);
+
+    assert.equal(queries.length, 2);
+    assert.equal(queries[0].meta.repository, "products");
+    assert.match(queries[0].sql, /FROM products p/i);
+    assert.equal(queries[1].meta.repository, "policies");
+    assert.match(queries[1].sql, /FROM policies p/i);
+
+    const health = await app.services.health();
+    assert.equal(health.storage.mainStore.driver, "postgres");
+    assert.equal(health.storage.mainStore.implementationStage, "read_side_preview");
+    assert.equal(health.storage.mainStore.adapterReady, true);
+    assert.deepEqual(health.storage.mainStore.repositoryDrivers, {
+      products: "postgres",
+      policies: "postgres",
+      cards: "sqlite",
+      entitlements: "sqlite"
+    });
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

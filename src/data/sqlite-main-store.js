@@ -16,7 +16,14 @@ export function createSqliteMainStore({ db }) {
     repositories: Object.keys(SQLITE_MAIN_STORE_REPOSITORIES),
     configuredDriver: "sqlite",
     targetDriver: "sqlite",
-    implementationStage: "native"
+    implementationStage: "native",
+    adapterReady: true,
+    repositoryDrivers: {
+      products: "sqlite",
+      policies: "sqlite",
+      cards: "sqlite",
+      entitlements: "sqlite"
+    }
   };
 
   return {

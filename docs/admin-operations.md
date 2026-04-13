@@ -125,7 +125,11 @@ Effects:
 - `POST /api/developer/login`
 - `GET /api/developer/me`
 - `POST /api/developer/logout`
+- `POST /api/developer/profile`
 - `POST /api/developer/change-password`
+- `GET /api/developer/members`
+- `POST /api/developer/members`
+- `POST /api/developer/members/:memberId`
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/feature-config`
@@ -147,11 +151,14 @@ Effects:
 Effects:
 
 - a developer account can create multiple projects under its own ownership
-- developers only see projects where `products.owner_developer_id` matches their own account
-- developers can edit feature toggles for their own projects, but cannot reassign ownership
-- developers can create and manage policies, card batches, client versions, and notices only under their own projects
+- the primary developer account can update its own display name, create developer members, and assign those members to specific products
+- developer members use the same `/api/developer/login` entry, but only see products explicitly assigned to them
+- developers and developer members only see projects where `products.owner_developer_id` matches the parent developer account
+- `admin` developer members can edit feature toggles for assigned products; `operator` members cannot; `viewer` members are read-only
+- developers can create and manage policies, card batches, client versions, and notices only under their own or assigned projects
 - developer card export is scoped to owned products, so exported CSV files never include another developer's inventory
 - changing the developer password revokes existing developer sessions and requires re-login
+- changing a developer member password or disabling a member revokes that member's existing sessions
 - ownership transfers made by the admin take effect immediately in the developer project list
 
 ### Accounts

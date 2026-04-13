@@ -45,6 +45,8 @@
 
 - 产品级功能开关
 - 开发者多项目归属
+- 开发者主账号 + 子账号
+- 子账号按项目授权与角色控制
 - 客户端版本规则
 - 强制升级与升级建议
 - 客户端公告与维护通知
@@ -85,6 +87,8 @@
 - `docs/`：架构、协议、部署和运营文档
 - `test/`：Node 端到端回归测试
 - `deploy/`：Windows / Linux 部署骨架
+
+开发者子账号和项目级权限的专门说明见 [docs/developer-members.md](/D:/code/OnlineVerification/docs/developer-members.md)。
 
 ## 本地运行
 
@@ -220,7 +224,11 @@ TCP：
 - `POST /api/developer/login`
 - `GET /api/developer/me`
 - `POST /api/developer/logout`
+- `POST /api/developer/profile`
 - `POST /api/developer/change-password`
+- `GET /api/developer/members`
+- `POST /api/developer/members`
+- `POST /api/developer/members/:memberId`
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/feature-config`
@@ -239,7 +247,15 @@ TCP：
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
 
-这组接口用于“一个开发者管理多个项目”的场景。开发者只会看到和修改归属到自己账号名下的项目，以及这些项目下的策略、卡密批次、版本规则和公告。开发者也可以自助改密和退出登录，管理员则可以禁用或恢复开发者账号。
+这组接口用于“一个开发者管理多个项目”的场景。现在除了开发者主账号，也支持开发者创建子账号，并按项目分配访问范围。子账号统一走 `/api/developer/login`，但只能看到被分配到自己名下的项目。
+
+当前开发者子账号角色：
+
+- `admin`：可管理已分配项目的功能开关、策略、卡密、版本、公告
+- `operator`：可管理已分配项目的策略、卡密、版本、公告，但不能改产品功能开关
+- `viewer`：只读查看已分配项目及其策略、卡密、版本、公告
+
+开发者主账号可以自助改密、改资料、创建/禁用子账号和调整项目授权；管理员仍然可以禁用或恢复开发者主账号。
 
 ## Windows C/C++ SDK
 

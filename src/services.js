@@ -26,6 +26,45 @@ const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze({
   allowClientUnbind: true
 });
 
+const DEVELOPER_MEMBER_ROLE_PERMISSIONS = Object.freeze({
+  owner: [
+    "*"
+  ],
+  admin: [
+    "products.read",
+    "products.write",
+    "policies.read",
+    "policies.write",
+    "cards.read",
+    "cards.write",
+    "versions.read",
+    "versions.write",
+    "notices.read",
+    "notices.write",
+    "profile.write"
+  ],
+  operator: [
+    "products.read",
+    "policies.read",
+    "policies.write",
+    "cards.read",
+    "cards.write",
+    "versions.read",
+    "versions.write",
+    "notices.read",
+    "notices.write",
+    "profile.write"
+  ],
+  viewer: [
+    "products.read",
+    "policies.read",
+    "cards.read",
+    "versions.read",
+    "notices.read",
+    "profile.write"
+  ]
+});
+
 function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
 }
@@ -36,6 +75,32 @@ function many(db, sql, ...params) {
 
 function run(db, sql, ...params) {
   return db.prepare(sql).run(...params);
+}
+
+function makeSqlPlaceholders(count) {
+  return Array.from({ length: Math.max(0, Number(count) || 0) }, () => "?").join(", ");
+}
+
+function appendInCondition(columnSql, values, conditions, params) {
+  if (!Array.isArray(values)) {
+    return;
+  }
+
+  const normalized = Array.from(
+    new Set(
+      values
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!normalized.length) {
+    conditions.push("1 = 0");
+    return;
+  }
+
+  conditions.push(`${columnSql} IN (${makeSqlPlaceholders(normalized.length)})`);
+  params.push(...normalized);
 }
 
 function expireActiveSessions(db, stateStore, whereSql, params, reason) {
@@ -97,6 +162,29 @@ function revokeDeveloperSessions(db, whereSql, params = []) {
   run(
     db,
     `DELETE FROM developer_sessions WHERE ${whereSql}`,
+    ...params
+  );
+  return rows.length;
+}
+
+function revokeDeveloperMemberSessions(db, whereSql, params = []) {
+  const rows = many(
+    db,
+    `
+      SELECT id, token
+      FROM developer_member_sessions
+      WHERE ${whereSql}
+    `,
+    ...params
+  );
+
+  if (!rows.length) {
+    return 0;
+  }
+
+  run(
+    db,
+    `DELETE FROM developer_member_sessions WHERE ${whereSql}`,
     ...params
   );
   return rows.length;
@@ -248,6 +336,45 @@ function normalizeDeveloperUsername(value) {
     .replace(/[^a-z0-9._-]/g, "");
 }
 
+function normalizeDeveloperMemberRole(value = "viewer") {
+  const role = String(value ?? "viewer").trim().toLowerCase();
+  if (!Object.hasOwn(DEVELOPER_MEMBER_ROLE_PERMISSIONS, role) || role === "owner") {
+    throw new AppError(400, "INVALID_DEVELOPER_MEMBER_ROLE", "Developer member role must be admin, operator, or viewer.");
+  }
+  return role;
+}
+
+function normalizeDeveloperMemberStatus(value = "active") {
+  const status = String(value ?? "active").trim().toLowerCase();
+  if (!["active", "disabled"].includes(status)) {
+    throw new AppError(400, "INVALID_DEVELOPER_MEMBER_STATUS", "Developer member status must be active or disabled.");
+  }
+  return status;
+}
+
+function developerRolePermissions(role = "viewer") {
+  const normalizedRole = role === "owner" ? "owner" : normalizeDeveloperMemberRole(role);
+  return [...(DEVELOPER_MEMBER_ROLE_PERMISSIONS[normalizedRole] ?? [])];
+}
+
+function hasDeveloperPermission(session, permission) {
+  if (!session) {
+    return false;
+  }
+  if (session.actor_scope === "owner") {
+    return true;
+  }
+  return Array.isArray(session.permissions)
+    && (session.permissions.includes("*") || session.permissions.includes(permission));
+}
+
+function requireDeveloperPermission(session, permission, code, message) {
+  if (hasDeveloperPermission(session, permission)) {
+    return;
+  }
+  throw new AppError(403, code, message);
+}
+
 function formatDeveloperRow(row) {
   return {
     id: row.id,
@@ -258,6 +385,45 @@ function formatDeveloperRow(row) {
     updatedAt: row.updated_at,
     lastLoginAt: row.last_login_at ?? null
   };
+}
+
+function formatDeveloperMemberRow(row, productAccess = []) {
+  const role = normalizeDeveloperMemberRole(row.role ?? "viewer");
+  return {
+    id: row.id,
+    developerId: row.developer_id,
+    username: row.username,
+    displayName: row.display_name ?? "",
+    role,
+    permissions: developerRolePermissions(role),
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lastLoginAt: row.last_login_at ?? null,
+    productAccess
+  };
+}
+
+function buildDeveloperActor(session) {
+  return {
+    type: session.actor_scope === "owner" ? "owner" : "member",
+    id: session.actor_id,
+    username: session.username,
+    displayName: session.display_name ?? "",
+    role: session.member_role ?? "owner",
+    permissions: session.permissions ?? developerRolePermissions(session.member_role ?? "owner")
+  };
+}
+
+function auditDeveloperSession(db, session, eventType, entityType, entityId, metadata = {}) {
+  const actorType = session.actor_scope === "member" ? "developer_member" : "developer";
+  audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
+    developerId: session.developer_id,
+    actorType: session.actor_scope,
+    actorUsername: session.username,
+    actorRole: session.member_role ?? "owner",
+    ...metadata
+  });
 }
 
 function requireDeveloperSession(db, token) {
@@ -277,12 +443,295 @@ function requireDeveloperSession(db, token) {
     nowIso()
   );
 
-  if (!session || session.developer_status !== "active") {
+  if (session) {
+    if (session.developer_status !== "active") {
+      throw new AppError(401, "DEVELOPER_AUTH_INVALID", "Developer session is invalid or expired.");
+    }
+
+    run(db, "UPDATE developer_sessions SET last_seen_at = ? WHERE id = ?", nowIso(), session.id);
+    return {
+      ...session,
+      actor_scope: "owner",
+      actor_type: "developer",
+      actor_id: session.developer_id,
+      developer_username: session.username,
+      developer_display_name: session.display_name ?? "",
+      member_role: "owner",
+      permissions: developerRolePermissions("owner")
+    };
+  }
+
+  const memberSession = one(
+    db,
+    `
+      SELECT dms.*, dm.username, dm.display_name, dm.status AS member_status, dm.role AS member_role,
+             da.username AS developer_username, da.display_name AS developer_display_name, da.status AS developer_status
+      FROM developer_member_sessions dms
+      JOIN developer_members dm ON dm.id = dms.member_id
+      JOIN developer_accounts da ON da.id = dms.developer_id
+      WHERE dms.token = ? AND dms.expires_at > ?
+    `,
+    token,
+    nowIso()
+  );
+
+  if (
+    !memberSession
+    || memberSession.member_status !== "active"
+    || memberSession.developer_status !== "active"
+  ) {
     throw new AppError(401, "DEVELOPER_AUTH_INVALID", "Developer session is invalid or expired.");
   }
 
-  run(db, "UPDATE developer_sessions SET last_seen_at = ? WHERE id = ?", nowIso(), session.id);
+  run(db, "UPDATE developer_member_sessions SET last_seen_at = ? WHERE id = ?", nowIso(), memberSession.id);
+  return {
+    ...memberSession,
+    actor_scope: "member",
+    actor_type: "developer_member",
+    actor_id: memberSession.member_id,
+    member_id: memberSession.member_id,
+    developer_id: memberSession.developer_id,
+    member_role: normalizeDeveloperMemberRole(memberSession.member_role),
+    permissions: developerRolePermissions(memberSession.member_role)
+  };
+}
+
+function requireDeveloperOwnerSession(db, token) {
+  const session = requireDeveloperSession(db, token);
+  if (session.actor_scope !== "owner") {
+    throw new AppError(
+      403,
+      "DEVELOPER_MEMBERS_FORBIDDEN",
+      "Only the primary developer account can manage developer team members."
+    );
+  }
   return session;
+}
+
+function listDeveloperAccessibleProductIds(db, session) {
+  if (session.actor_scope === "owner") {
+    return many(
+      db,
+      "SELECT id FROM products WHERE owner_developer_id = ? ORDER BY created_at DESC",
+      session.developer_id
+    ).map((row) => row.id);
+  }
+
+  return many(
+    db,
+    `
+      SELECT p.id
+      FROM developer_member_products dmp
+      JOIN products p ON p.id = dmp.product_id
+      WHERE dmp.member_id = ? AND p.owner_developer_id = ?
+      ORDER BY p.created_at DESC
+    `,
+    session.member_id,
+    session.developer_id
+  ).map((row) => row.id);
+}
+
+function listDeveloperAccessibleProductRows(db, session) {
+  if (session.actor_scope === "owner") {
+    return queryProductRows(db, { ownerDeveloperId: session.developer_id });
+  }
+
+  const productIds = listDeveloperAccessibleProductIds(db, session);
+  return queryProductRows(db, { productIds });
+}
+
+function ensureDeveloperCanAccessProduct(db, session, product, permission, code, message) {
+  const ownerDeveloperId = product?.owner_developer_id ?? product?.ownerDeveloperId ?? product?.ownerDeveloper?.id ?? null;
+  const productId = product?.id ?? null;
+
+  if (!product || ownerDeveloperId !== session.developer_id) {
+    throw new AppError(403, code, message);
+  }
+
+  requireDeveloperPermission(session, permission, code, message);
+
+  if (session.actor_scope === "member") {
+    const access = one(
+      db,
+      "SELECT id FROM developer_member_products WHERE member_id = ? AND product_id = ?",
+      session.member_id,
+      productId
+    );
+    if (!access) {
+      throw new AppError(403, code, message);
+    }
+  }
+
+  return product;
+}
+
+function resolveDeveloperAccessibleProductByCode(db, session, productCode, permission, code, message) {
+  const product = requireProductByCode(db, productCode);
+  return ensureDeveloperCanAccessProduct(db, session, product, permission, code, message);
+}
+
+function queryDeveloperMemberRows(db, developerId) {
+  const members = many(
+    db,
+    `
+      SELECT *
+      FROM developer_members
+      WHERE developer_id = ?
+      ORDER BY created_at DESC
+    `,
+    developerId
+  );
+
+  if (!members.length) {
+    return [];
+  }
+
+  const accessRows = many(
+    db,
+    `
+      SELECT dmp.member_id, dmp.product_id, dmp.created_at,
+             p.code AS product_code, p.name AS product_name
+      FROM developer_member_products dmp
+      JOIN developer_members dm ON dm.id = dmp.member_id
+      JOIN products p ON p.id = dmp.product_id
+      WHERE dm.developer_id = ?
+      ORDER BY p.created_at DESC
+    `,
+    developerId
+  );
+
+  const accessMap = new Map();
+  for (const row of accessRows) {
+    const items = accessMap.get(row.member_id) ?? [];
+    items.push({
+      productId: row.product_id,
+      productCode: row.product_code,
+      productName: row.product_name,
+      assignedAt: row.created_at
+    });
+    accessMap.set(row.member_id, items);
+  }
+
+  return members.map((row) => formatDeveloperMemberRow(row, accessMap.get(row.id) ?? []));
+}
+
+function syncDeveloperMemberProductAccess(db, developerId, memberId, productIds = [], timestamp = nowIso()) {
+  const normalizedIds = Array.from(
+    new Set(
+      (Array.isArray(productIds) ? productIds : [])
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (normalizedIds.length) {
+    const rows = many(
+      db,
+      `
+        SELECT id
+        FROM products
+        WHERE owner_developer_id = ?
+          AND id IN (${makeSqlPlaceholders(normalizedIds.length)})
+      `,
+      developerId,
+      ...normalizedIds
+    );
+
+    if (rows.length !== normalizedIds.length) {
+      throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only assign member access to your own projects.");
+    }
+  }
+
+  const existingRows = many(
+    db,
+    "SELECT id, product_id FROM developer_member_products WHERE member_id = ?",
+    memberId
+  );
+  const existingMap = new Map(existingRows.map((row) => [row.product_id, row]));
+
+  for (const row of existingRows) {
+    if (!normalizedIds.includes(row.product_id)) {
+      run(db, "DELETE FROM developer_member_products WHERE id = ?", row.id);
+    }
+  }
+
+  for (const productId of normalizedIds) {
+    const existing = existingMap.get(productId);
+    if (existing) {
+      run(
+        db,
+        "UPDATE developer_member_products SET updated_at = ? WHERE id = ?",
+        timestamp,
+        existing.id
+      );
+      continue;
+    }
+
+    run(
+      db,
+      `
+        INSERT INTO developer_member_products (id, member_id, product_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      generateId("devmap"),
+      memberId,
+      productId,
+      timestamp,
+      timestamp
+    );
+  }
+}
+
+function resolveDeveloperOwnedProductIdsInput(db, developerId, body = {}) {
+  const productIds = Array.isArray(body.productIds) ? body.productIds : [];
+  const productCodes = Array.isArray(body.productCodes)
+    ? body.productCodes
+    : Array.isArray(body.projectCodes)
+      ? body.projectCodes
+      : Array.isArray(body.softwareCodes)
+        ? body.softwareCodes
+        : [];
+
+  if (
+    body.productIds === undefined
+    && body.productCodes === undefined
+    && body.projectCodes === undefined
+    && body.softwareCodes === undefined
+  ) {
+    return null;
+  }
+
+  const normalizedIds = productIds
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  const normalizedCodes = productCodes
+    .map((value) => String(value ?? "").trim().toUpperCase())
+    .filter(Boolean);
+
+  const resolved = new Set(normalizedIds);
+  for (const productCode of normalizedCodes) {
+    const row = one(
+      db,
+      "SELECT id FROM products WHERE owner_developer_id = ? AND code = ?",
+      developerId,
+      productCode
+    );
+    if (!row) {
+      throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only assign member access to your own projects.");
+    }
+    resolved.add(row.id);
+  }
+
+  return [...resolved];
+}
+
+function assertDeveloperUsernameAvailable(db, username, conflictCode = "DEVELOPER_EXISTS") {
+  if (one(db, "SELECT id FROM developer_accounts WHERE username = ?", username)) {
+    throw new AppError(409, conflictCode, "Developer username already exists.");
+  }
+  if (one(db, "SELECT id FROM developer_members WHERE username = ?", username)) {
+    throw new AppError(409, conflictCode, "Developer username already exists.");
+  }
 }
 
 function requireProductByCode(db, code) {
@@ -628,6 +1077,7 @@ function queryProductRows(db, filters = {}) {
     conditions.push("p.id = ?");
     params.push(filters.productId);
   }
+  appendInCondition("p.id", filters.productIds, conditions, params);
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = many(
@@ -752,26 +1202,36 @@ function updateProductFeatureConfigRecord(db, productId, body = {}, timestamp = 
   };
 }
 
-function requireDeveloperOwnedProduct(db, developerId, productId) {
+function requireDeveloperOwnedProduct(db, session, productId, permission = "products.read") {
   const product = getProductRowById(db, productId);
   if (!product) {
     throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
   }
-  if (product.ownerDeveloper?.id !== developerId) {
-    throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only manage products owned by your developer account.");
-  }
-  return product;
+  return ensureDeveloperCanAccessProduct(
+    db,
+    session,
+    {
+      ...product,
+      owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+    },
+    permission,
+    "DEVELOPER_PRODUCT_FORBIDDEN",
+    "You can only manage products owned by your developer account."
+  );
 }
 
-function requireDeveloperOwnedProductByCode(db, developerId, productCode) {
-  const product = requireProductByCode(db, productCode);
-  if (product.owner_developer_id !== developerId) {
-    throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only manage products owned by your developer account.");
-  }
-  return product;
+function requireDeveloperOwnedProductByCode(db, session, productCode, permission = "products.read") {
+  return resolveDeveloperAccessibleProductByCode(
+    db,
+    session,
+    productCode,
+    permission,
+    "DEVELOPER_PRODUCT_FORBIDDEN",
+    "You can only manage products owned by your developer account."
+  );
 }
 
-function requireDeveloperOwnedPolicy(db, developerId, policyId) {
+function requireDeveloperOwnedPolicy(db, session, policyId, permission = "policies.read") {
   const row = one(
     db,
     `
@@ -786,14 +1246,19 @@ function requireDeveloperOwnedPolicy(db, developerId, policyId) {
   if (!row) {
     throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
   }
-  if (row.owner_developer_id !== developerId) {
-    throw new AppError(403, "DEVELOPER_POLICY_FORBIDDEN", "You can only manage policies under your own projects.");
-  }
+  ensureDeveloperCanAccessProduct(
+    db,
+    session,
+    { id: row.product_id, owner_developer_id: row.owner_developer_id },
+    permission,
+    "DEVELOPER_POLICY_FORBIDDEN",
+    "You can only manage policies under your own projects."
+  );
 
   return row;
 }
 
-function requireDeveloperOwnedCard(db, developerId, cardId) {
+function requireDeveloperOwnedCard(db, session, cardId, permission = "cards.read") {
   const row = one(
     db,
     `
@@ -811,14 +1276,19 @@ function requireDeveloperOwnedCard(db, developerId, cardId) {
   if (!row) {
     throw new AppError(404, "CARD_NOT_FOUND", "Card key does not exist.");
   }
-  if (row.owner_developer_id !== developerId) {
-    throw new AppError(403, "DEVELOPER_CARD_FORBIDDEN", "You can only manage card keys under your own projects.");
-  }
+  ensureDeveloperCanAccessProduct(
+    db,
+    session,
+    { id: row.product_id, owner_developer_id: row.owner_developer_id },
+    permission,
+    "DEVELOPER_CARD_FORBIDDEN",
+    "You can only manage card keys under your own projects."
+  );
 
   return row;
 }
 
-function requireDeveloperOwnedClientVersion(db, developerId, versionId) {
+function requireDeveloperOwnedClientVersion(db, session, versionId, permission = "versions.read") {
   const row = one(
     db,
     `
@@ -833,14 +1303,19 @@ function requireDeveloperOwnedClientVersion(db, developerId, versionId) {
   if (!row) {
     throw new AppError(404, "CLIENT_VERSION_NOT_FOUND", "Client version does not exist.");
   }
-  if (row.owner_developer_id !== developerId) {
-    throw new AppError(403, "DEVELOPER_CLIENT_VERSION_FORBIDDEN", "You can only manage client versions under your own projects.");
-  }
+  ensureDeveloperCanAccessProduct(
+    db,
+    session,
+    { id: row.product_id, owner_developer_id: row.owner_developer_id },
+    permission,
+    "DEVELOPER_CLIENT_VERSION_FORBIDDEN",
+    "You can only manage client versions under your own projects."
+  );
 
   return row;
 }
 
-function requireDeveloperOwnedNotice(db, developerId, noticeId) {
+function requireDeveloperOwnedNotice(db, session, noticeId, permission = "notices.read") {
   const row = one(
     db,
     `
@@ -855,9 +1330,17 @@ function requireDeveloperOwnedNotice(db, developerId, noticeId) {
   if (!row) {
     throw new AppError(404, "NOTICE_NOT_FOUND", "Notice does not exist.");
   }
-  if (!row.product_id || row.owner_developer_id !== developerId) {
+  if (!row.product_id) {
     throw new AppError(403, "DEVELOPER_NOTICE_FORBIDDEN", "You can only manage notices under your own projects.");
   }
+  ensureDeveloperCanAccessProduct(
+    db,
+    session,
+    { id: row.product_id, owner_developer_id: row.owner_developer_id },
+    permission,
+    "DEVELOPER_NOTICE_FORBIDDEN",
+    "You can only manage notices under your own projects."
+  );
 
   return row;
 }
@@ -1229,6 +1712,7 @@ function queryPolicyRows(db, filters = {}) {
     conditions.push("pr.owner_developer_id = ?");
     params.push(filters.ownerDeveloperId);
   }
+  appendInCondition("pr.id", filters.productIds, conditions, params);
 
   const rows = many(
     db,
@@ -1441,6 +1925,7 @@ function queryCardRows(db, filters = {}, options = {}) {
     conditions.push("pr.owner_developer_id = ?");
     params.push(filters.ownerDeveloperId);
   }
+  appendInCondition("pr.id", filters.productIds, conditions, params);
 
   if (normalizedFilters.productCode) {
     conditions.push("pr.code = ?");
@@ -3996,6 +4481,7 @@ function queryClientVersionRows(db, filters = {}) {
     conditions.push("pr.owner_developer_id = ?");
     params.push(normalizedFilters.ownerDeveloperId);
   }
+  appendInCondition("pr.id", filters.productIds, conditions, params);
 
   if (normalizedFilters.channel) {
     conditions.push("v.channel = ?");
@@ -4070,6 +4556,7 @@ function queryNoticeRows(db, filters = {}) {
     conditions.push("pr.owner_developer_id = ?");
     params.push(normalizedFilters.ownerDeveloperId);
   }
+  appendInCondition("n.product_id", filters.productIds, conditions, params);
 
   if (filters.channel !== undefined && filters.channel !== null && String(filters.channel).trim() !== "") {
     conditions.push("n.channel = ?");
@@ -4456,11 +4943,75 @@ export function createServices(db, config, runtimeState = null) {
         "SELECT * FROM developer_accounts WHERE username = ?",
         username
       );
-      if (!developer || !verifyPassword(String(body.password), developer.password_hash)) {
+      if (developer && verifyPassword(String(body.password), developer.password_hash)) {
+        if (developer.status !== "active") {
+          throw new AppError(403, "DEVELOPER_LOGIN_DISABLED", "This developer account has been disabled.");
+        }
+
+        const now = nowIso();
+        const token = randomToken(32);
+        const expiresAt = addSeconds(now, config.developerSessionHours * 3600);
+        run(
+          db,
+          `
+            INSERT INTO developer_sessions (id, developer_id, token, expires_at, created_at, last_seen_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `,
+          generateId("devsess"),
+          developer.id,
+          token,
+          expiresAt,
+          now,
+          now
+        );
+        run(
+          db,
+          "UPDATE developer_accounts SET last_login_at = ?, updated_at = ? WHERE id = ?",
+          now,
+          now,
+          developer.id
+        );
+
+        audit(db, "developer", developer.id, "developer.login", "developer", developer.id, {
+          username: developer.username
+        });
+
+        const developerProfile = formatDeveloperRow({
+          ...developer,
+          last_login_at: now,
+          updated_at: now
+        });
+
+        return {
+          token,
+          expiresAt,
+          developer: developerProfile,
+          actor: {
+            type: "owner",
+            id: developer.id,
+            username: developer.username,
+            displayName: developer.display_name ?? "",
+            role: "owner",
+            permissions: developerRolePermissions("owner")
+          }
+        };
+      }
+
+      const member = one(
+        db,
+        `
+          SELECT dm.*, da.username AS developer_username, da.display_name AS developer_display_name, da.status AS developer_status
+          FROM developer_members dm
+          JOIN developer_accounts da ON da.id = dm.developer_id
+          WHERE dm.username = ?
+        `,
+        username
+      );
+      if (!member || !verifyPassword(String(body.password), member.password_hash)) {
         throw new AppError(401, "DEVELOPER_LOGIN_FAILED", "Username or password is incorrect.");
       }
-      if (developer.status !== "active") {
-        throw new AppError(403, "DEVELOPER_LOGIN_DISABLED", "This developer account has been disabled.");
+      if (member.status !== "active" || member.developer_status !== "active") {
+        throw new AppError(403, "DEVELOPER_MEMBER_LOGIN_DISABLED", "This developer member account has been disabled.");
       }
 
       const now = nowIso();
@@ -4469,11 +5020,13 @@ export function createServices(db, config, runtimeState = null) {
       run(
         db,
         `
-          INSERT INTO developer_sessions (id, developer_id, token, expires_at, created_at, last_seen_at)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO developer_member_sessions
+          (id, member_id, developer_id, token, expires_at, created_at, last_seen_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `,
-        generateId("devsess"),
-        developer.id,
+        generateId("devmsess"),
+        member.id,
+        member.developer_id,
         token,
         expiresAt,
         now,
@@ -4481,21 +5034,37 @@ export function createServices(db, config, runtimeState = null) {
       );
       run(
         db,
-        "UPDATE developer_accounts SET last_login_at = ?, updated_at = ? WHERE id = ?",
+        "UPDATE developer_members SET last_login_at = ?, updated_at = ? WHERE id = ?",
         now,
         now,
-        developer.id
+        member.id
       );
 
-      audit(db, "developer", developer.id, "developer.login", "developer", developer.id, {
-        username: developer.username
+      audit(db, "developer_member", member.id, "developer-member.login", "developer_member", member.id, {
+        developerId: member.developer_id,
+        username: member.username,
+        role: member.role
       });
 
       return {
         token,
         expiresAt,
-        developer: formatDeveloperRow({
-          ...developer,
+        developer: {
+          id: member.developer_id,
+          username: member.developer_username,
+          displayName: member.developer_display_name ?? "",
+          status: member.developer_status
+        },
+        actor: {
+          type: "member",
+          id: member.id,
+          username: member.username,
+          displayName: member.display_name ?? "",
+          role: normalizeDeveloperMemberRole(member.role),
+          permissions: developerRolePermissions(member.role)
+        },
+        member: formatDeveloperMemberRow({
+          ...member,
           last_login_at: now,
           updated_at: now
         })
@@ -4507,10 +5076,11 @@ export function createServices(db, config, runtimeState = null) {
       return {
         developer: {
           id: session.developer_id,
-          username: session.username,
-          displayName: session.display_name ?? "",
+          username: session.developer_username ?? session.username,
+          displayName: session.developer_display_name ?? session.display_name ?? "",
           status: session.developer_status
         },
+        actor: buildDeveloperActor(session),
         session: {
           id: session.id,
           expiresAt: session.expires_at
@@ -4520,11 +5090,17 @@ export function createServices(db, config, runtimeState = null) {
 
     developerLogout(token) {
       const session = requireDeveloperSession(db, token);
-      revokeDeveloperSessions(db, "id = ?", [session.id]);
-
-      audit(db, "developer", session.developer_id, "developer.logout", "developer", session.developer_id, {
-        username: session.username
-      });
+      if (session.actor_scope === "member") {
+        revokeDeveloperMemberSessions(db, "id = ?", [session.id]);
+        auditDeveloperSession(db, session, "developer-member.logout", "developer_member", session.actor_id, {
+          username: session.username
+        });
+      } else {
+        revokeDeveloperSessions(db, "id = ?", [session.id]);
+        auditDeveloperSession(db, session, "developer.logout", "developer", session.developer_id, {
+          username: session.username
+        });
+      }
 
       return {
         status: "logged_out"
@@ -4536,41 +5112,139 @@ export function createServices(db, config, runtimeState = null) {
       requireField(body, "currentPassword");
       requireField(body, "newPassword");
 
-      const developer = one(
-        db,
-        "SELECT * FROM developer_accounts WHERE id = ?",
-        session.developer_id
-      );
-      if (!developer || developer.status !== "active") {
-        throw new AppError(401, "DEVELOPER_AUTH_INVALID", "Developer session is invalid or expired.");
-      }
-      if (!verifyPassword(String(body.currentPassword), developer.password_hash)) {
-        throw new AppError(401, "DEVELOPER_PASSWORD_INVALID", "Current password is incorrect.");
-      }
-
       const newPassword = String(body.newPassword ?? "");
       if (newPassword.length < 8) {
         throw new AppError(400, "INVALID_DEVELOPER_PASSWORD", "Developer password must be at least 8 characters.");
       }
 
       const timestamp = nowIso();
-      run(
-        db,
-        "UPDATE developer_accounts SET password_hash = ?, updated_at = ? WHERE id = ?",
-        hashPassword(newPassword),
-        timestamp,
-        developer.id
-      );
-      const revokedSessions = revokeDeveloperSessions(db, "developer_id = ?", [developer.id]);
+      let revokedSessions = 0;
+      if (session.actor_scope === "member") {
+        const member = one(
+          db,
+          "SELECT * FROM developer_members WHERE id = ?",
+          session.member_id
+        );
+        if (!member || member.status !== "active") {
+          throw new AppError(401, "DEVELOPER_AUTH_INVALID", "Developer session is invalid or expired.");
+        }
+        if (!verifyPassword(String(body.currentPassword), member.password_hash)) {
+          throw new AppError(401, "DEVELOPER_PASSWORD_INVALID", "Current password is incorrect.");
+        }
 
-      audit(db, "developer", developer.id, "developer.password.change", "developer", developer.id, {
-        username: developer.username,
-        revokedSessions
-      });
+        run(
+          db,
+          "UPDATE developer_members SET password_hash = ?, updated_at = ? WHERE id = ?",
+          hashPassword(newPassword),
+          timestamp,
+          member.id
+        );
+        revokedSessions = revokeDeveloperMemberSessions(db, "member_id = ?", [member.id]);
+
+        auditDeveloperSession(
+          db,
+          session,
+          "developer-member.password.change",
+          "developer_member",
+          member.id,
+          {
+            username: member.username,
+            revokedSessions
+          }
+        );
+      } else {
+        const developerAccount = one(
+          db,
+          "SELECT * FROM developer_accounts WHERE id = ?",
+          session.developer_id
+        );
+        if (!developerAccount || developerAccount.status !== "active") {
+          throw new AppError(401, "DEVELOPER_AUTH_INVALID", "Developer session is invalid or expired.");
+        }
+        if (!verifyPassword(String(body.currentPassword), developerAccount.password_hash)) {
+          throw new AppError(401, "DEVELOPER_PASSWORD_INVALID", "Current password is incorrect.");
+        }
+
+        run(
+          db,
+          "UPDATE developer_accounts SET password_hash = ?, updated_at = ? WHERE id = ?",
+          hashPassword(newPassword),
+          timestamp,
+          developerAccount.id
+        );
+        revokedSessions = revokeDeveloperSessions(db, "developer_id = ?", [developerAccount.id]);
+
+        auditDeveloperSession(db, session, "developer.password.change", "developer", developerAccount.id, {
+          username: developerAccount.username,
+          revokedSessions
+        });
+      }
 
       return {
         status: "password_changed",
         revokedSessions
+      };
+    },
+
+    developerUpdateProfile(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "profile.write",
+        "DEVELOPER_PROFILE_FORBIDDEN",
+        "This developer session cannot update its profile."
+      );
+
+      const timestamp = nowIso();
+      const displayName = String(body.displayName ?? "").trim();
+
+      if (session.actor_scope === "member") {
+        run(
+          db,
+          "UPDATE developer_members SET display_name = ?, updated_at = ? WHERE id = ?",
+          displayName || null,
+          timestamp,
+          session.member_id
+        );
+        const member = one(
+          db,
+          "SELECT * FROM developer_members WHERE id = ?",
+          session.member_id
+        );
+        auditDeveloperSession(db, session, "developer-member.profile.update", "developer_member", session.member_id, {
+          displayName: member?.display_name ?? ""
+        });
+        return {
+          status: "profile_updated",
+          actor: {
+            ...buildDeveloperActor(session),
+            displayName: member?.display_name ?? ""
+          }
+        };
+      }
+
+      run(
+        db,
+        "UPDATE developer_accounts SET display_name = ?, updated_at = ? WHERE id = ?",
+        displayName || null,
+        timestamp,
+        session.developer_id
+      );
+      const developerAccount = one(
+        db,
+        "SELECT * FROM developer_accounts WHERE id = ?",
+        session.developer_id
+      );
+      auditDeveloperSession(db, session, "developer.profile.update", "developer", session.developer_id, {
+        displayName: developerAccount?.display_name ?? ""
+      });
+      return {
+        status: "profile_updated",
+        actor: {
+          ...buildDeveloperActor(session),
+          displayName: developerAccount?.display_name ?? ""
+        },
+        developer: formatDeveloperRow(developerAccount)
       };
     },
 
@@ -4610,9 +5284,7 @@ export function createServices(db, config, runtimeState = null) {
         throw new AppError(400, "INVALID_DEVELOPER_PASSWORD", "Developer password must be at least 8 characters.");
       }
 
-      if (one(db, "SELECT id FROM developer_accounts WHERE username = ?", username)) {
-        throw new AppError(409, "DEVELOPER_EXISTS", "Developer username already exists.");
-      }
+      assertDeveloperUsernameAvailable(db, username, "DEVELOPER_EXISTS");
 
       const now = nowIso();
       const developer = {
@@ -4683,6 +5355,7 @@ export function createServices(db, config, runtimeState = null) {
       let revokedSessions = 0;
       if (status === "disabled") {
         revokedSessions = revokeDeveloperSessions(db, "developer_id = ?", [developer.id]);
+        revokedSessions += revokeDeveloperMemberSessions(db, "developer_id = ?", [developer.id]);
       }
 
       audit(db, "admin", admin.admin_id, "developer.status", "developer", developer.id, {
@@ -4696,6 +5369,141 @@ export function createServices(db, config, runtimeState = null) {
         status,
         updated_at: timestamp
       });
+    },
+
+    developerListMembers(token) {
+      const session = requireDeveloperOwnerSession(db, token);
+      const items = queryDeveloperMemberRows(db, session.developer_id);
+      return {
+        items,
+        total: items.length
+      };
+    },
+
+    developerCreateMember(token, body = {}) {
+      const session = requireDeveloperOwnerSession(db, token);
+      requireField(body, "username");
+      requireField(body, "password");
+
+      const username = normalizeDeveloperUsername(body.username);
+      if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) {
+        throw new AppError(
+          400,
+          "INVALID_DEVELOPER_USERNAME",
+          "Developer username must be 3-32 chars and use letters, digits, dot, underscore, or dash."
+        );
+      }
+
+      const password = String(body.password ?? "");
+      if (password.length < 8) {
+        throw new AppError(400, "INVALID_DEVELOPER_PASSWORD", "Developer password must be at least 8 characters.");
+      }
+
+      assertDeveloperUsernameAvailable(db, username, "DEVELOPER_MEMBER_EXISTS");
+
+      const role = normalizeDeveloperMemberRole(body.role ?? "viewer");
+      const status = normalizeDeveloperMemberStatus(body.status ?? "active");
+      const productIds = resolveDeveloperOwnedProductIdsInput(db, session.developer_id, body) ?? [];
+      const timestamp = nowIso();
+      const memberId = generateId("devm");
+
+      run(
+        db,
+        `
+          INSERT INTO developer_members
+          (id, developer_id, username, display_name, password_hash, role, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        memberId,
+        session.developer_id,
+        username,
+        String(body.displayName ?? "").trim() || null,
+        hashPassword(password),
+        role,
+        status,
+        timestamp,
+        timestamp
+      );
+      syncDeveloperMemberProductAccess(db, session.developer_id, memberId, productIds, timestamp);
+
+      const member = queryDeveloperMemberRows(db, session.developer_id).find((item) => item.id === memberId);
+      auditDeveloperSession(db, session, "developer-member.create", "developer_member", memberId, {
+        username,
+        role,
+        status,
+        productCount: member?.productAccess.length ?? 0
+      });
+
+      return member;
+    },
+
+    developerUpdateMember(token, memberId, body = {}) {
+      const session = requireDeveloperOwnerSession(db, token);
+      const current = one(
+        db,
+        "SELECT * FROM developer_members WHERE id = ? AND developer_id = ?",
+        memberId,
+        session.developer_id
+      );
+      if (!current) {
+        throw new AppError(404, "DEVELOPER_MEMBER_NOT_FOUND", "Developer member account does not exist.");
+      }
+
+      const displayName = body.displayName === undefined
+        ? current.display_name ?? ""
+        : String(body.displayName ?? "").trim();
+      const role = body.role === undefined
+        ? normalizeDeveloperMemberRole(current.role)
+        : normalizeDeveloperMemberRole(body.role);
+      const status = body.status === undefined
+        ? normalizeDeveloperMemberStatus(current.status)
+        : normalizeDeveloperMemberStatus(body.status);
+      const nextProductIds = resolveDeveloperOwnedProductIdsInput(db, session.developer_id, body);
+      const newPasswordProvided = body.newPassword !== undefined && String(body.newPassword).trim() !== "";
+
+      if (newPasswordProvided && String(body.newPassword).length < 8) {
+        throw new AppError(400, "INVALID_DEVELOPER_PASSWORD", "Developer password must be at least 8 characters.");
+      }
+
+      const timestamp = nowIso();
+      run(
+        db,
+        `
+          UPDATE developer_members
+          SET display_name = ?, role = ?, status = ?, password_hash = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        displayName || null,
+        role,
+        status,
+        newPasswordProvided ? hashPassword(String(body.newPassword)) : current.password_hash,
+        timestamp,
+        current.id
+      );
+
+      if (nextProductIds !== null) {
+        syncDeveloperMemberProductAccess(db, session.developer_id, current.id, nextProductIds, timestamp);
+      }
+
+      let revokedSessions = 0;
+      if (status !== "active" || newPasswordProvided) {
+        revokedSessions = revokeDeveloperMemberSessions(db, "member_id = ?", [current.id]);
+      }
+
+      const member = queryDeveloperMemberRows(db, session.developer_id).find((item) => item.id === current.id);
+      auditDeveloperSession(db, session, "developer-member.update", "developer_member", current.id, {
+        username: current.username,
+        role,
+        status,
+        revokedSessions,
+        productCount: member?.productAccess.length ?? 0,
+        passwordUpdated: newPasswordProvided
+      });
+
+      return {
+        ...member,
+        revokedSessions
+      };
     },
 
     listProducts(token) {
@@ -4756,14 +5564,20 @@ export function createServices(db, config, runtimeState = null) {
 
     developerListProducts(token) {
       const session = requireDeveloperSession(db, token);
-      return queryProductRows(db, { ownerDeveloperId: session.developer_id });
+      requireDeveloperPermission(
+        session,
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+      return listDeveloperAccessibleProductRows(db, session);
     },
 
     developerCreateProduct(token, body = {}) {
-      const session = requireDeveloperSession(db, token);
+      const session = requireDeveloperOwnerSession(db, token);
       const product = createProductRecord(db, body, session.developer_id);
 
-      audit(db, "developer", session.developer_id, "product.create", "product", product.id, {
+      auditDeveloperSession(db, session, "product.create", "product", product.id, {
         code: product.code,
         sdkAppId: product.sdkAppId
       });
@@ -4773,10 +5587,10 @@ export function createServices(db, config, runtimeState = null) {
 
     developerUpdateProductFeatureConfig(token, productId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const ownedProduct = requireDeveloperOwnedProduct(db, session.developer_id, productId);
+      const ownedProduct = requireDeveloperOwnedProduct(db, session, productId, "products.write");
       const result = updateProductFeatureConfigRecord(db, ownedProduct.id, body, nowIso());
 
-      audit(db, "developer", session.developer_id, "product.feature-config", "product", ownedProduct.id, {
+      auditDeveloperSession(db, session, "product.feature-config", "product", ownedProduct.id, {
         code: result.product.code,
         featureConfig: result.featureConfig
       });
@@ -4794,12 +5608,23 @@ export function createServices(db, config, runtimeState = null) {
 
     developerListPolicies(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "policies.read",
+        "DEVELOPER_POLICY_FORBIDDEN",
+        "You can only view policies under your assigned projects."
+      );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "policies.read"
+        );
       }
       return queryPolicyRows(db, {
         productCode: filters.productCode ?? null,
-        ownerDeveloperId: session.developer_id
+        productIds: listDeveloperAccessibleProductIds(db, session)
       });
     },
 
@@ -4924,9 +5749,15 @@ export function createServices(db, config, runtimeState = null) {
 
     developerCreatePolicy(token, body = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "policies.write",
+        "DEVELOPER_POLICY_FORBIDDEN",
+        "You can only manage policies under your assigned projects."
+      );
       requireField(body, "name");
 
-      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "policies.write");
       const now = nowIso();
       const grantType = normalizeGrantType(body.grantType ?? "duration");
       const grantPoints = normalizeNonNegativeInteger(body.grantPoints, "grantPoints", 0, 1000000);
@@ -4992,7 +5823,7 @@ export function createServices(db, config, runtimeState = null) {
       persistPolicyUnbindConfig(db, policy.id, body, now);
       persistPolicyGrantConfig(db, policy.id, { grantType, grantPoints }, now);
 
-      audit(db, "developer", session.developer_id, "policy.create", "policy", policy.id, {
+      auditDeveloperSession(db, session, "policy.create", "policy", policy.id, {
         productCode: product.code,
         name: policy.name,
         allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
@@ -5169,7 +6000,7 @@ export function createServices(db, config, runtimeState = null) {
 
     developerUpdatePolicyRuntimeConfig(token, policyId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const policy = requireDeveloperOwnedPolicy(db, session.developer_id, policyId);
+      const policy = requireDeveloperOwnedPolicy(db, session, policyId, "policies.write");
       const currentBindConfig = loadPolicyBindConfig(db, policy.id, policy.bind_mode, policy.updated_at);
       const nextBindMode = body.bindMode !== undefined
         ? normalizeBindMode(body.bindMode)
@@ -5198,7 +6029,7 @@ export function createServices(db, config, runtimeState = null) {
 
       persistPolicyBindConfig(db, policy.id, nextBindMode, nextBindFields, timestamp);
 
-      audit(db, "developer", session.developer_id, "policy.runtime.update", "policy", policy.id, {
+      auditDeveloperSession(db, session, "policy.runtime.update", "policy", policy.id, {
         productCode: policy.product_code,
         allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
         bindMode: nextBindMode,
@@ -5220,7 +6051,7 @@ export function createServices(db, config, runtimeState = null) {
 
     developerUpdatePolicyUnbindConfig(token, policyId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const policy = requireDeveloperOwnedPolicy(db, session.developer_id, policyId);
+      const policy = requireDeveloperOwnedPolicy(db, session, policyId, "policies.write");
       const currentConfig = loadPolicyUnbindConfig(db, policy.id, policy.updated_at);
       const nextConfig = {
         allowClientUnbind: body.allowClientUnbind === undefined
@@ -5243,7 +6074,7 @@ export function createServices(db, config, runtimeState = null) {
 
       persistPolicyUnbindConfig(db, policy.id, nextConfig, timestamp);
 
-      audit(db, "developer", session.developer_id, "policy.unbind.update", "policy", policy.id, {
+      auditDeveloperSession(db, session, "policy.unbind.update", "policy", policy.id, {
         productCode: policy.product_code,
         allowClientUnbind: nextConfig.allowClientUnbind,
         clientUnbindLimit: nextConfig.clientUnbindLimit,
@@ -5281,12 +6112,23 @@ export function createServices(db, config, runtimeState = null) {
 
     developerListCards(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "cards.read",
+        "DEVELOPER_CARD_FORBIDDEN",
+        "You can only view cards under your assigned projects."
+      );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "cards.read"
+        );
       }
       const { items, summary, filters: normalizedFilters } = queryCardRows(
         db,
-        { ...filters, ownerDeveloperId: session.developer_id }
+        { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) }
       );
       return {
         items,
@@ -5298,12 +6140,23 @@ export function createServices(db, config, runtimeState = null) {
 
     developerExportCardsCsv(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "cards.read",
+        "DEVELOPER_CARD_FORBIDDEN",
+        "You can only view cards under your assigned projects."
+      );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "cards.read"
+        );
       }
       const { items } = queryCardRows(
         db,
-        { ...filters, ownerDeveloperId: session.developer_id },
+        { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
         { limit: 5000 }
       );
       return buildCardsCsv(items);
@@ -5365,7 +6218,7 @@ export function createServices(db, config, runtimeState = null) {
 
     developerUpdateCardStatus(token, cardId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const card = requireDeveloperOwnedCard(db, session.developer_id, cardId);
+      const card = requireDeveloperOwnedCard(db, session, cardId, "cards.write");
 
       return withTransaction(db, () => {
         const timestamp = nowIso();
@@ -5385,7 +6238,7 @@ export function createServices(db, config, runtimeState = null) {
           );
         }
 
-        audit(db, "developer", session.developer_id, "card.status", "license_key", card.id, {
+        auditDeveloperSession(db, session, "card.status", "license_key", card.id, {
           productCode: card.product_code,
           cardKeyMasked: maskCardKey(card.card_key),
           status: control.status,
@@ -5471,9 +6324,15 @@ export function createServices(db, config, runtimeState = null) {
 
     developerCreateCardBatch(token, body = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "cards.write",
+        "DEVELOPER_CARD_FORBIDDEN",
+        "You can only manage cards under your assigned projects."
+      );
       requireField(body, "policyId");
 
-      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "cards.write");
       const policy = one(
         db,
         `
@@ -5520,7 +6379,7 @@ export function createServices(db, config, runtimeState = null) {
         return issued;
       });
 
-      audit(db, "developer", session.developer_id, "card.batch.create", "policy", policy.id, {
+      auditDeveloperSession(db, session, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
         batchCode,
         count,
@@ -7963,12 +8822,23 @@ export function createServices(db, config, runtimeState = null) {
 
     developerListClientVersions(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "versions.read",
+        "DEVELOPER_CLIENT_VERSION_FORBIDDEN",
+        "You can only view client versions under your assigned projects."
+      );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "versions.read"
+        );
       }
       return queryClientVersionRows(db, {
         ...filters,
-        ownerDeveloperId: session.developer_id
+        productIds: listDeveloperAccessibleProductIds(db, session)
       });
     },
 
@@ -8054,9 +8924,15 @@ export function createServices(db, config, runtimeState = null) {
 
     developerCreateClientVersion(token, body = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "versions.write",
+        "DEVELOPER_CLIENT_VERSION_FORBIDDEN",
+        "You can only manage client versions under your assigned projects."
+      );
       requireField(body, "version");
 
-      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "versions.write");
       const version = String(body.version).trim();
       const channel = normalizeChannel(body.channel);
       const status = String(body.status ?? "active").trim().toLowerCase();
@@ -8109,7 +8985,7 @@ export function createServices(db, config, runtimeState = null) {
         timestamp
       );
 
-      audit(db, "developer", session.developer_id, "client-version.create", "client_version", id, {
+      auditDeveloperSession(db, session, "client-version.create", "client_version", id, {
         productCode: product.code,
         channel,
         version,
@@ -8196,7 +9072,7 @@ export function createServices(db, config, runtimeState = null) {
 
     developerUpdateClientVersionStatus(token, versionId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const row = requireDeveloperOwnedClientVersion(db, session.developer_id, versionId);
+      const row = requireDeveloperOwnedClientVersion(db, session, versionId, "versions.write");
 
       const nextStatus = String(body.status ?? "").trim().toLowerCase();
       if (!["active", "disabled"].includes(nextStatus)) {
@@ -8223,7 +9099,7 @@ export function createServices(db, config, runtimeState = null) {
         row.id
       );
 
-      audit(db, "developer", session.developer_id, "client-version.status", "client_version", row.id, {
+      auditDeveloperSession(db, session, "client-version.status", "client_version", row.id, {
         productCode: row.product_code,
         version: row.version,
         channel: row.channel,
@@ -8250,12 +9126,23 @@ export function createServices(db, config, runtimeState = null) {
 
     developerListNotices(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "notices.read",
+        "DEVELOPER_NOTICE_FORBIDDEN",
+        "You can only view notices under your assigned projects."
+      );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(db, session.developer_id, String(filters.productCode).trim().toUpperCase());
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "notices.read"
+        );
       }
       return queryNoticeRows(db, {
         ...filters,
-        ownerDeveloperId: session.developer_id
+        productIds: listDeveloperAccessibleProductIds(db, session)
       });
     },
 
@@ -8342,10 +9229,16 @@ export function createServices(db, config, runtimeState = null) {
 
     developerCreateNotice(token, body = {}) {
       const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "notices.write",
+        "DEVELOPER_NOTICE_FORBIDDEN",
+        "You can only manage notices under your assigned projects."
+      );
       requireField(body, "title");
       requireField(body, "body");
 
-      const product = requireDeveloperOwnedProductByCode(db, session.developer_id, readProductCodeInput(body));
+      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "notices.write");
       const kind = String(body.kind ?? "announcement").trim().toLowerCase();
       const severity = String(body.severity ?? "info").trim().toLowerCase();
       const status = String(body.status ?? "active").trim().toLowerCase();
@@ -8395,7 +9288,7 @@ export function createServices(db, config, runtimeState = null) {
         timestamp
       );
 
-      audit(db, "developer", session.developer_id, "notice.create", "notice", id, {
+      auditDeveloperSession(db, session, "notice.create", "notice", id, {
         productCode: product.code,
         channel,
         kind,
@@ -8482,7 +9375,7 @@ export function createServices(db, config, runtimeState = null) {
 
     developerUpdateNoticeStatus(token, noticeId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const row = requireDeveloperOwnedNotice(db, session.developer_id, noticeId);
+      const row = requireDeveloperOwnedNotice(db, session, noticeId, "notices.write");
 
       const status = String(body.status ?? "").trim().toLowerCase();
       if (!["active", "archived"].includes(status)) {
@@ -8509,7 +9402,7 @@ export function createServices(db, config, runtimeState = null) {
         row.id
       );
 
-      audit(db, "developer", session.developer_id, "notice.status", "notice", row.id, {
+      auditDeveloperSession(db, session, "notice.status", "notice", row.id, {
         productCode: row.product_code ?? null,
         channel: row.channel,
         status,

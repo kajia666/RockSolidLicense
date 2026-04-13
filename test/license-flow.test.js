@@ -4481,6 +4481,230 @@ test("developer accounts can change password, logout, and be disabled by admin",
   }
 });
 
+test("developer owners can manage scoped team members with project roles", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "owner.team",
+        password: "OwnerTeam123!",
+        displayName: "Owner Team"
+      },
+      adminSession.token
+    );
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "TEAM_ALPHA",
+        name: "Team Alpha",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "TEAM_BETA",
+        name: "Team Beta",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "owner.team",
+      password: "OwnerTeam123!"
+    });
+    assert.equal(ownerSession.actor.type, "owner");
+
+    const ownerProfile = await postJson(
+      baseUrl,
+      "/api/developer/profile",
+      {
+        displayName: "Owner Prime"
+      },
+      ownerSession.token
+    );
+    assert.equal(ownerProfile.status, "profile_updated");
+
+    const ownerMe = await getJson(baseUrl, "/api/developer/me", ownerSession.token);
+    assert.equal(ownerMe.developer.displayName, "Owner Prime");
+    assert.equal(ownerMe.actor.type, "owner");
+
+    const alphaPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "TEAM_ALPHA",
+        name: "Alpha Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const betaPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "TEAM_BETA",
+        name: "Beta Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const member = await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "ops.member",
+        password: "OpsMember123!",
+        displayName: "Ops Member",
+        role: "operator",
+        productCodes: ["TEAM_ALPHA"]
+      },
+      ownerSession.token
+    );
+    assert.equal(member.role, "operator");
+    assert.equal(member.productAccess.length, 1);
+    assert.equal(member.productAccess[0].productCode, "TEAM_ALPHA");
+
+    const memberList = await getJson(baseUrl, "/api/developer/members", ownerSession.token);
+    assert.equal(memberList.total, 1);
+    assert.equal(memberList.items[0].username, "ops.member");
+
+    const memberLogin = await postJson(baseUrl, "/api/developer/login", {
+      username: "ops.member",
+      password: "OpsMember123!"
+    });
+    assert.equal(memberLogin.actor.type, "member");
+    assert.equal(memberLogin.actor.role, "operator");
+
+    const memberMe = await getJson(baseUrl, "/api/developer/me", memberLogin.token);
+    assert.equal(memberMe.actor.type, "member");
+    assert.equal(memberMe.actor.role, "operator");
+    assert.equal(memberMe.developer.username, "owner.team");
+
+    const memberProjects = await getJson(baseUrl, "/api/developer/products", memberLogin.token);
+    assert.equal(memberProjects.length, 1);
+    assert.equal(memberProjects[0].code, "TEAM_ALPHA");
+
+    const memberBatch = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "TEAM_ALPHA",
+        policyId: alphaPolicy.id,
+        count: 1,
+        prefix: "TEAMOP"
+      },
+      memberLogin.token
+    );
+    assert.equal(memberBatch.count, 1);
+
+    const forbiddenBatch = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "TEAM_BETA",
+        policyId: betaPolicy.id,
+        count: 1,
+        prefix: "TEAMOP"
+      },
+      memberLogin.token
+    );
+    assert.equal(forbiddenBatch.status, 403);
+    assert.equal(forbiddenBatch.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const forbiddenFeature = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/products/${alphaProduct.id}/feature-config`,
+      {
+        allowNotices: false
+      },
+      memberLogin.token
+    );
+    assert.equal(forbiddenFeature.status, 403);
+    assert.equal(forbiddenFeature.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const elevatedMember = await postJson(
+      baseUrl,
+      `/api/developer/members/${member.id}`,
+      {
+        role: "admin",
+        productCodes: ["TEAM_ALPHA", "TEAM_BETA"]
+      },
+      ownerSession.token
+    );
+    assert.equal(elevatedMember.role, "admin");
+    assert.equal(elevatedMember.productAccess.length, 2);
+
+    const memberProjectsAfterGrant = await getJson(baseUrl, "/api/developer/products", memberLogin.token);
+    assert.equal(memberProjectsAfterGrant.length, 2);
+
+    const featureSaved = await postJson(
+      baseUrl,
+      `/api/developer/products/${alphaProduct.id}/feature-config`,
+      {
+        allowNotices: false,
+        allowVersionCheck: false
+      },
+      memberLogin.token
+    );
+    assert.equal(featureSaved.featureConfig.allowNotices, false);
+    assert.equal(featureSaved.featureConfig.allowVersionCheck, false);
+
+    const disabledMember = await postJson(
+      baseUrl,
+      `/api/developer/members/${member.id}`,
+      {
+        status: "disabled"
+      },
+      ownerSession.token
+    );
+    assert.equal(disabledMember.status, "disabled");
+    assert.ok(disabledMember.revokedSessions >= 1);
+
+    const memberAfterDisable = await getJsonExpectError(baseUrl, "/api/developer/products", memberLogin.token);
+    assert.equal(memberAfterDisable.status, 401);
+    assert.equal(memberAfterDisable.error.code, "DEVELOPER_AUTH_INVALID");
+
+    const disabledMemberLogin = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/login",
+      {
+        username: "ops.member",
+        password: "OpsMember123!"
+      }
+    );
+    assert.equal(disabledMemberLogin.status, 403);
+    assert.equal(disabledMemberLogin.error.code, "DEVELOPER_MEMBER_LOGIN_DISABLED");
+
+    const auditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=120", adminSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("developer.profile.update"));
+    assert.ok(eventTypes.includes("developer-member.create"));
+    assert.ok(eventTypes.includes("developer-member.update"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -4511,7 +4735,10 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /Developer Project Center/);
     assert.match(html, /api\/developer\/products/);
     assert.match(html, /api\/developer\/policies/);
+    assert.match(html, /api\/developer\/profile/);
+    assert.match(html, /api\/developer\/members/);
     assert.match(html, /change-password/);
+    assert.match(html, /Create Team Member/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

@@ -45,6 +45,43 @@ CREATE TABLE IF NOT EXISTS developer_sessions (
   last_seen_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS developer_members (
+  id TEXT PRIMARY KEY,
+  developer_id TEXT NOT NULL,
+  username TEXT NOT NULL UNIQUE,
+  display_name TEXT,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_login_at TEXT,
+  FOREIGN KEY (developer_id) REFERENCES developer_accounts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS developer_member_sessions (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  developer_id TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  FOREIGN KEY (member_id) REFERENCES developer_members(id) ON DELETE CASCADE,
+  FOREIGN KEY (developer_id) REFERENCES developer_accounts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS developer_member_products (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (member_id) REFERENCES developer_members(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  UNIQUE(member_id, product_id)
+);
+
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   code TEXT NOT NULL UNIQUE,
@@ -523,6 +560,14 @@ CREATE INDEX IF NOT EXISTS idx_developer_accounts_lookup
   ON developer_accounts(username, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_developer_sessions_lookup
   ON developer_sessions(developer_id, expires_at, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_developer_members_lookup
+  ON developer_members(developer_id, role, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_developer_member_sessions_lookup
+  ON developer_member_sessions(member_id, developer_id, expires_at, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_developer_member_products_lookup
+  ON developer_member_products(member_id, product_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_developer_member_products_product
+  ON developer_member_products(product_id, member_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_relations_parent
   ON reseller_relations(parent_reseller_id, can_view_descendants, updated_at);
 CREATE INDEX IF NOT EXISTS idx_reseller_users_reseller

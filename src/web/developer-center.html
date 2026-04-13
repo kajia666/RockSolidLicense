@@ -261,8 +261,9 @@
       <section class="hero">
         <h1>Developer Project Center</h1>
         <p class="sub">
-          Sign in as a software author, manage only your own projects, configure feature toggles, and use the
-          developer APIs to manage policies, card batches, client versions, and notices under your own scope.
+          Sign in as a software author, manage only your own projects, configure feature toggles, delegate work to
+          scoped developer members, and use the developer APIs to operate policies, cards, versions, and notices
+          inside your own project scope.
         </p>
         <div class="nav">
           <a href="/developer">Developer Center</a>
@@ -363,6 +364,8 @@
             After signing in, the same bearer token also works with these scoped endpoints:
           </div>
           <div class="developer-list">
+            <div class="split-line"><span>Profile</span><span class="mono">POST /api/developer/profile</span></div>
+            <div class="split-line"><span>Members</span><span class="mono">GET/POST /api/developer/members</span></div>
             <div class="split-line"><span>Policies</span><span class="mono">GET/POST /api/developer/policies</span></div>
             <div class="split-line"><span>Policy runtime</span><span class="mono">POST /api/developer/policies/:policyId/runtime-config</span></div>
             <div class="split-line"><span>Policy unbind</span><span class="mono">POST /api/developer/policies/:policyId/unbind-config</span></div>
@@ -376,6 +379,15 @@
         </article>
 
         <article class="card">
+          <h2>Account Profile</h2>
+          <label>Display Name<input id="profile-display-name" placeholder="Visible name for this login identity" /></label>
+          <div class="actions">
+            <button class="secondary" id="save-profile-btn">Save Profile</button>
+          </div>
+          <div class="hint">Owners can update the main developer display name. Member accounts can update their own display name.</div>
+        </article>
+
+        <article class="card">
           <h2>Account Security</h2>
           <label>Current Password<input id="current-password" type="password" placeholder="Current password" /></label>
           <label>New Password<input id="new-password" type="password" placeholder="At least 8 characters" /></label>
@@ -383,6 +395,27 @@
             <button class="secondary" id="change-password-btn">Change Password</button>
           </div>
           <div class="hint">Changing the password will revoke current developer sessions and require signing in again.</div>
+        </article>
+
+        <article class="card">
+          <h2>Create Team Member</h2>
+          <label>Username<input id="member-username" placeholder="ops.agent" /></label>
+          <label>Display Name<input id="member-display-name" placeholder="Operations Agent" /></label>
+          <label>Password<input id="member-password" type="password" placeholder="At least 8 characters" /></label>
+          <label>Role
+            <select id="member-role">
+              <option value="admin">admin</option>
+              <option value="operator">operator</option>
+              <option value="viewer">viewer</option>
+            </select>
+          </label>
+          <label>Assigned Project Codes
+            <textarea id="member-product-codes" placeholder="ALPHA_APP, BETA_APP"></textarea>
+          </label>
+          <div class="actions">
+            <button class="secondary" id="create-member-btn">Create Member</button>
+          </div>
+          <div class="hint">Only the primary developer account can create or update team members.</div>
         </article>
       </section>
 
@@ -412,6 +445,54 @@
         </article>
       </section>
 
+      <section class="table-grid">
+        <article class="card">
+          <h2>Team Members</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Projects</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody id="members-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Member Controls</h2>
+          <label>Member ID<input id="edit-member-id" readonly placeholder="Click a member row to edit" /></label>
+          <label>Display Name<input id="edit-member-display-name" placeholder="Display name" /></label>
+          <label>Role
+            <select id="edit-member-role">
+              <option value="admin">admin</option>
+              <option value="operator">operator</option>
+              <option value="viewer">viewer</option>
+            </select>
+          </label>
+          <label>Status
+            <select id="edit-member-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>Reset Password (optional)<input id="edit-member-password" type="password" placeholder="Leave blank to keep current password" /></label>
+          <label>Assigned Project Codes
+            <textarea id="edit-member-product-codes" placeholder="ALPHA_APP, BETA_APP"></textarea>
+          </label>
+          <div class="actions">
+            <button class="secondary" id="save-member-btn">Save Member</button>
+            <button class="danger" id="clear-member-btn">Clear Member</button>
+          </div>
+          <div class="hint" id="members-hint">Team members will only see projects explicitly assigned to them.</div>
+        </article>
+      </section>
+
       <section class="card">
         <h2>API Output</h2>
         <pre id="output">Waiting for actions...</pre>
@@ -431,7 +512,9 @@
 
       let developerToken = "";
       let developerProfile = null;
+      let currentActor = null;
       let productsCache = [];
+      let membersCache = [];
 
       function el(id) { return document.getElementById(id); }
 
@@ -446,15 +529,28 @@
       }
 
       function setSessionMeta() {
-        if (!developerProfile || !developerToken) {
+        if (!currentActor || !developerToken) {
           el("session-meta").textContent = "No developer session yet.";
+          el("profile-display-name").value = "";
           return;
         }
 
-        const label = developerProfile.displayName
-          ? `${developerProfile.username} (${developerProfile.displayName})`
-          : developerProfile.username;
-        el("session-meta").textContent = `Signed in as ${label} | status: ${developerProfile.status || "active"}`;
+        const actorLabel = currentActor.displayName
+          ? `${currentActor.username} (${currentActor.displayName})`
+          : currentActor.username;
+        const developerLabel = developerProfile
+          ? developerProfile.displayName
+            ? `${developerProfile.username} (${developerProfile.displayName})`
+            : developerProfile.username
+          : "";
+        const scopeLabel = currentActor.type === "member"
+          ? `member/${currentActor.role}`
+          : "owner";
+
+        el("session-meta").textContent = currentActor.type === "member"
+          ? `Signed in as ${actorLabel} | ${scopeLabel} under ${developerLabel} | status: ${developerProfile?.status || "active"}`
+          : `Signed in as ${actorLabel} | ${scopeLabel} | status: ${developerProfile?.status || "active"}`;
+        el("profile-display-name").value = currentActor.displayName || "";
       }
 
       function escapeHtml(value) {
@@ -477,6 +573,13 @@
         return `<span class="tag ${enabled ? "ok" : "danger"}">${escapeHtml(label)}: ${enabled ? "on" : "off"}</span>`;
       }
 
+      function parseProductCodes(value) {
+        return String(value ?? "")
+          .split(/[\n,]+/)
+          .map((item) => item.trim().toUpperCase())
+          .filter(Boolean);
+      }
+
       function renderStats(items) {
         const stats = {
           total: items.length,
@@ -484,12 +587,16 @@
           directCardOpen: items.filter((item) => item.featureConfig?.allowCardLogin).length,
           noticesOpen: items.filter((item) => item.featureConfig?.allowNotices).length
         };
+        const tail = currentActor?.type === "owner"
+          ? `<div class="stat"><strong>${membersCache.length}</strong><span>Team Members</span></div>`
+          : `<div class="stat"><strong>${escapeHtml(currentActor?.role || "-")}</strong><span>Actor Role</span></div>`;
 
         el("stats-box").innerHTML = `
           <div class="stat"><strong>${stats.total}</strong><span>My Projects</span></div>
           <div class="stat"><strong>${stats.registerOpen}</strong><span>Register Enabled</span></div>
           <div class="stat"><strong>${stats.directCardOpen}</strong><span>Card Login Enabled</span></div>
           <div class="stat"><strong>${stats.noticesOpen}</strong><span>Notices Enabled</span></div>
+          ${tail}
         `;
       }
 
@@ -542,6 +649,27 @@
         el("edit-product-code").value = product.code;
         writeFeatureConfig("edit", product.featureConfig || {});
         renderDetails(product);
+      }
+
+      function setMemberSelection(member = null) {
+        if (!member) {
+          el("edit-member-id").value = "";
+          el("edit-member-display-name").value = "";
+          el("edit-member-role").value = "admin";
+          el("edit-member-status").value = "active";
+          el("edit-member-password").value = "";
+          el("edit-member-product-codes").value = "";
+          return;
+        }
+
+        el("edit-member-id").value = member.id;
+        el("edit-member-display-name").value = member.displayName || "";
+        el("edit-member-role").value = member.role || "admin";
+        el("edit-member-status").value = member.status || "active";
+        el("edit-member-password").value = "";
+        el("edit-member-product-codes").value = (member.productAccess || [])
+          .map((item) => item.productCode)
+          .join(", ");
       }
 
       function renderProjects(items) {
@@ -597,6 +725,43 @@
         renderStats(items);
       }
 
+      function renderMembers(items, hint = "") {
+        const body = el("members-body");
+        el("members-hint").textContent = hint || "Team members will only see projects explicitly assigned to them.";
+
+        if (!items.length) {
+          body.innerHTML = `<tr><td colspan="5">${escapeHtml(hint || "No team members yet.")}</td></tr>`;
+          setMemberSelection(null);
+          renderStats(productsCache);
+          return;
+        }
+
+        body.innerHTML = items.map((item) => `
+          <tr data-id="${escapeHtml(item.id)}">
+            <td>
+              <strong>${escapeHtml(item.username)}</strong>
+              <div>${escapeHtml(item.displayName || "No display name")}</div>
+            </td>
+            <td>${escapeHtml(item.role)}</td>
+            <td>${renderTag(item.status, item.status === "active")}</td>
+            <td>${escapeHtml((item.productAccess || []).map((entry) => entry.productCode).join(", ") || "No projects")}</td>
+            <td>${escapeHtml(formatTime(item.updatedAt))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            const member = membersCache.find((item) => item.id === row.dataset.id);
+            if (member) {
+              setMemberSelection(member);
+              setStatus(`Loaded member ${member.username}.`);
+            }
+          });
+        }
+
+        renderStats(productsCache);
+      }
+
       async function callApi(path, options = {}) {
         const headers = { ...(options.headers || {}) };
         let body = options.body;
@@ -615,7 +780,9 @@
         const response = await fetch(path, { ...options, headers, body });
         const json = await response.json();
         if (!response.ok || !json.ok) {
-          throw new Error(json.error?.message || `Request failed: ${response.status}`);
+          const error = new Error(json.error?.message || `Request failed: ${response.status}`);
+          error.code = json.error?.code || `HTTP_${response.status}`;
+          throw error;
         }
         return json.data;
       }
@@ -625,23 +792,40 @@
         productsCache = Array.isArray(data) ? data : [];
         renderProjects(productsCache);
         setOutput(productsCache);
-        setStatus(`Loaded ${productsCache.length} owned projects.`);
+        setStatus(`Loaded ${productsCache.length} accessible projects.`);
       }
 
       async function refreshDeveloperMe() {
         const data = await callApi("/api/developer/me");
         developerProfile = data.developer || null;
+        currentActor = data.actor || null;
         setSessionMeta();
         return data;
+      }
+
+      async function refreshMembers() {
+        if (!developerToken || currentActor?.type !== "owner") {
+          membersCache = [];
+          renderMembers([], developerToken ? "Only the primary developer account can manage team members." : "Sign in to view team members.");
+          return;
+        }
+
+        const data = await callApi("/api/developer/members");
+        membersCache = Array.isArray(data?.items) ? data.items : [];
+        renderMembers(membersCache);
       }
 
       function clearDeveloperSession() {
         developerToken = "";
         developerProfile = null;
+        currentActor = null;
         productsCache = [];
+        membersCache = [];
         renderStats([]);
         renderProjects([]);
+        renderMembers([], "Sign in to view team members.");
         setSelection(null);
+        setMemberSelection(null);
         setSessionMeta();
       }
 
@@ -649,7 +833,7 @@
         try {
           await action();
         } catch (error) {
-          setOutput({ error: error.message });
+          setOutput({ error: error.message, code: error.code || null });
           setStatus(error.message, true);
         }
       }
@@ -663,17 +847,20 @@
           }
         });
         developerToken = data.token;
-        developerProfile = data.developer;
+        developerProfile = data.developer || null;
+        currentActor = data.actor || null;
         setOutput(data);
-        setStatus(`Developer ${data.developer.username} is connected.`);
+        setStatus(`${data.actor?.type === "member" ? "Member" : "Developer"} ${data.actor?.username || data.developer?.username} is connected.`);
         setSessionMeta();
         await refreshDeveloperMe();
         await refreshProjects();
+        await refreshMembers();
       }));
 
       el("refresh-btn").addEventListener("click", () => guarded(async () => {
         await refreshDeveloperMe();
         await refreshProjects();
+        await refreshMembers();
       }));
 
       el("logout-btn").addEventListener("click", () => guarded(async () => {
@@ -690,6 +877,22 @@
         setStatus("Developer session has been signed out.");
       }));
 
+      el("save-profile-btn").addEventListener("click", () => guarded(async () => {
+        if (!developerToken) {
+          throw new Error("Sign in before updating your profile.");
+        }
+
+        const data = await callApi("/api/developer/profile", {
+          method: "POST",
+          body: {
+            displayName: el("profile-display-name").value.trim()
+          }
+        });
+        setOutput(data);
+        await refreshDeveloperMe();
+        setStatus("Profile updated.");
+      }));
+
       el("create-btn").addEventListener("click", () => guarded(async () => {
         const data = await callApi("/api/developer/products", {
           method: "POST",
@@ -703,6 +906,7 @@
         setOutput(data);
         setStatus(`Created project ${data.code}.`);
         await refreshProjects();
+        await refreshMembers();
         const created = productsCache.find((item) => item.id === data.id) || data;
         setSelection(created);
       }));
@@ -722,6 +926,57 @@
         await refreshProjects();
         const updated = productsCache.find((item) => item.id === productId) || data;
         setSelection(updated);
+      }));
+
+      el("create-member-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/developer/members", {
+          method: "POST",
+          body: {
+            username: el("member-username").value.trim(),
+            displayName: el("member-display-name").value.trim(),
+            password: el("member-password").value,
+            role: el("member-role").value,
+            productCodes: parseProductCodes(el("member-product-codes").value)
+          }
+        });
+        el("member-username").value = "";
+        el("member-display-name").value = "";
+        el("member-password").value = "";
+        el("member-role").value = "admin";
+        el("member-product-codes").value = "";
+        setOutput(data);
+        setStatus(`Created member ${data.username}.`);
+        await refreshMembers();
+        const created = membersCache.find((item) => item.id === data.id) || data;
+        setMemberSelection(created);
+      }));
+
+      el("save-member-btn").addEventListener("click", () => guarded(async () => {
+        const memberId = el("edit-member-id").value.trim();
+        if (!memberId) {
+          throw new Error("Select a member before saving changes.");
+        }
+
+        const body = {
+          displayName: el("edit-member-display-name").value.trim(),
+          role: el("edit-member-role").value,
+          status: el("edit-member-status").value,
+          productCodes: parseProductCodes(el("edit-member-product-codes").value)
+        };
+        if (el("edit-member-password").value.trim()) {
+          body.newPassword = el("edit-member-password").value;
+        }
+
+        const data = await callApi(`/api/developer/members/${encodeURIComponent(memberId)}`, {
+          method: "POST",
+          body
+        });
+        el("edit-member-password").value = "";
+        setOutput(data);
+        setStatus(`Updated member ${data.username}.`);
+        await refreshMembers();
+        const updated = membersCache.find((item) => item.id === memberId) || data;
+        setMemberSelection(updated);
       }));
 
       el("change-password-btn").addEventListener("click", () => guarded(async () => {
@@ -748,8 +1003,15 @@
         setStatus("Selection cleared.");
       });
 
+      el("clear-member-btn").addEventListener("click", () => {
+        setMemberSelection(null);
+        setStatus("Member selection cleared.");
+      });
+
       renderStats([]);
       renderProjects([]);
+      renderMembers([], "Sign in to view team members.");
+      setMemberSelection(null);
       setSessionMeta();
     </script>
   </body>

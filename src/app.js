@@ -905,6 +905,35 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/developer/profile") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, { ok: true, data: services.developerUpdateProfile(getBearerToken(req), body) });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/members") {
+        sendJson(res, 200, { ok: true, data: services.developerListMembers(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/members") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, { ok: true, data: services.developerCreateMember(getBearerToken(req), body) });
+        return;
+      }
+
+      const developerMemberRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/members/:memberId")
+        : null;
+      if (developerMemberRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateMember(getBearerToken(req), developerMemberRoute.memberId, body)
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/products") {
         sendJson(res, 200, { ok: true, data: services.developerListProducts(getBearerToken(req)) });
         return;

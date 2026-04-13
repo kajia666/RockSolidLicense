@@ -50,6 +50,7 @@ Dedicated UI:
 
 - `/admin/products`
 - `/developer`
+- `/developer/integration`
 - `/developer/projects`
 - `/developer/licenses`
 - `/developer/ops`
@@ -188,6 +189,7 @@ Effects:
 - developer members use the same `/api/developer/login` entry, but only see products explicitly assigned to them
 - developers and developer members only see projects where `products.owner_developer_id` matches the parent developer account
 - `GET /api/developer/dashboard` returns a scoped summary for accessible projects, including cards, sessions, releases, notices, and network-rule counts
+- `/developer/integration` provides a dedicated SDK onboarding and transport bootstrap workspace for software authors
 - `/developer/projects` provides a dedicated product settings workspace for software authors
 - `/developer/ops` provides a dedicated authorization operations workspace for software authors
 - `/developer/licenses` provides a dedicated policy and card inventory workspace for software authors

@@ -78,6 +78,13 @@ Owners update the main developer profile. Members update only their own display 
 
 The owner account can create new projects. Product feature toggles and SDK credential rotation require product write permission, which in the current role model means the owner account or an assigned `admin` member. `operator` and `viewer` members stay read-only for project settings.
 
+## Integration workspace
+
+- `/developer/integration`
+- `GET /api/developer/integration`
+
+This workspace is read-only and is safe for every developer role. It aggregates scoped project credentials, public token keys, transport information, and example request payloads so software authors can integrate the SDK without opening the admin backoffice.
+
 ## Authorization operations
 
 - `/developer/ops`

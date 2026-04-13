@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Developer Integration</title>
+    <style>
+      :root{--bg:#f4efe4;--surface:rgba(255,252,246,.94);--line:rgba(23,32,27,.1);--ink:#17201b;--muted:#617066;--accent:#0f7c68;--danger:#a0422c;--accent-soft:rgba(15,124,104,.12);--danger-soft:rgba(160,66,44,.12);--shadow:0 24px 58px rgba(54,49,42,.14)}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--ink);font-family:"Bahnschrift","Segoe UI Variable","Segoe UI",sans-serif;background:radial-gradient(circle at top left,rgba(15,124,104,.15),transparent 24%),radial-gradient(circle at bottom right,rgba(201,126,78,.16),transparent 28%),linear-gradient(135deg,#f4ede0 0%,#f8f4ed 52%,#efe5d5 100%)}code,pre,.mono{font-family:"Cascadia Code","Consolas",monospace}.shell{width:min(1480px,calc(100vw - 28px));margin:20px auto 36px;display:grid;gap:18px}.hero,.card{background:var(--surface);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:20px}.hero{display:grid;gap:10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}.wide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}h1,h2,p{margin:0}h1{font-size:clamp(28px,5vw,44px)}h2{font-size:20px}.sub,.hint,.nav{color:var(--muted);line-height:1.6}.hint,.nav{font-size:13px}.nav a{color:var(--accent);text-decoration:none}.pill-row,.actions,.stats{display:flex;flex-wrap:wrap;gap:10px}.pill,.stat{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.68);color:var(--muted);font-size:13px}.stat{flex-direction:column;align-items:flex-start;border-radius:18px;min-width:140px}.stat strong{font-size:24px;color:var(--ink)}label{display:grid;gap:8px;color:var(--muted);font-size:14px}.two,.three{display:grid;gap:12px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}input,select,textarea{width:100%;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.82);color:var(--ink);font:inherit}textarea{min-height:90px;resize:vertical}button{border:0;border-radius:999px;padding:12px 16px;color:white;background:var(--ink);font:inherit;cursor:pointer}button.secondary{background:var(--accent)}button.danger{background:var(--danger)}.status{padding:12px 14px;border-radius:14px;background:var(--accent-soft);color:var(--accent);font-size:13px}.status.warn{background:var(--danger-soft);color:var(--danger)}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.78)}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:12px 14px;border-bottom:1px solid rgba(23,32,27,.08);text-align:left;vertical-align:top}th{background:rgba(247,243,235,.96);color:var(--muted)}tbody tr{cursor:pointer}tbody tr:hover{background:rgba(15,124,104,.06)}.tag{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(23,32,27,.08);color:var(--muted);margin:0 6px 6px 0}.tag.ok{background:var(--accent-soft);color:var(--accent)}.split-line{display:flex;justify-content:space-between;gap:12px}pre{margin:0;min-height:220px;padding:16px;border-radius:18px;background:#101715;color:#eef7f2;overflow:auto;white-space:pre-wrap;word-break:break-word}@media (max-width:1180px){.wide{grid-template-columns:1fr}}@media (max-width:760px){.two,.three{grid-template-columns:1fr}}
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer Integration Center</h1>
+        <p class="sub">Centralize project credentials, public token keys, HTTP/TCP endpoint information, and ready-to-adapt request examples for software authors integrating the SDK.</p>
+        <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
+        <div class="pill-row">
+          <div class="pill">Route: <code>/developer/integration</code></div>
+          <div class="pill">API: <code>/api/developer/integration</code></div>
+          <div class="pill">Includes scoped projects, token keys, and transport bootstrap data.</div>
+        </div>
+        <div class="stats" id="stats-box"></div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username or member" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions"><button id="login-btn">Sign In</button><button class="secondary" id="refresh-btn">Refresh Snapshot</button><button class="danger" id="logout-btn">Logout</button></div>
+          <div class="hint" id="session-meta">No developer session yet.</div>
+          <div class="status" id="status-box">Sign in to load integration bootstrap data.</div>
+        </article>
+
+        <article class="card">
+          <h2>Project Selector</h2>
+          <label>Project Code<select id="project-select"></select></label>
+          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button></div>
+          <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples and inspect the matching SDK credentials.</div>
+        </article>
+
+        <article class="card">
+          <h2>Transport Snapshot</h2>
+          <div id="transport-box" class="hint">Integration transport data will appear here after sign-in.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Scoped Projects</h2>
+          <div class="table-wrap"><table><thead><tr><th>Project</th><th>SDK</th><th>Features</th><th>Updated</th></tr></thead><tbody id="projects-body"></tbody></table></div>
+        </article>
+        <article class="card">
+          <h2>Selected Project Credentials</h2>
+          <div id="project-detail" class="hint">Select a project to inspect credentials and feature toggles.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Token Keys</h2>
+          <div class="table-wrap"><table><thead><tr><th>Key</th><th>Status</th><th>Fingerprint</th><th>Created</th></tr></thead><tbody id="token-keys-body"></tbody></table></div>
+        </article>
+        <article class="card">
+          <h2>HTTP Example</h2>
+          <pre id="http-example">Sign in to generate an example request.</pre>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>TCP Example</h2>
+          <pre id="tcp-example">Sign in to generate a TCP frame example.</pre>
+        </article>
+        <article class="card">
+          <h2>Raw Snapshot</h2>
+          <pre id="output">Waiting for actions...</pre>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      let token="",snapshot=null,selectedProduct=null; const el=(id)=>document.getElementById(id); const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;"); const setOutput=(v)=>{el("output").textContent=typeof v==="string"?v:JSON.stringify(v,null,2)}; const setStatus=(m,w=false)=>{const box=el("status-box"); box.textContent=m; box.className=`status${w?" warn":""}`}; const fmt=(v)=>{if(!v)return"-"; const d=new Date(v); return Number.isNaN(d.getTime())?String(v):d.toLocaleString("zh-CN",{hour12:false})}; const tag=(v,ok=true)=>`<span class="tag${ok?" ok":""}">${esc(v)}</span>`;
+      async function api(path,options={}){const headers={...(options.headers||{})}; if(options.body!==undefined) headers["Content-Type"]="application/json"; if(token) headers.Authorization=`Bearer ${token}`; const response=await fetch(path,{method:options.method||"GET",headers,body:options.body!==undefined?JSON.stringify(options.body):undefined}); const payload=await response.json().catch(()=>({})); if(!response.ok||payload.ok===false){const error=new Error(payload?.error?.message||`Request failed: ${response.status}`); error.code=payload?.error?.code||"REQUEST_FAILED"; throw error} return payload.data}
+      function setMeta(){if(!token||!snapshot){el("session-meta").textContent="No developer session yet."; return} const actor=snapshot.actor||{}; const developer=snapshot.developer||{}; const scope=actor.type==="member"?`member/${actor.role}`:"owner"; el("session-meta").textContent=`${actor.username||developer.username} | ${scope} | developer=${developer.username}`;}
+      function renderStats(){const items=snapshot?.products||[]; const keys=snapshot?.tokenKeys?.keys||[]; el("stats-box").innerHTML=`<div class="stat"><strong>${items.length}</strong><span>Visible Projects</span></div><div class="stat"><strong>${keys.length}</strong><span>Public Keys</span></div><div class="stat"><strong>${snapshot?.transport?.tcp?.enabled?1:0}</strong><span>TCP Enabled</span></div><div class="stat"><strong>${snapshot?.signing?.requestSkewSeconds??0}</strong><span>Skew Seconds</span></div>`}
+      function renderTransport(){if(!snapshot){el("transport-box").textContent="Integration transport data will appear here after sign-in.";return} const http=snapshot.transport?.http||{}; const tcp=snapshot.transport?.tcp||{}; const signing=snapshot.signing||{}; el("transport-box").innerHTML=`<div class="split-line"><span>HTTP Base</span><span class="mono">${esc(http.baseUrl||"-")}</span></div><div class="split-line"><span>Listener</span><span>${esc(http.host||"-")}:${esc(http.port||"-")}</span></div><div class="split-line"><span>TCP Gateway</span><span>${esc(String(tcp.enabled))} | ${esc(tcp.host||"-")}:${esc(tcp.port||"-")}</span></div><div class="split-line"><span>Request Signing</span><span>${esc(signing.requestAlgorithm||"-")} | skew ${esc(signing.requestSkewSeconds||"-")}s</span></div><div class="split-line"><span>Token Signing</span><span>${esc(signing.tokenAlgorithm||"-")} | issuer ${esc(signing.tokenIssuer||"-")}</span></div><div class="split-line"><span>Active Key ID</span><span class="mono">${esc(signing.activeKeyId||"-")}</span></div>`}
+      function renderProjects(){const items=snapshot?.products||[]; const body=el("projects-body"); const select=el("project-select"); if(!items.length){body.innerHTML='<tr><td colspan="4">No scoped projects found.</td></tr>'; select.innerHTML='<option value="">No scoped projects</option>'; selectedProduct=null; renderSelected(); return} body.innerHTML=items.map((item)=>{const features=item.featureConfig||{}; return `<tr data-id="${esc(item.id)}"><td><strong>${esc(item.code)}</strong><div>${esc(item.name)}</div><div class="hint">${esc(item.description||"No description")}</div></td><td><div class="mono">${esc(item.sdkAppId)}</div><div class="hint">${esc(item.status)}</div></td><td>${tag("register",features.allowRegister!==false)}${tag("account",features.allowAccountLogin!==false)}${tag("card",features.allowCardLogin!==false)}${tag("version",features.allowVersionCheck!==false)}${tag("notices",features.allowNotices!==false)}</td><td>${esc(fmt(item.updatedAt))}</td></tr>`}).join(""); select.innerHTML=items.map((item)=>`<option value="${esc(item.id)}">${esc(item.code)} | ${esc(item.name)}</option>`).join(""); for(const row of body.querySelectorAll("tr[data-id]")){row.addEventListener("click",()=>{select.value=row.dataset.id; chooseSelected(); setStatus(`Loaded integration data for ${(selectedProduct||{}).code || "project"}.`)})} if(!selectedProduct || !items.find((item)=>item.id===selectedProduct.id)){selectedProduct=items[0]} select.value=selectedProduct.id; renderSelected()}
+      function renderTokenKeys(){const keys=snapshot?.tokenKeys?.keys||[]; const activeId=snapshot?.tokenKeys?.activeKeyId; const body=el("token-keys-body"); body.innerHTML=keys.length?keys.map((item)=>`<tr><td><strong>${esc(item.keyId)}</strong><div>${item.keyId===activeId?tag("active"):tag(item.status||"stored",item.status==="active")}</div></td><td>${esc(item.status||"-")}</td><td class="mono">${esc(item.publicKeyFingerprint||"-")}</td><td>${esc(fmt(item.createdAt))}</td></tr>`).join(""):'<tr><td colspan="4">No public keys loaded.</td></tr>'}
+      function buildHttpExample(product){if(!product||!snapshot) return "Sign in to generate an example request."; const base=snapshot.transport?.http?.baseUrl||"http://127.0.0.1:3000"; return `POST ${base}/api/client/login\nHeaders:\n  x-rsl-app-id: ${product.sdkAppId}\n  x-rsl-timestamp: 1713024000\n  x-rsl-nonce: random-16-bytes\n  x-rsl-signature: <HMAC-SHA256 of raw body>\nBody:\n${JSON.stringify({productCode:product.code,username:"demo_user",password:"demo_password",deviceFingerprint:"machine-guid-hash",deviceProfile:{machineGuid:"machine-guid",requestIp:"<client-ip>"},clientVersion:"1.0.0",channel:"stable"},null,2)}`;}
+      function buildTcpExample(product){if(!product||!snapshot) return "Sign in to generate a TCP frame example."; return JSON.stringify({action:"client.login",requestId:"req_demo_001",payload:{productCode:product.code,username:"demo_user",password:"demo_password",deviceFingerprint:"machine-guid-hash",deviceProfile:{machineGuid:"machine-guid"},clientVersion:"1.0.0",channel:"stable"}},null,2);}
+      function renderSelected(){const product=selectedProduct; if(!product){el("project-detail").innerHTML='<div class="hint">Select a project to inspect credentials and feature toggles.</div>'; el("http-example").textContent="Sign in to generate an example request."; el("tcp-example").textContent="Sign in to generate a TCP frame example."; return} const features=product.featureConfig||{}; el("project-detail").innerHTML=`<div class="split-line"><span>Project</span><span><strong>${esc(product.code)}</strong> | ${esc(product.name)}</span></div><div class="split-line"><span>SDK App ID</span><span class="mono">${esc(product.sdkAppId)}</span></div><div class="split-line"><span>SDK App Secret</span><span class="mono">${esc(product.sdkAppSecret)}</span></div><div class="split-line"><span>Status</span><span>${esc(product.status)}</span></div><div class="hint" style="margin-top:14px;">Feature toggles</div><div style="margin-top:8px;">${Object.entries(features).map(([k,v])=>tag(k,v!==false)).join("")}</div>`; el("http-example").textContent=buildHttpExample(product); el("tcp-example").textContent=buildTcpExample(product);}
+      function chooseSelected(){const id=el("project-select").value; selectedProduct=(snapshot?.products||[]).find((item)=>item.id===id)||null; renderSelected(); setOutput(snapshot)}
+      function clear(){token="";snapshot=null;selectedProduct=null; setMeta(); renderStats(); renderTransport(); renderProjects(); renderTokenKeys(); setOutput("Waiting for actions...")}
+      async function refresh(){if(!token){clear(); setStatus("Sign in to load integration bootstrap data."); return} snapshot=await api("/api/developer/integration"); setMeta(); renderStats(); renderTransport(); renderProjects(); renderTokenKeys(); setOutput(snapshot)}
+      el("login-btn").addEventListener("click",async()=>{try{const data=await api("/api/developer/login",{method:"POST",body:{username:el("username").value.trim(),password:el("password").value}}); token=data.token; await refresh(); setStatus("Developer integration snapshot loaded.")}catch(error){clear(); setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
+      el("refresh-btn").addEventListener("click",async()=>{try{await refresh(); setStatus("Developer integration snapshot refreshed.")}catch(error){setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
+      el("logout-btn").addEventListener("click",async()=>{try{if(token) await api("/api/developer/logout",{method:"POST"}); clear(); setStatus("Developer session closed."); setOutput("Logged out.")}catch(error){setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
+      el("use-selected-btn").addEventListener("click",()=>{chooseSelected(); setStatus(`Using ${(selectedProduct||{}).code || "selected project"} for examples.`)});
+      clear(); renderStats(); renderTransport(); renderProjects(); renderTokenKeys();
+    </script>
+  </body>
+</html>

@@ -14,6 +14,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), "utf8");
 const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center-v2.html"), "utf8");
 const developerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "developer-center.html"), "utf8");
+const developerIntegrationHtml = fs.readFileSync(path.join(currentDir, "web", "developer-integration.html"), "utf8");
 const developerProjectsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-projects.html"), "utf8");
 const developerLicenseHtml = fs.readFileSync(path.join(currentDir, "web", "developer-license.html"), "utf8");
 const developerOpsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-ops.html"), "utf8");
@@ -82,6 +83,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/developer") {
         sendHtml(res, 200, developerCenterHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/developer/integration") {
+        sendHtml(res, 200, developerIntegrationHtml);
         return;
       }
 
@@ -942,6 +948,17 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/api/developer/dashboard") {
         sendJson(res, 200, { ok: true, data: services.developerDashboard(getBearerToken(req)) });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/integration") {
+        const data = services.developerIntegration(getBearerToken(req));
+        if (data?.transport?.http) {
+          data.transport.http.baseUrl = url.origin;
+          data.transport.http.publicHost = url.hostname;
+          data.transport.http.publicPort = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+        }
+        sendJson(res, 200, { ok: true, data });
         return;
       }
 

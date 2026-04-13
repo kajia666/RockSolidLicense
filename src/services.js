@@ -6340,6 +6340,64 @@ export function createServices(db, config, runtimeState = null) {
       return queryDeveloperDashboardPayload(db, session, stateStore);
     },
 
+    developerIntegration(token) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+      const products = listDeveloperAccessibleProductRows(db, session);
+      return {
+        developer: {
+          id: session.developer_id,
+          username: session.developer_username ?? session.username,
+          displayName: session.developer_display_name ?? session.display_name ?? "",
+          status: session.developer_status
+        },
+        actor: buildDeveloperActor(session),
+        transport: {
+          http: {
+            protocol: "http",
+            host: config.host,
+            port: config.port,
+            baseUrl: `http://127.0.0.1:${config.port}`
+          },
+          tcp: {
+            enabled: Boolean(config.tcpEnabled),
+            host: config.tcpHost,
+            port: config.tcpPort
+          }
+        },
+        signing: {
+          requestAlgorithm: "HMAC-SHA256",
+          requestSkewSeconds: config.requestSkewSeconds,
+          tokenAlgorithm: config.licenseKeys.algorithm,
+          tokenIssuer: config.tokenIssuer,
+          activeKeyId: config.licenseKeys.keyId
+        },
+        tokenKeys: this.tokenKeys(),
+        products,
+        examples: {
+          http: [
+            { action: "register", path: "/api/client/register" },
+            { action: "login", path: "/api/client/login" },
+            { action: "card-login", path: "/api/client/card-login" },
+            { action: "version-check", path: "/api/client/version-check" },
+            { action: "notices", path: "/api/client/notices" },
+            { action: "heartbeat", path: "/api/client/heartbeat" }
+          ],
+          tcp: [
+            { action: "client.register" },
+            { action: "client.login" },
+            { action: "client.card-login" },
+            { action: "client.heartbeat" }
+          ]
+        }
+      };
+    },
+
     developerCreateProduct(token, body = {}) {
       const session = requireDeveloperOwnerSession(db, token);
       const product = createProductRecord(db, body, session.developer_id);

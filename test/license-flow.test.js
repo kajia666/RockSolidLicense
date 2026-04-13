@@ -6018,6 +6018,87 @@ test("developer center page is served from the dedicated route", async () => {
   }
 });
 
+test("developer integration snapshot is scoped to visible projects", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "integration.owner",
+        password: "IntegrationOwner123!",
+        displayName: "Integration Owner"
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "integration.owner",
+      password: "IntegrationOwner123!"
+    });
+
+    const alphaProject = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "INT_ALPHA",
+        name: "Integration Alpha"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "INT_BETA",
+        name: "Integration Beta"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "integration.viewer",
+        password: "IntegrationViewer123!",
+        displayName: "Integration Viewer",
+        role: "viewer",
+        productCodes: ["INT_ALPHA"]
+      },
+      ownerSession.token
+    );
+
+    const viewerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "integration.viewer",
+      password: "IntegrationViewer123!"
+    });
+
+    const snapshot = await getJson(baseUrl, "/api/developer/integration", viewerSession.token);
+    assert.equal(snapshot.actor.type, "member");
+    assert.equal(snapshot.actor.role, "viewer");
+    assert.equal(snapshot.products.length, 1);
+    assert.equal(snapshot.products[0].id, alphaProject.id);
+    assert.equal(snapshot.products[0].code, "INT_ALPHA");
+    assert.equal(snapshot.transport.http.baseUrl, baseUrl);
+    assert.equal(snapshot.transport.tcp.enabled, true);
+    assert.ok(snapshot.signing.activeKeyId);
+    assert.ok(Array.isArray(snapshot.tokenKeys.keys));
+    assert.ok(snapshot.tokenKeys.keys.length >= 1);
+    assert.ok(snapshot.examples.http.some((entry) => entry.path === "/api/client/login"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer projects page is served from the dedicated route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -6031,6 +6112,24 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /feature-config/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer integration page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/integration`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Integration Center/);
+    assert.match(html, /api\/developer\/integration/);
+    assert.match(html, /api\/client\/login/);
+    assert.match(html, /Token Keys/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

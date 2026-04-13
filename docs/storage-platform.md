@@ -22,6 +22,7 @@ RSL_DB_PATH=./data/rocksolid.db
 当前已经开始把主库读写边界从大体量服务逻辑里抽出来。第一块抽离的是项目/产品查询仓储：
 
 - [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
+- [policy-repository.js](/D:/code/OnlineVerification/src/data/policy-repository.js)
 
 这一步的重点不是换库，而是先把“主数据访问层”收成可复用边界，后面接 PostgreSQL 时就不需要直接在 [services.js](/D:/code/OnlineVerification/src/services.js) 里到处改 SQL。
 

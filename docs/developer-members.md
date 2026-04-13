@@ -79,6 +79,20 @@ Owners update the main developer profile. Members update only their own display 
 
 Write-capable roles can also freeze accounts, extend entitlements, adjust points, revoke sessions, release bindings, and block or unblock devices inside their assigned project scope.
 
+## License workspace
+
+- `/developer/licenses`
+- `GET /api/developer/policies`
+- `POST /api/developer/policies`
+- `POST /api/developer/policies/:policyId/runtime-config`
+- `POST /api/developer/policies/:policyId/unbind-config`
+- `GET /api/developer/cards`
+- `GET /api/developer/cards/export`
+- `POST /api/developer/cards/batch`
+- `POST /api/developer/cards/:cardId/status`
+
+This workspace is meant for day-to-day policy maintenance and card inventory operations. Owners and write-capable members can create policies, issue card batches, export scoped inventory, and freeze or revoke cards. `viewer` members can inspect the same scoped data but cannot create or modify it.
+
 ## Project network security
 
 - `/developer/security`

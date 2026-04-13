@@ -6037,6 +6037,25 @@ test("developer operations page is served from the dedicated route", async () =>
   }
 });
 
+test("developer license page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/licenses`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer License Center/);
+    assert.match(html, /api\/developer\/policies/);
+    assert.match(html, /api\/developer\/cards/);
+    assert.match(html, /api\/developer\/cards\/export/);
+    assert.match(html, /Issue Card Batch/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer release page is served from the dedicated route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

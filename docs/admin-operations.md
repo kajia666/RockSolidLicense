@@ -50,6 +50,7 @@ Dedicated UI:
 
 - `/admin/products`
 - `/developer`
+- `/developer/licenses`
 - `/developer/ops`
 - `/developer/releases`
 - `/developer/security`
@@ -187,6 +188,7 @@ Effects:
 - developers and developer members only see projects where `products.owner_developer_id` matches the parent developer account
 - `GET /api/developer/dashboard` returns a scoped summary for accessible projects, including cards, sessions, releases, notices, and network-rule counts
 - `/developer/ops` provides a dedicated authorization operations workspace for software authors
+- `/developer/licenses` provides a dedicated policy and card inventory workspace for software authors
 - `/developer/releases` provides a dedicated client version and notice workspace for software authors
 - `/developer/security` provides a dedicated project network-rule workspace for software authors
 - `admin` developer members can edit feature toggles for assigned products; `operator` members cannot; `viewer` members are read-only

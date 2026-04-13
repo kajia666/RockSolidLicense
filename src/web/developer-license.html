@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Developer License Center</title>
+    <style>
+      :root{--bg:#f4efe4;--surface:rgba(255,252,246,.94);--line:rgba(23,32,27,.1);--ink:#17201b;--muted:#617066;--accent:#0f7c68;--danger:#a0422c;--accent-soft:rgba(15,124,104,.12);--danger-soft:rgba(160,66,44,.12);--shadow:0 24px 58px rgba(54,49,42,.14)}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--ink);font-family:"Bahnschrift","Segoe UI Variable","Segoe UI",sans-serif;background:radial-gradient(circle at top left,rgba(15,124,104,.15),transparent 24%),radial-gradient(circle at bottom right,rgba(201,126,78,.16),transparent 28%),linear-gradient(135deg,#f4ede0 0%,#f8f4ed 52%,#efe5d5 100%)}code,pre,.mono{font-family:"Cascadia Code","Consolas",monospace}.shell{width:min(1460px,calc(100vw - 28px));margin:20px auto 36px;display:grid;gap:18px}.hero,.card{background:var(--surface);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:20px}.hero{display:grid;gap:10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}.wide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}h1,h2,p{margin:0}h1{font-size:clamp(28px,5vw,44px)}h2{font-size:20px}.sub,.hint,.nav{color:var(--muted);line-height:1.6}.hint,.nav{font-size:13px}.nav a{color:var(--accent);text-decoration:none}.pill-row,.actions,.stats,.project-list{display:flex;flex-wrap:wrap;gap:10px}.pill,.project-pill,.stat{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.68);color:var(--muted);font-size:13px}.project-pill strong,.stat strong{color:var(--ink)}.stat{flex-direction:column;align-items:flex-start;border-radius:18px;min-width:140px}.stat strong{font-size:24px}label{display:grid;gap:8px;color:var(--muted);font-size:14px}.two,.three{display:grid;gap:12px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}input,select,textarea{width:100%;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.82);color:var(--ink);font:inherit}textarea{min-height:90px;resize:vertical}button{border:0;border-radius:999px;padding:12px 16px;color:#fff;background:var(--ink);font:inherit;cursor:pointer}button.secondary{background:var(--accent)}button.danger{background:var(--danger)}.status{padding:12px 14px;border-radius:14px;background:var(--accent-soft);color:var(--accent);font-size:13px}.status.warn{background:var(--danger-soft);color:var(--danger)}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.78)}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:12px 14px;border-bottom:1px solid rgba(23,32,27,.08);text-align:left;vertical-align:top}th{background:rgba(247,243,235,.96);color:var(--muted)}tbody tr{cursor:pointer}tbody tr:hover{background:rgba(15,124,104,.06)}.tag{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(23,32,27,.08);color:var(--muted);margin:0 6px 6px 0}.tag.ok{background:var(--accent-soft);color:var(--accent)}.tag.danger{background:var(--danger-soft);color:var(--danger)}pre{margin:0;min-height:220px;padding:16px;border-radius:18px;background:#101715;color:#eef7f2;overflow:auto;white-space:pre-wrap;word-break:break-word}@media (max-width:1180px){.wide{grid-template-columns:1fr}}@media (max-width:760px){.two,.three{grid-template-columns:1fr}}
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer License Center</h1>
+        <p class="sub">Manage project-scoped policies, card batches, CSV export, and card status updates inside one developer workspace.</p>
+        <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
+        <div class="pill-row">
+          <div class="pill">Route: <code>/developer/licenses</code></div>
+          <div class="pill">APIs: <code>/api/developer/policies</code>, <code>/api/developer/cards</code>, <code>/api/developer/cards/export</code></div>
+          <div class="pill">Scoped to assigned projects. Viewer members stay read-only.</div>
+        </div>
+        <div class="stats" id="stats-box"></div>
+        <div class="project-list" id="project-list"></div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username or member" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions"><button id="login-btn">Sign In</button><button class="secondary" id="refresh-btn">Refresh Workspace</button><button class="danger" id="logout-btn">Logout</button></div>
+          <div class="hint" id="session-meta">No developer session yet.</div>
+          <div class="status" id="status-box">Sign in to manage scoped policies and cards.</div>
+        </article>
+
+        <article class="card">
+          <h2>Scoped Filters</h2>
+          <div class="three">
+            <label>Project Code<input id="filter-product-code" placeholder="ALPHA_APP" /></label>
+            <label>Policy ID<input id="filter-policy-id" placeholder="pol_xxx" /></label>
+            <label>Batch Code<input id="filter-batch-code" placeholder="BATCH-..." /></label>
+            <label>Usage Status<select id="filter-usage-status"><option value="">all</option><option value="unused">unused</option><option value="used">used</option></select></label>
+            <label>Control Status<select id="filter-status"><option value="">all</option><option value="active">active</option><option value="frozen">frozen</option><option value="revoked">revoked</option><option value="expired">expired</option></select></label>
+            <label>Search<input id="filter-search" placeholder="policy, card key, masked key, note" /></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-filters-btn">Apply Filters</button><button id="clear-filters-btn">Clear Filters</button><button class="secondary" id="export-csv-btn">Export CSV</button></div>
+          <div class="hint">Leave a field blank to query everything you can access inside the current developer scope.</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Create Policy</h2>
+          <div class="three">
+            <label>Project Code<input id="policy-product-code" placeholder="ALPHA_APP" /></label>
+            <label>Policy Name<input id="policy-name" placeholder="Standard 30 Days" /></label>
+            <label>Grant Type<select id="policy-grant-type"><option value="duration">duration</option><option value="points">points</option></select></label>
+            <label>Duration Days<input id="policy-duration-days" type="number" min="0" value="30" /></label>
+            <label>Grant Points<input id="policy-grant-points" type="number" min="0" value="0" /></label>
+            <label>Max Devices<input id="policy-max-devices" type="number" min="1" value="1" /></label>
+            <label>Allow Concurrent<select id="policy-allow-concurrent"><option value="false">false</option><option value="true">true</option></select></label>
+            <label>Heartbeat Interval<input id="policy-heartbeat-interval" type="number" min="1" value="60" /></label>
+            <label>Heartbeat Timeout<input id="policy-heartbeat-timeout" type="number" min="1" value="180" /></label>
+            <label>Token TTL<input id="policy-token-ttl" type="number" min="1" value="300" /></label>
+            <label>Bind Mode<select id="policy-bind-mode"><option value="strict">strict</option><option value="selected_fields">selected_fields</option></select></label>
+            <label>Bind Fields<input id="policy-bind-fields" placeholder="machineGuid, requestIp" /></label>
+            <label>Allow Client Unbind<select id="policy-allow-unbind"><option value="false">false</option><option value="true">true</option></select></label>
+            <label>Unbind Limit<input id="policy-unbind-limit" type="number" min="0" value="0" /></label>
+            <label>Unbind Window Days<input id="policy-unbind-window" type="number" min="1" value="30" /></label>
+            <label>Unbind Deduct Days<input id="policy-unbind-deduct" type="number" min="0" value="0" /></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="create-policy-btn">Create Policy</button></div>
+        </article>
+
+        <article class="card">
+          <h2>Policy Controls</h2>
+          <div class="three">
+            <label>Policy ID<input id="control-policy-id" placeholder="Click a policy row below" /></label>
+            <label>Runtime Concurrent<select id="runtime-allow-concurrent"><option value="false">false</option><option value="true">true</option></select></label>
+            <label>Runtime Bind Mode<select id="runtime-bind-mode"><option value="strict">strict</option><option value="selected_fields">selected_fields</option></select></label>
+            <label>Runtime Bind Fields<input id="runtime-bind-fields" placeholder="machineGuid, requestIp" /></label>
+            <label>Allow Client Unbind<select id="unbind-allow-client"><option value="false">false</option><option value="true">true</option></select></label>
+            <label>Unbind Limit<input id="unbind-limit" type="number" min="0" value="0" /></label>
+            <label>Unbind Window Days<input id="unbind-window" type="number" min="1" value="30" /></label>
+            <label>Unbind Deduct Days<input id="unbind-deduct" type="number" min="0" value="0" /></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="save-runtime-btn">Save Runtime Config</button><button class="danger" id="save-unbind-btn">Save Unbind Config</button></div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Create Card Batch</h2>
+          <div class="three">
+            <label>Project Code<input id="batch-product-code" placeholder="ALPHA_APP" /></label>
+            <label>Policy ID<input id="batch-policy-id" placeholder="pol_xxx" /></label>
+            <label>Count<input id="batch-count" type="number" min="1" max="5000" value="10" /></label>
+            <label>Prefix<input id="batch-prefix" placeholder="ALPHA" /></label>
+            <label>Expires At<input id="batch-expires-at" placeholder="2026-12-31T23:59:59+08:00" /></label>
+            <label>Notes<input id="batch-notes" placeholder="April promotion" /></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="create-batch-btn">Issue Card Batch</button></div>
+        </article>
+
+        <article class="card">
+          <h2>Card Controls</h2>
+          <div class="three">
+            <label>Card ID<input id="card-id" placeholder="Click a card row below" /></label>
+            <label>Status<select id="card-status"><option value="active">active</option><option value="frozen">frozen</option><option value="revoked">revoked</option></select></label>
+            <label>Expires At<input id="card-expires-at" placeholder="optional ISO datetime" /></label>
+          </div>
+          <label style="margin-top:12px;">Notes<textarea id="card-notes" placeholder="Reason for freezing or revoking the card"></textarea></label>
+          <div class="actions" style="margin-top:12px;"><button class="danger" id="save-card-status-btn">Save Card Status</button></div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card"><h2>Policies</h2><div class="table-wrap"><table><thead><tr><th>Policy</th><th>Project</th><th>Grant</th><th>Runtime</th><th>Unbind</th></tr></thead><tbody id="policy-body"></tbody></table></div></article>
+        <article class="card"><h2>Cards</h2><div class="table-wrap"><table><thead><tr><th>Card</th><th>Project</th><th>Policy</th><th>Status</th><th>Batch</th></tr></thead><tbody id="card-body"></tbody></table></div></article>
+      </section>
+
+      <section class="wide">
+        <article class="card"><h2>Workspace Notes</h2><div class="hint"><p>Policy creation supports duration cards and points cards. Runtime updates can change single-session rules and selected bind fields without recreating the policy.</p><p>Card filters map directly to the scoped developer inventory endpoints, so list and CSV export never leak another developer's inventory.</p></div></article>
+        <article class="card"><h2>API Output</h2><pre id="output">Waiting for actions...</pre></article>
+      </section>
+    </main>
+
+    <script>
+      let token="",actor=null,profile=null,products=[],policies=[],cards=[];const el=(id)=>document.getElementById(id);const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");const setStatus=(m,w=false)=>{const box=el("status-box");box.textContent=m;box.className=`status${w?" warn":""}`};const setOutput=(v)=>{el("output").textContent=typeof v==="string"?v:JSON.stringify(v,null,2)};const fmt=(v)=>{if(!v)return"-";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString("zh-CN",{hour12:false})};const tag=(v,t="")=>`<span class="tag${t?` ${t}`:""}">${esc(v)}</span>`;const q=(params)=>{const s=new URLSearchParams();Object.entries(params).forEach(([k,v])=>{if(v!==null&&v!==undefined&&String(v).trim()!=="")s.set(k,String(v).trim())});const r=s.toString();return r?`?${r}`:""};const csv=(value)=>String(value??"").split(/[,\n]+/).map((item)=>item.trim()).filter(Boolean);const bool=(id)=>el(id).value==="true";
+      function filters(){return{productCode:el("filter-product-code").value.trim(),policyId:el("filter-policy-id").value.trim(),batchCode:el("filter-batch-code").value.trim(),usageStatus:el("filter-usage-status").value,status:el("filter-status").value,search:el("filter-search").value.trim()}}
+      function setMeta(){if(!token||!profile){el("session-meta").textContent="No developer session yet.";return}const actorLabel=actor?.type==="member"?`${actor.username} (${actor.role})`:profile.username;const scopeLabel=actor?.type==="member"?`member scope: ${(actor.productAccess||[]).map((i)=>i.productCode).join(", ")||"no projects"}`:"owner scope";el("session-meta").textContent=`${actorLabel} | ${scopeLabel} | status=${profile.status||"active"}`}
+      async function api(path,options={}){const headers={...(options.headers||{})};if(options.body!==undefined)headers["Content-Type"]="application/json";if(token)headers.Authorization=`Bearer ${token}`;const response=await fetch(path,{method:options.method||"GET",headers,body:options.body!==undefined?JSON.stringify(options.body):undefined});const payload=await response.json().catch(()=>({}));if(!response.ok||payload.ok===false){const error=new Error(payload?.error?.message||`Request failed: ${response.status}`);error.code=payload?.error?.code||"REQUEST_FAILED";throw error}return payload.data}
+      async function apiText(path){const headers={};if(token)headers.Authorization=`Bearer ${token}`;const response=await fetch(path,{headers});const contentType=response.headers.get("content-type")||"";if(!response.ok||contentType.includes("application/json")){const payload=await response.json().catch(()=>({}));const error=new Error(payload?.error?.message||`Request failed: ${response.status}`);error.code=payload?.error?.code||"REQUEST_FAILED";throw error}return response.text()}
+      function renderStats(){const activePolicies=policies.filter((i)=>i.status==="active").length;const freshCards=cards.filter((i)=>i.usageStatus==="unused").length;const redeemedCards=cards.filter((i)=>i.usageStatus==="used").length;const blockedCards=cards.filter((i)=>i.available===false).length;el("stats-box").innerHTML=`<div class="stat"><strong>${products.length}</strong><span>Scoped Projects</span></div><div class="stat"><strong>${policies.length}</strong><span>Policies</span></div><div class="stat"><strong>${activePolicies}</strong><span>Active Policies</span></div><div class="stat"><strong>${cards.length}</strong><span>Visible Cards</span></div><div class="stat"><strong>${freshCards}</strong><span>Fresh Cards</span></div><div class="stat"><strong>${redeemedCards}</strong><span>Redeemed Cards</span></div><div class="stat"><strong>${blockedCards}</strong><span>Unavailable Cards</span></div>`}
+      function renderProjects(){el("project-list").innerHTML=products.length?products.map((item)=>`<div class="project-pill"><strong>${esc(item.code)}</strong><span>${esc(item.name)}</span></div>`).join(""):`<div class="pill">No scoped projects loaded yet.</div>`}
+      function fillPolicy(item){el("control-policy-id").value=item.id||"";el("runtime-allow-concurrent").value=String(item.allowConcurrentSessions===true);el("runtime-bind-mode").value=item.bindMode||"strict";el("runtime-bind-fields").value=Array.isArray(item.bindFields)?item.bindFields.join(", "):"";el("unbind-allow-client").value=String(item.allowClientUnbind===true);el("unbind-limit").value=String(item.clientUnbindLimit??0);el("unbind-window").value=String(item.clientUnbindWindowDays??30);el("unbind-deduct").value=String(item.clientUnbindDeductDays??0);el("batch-product-code").value=item.productCode||"";el("batch-policy-id").value=item.id||""}
+      function renderPolicies(){const body=el("policy-body");if(!policies.length){body.innerHTML=`<tr><td colspan="5">No scoped policies found.</td></tr>`;return}body.innerHTML=policies.map((item)=>{const grant=item.grantType==="points"?`points ${item.grantPoints}`:`${item.durationDays} days`;return`<tr data-id="${esc(item.id)}"><td><strong>${esc(item.name)}</strong><div class="mono">${esc(item.id)}</div><div>${tag(item.status,item.status==="active"?"ok":"danger")}</div></td><td>${esc(item.productCode)}<div>${esc(item.productName||"")}</div></td><td>${esc(grant)}</td><td>${tag(`maxDevices ${item.maxDevices}`)}${tag(`concurrent ${item.allowConcurrentSessions===true}`)}${tag(item.bindMode)}</td><td>${tag(`allow ${item.allowClientUnbind===true}`)}${tag(`limit ${item.clientUnbindLimit??0}`)}${tag(`window ${item.clientUnbindWindowDays??30}d`)}</td></tr>`}).join("");for(const row of body.querySelectorAll("tr[data-id]")){row.addEventListener("click",()=>{const item=policies.find((p)=>p.id===row.dataset.id);if(item){fillPolicy(item);setOutput(item)}})}}
+      function renderCards(){const body=el("card-body");if(!cards.length){body.innerHTML=`<tr><td colspan="5">No scoped cards found.</td></tr>`;return}body.innerHTML=cards.map((item)=>`<tr data-id="${esc(item.id)}" data-status="${esc(item.controlStatus||"active")}" data-expires-at="${esc(item.expiresAt||"")}" data-notes="${esc(item.notes||"")}"><td><strong>${esc(item.maskedKey||item.cardKey)}</strong><div class="mono">${esc(item.id)}</div><div>${esc(item.cardKey||"")}</div></td><td>${esc(item.productCode||"-")}</td><td>${esc(item.policyName||"-")}<div>${esc(item.grantType||"-")}</div></td><td>${tag(item.displayStatus||item.controlStatus||"unknown",item.available===false?"danger":"ok")}<div>${esc(item.redeemedUsername||"-")}</div></td><td>${esc(item.batchCode||"-")}<div>${esc(fmt(item.issuedAt))}</div></td></tr>`).join("");for(const row of body.querySelectorAll("tr[data-id]")){row.addEventListener("click",()=>{el("card-id").value=row.dataset.id||"";el("card-status").value=row.dataset.status||"active";el("card-expires-at").value=row.dataset.expiresAt||"";el("card-notes").value=row.dataset.notes||"";const item=cards.find((c)=>c.id===row.dataset.id);if(item)setOutput(item)})}}
+      function clear(){token="";actor=null;profile=null;products=[];policies=[];cards=[];setMeta();renderProjects();renderStats();renderPolicies();renderCards()}
+      async function refreshProfile(){const data=await api("/api/developer/me");profile=data.developer;actor=data.actor||null;setMeta()}
+      async function refreshProducts(){const data=await api("/api/developer/products");products=data.items||[];renderProjects();return data}
+      async function refreshPolicies(){const data=await api(`/api/developer/policies${q({productCode:filters().productCode})}`);policies=data.items||[];renderPolicies();return data}
+      async function refreshCards(){const data=await api(`/api/developer/cards${q(filters())}`);cards=data.items||[];renderCards();return data}
+      async function refresh(){if(!token){clear();setStatus("Sign in to manage scoped policies and cards.");setOutput("Waiting for actions...");return}await refreshProfile();const [p1,p2,p3]=await Promise.all([refreshProducts(),refreshPolicies(),refreshCards()]);renderStats();setOutput({products:p1,policies:p2,cards:p3})}
+      async function postAndRefresh(path,body,message){const data=await api(path,{method:"POST",body});await refresh();setStatus(message);setOutput(data)}
+      el("policy-grant-type").addEventListener("change",()=>{const isPoints=el("policy-grant-type").value==="points";el("policy-duration-days").disabled=isPoints;el("policy-grant-points").disabled=!isPoints});
+      el("login-btn").addEventListener("click",async()=>{try{const session=await api("/api/developer/login",{method:"POST",body:{username:el("username").value.trim(),password:el("password").value}});token=session.token;await refresh();setStatus("Developer license workspace loaded.")}catch(error){clear();setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("refresh-btn").addEventListener("click",async()=>{try{await refresh();setStatus("Developer license workspace refreshed.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("logout-btn").addEventListener("click",async()=>{try{if(token)await api("/api/developer/logout",{method:"POST"});clear();setStatus("Developer session closed.");setOutput("Logged out.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("apply-filters-btn").addEventListener("click",async()=>{try{await refresh();setStatus("Filters applied.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("clear-filters-btn").addEventListener("click",async()=>{for(const id of["filter-product-code","filter-policy-id","filter-batch-code","filter-usage-status","filter-status","filter-search"]){el(id).value=""}try{await refresh();setStatus("Filters cleared.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("export-csv-btn").addEventListener("click",async()=>{try{const text=await apiText(`/api/developer/cards/export${q(filters())}`);const blob=new Blob([text],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="developer-cards.csv";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);setStatus("CSV export generated for the current scoped filters.");setOutput(text)}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("create-policy-btn").addEventListener("click",async()=>{try{const grantType=el("policy-grant-type").value;await postAndRefresh("/api/developer/policies",{productCode:el("policy-product-code").value.trim(),name:el("policy-name").value.trim(),grantType,durationDays:grantType==="points"?0:Number(el("policy-duration-days").value||0),grantPoints:grantType==="points"?Number(el("policy-grant-points").value||0):0,maxDevices:Number(el("policy-max-devices").value||1),allowConcurrentSessions:bool("policy-allow-concurrent"),heartbeatIntervalSeconds:Number(el("policy-heartbeat-interval").value||60),heartbeatTimeoutSeconds:Number(el("policy-heartbeat-timeout").value||180),tokenTtlSeconds:Number(el("policy-token-ttl").value||300),bindMode:el("policy-bind-mode").value,bindFields:csv(el("policy-bind-fields").value),allowClientUnbind:bool("policy-allow-unbind"),clientUnbindLimit:Number(el("policy-unbind-limit").value||0),clientUnbindWindowDays:Number(el("policy-unbind-window").value||30),clientUnbindDeductDays:Number(el("policy-unbind-deduct").value||0)},"Policy created.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("save-runtime-btn").addEventListener("click",async()=>{try{await postAndRefresh(`/api/developer/policies/${encodeURIComponent(el("control-policy-id").value.trim())}/runtime-config`,{allowConcurrentSessions:bool("runtime-allow-concurrent"),bindMode:el("runtime-bind-mode").value,bindFields:csv(el("runtime-bind-fields").value)},"Policy runtime config updated.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("save-unbind-btn").addEventListener("click",async()=>{try{await postAndRefresh(`/api/developer/policies/${encodeURIComponent(el("control-policy-id").value.trim())}/unbind-config`,{allowClientUnbind:bool("unbind-allow-client"),clientUnbindLimit:Number(el("unbind-limit").value||0),clientUnbindWindowDays:Number(el("unbind-window").value||30),clientUnbindDeductDays:Number(el("unbind-deduct").value||0)},"Policy unbind config updated.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("create-batch-btn").addEventListener("click",async()=>{try{await postAndRefresh("/api/developer/cards/batch",{productCode:el("batch-product-code").value.trim(),policyId:el("batch-policy-id").value.trim(),count:Number(el("batch-count").value||1),prefix:el("batch-prefix").value.trim(),expiresAt:el("batch-expires-at").value.trim()||null,notes:el("batch-notes").value.trim()},"Card batch issued.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("save-card-status-btn").addEventListener("click",async()=>{try{await postAndRefresh(`/api/developer/cards/${encodeURIComponent(el("card-id").value.trim())}/status`,{status:el("card-status").value,expiresAt:el("card-expires-at").value.trim()||null,notes:el("card-notes").value.trim()},"Card status updated.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
+      el("policy-grant-type").dispatchEvent(new Event("change"));clear();renderProjects();renderStats();renderPolicies();renderCards();setOutput("Waiting for actions...");
+    </script>
+  </body>
+</html>

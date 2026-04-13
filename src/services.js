@@ -41,6 +41,8 @@ const DEVELOPER_MEMBER_ROLE_PERMISSIONS = Object.freeze({
     "versions.write",
     "notices.read",
     "notices.write",
+    "ops.read",
+    "ops.write",
     "profile.write"
   ],
   operator: [
@@ -53,6 +55,8 @@ const DEVELOPER_MEMBER_ROLE_PERMISSIONS = Object.freeze({
     "versions.write",
     "notices.read",
     "notices.write",
+    "ops.read",
+    "ops.write",
     "profile.write"
   ],
   viewer: [
@@ -61,6 +65,7 @@ const DEVELOPER_MEMBER_ROLE_PERMISSIONS = Object.freeze({
     "cards.read",
     "versions.read",
     "notices.read",
+    "ops.read",
     "profile.write"
   ]
 });
@@ -538,6 +543,10 @@ function listDeveloperAccessibleProductRows(db, session) {
 
   const productIds = listDeveloperAccessibleProductIds(db, session);
   return queryProductRows(db, { productIds });
+}
+
+function listDeveloperAccessibleProductCodes(db, session) {
+  return listDeveloperAccessibleProductRows(db, session).map((item) => item.code);
 }
 
 function ensureDeveloperCanAccessProduct(db, session, product, permission, code, message) {
@@ -2499,6 +2508,8 @@ function queryEntitlementRows(db, filters = {}, options = {}) {
     params.push(normalizedFilters.productCode);
   }
 
+  appendInCondition("pr.id", filters.productIds, conditions, params);
+
   if (normalizedFilters.username) {
     conditions.push("a.username = ?");
     params.push(normalizedFilters.username);
@@ -2623,6 +2634,361 @@ function loadPointEntitlementForAdmin(db, entitlementId) {
     `,
     entitlementId
   );
+}
+
+function queryAccountRows(db, filters = {}, runtimeState = null) {
+  expireStaleSessions(db, runtimeState);
+
+  const conditions = [];
+  const params = [nowIso()];
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+
+  if (normalizedFilters.status && !["active", "disabled"].includes(normalizedFilters.status)) {
+    throw new AppError(400, "INVALID_ACCOUNT_STATUS", "Account status must be active or disabled.");
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  appendInCondition("pr.id", filters.productIds, conditions, params);
+
+  if (normalizedFilters.status) {
+    conditions.push("a.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push("(a.username LIKE ? ESCAPE '\\' OR pr.code LIKE ? ESCAPE '\\')");
+    params.push(pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT a.id, a.username, a.status, a.created_at, a.updated_at, a.last_login_at,
+             pr.id AS product_id, pr.code AS product_code, pr.name AS product_name,
+             COALESCE(ent.active_entitlement_count, 0) AS active_entitlement_count,
+             ent.latest_entitlement_ends_at,
+             COALESCE(sess.active_session_count, 0) AS active_session_count
+      FROM customer_accounts a
+      JOIN products pr ON pr.id = a.product_id
+      LEFT JOIN (
+        SELECT account_id,
+               COUNT(*) AS active_entitlement_count,
+               MAX(ends_at) AS latest_entitlement_ends_at
+        FROM entitlements
+        WHERE status = 'active' AND ends_at > ?
+        GROUP BY account_id
+      ) ent ON ent.account_id = a.id
+      LEFT JOIN (
+        SELECT account_id, COUNT(*) AS active_session_count
+        FROM sessions
+        WHERE status = 'active'
+        GROUP BY account_id
+      ) sess ON sess.account_id = a.id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `,
+    ...params
+  );
+
+  return {
+    items,
+    total: items.length,
+    filters: normalizedFilters
+  };
+}
+
+function queryDeviceBindingRows(db, filters = {}, runtimeState = null) {
+  expireStaleSessions(db, runtimeState);
+
+  const conditions = [];
+  const params = [];
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    username: filters.username ? String(filters.username).trim() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+
+  if (normalizedFilters.status && !["active", "revoked"].includes(normalizedFilters.status)) {
+    throw new AppError(400, "INVALID_BINDING_STATUS", "Binding status must be active or revoked.");
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  appendInCondition("pr.id", filters.productIds, conditions, params);
+
+  if (normalizedFilters.username) {
+    conditions.push("a.username = ?");
+    params.push(normalizedFilters.username);
+  }
+
+  if (normalizedFilters.status) {
+    conditions.push("b.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(d.fingerprint LIKE ? ESCAPE '\\' OR d.device_name LIKE ? ESCAPE '\\' OR a.username LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT b.id, b.entitlement_id, b.device_id, b.status, b.first_bound_at, b.last_bound_at, b.revoked_at,
+             pr.id AS product_id, pr.code AS product_code, pr.name AS product_name,
+             a.id AS account_id, a.username,
+             pol.name AS policy_name,
+             e.ends_at AS entitlement_ends_at,
+             d.fingerprint, d.device_name, d.last_seen_at, d.last_seen_ip,
+             bp.identity_hash, bp.match_fields_json, bp.identity_json, bp.request_ip AS bind_request_ip,
+             COALESCE(sess.active_session_count, 0) AS active_session_count
+      FROM device_bindings b
+      JOIN entitlements e ON e.id = b.entitlement_id
+      JOIN customer_accounts a ON a.id = e.account_id
+      JOIN products pr ON pr.id = e.product_id
+      JOIN policies pol ON pol.id = e.policy_id
+      JOIN devices d ON d.id = b.device_id
+      LEFT JOIN device_binding_profiles bp ON bp.binding_id = b.id
+      LEFT JOIN (
+        SELECT entitlement_id, device_id, COUNT(*) AS active_session_count
+        FROM sessions
+        WHERE status = 'active'
+        GROUP BY entitlement_id, device_id
+      ) sess ON sess.entitlement_id = b.entitlement_id AND sess.device_id = b.device_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY b.last_bound_at DESC
+      LIMIT 100
+    `,
+    ...params
+  );
+
+  return {
+    items: items.map((row) => ({
+      ...row,
+      matchFields: row.match_fields_json ? JSON.parse(row.match_fields_json) : [],
+      identity: row.identity_json ? JSON.parse(row.identity_json) : {},
+      bindRequestIp: row.bind_request_ip ?? null
+    })),
+    total: items.length,
+    filters: normalizedFilters
+  };
+}
+
+function queryDeviceBlockRows(db, filters = {}) {
+  const conditions = [];
+  const params = [];
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+
+  if (normalizedFilters.status && !["active", "released"].includes(normalizedFilters.status)) {
+    throw new AppError(400, "INVALID_DEVICE_BLOCK_STATUS", "Device block status must be active or released.");
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  appendInCondition("pr.id", filters.productIds, conditions, params);
+
+  if (normalizedFilters.status) {
+    conditions.push("b.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(b.fingerprint LIKE ? ESCAPE '\\' OR b.reason LIKE ? ESCAPE '\\' OR COALESCE(b.notes, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT b.id, b.product_id, b.fingerprint, b.status, b.reason, b.notes, b.created_at, b.updated_at, b.released_at,
+             pr.code AS product_code, pr.name AS product_name,
+             d.id AS device_id, d.device_name, d.last_seen_at, d.last_seen_ip,
+             COALESCE(sess.active_session_count, 0) AS active_session_count
+      FROM device_blocks b
+      JOIN products pr ON pr.id = b.product_id
+      LEFT JOIN devices d ON d.product_id = b.product_id AND d.fingerprint = b.fingerprint
+      LEFT JOIN (
+        SELECT device_id, COUNT(*) AS active_session_count
+        FROM sessions
+        WHERE status = 'active'
+        GROUP BY device_id
+      ) sess ON sess.device_id = d.id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY CASE WHEN b.status = 'active' THEN 0 ELSE 1 END, b.updated_at DESC
+      LIMIT 100
+    `,
+    ...params
+  );
+
+  return {
+    items,
+    total: items.length,
+    filters: normalizedFilters
+  };
+}
+
+function querySessionRows(db, filters = {}, runtimeState = null) {
+  expireStaleSessions(db, runtimeState);
+
+  const conditions = [];
+  const params = [];
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    username: filters.username ? String(filters.username).trim() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+
+  if (
+    normalizedFilters.status &&
+    !["active", "expired"].includes(normalizedFilters.status)
+  ) {
+    throw new AppError(400, "INVALID_SESSION_STATUS", "Session status must be active or expired.");
+  }
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  appendInCondition("pr.id", filters.productIds, conditions, params);
+
+  if (normalizedFilters.username) {
+    conditions.push("a.username = ?");
+    params.push(normalizedFilters.username);
+  }
+
+  if (normalizedFilters.status) {
+    conditions.push("s.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(a.username LIKE ? ESCAPE '\\' OR d.fingerprint LIKE ? ESCAPE '\\' OR s.id LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT s.id, s.account_id, s.entitlement_id, s.device_id, s.status, s.issued_at, s.expires_at,
+             s.last_heartbeat_at, s.last_seen_ip, s.user_agent, s.revoked_reason,
+             pr.id AS product_id, pr.code AS product_code, pr.name AS product_name,
+             a.username,
+             d.fingerprint, d.device_name,
+             pol.name AS policy_name
+      FROM sessions s
+      JOIN customer_accounts a ON a.id = s.account_id
+      JOIN devices d ON d.id = s.device_id
+      JOIN products pr ON pr.id = s.product_id
+      JOIN entitlements e ON e.id = s.entitlement_id
+      JOIN policies pol ON pol.id = e.policy_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY s.last_heartbeat_at DESC
+      LIMIT 100
+    `,
+    ...params
+  );
+
+  return {
+    items,
+    total: items.length,
+    filters: normalizedFilters
+  };
+}
+
+function queryAuditLogRows(db, filters = {}) {
+  const conditions = [];
+  const params = [];
+  const limit = Math.min(Math.max(Number(filters.limit ?? 50), 1), 200);
+  const normalizedFilters = {
+    eventType: filters.eventType ? String(filters.eventType).trim() : null,
+    actorType: filters.actorType ? String(filters.actorType).trim() : null,
+    limit
+  };
+
+  if (normalizedFilters.eventType) {
+    conditions.push("event_type = ?");
+    params.push(normalizedFilters.eventType);
+  }
+
+  if (normalizedFilters.actorType) {
+    conditions.push("actor_type = ?");
+    params.push(normalizedFilters.actorType);
+  }
+
+  if (filters.developerId || (Array.isArray(filters.productCodes) && filters.productCodes.length)) {
+    const scopedConditions = [];
+    if (filters.developerId) {
+      scopedConditions.push("metadata_json LIKE ?");
+      params.push(`%\"developerId\":\"${String(filters.developerId).trim()}\"%`);
+    }
+    const productCodes = Array.isArray(filters.productCodes)
+      ? Array.from(new Set(filters.productCodes.map((value) => String(value ?? "").trim().toUpperCase()).filter(Boolean)))
+      : [];
+    if (productCodes.length) {
+      const productPredicates = productCodes.map(() => "metadata_json LIKE ?").join(" OR ");
+      scopedConditions.push(`(${productPredicates})`);
+      for (const productCode of productCodes) {
+        params.push(`%\"productCode\":\"${productCode}\"%`);
+      }
+    }
+    if (scopedConditions.length) {
+      conditions.push(`(${scopedConditions.join(" OR ")})`);
+    }
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT id, actor_type, actor_id, event_type, entity_type, entity_id, metadata_json, created_at
+      FROM audit_logs
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY created_at DESC
+      LIMIT ?
+    `,
+    ...params,
+    limit
+  ).map((row) => ({
+    ...row,
+    metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null
+  }));
+
+  return {
+    items,
+    total: items.length,
+    filters: normalizedFilters
+  };
 }
 
 function normalizePointAdjustMode(value = "add") {
@@ -6395,9 +6761,155 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
+    developerListAccounts(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only view customer accounts under your assigned projects."
+      );
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "ops.read"
+        );
+      }
+      return queryAccountRows(
+        db,
+        { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
+        stateStore
+      );
+    },
+
+    developerUpdateAccountStatus(token, accountId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage customer accounts under your assigned projects."
+      );
+
+      const account = one(
+        db,
+        `
+          SELECT a.id, a.username, a.status, a.product_id,
+                 pr.code AS product_code, pr.owner_developer_id
+          FROM customer_accounts a
+          JOIN products pr ON pr.id = a.product_id
+          WHERE a.id = ?
+        `,
+        accountId
+      );
+
+      if (!account) {
+        throw new AppError(404, "ACCOUNT_NOT_FOUND", "Account does not exist.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: account.product_id, owner_developer_id: account.owner_developer_id },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage customer accounts under your assigned projects."
+      );
+
+      const nextStatus = String(body.status ?? "").trim().toLowerCase();
+      if (!["active", "disabled"].includes(nextStatus)) {
+        throw new AppError(400, "INVALID_ACCOUNT_STATUS", "Account status must be active or disabled.");
+      }
+
+      if (account.status === nextStatus) {
+        return {
+          ...account,
+          status: nextStatus,
+          changed: false,
+          revokedSessions: 0
+        };
+      }
+
+      return withTransaction(db, () => {
+        const timestamp = nowIso();
+        run(
+          db,
+          `
+            UPDATE customer_accounts
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+          `,
+          nextStatus,
+          timestamp,
+          account.id
+        );
+
+        let revokedSessions = 0;
+        if (nextStatus === "disabled") {
+          revokedSessions = expireActiveSessions(
+            db,
+            stateStore,
+            "account_id = ?",
+            [account.id],
+            "account_disabled"
+          );
+        }
+
+        auditDeveloperSession(
+          db,
+          session,
+          nextStatus === "disabled" ? "account.disable" : "account.enable",
+          "account",
+          account.id,
+          {
+            username: account.username,
+            productCode: account.product_code,
+            revokedSessions
+          }
+        );
+
+        return {
+          ...account,
+          status: nextStatus,
+          updatedAt: timestamp,
+          changed: true,
+          revokedSessions
+        };
+      });
+    },
+
     listEntitlements(token, filters = {}) {
       requireAdminSession(db, token);
       const { items, filters: normalizedFilters } = queryEntitlementRows(db, filters);
+      return {
+        items,
+        total: items.length,
+        filters: normalizedFilters
+      };
+    },
+
+    developerListEntitlements(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only view entitlements under your assigned projects."
+      );
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "ops.read"
+        );
+      }
+      const { items, filters: normalizedFilters } = queryEntitlementRows(db, {
+        ...filters,
+        productIds: listDeveloperAccessibleProductIds(db, session)
+      });
       return {
         items,
         total: items.length,
@@ -6485,6 +6997,93 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
+    developerUpdateEntitlementStatus(token, entitlementId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage entitlements under your assigned projects."
+      );
+      const entitlement = one(
+        db,
+        `
+          SELECT e.*, pr.code AS product_code, pr.owner_developer_id, a.username, pol.name AS policy_name, lk.card_key
+          FROM entitlements e
+          JOIN products pr ON pr.id = e.product_id
+          JOIN customer_accounts a ON a.id = e.account_id
+          JOIN policies pol ON pol.id = e.policy_id
+          JOIN license_keys lk ON lk.id = e.source_license_key_id
+          WHERE e.id = ?
+        `,
+        entitlementId
+      );
+
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: entitlement.product_id, owner_developer_id: entitlement.owner_developer_id },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage entitlements under your assigned projects."
+      );
+
+      const nextStatus = normalizeEntitlementStatus(body.status ?? "active");
+      if (nextStatus === entitlement.status) {
+        return {
+          id: entitlement.id,
+          productCode: entitlement.product_code,
+          username: entitlement.username,
+          status: nextStatus,
+          changed: false,
+          revokedSessions: 0,
+          endsAt: entitlement.ends_at
+        };
+      }
+
+      return withTransaction(db, () => {
+        const timestamp = nowIso();
+        run(
+          db,
+          `
+            UPDATE entitlements
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+          `,
+          nextStatus,
+          timestamp,
+          entitlement.id
+        );
+
+        const revokedSessions = nextStatus === "frozen"
+          ? expireSessionsForEntitlement(db, stateStore, entitlement.id, "entitlement_frozen")
+          : 0;
+
+        auditDeveloperSession(db, session, "entitlement.status", "entitlement", entitlement.id, {
+          productCode: entitlement.product_code,
+          username: entitlement.username,
+          status: nextStatus,
+          revokedSessions,
+          sourceCardKeyMasked: maskCardKey(entitlement.card_key)
+        });
+
+        return {
+          id: entitlement.id,
+          productCode: entitlement.product_code,
+          username: entitlement.username,
+          status: nextStatus,
+          changed: true,
+          revokedSessions,
+          endsAt: entitlement.ends_at,
+          updatedAt: timestamp
+        };
+      });
+    },
+
     extendEntitlement(token, entitlementId, body = {}) {
       const admin = requireAdminSession(db, token);
       const entitlement = one(
@@ -6527,6 +7126,82 @@ export function createServices(db, config, runtimeState = null) {
       );
 
       audit(db, "admin", admin.admin_id, "entitlement.extend", "entitlement", entitlement.id, {
+        productCode: entitlement.product_code,
+        username: entitlement.username,
+        days,
+        sourceCardKeyMasked: maskCardKey(entitlement.card_key),
+        endsAt
+      });
+
+      return {
+        id: entitlement.id,
+        productCode: entitlement.product_code,
+        username: entitlement.username,
+        status: entitlement.status,
+        previousEndsAt: entitlement.ends_at,
+        endsAt,
+        addedDays: days,
+        updatedAt: timestamp
+      };
+    },
+
+    developerExtendEntitlement(token, entitlementId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage entitlements under your assigned projects."
+      );
+      const entitlement = one(
+        db,
+        `
+          SELECT e.*, pr.code AS product_code, pr.owner_developer_id, a.username, pol.name AS policy_name, lk.card_key
+          FROM entitlements e
+          JOIN products pr ON pr.id = e.product_id
+          JOIN customer_accounts a ON a.id = e.account_id
+          JOIN policies pol ON pol.id = e.policy_id
+          JOIN license_keys lk ON lk.id = e.source_license_key_id
+          WHERE e.id = ?
+        `,
+        entitlementId
+      );
+
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: entitlement.product_id, owner_developer_id: entitlement.owner_developer_id },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage entitlements under your assigned projects."
+      );
+
+      const days = Number(body.days ?? body.extendDays ?? 0);
+      if (!Number.isInteger(days) || days < 1 || days > 3650) {
+        throw new AppError(400, "INVALID_EXTENSION_DAYS", "days must be an integer between 1 and 3650.");
+      }
+
+      const timestamp = nowIso();
+      const baseTime = entitlement.ends_at > timestamp ? entitlement.ends_at : timestamp;
+      const endsAt = addDays(baseTime, days);
+
+      run(
+        db,
+        `
+          UPDATE entitlements
+          SET ends_at = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        endsAt,
+        timestamp,
+        entitlement.id
+      );
+
+      auditDeveloperSession(db, session, "entitlement.extend", "entitlement", entitlement.id, {
         productCode: entitlement.product_code,
         username: entitlement.username,
         days,
@@ -6842,6 +7517,133 @@ export function createServices(db, config, runtimeState = null) {
           updatedAt: now
         };
       });
+    },
+
+    developerAdjustEntitlementPoints(token, entitlementId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage point entitlements under your assigned projects."
+      );
+      const entitlement = one(
+        db,
+        `
+          SELECT e.id, e.status, e.ends_at, e.account_id, e.product_id,
+                 pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id,
+                 a.username,
+                 pol.name AS policy_name,
+                 COALESCE(pgc.grant_type, 'duration') AS grant_type,
+                 COALESCE(pgc.grant_points, 0) AS grant_points,
+                 em.total_points, em.remaining_points, em.consumed_points,
+                 COALESCE(sess.active_session_count, 0) AS active_session_count
+          FROM entitlements e
+          JOIN products pr ON pr.id = e.product_id
+          JOIN customer_accounts a ON a.id = e.account_id
+          JOIN policies pol ON pol.id = e.policy_id
+          LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = e.policy_id
+          LEFT JOIN entitlement_metering em ON em.entitlement_id = e.id
+          LEFT JOIN (
+            SELECT entitlement_id, COUNT(*) AS active_session_count
+            FROM sessions
+            WHERE status = 'active'
+            GROUP BY entitlement_id
+          ) sess ON sess.entitlement_id = e.id
+          WHERE e.id = ?
+        `,
+        entitlementId
+      );
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: entitlement.product_id, owner_developer_id: entitlement.owner_developer_id },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage point entitlements under your assigned projects."
+      );
+
+      if (normalizeGrantType(entitlement.grant_type ?? "duration") !== "points") {
+        throw new AppError(409, "ENTITLEMENT_NOT_POINTS", "This entitlement is not a point-based authorization.");
+      }
+
+      const mode = normalizePointAdjustMode(body.mode ?? "add");
+      const points = normalizeNonNegativeInteger(body.points, "points", 0, 1000000);
+      if (mode !== "set" && points < 1) {
+        throw new AppError(400, "INVALID_POINT_ADJUSTMENT", "points must be at least 1 for add or subtract mode.");
+      }
+
+      const previous = {
+        totalPoints: Number(entitlement.total_points ?? entitlement.grant_points ?? 0),
+        remainingPoints: Number(entitlement.remaining_points ?? entitlement.grant_points ?? 0),
+        consumedPoints: Number(entitlement.consumed_points ?? 0)
+      };
+
+      let nextRemainingPoints = previous.remainingPoints;
+      if (mode === "add") {
+        nextRemainingPoints = previous.remainingPoints + points;
+      } else if (mode === "subtract") {
+        nextRemainingPoints = Math.max(0, previous.remainingPoints - points);
+      } else {
+        nextRemainingPoints = points;
+      }
+
+      const nextConsumedPoints = Math.max(0, previous.totalPoints - nextRemainingPoints);
+      const nextTotalPoints = Math.max(previous.totalPoints, nextRemainingPoints + nextConsumedPoints);
+      const timestamp = nowIso();
+
+      run(
+        db,
+        `
+          INSERT INTO entitlement_metering
+          (entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at)
+          VALUES (?, 'points', ?, ?, ?, ?, ?)
+          ON CONFLICT(entitlement_id) DO UPDATE SET
+            total_points = excluded.total_points,
+            remaining_points = excluded.remaining_points,
+            consumed_points = excluded.consumed_points,
+            updated_at = excluded.updated_at
+        `,
+        entitlement.id,
+        nextTotalPoints,
+        nextRemainingPoints,
+        nextConsumedPoints,
+        timestamp,
+        timestamp
+      );
+
+      auditDeveloperSession(db, session, "entitlement.points.adjust", "entitlement", entitlement.id, {
+        productCode: entitlement.product_code,
+        username: entitlement.username,
+        mode,
+        points,
+        previous,
+        next: {
+          totalPoints: nextTotalPoints,
+          remainingPoints: nextRemainingPoints,
+          consumedPoints: nextConsumedPoints
+        }
+      });
+
+      return {
+        id: entitlement.id,
+        productCode: entitlement.product_code,
+        username: entitlement.username,
+        status: entitlement.status,
+        mode,
+        points,
+        previous,
+        current: {
+          totalPoints: nextTotalPoints,
+          remainingPoints: nextRemainingPoints,
+          consumedPoints: nextConsumedPoints
+        },
+        updatedAt: timestamp
+      };
     },
 
     resellerLogin(body = {}) {
@@ -8283,72 +9085,7 @@ export function createServices(db, config, runtimeState = null) {
 
     listAccounts(token, filters = {}) {
       requireAdminSession(db, token);
-      expireStaleSessions(db, stateStore);
-
-      const conditions = [];
-      const params = [nowIso()];
-      const normalizedFilters = {
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (normalizedFilters.status && !["active", "disabled"].includes(normalizedFilters.status)) {
-        throw new AppError(400, "INVALID_ACCOUNT_STATUS", "Account status must be active or disabled.");
-      }
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
-      }
-
-      if (normalizedFilters.status) {
-        conditions.push("a.status = ?");
-        params.push(normalizedFilters.status);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push("(a.username LIKE ? ESCAPE '\\' OR pr.code LIKE ? ESCAPE '\\')");
-        params.push(pattern, pattern);
-      }
-
-      const items = many(
-        db,
-        `
-          SELECT a.id, a.username, a.status, a.created_at, a.updated_at, a.last_login_at,
-                 pr.code AS product_code, pr.name AS product_name,
-                 COALESCE(ent.active_entitlement_count, 0) AS active_entitlement_count,
-                 ent.latest_entitlement_ends_at,
-                 COALESCE(sess.active_session_count, 0) AS active_session_count
-          FROM customer_accounts a
-          JOIN products pr ON pr.id = a.product_id
-          LEFT JOIN (
-            SELECT account_id,
-                   COUNT(*) AS active_entitlement_count,
-                   MAX(ends_at) AS latest_entitlement_ends_at
-            FROM entitlements
-            WHERE status = 'active' AND ends_at > ?
-            GROUP BY account_id
-          ) ent ON ent.account_id = a.id
-          LEFT JOIN (
-            SELECT account_id, COUNT(*) AS active_session_count
-            FROM sessions
-            WHERE status = 'active'
-            GROUP BY account_id
-          ) sess ON sess.account_id = a.id
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY a.created_at DESC
-          LIMIT 100
-        `,
-        ...params
-      );
-
-      return {
-        items,
-        total: items.length,
-        filters: normalizedFilters
-      };
+      return queryAccountRows(db, filters, stateStore);
     },
 
     updateAccountStatus(token, accountId, body = {}) {
@@ -8435,85 +9172,7 @@ export function createServices(db, config, runtimeState = null) {
 
     listDeviceBindings(token, filters = {}) {
       requireAdminSession(db, token);
-      expireStaleSessions(db, stateStore);
-
-      const conditions = [];
-      const params = [];
-      const normalizedFilters = {
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        username: filters.username ? String(filters.username).trim() : null,
-        status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (normalizedFilters.status && !["active", "revoked"].includes(normalizedFilters.status)) {
-        throw new AppError(400, "INVALID_BINDING_STATUS", "Binding status must be active or revoked.");
-      }
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
-      }
-
-      if (normalizedFilters.username) {
-        conditions.push("a.username = ?");
-        params.push(normalizedFilters.username);
-      }
-
-      if (normalizedFilters.status) {
-        conditions.push("b.status = ?");
-        params.push(normalizedFilters.status);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push(
-          "(d.fingerprint LIKE ? ESCAPE '\\' OR d.device_name LIKE ? ESCAPE '\\' OR a.username LIKE ? ESCAPE '\\')"
-        );
-        params.push(pattern, pattern, pattern);
-      }
-
-      const items = many(
-        db,
-        `
-          SELECT b.id, b.entitlement_id, b.device_id, b.status, b.first_bound_at, b.last_bound_at, b.revoked_at,
-                 pr.code AS product_code, pr.name AS product_name,
-                 a.id AS account_id, a.username,
-                 pol.name AS policy_name,
-                 e.ends_at AS entitlement_ends_at,
-                 d.fingerprint, d.device_name, d.last_seen_at, d.last_seen_ip,
-                 bp.identity_hash, bp.match_fields_json, bp.identity_json, bp.request_ip AS bind_request_ip,
-                 COALESCE(sess.active_session_count, 0) AS active_session_count
-          FROM device_bindings b
-          JOIN entitlements e ON e.id = b.entitlement_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN products pr ON pr.id = e.product_id
-          JOIN policies pol ON pol.id = e.policy_id
-          JOIN devices d ON d.id = b.device_id
-          LEFT JOIN device_binding_profiles bp ON bp.binding_id = b.id
-          LEFT JOIN (
-            SELECT entitlement_id, device_id, COUNT(*) AS active_session_count
-            FROM sessions
-            WHERE status = 'active'
-            GROUP BY entitlement_id, device_id
-          ) sess ON sess.entitlement_id = b.entitlement_id AND sess.device_id = b.device_id
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY b.last_bound_at DESC
-          LIMIT 100
-        `,
-        ...params
-      );
-
-      return {
-        items: items.map((row) => ({
-          ...row,
-          matchFields: row.match_fields_json ? JSON.parse(row.match_fields_json) : [],
-          identity: row.identity_json ? JSON.parse(row.identity_json) : {},
-          bindRequestIp: row.bind_request_ip ?? null
-        })),
-        total: items.length,
-        filters: normalizedFilters
-      };
+      return queryDeviceBindingRows(db, filters, stateStore);
     },
 
     releaseDeviceBinding(token, bindingId, body = {}) {
@@ -8571,67 +9230,124 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
-    listDeviceBlocks(token, filters = {}) {
-      requireAdminSession(db, token);
-
-      const conditions = [];
-      const params = [];
-      const normalizedFilters = {
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (normalizedFilters.status && !["active", "released"].includes(normalizedFilters.status)) {
-        throw new AppError(400, "INVALID_DEVICE_BLOCK_STATUS", "Device block status must be active or released.");
-      }
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
-      }
-
-      if (normalizedFilters.status) {
-        conditions.push("b.status = ?");
-        params.push(normalizedFilters.status);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push(
-          "(b.fingerprint LIKE ? ESCAPE '\\' OR b.reason LIKE ? ESCAPE '\\' OR COALESCE(b.notes, '') LIKE ? ESCAPE '\\')"
+    developerListDeviceBindings(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only view device bindings under your assigned projects."
+      );
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "ops.read"
         );
-        params.push(pattern, pattern, pattern);
       }
+      return queryDeviceBindingRows(
+        db,
+        { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
+        stateStore
+      );
+    },
 
-      const items = many(
+    developerReleaseDeviceBinding(token, bindingId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage device bindings under your assigned projects."
+      );
+      const binding = one(
         db,
         `
-          SELECT b.id, b.product_id, b.fingerprint, b.status, b.reason, b.notes, b.created_at, b.updated_at, b.released_at,
-                 pr.code AS product_code, pr.name AS product_name,
-                 d.id AS device_id, d.device_name, d.last_seen_at, d.last_seen_ip,
-                 COALESCE(sess.active_session_count, 0) AS active_session_count
-          FROM device_blocks b
-          JOIN products pr ON pr.id = b.product_id
-          LEFT JOIN devices d ON d.product_id = b.product_id AND d.fingerprint = b.fingerprint
-          LEFT JOIN (
-            SELECT device_id, COUNT(*) AS active_session_count
-            FROM sessions
-            WHERE status = 'active'
-            GROUP BY device_id
-          ) sess ON sess.device_id = d.id
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY CASE WHEN b.status = 'active' THEN 0 ELSE 1 END, b.updated_at DESC
-          LIMIT 100
+          SELECT b.id, b.entitlement_id, b.device_id, b.status,
+                 pr.id AS product_id, pr.code AS product_code, pr.owner_developer_id,
+                 a.username,
+                 d.fingerprint, d.device_name
+          FROM device_bindings b
+          JOIN entitlements e ON e.id = b.entitlement_id
+          JOIN customer_accounts a ON a.id = e.account_id
+          JOIN products pr ON pr.id = e.product_id
+          JOIN devices d ON d.id = b.device_id
+          WHERE b.id = ?
         `,
-        ...params
+        bindingId
       );
 
-      return {
-        items,
-        total: items.length,
-        filters: normalizedFilters
-      };
+      if (!binding) {
+        throw new AppError(404, "BINDING_NOT_FOUND", "Device binding does not exist.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: binding.product_id, owner_developer_id: binding.owner_developer_id },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage device bindings under your assigned projects."
+      );
+
+      if (binding.status !== "active") {
+        return {
+          ...binding,
+          changed: false,
+          releasedSessions: 0
+        };
+      }
+
+      return withTransaction(db, () => {
+        const timestamp = nowIso();
+        const reason = normalizeReason(body.reason, "developer_binding_released");
+        const releasedSessions = releaseBindingRecord(db, stateStore, binding, reason, timestamp);
+
+        auditDeveloperSession(db, session, "device-binding.release", "device_binding", binding.id, {
+          productCode: binding.product_code,
+          username: binding.username,
+          fingerprint: binding.fingerprint,
+          reason,
+          releasedSessions
+        });
+
+        return {
+          ...binding,
+          status: "revoked",
+          revokedAt: timestamp,
+          changed: true,
+          reason,
+          releasedSessions
+        };
+      });
+    },
+
+    listDeviceBlocks(token, filters = {}) {
+      requireAdminSession(db, token);
+      return queryDeviceBlockRows(db, filters);
+    },
+
+    developerListDeviceBlocks(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only view device blocks under your assigned projects."
+      );
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "ops.read"
+        );
+      }
+      return queryDeviceBlockRows(db, {
+        ...filters,
+        productIds: listDeveloperAccessibleProductIds(db, session)
+      });
     },
 
     blockDevice(token, body = {}) {
@@ -8756,6 +9472,134 @@ export function createServices(db, config, runtimeState = null) {
       });
     },
 
+    developerBlockDevice(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage device blocks under your assigned projects."
+      );
+      requireField(body, "deviceFingerprint");
+
+      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "ops.write");
+      const fingerprint = String(body.deviceFingerprint).trim();
+      if (fingerprint.length < 6) {
+        throw new AppError(400, "INVALID_DEVICE_FINGERPRINT", "Device fingerprint must be at least 6 characters.");
+      }
+
+      const reason = normalizeReason(body.reason, "developer_blocked");
+      const notes = String(body.notes ?? "").trim();
+      const existing = one(
+        db,
+        `
+          SELECT *
+          FROM device_blocks
+          WHERE product_id = ? AND fingerprint = ?
+        `,
+        product.id,
+        fingerprint
+      );
+      const device = one(
+        db,
+        `
+          SELECT *
+          FROM devices
+          WHERE product_id = ? AND fingerprint = ?
+        `,
+        product.id,
+        fingerprint
+      );
+
+      return withTransaction(db, () => {
+        const timestamp = nowIso();
+        let blockId = existing?.id ?? generateId("dblock");
+        let changed = false;
+
+        if (!existing) {
+          run(
+            db,
+            `
+              INSERT INTO device_blocks
+              (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)
+              VALUES (?, ?, ?, 'active', ?, ?, ?, ?, NULL)
+            `,
+            blockId,
+            product.id,
+            fingerprint,
+            reason,
+            notes,
+            timestamp,
+            timestamp
+          );
+          changed = true;
+        } else if (existing.status !== "active" || existing.reason !== reason || String(existing.notes ?? "") !== notes) {
+          run(
+            db,
+            `
+              UPDATE device_blocks
+              SET status = 'active', reason = ?, notes = ?, updated_at = ?, released_at = NULL
+              WHERE id = ?
+            `,
+            reason,
+            notes,
+            timestamp,
+            existing.id
+          );
+          blockId = existing.id;
+          changed = true;
+        }
+
+        let affectedSessions = 0;
+        let affectedBindings = 0;
+        if (device) {
+          affectedSessions = expireActiveSessions(
+            db,
+            stateStore,
+            "product_id = ? AND device_id = ?",
+            [product.id, device.id],
+            "device_blocked"
+          );
+
+          const bindingResult = run(
+            db,
+            `
+              UPDATE device_bindings
+              SET status = 'revoked', revoked_at = ?, last_bound_at = ?
+              WHERE device_id = ? AND status = 'active'
+            `,
+            timestamp,
+            timestamp,
+            device.id
+          );
+          affectedBindings = Number(bindingResult.changes ?? 0);
+        }
+
+        if (changed || affectedSessions > 0 || affectedBindings > 0) {
+          auditDeveloperSession(db, session, "device-block.activate", "device_block", blockId, {
+            productCode: product.code,
+            fingerprint,
+            reason,
+            notes,
+            affectedSessions,
+            affectedBindings
+          });
+        }
+
+        return {
+          id: blockId,
+          productCode: product.code,
+          fingerprint,
+          status: "active",
+          reason,
+          notes,
+          changed,
+          affectedSessions,
+          affectedBindings
+        };
+      });
+    },
+
     unblockDevice(token, blockId, body = {}) {
       const admin = requireAdminSession(db, token);
       const block = one(
@@ -8799,6 +9643,80 @@ export function createServices(db, config, runtimeState = null) {
       );
 
       audit(db, "admin", admin.admin_id, "device-block.release", "device_block", block.id, {
+        productCode: block.product_code,
+        fingerprint: block.fingerprint,
+        releaseReason
+      });
+
+      return {
+        id: block.id,
+        productCode: block.product_code,
+        fingerprint: block.fingerprint,
+        status: "released",
+        changed: true,
+        releaseReason,
+        releasedAt: timestamp
+      };
+    },
+
+    developerUnblockDevice(token, blockId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage device blocks under your assigned projects."
+      );
+      const block = one(
+        db,
+        `
+          SELECT b.*, pr.code AS product_code, pr.owner_developer_id
+          FROM device_blocks b
+          JOIN products pr ON pr.id = b.product_id
+          WHERE b.id = ?
+        `,
+        blockId
+      );
+
+      if (!block) {
+        throw new AppError(404, "DEVICE_BLOCK_NOT_FOUND", "Device block does not exist.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: block.product_id, owner_developer_id: block.owner_developer_id },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage device blocks under your assigned projects."
+      );
+
+      const releaseReason = normalizeReason(body.reason, "developer_unblocked");
+      if (block.status !== "active") {
+        return {
+          id: block.id,
+          productCode: block.product_code,
+          fingerprint: block.fingerprint,
+          status: block.status,
+          changed: false,
+          releaseReason
+        };
+      }
+
+      const timestamp = nowIso();
+      run(
+        db,
+        `
+          UPDATE device_blocks
+          SET status = 'released', updated_at = ?, released_at = ?
+          WHERE id = ?
+        `,
+        timestamp,
+        timestamp,
+        block.id
+      );
+
+      auditDeveloperSession(db, session, "device-block.release", "device_block", block.id, {
         productCode: block.product_code,
         fingerprint: block.fingerprint,
         releaseReason
@@ -9639,74 +10557,30 @@ export function createServices(db, config, runtimeState = null) {
 
     listSessions(token, filters = {}) {
       requireAdminSession(db, token);
-      expireStaleSessions(db, stateStore);
+      return querySessionRows(db, filters, stateStore);
+    },
 
-      const conditions = [];
-      const params = [];
-      const normalizedFilters = {
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        username: filters.username ? String(filters.username).trim() : null,
-        status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (
-        normalizedFilters.status &&
-        !["active", "expired"].includes(normalizedFilters.status)
-      ) {
-        throw new AppError(400, "INVALID_SESSION_STATUS", "Session status must be active or expired.");
-      }
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
-      }
-
-      if (normalizedFilters.username) {
-        conditions.push("a.username = ?");
-        params.push(normalizedFilters.username);
-      }
-
-      if (normalizedFilters.status) {
-        conditions.push("s.status = ?");
-        params.push(normalizedFilters.status);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push(
-          "(a.username LIKE ? ESCAPE '\\' OR d.fingerprint LIKE ? ESCAPE '\\' OR s.id LIKE ? ESCAPE '\\')"
-        );
-        params.push(pattern, pattern, pattern);
-      }
-
-      const items = many(
-        db,
-        `
-          SELECT s.id, s.account_id, s.entitlement_id, s.device_id, s.status, s.issued_at, s.expires_at,
-                 s.last_heartbeat_at, s.last_seen_ip, s.user_agent, s.revoked_reason,
-                 pr.code AS product_code, pr.name AS product_name,
-                 a.username,
-                 d.fingerprint, d.device_name,
-                 pol.name AS policy_name
-          FROM sessions s
-          JOIN customer_accounts a ON a.id = s.account_id
-          JOIN devices d ON d.id = s.device_id
-          JOIN products pr ON pr.id = s.product_id
-          JOIN entitlements e ON e.id = s.entitlement_id
-          JOIN policies pol ON pol.id = e.policy_id
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY s.last_heartbeat_at DESC
-          LIMIT 100
-        `,
-        ...params
+    developerListSessions(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only view sessions under your assigned projects."
       );
-
-      return {
-        items,
-        total: items.length,
-        filters: normalizedFilters
-      };
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "ops.read"
+        );
+      }
+      return querySessionRows(
+        db,
+        { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
+        stateStore
+      );
     },
 
     revokeSession(token, sessionId, body = {}) {
@@ -9757,49 +10631,87 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
-    listAuditLogs(token, filters = {}) {
-      requireAdminSession(db, token);
-
-      const conditions = [];
-      const params = [];
-      const limit = Math.min(Math.max(Number(filters.limit ?? 50), 1), 200);
-      const normalizedFilters = {
-        eventType: filters.eventType ? String(filters.eventType).trim() : null,
-        actorType: filters.actorType ? String(filters.actorType).trim() : null,
-        limit
-      };
-
-      if (normalizedFilters.eventType) {
-        conditions.push("event_type = ?");
-        params.push(normalizedFilters.eventType);
-      }
-
-      if (normalizedFilters.actorType) {
-        conditions.push("actor_type = ?");
-        params.push(normalizedFilters.actorType);
-      }
-
-      const items = many(
+    developerRevokeSession(token, sessionId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage sessions under your assigned projects."
+      );
+      const targetSession = one(
         db,
         `
-          SELECT id, actor_type, actor_id, event_type, entity_type, entity_id, metadata_json, created_at
-          FROM audit_logs
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY created_at DESC
-          LIMIT ?
+          SELECT s.id, s.status, s.revoked_reason, s.product_id,
+                 pr.code AS product_code, pr.owner_developer_id,
+                 a.username,
+                 d.fingerprint
+          FROM sessions s
+          JOIN customer_accounts a ON a.id = s.account_id
+          JOIN devices d ON d.id = s.device_id
+          JOIN products pr ON pr.id = s.product_id
+          WHERE s.id = ?
         `,
-        ...params,
-        limit
-      ).map((row) => ({
-        ...row,
-        metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null
-      }));
+        sessionId
+      );
+
+      if (!targetSession) {
+        throw new AppError(404, "SESSION_NOT_FOUND", "Session does not exist.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: targetSession.product_id, owner_developer_id: targetSession.owner_developer_id },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage sessions under your assigned projects."
+      );
+
+      const reason = normalizeReason(body.reason, "developer_revoked");
+      if (targetSession.status !== "active") {
+        return {
+          ...targetSession,
+          changed: false,
+          revokedReason: targetSession.revoked_reason ?? reason
+        };
+      }
+
+      expireSessionById(db, stateStore, targetSession.id, reason);
+
+      auditDeveloperSession(db, session, "session.revoke", "session", targetSession.id, {
+        productCode: targetSession.product_code,
+        username: targetSession.username,
+        fingerprint: targetSession.fingerprint,
+        reason
+      });
 
       return {
-        items,
-        total: items.length,
-        filters: normalizedFilters
+        ...targetSession,
+        status: "expired",
+        changed: true,
+        revokedReason: reason
       };
+    },
+
+    listAuditLogs(token, filters = {}) {
+      requireAdminSession(db, token);
+      return queryAuditLogRows(db, filters);
+    },
+
+    developerListAuditLogs(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only view audit logs for your assigned projects."
+      );
+      return queryAuditLogRows(db, {
+        ...filters,
+        developerId: session.developer_id,
+        productCodes: listDeveloperAccessibleProductCodes(db, session)
+      });
     },
 
     rotateTokenKey(token) {

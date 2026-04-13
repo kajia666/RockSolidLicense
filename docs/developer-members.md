@@ -14,11 +14,11 @@ The platform now supports a two-layer developer backoffice model:
 ## Supported member roles
 
 - `admin`
-  Can view assigned projects and can manage feature toggles, policies, cards, versions, and notices for those projects.
+  Can view assigned projects and can manage feature toggles, policies, cards, versions, notices, and developer authorization operations for those projects.
 - `operator`
-  Can view assigned projects and can manage policies, cards, versions, and notices, but cannot edit product feature toggles.
+  Can view assigned projects and can manage policies, cards, versions, notices, and developer authorization operations, but cannot edit product feature toggles.
 - `viewer`
-  Read-only access to assigned projects and their policies, cards, versions, and notices.
+  Read-only access to assigned projects and their policies, cards, versions, notices, and authorization operations data.
 
 ## Owner-only endpoints
 
@@ -63,6 +63,18 @@ Optional password reset during update:
 - `POST /api/developer/logout`
 
 Owners update the main developer profile. Members update only their own display name and password.
+
+## Authorization operations
+
+- `/developer/ops`
+- `GET /api/developer/accounts`
+- `GET /api/developer/entitlements`
+- `GET /api/developer/sessions`
+- `GET /api/developer/device-bindings`
+- `GET /api/developer/device-blocks`
+- `GET /api/developer/audit-logs`
+
+Write-capable roles can also freeze accounts, extend entitlements, adjust points, revoke sessions, release bindings, and block or unblock devices inside their assigned project scope.
 
 ## Isolation rules
 

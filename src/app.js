@@ -14,6 +14,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), "utf8");
 const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center-v2.html"), "utf8");
 const developerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "developer-center.html"), "utf8");
+const developerOpsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-ops.html"), "utf8");
 const noticeCenterHtml = fs.readFileSync(path.join(currentDir, "web", "notice-center.html"), "utf8");
 const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-ops.html"), "utf8");
 const resellerFinanceHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-finance.html"), "utf8");
@@ -77,6 +78,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/developer") {
         sendHtml(res, 200, developerCenterHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/developer/ops") {
+        sendHtml(res, 200, developerOpsHtml);
         return;
       }
 
@@ -1140,6 +1146,203 @@ export function createApp(overrides = {}) {
             developerNoticeStatusRoute.noticeId,
             body
           )
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/accounts") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListAccounts(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/entitlements") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListEntitlements(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            status: url.searchParams.get("status"),
+            grantType: url.searchParams.get("grantType"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      const developerAccountStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/accounts/:accountId/status")
+        : null;
+      if (developerAccountStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateAccountStatus(
+            getBearerToken(req),
+            developerAccountStatusRoute.accountId,
+            body
+          )
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/device-bindings") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListDeviceBindings(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/device-blocks") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListDeviceBlocks(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/device-blocks") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.developerBlockDevice(getBearerToken(req), body)
+        });
+        return;
+      }
+
+      const developerBindingReleaseRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/device-bindings/:bindingId/release")
+        : null;
+      if (developerBindingReleaseRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerReleaseDeviceBinding(
+            getBearerToken(req),
+            developerBindingReleaseRoute.bindingId,
+            body
+          )
+        });
+        return;
+      }
+
+      const developerEntitlementStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/entitlements/:entitlementId/status")
+        : null;
+      if (developerEntitlementStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateEntitlementStatus(
+            getBearerToken(req),
+            developerEntitlementStatusRoute.entitlementId,
+            body
+          )
+        });
+        return;
+      }
+
+      const developerEntitlementExtendRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/entitlements/:entitlementId/extend")
+        : null;
+      if (developerEntitlementExtendRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerExtendEntitlement(
+            getBearerToken(req),
+            developerEntitlementExtendRoute.entitlementId,
+            body
+          )
+        });
+        return;
+      }
+
+      const developerEntitlementPointsRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/entitlements/:entitlementId/points")
+        : null;
+      if (developerEntitlementPointsRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerAdjustEntitlementPoints(
+            getBearerToken(req),
+            developerEntitlementPointsRoute.entitlementId,
+            body
+          )
+        });
+        return;
+      }
+
+      const developerDeviceUnblockRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/device-blocks/:blockId/unblock")
+        : null;
+      if (developerDeviceUnblockRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUnblockDevice(
+            getBearerToken(req),
+            developerDeviceUnblockRoute.blockId,
+            body
+          )
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/sessions") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListSessions(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
+      const developerSessionRevokeRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/sessions/:sessionId/revoke")
+        : null;
+      if (developerSessionRevokeRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerRevokeSession(
+            getBearerToken(req),
+            developerSessionRevokeRoute.sessionId,
+            body
+          )
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/audit-logs") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListAuditLogs(getBearerToken(req), {
+            actorType: url.searchParams.get("actorType"),
+            eventType: url.searchParams.get("eventType"),
+            limit: url.searchParams.get("limit")
+          })
         });
         return;
       }

@@ -88,7 +88,7 @@
 - `test/`：Node 端到端回归测试
 - `deploy/`：Windows / Linux 部署骨架
 
-开发者子账号和项目级权限的专门说明见 [docs/developer-members.md](/D:/code/OnlineVerification/docs/developer-members.md)。
+开发者子账号和项目级权限说明见 [docs/developer-members.md](/D:/code/OnlineVerification/docs/developer-members.md)，开发者授权运营台说明见 [docs/developer-ops.md](/D:/code/OnlineVerification/docs/developer-ops.md)。
 
 ## 本地运行
 
@@ -103,6 +103,7 @@ node src/server.js
 - 管理后台：`http://127.0.0.1:3000/admin`
 - 产品中心：`http://127.0.0.1:3000/admin/products`
 - 开发者中心：`http://127.0.0.1:3000/developer`
+- 开发者运营台：`http://127.0.0.1:3000/developer/ops`
 - 公告中心：`http://127.0.0.1:3000/admin/notices`
 - 健康检查：`http://127.0.0.1:3000/api/health`
 - TCP Gateway：`tcp://127.0.0.1:4000`
@@ -240,6 +241,20 @@ TCP：
 - `GET /api/developer/cards/export`
 - `POST /api/developer/cards/batch`
 - `POST /api/developer/cards/:cardId/status`
+- `GET /api/developer/accounts`
+- `POST /api/developer/accounts/:accountId/status`
+- `GET /api/developer/entitlements`
+- `POST /api/developer/entitlements/:entitlementId/status`
+- `POST /api/developer/entitlements/:entitlementId/extend`
+- `POST /api/developer/entitlements/:entitlementId/points`
+- `GET /api/developer/sessions`
+- `POST /api/developer/sessions/:sessionId/revoke`
+- `GET /api/developer/device-bindings`
+- `POST /api/developer/device-bindings/:bindingId/release`
+- `GET /api/developer/device-blocks`
+- `POST /api/developer/device-blocks`
+- `POST /api/developer/device-blocks/:blockId/unblock`
+- `GET /api/developer/audit-logs`
 - `GET /api/developer/client-versions`
 - `POST /api/developer/client-versions`
 - `POST /api/developer/client-versions/:versionId/status`
@@ -251,11 +266,11 @@ TCP：
 
 当前开发者子账号角色：
 
-- `admin`：可管理已分配项目的功能开关、策略、卡密、版本、公告
-- `operator`：可管理已分配项目的策略、卡密、版本、公告，但不能改产品功能开关
-- `viewer`：只读查看已分配项目及其策略、卡密、版本、公告
+- `admin`：可管理已分配项目的功能开关、策略、卡密、版本、公告，以及终端用户授权运营动作
+- `operator`：可管理已分配项目的策略、卡密、版本、公告和终端用户授权运营动作，但不能改产品功能开关
+- `viewer`：只读查看已分配项目及其策略、卡密、版本、公告，以及授权运营数据
 
-开发者主账号可以自助改密、改资料、创建/禁用子账号和调整项目授权；管理员仍然可以禁用或恢复开发者主账号。
+开发者主账号可以自助改密、改资料、创建/禁用子账号和调整项目授权；管理员仍然可以禁用或恢复开发者主账号。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。
 
 ## Windows C/C++ SDK
 

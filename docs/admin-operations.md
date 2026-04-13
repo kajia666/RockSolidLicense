@@ -49,6 +49,7 @@ Dedicated UI:
 
 - `/admin/products`
 - `/developer`
+- `/developer/ops`
 
 Product create requests can optionally include a `featureConfig` object:
 
@@ -147,6 +148,20 @@ Effects:
 - `GET /api/developer/notices`
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
+- `GET /api/developer/accounts`
+- `POST /api/developer/accounts/:accountId/status`
+- `GET /api/developer/entitlements`
+- `POST /api/developer/entitlements/:entitlementId/status`
+- `POST /api/developer/entitlements/:entitlementId/extend`
+- `POST /api/developer/entitlements/:entitlementId/points`
+- `GET /api/developer/sessions`
+- `POST /api/developer/sessions/:sessionId/revoke`
+- `GET /api/developer/device-bindings`
+- `POST /api/developer/device-bindings/:bindingId/release`
+- `GET /api/developer/device-blocks`
+- `POST /api/developer/device-blocks`
+- `POST /api/developer/device-blocks/:blockId/unblock`
+- `GET /api/developer/audit-logs`
 
 Effects:
 
@@ -154,8 +169,10 @@ Effects:
 - the primary developer account can update its own display name, create developer members, and assign those members to specific products
 - developer members use the same `/api/developer/login` entry, but only see products explicitly assigned to them
 - developers and developer members only see projects where `products.owner_developer_id` matches the parent developer account
+- `/developer/ops` provides a dedicated authorization operations workspace for software authors
 - `admin` developer members can edit feature toggles for assigned products; `operator` members cannot; `viewer` members are read-only
 - developers can create and manage policies, card batches, client versions, and notices only under their own or assigned projects
+- developers can inspect and control accounts, entitlements, sessions, bindings, device blocks, and scoped audit logs only under their own or assigned projects
 - developer card export is scoped to owned products, so exported CSV files never include another developer's inventory
 - changing the developer password revokes existing developer sessions and requires re-login
 - changing a developer member password or disabling a member revokes that member's existing sessions

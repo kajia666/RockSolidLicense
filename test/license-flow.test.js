@@ -4705,6 +4705,505 @@ test("developer owners can manage scoped team members with project roles", async
   }
 });
 
+test("developer operators can manage scoped authorization operations for assigned projects", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "scope.owner",
+        password: "ScopeOwner123!",
+        displayName: "Scope Owner"
+      },
+      adminSession.token
+    );
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "DEV_ALPHA",
+        name: "Developer Alpha",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "DEV_BETA",
+        name: "Developer Beta",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "scope.owner",
+      password: "ScopeOwner123!"
+    });
+
+    const alphaDurationPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "DEV_ALPHA",
+        name: "Alpha Duration",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const alphaPointsPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "DEV_ALPHA",
+        name: "Alpha Points",
+        grantType: "points",
+        grantPoints: 3,
+        durationDays: 0,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const betaPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "DEV_BETA",
+        name: "Beta Duration",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const alphaDurationCards = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "DEV_ALPHA",
+        policyId: alphaDurationPolicy.id,
+        count: 1,
+        prefix: "ADURA"
+      },
+      ownerSession.token
+    );
+
+    const alphaPointsCards = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "DEV_ALPHA",
+        policyId: alphaPointsPolicy.id,
+        count: 1,
+        prefix: "APOINT"
+      },
+      ownerSession.token
+    );
+
+    const betaCards = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "DEV_BETA",
+        policyId: betaPolicy.id,
+        count: 1,
+        prefix: "BDURA"
+      },
+      ownerSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "DEV_ALPHA",
+      username: "alphauser",
+      password: "AlphaUser123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "DEV_ALPHA",
+      username: "alphapoints",
+      password: "AlphaPoints123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/register", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "DEV_BETA",
+      username: "betauser",
+      password: "BetaUser123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "DEV_ALPHA",
+      username: "alphauser",
+      password: "AlphaUser123!",
+      cardKey: alphaDurationCards.keys[0]
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "DEV_ALPHA",
+      username: "alphapoints",
+      password: "AlphaPoints123!",
+      cardKey: alphaPointsCards.keys[0]
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "DEV_BETA",
+      username: "betauser",
+      password: "BetaUser123!",
+      cardKey: betaCards.keys[0]
+    });
+
+    const alphaLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        username: "alphauser",
+        password: "AlphaUser123!",
+        deviceFingerprint: "alpha-scope-device-001",
+        deviceName: "Alpha Scope Desktop"
+      }
+    );
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      betaProduct.sdkAppId,
+      betaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_BETA",
+        username: "betauser",
+        password: "BetaUser123!",
+        deviceFingerprint: "beta-scope-device-001",
+        deviceName: "Beta Scope Desktop"
+      }
+    );
+
+    const alphaAccounts = await getJson(baseUrl, "/api/admin/accounts?productCode=DEV_ALPHA", adminSession.token);
+    const betaAccounts = await getJson(baseUrl, "/api/admin/accounts?productCode=DEV_BETA", adminSession.token);
+    const alphaDurationAccount = alphaAccounts.items.find((item) => item.username === "alphauser");
+    const alphaPointsAccount = alphaAccounts.items.find((item) => item.username === "alphapoints");
+    const betaAccount = betaAccounts.items.find((item) => item.username === "betauser");
+    assert.ok(alphaDurationAccount);
+    assert.ok(alphaPointsAccount);
+    assert.ok(betaAccount);
+
+    const alphaDurationEntitlements = await getJson(
+      baseUrl,
+      "/api/admin/entitlements?productCode=DEV_ALPHA&username=alphauser",
+      adminSession.token
+    );
+    const alphaPointsEntitlements = await getJson(
+      baseUrl,
+      "/api/admin/entitlements?productCode=DEV_ALPHA&username=alphapoints",
+      adminSession.token
+    );
+    const alphaDurationEntitlement = alphaDurationEntitlements.items[0];
+    const alphaPointsEntitlement = alphaPointsEntitlements.items[0];
+    assert.equal(alphaDurationEntitlement.grantType, "duration");
+    assert.equal(alphaPointsEntitlement.grantType, "points");
+
+    const member = await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "scope.operator",
+        password: "ScopeOperator123!",
+        displayName: "Scoped Operator",
+        role: "operator",
+        productCodes: ["DEV_ALPHA"]
+      },
+      ownerSession.token
+    );
+    assert.equal(member.role, "operator");
+
+    const memberSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "scope.operator",
+      password: "ScopeOperator123!"
+    });
+
+    const scopedAccounts = await getJson(baseUrl, "/api/developer/accounts", memberSession.token);
+    assert.equal(scopedAccounts.total, 2);
+    assert.deepEqual(
+      scopedAccounts.items.map((item) => item.username).sort(),
+      ["alphapoints", "alphauser"]
+    );
+
+    const scopedEntitlements = await getJson(baseUrl, "/api/developer/entitlements", memberSession.token);
+    assert.equal(scopedEntitlements.total, 2);
+    assert.deepEqual(
+      scopedEntitlements.items.map((item) => item.grantType).sort(),
+      ["duration", "points"]
+    );
+
+    const scopedSessions = await getJson(baseUrl, "/api/developer/sessions", memberSession.token);
+    assert.equal(scopedSessions.total, 1);
+    assert.equal(scopedSessions.items[0].username, "alphauser");
+    assert.equal(scopedSessions.items[0].product_code, "DEV_ALPHA");
+
+    const scopedBindings = await getJson(baseUrl, "/api/developer/device-bindings", memberSession.token);
+    assert.equal(scopedBindings.total, 1);
+    assert.equal(scopedBindings.items[0].product_code, "DEV_ALPHA");
+
+    const betaForbidden = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/accounts/${betaAccount.id}/status`,
+      { status: "disabled" },
+      memberSession.token
+    );
+    assert.equal(betaForbidden.status, 403);
+    assert.equal(betaForbidden.error.code, "DEVELOPER_OPS_FORBIDDEN");
+
+    const disabledAccount = await postJson(
+      baseUrl,
+      `/api/developer/accounts/${alphaDurationAccount.id}/status`,
+      { status: "disabled" },
+      memberSession.token
+    );
+    assert.equal(disabledAccount.status, "disabled");
+    assert.equal(disabledAccount.changed, true);
+    assert.ok(disabledAccount.revokedSessions >= 1);
+
+    const disabledHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        sessionToken: alphaLogin.sessionToken,
+        deviceFingerprint: "alpha-scope-device-001"
+      }
+    );
+    assert.equal(disabledHeartbeat.status, 401);
+    assert.equal(disabledHeartbeat.error.code, "SESSION_INVALID");
+
+    const enabledAccount = await postJson(
+      baseUrl,
+      `/api/developer/accounts/${alphaDurationAccount.id}/status`,
+      { status: "active" },
+      memberSession.token
+    );
+    assert.equal(enabledAccount.status, "active");
+
+    const reloginAfterAccountEnable = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        username: "alphauser",
+        password: "AlphaUser123!",
+        deviceFingerprint: "alpha-scope-device-001",
+        deviceName: "Alpha Scope Desktop"
+      }
+    );
+    assert.ok(reloginAfterAccountEnable.sessionToken);
+
+    const frozenEntitlement = await postJson(
+      baseUrl,
+      `/api/developer/entitlements/${alphaDurationEntitlement.id}/status`,
+      { status: "frozen" },
+      memberSession.token
+    );
+    assert.equal(frozenEntitlement.status, "frozen");
+    assert.ok(frozenEntitlement.revokedSessions >= 1);
+
+    const frozenHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        sessionToken: reloginAfterAccountEnable.sessionToken,
+        deviceFingerprint: "alpha-scope-device-001"
+      }
+    );
+    assert.equal(frozenHeartbeat.status, 401);
+    assert.equal(frozenHeartbeat.error.code, "SESSION_INVALID");
+
+    const reactivatedEntitlement = await postJson(
+      baseUrl,
+      `/api/developer/entitlements/${alphaDurationEntitlement.id}/status`,
+      { status: "active" },
+      memberSession.token
+    );
+    assert.equal(reactivatedEntitlement.status, "active");
+
+    const extendedEntitlement = await postJson(
+      baseUrl,
+      `/api/developer/entitlements/${alphaDurationEntitlement.id}/extend`,
+      { days: 5 },
+      memberSession.token
+    );
+    assert.equal(extendedEntitlement.addedDays, 5);
+    assert.ok(new Date(extendedEntitlement.endsAt).getTime() > new Date(alphaDurationEntitlement.endsAt).getTime());
+
+    const adjustedPoints = await postJson(
+      baseUrl,
+      `/api/developer/entitlements/${alphaPointsEntitlement.id}/points`,
+      { mode: "add", points: 2 },
+      memberSession.token
+    );
+    assert.equal(adjustedPoints.mode, "add");
+    assert.ok(adjustedPoints.current.remainingPoints >= 5);
+
+    const reloginForSession = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        username: "alphauser",
+        password: "AlphaUser123!",
+        deviceFingerprint: "alpha-scope-device-001",
+        deviceName: "Alpha Scope Desktop"
+      }
+    );
+
+    const refreshedSessions = await getJson(
+      baseUrl,
+      "/api/developer/sessions?status=active",
+      memberSession.token
+    );
+    assert.equal(refreshedSessions.total, 1);
+
+    const revokedSession = await postJson(
+      baseUrl,
+      `/api/developer/sessions/${refreshedSessions.items[0].id}/revoke`,
+      { reason: "scoped_operator_revoked" },
+      memberSession.token
+    );
+    assert.equal(revokedSession.status, "expired");
+    assert.equal(revokedSession.revokedReason, "scoped_operator_revoked");
+
+    const revokedHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        sessionToken: reloginForSession.sessionToken,
+        deviceFingerprint: "alpha-scope-device-001"
+      }
+    );
+    assert.equal(revokedHeartbeat.status, 401);
+    assert.equal(revokedHeartbeat.error.code, "SESSION_INVALID");
+
+    const refreshedBindings = await getJson(baseUrl, "/api/developer/device-bindings", memberSession.token);
+    assert.equal(refreshedBindings.total, 1);
+
+    const releasedBinding = await postJson(
+      baseUrl,
+      `/api/developer/device-bindings/${refreshedBindings.items[0].id}/release`,
+      { reason: "scoped_operator_released" },
+      memberSession.token
+    );
+    assert.equal(releasedBinding.status, "revoked");
+    assert.equal(releasedBinding.reason, "scoped_operator_released");
+
+    const reloginForBlock = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        username: "alphauser",
+        password: "AlphaUser123!",
+        deviceFingerprint: "alpha-scope-device-001",
+        deviceName: "Alpha Scope Desktop"
+      }
+    );
+    assert.ok(reloginForBlock.sessionToken);
+
+    const blockedDevice = await postJson(
+      baseUrl,
+      "/api/developer/device-blocks",
+      {
+        projectCode: "DEV_ALPHA",
+        deviceFingerprint: "alpha-scope-device-001",
+        reason: "member_device_block"
+      },
+      memberSession.token
+    );
+    assert.equal(blockedDevice.status, "active");
+    assert.ok(blockedDevice.affectedSessions >= 1);
+
+    const blockedHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        sessionToken: reloginForBlock.sessionToken,
+        deviceFingerprint: "alpha-scope-device-001"
+      }
+    );
+    assert.equal(blockedHeartbeat.status, 401);
+    assert.equal(blockedHeartbeat.error.code, "SESSION_INVALID");
+
+    const scopedBlocks = await getJson(baseUrl, "/api/developer/device-blocks", memberSession.token);
+    assert.equal(scopedBlocks.total, 1);
+    assert.equal(scopedBlocks.items[0].fingerprint, "alpha-scope-device-001");
+
+    const unblockedDevice = await postJson(
+      baseUrl,
+      `/api/developer/device-blocks/${scopedBlocks.items[0].id}/unblock`,
+      { reason: "member_device_unblock" },
+      memberSession.token
+    );
+    assert.equal(unblockedDevice.status, "released");
+
+    const loginAfterUnblock = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "DEV_ALPHA",
+        username: "alphauser",
+        password: "AlphaUser123!",
+        deviceFingerprint: "alpha-scope-device-001",
+        deviceName: "Alpha Scope Desktop"
+      }
+    );
+    assert.ok(loginAfterUnblock.sessionToken);
+
+    const developerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=120", memberSession.token);
+    const eventTypes = developerAuditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("account.disable"));
+    assert.ok(eventTypes.includes("entitlement.extend"));
+    assert.ok(eventTypes.includes("entitlement.points.adjust"));
+    assert.ok(eventTypes.includes("session.revoke"));
+    assert.ok(eventTypes.includes("device-binding.release"));
+    assert.ok(eventTypes.includes("device-block.activate"));
+    assert.ok(eventTypes.includes("device-block.release"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -4739,6 +5238,25 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/members/);
     assert.match(html, /change-password/);
     assert.match(html, /Create Team Member/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer operations page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/ops`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Authorization Ops/);
+    assert.match(html, /api\/developer\/accounts/);
+    assert.match(html, /api\/developer\/entitlements/);
+    assert.match(html, /api\/developer\/device-bindings/);
+    assert.match(html, /api\/developer\/audit-logs/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

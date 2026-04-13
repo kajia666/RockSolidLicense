@@ -268,14 +268,15 @@
         <div class="nav">
           <a href="/developer">Developer Center</a>
           |
-          ·
+          <a href="/developer/security">Developer Security</a>
+          |
           <a href="/admin/products">Admin Product Center</a>
         </div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer</code></div>
           <div class="pill">Each product is one software title or one project</div>
           <div class="pill">You only see projects owned by your developer account</div>
-          <div class="pill">APIs: <code>/api/developer/policies</code> · <code>/cards</code> · <code>/client-versions</code> · <code>/notices</code></div>
+          <div class="pill">APIs: <code>/api/developer/policies</code> | <code>/cards</code> | <code>/client-versions</code> | <code>/notices</code></div>
         </div>
         <div class="stats" id="stats-box"></div>
       </section>
@@ -629,7 +630,7 @@
       function renderDetails(product) {
         const featureConfig = product.featureConfig || {};
         el("details-box").innerHTML = `
-          <div class="split-line"><span>Project</span><span><strong>${escapeHtml(product.code)}</strong> · ${escapeHtml(product.name)}</span></div>
+          <div class="split-line"><span>Project</span><span><strong>${escapeHtml(product.code)}</strong> | ${escapeHtml(product.name)}</span></div>
           <div class="split-line"><span>Status</span><span>${escapeHtml(product.status)}</span></div>
           <div class="split-line"><span>SDK App ID</span><span class="mono">${escapeHtml(product.sdkAppId)}</span></div>
           <div class="split-line"><span>SDK App Secret</span><span class="mono">${escapeHtml(product.sdkAppSecret)}</span></div>

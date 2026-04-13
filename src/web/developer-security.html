@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RockSolidLicense Developer Security</title>
+    <style>
+      :root {
+        --bg: #f4efe4;
+        --surface: rgba(255, 252, 246, 0.94);
+        --line: rgba(23, 32, 27, 0.1);
+        --ink: #17201b;
+        --muted: #617066;
+        --accent: #0f7c68;
+        --danger: #a0422c;
+        --accent-soft: rgba(15, 124, 104, 0.12);
+        --danger-soft: rgba(160, 66, 44, 0.12);
+        --shadow: 0 24px 58px rgba(54, 49, 42, 0.14);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 124, 104, 0.15), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(201, 126, 78, 0.16), transparent 28%),
+          linear-gradient(135deg, #f4ede0 0%, #f8f4ed 52%, #efe5d5 100%);
+      }
+
+      code, pre, .mono { font-family: "Cascadia Code", "Consolas", monospace; }
+      .shell { width: min(1360px, calc(100vw - 28px)); margin: 20px auto 36px; display: grid; gap: 18px; }
+      .hero, .card { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); padding: 20px; }
+      .hero { display: grid; gap: 10px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+      .table-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; }
+      h1, h2, p { margin: 0; }
+      h1 { font-size: clamp(28px, 5vw, 44px); }
+      h2 { font-size: 20px; }
+      .sub, .hint, .nav { color: var(--muted); line-height: 1.6; }
+      .hint, .nav { font-size: 13px; }
+      .nav a { color: var(--accent); text-decoration: none; }
+      .pill-row, .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      .pill { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.64); color: var(--muted); font-size: 13px; }
+      label { display: grid; gap: 8px; color: var(--muted); font-size: 14px; }
+      input, select, textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--ink);
+        font: inherit;
+      }
+      textarea { min-height: 110px; resize: vertical; }
+      button { border: 0; border-radius: 999px; padding: 12px 16px; color: white; background: var(--ink); font: inherit; cursor: pointer; }
+      button.secondary { background: var(--accent); }
+      button.danger { background: var(--danger); }
+      .status { padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); font-size: 13px; }
+      .status.warn { background: var(--danger-soft); color: var(--danger); }
+      .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 18px; background: rgba(255, 255, 255, 0.78); }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { padding: 12px 14px; border-bottom: 1px solid rgba(23, 32, 27, 0.08); text-align: left; vertical-align: top; }
+      th { background: rgba(247, 243, 235, 0.96); color: var(--muted); }
+      tbody tr { cursor: pointer; }
+      tbody tr:hover { background: rgba(15, 124, 104, 0.06); }
+      .tag { display: inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(23, 32, 27, 0.08); color: var(--muted); }
+      .tag.ok { background: var(--accent-soft); color: var(--accent); }
+      .tag.danger { background: var(--danger-soft); color: var(--danger); }
+      .split-line { display: flex; justify-content: space-between; gap: 12px; }
+      pre { margin: 0; min-height: 220px; padding: 16px; border-radius: 18px; background: #101715; color: #eef7f2; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+      @media (max-width: 1180px) { .table-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer Security Center</h1>
+        <p class="sub">Manage project-level IP and CIDR block rules inside your own developer scope. These rules are ideal for login blocking, temporary abuse controls, and regional access restrictions.</p>
+        <div class="nav">
+          <a href="/developer">Developer Center</a>
+          |
+          <a href="/developer/ops">Developer Ops</a>
+          |
+          <a href="/developer/security">Developer Security</a>
+          |
+          <a href="/admin/security">Admin Security</a>
+        </div>
+        <div class="pill-row">
+          <div class="pill">Route: <code>/developer/security</code></div>
+          <div class="pill">APIs: <code>/api/developer/network-rules</code></div>
+          <div class="pill">Project-scoped only. Developers cannot edit global rules.</div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username or member" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions">
+            <button id="login-btn">Sign In</button>
+            <button class="secondary" id="refresh-btn">Refresh Rules</button>
+          </div>
+          <div class="hint" id="session-meta">No developer session yet.</div>
+          <div class="status" id="status-box">Sign in to load project network rules.</div>
+        </article>
+
+        <article class="card">
+          <h2>Create Rule</h2>
+          <label>Project Code<input id="product-code" placeholder="ALPHA_APP" /></label>
+          <label>Target Type
+            <select id="target-type">
+              <option value="ip">ip</option>
+              <option value="cidr">cidr</option>
+            </select>
+          </label>
+          <label>Pattern<input id="pattern" placeholder="127.0.0.1 or 192.168.1.0/24" /></label>
+          <label>Action Scope
+            <select id="action-scope">
+              <option value="all">all</option>
+              <option value="register">register</option>
+              <option value="recharge">recharge</option>
+              <option value="login">login</option>
+              <option value="heartbeat">heartbeat</option>
+            </select>
+          </label>
+          <label>Initial Status
+            <select id="rule-status">
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <label>Notes<textarea id="notes" placeholder="Optional reason for the rule"></textarea></label>
+          <button class="secondary" id="create-btn">Create Rule</button>
+        </article>
+
+        <article class="card">
+          <h2>Rule Status</h2>
+          <label>Rule ID<input id="rule-id" placeholder="Click a row below to auto-fill" /></label>
+          <label>Target Status
+            <select id="update-status">
+              <option value="active">active</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <button class="danger" id="update-btn">Save Status</button>
+          <div class="hint">Archiving keeps the rule history while removing the live block.</div>
+        </article>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
+          <h2>Rule List</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pattern</th>
+                  <th>Project</th>
+                  <th>Type</th>
+                  <th>Scope</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="rule-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>API Output</h2>
+          <pre id="output">Waiting for actions...</pre>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      let developerToken = "";
+      let currentActor = null;
+
+      function el(id) { return document.getElementById(id); }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+
+      function setSessionMeta() {
+        el("session-meta").textContent = developerToken
+          ? `Signed in as ${currentActor?.username || "-"} | role=${currentActor?.role || "owner"}`
+          : "No developer session yet.";
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function formatTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function renderTag(value) {
+        const text = String(value ?? "unknown");
+        const className = text === "active" ? "tag ok" : text === "archived" ? "tag danger" : "tag";
+        return `<span class="${className}">${escapeHtml(text)}</span>`;
+      }
+
+      async function callApi(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (options.body) {
+          headers["Content-Type"] = "application/json";
+        }
+        if (developerToken) {
+          headers.Authorization = `Bearer ${developerToken}`;
+        }
+
+        const response = await fetch(path, {
+          ...options,
+          headers,
+          body: options.body ? JSON.stringify(options.body) : undefined
+        });
+        const json = await response.json();
+        if (!response.ok || !json.ok) {
+          throw new Error(json.error?.message || `Request failed: ${response.status}`);
+        }
+        return json.data;
+      }
+
+      function renderRules(items) {
+        if (!items.length) {
+          el("rule-body").innerHTML = `<tr><td colspan="6">No scoped rules yet.</td></tr>`;
+          return;
+        }
+
+        el("rule-body").innerHTML = items.map((item) => `
+          <tr data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status)}">
+            <td><strong>${escapeHtml(item.pattern)}</strong><div>${escapeHtml(item.notes || "")}</div></td>
+            <td>${escapeHtml(item.productCode || "-")}</td>
+            <td>${escapeHtml(item.targetType)}</td>
+            <td>${escapeHtml(item.actionScope)}</td>
+            <td>${renderTag(item.status)}</td>
+            <td>${escapeHtml(formatTime(item.createdAt))}</td>
+          </tr>
+        `).join("");
+
+        for (const row of el("rule-body").querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            el("rule-id").value = row.dataset.id || "";
+            el("update-status").value = row.dataset.status || "active";
+            setStatus("Loaded rule id into the editor.");
+          });
+        }
+      }
+
+      async function loadRules() {
+        const data = await callApi("/api/developer/network-rules");
+        renderRules(data.items);
+        setOutput(data);
+        setStatus(`Loaded ${data.total} scoped network rules.`);
+      }
+
+      async function guarded(action) {
+        try {
+          await action();
+        } catch (error) {
+          setOutput({ error: error.message });
+          setStatus(error.message, true);
+        }
+      }
+
+      el("login-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/developer/login", {
+          method: "POST",
+          body: {
+            username: el("username").value.trim(),
+            password: el("password").value
+          }
+        });
+        developerToken = data.token;
+        currentActor = {
+          username: data.actor?.username || data.developer?.username || "",
+          role: data.actor?.role || "owner"
+        };
+        setSessionMeta();
+        setOutput(data);
+        await loadRules();
+      }));
+
+      el("refresh-btn").addEventListener("click", () => guarded(loadRules));
+
+      el("create-btn").addEventListener("click", () => guarded(async () => {
+        const data = await callApi("/api/developer/network-rules", {
+          method: "POST",
+          body: {
+            productCode: el("product-code").value.trim(),
+            targetType: el("target-type").value,
+            pattern: el("pattern").value.trim(),
+            actionScope: el("action-scope").value,
+            status: el("rule-status").value,
+            notes: el("notes").value.trim()
+          }
+        });
+        setOutput(data);
+        setStatus(`Created rule ${data.id}.`);
+        await loadRules();
+      }));
+
+      el("update-btn").addEventListener("click", () => guarded(async () => {
+        const ruleId = el("rule-id").value.trim();
+        if (!ruleId) {
+          throw new Error("Select a rule before saving status.");
+        }
+        const data = await callApi(`/api/developer/network-rules/${encodeURIComponent(ruleId)}/status`, {
+          method: "POST",
+          body: {
+            status: el("update-status").value
+          }
+        });
+        setOutput(data);
+        setStatus(`Saved status for rule ${data.id}.`);
+        await loadRules();
+      }));
+
+      setSessionMeta();
+    </script>
+  </body>
+</html>

@@ -3038,6 +3038,76 @@ function queryAuditLogRows(db, filters = {}) {
   };
 }
 
+function queryNetworkRuleRows(db, filters = {}) {
+  const conditions = [];
+  const params = [];
+  const normalizedFilters = {
+    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+    actionScope: filters.actionScope ? String(filters.actionScope).trim().toLowerCase() : null,
+    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
+    search: filters.search ? String(filters.search).trim() : null
+  };
+
+  if (normalizedFilters.productCode) {
+    conditions.push("pr.code = ?");
+    params.push(normalizedFilters.productCode);
+  }
+
+  appendInCondition("pr.id", filters.productIds, conditions, params);
+
+  if (normalizedFilters.actionScope) {
+    conditions.push("nr.action_scope = ?");
+    params.push(normalizedFilters.actionScope);
+  }
+
+  if (normalizedFilters.status) {
+    if (!["active", "archived"].includes(normalizedFilters.status)) {
+      throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+    }
+    conditions.push("nr.status = ?");
+    params.push(normalizedFilters.status);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(nr.pattern LIKE ? ESCAPE '\\' OR COALESCE(nr.notes, '') LIKE ? ESCAPE '\\' OR COALESCE(pr.code, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern);
+  }
+
+  const items = many(
+    db,
+    `
+      SELECT nr.*, pr.code AS product_code, pr.name AS product_name
+      FROM network_rules nr
+      LEFT JOIN products pr ON pr.id = nr.product_id
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY nr.created_at DESC
+      LIMIT 100
+    `,
+    ...params
+  ).map((row) => ({
+    id: row.id,
+    productCode: row.product_code ?? null,
+    productName: row.product_name ?? null,
+    targetType: row.target_type,
+    pattern: row.pattern,
+    actionScope: row.action_scope,
+    decision: row.decision,
+    status: row.status,
+    notes: row.notes ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }));
+
+  return {
+    items,
+    total: items.length,
+    filters: normalizedFilters
+  };
+}
+
 function normalizePointAdjustMode(value = "add") {
   const mode = String(value ?? "add").trim().toLowerCase();
   if (!["add", "subtract", "set"].includes(mode)) {
@@ -10440,72 +10510,29 @@ export function createServices(db, config, runtimeState = null) {
 
     listNetworkRules(token, filters = {}) {
       requireAdminSession(db, token);
+      return queryNetworkRuleRows(db, filters);
+    },
 
-      const conditions = [];
-      const params = [];
-      const normalizedFilters = {
-        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-        actionScope: filters.actionScope ? String(filters.actionScope).trim().toLowerCase() : null,
-        status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-        search: filters.search ? String(filters.search).trim() : null
-      };
-
-      if (normalizedFilters.productCode) {
-        conditions.push("pr.code = ?");
-        params.push(normalizedFilters.productCode);
-      }
-
-      if (normalizedFilters.actionScope) {
-        conditions.push("nr.action_scope = ?");
-        params.push(normalizedFilters.actionScope);
-      }
-
-      if (normalizedFilters.status) {
-        if (!["active", "archived"].includes(normalizedFilters.status)) {
-          throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
-        }
-        conditions.push("nr.status = ?");
-        params.push(normalizedFilters.status);
-      }
-
-      if (normalizedFilters.search) {
-        const pattern = likeFilter(normalizedFilters.search);
-        conditions.push(
-          "(nr.pattern LIKE ? ESCAPE '\\' OR COALESCE(nr.notes, '') LIKE ? ESCAPE '\\' OR COALESCE(pr.code, '') LIKE ? ESCAPE '\\')"
+    developerListNetworkRules(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "products.read",
+        "DEVELOPER_NETWORK_RULE_FORBIDDEN",
+        "You can only view network rules under your assigned projects."
+      );
+      if (filters.productCode) {
+        requireDeveloperOwnedProductByCode(
+          db,
+          session,
+          String(filters.productCode).trim().toUpperCase(),
+          "products.read"
         );
-        params.push(pattern, pattern, pattern);
       }
-
-      const items = many(
-        db,
-        `
-          SELECT nr.*, pr.code AS product_code, pr.name AS product_name
-          FROM network_rules nr
-          LEFT JOIN products pr ON pr.id = nr.product_id
-          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY nr.created_at DESC
-          LIMIT 100
-        `,
-        ...params
-      ).map((row) => ({
-        id: row.id,
-        productCode: row.product_code ?? null,
-        productName: row.product_name ?? null,
-        targetType: row.target_type,
-        pattern: row.pattern,
-        actionScope: row.action_scope,
-        decision: row.decision,
-        status: row.status,
-        notes: row.notes ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      }));
-
-      return {
-        items,
-        total: items.length,
-        filters: normalizedFilters
-      };
+      return queryNetworkRuleRows(db, {
+        ...filters,
+        productIds: listDeveloperAccessibleProductIds(db, session)
+      });
     },
 
     createNetworkRule(token, body = {}) {
@@ -10584,6 +10611,92 @@ export function createServices(db, config, runtimeState = null) {
       };
     },
 
+    developerCreateNetworkRule(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "products.write",
+        "DEVELOPER_NETWORK_RULE_FORBIDDEN",
+        "You can only manage network rules under your assigned projects."
+      );
+      requireField(body, "pattern");
+
+      const product = requireDeveloperOwnedProductByCode(
+        db,
+        session,
+        readProductCodeInput(body),
+        "products.write"
+      );
+      const targetType = String(body.targetType ?? (String(body.pattern).includes("/") ? "cidr" : "ip"))
+        .trim()
+        .toLowerCase();
+      const pattern = String(body.pattern).trim();
+      const actionScope = String(body.actionScope ?? "all").trim().toLowerCase();
+      const decision = String(body.decision ?? "block").trim().toLowerCase();
+      const status = String(body.status ?? "active").trim().toLowerCase();
+      const notes = String(body.notes ?? "").trim();
+
+      if (!["ip", "cidr"].includes(targetType)) {
+        throw new AppError(400, "INVALID_NETWORK_TARGET_TYPE", "Target type must be ip or cidr.");
+      }
+      if (!["all", "register", "recharge", "login", "heartbeat"].includes(actionScope)) {
+        throw new AppError(400, "INVALID_NETWORK_ACTION_SCOPE", "Action scope is not supported.");
+      }
+      if (decision !== "block") {
+        throw new AppError(400, "INVALID_NETWORK_DECISION", "Only block rules are supported in this version.");
+      }
+      if (!["active", "archived"].includes(status)) {
+        throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+      }
+
+      if (targetType === "ip" && !normalizeIpAddress(pattern)) {
+        throw new AppError(400, "INVALID_NETWORK_PATTERN", "IP pattern is invalid.");
+      }
+      if (targetType === "cidr" && !ipv4CidrMatch(pattern.split("/")[0], pattern)) {
+        throw new AppError(400, "INVALID_NETWORK_PATTERN", "CIDR pattern must be a valid IPv4 CIDR.");
+      }
+
+      const timestamp = nowIso();
+      const id = generateId("nrule");
+      run(
+        db,
+        `
+          INSERT INTO network_rules
+          (id, product_id, target_type, pattern, action_scope, decision, status, notes, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        id,
+        product.id,
+        targetType,
+        pattern,
+        actionScope,
+        decision,
+        status,
+        notes || null,
+        timestamp,
+        timestamp
+      );
+
+      auditDeveloperSession(db, session, "network-rule.create", "network_rule", id, {
+        productCode: product.code,
+        targetType,
+        pattern,
+        actionScope,
+        status
+      });
+
+      return {
+        id,
+        productCode: product.code,
+        targetType,
+        pattern,
+        actionScope,
+        decision,
+        status,
+        notes: notes || null
+      };
+    },
+
     updateNetworkRuleStatus(token, ruleId, body = {}) {
       const admin = requireAdminSession(db, token);
       const row = one(
@@ -10620,6 +10733,77 @@ export function createServices(db, config, runtimeState = null) {
       );
 
       audit(db, "admin", admin.admin_id, "network-rule.status", "network_rule", row.id, {
+        productCode: row.product_code ?? null,
+        pattern: row.pattern,
+        actionScope: row.action_scope,
+        status
+      });
+
+      return {
+        id: row.id,
+        productCode: row.product_code ?? null,
+        pattern: row.pattern,
+        actionScope: row.action_scope,
+        status,
+        changed: status !== row.status,
+        updatedAt: timestamp
+      };
+    },
+
+    developerUpdateNetworkRuleStatus(token, ruleId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "products.write",
+        "DEVELOPER_NETWORK_RULE_FORBIDDEN",
+        "You can only manage network rules under your assigned projects."
+      );
+      const row = one(
+        db,
+        `
+          SELECT nr.*, pr.code AS product_code, pr.owner_developer_id
+          FROM network_rules nr
+          LEFT JOIN products pr ON pr.id = nr.product_id
+          WHERE nr.id = ?
+        `,
+        ruleId
+      );
+
+      if (!row) {
+        throw new AppError(404, "NETWORK_RULE_NOT_FOUND", "Network rule does not exist.");
+      }
+      if (!row.product_id) {
+        throw new AppError(403, "DEVELOPER_NETWORK_RULE_FORBIDDEN", "Developers cannot manage global network rules.");
+      }
+
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: row.product_id, owner_developer_id: row.owner_developer_id },
+        "products.write",
+        "DEVELOPER_NETWORK_RULE_FORBIDDEN",
+        "You can only manage network rules under your assigned projects."
+      );
+
+      const status = String(body.status ?? "").trim().toLowerCase();
+      if (!["active", "archived"].includes(status)) {
+        throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+      }
+
+      const timestamp = nowIso();
+      run(
+        db,
+        `
+          UPDATE network_rules
+          SET status = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        status,
+        timestamp,
+        row.id
+      );
+
+      auditDeveloperSession(db, session, "network-rule.status", "network_rule", row.id, {
         productCode: row.product_code ?? null,
         pattern: row.pattern,
         actionScope: row.action_scope,

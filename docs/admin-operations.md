@@ -171,6 +171,9 @@ Effects:
 - `GET /api/developer/device-blocks`
 - `POST /api/developer/device-blocks`
 - `POST /api/developer/device-blocks/:blockId/unblock`
+- `GET /api/developer/network-rules`
+- `POST /api/developer/network-rules`
+- `POST /api/developer/network-rules/:ruleId/status`
 - `GET /api/developer/audit-logs`
 
 Effects:
@@ -180,9 +183,11 @@ Effects:
 - developer members use the same `/api/developer/login` entry, but only see products explicitly assigned to them
 - developers and developer members only see projects where `products.owner_developer_id` matches the parent developer account
 - `/developer/ops` provides a dedicated authorization operations workspace for software authors
+- `/developer/security` provides a dedicated project network-rule workspace for software authors
 - `admin` developer members can edit feature toggles for assigned products; `operator` members cannot; `viewer` members are read-only
 - developers can create and manage policies, card batches, client versions, and notices only under their own or assigned projects
 - developers can inspect and control accounts, entitlements, sessions, bindings, device blocks, and scoped audit logs only under their own or assigned projects
+- developers can list project-scoped network rules inside their assigned scope, but only roles with `products.write` can create or archive those rules
 - developer card export is scoped to owned products, so exported CSV files never include another developer's inventory
 - changing the developer password revokes existing developer sessions and requires re-login
 - changing a developer member password or disabling a member revokes that member's existing sessions

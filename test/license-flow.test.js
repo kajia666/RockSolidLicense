@@ -2481,6 +2481,193 @@ test("network rules can block login by ip or cidr and recover after archive", as
   }
 });
 
+test("developers can manage scoped network rules while operators stay read-only", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "sec.owner",
+        password: "SecOwner123!",
+        displayName: "Security Owner"
+      },
+      adminSession.token
+    );
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "DEV_SEC_APP",
+        name: "Developer Security App",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "sec.owner",
+      password: "SecOwner123!"
+    });
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "DEV_SEC_APP",
+        name: "Developer Security Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "DEV_SEC_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "DEVSEC"
+      },
+      ownerSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "DEV_SEC_APP",
+      username: "secdevuser",
+      password: "StrongPass123"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "DEV_SEC_APP",
+      username: "secdevuser",
+      password: "StrongPass123",
+      cardKey: batch.keys[0]
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "sec.operator",
+        password: "SecOperator123!",
+        displayName: "Security Operator",
+        role: "operator",
+        productCodes: ["DEV_SEC_APP"]
+      },
+      ownerSession.token
+    );
+
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "sec.operator",
+      password: "SecOperator123!"
+    });
+
+    const createdRule = await postJson(
+      baseUrl,
+      "/api/developer/network-rules",
+      {
+        productCode: "DEV_SEC_APP",
+        targetType: "cidr",
+        pattern: "127.0.0.0/24",
+        actionScope: "login",
+        status: "active",
+        notes: "Developer local block"
+      },
+      ownerSession.token
+    );
+    assert.equal(createdRule.productCode, "DEV_SEC_APP");
+    assert.equal(createdRule.actionScope, "login");
+
+    const operatorRules = await getJson(
+      baseUrl,
+      "/api/developer/network-rules?productCode=DEV_SEC_APP&actionScope=login",
+      operatorSession.token
+    );
+    assert.equal(operatorRules.total, 1);
+    assert.equal(operatorRules.items[0].pattern, "127.0.0.0/24");
+
+    const operatorCreateForbidden = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/network-rules",
+      {
+        productCode: "DEV_SEC_APP",
+        targetType: "ip",
+        pattern: "127.0.0.1",
+        actionScope: "heartbeat"
+      },
+      operatorSession.token
+    );
+    assert.equal(operatorCreateForbidden.status, 403);
+    assert.equal(operatorCreateForbidden.error.code, "DEVELOPER_NETWORK_RULE_FORBIDDEN");
+
+    const blockedLogin = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "DEV_SEC_APP",
+        username: "secdevuser",
+        password: "StrongPass123",
+        deviceFingerprint: "dev-sec-device-001",
+        deviceName: "Security Desktop"
+      }
+    );
+    assert.equal(blockedLogin.status, 403);
+    assert.equal(blockedLogin.error.code, "NETWORK_RULE_BLOCKED");
+
+    const operatorArchiveForbidden = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/network-rules/${createdRule.id}/status`,
+      { status: "archived" },
+      operatorSession.token
+    );
+    assert.equal(operatorArchiveForbidden.status, 403);
+    assert.equal(operatorArchiveForbidden.error.code, "DEVELOPER_NETWORK_RULE_FORBIDDEN");
+
+    const archivedRule = await postJson(
+      baseUrl,
+      `/api/developer/network-rules/${createdRule.id}/status`,
+      { status: "archived" },
+      ownerSession.token
+    );
+    assert.equal(archivedRule.status, "archived");
+
+    const login = await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "DEV_SEC_APP",
+        username: "secdevuser",
+        password: "StrongPass123",
+        deviceFingerprint: "dev-sec-device-001",
+        deviceName: "Security Desktop"
+      }
+    );
+    assert.ok(login.sessionToken);
+
+    const auditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=80", ownerSession.token);
+    const eventTypes = auditLogs.items.map((entry) => entry.event_type);
+    assert.ok(eventTypes.includes("network-rule.create"));
+    assert.ok(eventTypes.includes("network-rule.status"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("reseller inventory can be allocated, tracked, and blocked from new allocation when disabled", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -5410,6 +5597,24 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/entitlements/);
     assert.match(html, /api\/developer\/device-bindings/);
     assert.match(html, /api\/developer\/audit-logs/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer security page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/security`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Security Center/);
+    assert.match(html, /api\/developer\/network-rules/);
+    assert.match(html, /Project-scoped only/);
+    assert.match(html, /Create Rule/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

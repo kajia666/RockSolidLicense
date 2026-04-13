@@ -19,6 +19,7 @@ const noticeCenterHtml = fs.readFileSync(path.join(currentDir, "web", "notice-ce
 const resellerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-ops.html"), "utf8");
 const resellerFinanceHtml = fs.readFileSync(path.join(currentDir, "web", "reseller-finance.html"), "utf8");
 const securityCenterHtml = fs.readFileSync(path.join(currentDir, "web", "security-center.html"), "utf8");
+const developerSecurityHtml = fs.readFileSync(path.join(currentDir, "web", "developer-security.html"), "utf8");
 
 function matchPath(pathname, pattern) {
   const pathnameParts = pathname.split("/").filter(Boolean);
@@ -83,6 +84,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/developer/ops") {
         sendHtml(res, 200, developerOpsHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/developer/security") {
+        sendHtml(res, 200, developerSecurityHtml);
         return;
       }
 
@@ -1157,11 +1163,33 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/network-rules") {
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerListNetworkRules(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            actionScope: url.searchParams.get("actionScope"),
+            status: url.searchParams.get("status"),
+            search: url.searchParams.get("search")
+          })
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/developer/notices") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
           data: services.developerCreateNotice(getBearerToken(req), body)
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/network-rules") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 201, {
+          ok: true,
+          data: services.developerCreateNetworkRule(getBearerToken(req), body)
         });
         return;
       }
@@ -1176,6 +1204,22 @@ export function createApp(overrides = {}) {
           data: services.developerUpdateNoticeStatus(
             getBearerToken(req),
             developerNoticeStatusRoute.noticeId,
+            body
+          )
+        });
+        return;
+      }
+
+      const developerNetworkRuleStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/network-rules/:ruleId/status")
+        : null;
+      if (developerNetworkRuleStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: services.developerUpdateNetworkRuleStatus(
+            getBearerToken(req),
+            developerNetworkRuleStatusRoute.ruleId,
             body
           )
         });

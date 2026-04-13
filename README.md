@@ -105,6 +105,7 @@ node src/server.js
 - 产品中心：`http://127.0.0.1:3000/admin/products`
 - 开发者中心：`http://127.0.0.1:3000/developer`
 - 开发者运营台：`http://127.0.0.1:3000/developer/ops`
+- 开发者安全中心：`http://127.0.0.1:3000/developer/security`
 - 公告中心：`http://127.0.0.1:3000/admin/notices`
 - 健康检查：`http://127.0.0.1:3000/api/health`
 - TCP Gateway：`tcp://127.0.0.1:4000`
@@ -257,6 +258,9 @@ TCP：
 - `GET /api/developer/device-blocks`
 - `POST /api/developer/device-blocks`
 - `POST /api/developer/device-blocks/:blockId/unblock`
+- `GET /api/developer/network-rules`
+- `POST /api/developer/network-rules`
+- `POST /api/developer/network-rules/:ruleId/status`
 - `GET /api/developer/audit-logs`
 - `GET /api/developer/client-versions`
 - `POST /api/developer/client-versions`
@@ -273,7 +277,7 @@ TCP：
 - `operator`：可管理已分配项目的策略、卡密、版本、公告和终端用户授权运营动作，但不能改产品功能开关
 - `viewer`：只读查看已分配项目及其策略、卡密、版本、公告，以及授权运营数据
 
-开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。
+开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
 
 ## Windows C/C++ SDK
 

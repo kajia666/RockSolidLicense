@@ -76,6 +76,15 @@ Owners update the main developer profile. Members update only their own display 
 
 Write-capable roles can also freeze accounts, extend entitlements, adjust points, revoke sessions, release bindings, and block or unblock devices inside their assigned project scope.
 
+## Project network security
+
+- `/developer/security`
+- `GET /api/developer/network-rules`
+- `POST /api/developer/network-rules`
+- `POST /api/developer/network-rules/:ruleId/status`
+
+These endpoints are project-scoped only. Developers and members can list rules only inside assigned products, while creating or archiving rules requires `products.write`. That typically means the owner account or an `admin` member. `operator` and `viewer` roles remain read-only for network-rule changes.
+
 ## SDK credential rotation
 
 - `POST /api/developer/products/:productId/sdk-credentials/rotate`

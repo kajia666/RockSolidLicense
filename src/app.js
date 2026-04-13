@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import { createDatabase } from "./database.js";
+import { createMainStore } from "./data/main-store.js";
 import { AppError, getBearerToken, readJsonBody, requestMeta, sendHtml, sendJson, sendText } from "./http.js";
 import { loadOrCreateLicenseKeyStore } from "./license-keys.js";
 import { createRuntimeStateStore } from "./runtime-state.js";
@@ -53,8 +54,9 @@ export function createApp(overrides = {}) {
   const config = loadConfig(overrides);
   config.licenseKeys = loadOrCreateLicenseKeyStore(config);
   const db = createDatabase(config);
+  const mainStore = createMainStore({ db, config });
   const runtimeState = createRuntimeStateStore({ db, config });
-  const services = createServices(db, config, runtimeState);
+  const services = createServices(db, config, runtimeState, mainStore);
   const tcpServer = createTcpServer({ services, config });
 
   const server = http.createServer(async (req, res) => {
@@ -1688,6 +1690,7 @@ export function createApp(overrides = {}) {
   return {
     config,
     db,
+    mainStore,
     runtimeState,
     services,
     server,

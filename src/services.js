@@ -40,6 +40,7 @@ import {
   parsePolicyUnbindConfigRow,
   queryPolicyRows
 } from "./data/policy-repository.js";
+import { createSqliteMainStore } from "./data/sqlite-main-store.js";
 import {
   addDays,
   addSeconds,
@@ -4646,7 +4647,8 @@ async function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
   return product;
 }
 
-export function createServices(db, config, runtimeState = null) {
+export function createServices(db, config, runtimeState = null, mainStore = null) {
+  const store = mainStore ?? createSqliteMainStore({ db });
   const stateStore = runtimeState ?? {
     registerNonceOrThrow(appId, nonce, expiresAt) {
       run(db, "DELETE FROM request_nonces WHERE expires_at <= ?", nowIso());
@@ -4721,6 +4723,10 @@ export function createServices(db, config, runtimeState = null) {
             driver: "sqlite",
             location: config.dbPath,
             postgresUrlConfigured: Boolean(config.postgresUrl)
+          },
+          mainStore: {
+            driver: store.driver,
+            repositories: store.repositories
           },
           runtimeState: await stateStore.health()
         }
@@ -5368,7 +5374,7 @@ export function createServices(db, config, runtimeState = null) {
 
     listProducts(token) {
       requireAdminSession(db, token);
-      return queryProductRows(db);
+      return store.products.queryProductRows(db);
     },
 
     createProduct(token, body) {
@@ -5447,7 +5453,10 @@ export function createServices(db, config, runtimeState = null) {
         "DEVELOPER_PRODUCT_FORBIDDEN",
         "You can only view projects assigned to your developer account."
       );
-      return listDeveloperAccessibleProductRows(db, session);
+      if (session.actor_scope === "owner") {
+        return store.products.queryProductRows(db, { ownerDeveloperId: session.developer_id });
+      }
+      return store.products.queryProductRows(db, { productIds: listDeveloperAccessibleProductIds(db, session) });
     },
 
     developerDashboard(token) {
@@ -5567,7 +5576,7 @@ export function createServices(db, config, runtimeState = null) {
 
     listPolicies(token, productCode = null) {
       requireAdminSession(db, token);
-      return queryPolicyRows(db, productCode ? { productCode } : {});
+      return store.policies.queryPolicyRows(db, productCode ? { productCode } : {});
     },
 
     developerListPolicies(token, filters = {}) {
@@ -5586,7 +5595,7 @@ export function createServices(db, config, runtimeState = null) {
           "policies.read"
         );
       }
-      return queryPolicyRows(db, {
+      return store.policies.queryPolicyRows(db, {
         productCode: filters.productCode ?? null,
         productIds: listDeveloperAccessibleProductIds(db, session)
       });
@@ -6059,7 +6068,7 @@ export function createServices(db, config, runtimeState = null) {
 
     listCards(token, filters = {}) {
       requireAdminSession(db, token);
-      const { items, summary, filters: normalizedFilters } = queryCardRows(db, filters);
+      const { items, summary, filters: normalizedFilters } = store.cards.queryCardRows(db, filters);
       return {
         items,
         total: items.length,
@@ -6070,7 +6079,7 @@ export function createServices(db, config, runtimeState = null) {
 
     exportCardsCsv(token, filters = {}) {
       requireAdminSession(db, token);
-      const { items } = queryCardRows(db, filters, { limit: 5000 });
+      const { items } = store.cards.queryCardRows(db, filters, { limit: 5000 });
       return buildCardsCsv(items);
     },
 
@@ -6090,7 +6099,7 @@ export function createServices(db, config, runtimeState = null) {
           "cards.read"
         );
       }
-      const { items, summary, filters: normalizedFilters } = queryCardRows(
+      const { items, summary, filters: normalizedFilters } = store.cards.queryCardRows(
         db,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) }
       );
@@ -6118,7 +6127,7 @@ export function createServices(db, config, runtimeState = null) {
           "cards.read"
         );
       }
-      const { items } = queryCardRows(
+      const { items } = store.cards.queryCardRows(
         db,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
         { limit: 5000 }
@@ -6173,7 +6182,7 @@ export function createServices(db, config, runtimeState = null) {
         });
 
         return {
-          ...getCardRowById(db, card.id),
+          ...store.cards.getCardRowById(db, card.id),
           changed: true,
           revokedSessions
         };
@@ -6212,7 +6221,7 @@ export function createServices(db, config, runtimeState = null) {
         });
 
         return {
-          ...getCardRowById(db, card.id),
+          ...store.cards.getCardRowById(db, card.id),
           changed: true,
           revokedSessions
         };
@@ -6480,7 +6489,7 @@ export function createServices(db, config, runtimeState = null) {
 
     listEntitlements(token, filters = {}) {
       requireAdminSession(db, token);
-      const { items, filters: normalizedFilters } = queryEntitlementRows(db, filters);
+      const { items, filters: normalizedFilters } = store.entitlements.queryEntitlementRows(db, filters);
       return {
         items,
         total: items.length,
@@ -6504,7 +6513,7 @@ export function createServices(db, config, runtimeState = null) {
           "ops.read"
         );
       }
-      const { items, filters: normalizedFilters } = queryEntitlementRows(db, {
+      const { items, filters: normalizedFilters } = store.entitlements.queryEntitlementRows(db, {
         ...filters,
         productIds: listDeveloperAccessibleProductIds(db, session)
       });

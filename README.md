@@ -163,6 +163,8 @@ npm run db:postgres:check
 
 当前主数据访问层也已经开始抽边界，第一块仓储是：
 
+- [main-store.js](/D:/code/OnlineVerification/src/data/main-store.js)
+- [sqlite-main-store.js](/D:/code/OnlineVerification/src/data/sqlite-main-store.js)
 - [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
 - [policy-repository.js](/D:/code/OnlineVerification/src/data/policy-repository.js)
 - [card-repository.js](/D:/code/OnlineVerification/src/data/card-repository.js)

@@ -891,7 +891,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.revokeSession(
+          data: await services.revokeSession(
             getBearerToken(req),
             sessionRevokeRoute.sessionId,
             body
@@ -1444,7 +1444,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerRevokeSession(
+          data: await services.developerRevokeSession(
             getBearerToken(req),
             developerSessionRevokeRoute.sessionId,
             body

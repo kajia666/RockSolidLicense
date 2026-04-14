@@ -267,6 +267,30 @@ test("app exposes sqlite main store and services read through it", async () => {
     });
     assert.equal(issuedSession.session_token, "session-token-store-main");
 
+    const sessionByProductToken = app.mainStore.sessions.getSessionRecordByProductToken(
+      app.db,
+      directProduct.id,
+      "session-token-store-main"
+    );
+    assert.equal(sessionByProductToken.id, "sess_store_main");
+
+    const sessionHeartbeatRow = app.mainStore.sessions.getActiveSessionHeartbeatRow(
+      app.db,
+      directProduct.id,
+      "session-token-store-main"
+    );
+    assert.equal(sessionHeartbeatRow.id, "sess_store_main");
+    assert.equal(sessionHeartbeatRow.username, "store_direct_user");
+    assert.equal(sessionHeartbeatRow.fingerprint, "store-session-device");
+
+    const sessionManageRow = app.mainStore.sessions.getSessionManageRowById(
+      app.db,
+      "sess_store_main"
+    );
+    assert.equal(sessionManageRow.id, "sess_store_main");
+    assert.equal(sessionManageRow.product_code, "STOREAPP2");
+    assert.equal(sessionManageRow.username, "store_direct_user");
+
     const touchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
     assert.equal(touchedAccount.last_login_at, "2026-01-05T00:00:00.000Z");
 

@@ -4261,6 +4261,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     ));
   }
 
+  async function getStoreSessionRecordByProductToken(productId, sessionToken) {
+    return Promise.resolve(store.sessions.getSessionRecordByProductToken(db, productId, sessionToken));
+  }
+
+  async function getStoreActiveHeartbeatSession(productId, sessionToken) {
+    return Promise.resolve(store.sessions.getActiveSessionHeartbeatRow(db, productId, sessionToken));
+  }
+
+  async function getStoreSessionManageRowById(sessionId) {
+    return Promise.resolve(store.sessions.getSessionManageRowById(db, sessionId));
+  }
+
   return {
     async health() {
       expireStaleSessions(db, store, stateStore);
@@ -9206,23 +9218,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
     },
 
-    revokeSession(token, sessionId, body = {}) {
+    async revokeSession(token, sessionId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const session = one(
-        db,
-        `
-          SELECT s.id, s.status, s.revoked_reason,
-                 pr.code AS product_code,
-                 a.username,
-                 d.fingerprint
-          FROM sessions s
-          JOIN customer_accounts a ON a.id = s.account_id
-          JOIN devices d ON d.id = s.device_id
-          JOIN products pr ON pr.id = s.product_id
-          WHERE s.id = ?
-        `,
-        sessionId
-      );
+      const session = await getStoreSessionManageRowById(sessionId);
 
       if (!session) {
         throw new AppError(404, "SESSION_NOT_FOUND", "Session does not exist.");
@@ -9254,7 +9252,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    developerRevokeSession(token, sessionId, body = {}) {
+    async developerRevokeSession(token, sessionId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -9262,21 +9260,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage sessions under your assigned projects."
       );
-      const targetSession = one(
-        db,
-        `
-          SELECT s.id, s.status, s.revoked_reason, s.product_id,
-                 pr.code AS product_code, pr.owner_developer_id,
-                 a.username,
-                 d.fingerprint
-          FROM sessions s
-          JOIN customer_accounts a ON a.id = s.account_id
-          JOIN devices d ON d.id = s.device_id
-          JOIN products pr ON pr.id = s.product_id
-          WHERE s.id = ?
-        `,
-        sessionId
-      );
+      const targetSession = await getStoreSessionManageRowById(sessionId);
 
       if (!targetSession) {
         throw new AppError(404, "SESSION_NOT_FOUND", "Session does not exist.");
@@ -9853,26 +9837,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         });
       }
 
-      return withTransaction(db, () => {
+      return withTransaction(db, async () => {
         expireStaleSessions(db, store, stateStore);
-        const session = one(
-          db,
-          `
-            SELECT s.*, d.fingerprint, a.username, e.status AS entitlement_status,
-                   pol.heartbeat_interval_seconds, pol.heartbeat_timeout_seconds, pol.token_ttl_seconds,
-                   lkc.status AS card_control_status, lkc.expires_at AS card_expires_at
-            FROM sessions s
-            JOIN devices d ON d.id = s.device_id
-            JOIN customer_accounts a ON a.id = s.account_id
-            JOIN entitlements e ON e.id = s.entitlement_id
-            JOIN policies pol ON pol.id = e.policy_id
-            JOIN license_keys lk ON lk.id = e.source_license_key_id
-            LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
-            WHERE s.product_id = ? AND s.session_token = ? AND s.status = 'active'
-          `,
-          product.id,
-          sessionToken
-        );
+        const session = await getStoreActiveHeartbeatSession(product.id, sessionToken);
 
         if (!session) {
           throw new AppError(401, "SESSION_INVALID", "Session token is invalid or expired.");
@@ -9942,9 +9909,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       requireField(body, "sessionToken");
       requireSignedProductCodeMatch(product, body);
 
-      const session = one(
-        db,
-        "SELECT * FROM sessions WHERE product_id = ? AND session_token = ?",
+      const session = await getStoreSessionRecordByProductToken(
         product.id,
         String(body.sessionToken).trim()
       );

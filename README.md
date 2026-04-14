@@ -202,9 +202,9 @@ npm run db:postgres:check
 - `entitlements`：卡密充值生成授权、卡密直登激活授权、授权冻结/恢复、续期、点数调账
 - `accounts`：终端账号注册、卡密直登账号映射、账号列表、账号禁用/恢复、最近登录时间更新
 - `devices`：设备指纹记录、绑定身份快照、绑定管理查询、绑定列表/释放、自助解绑计数与日志、设备封禁查找、登录时设备绑定落点
-- `sessions`：登录会话写入、按 `product + sessionToken` 的会话查找、心跳续期、会话过期扫描、退出登录和会话失效状态更新落点
+- `sessions`：登录会话写入、会话列表查询、按 `product + sessionToken` 的会话查找、心跳续期、会话过期扫描、退出登录和会话失效状态更新落点
 
-也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 已经收进 `mainStore.entitlements`，而且登录前的 `usable entitlement` 选择和失败时的 `latest entitlement snapshot` 也已经通过这层边界提供；`device upsert -> binding profile -> session issuance -> heartbeat refresh -> logout/revoke` 也已经分别收进 `mainStore.devices / sessions`。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements / accounts` 这五组核心主数据都已经可以逐步走向 PostgreSQL write preview，`devices / sessions` 也已经进入 PostgreSQL read-side preview，其中 `devices` 对绑定释放与自助解绑日志链路提供 `postgres_partial` 写侧预览，`sessions` 则已经对会话创建、心跳续期、按条件失效回收这条运行主链提供 `postgres_partial` 写侧预览。剩余还没有完全迁走的部分，主要是会话列表统计这类仍直接依赖服务层 SQLite 聚合查询的管理视图，以及部分设备写侧链路，后续会继续按边界收口。
+也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 已经收进 `mainStore.entitlements`，而且登录前的 `usable entitlement` 选择和失败时的 `latest entitlement snapshot` 也已经通过这层边界提供；`device upsert -> binding profile -> session issuance -> heartbeat refresh -> logout/revoke` 也已经分别收进 `mainStore.devices / sessions`。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements / accounts` 这五组核心主数据都已经可以逐步走向 PostgreSQL write preview，`devices / sessions` 也已经进入 PostgreSQL read-side preview，其中 `devices` 对绑定释放与自助解绑日志链路提供 `postgres_partial` 写侧预览，`sessions` 则已经对会话创建、会话列表查询、心跳续期、按条件失效回收这条运行主链提供 `postgres_partial` 写侧预览。剩余还没有完全迁走的部分，主要是在线统计/看板汇总这类仍直接依赖服务层聚合查询的视图，以及部分设备写侧链路，后续会继续按边界收口。
 
 ## 终端用户主流程
 

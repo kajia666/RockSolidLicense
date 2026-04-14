@@ -1108,6 +1108,31 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "sessions" && meta.operation === "querySessionRows") {
+        return [
+          {
+            id: "sess_pg_1",
+            account_id: "acct_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            status: "active",
+            issued_at: "2026-01-04T00:00:00.000Z",
+            expires_at: "2026-01-04T01:00:00.000Z",
+            last_heartbeat_at: "2026-01-04T00:10:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            user_agent: "postgres-session-test",
+            revoked_reason: null,
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            username: "pguser",
+            fingerprint: "pg-device-001",
+            device_name: "PG Desktop",
+            policy_name: "PG Policy"
+          }
+        ];
+      }
+
       if (meta.repository === "sessions" && meta.operation === "listActiveSessionExpiryRows") {
         return [
           {
@@ -1248,7 +1273,16 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(activeSessionExpiryRows.length, 1);
     assert.equal(activeSessionExpiryRows[0].session_token, "session_pg_1");
 
-    assert.equal(queries.length, 19);
+    const sessionRows = await app.mainStore.sessions.querySessionRows(app.db, {
+      productCode: "PGAPP",
+      username: "pguser",
+      status: "active"
+    });
+    assert.equal(sessionRows.total, 1);
+    assert.equal(sessionRows.items[0].product_code, "PGAPP");
+    assert.equal(sessionRows.items[0].policy_name, "PG Policy");
+
+    assert.equal(queries.length, 20);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -1287,6 +1321,8 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[17].sql, /JOIN products pr ON pr\.id = s\.product_id/i);
     assert.equal(queries[18].meta.operation, "listActiveSessionExpiryRows");
     assert.match(queries[18].sql, /JOIN policies p ON p\.id = e\.policy_id/i);
+    assert.equal(queries[19].meta.operation, "querySessionRows");
+    assert.match(queries[19].sql, /ORDER BY s\.last_heartbeat_at DESC/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");

@@ -2152,75 +2152,7 @@ function queryDeviceBlockRows(db, filters = {}) {
 
 async function querySessionRows(db, store, filters = {}, runtimeState = null) {
   await expireStaleSessions(db, store, runtimeState);
-
-  const conditions = [];
-  const params = [];
-  const normalizedFilters = {
-    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-    username: filters.username ? String(filters.username).trim() : null,
-    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-    search: filters.search ? String(filters.search).trim() : null
-  };
-
-  if (
-    normalizedFilters.status &&
-    !["active", "expired"].includes(normalizedFilters.status)
-  ) {
-    throw new AppError(400, "INVALID_SESSION_STATUS", "Session status must be active or expired.");
-  }
-
-  if (normalizedFilters.productCode) {
-    conditions.push("pr.code = ?");
-    params.push(normalizedFilters.productCode);
-  }
-
-  appendInCondition("pr.id", filters.productIds, conditions, params);
-
-  if (normalizedFilters.username) {
-    conditions.push("a.username = ?");
-    params.push(normalizedFilters.username);
-  }
-
-  if (normalizedFilters.status) {
-    conditions.push("s.status = ?");
-    params.push(normalizedFilters.status);
-  }
-
-  if (normalizedFilters.search) {
-    const pattern = likeFilter(normalizedFilters.search);
-    conditions.push(
-      "(a.username LIKE ? ESCAPE '\\' OR d.fingerprint LIKE ? ESCAPE '\\' OR s.id LIKE ? ESCAPE '\\')"
-    );
-    params.push(pattern, pattern, pattern);
-  }
-
-  const items = many(
-    db,
-    `
-      SELECT s.id, s.account_id, s.entitlement_id, s.device_id, s.status, s.issued_at, s.expires_at,
-             s.last_heartbeat_at, s.last_seen_ip, s.user_agent, s.revoked_reason,
-             pr.id AS product_id, pr.code AS product_code, pr.name AS product_name,
-             a.username,
-             d.fingerprint, d.device_name,
-             pol.name AS policy_name
-      FROM sessions s
-      JOIN customer_accounts a ON a.id = s.account_id
-      JOIN devices d ON d.id = s.device_id
-      JOIN products pr ON pr.id = s.product_id
-      JOIN entitlements e ON e.id = s.entitlement_id
-      JOIN policies pol ON pol.id = e.policy_id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY s.last_heartbeat_at DESC
-      LIMIT 100
-    `,
-    ...params
-  );
-
-  return {
-    items,
-    total: items.length,
-    filters: normalizedFilters
-  };
+  return Promise.resolve(store.sessions.querySessionRows(db, filters));
 }
 
 function queryAuditLogRows(db, filters = {}) {

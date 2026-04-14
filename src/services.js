@@ -5,7 +5,6 @@ import {
   DEFAULT_PRODUCT_FEATURE_CONFIG,
   findOwnedProductIdByCode,
   getActiveProductRecordByCode,
-  getActiveProductRecordBySdkAppId,
   getProductRecordById,
   getProductRowById,
   listAssignedDeveloperProductIds,
@@ -4095,7 +4094,7 @@ function enforceNetworkRules(db, product, ip, actionScope) {
   });
 }
 
-async function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
+async function requireSignedProduct(db, store, config, stateStore, reqLike, rawBody) {
   const appId = reqLike.headers["x-rs-app-id"];
   const timestamp = reqLike.headers["x-rs-timestamp"];
   const nonce = reqLike.headers["x-rs-nonce"];
@@ -4105,7 +4104,7 @@ async function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
     throw new AppError(401, "SDK_SIGNATURE_REQUIRED", "Missing signed SDK headers.");
   }
 
-  const product = getActiveProductRecordBySdkAppId(db, appId);
+  const product = await Promise.resolve(store.products.getActiveProductRowBySdkAppId(db, appId));
   if (!product) {
     throw new AppError(401, "SDK_APP_INVALID", "Unknown SDK app id.");
   }
@@ -4120,7 +4119,7 @@ async function requireSignedProduct(db, config, stateStore, reqLike, rawBody) {
     throw new AppError(401, "SDK_SIGNATURE_EXPIRED", "Request timestamp is outside the allowed window.");
   }
 
-  const expected = signClientRequest(product.sdk_app_secret, {
+  const expected = signClientRequest(product.sdkAppSecret ?? product.sdk_app_secret, {
     method: reqLike.method,
     path: reqLike.path,
     timestamp,
@@ -8859,7 +8858,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async clientNotices(reqLike, body, rawBody) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireSignedProductCodeMatch(product, body);
 
       const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
@@ -9342,7 +9341,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async checkClientVersion(reqLike, body, rawBody) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireField(body, "clientVersion");
       requireSignedProductCodeMatch(product, body);
 
@@ -9360,7 +9359,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async clientBindings(reqLike, body, rawBody, meta = {}) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireSignedProductCodeMatch(product, body);
 
       const productFeatureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
@@ -9406,7 +9405,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async clientUnbind(reqLike, body, rawBody, meta = {}) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireSignedProductCodeMatch(product, body);
 
       requireProductFeatureEnabled(
@@ -9561,7 +9560,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async registerClient(reqLike, body, rawBody, meta = {}) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireField(body, "username");
       requireField(body, "password");
       requireSignedProductCodeMatch(product, body);
@@ -9601,7 +9600,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async redeemCard(reqLike, body, rawBody, meta = {}) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireField(body, "username");
       requireField(body, "password");
       requireField(body, "cardKey");
@@ -9650,7 +9649,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async cardLoginClient(reqLike, body, rawBody, meta = {}) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireField(body, "cardKey");
       requireField(body, "deviceFingerprint");
       requireSignedProductCodeMatch(product, body);
@@ -9758,7 +9757,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async loginClient(reqLike, body, rawBody, meta = {}) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireField(body, "username");
       requireField(body, "password");
       requireField(body, "deviceFingerprint");
@@ -9823,7 +9822,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async heartbeatClient(reqLike, body, rawBody, meta) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireField(body, "sessionToken");
       requireField(body, "deviceFingerprint");
       const sessionToken = String(body.sessionToken).trim();
@@ -9905,7 +9904,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async logoutClient(reqLike, body, rawBody) {
-      const product = await requireSignedProduct(db, config, stateStore, reqLike, rawBody);
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireField(body, "sessionToken");
       requireSignedProductCodeMatch(product, body);
 

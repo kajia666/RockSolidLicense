@@ -44,6 +44,8 @@ function createWriteCapableAdapter() {
     return state.products
       .filter((product) => !filters.productId || product.id === filters.productId)
       .filter((product) => !filters.productCode || product.code === filters.productCode)
+      .filter((product) => !filters.sdkAppId || product.sdk_app_id === filters.sdkAppId)
+      .filter((product) => !filters.status || product.status === filters.status)
       .filter((product) => !filters.ownerDeveloperId || product.owner_developer_id === filters.ownerDeveloperId)
       .filter((product) => !filters.productIds || filters.productIds.includes(product.id))
       .map((product) => {
@@ -248,6 +250,10 @@ function createWriteCapableAdapter() {
 
     if (meta.repository === "products" && (meta.operation === "queryProductRows" || meta.operation === "loadProductRow")) {
       return productRows(meta.filters ?? { productId: meta.productId });
+    }
+
+    if (meta.repository === "products" && meta.operation === "getActiveProductRowBySdkAppId") {
+      return productRows({ sdkAppId: meta.sdkAppId, status: "active" }).slice(0, 1);
     }
 
     if (meta.repository === "policies" && meta.operation === "createPolicy") {
@@ -640,6 +646,10 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(products[0].code, "PGAPP");
     assert.equal(products[0].ownerDeveloper.username, "pgdev");
 
+    const signedProduct = await app.mainStore.products.getActiveProductRowBySdkAppId(app.db, "app_pg_1");
+    assert.equal(signedProduct.id, "prod_pg_1");
+    assert.equal(signedProduct.code, "PGAPP");
+
     const policies = await app.services.listPolicies(admin.token, { productCode: "PGAPP" });
     assert.equal(policies.length, 1);
     assert.equal(policies[0].productCode, "PGAPP");
@@ -659,17 +669,19 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(entitlements.items[0].username, "pguser");
     assert.equal(entitlements.items[0].remainingPoints, 17);
 
-    assert.equal(queries.length, 5);
+    assert.equal(queries.length, 6);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
-    assert.equal(queries[1].meta.repository, "policies");
-    assert.match(queries[1].sql, /FROM policies p/i);
-    assert.equal(queries[2].meta.repository, "cards");
-    assert.match(queries[2].sql, /FROM license_keys lk/i);
+    assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
+    assert.match(queries[1].sql, /p\.sdk_app_id = \$1/i);
+    assert.equal(queries[2].meta.repository, "policies");
+    assert.match(queries[2].sql, /FROM policies p/i);
     assert.equal(queries[3].meta.repository, "cards");
-    assert.match(queries[3].sql, /WHERE lk\.id = \$1/i);
-    assert.equal(queries[4].meta.repository, "entitlements");
-    assert.match(queries[4].sql, /FROM entitlements e/i);
+    assert.match(queries[3].sql, /FROM license_keys lk/i);
+    assert.equal(queries[4].meta.repository, "cards");
+    assert.match(queries[4].sql, /WHERE lk\.id = \$1/i);
+    assert.equal(queries[5].meta.repository, "entitlements");
+    assert.match(queries[5].sql, /FROM entitlements e/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");

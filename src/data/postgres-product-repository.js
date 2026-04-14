@@ -60,6 +60,14 @@ export function createPostgresProductRepository(adapter) {
         conditions.push(`p.code = $${params.length + 1}`);
         params.push(filters.productCode);
       }
+      if (filters.sdkAppId) {
+        conditions.push(`p.sdk_app_id = $${params.length + 1}`);
+        params.push(filters.sdkAppId);
+      }
+      if (filters.status) {
+        conditions.push(`p.status = $${params.length + 1}`);
+        params.push(String(filters.status).trim().toLowerCase());
+      }
       appendInCondition("p.id", filters.productIds, conditions, params);
 
       const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -74,6 +82,20 @@ export function createPostgresProductRepository(adapter) {
       ));
 
       return rows.map((row) => formatProductRow(row));
+    },
+
+    async getActiveProductRowBySdkAppId(_db, appId) {
+      const rows = await Promise.resolve(adapter.query(
+        `${productSelectSql("WHERE p.sdk_app_id = $1 AND p.status = 'active'")} ORDER BY p.created_at DESC LIMIT 1`,
+        [appId],
+        {
+          repository: "products",
+          operation: "getActiveProductRowBySdkAppId",
+          sdkAppId: appId
+        }
+      ));
+
+      return rows[0] ? formatProductRow(rows[0]) : null;
     }
   };
 }

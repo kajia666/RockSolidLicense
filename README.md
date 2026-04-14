@@ -196,7 +196,7 @@ npm run db:postgres:check
 
 当前已经落进 `mainStore` 的七块主数据边界是：
 
-- `products`：项目创建、功能开关更新、SDK 凭据轮换、项目归属切换
+- `products`：项目创建、功能开关更新、SDK 凭据轮换、项目归属切换、签名入口 `sdkAppId` 查找
 - `policies`：策略创建、运行时绑定/多开配置、自助解绑配置
 - `cards`：批量发卡、卡密冻结/恢复/过期控制
 - `entitlements`：卡密充值生成授权、卡密直登激活授权、授权冻结/恢复、续期、点数调账

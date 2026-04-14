@@ -119,6 +119,14 @@ export function queryProductRows(db, filters = {}) {
     conditions.push("p.code = ?");
     params.push(filters.productCode);
   }
+  if (filters.sdkAppId) {
+    conditions.push("p.sdk_app_id = ?");
+    params.push(filters.sdkAppId);
+  }
+  if (filters.status) {
+    conditions.push("p.status = ?");
+    params.push(String(filters.status).trim().toLowerCase());
+  }
   appendInCondition("p.id", filters.productIds, conditions, params);
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -149,6 +157,10 @@ export function getActiveProductRecordByCode(db, productCode) {
 
 export function getActiveProductRecordBySdkAppId(db, appId) {
   return one(db, "SELECT * FROM products WHERE sdk_app_id = ? AND status = 'active'", appId);
+}
+
+export function getActiveProductRowBySdkAppId(db, appId) {
+  return queryProductRows(db, { sdkAppId: appId, status: "active" })[0] ?? null;
 }
 
 export function productCodeExists(db, productCode) {

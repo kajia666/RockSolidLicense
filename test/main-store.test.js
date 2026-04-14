@@ -82,6 +82,13 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(directProduct.code, "STOREAPP2");
     assert.equal(directProduct.ownerDeveloper.id, developer.id);
 
+    const signedProduct = app.mainStore.products.getActiveProductRowBySdkAppId(
+      app.db,
+      directProduct.sdkAppId
+    );
+    assert.equal(signedProduct.id, directProduct.id);
+    assert.equal(signedProduct.code, "STOREAPP2");
+
     const directAccount = app.mainStore.accounts.createAccount(directProduct, {
       username: "store_direct_user",
       passwordHash: "direct-hash"

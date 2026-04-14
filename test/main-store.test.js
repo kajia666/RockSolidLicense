@@ -30,13 +30,14 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(app.mainStore.driver, "sqlite");
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements"]
+      ["products", "policies", "cards", "entitlements", "accounts"]
     );
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
       policies: "sqlite",
       cards: "sqlite",
-      entitlements: "sqlite"
+      entitlements: "sqlite",
+      accounts: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -78,6 +79,24 @@ test("app exposes sqlite main store and services read through it", async () => {
     }, developer.id);
     assert.equal(directProduct.code, "STOREAPP2");
     assert.equal(directProduct.ownerDeveloper.id, developer.id);
+
+    const directAccount = app.mainStore.accounts.createAccount(directProduct, {
+      username: "store_direct_user",
+      passwordHash: "direct-hash"
+    });
+    assert.equal(directAccount.username, "store_direct_user");
+
+    const accountRows = app.mainStore.accounts.queryAccountRows(app.db, {
+      productCode: "STOREAPP2"
+    });
+    assert.equal(accountRows.items.length, 1);
+    assert.equal(accountRows.items[0].username, "store_direct_user");
+
+    const disabledAccount = app.mainStore.accounts.updateAccountStatus(directAccount.id, "disabled");
+    assert.equal(disabledAccount.status, "disabled");
+
+    const restoredAccount = app.mainStore.accounts.updateAccountStatus(directAccount.id, "active");
+    assert.equal(restoredAccount.status, "active");
 
     const directPolicy = app.mainStore.policies.createPolicy(directProduct, {
       name: "Direct Store Policy",
@@ -150,24 +169,18 @@ test("app exposes sqlite main store and services read through it", async () => {
 
     const durationCard = directCards.items.find((item) => item.id !== updatedCard.card.id);
     assert.ok(durationCard);
-    const accountId = "acct_store_main";
     const now = new Date().toISOString();
     const durationEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    app.db.prepare(`
-      INSERT INTO customer_accounts
-      (id, product_id, username, password_hash, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'active', ?, ?)
-    `).run(accountId, directProduct.id, "store_user", "test-hash", now, now);
     app.db.prepare(`
       UPDATE license_keys
       SET status = 'redeemed', redeemed_by_account_id = ?, redeemed_at = ?
       WHERE id = ?
-    `).run(accountId, now, durationCard.id);
+    `).run(directAccount.id, now, durationCard.id);
     app.db.prepare(`
       INSERT INTO entitlements
       (id, product_id, account_id, policy_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `).run("ent_store_duration", directProduct.id, accountId, directPolicy.id, durationCard.id, now, durationEndsAt, now, now);
+    `).run("ent_store_duration", directProduct.id, directAccount.id, directPolicy.id, durationCard.id, now, durationEndsAt, now, now);
 
     const pointPolicy = app.mainStore.policies.createPolicy(directProduct, {
       name: "Point Store Policy",
@@ -190,12 +203,12 @@ test("app exposes sqlite main store and services read through it", async () => {
       UPDATE license_keys
       SET status = 'redeemed', redeemed_by_account_id = ?, redeemed_at = ?
       WHERE id = ?
-    `).run(accountId, now, pointCard.id);
+    `).run(directAccount.id, now, pointCard.id);
     app.db.prepare(`
       INSERT INTO entitlements
       (id, product_id, account_id, policy_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `).run("ent_store_points", directProduct.id, accountId, pointPolicy.id, pointCard.id, now, pointEndsAt, now, now);
+    `).run("ent_store_points", directProduct.id, directAccount.id, pointPolicy.id, pointCard.id, now, pointEndsAt, now, now);
     app.db.prepare(`
       INSERT INTO entitlement_metering
       (entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at)

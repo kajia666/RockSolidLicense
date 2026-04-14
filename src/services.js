@@ -222,11 +222,12 @@ function revokeDeveloperMemberSessions(db, whereSql, params = []) {
 }
 
 async function finalizeIssuedSessionRuntime(db, stateStore, payload) {
-  if (!payload?.runtime) {
-    return payload;
+  const resolvedPayload = await Promise.resolve(payload);
+  if (!resolvedPayload?.runtime) {
+    return resolvedPayload;
   }
 
-  const runtime = payload.runtime;
+  const runtime = resolvedPayload.runtime;
   if (stateStore?.commitSessionRuntime) {
     const result = await stateStore.commitSessionRuntime(runtime.session, {
       claimSingleOwner: runtime.claimSingleOwner
@@ -238,7 +239,7 @@ async function finalizeIssuedSessionRuntime(db, stateStore, payload) {
     stateStore.recordSession(runtime.session);
   }
 
-  const { runtime: _runtime, ...publicPayload } = payload;
+  const { runtime: _runtime, ...publicPayload } = resolvedPayload;
   return publicPayload;
 }
 
@@ -1978,20 +1979,16 @@ function queryBindingsForEntitlement(db, entitlementId) {
   }));
 }
 
-function resolveClientManagedAccount(db, product, body) {
+async function resolveClientManagedAccount(db, store, product, body) {
   if (body.username !== undefined || body.password !== undefined) {
     requireField(body, "username");
     requireField(body, "password");
-    const account = one(
+    const account = await Promise.resolve(store.accounts.getAccountRecordByProductUsername(
       db,
-      `
-        SELECT *
-        FROM customer_accounts
-        WHERE product_id = ? AND username = ? AND status = 'active'
-      `,
       product.id,
-      String(body.username).trim()
-    );
+      String(body.username).trim(),
+      "active"
+    ));
 
     if (!account || !verifyPassword(String(body.password), account.password_hash)) {
       throw new AppError(401, "ACCOUNT_LOGIN_FAILED", "Username or password is incorrect.");
@@ -2034,12 +2031,17 @@ function resolveClientManagedAccount(db, product, body) {
 
     let account = null;
     if (card.card_login_account_id) {
-      account = one(db, "SELECT * FROM customer_accounts WHERE id = ?", card.card_login_account_id);
+      account = await Promise.resolve(store.accounts.getAccountRecordById(db, card.card_login_account_id));
       if (!account || account.status !== "active") {
         throw new AppError(403, "CARD_LOGIN_DISABLED", "This card-login identity has been disabled.");
       }
     } else {
-      account = createCardLoginAccount(db, product, card);
+      account = await Promise.resolve(store.accounts.createCardLoginAccount(product, card, nowIso()));
+      audit(db, "license_key", card.id, "card.direct_account_create", "account", account.id, {
+        productCode: product.code,
+        username: account.username,
+        cardKeyMasked: maskCardKey(card.card_key)
+      });
       activateFreshCardEntitlement(db, product, account, card, "card.direct_redeem", {
         authMode: "card"
       });
@@ -2061,78 +2063,6 @@ function resolveClientManagedAccount(db, product, body) {
 
   throw new AppError(400, "CLIENT_AUTH_REQUIRED", "Provide username/password or cardKey for this action.");
 }
-
-function queryAccountRows(db, filters = {}, runtimeState = null) {
-  expireStaleSessions(db, runtimeState);
-
-  const conditions = [];
-  const params = [nowIso()];
-  const normalizedFilters = {
-    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-    search: filters.search ? String(filters.search).trim() : null
-  };
-
-  if (normalizedFilters.status && !["active", "disabled"].includes(normalizedFilters.status)) {
-    throw new AppError(400, "INVALID_ACCOUNT_STATUS", "Account status must be active or disabled.");
-  }
-
-  if (normalizedFilters.productCode) {
-    conditions.push("pr.code = ?");
-    params.push(normalizedFilters.productCode);
-  }
-
-  appendInCondition("pr.id", filters.productIds, conditions, params);
-
-  if (normalizedFilters.status) {
-    conditions.push("a.status = ?");
-    params.push(normalizedFilters.status);
-  }
-
-  if (normalizedFilters.search) {
-    const pattern = likeFilter(normalizedFilters.search);
-    conditions.push("(a.username LIKE ? ESCAPE '\\' OR pr.code LIKE ? ESCAPE '\\')");
-    params.push(pattern, pattern);
-  }
-
-  const items = many(
-    db,
-    `
-      SELECT a.id, a.username, a.status, a.created_at, a.updated_at, a.last_login_at,
-             pr.id AS product_id, pr.code AS product_code, pr.name AS product_name,
-             COALESCE(ent.active_entitlement_count, 0) AS active_entitlement_count,
-             ent.latest_entitlement_ends_at,
-             COALESCE(sess.active_session_count, 0) AS active_session_count
-      FROM customer_accounts a
-      JOIN products pr ON pr.id = a.product_id
-      LEFT JOIN (
-        SELECT account_id,
-               COUNT(*) AS active_entitlement_count,
-               MAX(ends_at) AS latest_entitlement_ends_at
-        FROM entitlements
-        WHERE status = 'active' AND ends_at > ?
-        GROUP BY account_id
-      ) ent ON ent.account_id = a.id
-      LEFT JOIN (
-        SELECT account_id, COUNT(*) AS active_session_count
-        FROM sessions
-        WHERE status = 'active'
-        GROUP BY account_id
-      ) sess ON sess.account_id = a.id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY a.created_at DESC
-      LIMIT 100
-    `,
-    ...params
-  );
-
-  return {
-    items,
-    total: items.length,
-    filters: normalizedFilters
-  };
-}
-
 function queryDeviceBindingRows(db, filters = {}, runtimeState = null) {
   expireStaleSessions(db, runtimeState);
 
@@ -2511,56 +2441,6 @@ function findClientCardByKey(db, productId, cardKey) {
     productId,
     String(cardKey).trim().toUpperCase()
   );
-}
-
-function createCardLoginAccount(db, product, card, timestamp = nowIso()) {
-  const accountId = generateId("acct");
-  const productCode = String(product.code)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .slice(0, 8) || "product";
-  const cardTail = String(card.card_key ?? card.id)
-    .trim()
-    .replace(/[^A-Z0-9]/gi, "")
-    .slice(-6)
-    .toLowerCase() || accountId.slice(-6).toLowerCase();
-  const username = `card_${productCode}_${cardTail}_${accountId.slice(-4).toLowerCase()}`;
-
-  run(
-    db,
-    `
-      INSERT INTO customer_accounts
-      (id, product_id, username, password_hash, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'active', ?, ?)
-    `,
-    accountId,
-    product.id,
-    username,
-    hashPassword(randomToken(32)),
-    timestamp,
-    timestamp
-  );
-
-  run(
-    db,
-    `
-      INSERT INTO card_login_accounts (license_key_id, account_id, product_id, created_at)
-      VALUES (?, ?, ?, ?)
-    `,
-    card.id,
-    accountId,
-    product.id,
-    timestamp
-  );
-
-  audit(db, "license_key", card.id, "card.direct_account_create", "account", accountId, {
-    productCode: product.code,
-    username,
-    cardKeyMasked: maskCardKey(card.card_key)
-  });
-
-  return one(db, "SELECT * FROM customer_accounts WHERE id = ?", accountId);
 }
 
 function upsertBindingProfile(db, binding, device, bindingIdentity) {
@@ -4732,6 +4612,23 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     return items[0] ?? null;
   }
 
+  async function getStoreAccountById(accountId) {
+    return Promise.resolve(store.accounts.getAccountManageRowById(db, accountId));
+  }
+
+  async function getStoreAccountRecordById(accountId) {
+    return Promise.resolve(store.accounts.getAccountRecordById(db, accountId));
+  }
+
+  async function getStoreAccountRecordByProductUsername(productId, username, status = null) {
+    return Promise.resolve(store.accounts.getAccountRecordByProductUsername(
+      db,
+      productId,
+      username,
+      status
+    ));
+  }
+
   return {
     async health() {
       expireStaleSessions(db, stateStore);
@@ -6038,7 +5935,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return batch;
     },
 
-    developerListAccounts(token, filters = {}) {
+    async developerListAccounts(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6054,14 +5951,15 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "ops.read"
         );
       }
-      return queryAccountRows(
+      expireStaleSessions(db, stateStore);
+      return Promise.resolve(store.accounts.queryAccountRows(
         db,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
         stateStore
-      );
+      ));
     },
 
-    developerUpdateAccountStatus(token, accountId, body = {}) {
+    async developerUpdateAccountStatus(token, accountId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6070,17 +5968,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only manage customer accounts under your assigned projects."
       );
 
-      const account = one(
-        db,
-        `
-          SELECT a.id, a.username, a.status, a.product_id,
-                 pr.code AS product_code, pr.owner_developer_id
-          FROM customer_accounts a
-          JOIN products pr ON pr.id = a.product_id
-          WHERE a.id = ?
-        `,
-        accountId
-      );
+      const account = await getStoreAccountById(accountId);
 
       if (!account) {
         throw new AppError(404, "ACCOUNT_NOT_FOUND", "Account does not exist.");
@@ -6089,7 +5977,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       ensureDeveloperCanAccessProduct(
         db,
         session,
-        { id: account.product_id, owner_developer_id: account.owner_developer_id },
+        { id: account.productId, owner_developer_id: account.ownerDeveloperId },
         "ops.write",
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage customer accounts under your assigned projects."
@@ -6109,19 +5997,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       }
 
-      return withTransaction(db, () => {
+      return withTransaction(db, async () => {
         const timestamp = nowIso();
-        run(
-          db,
-          `
-            UPDATE customer_accounts
-            SET status = ?, updated_at = ?
-            WHERE id = ?
-          `,
-          nextStatus,
-          timestamp,
-          account.id
-        );
+        await Promise.resolve(store.accounts.updateAccountStatus(account.id, nextStatus, timestamp));
 
         let revokedSessions = 0;
         if (nextStatus === "disabled") {
@@ -6142,7 +6020,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           account.id,
           {
             username: account.username,
-            productCode: account.product_code,
+            productCode: account.productCode,
             revokedSessions
           }
         );
@@ -8090,23 +7968,15 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return { summary, sessions };
     },
 
-    listAccounts(token, filters = {}) {
+    async listAccounts(token, filters = {}) {
       requireAdminSession(db, token);
-      return queryAccountRows(db, filters, stateStore);
+      expireStaleSessions(db, stateStore);
+      return Promise.resolve(store.accounts.queryAccountRows(db, filters, stateStore));
     },
 
-    updateAccountStatus(token, accountId, body = {}) {
+    async updateAccountStatus(token, accountId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const account = one(
-        db,
-        `
-          SELECT a.id, a.username, a.status, pr.code AS product_code
-          FROM customer_accounts a
-          JOIN products pr ON pr.id = a.product_id
-          WHERE a.id = ?
-        `,
-        accountId
-      );
+      const account = await getStoreAccountById(accountId);
 
       if (!account) {
         throw new AppError(404, "ACCOUNT_NOT_FOUND", "Account does not exist.");
@@ -8128,19 +7998,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       }
 
-      return withTransaction(db, () => {
+      return withTransaction(db, async () => {
         const timestamp = nowIso();
-        run(
-          db,
-          `
-            UPDATE customer_accounts
-            SET status = ?, updated_at = ?
-            WHERE id = ?
-          `,
-          nextStatus,
-          timestamp,
-          account.id
-        );
+        await Promise.resolve(store.accounts.updateAccountStatus(account.id, nextStatus, timestamp));
 
         let revokedSessions = 0;
         if (nextStatus === "disabled") {
@@ -8162,7 +8022,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           account.id,
           {
             username: account.username,
-            productCode: account.product_code,
+            productCode: account.productCode,
             revokedSessions
           }
         );
@@ -9880,8 +9740,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const productFeatureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
       enforceNetworkRules(db, product, meta.ip, "login");
 
-      return withTransaction(db, () => {
-        const subject = resolveClientManagedAccount(db, product, body);
+      return withTransaction(db, async () => {
+        const subject = await resolveClientManagedAccount(db, store, product, body);
         const unbindConfig = loadPolicyUnbindConfig(db, subject.entitlement.policy_id, subject.entitlement.updated_at);
         const bindings = queryBindingsForEntitlement(db, subject.entitlement.id);
         const recentClientUnbinds = countRecentClientUnbinds(
@@ -9933,8 +9793,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       enforceNetworkRules(db, product, meta.ip, "login");
 
-      return withTransaction(db, () => {
-        const subject = resolveClientManagedAccount(db, product, body);
+      return withTransaction(db, async () => {
+        const subject = await resolveClientManagedAccount(db, store, product, body);
         const unbindConfig = loadPolicyUnbindConfig(db, subject.entitlement.policy_id, subject.entitlement.updated_at);
         if (!unbindConfig.allowClientUnbind) {
           throw new AppError(403, "CLIENT_UNBIND_DISABLED", "Self-service unbind is disabled for this policy.");
@@ -10095,41 +9955,19 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(400, "INVALID_ACCOUNT", "Username must be 3+ chars and password 8+ chars.");
       }
 
-      if (
-        one(
-          db,
-          "SELECT id FROM customer_accounts WHERE product_id = ? AND username = ?",
-          product.id,
-          username
-        )
-      ) {
-        throw new AppError(409, "ACCOUNT_EXISTS", "This username has already been registered.");
-      }
-
       const now = nowIso();
-      const accountId = generateId("acct");
-      run(
-        db,
-        `
-          INSERT INTO customer_accounts
-          (id, product_id, username, password_hash, status, created_at, updated_at)
-          VALUES (?, ?, ?, ?, 'active', ?, ?)
-        `,
-        accountId,
-        product.id,
+      const account = await Promise.resolve(store.accounts.createAccount(product, {
         username,
-        hashPassword(password),
-        now,
-        now
-      );
+        passwordHash: hashPassword(password)
+      }, now));
 
-      audit(db, "account", accountId, "account.register", "account", accountId, {
+      audit(db, "account", account.id, "account.register", "account", account.id, {
         productCode: product.code,
         username
       });
 
       return {
-        accountId,
+        accountId: account.id,
         productCode: product.code,
         username
       };
@@ -10152,15 +9990,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       enforceNetworkRules(db, product, meta.ip, "recharge");
 
-      return withTransaction(db, () => {
-        const account = one(
-          db,
-          `
-            SELECT * FROM customer_accounts
-            WHERE product_id = ? AND username = ? AND status = 'active'
-          `,
+      return withTransaction(db, async () => {
+        const account = await getStoreAccountRecordByProductUsername(
           product.id,
-          String(body.username).trim()
+          String(body.username).trim(),
+          "active"
         );
 
         if (!account || !verifyPassword(String(body.password), account.password_hash)) {
@@ -10208,7 +10042,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         );
       }
 
-      const sessionResult = withTransaction(db, () => {
+      const sessionResult = withTransaction(db, async () => {
         expireStaleSessions(db, stateStore);
 
         const card = findClientCardByKey(db, product.id, body.cardKey);
@@ -10234,7 +10068,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
         let account = null;
         if (card.card_login_account_id) {
-          account = one(db, "SELECT * FROM customer_accounts WHERE id = ?", card.card_login_account_id);
+          account = await getStoreAccountRecordById(card.card_login_account_id);
           if (!account) {
             throw new AppError(409, "CARD_LOGIN_CORRUPTED", "Card-login mapping is missing its internal account.");
           }
@@ -10242,7 +10076,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             throw new AppError(403, "CARD_LOGIN_DISABLED", "This card-login identity has been disabled.");
           }
         } else {
-          account = createCardLoginAccount(db, product, card);
+          account = await Promise.resolve(store.accounts.createCardLoginAccount(product, card, nowIso()));
+          audit(db, "license_key", card.id, "card.direct_account_create", "account", account.id, {
+            productCode: product.code,
+            username: account.username,
+            cardKeyMasked: maskCardKey(card.card_key)
+          });
           activateFreshCardEntitlement(db, product, account, card, "card.direct_redeem", {
             authMode: "card"
           });
@@ -10260,7 +10099,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const maskedKey = maskCardKey(card.card_key);
         const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
         return {
-          ...issueClientSession(db, config, stateStore, {
+          ...(await issueClientSession(db, config, stateStore, {
             product,
             account,
             entitlement,
@@ -10269,7 +10108,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             authMode: "card",
             tokenSubject: account.username,
             bindConfig
-          }),
+          })),
           card: {
             maskedKey
           }
@@ -10306,17 +10145,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         );
       }
 
-      const sessionResult = withTransaction(db, () => {
+      const sessionResult = withTransaction(db, async () => {
         expireStaleSessions(db, stateStore);
 
-        const account = one(
-          db,
-          `
-            SELECT * FROM customer_accounts
-            WHERE product_id = ? AND username = ? AND status = 'active'
-          `,
+        const account = await getStoreAccountRecordByProductUsername(
           product.id,
-          String(body.username).trim()
+          String(body.username).trim(),
+          "active"
         );
 
         if (!account || !verifyPassword(String(body.password), account.password_hash)) {

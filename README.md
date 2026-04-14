@@ -191,17 +191,18 @@ npm run db:postgres:check
 
 当前 PostgreSQL preview 分成两层：
 
-- `read_side_preview`：`products / policies / cards / entitlements` 四组主数据读侧走 PostgreSQL；写侧仍在 SQLite
+- `read_side_preview`：`products / policies / cards / entitlements` 四组主数据读侧走 PostgreSQL；`accounts` 和写侧仍在 SQLite
 - `core_write_preview`：如果 adapter 额外支持事务接口 `withTransaction(...)`，则 `products / policies / cards / entitlements` 四组核心主数据写侧也会走 PostgreSQL
 
-当前已经落进 `mainStore` 的四块核心写侧边界是：
+当前已经落进 `mainStore` 的五块主数据边界是：
 
 - `products`：项目创建、功能开关更新、SDK 凭据轮换、项目归属切换
 - `policies`：策略创建、运行时绑定/多开配置、自助解绑配置
 - `cards`：批量发卡、卡密冻结/恢复/过期控制
 - `entitlements`：授权冻结/恢复、续期、点数调账
+- `accounts`：终端账号注册、卡密直登账号映射、账号列表、账号禁用/恢复
 
-也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements` 这四组核心主数据都已经可以真实写入 PostgreSQL。
+也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements` 这四组核心主数据都已经可以真实写入 PostgreSQL；`accounts` 已经收进统一 store 边界，但为了避免和授权生成、会话外键链路脱节，当前仍然保留在 SQLite，等待和 `entitlement / session` 主链路一起迁移。
 
 ## 终端用户主流程
 

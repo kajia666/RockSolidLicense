@@ -1,7 +1,9 @@
+import * as accounts from "./account-repository.js";
 import * as products from "./product-repository.js";
 import * as policies from "./policy-repository.js";
 import * as cards from "./card-repository.js";
 import * as entitlements from "./entitlement-repository.js";
+import { createSqliteAccountStore } from "./sqlite-account-store.js";
 import { createSqliteCardStore } from "./sqlite-card-store.js";
 import { createSqliteEntitlementStore } from "./sqlite-entitlement-store.js";
 import { createSqlitePolicyStore } from "./sqlite-policy-store.js";
@@ -24,6 +26,10 @@ export function createSqliteMainStore({ db }) {
     entitlements: {
       ...entitlements,
       ...createSqliteEntitlementStore({ db })
+    },
+    accounts: {
+      ...accounts,
+      ...createSqliteAccountStore({ db })
     }
   };
 
@@ -38,13 +44,15 @@ export function createSqliteMainStore({ db }) {
       products: "sqlite",
       policies: "sqlite",
       cards: "sqlite",
-      entitlements: "sqlite"
+      entitlements: "sqlite",
+      accounts: "sqlite"
     },
     repositoryWriteDrivers: {
       products: "sqlite",
       policies: "sqlite",
       cards: "sqlite",
-      entitlements: "sqlite"
+      entitlements: "sqlite",
+      accounts: "sqlite"
     }
   };
 

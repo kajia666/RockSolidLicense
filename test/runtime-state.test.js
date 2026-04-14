@@ -328,7 +328,7 @@ test("health exposes storage profile and runtime state configuration", async () 
     assert.equal(health.storage.database.driver, "sqlite");
     assert.equal(health.storage.database.postgresUrlConfigured, true);
     assert.equal(health.storage.mainStore.driver, "sqlite");
-    assert.deepEqual(health.storage.mainStore.repositories, ["products", "policies", "cards", "entitlements"]);
+    assert.deepEqual(health.storage.mainStore.repositories, ["products", "policies", "cards", "entitlements", "accounts"]);
     assert.equal(health.storage.runtimeState.driver, "memory");
     assert.equal(health.storage.runtimeState.nonceReplayStore, "process_memory");
     assert.equal(health.storage.runtimeState.sessionPresenceStore, "process_memory");

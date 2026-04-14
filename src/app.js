@@ -523,7 +523,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/accounts") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listAccounts(getBearerToken(req), {
+          data: await services.listAccounts(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             status: url.searchParams.get("status"),
             search: url.searchParams.get("search")
@@ -553,7 +553,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateAccountStatus(
+          data: await services.updateAccountStatus(
             getBearerToken(req),
             accountStatusRoute.accountId,
             body
@@ -1271,7 +1271,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/accounts") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListAccounts(getBearerToken(req), {
+          data: await services.developerListAccounts(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             status: url.searchParams.get("status"),
             search: url.searchParams.get("search")
@@ -1301,7 +1301,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateAccountStatus(
+          data: await services.developerUpdateAccountStatus(
             getBearerToken(req),
             developerAccountStatusRoute.accountId,
             body

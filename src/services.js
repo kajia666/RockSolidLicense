@@ -1519,9 +1519,18 @@ function normalizeBindFieldValue(field, value) {
   return normalizeOptionalText(value, 256).toLowerCase();
 }
 
-function loadPolicyBindConfig(db, policyId, fallbackBindMode = "strict", fallbackUpdatedAt = null) {
-  const row = one(db, "SELECT * FROM policy_bind_configs WHERE policy_id = ?", policyId);
-  return parsePolicyBindConfigRow(row, fallbackBindMode, fallbackUpdatedAt);
+async function loadPolicyBindConfig(db, store, policyId, fallbackBindMode = "strict", fallbackUpdatedAt = null) {
+  const rows = await Promise.resolve(store.policies.queryPolicyRows(db, { policyId }));
+  const policy = rows[0] ?? null;
+  if (policy) {
+    return {
+      bindMode: policy.bindMode,
+      bindFields: [...policy.bindFields],
+      createdAt: policy.createdAt ?? fallbackUpdatedAt ?? null,
+      updatedAt: policy.updatedAt ?? fallbackUpdatedAt ?? null
+    };
+  }
+  return parsePolicyBindConfigRow(null, fallbackBindMode, fallbackUpdatedAt);
 }
 
 function persistPolicyBindConfig(db, policyId, bindMode, bindFields, timestamp) {
@@ -1559,9 +1568,20 @@ function persistPolicyBindConfig(db, policyId, bindMode, bindFields, timestamp) 
 }
 
 
-function loadPolicyUnbindConfig(db, policyId, fallbackUpdatedAt = null) {
-  const row = one(db, "SELECT * FROM policy_unbind_configs WHERE policy_id = ?", policyId);
-  return parsePolicyUnbindConfigRow(row, fallbackUpdatedAt);
+async function loadPolicyUnbindConfig(db, store, policyId, fallbackUpdatedAt = null) {
+  const rows = await Promise.resolve(store.policies.queryPolicyRows(db, { policyId }));
+  const policy = rows[0] ?? null;
+  if (policy) {
+    return {
+      allowClientUnbind: policy.allowClientUnbind,
+      clientUnbindLimit: policy.clientUnbindLimit,
+      clientUnbindWindowDays: policy.clientUnbindWindowDays,
+      clientUnbindDeductDays: policy.clientUnbindDeductDays,
+      createdAt: policy.createdAt ?? fallbackUpdatedAt ?? null,
+      updatedAt: policy.updatedAt ?? fallbackUpdatedAt ?? null
+    };
+  }
+  return parsePolicyUnbindConfigRow(null, fallbackUpdatedAt);
 }
 
 function persistPolicyUnbindConfig(db, policyId, body = {}, timestamp) {
@@ -2714,7 +2734,13 @@ async function issueClientSession(
     },
     meta
   );
-  const resolvedBindConfig = bindConfig ?? loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode);
+  const resolvedBindConfig = bindConfig ?? await loadPolicyBindConfig(
+    db,
+    store,
+    entitlement.policy_id,
+    entitlement.bind_mode,
+    entitlement.updated_at
+  );
   const bindingIdentity = buildBindingIdentity(resolvedBindConfig, resolvedDeviceProfile);
   const device = await Promise.resolve(store.devices.upsertDevice(
     product.id,
@@ -9330,7 +9356,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       return withTransaction(db, async () => {
         const subject = await resolveClientManagedAccount(db, store, product, body);
-        const unbindConfig = loadPolicyUnbindConfig(db, subject.entitlement.policy_id, subject.entitlement.updated_at);
+        const unbindConfig = await loadPolicyUnbindConfig(
+          db,
+          store,
+          subject.entitlement.policy_id,
+          subject.entitlement.updated_at
+        );
         const bindings = queryBindingsForEntitlement(db, subject.entitlement.id);
         const recentClientUnbinds = countRecentClientUnbinds(
           db,
@@ -9383,7 +9414,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       return withTransaction(db, async () => {
         const subject = await resolveClientManagedAccount(db, store, product, body);
-        const unbindConfig = loadPolicyUnbindConfig(db, subject.entitlement.policy_id, subject.entitlement.updated_at);
+        const unbindConfig = await loadPolicyUnbindConfig(
+          db,
+          store,
+          subject.entitlement.policy_id,
+          subject.entitlement.updated_at
+        );
         if (!unbindConfig.allowClientUnbind) {
           throw new AppError(403, "CLIENT_UNBIND_DISABLED", "Self-service unbind is disabled for this policy.");
         }
@@ -9699,7 +9735,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         }
 
         const maskedKey = maskCardKey(card.card_key);
-        const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
+        const bindConfig = await loadPolicyBindConfig(
+          db,
+          store,
+          entitlement.policy_id,
+          entitlement.bind_mode,
+          entitlement.updated_at
+        );
         return {
           ...(await issueClientSession(db, store, config, stateStore, {
             product,
@@ -9769,7 +9811,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           throwEntitlementUnavailable(await getStoreLatestEntitlementSnapshot(account.id, product.id), now);
         }
 
-        const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
+        const bindConfig = await loadPolicyBindConfig(
+          db,
+          store,
+          entitlement.policy_id,
+          entitlement.bind_mode,
+          entitlement.updated_at
+        );
         return issueClientSession(db, store, config, stateStore, {
           product,
           account,

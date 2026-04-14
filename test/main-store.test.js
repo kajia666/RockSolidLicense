@@ -222,6 +222,23 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.ok(durationEntitlement);
     assert.ok(pointEntitlement);
 
+    const usableEntitlement = app.mainStore.entitlements.getUsableEntitlement(
+      app.db,
+      directAccount.id,
+      directProduct.id,
+      new Date().toISOString()
+    );
+    assert.ok(usableEntitlement);
+    assert.equal(usableEntitlement.account_id, directAccount.id);
+
+    const latestEntitlement = app.mainStore.entitlements.getLatestEntitlementSnapshot(
+      app.db,
+      directAccount.id,
+      directProduct.id
+    );
+    assert.ok(latestEntitlement);
+    assert.equal(latestEntitlement.account_id, directAccount.id);
+
     const frozenEntitlement = app.mainStore.entitlements.updateEntitlementStatus(durationEntitlement.id, {
       status: "frozen"
     });

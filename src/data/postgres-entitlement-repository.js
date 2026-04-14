@@ -37,8 +37,104 @@ function likeFilter(value) {
   return `%${escapeLikeText(value).trim()}%`;
 }
 
+function entitlementAccessSelectSql(whereClause = "") {
+  return `
+    SELECT e.*, p.name AS policy_name, p.max_devices, p.allow_concurrent_sessions,
+           p.heartbeat_interval_seconds, p.heartbeat_timeout_seconds, p.token_ttl_seconds, p.bind_mode,
+           lkc.status AS card_control_status, lkc.expires_at AS card_expires_at,
+           pgc.grant_type, pgc.grant_points,
+           em.total_points, em.remaining_points, em.consumed_points
+    FROM entitlements e
+    JOIN policies p ON p.id = e.policy_id
+    JOIN license_keys lk ON lk.id = e.source_license_key_id
+    LEFT JOIN license_key_controls lkc ON lkc.license_key_id = lk.id
+    LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = p.id
+    LEFT JOIN entitlement_metering em ON em.entitlement_id = e.id
+    ${whereClause}
+  `;
+}
+
 export function createPostgresEntitlementRepository(adapter) {
   return {
+    async getUsableDurationEntitlement(_db, accountId, productId, referenceTime = nowIso()) {
+      const rows = await Promise.resolve(adapter.query(
+        `${entitlementAccessSelectSql(`
+          WHERE e.account_id = $1
+            AND e.product_id = $2
+            AND e.status = 'active'
+            AND e.starts_at <= $3
+            AND e.ends_at > $4
+            AND COALESCE(pgc.grant_type, 'duration') = 'duration'
+            AND (lkc.license_key_id IS NULL OR lkc.status = 'active')
+            AND (lkc.expires_at IS NULL OR lkc.expires_at > $5)
+        `)}
+         ORDER BY e.ends_at DESC
+         LIMIT 1`,
+        [accountId, productId, referenceTime, referenceTime, referenceTime],
+        {
+          repository: "entitlements",
+          operation: "getUsableDurationEntitlement",
+          accountId,
+          productId,
+          referenceTime
+        }
+      ));
+
+      return rows[0] ?? null;
+    },
+
+    async getUsablePointsEntitlement(_db, accountId, productId, referenceTime = nowIso()) {
+      const rows = await Promise.resolve(adapter.query(
+        `${entitlementAccessSelectSql(`
+          WHERE e.account_id = $1
+            AND e.product_id = $2
+            AND e.status = 'active'
+            AND e.starts_at <= $3
+            AND e.ends_at > $4
+            AND pgc.grant_type = 'points'
+            AND em.remaining_points > 0
+            AND (lkc.license_key_id IS NULL OR lkc.status = 'active')
+            AND (lkc.expires_at IS NULL OR lkc.expires_at > $5)
+        `)}
+         ORDER BY e.created_at ASC, e.ends_at ASC
+         LIMIT 1`,
+        [accountId, productId, referenceTime, referenceTime, referenceTime],
+        {
+          repository: "entitlements",
+          operation: "getUsablePointsEntitlement",
+          accountId,
+          productId,
+          referenceTime
+        }
+      ));
+
+      return rows[0] ?? null;
+    },
+
+    async getUsableEntitlement(db, accountId, productId, referenceTime = nowIso()) {
+      return this.getUsableDurationEntitlement(db, accountId, productId, referenceTime)
+        ?? this.getUsablePointsEntitlement(db, accountId, productId, referenceTime);
+    },
+
+    async getLatestEntitlementSnapshot(_db, accountId, productId) {
+      const rows = await Promise.resolve(adapter.query(
+        `${entitlementAccessSelectSql(`
+          WHERE e.account_id = $1 AND e.product_id = $2
+        `)}
+         ORDER BY e.ends_at DESC, e.created_at DESC
+         LIMIT 1`,
+        [accountId, productId],
+        {
+          repository: "entitlements",
+          operation: "getLatestEntitlementSnapshot",
+          accountId,
+          productId
+        }
+      ));
+
+      return rows[0] ?? null;
+    },
+
     async queryEntitlementRows(_db, filters = {}, options = {}) {
       const referenceTime = nowIso();
       const normalizedFilters = {

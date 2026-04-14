@@ -73,6 +73,21 @@ test("postgres runtime adapter can load a pg-style pool module and close it clea
     assert.equal(entitlements.items.length, 1);
     assert.equal(entitlements.items[0].username, "runtime-user");
 
+    const usableEntitlement = await app.mainStore.entitlements.getUsableEntitlement(
+      app.db,
+      "acct_runtime_1",
+      "prod_runtime_1",
+      "2026-01-15T00:00:00.000Z"
+    );
+    assert.equal(usableEntitlement.id, "ent_runtime_1");
+
+    const latestEntitlement = await app.mainStore.entitlements.getLatestEntitlementSnapshot(
+      app.db,
+      "acct_runtime_1",
+      "prod_runtime_1"
+    );
+    assert.equal(latestEntitlement.id, "ent_runtime_1");
+
     const accounts = await app.services.listAccounts(admin.token, { productCode: "PGREAL" });
     assert.equal(accounts.items.length, 1);
     assert.equal(accounts.items[0].username, "runtime-user");

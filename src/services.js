@@ -21,8 +21,6 @@ import {
 import {
   entitlementLifecycleStatus,
   formatEntitlementGrant,
-  getLatestEntitlementSnapshot,
-  getUsableEntitlement,
   queryEntitlementRows
 } from "./data/entitlement-repository.js";
 import {
@@ -1958,9 +1956,18 @@ async function resolveClientManagedAccount(db, store, product, body) {
       throw new AppError(401, "ACCOUNT_LOGIN_FAILED", "Username or password is incorrect.");
     }
 
-    const entitlement = getUsableEntitlement(db, account.id, product.id, nowIso());
+    const entitlement = await Promise.resolve(store.entitlements.getUsableEntitlement(
+      db,
+      account.id,
+      product.id,
+      nowIso()
+    ));
     if (!entitlement) {
-      throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id));
+      throwEntitlementUnavailable(await Promise.resolve(store.entitlements.getLatestEntitlementSnapshot(
+        db,
+        account.id,
+        product.id
+      )));
     }
 
     return {
@@ -2017,9 +2024,18 @@ async function resolveClientManagedAccount(db, store, product, body) {
       });
     }
 
-    const entitlement = getUsableEntitlement(db, account.id, product.id, nowIso());
+    const entitlement = await Promise.resolve(store.entitlements.getUsableEntitlement(
+      db,
+      account.id,
+      product.id,
+      nowIso()
+    ));
     if (!entitlement) {
-      throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id));
+      throwEntitlementUnavailable(await Promise.resolve(store.entitlements.getLatestEntitlementSnapshot(
+        db,
+        account.id,
+        product.id
+      )));
     }
 
     return {
@@ -4264,6 +4280,23 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       productId,
       username,
       status
+    ));
+  }
+
+  async function getStoreUsableEntitlement(accountId, productId, referenceTime = nowIso()) {
+    return Promise.resolve(store.entitlements.getUsableEntitlement(
+      db,
+      accountId,
+      productId,
+      referenceTime
+    ));
+  }
+
+  async function getStoreLatestEntitlementSnapshot(accountId, productId) {
+    return Promise.resolve(store.entitlements.getLatestEntitlementSnapshot(
+      db,
+      accountId,
+      productId
     ));
   }
 
@@ -9737,9 +9770,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const deviceProfile = extractClientDeviceProfile(body, meta);
         const deviceFingerprint = deviceProfile.deviceFingerprint;
         requireDeviceNotBlocked(db, product.id, deviceFingerprint);
-        const entitlement = getUsableEntitlement(db, account.id, product.id, now);
+        const entitlement = await getStoreUsableEntitlement(account.id, product.id, now);
         if (!entitlement) {
-          throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id), now);
+          throwEntitlementUnavailable(await getStoreLatestEntitlementSnapshot(account.id, product.id), now);
         }
 
         const maskedKey = maskCardKey(card.card_key);
@@ -9808,9 +9841,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const deviceProfile = extractClientDeviceProfile(body, meta);
         const deviceFingerprint = deviceProfile.deviceFingerprint;
         requireDeviceNotBlocked(db, product.id, deviceFingerprint);
-        const entitlement = getUsableEntitlement(db, account.id, product.id, now);
+        const entitlement = await getStoreUsableEntitlement(account.id, product.id, now);
         if (!entitlement) {
-          throwEntitlementUnavailable(getLatestEntitlementSnapshot(db, account.id, product.id), now);
+          throwEntitlementUnavailable(await getStoreLatestEntitlementSnapshot(account.id, product.id), now);
         }
 
         const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);

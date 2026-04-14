@@ -150,6 +150,12 @@ function createWriteCapableAdapter() {
           product_name: product?.name ?? null,
           username: account?.username ?? null,
           policy_name: policy?.name ?? null,
+          max_devices: policy?.max_devices ?? policy?.maxDevices ?? 1,
+          allow_concurrent_sessions: policy?.allow_concurrent_sessions ?? policy?.allowConcurrentSessions ?? 0,
+          heartbeat_interval_seconds: policy?.heartbeat_interval_seconds ?? policy?.heartbeatIntervalSeconds ?? 60,
+          heartbeat_timeout_seconds: policy?.heartbeat_timeout_seconds ?? policy?.heartbeatTimeoutSeconds ?? 180,
+          token_ttl_seconds: policy?.token_ttl_seconds ?? policy?.tokenTtlSeconds ?? 300,
+          bind_mode: policy?.bind_mode ?? policy?.bindMode ?? "strict",
           card_key: card?.card_key ?? null,
           license_key_id: card?.id ?? null,
           card_control_status: control?.status ?? null,
@@ -453,6 +459,47 @@ function createWriteCapableAdapter() {
       return entitlementRows(meta.filters ?? {});
     }
 
+    if (meta.repository === "entitlements" && meta.operation === "getUsableDurationEntitlement") {
+      return entitlementRows({})
+        .filter((entitlement) => entitlement.account_id === params[0])
+        .filter((entitlement) => entitlement.product_id === params[1])
+        .filter((entitlement) => entitlement.status === "active")
+        .filter((entitlement) => entitlement.starts_at <= params[2] && entitlement.ends_at > params[3])
+        .filter((entitlement) => (entitlement.grant_type ?? "duration") === "duration")
+        .filter((entitlement) => !entitlement.card_control_status || entitlement.card_control_status === "active")
+        .filter((entitlement) => !entitlement.card_expires_at || entitlement.card_expires_at > params[4])
+        .sort((left, right) => String(right.ends_at).localeCompare(String(left.ends_at)))
+        .slice(0, 1);
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "getUsablePointsEntitlement") {
+      return entitlementRows({})
+        .filter((entitlement) => entitlement.account_id === params[0])
+        .filter((entitlement) => entitlement.product_id === params[1])
+        .filter((entitlement) => entitlement.status === "active")
+        .filter((entitlement) => entitlement.starts_at <= params[2] && entitlement.ends_at > params[3])
+        .filter((entitlement) => entitlement.grant_type === "points")
+        .filter((entitlement) => Number(entitlement.remaining_points ?? 0) > 0)
+        .filter((entitlement) => !entitlement.card_control_status || entitlement.card_control_status === "active")
+        .filter((entitlement) => !entitlement.card_expires_at || entitlement.card_expires_at > params[4])
+        .sort((left, right) => {
+          const createdOrder = String(left.created_at).localeCompare(String(right.created_at));
+          return createdOrder || String(left.ends_at).localeCompare(String(right.ends_at));
+        })
+        .slice(0, 1);
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "getLatestEntitlementSnapshot") {
+      return entitlementRows({})
+        .filter((entitlement) => entitlement.account_id === params[0])
+        .filter((entitlement) => entitlement.product_id === params[1])
+        .sort((left, right) => {
+          const endsOrder = String(right.ends_at).localeCompare(String(left.ends_at));
+          return endsOrder || String(right.created_at).localeCompare(String(left.created_at));
+        })
+        .slice(0, 1);
+    }
+
     if (meta.repository === "accounts" && (meta.operation === "queryAccountRows" || meta.operation === "loadAccountManageRow")) {
       return accountRows(meta.filters ?? {}, params[0]);
     }
@@ -649,12 +696,19 @@ test("postgres main store can serve all main-store read-side queries through ada
         return [
           {
             id: "ent_pg_1",
+            product_id: "prod_pg_1",
             product_code: "PGAPP",
             product_name: "Postgres Product",
             account_id: "acct_pg_1",
             username: "pguser",
             policy_id: "policy_pg_1",
             policy_name: "PG Policy",
+            max_devices: 2,
+            allow_concurrent_sessions: 1,
+            heartbeat_interval_seconds: 60,
+            heartbeat_timeout_seconds: 180,
+            token_ttl_seconds: 300,
+            bind_mode: "selected_fields",
             source_license_key_id: "card_pg_1",
             card_key: "PGAPP-123456-ABCD",
             status: "active",
@@ -760,12 +814,28 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(entitlements.items[0].username, "pguser");
     assert.equal(entitlements.items[0].remainingPoints, 17);
 
+    const usableEntitlement = await app.mainStore.entitlements.getUsableEntitlement(
+      app.db,
+      "acct_pg_1",
+      "prod_pg_1",
+      "2026-01-15T00:00:00.000Z"
+    );
+    assert.equal(usableEntitlement.id, "ent_pg_1");
+    assert.equal(usableEntitlement.bind_mode, "selected_fields");
+
+    const latestEntitlement = await app.mainStore.entitlements.getLatestEntitlementSnapshot(
+      app.db,
+      "acct_pg_1",
+      "prod_pg_1"
+    );
+    assert.equal(latestEntitlement.id, "ent_pg_1");
+
     const accounts = await app.services.listAccounts(admin.token, { productCode: "PGAPP" });
     assert.equal(accounts.items.length, 1);
     assert.equal(accounts.items[0].username, "pguser");
     assert.equal(accounts.items[0].activeSessionCount, 2);
 
-    assert.equal(queries.length, 7);
+    assert.equal(queries.length, 9);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -778,8 +848,12 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[4].sql, /WHERE lk\.id = \$1/i);
     assert.equal(queries[5].meta.repository, "entitlements");
     assert.match(queries[5].sql, /FROM entitlements e/i);
-    assert.equal(queries[6].meta.repository, "accounts");
-    assert.match(queries[6].sql, /FROM customer_accounts a/i);
+    assert.equal(queries[6].meta.operation, "getUsableDurationEntitlement");
+    assert.match(queries[6].sql, /FROM entitlements e/i);
+    assert.equal(queries[7].meta.operation, "getLatestEntitlementSnapshot");
+    assert.match(queries[7].sql, /FROM entitlements e/i);
+    assert.equal(queries[8].meta.repository, "accounts");
+    assert.match(queries[8].sql, /FROM customer_accounts a/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");

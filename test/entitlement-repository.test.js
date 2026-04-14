@@ -128,10 +128,27 @@ test("entitlement repository reads usable authorization and formatted grant stat
     assert.ok(usable);
     assert.equal(usable.id, rows.items[0].id);
 
+    const storeUsable = app.mainStore.entitlements.getUsableEntitlement(
+      app.db,
+      account.id,
+      product.id,
+      new Date().toISOString()
+    );
+    assert.ok(storeUsable);
+    assert.equal(storeUsable.id, rows.items[0].id);
+
     const latest = getLatestEntitlementSnapshot(app.db, account.id, product.id);
     assert.ok(latest);
     assert.equal(latest.id, rows.items[0].id);
     assert.equal(entitlementLifecycleStatus(latest, new Date().toISOString()), "active");
+
+    const storeLatest = app.mainStore.entitlements.getLatestEntitlementSnapshot(
+      app.db,
+      account.id,
+      product.id
+    );
+    assert.ok(storeLatest);
+    assert.equal(storeLatest.id, rows.items[0].id);
 
     const grant = formatEntitlementGrant(latest);
     assert.equal(grant.grantType, "points");

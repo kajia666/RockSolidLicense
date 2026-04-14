@@ -410,6 +410,15 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(releasedBinding.status, "revoked");
     assert.equal(releasedBinding.revoked_at, "2026-01-05T00:30:00.000Z");
 
+    const bindingManageRow = app.mainStore.devices.getBindingManageRowById(
+      app.db,
+      directBinding.binding.id
+    );
+    assert.equal(bindingManageRow.id, directBinding.binding.id);
+    assert.equal(bindingManageRow.product_code, "STOREAPP2");
+    assert.equal(bindingManageRow.username, "store_direct_user");
+    assert.equal(bindingManageRow.fingerprint, "store-direct-bind-device");
+
     app.db.prepare(`
       INSERT INTO device_blocks
       (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)

@@ -193,6 +193,25 @@ export function createSqliteDeviceStore({ db }) {
       }));
     },
 
+    getBindingManageRowById(_db, bindingId) {
+      return one(
+        db,
+        `
+          SELECT b.id, b.entitlement_id, b.device_id, b.status,
+                 pr.id AS product_id, pr.code AS product_code, pr.owner_developer_id,
+                 a.id AS account_id, a.username,
+                 d.fingerprint, d.device_name
+          FROM device_bindings b
+          JOIN entitlements e ON e.id = b.entitlement_id
+          JOIN customer_accounts a ON a.id = e.account_id
+          JOIN products pr ON pr.id = e.product_id
+          JOIN devices d ON d.id = b.device_id
+          WHERE b.id = ?
+        `,
+        bindingId
+      );
+    },
+
     releaseBinding(bindingId, timestamp = nowIso()) {
       run(
         db,

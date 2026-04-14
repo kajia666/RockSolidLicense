@@ -7603,22 +7603,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     releaseDeviceBinding(token, bindingId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const binding = one(
-        db,
-        `
-          SELECT b.id, b.entitlement_id, b.device_id, b.status,
-                 pr.code AS product_code,
-                 a.username,
-                 d.fingerprint, d.device_name
-          FROM device_bindings b
-          JOIN entitlements e ON e.id = b.entitlement_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN products pr ON pr.id = e.product_id
-          JOIN devices d ON d.id = b.device_id
-          WHERE b.id = ?
-        `,
-        bindingId
-      );
+      const binding = store.devices.getBindingManageRowById(db, bindingId);
 
       if (!binding) {
         throw new AppError(404, "BINDING_NOT_FOUND", "Device binding does not exist.");
@@ -7688,22 +7673,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage device bindings under your assigned projects."
       );
-      const binding = one(
-        db,
-        `
-          SELECT b.id, b.entitlement_id, b.device_id, b.status,
-                 pr.id AS product_id, pr.code AS product_code, pr.owner_developer_id,
-                 a.username,
-                 d.fingerprint, d.device_name
-          FROM device_bindings b
-          JOIN entitlements e ON e.id = b.entitlement_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN products pr ON pr.id = e.product_id
-          JOIN devices d ON d.id = b.device_id
-          WHERE b.id = ?
-        `,
-        bindingId
-      );
+      const binding = store.devices.getBindingManageRowById(db, bindingId);
 
       if (!binding) {
         throw new AppError(404, "BINDING_NOT_FOUND", "Device binding does not exist.");

@@ -37,6 +37,8 @@ function createWriteCapableAdapter() {
     licenseKeyControls: new Map(),
     customerAccounts: [],
     cardLoginAccounts: [],
+    deviceBindings: [],
+    entitlementUnbindLogs: [],
     sessions: [],
     entitlements: [],
     entitlementMetering: new Map()
@@ -587,6 +589,53 @@ function createWriteCapableAdapter() {
       return [];
     }
 
+    if (meta.repository === "devices" && meta.operation === "releaseBinding") {
+      const binding = state.deviceBindings.find((item) => item.id === params[2]);
+      if (binding) {
+        binding.status = "revoked";
+        binding.revoked_at = params[0];
+        binding.last_bound_at = params[1];
+      }
+      return [];
+    }
+
+    if (meta.repository === "devices" && meta.operation === "loadBindingRecordById") {
+      return state.deviceBindings
+        .filter((binding) => binding.id === params[0])
+        .slice(0, 1)
+        .map((binding) => ({ ...binding }));
+    }
+
+    if (meta.repository === "devices" && meta.operation === "countRecentClientUnbinds") {
+      const count = state.entitlementUnbindLogs.filter((entry) =>
+        entry.entitlement_id === params[0]
+        && entry.actor_type === "client"
+        && entry.created_at >= params[1]
+      ).length;
+      return [{ count }];
+    }
+
+    if (meta.repository === "devices" && meta.operation === "recordEntitlementUnbind") {
+      state.entitlementUnbindLogs.push({
+        id: params[0],
+        entitlement_id: params[1],
+        binding_id: params[2],
+        actor_type: params[3],
+        actor_id: params[4],
+        reason: params[5],
+        deducted_days: params[6],
+        created_at: params[7]
+      });
+      return [];
+    }
+
+    if (meta.repository === "devices" && meta.operation === "loadEntitlementUnbindLog") {
+      return state.entitlementUnbindLogs
+        .filter((entry) => entry.id === params[0])
+        .slice(0, 1)
+        .map((entry) => ({ ...entry }));
+    }
+
     return [];
   }
 
@@ -1035,7 +1084,7 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      devices: "sqlite",
+      devices: "postgres_partial",
       sessions: "sqlite"
     });
 
@@ -1145,7 +1194,7 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      devices: "sqlite",
+      devices: "postgres_partial",
       sessions: "sqlite"
     });
 
@@ -1153,6 +1202,42 @@ test("postgres main store can write products and policies through a transaction-
     assert.equal(state.policies.length, 1);
     assert.equal(state.customerAccounts.length, 2);
     assert.equal(state.cardLoginAccounts.length, 1);
+    state.deviceBindings.push({
+      id: "bind_pg_write_1",
+      entitlement_id: "ent_pg_write_1",
+      device_id: "dev_pg_write_1",
+      status: "active",
+      first_bound_at: "2026-01-13T00:00:00.000Z",
+      last_bound_at: "2026-01-13T00:00:00.000Z",
+      revoked_at: null
+    });
+
+    const releasedBinding = await app.mainStore.devices.releaseBinding(
+      "bind_pg_write_1",
+      "2026-01-14T00:00:00.000Z"
+    );
+    assert.equal(releasedBinding.status, "revoked");
+    assert.equal(releasedBinding.revoked_at, "2026-01-14T00:00:00.000Z");
+
+    const unbindLog = await app.mainStore.devices.recordEntitlementUnbind(
+      "ent_pg_write_1",
+      "bind_pg_write_1",
+      "client",
+      createdAccount.id,
+      "pg_preview_unbind",
+      1,
+      "2026-01-14T00:05:00.000Z"
+    );
+    assert.equal(unbindLog.binding_id, "bind_pg_write_1");
+
+    const recentClientUnbinds = await app.mainStore.devices.countRecentClientUnbinds(
+      app.db,
+      "ent_pg_write_1",
+      30,
+      "2026-01-15T00:00:00.000Z"
+    );
+    assert.equal(recentClientUnbinds, 1);
+
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "createProduct"),
       true
@@ -1183,6 +1268,18 @@ test("postgres main store can write products and policies through a transaction-
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "linkCardLoginAccount"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "releaseBinding"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "recordEntitlementUnbind"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countRecentClientUnbinds"),
       true
     );
   } finally {
@@ -1293,7 +1390,7 @@ test("postgres main store can write cards and entitlements through a transaction
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      devices: "sqlite",
+      devices: "postgres_partial",
       sessions: "sqlite"
     });
 

@@ -4,6 +4,7 @@ import { createPostgresAccountRepository } from "./postgres-account-repository.j
 import { createPostgresCardRepository } from "./postgres-card-repository.js";
 import { createPostgresCardStore } from "./postgres-card-store.js";
 import { createPostgresDeviceRepository } from "./postgres-device-repository.js";
+import { createPostgresDeviceStore } from "./postgres-device-store.js";
 import { createPostgresEntitlementRepository } from "./postgres-entitlement-repository.js";
 import { createPostgresEntitlementStore } from "./postgres-entitlement-store.js";
 import { createPostgresPolicyRepository } from "./postgres-policy-repository.js";
@@ -48,7 +49,8 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       },
       devices: {
         ...fallbackStore.devices,
-        ...createPostgresDeviceRepository(adapter)
+        ...createPostgresDeviceRepository(adapter),
+        ...createPostgresDeviceStore(adapter)
       },
       sessions: {
         ...fallbackStore.sessions
@@ -81,7 +83,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         cards: coreWriteReady ? "postgres" : "sqlite",
         entitlements: coreWriteReady ? "postgres" : "sqlite",
         accounts: coreWriteReady ? "postgres" : "sqlite",
-        devices: "sqlite",
+        devices: coreWriteReady ? "postgres_partial" : "sqlite",
         sessions: "sqlite"
       }
     };

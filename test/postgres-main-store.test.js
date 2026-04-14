@@ -36,6 +36,7 @@ function createWriteCapableAdapter() {
     licenseKeys: [],
     licenseKeyControls: new Map(),
     customerAccounts: [],
+    sessions: [],
     entitlements: [],
     entitlementMetering: new Map()
   };
@@ -164,6 +165,49 @@ function createWriteCapableAdapter() {
       .filter((entitlement) => !filters.productCode || entitlement.product_code === filters.productCode)
       .filter((entitlement) => !filters.username || entitlement.username === filters.username)
       .filter((entitlement) => !filters.grantType || entitlement.grant_type === filters.grantType);
+  }
+
+  function accountRows(filters = {}, referenceTime = "9999-12-31T23:59:59.999Z") {
+    const normalizedSearch = String(filters.search ?? "").trim().toLowerCase();
+
+    return state.customerAccounts
+      .map((account) => {
+        const product = state.products.find((item) => item.id === account.product_id);
+        const activeEntitlements = state.entitlements.filter(
+          (entitlement) => entitlement.account_id === account.id
+            && entitlement.status === "active"
+            && String(entitlement.ends_at ?? "") > referenceTime
+        );
+        const activeSessions = state.sessions.filter(
+          (session) => session.account_id === account.id && session.status === "active"
+        );
+        const latestEntitlementEndsAt = activeEntitlements
+          .map((entitlement) => entitlement.ends_at)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? null;
+
+        return {
+          ...account,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          owner_developer_id: product?.owner_developer_id ?? null,
+          active_entitlement_count: activeEntitlements.length,
+          latest_entitlement_ends_at: latestEntitlementEndsAt,
+          active_session_count: activeSessions.length
+        };
+      })
+      .filter((account) => !filters.accountId || account.id === filters.accountId)
+      .filter((account) => !filters.productCode || account.product_code === filters.productCode)
+      .filter((account) => !filters.productIds || filters.productIds.includes(account.product_id))
+      .filter((account) => !filters.status || account.status === filters.status)
+      .filter((account) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+        return String(account.username ?? "").toLowerCase().includes(normalizedSearch)
+          || String(account.product_code ?? "").toLowerCase().includes(normalizedSearch);
+      });
   }
 
   function recordQuery(sql, params = [], meta = {}) {
@@ -409,6 +453,32 @@ function createWriteCapableAdapter() {
       return entitlementRows(meta.filters ?? {});
     }
 
+    if (meta.repository === "accounts" && (meta.operation === "queryAccountRows" || meta.operation === "loadAccountManageRow")) {
+      return accountRows(meta.filters ?? {}, params[0]);
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "getAccountRecordById") {
+      return state.customerAccounts
+        .filter((account) => account.id === params[0])
+        .slice(0, 1)
+        .map((account) => ({ ...account }));
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "getAccountRecordByProductUsername") {
+      return state.customerAccounts
+        .filter((account) => account.product_id === params[0] && account.username === params[1])
+        .filter((account) => !params[2] || account.status === params[2])
+        .slice(0, 1)
+        .map((account) => ({ ...account }));
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "accountUsernameExists") {
+      return state.customerAccounts
+        .filter((account) => account.product_id === params[0] && account.username === params[1])
+        .slice(0, 1)
+        .map((account) => ({ id: account.id }));
+    }
+
     return [];
   }
 
@@ -604,6 +674,26 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "accounts") {
+        return [
+          {
+            id: "acct_pg_1",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            owner_developer_id: "dev_pg_1",
+            username: "pguser",
+            status: "active",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-02T00:00:00.000Z",
+            last_login_at: "2026-01-03T00:00:00.000Z",
+            active_entitlement_count: 1,
+            latest_entitlement_ends_at: "2026-02-01T00:00:00.000Z",
+            active_session_count: 2
+          }
+        ];
+      }
+
       return [];
     }
   };
@@ -622,7 +712,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite",
+      accounts: "postgres",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -670,7 +760,12 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(entitlements.items[0].username, "pguser");
     assert.equal(entitlements.items[0].remainingPoints, 17);
 
-    assert.equal(queries.length, 6);
+    const accounts = await app.services.listAccounts(admin.token, { productCode: "PGAPP" });
+    assert.equal(accounts.items.length, 1);
+    assert.equal(accounts.items[0].username, "pguser");
+    assert.equal(accounts.items[0].activeSessionCount, 2);
+
+    assert.equal(queries.length, 7);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -683,6 +778,8 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[4].sql, /WHERE lk\.id = \$1/i);
     assert.equal(queries[5].meta.repository, "entitlements");
     assert.match(queries[5].sql, /FROM entitlements e/i);
+    assert.equal(queries[6].meta.repository, "accounts");
+    assert.match(queries[6].sql, /FROM customer_accounts a/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -693,7 +790,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite",
+      accounts: "postgres",
       devices: "sqlite",
       sessions: "sqlite"
     });

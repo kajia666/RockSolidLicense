@@ -149,6 +149,28 @@ class Pool {
       };
     }
 
+    if (/FROM customer_accounts a/i.test(normalizedSql)) {
+      return {
+        rows: [
+          {
+            id: "acct_runtime_1",
+            product_id: "prod_runtime_1",
+            product_code: "PGREAL",
+            product_name: "Runtime Product",
+            owner_developer_id: "dev_runtime_1",
+            username: "runtime-user",
+            status: "active",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-02T00:00:00.000Z",
+            last_login_at: "2026-01-03T00:00:00.000Z",
+            active_entitlement_count: 1,
+            latest_entitlement_ends_at: "2026-02-01T00:00:00.000Z",
+            active_session_count: 1
+          }
+        ]
+      };
+    }
+
     return { rows: [] };
   }
 

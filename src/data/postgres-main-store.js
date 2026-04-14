@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createPostgresAccountRepository } from "./postgres-account-repository.js";
 import { createPostgresCardRepository } from "./postgres-card-repository.js";
 import { createPostgresCardStore } from "./postgres-card-store.js";
 import { createPostgresEntitlementRepository } from "./postgres-entitlement-repository.js";
@@ -39,7 +40,8 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         ...createPostgresEntitlementStore(adapter)
       },
       accounts: {
-        ...fallbackStore.accounts
+        ...fallbackStore.accounts,
+        ...createPostgresAccountRepository(adapter)
       },
       devices: {
         ...fallbackStore.devices
@@ -65,7 +67,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         policies: "postgres",
         cards: "postgres",
         entitlements: "postgres",
-        accounts: "sqlite",
+        accounts: "postgres",
         devices: "sqlite",
         sessions: "sqlite"
       },

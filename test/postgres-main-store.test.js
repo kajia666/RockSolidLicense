@@ -227,26 +227,26 @@ test("postgres main store can serve all main-store read-side queries through ada
       password: "Pass123!abc"
     });
 
-    const products = app.services.listProducts(admin.token);
+    const products = await app.services.listProducts(admin.token);
     assert.equal(products.length, 1);
     assert.equal(products[0].code, "PGAPP");
     assert.equal(products[0].ownerDeveloper.username, "pgdev");
 
-    const policies = app.services.listPolicies(admin.token, { productCode: "PGAPP" });
+    const policies = await app.services.listPolicies(admin.token, { productCode: "PGAPP" });
     assert.equal(policies.length, 1);
     assert.equal(policies[0].productCode, "PGAPP");
     assert.deepEqual(policies[0].bindFields, ["deviceFingerprint", "machineGuid"]);
 
-    const cards = app.services.listCards(admin.token, { productCode: "PGAPP" });
+    const cards = await app.services.listCards(admin.token, { productCode: "PGAPP" });
     assert.equal(cards.items.length, 1);
     assert.equal(cards.items[0].cardKey, "PGAPP-123456-ABCD");
     assert.equal(cards.items[0].grantType, "points");
 
-    const cardById = app.mainStore.cards.getCardRowById(app.db, "card_pg_1");
+    const cardById = await app.mainStore.cards.getCardRowById(app.db, "card_pg_1");
     assert.equal(cardById.id, "card_pg_1");
     assert.equal(cardById.maskedKey, "PGAPP-******-ABCD");
 
-    const entitlements = app.services.listEntitlements(admin.token, { productCode: "PGAPP" });
+    const entitlements = await app.services.listEntitlements(admin.token, { productCode: "PGAPP" });
     assert.equal(entitlements.items.length, 1);
     assert.equal(entitlements.items[0].username, "pguser");
     assert.equal(entitlements.items[0].remainingPoints, 17);

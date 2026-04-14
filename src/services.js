@@ -5377,9 +5377,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    listProducts(token) {
+    async listProducts(token) {
       requireAdminSession(db, token);
-      return store.products.queryProductRows(db);
+      return await Promise.resolve(store.products.queryProductRows(db));
     },
 
     createProduct(token, body) {
@@ -5450,7 +5450,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return nextProduct;
     },
 
-    developerListProducts(token) {
+    async developerListProducts(token) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -5459,9 +5459,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view projects assigned to your developer account."
       );
       if (session.actor_scope === "owner") {
-        return store.products.queryProductRows(db, { ownerDeveloperId: session.developer_id });
+        return await Promise.resolve(
+          store.products.queryProductRows(db, { ownerDeveloperId: session.developer_id })
+        );
       }
-      return store.products.queryProductRows(db, { productIds: listDeveloperAccessibleProductIds(db, session) });
+      return await Promise.resolve(
+        store.products.queryProductRows(db, { productIds: listDeveloperAccessibleProductIds(db, session) })
+      );
     },
 
     developerDashboard(token) {
@@ -5579,12 +5583,15 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    listPolicies(token, productCode = null) {
+    async listPolicies(token, productCode = null) {
       requireAdminSession(db, token);
-      return store.policies.queryPolicyRows(db, productCode ? { productCode } : {});
+      const filters = productCode && typeof productCode === "object"
+        ? productCode
+        : (productCode ? { productCode } : {});
+      return await Promise.resolve(store.policies.queryPolicyRows(db, filters));
     },
 
-    developerListPolicies(token, filters = {}) {
+    async developerListPolicies(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -5600,10 +5607,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "policies.read"
         );
       }
-      return store.policies.queryPolicyRows(db, {
+      return await Promise.resolve(store.policies.queryPolicyRows(db, {
         productCode: filters.productCode ?? null,
         productIds: listDeveloperAccessibleProductIds(db, session)
-      });
+      }));
     },
 
     createPolicy(token, body) {
@@ -6071,9 +6078,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    listCards(token, filters = {}) {
+    async listCards(token, filters = {}) {
       requireAdminSession(db, token);
-      const { items, summary, filters: normalizedFilters } = store.cards.queryCardRows(db, filters);
+      const { items, summary, filters: normalizedFilters } = await Promise.resolve(
+        store.cards.queryCardRows(db, filters)
+      );
       return {
         items,
         total: items.length,
@@ -6082,13 +6091,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    exportCardsCsv(token, filters = {}) {
+    async exportCardsCsv(token, filters = {}) {
       requireAdminSession(db, token);
-      const { items } = store.cards.queryCardRows(db, filters, { limit: 5000 });
+      const { items } = await Promise.resolve(store.cards.queryCardRows(db, filters, { limit: 5000 }));
       return buildCardsCsv(items);
     },
 
-    developerListCards(token, filters = {}) {
+    async developerListCards(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6104,10 +6113,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "cards.read"
         );
       }
-      const { items, summary, filters: normalizedFilters } = store.cards.queryCardRows(
+      const { items, summary, filters: normalizedFilters } = await Promise.resolve(store.cards.queryCardRows(
         db,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) }
-      );
+      ));
       return {
         items,
         total: items.length,
@@ -6116,7 +6125,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    developerExportCardsCsv(token, filters = {}) {
+    async developerExportCardsCsv(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6132,11 +6141,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "cards.read"
         );
       }
-      const { items } = store.cards.queryCardRows(
+      const { items } = await Promise.resolve(store.cards.queryCardRows(
         db,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
         { limit: 5000 }
-      );
+      ));
       return buildCardsCsv(items);
     },
 
@@ -6187,7 +6196,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         });
 
         return {
-          ...store.cards.getCardRowById(db, card.id),
+          ...getCardRowById(db, card.id),
           changed: true,
           revokedSessions
         };
@@ -6226,7 +6235,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         });
 
         return {
-          ...store.cards.getCardRowById(db, card.id),
+          ...getCardRowById(db, card.id),
           changed: true,
           revokedSessions
         };
@@ -6492,9 +6501,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    listEntitlements(token, filters = {}) {
+    async listEntitlements(token, filters = {}) {
       requireAdminSession(db, token);
-      const { items, filters: normalizedFilters } = store.entitlements.queryEntitlementRows(db, filters);
+      const { items, filters: normalizedFilters } = await Promise.resolve(
+        store.entitlements.queryEntitlementRows(db, filters)
+      );
       return {
         items,
         total: items.length,
@@ -6502,7 +6513,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    developerListEntitlements(token, filters = {}) {
+    async developerListEntitlements(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6518,10 +6529,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "ops.read"
         );
       }
-      const { items, filters: normalizedFilters } = store.entitlements.queryEntitlementRows(db, {
+      const { items, filters: normalizedFilters } = await Promise.resolve(store.entitlements.queryEntitlementRows(db, {
         ...filters,
         productIds: listDeveloperAccessibleProductIds(db, session)
-      });
+      }));
       return {
         items,
         total: items.length,

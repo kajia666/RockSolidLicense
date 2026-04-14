@@ -78,7 +78,7 @@ test("entitlement repository reads usable authorization and formatted grant stat
       code: "ENTREPO",
       name: "Entitlement Repo Product"
     });
-    const product = app.services.listProducts(admin.token).find((item) => item.code === "ENTREPO");
+    const product = (await app.services.listProducts(admin.token)).find((item) => item.code === "ENTREPO");
     const policy = app.services.createPolicy(admin.token, {
       productCode: "ENTREPO",
       name: "Points Policy",

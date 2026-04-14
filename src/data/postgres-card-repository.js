@@ -93,7 +93,7 @@ function buildCardSelectSql(whereClause = "", limit = 500) {
 
 export function createPostgresCardRepository(adapter) {
   return {
-    queryCardRows(_db, filters = {}, options = {}) {
+    async queryCardRows(_db, filters = {}, options = {}) {
       const normalizedFilters = normalizeCardFilters(filters);
       const conditions = [];
       const params = [];
@@ -146,7 +146,7 @@ export function createPostgresCardRepository(adapter) {
       const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
       const referenceTime = nowIso();
 
-      const items = adapter.query(
+      const items = (await Promise.resolve(adapter.query(
         buildCardSelectSql(whereClause, limit),
         params,
         {
@@ -155,7 +155,7 @@ export function createPostgresCardRepository(adapter) {
           filters: normalizedFilters,
           options: { limit }
         }
-      )
+      )))
         .map((row) => formatCardRow({
           ...row,
           status: row.status,
@@ -183,8 +183,8 @@ export function createPostgresCardRepository(adapter) {
       };
     },
 
-    getCardRowById(_db, cardId) {
-      const rows = adapter.query(
+    async getCardRowById(_db, cardId) {
+      const rows = await Promise.resolve(adapter.query(
         buildCardSelectSql("WHERE lk.id = $1", 1),
         [cardId],
         {
@@ -192,7 +192,7 @@ export function createPostgresCardRepository(adapter) {
           operation: "getCardRowById",
           cardId
         }
-      );
+      ));
       const row = rows[0] ?? null;
       return row ? formatCardRow({
         ...row,

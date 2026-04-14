@@ -39,7 +39,7 @@ function likeFilter(value) {
 
 export function createPostgresEntitlementRepository(adapter) {
   return {
-    queryEntitlementRows(_db, filters = {}, options = {}) {
+    async queryEntitlementRows(_db, filters = {}, options = {}) {
       const referenceTime = nowIso();
       const normalizedFilters = {
         productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
@@ -80,7 +80,7 @@ export function createPostgresEntitlementRepository(adapter) {
         ? 300
         : Math.min(Math.max(Number(options.limit), 1), 2000);
 
-      const items = adapter.query(
+      const items = (await Promise.resolve(adapter.query(
         `
           SELECT e.*, pr.code AS product_code, pr.name AS product_name,
                  a.username, pol.name AS policy_name,
@@ -114,7 +114,7 @@ export function createPostgresEntitlementRepository(adapter) {
           filters: normalizedFilters,
           options: { limit }
         }
-      ).map((row) => formatEntitlementRow(row, referenceTime)).filter((item) => {
+      ))).map((row) => formatEntitlementRow(row, referenceTime)).filter((item) => {
         if (!normalizedFilters.status) {
           return true;
         }

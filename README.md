@@ -131,6 +131,9 @@ RSL_DB_PATH=./data/rocksolid.db
 RSL_MAIN_STORE_DRIVER=sqlite
 RSL_STATE_STORE_DRIVER=sqlite
 RSL_POSTGRES_URL=
+RSL_POSTGRES_PG_MODULE=pg
+RSL_POSTGRES_PG_MODULE_PATH=
+RSL_POSTGRES_POOL_MAX=10
 RSL_REDIS_URL=
 RSL_REDIS_KEY_PREFIX=rsl
 RSL_LICENSE_PRIVATE_KEY_PATH=./data/license_private.pem
@@ -161,6 +164,7 @@ npm run db:postgres:check
 - [init.sql](/D:/code/OnlineVerification/deploy/postgres/init.sql)
 - [render-postgres-init.mjs](/D:/code/OnlineVerification/scripts/render-postgres-init.mjs)
 - [storage-platform.md](/D:/code/OnlineVerification/docs/storage-platform.md)
+- [postgres-runtime-adapter.md](/D:/code/OnlineVerification/docs/postgres-runtime-adapter.md)
 
 当前主数据访问层也已经开始抽边界，第一块仓储是：
 
@@ -176,6 +180,14 @@ npm run db:postgres:check
 
 - `sqlite`：默认主数据访问层，直接使用当前 SQLite 主库
 - `postgres`：当前支持 `products / policies / cards / entitlements` 的 PostgreSQL 读侧 adapter 预览；如果没有接入 adapter，运行时仍会安全回退到 SQLite，并继续在健康检查里明确显示当前阶段
+
+当前 PostgreSQL runtime adapter 已经支持直接加载 `pg` 风格连接池模块：
+
+- 默认读取 `RSL_POSTGRES_PG_MODULE=pg`
+- 也可以用 `RSL_POSTGRES_PG_MODULE_PATH` 指向自定义模块路径
+- `RSL_POSTGRES_POOL_MAX` 控制查询池大小
+
+这条链路当前已经能让四块主数据读侧通过 runtime adapter 走 PostgreSQL 查询；写路径仍然保留在 SQLite，所以健康检查里的 `implementationStage` 会继续显示 `read_side_preview`。
 
 ## 终端用户主流程
 
@@ -451,6 +463,7 @@ cl /EHsc /std:c++17 ^
 - `docs/developer-ops.md`
 - `docs/developer-release.md`
 - `docs/storage-platform.md`
+- `docs/postgres-runtime-adapter.md`
 - `docs/linux-deployment.md`
 - `docs/windows-server-deployment.md`
 

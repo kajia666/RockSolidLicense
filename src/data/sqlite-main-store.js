@@ -32,6 +32,9 @@ export function createSqliteMainStore({ db }) {
     ...SQLITE_MAIN_STORE_REPOSITORIES,
     health() {
       return { ...metadata };
+    },
+    async close() {
+      return undefined;
     }
   };
 }

@@ -5,9 +5,10 @@ import { createPostgresPolicyRepository } from "./postgres-policy-repository.js"
 import { createPostgresProductRepository } from "./postgres-product-repository.js";
 import { createSqliteMainStore } from "./sqlite-main-store.js";
 
-export function createPostgresMainStore({ db, config }) {
+export function createPostgresMainStore({ db, config, adapterResolution = null }) {
   const fallbackStore = createSqliteMainStore({ db });
-  const adapter = config.postgresMainStoreAdapter;
+  const adapter = adapterResolution?.adapter ?? config.postgresMainStoreAdapter ?? null;
+  const adapterMetadata = adapterResolution?.metadata ?? {};
   const adapterReady = Boolean(adapter && typeof adapter.query === "function");
 
   if (adapterReady) {
@@ -24,6 +25,7 @@ export function createPostgresMainStore({ db, config }) {
       targetDriver: "postgres",
       implementationStage: "read_side_preview",
       fallbackReason: "writes_still_use_sqlite",
+      ...adapterMetadata,
       adapterReady,
       postgresUrlConfigured: Boolean(config.postgresUrl),
       schemaScriptPath: path.join(config.cwd, "deploy", "postgres", "init.sql"),
@@ -40,8 +42,16 @@ export function createPostgresMainStore({ db, config }) {
       ...repositories,
       db,
       ...metadata,
-      health() {
-        return { ...metadata };
+      async health() {
+        const runtimeHealth = typeof adapter.health === "function"
+          ? await Promise.resolve(adapter.health())
+          : null;
+        return runtimeHealth ? { ...metadata, ...runtimeHealth } : { ...metadata };
+      },
+      async close() {
+        if (typeof adapter.close === "function") {
+          await Promise.resolve(adapter.close());
+        }
       }
     };
   }
@@ -52,6 +62,7 @@ export function createPostgresMainStore({ db, config }) {
     targetDriver: "postgres",
     implementationStage: "sqlite_fallback",
     fallbackReason: "postgres_runtime_not_implemented",
+    ...adapterMetadata,
     adapterReady,
     postgresUrlConfigured: Boolean(config.postgresUrl),
     schemaScriptPath: path.join(config.cwd, "deploy", "postgres", "init.sql"),
@@ -67,8 +78,16 @@ export function createPostgresMainStore({ db, config }) {
   return {
     ...fallbackStore,
     ...metadata,
-    health() {
-      return { ...metadata };
+    async health() {
+      const runtimeHealth = adapter && typeof adapter.health === "function"
+        ? await Promise.resolve(adapter.health())
+        : null;
+      return runtimeHealth ? { ...metadata, ...runtimeHealth } : { ...metadata };
+    },
+    async close() {
+      if (adapter && typeof adapter.close === "function") {
+        await Promise.resolve(adapter.close());
+      }
     }
   };
 }

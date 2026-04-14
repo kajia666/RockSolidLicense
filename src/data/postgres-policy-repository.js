@@ -28,7 +28,7 @@ function appendInCondition(columnSql, values, conditions, params) {
 
 export function createPostgresPolicyRepository(adapter) {
   return {
-    queryPolicyRows(_db, filters = {}) {
+    async queryPolicyRows(_db, filters = {}) {
       const conditions = [];
       const params = [];
 
@@ -42,7 +42,7 @@ export function createPostgresPolicyRepository(adapter) {
       }
       appendInCondition("pr.id", filters.productIds, conditions, params);
 
-      const rows = adapter.query(
+      const rows = await Promise.resolve(adapter.query(
         `
           SELECT p.*, pr.code AS product_code, pr.name AS product_name,
                  pbc.bind_fields_json,
@@ -63,7 +63,7 @@ export function createPostgresPolicyRepository(adapter) {
           operation: "queryPolicyRows",
           filters
         }
-      );
+      ));
 
       return rows.map(formatPolicyRow);
     }

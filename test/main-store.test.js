@@ -54,7 +54,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(productRows.length, 1);
     assert.equal(productRows[0].id, product.id);
 
-    const adminRows = app.services.listProducts(admin.token);
+    const adminRows = await app.services.listProducts(admin.token);
     assert.equal(adminRows.length, 1);
     assert.equal(adminRows[0].code, "STOREAPP");
 
@@ -62,7 +62,7 @@ test("app exposes sqlite main store and services read through it", async () => {
       username: "storedev",
       password: "Pass123!abc"
     });
-    const developerRows = app.services.developerListProducts(developerLogin.token);
+    const developerRows = await app.services.developerListProducts(developerLogin.token);
     assert.equal(developerRows.length, 1);
     assert.equal(developerRows[0].code, "STOREAPP");
   } finally {

@@ -187,7 +187,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/products") {
-        sendJson(res, 200, { ok: true, data: services.listProducts(getBearerToken(req)) });
+        sendJson(res, 200, { ok: true, data: await services.listProducts(getBearerToken(req)) });
         return;
       }
 
@@ -249,7 +249,7 @@ export function createApp(overrides = {}) {
         sendJson(
           res,
           200,
-          { ok: true, data: services.listPolicies(getBearerToken(req), url.searchParams.get("productCode")) }
+          { ok: true, data: await services.listPolicies(getBearerToken(req), url.searchParams.get("productCode")) }
         );
         return;
       }
@@ -301,7 +301,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/cards") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listCards(getBearerToken(req), {
+          data: await services.listCards(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             policyId: url.searchParams.get("policyId"),
             batchCode: url.searchParams.get("batchCode"),
@@ -315,7 +315,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/cards/export") {
-        const csv = services.exportCardsCsv(getBearerToken(req), {
+        const csv = await services.exportCardsCsv(getBearerToken(req), {
           productCode: url.searchParams.get("productCode"),
           policyId: url.searchParams.get("policyId"),
           batchCode: url.searchParams.get("batchCode"),
@@ -535,7 +535,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/entitlements") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listEntitlements(getBearerToken(req), {
+          data: await services.listEntitlements(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             username: url.searchParams.get("username"),
             status: url.searchParams.get("status"),
@@ -1005,7 +1005,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/developer/products") {
-        sendJson(res, 200, { ok: true, data: services.developerListProducts(getBearerToken(req)) });
+        sendJson(res, 200, { ok: true, data: await services.developerListProducts(getBearerToken(req)) });
         return;
       }
 
@@ -1050,7 +1050,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/policies") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListPolicies(getBearerToken(req), {
+          data: await services.developerListPolicies(getBearerToken(req), {
             productCode: url.searchParams.get("productCode")
           })
         });
@@ -1098,7 +1098,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/cards") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListCards(getBearerToken(req), {
+          data: await services.developerListCards(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             policyId: url.searchParams.get("policyId"),
             batchCode: url.searchParams.get("batchCode"),
@@ -1111,7 +1111,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/developer/cards/export") {
-        const csv = services.developerExportCardsCsv(getBearerToken(req), {
+        const csv = await services.developerExportCardsCsv(getBearerToken(req), {
           productCode: url.searchParams.get("productCode"),
           policyId: url.searchParams.get("policyId"),
           batchCode: url.searchParams.get("batchCode"),
@@ -1283,7 +1283,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/entitlements") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListEntitlements(getBearerToken(req), {
+          data: await services.developerListEntitlements(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             username: url.searchParams.get("username"),
             status: url.searchParams.get("status"),
@@ -1719,6 +1719,10 @@ export function createApp(overrides = {}) {
         await new Promise((resolve, reject) => {
           tcpServer.close((error) => (error ? reject(error) : resolve()));
         }).catch(() => {});
+      }
+
+      if (mainStore?.close) {
+        await Promise.resolve(mainStore.close()).catch(() => {});
       }
 
       runtimeState.close();

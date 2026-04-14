@@ -44,7 +44,7 @@ function productSelectSql(whereClause = "") {
 
 export function createPostgresProductRepository(adapter) {
   return {
-    queryProductRows(_db, filters = {}) {
+    async queryProductRows(_db, filters = {}) {
       const conditions = [];
       const params = [];
 
@@ -63,7 +63,7 @@ export function createPostgresProductRepository(adapter) {
       appendInCondition("p.id", filters.productIds, conditions, params);
 
       const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-      const rows = adapter.query(
+      const rows = await Promise.resolve(adapter.query(
         `${productSelectSql(whereClause)} ORDER BY p.created_at DESC`,
         params,
         {
@@ -71,7 +71,7 @@ export function createPostgresProductRepository(adapter) {
           operation: "queryProductRows",
           filters
         }
-      );
+      ));
 
       return rows.map((row) => formatProductRow(row));
     }

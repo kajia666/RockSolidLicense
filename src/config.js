@@ -46,6 +46,11 @@ export function loadConfig(overrides = {}) {
       process.env.RSL_DB_PATH ??
       path.join(dataDir, "rocksolid.db"),
     postgresUrl: optionalString(overrides.postgresUrl ?? process.env.RSL_POSTGRES_URL),
+    postgresPgModule:
+      optionalString(overrides.postgresPgModule ?? process.env.RSL_POSTGRES_PG_MODULE) ?? "pg",
+    postgresPgModulePath:
+      optionalString(overrides.postgresPgModulePath ?? process.env.RSL_POSTGRES_PG_MODULE_PATH),
+    postgresPoolMax: Number(overrides.postgresPoolMax ?? process.env.RSL_POSTGRES_POOL_MAX ?? 10),
     stateStoreDriver,
     mainStoreDriver,
     redisUrl: optionalString(overrides.redisUrl ?? process.env.RSL_REDIS_URL),

@@ -328,6 +328,11 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(sessionManageRow.product_code, "STOREAPP2");
     assert.equal(sessionManageRow.username, "store_direct_user");
 
+    const activeSessionExpiryRows = app.mainStore.sessions.listActiveSessionExpiryRows(app.db);
+    assert.equal(activeSessionExpiryRows.length, 1);
+    assert.equal(activeSessionExpiryRows[0].id, "sess_store_main");
+    assert.equal(activeSessionExpiryRows[0].session_token, "session-token-store-main");
+
     const untouchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
     assert.equal(untouchedAccount.last_login_at ?? null, null);
 
@@ -357,7 +362,7 @@ test("app exposes sqlite main store and services read through it", async () => {
         requestIp: "127.0.0.2"
       }
     );
-    const directBinding = app.mainStore.devices.bindDeviceToEntitlement(
+    const directBinding = await app.mainStore.devices.bindDeviceToEntitlement(
       {
         id: durationEntitlement.id,
         max_devices: 2

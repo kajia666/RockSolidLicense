@@ -53,7 +53,7 @@ test("postgres runtime adapter can load a pg-style pool module and close it clea
       entitlements: "postgres",
       accounts: "postgres",
       devices: "postgres_partial",
-      sessions: "sqlite"
+      sessions: "postgres_partial"
     });
 
     const admin = app.services.adminLogin({

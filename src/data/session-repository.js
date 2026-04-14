@@ -57,3 +57,15 @@ export function getSessionManageRowById(db, sessionId) {
     sessionId
   );
 }
+
+export function listActiveSessionExpiryRows(db) {
+  return db.prepare(
+    `
+      SELECT s.id, s.session_token, s.expires_at, s.last_heartbeat_at, p.heartbeat_timeout_seconds
+      FROM sessions s
+      JOIN entitlements e ON e.id = s.entitlement_id
+      JOIN policies p ON p.id = e.policy_id
+      WHERE s.status = 'active'
+    `
+  ).all();
+}

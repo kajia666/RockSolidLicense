@@ -265,7 +265,7 @@ export function createSqliteDeviceStore({ db }) {
       return one(db, "SELECT * FROM entitlement_unbind_logs WHERE id = ?", logId);
     },
 
-    bindDeviceToEntitlement(entitlement, device, bindingIdentity, options = {}) {
+    async bindDeviceToEntitlement(entitlement, device, bindingIdentity, options = {}) {
       const releaseSessions = typeof options.releaseSessions === "function"
         ? options.releaseSessions
         : () => 0;
@@ -328,11 +328,11 @@ export function createSqliteDeviceStore({ db }) {
         let releasedSessions = 0;
 
         if (profileMatch.status === "active" && profileMatch.device_id !== device.id) {
-          releasedSessions = Number(releaseSessions({
+          releasedSessions = Number(await Promise.resolve(releaseSessions({
             entitlementId: entitlement.id,
             deviceId: profileMatch.device_id,
             reason: "binding_rebound"
-          }) ?? 0);
+          })) ?? 0);
         }
 
         run(

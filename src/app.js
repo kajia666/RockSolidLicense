@@ -565,7 +565,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/device-bindings") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listDeviceBindings(getBearerToken(req), {
+          data: await services.listDeviceBindings(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             username: url.searchParams.get("username"),
             status: url.searchParams.get("status"),
@@ -631,7 +631,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.blockDevice(getBearerToken(req), body)
+          data: await services.blockDevice(getBearerToken(req), body)
         });
         return;
       }
@@ -874,7 +874,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/sessions") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listSessions(getBearerToken(req), {
+          data: await services.listSessions(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             username: url.searchParams.get("username"),
             status: url.searchParams.get("status"),
@@ -949,7 +949,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/developer/dashboard") {
-        sendJson(res, 200, { ok: true, data: services.developerDashboard(getBearerToken(req)) });
+        sendJson(res, 200, { ok: true, data: await services.developerDashboard(getBearerToken(req)) });
         return;
       }
 
@@ -1313,7 +1313,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/device-bindings") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListDeviceBindings(getBearerToken(req), {
+          data: await services.developerListDeviceBindings(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             username: url.searchParams.get("username"),
             status: url.searchParams.get("status"),
@@ -1339,7 +1339,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.developerBlockDevice(getBearerToken(req), body)
+          data: await services.developerBlockDevice(getBearerToken(req), body)
         });
         return;
       }
@@ -1427,7 +1427,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/sessions") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListSessions(getBearerToken(req), {
+          data: await services.developerListSessions(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             username: url.searchParams.get("username"),
             status: url.searchParams.get("status"),

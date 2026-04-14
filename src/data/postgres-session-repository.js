@@ -109,6 +109,23 @@ export function createPostgresSessionRepository(adapter) {
       ));
 
       return rows[0] ?? null;
+    },
+
+    async listActiveSessionExpiryRows() {
+      return Promise.resolve(adapter.query(
+        `
+          SELECT s.id, s.session_token, s.expires_at, s.last_heartbeat_at, p.heartbeat_timeout_seconds
+          FROM sessions s
+          JOIN entitlements e ON e.id = s.entitlement_id
+          JOIN policies p ON p.id = e.policy_id
+          WHERE s.status = 'active'
+        `,
+        [],
+        {
+          repository: "sessions",
+          operation: "listActiveSessionExpiryRows"
+        }
+      ));
     }
   };
 }

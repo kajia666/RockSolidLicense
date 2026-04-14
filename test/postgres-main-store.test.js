@@ -636,6 +636,96 @@ function createWriteCapableAdapter() {
         .map((entry) => ({ ...entry }));
     }
 
+    if (meta.repository === "sessions" && meta.operation === "createIssuedSession") {
+      state.sessions.push({
+        id: params[0],
+        product_id: params[1],
+        account_id: params[2],
+        entitlement_id: params[3],
+        device_id: params[4],
+        session_token: params[5],
+        license_token: params[6],
+        status: "active",
+        issued_at: params[7],
+        expires_at: params[8],
+        last_heartbeat_at: params[9],
+        last_seen_ip: params[10],
+        user_agent: params[11],
+        revoked_reason: null
+      });
+      return [];
+    }
+
+    if (meta.repository === "sessions" && meta.operation === "getSessionRecordById") {
+      return state.sessions
+        .filter((session) => session.id === params[0])
+        .slice(0, 1)
+        .map((session) => ({ ...session }));
+    }
+
+    if (meta.repository === "sessions" && meta.operation === "listActiveSessionExpiryRows") {
+      return state.sessions
+        .filter((session) => session.status === "active")
+        .map((session) => ({
+          id: session.id,
+          session_token: session.session_token,
+          expires_at: session.expires_at,
+          last_heartbeat_at: session.last_heartbeat_at,
+          heartbeat_timeout_seconds: 180
+        }));
+    }
+
+    if (meta.repository === "sessions" && meta.operation === "selectActiveSessionsForExpiry") {
+      return state.sessions
+        .filter((session) => session.status === "active")
+        .filter((session) => (
+          (!meta.filters?.sessionId || session.id === meta.filters.sessionId)
+          && (!meta.filters?.sessionToken || session.session_token === meta.filters.sessionToken)
+          && (!meta.filters?.productId || session.product_id === meta.filters.productId)
+          && (!meta.filters?.accountId || session.account_id === meta.filters.accountId)
+          && (!meta.filters?.entitlementId || session.entitlement_id === meta.filters.entitlementId)
+          && (!meta.filters?.deviceId || session.device_id === meta.filters.deviceId)
+        ))
+        .map((session) => ({
+          id: session.id,
+          session_token: session.session_token
+        }));
+    }
+
+    if (meta.repository === "sessions" && meta.operation === "expireActiveSessions") {
+      const reason = params[params.length - 1];
+      for (const session of state.sessions) {
+        if (session.status !== "active") {
+          continue;
+        }
+
+        const matches = (
+          (!meta.filters?.sessionId || session.id === meta.filters.sessionId)
+          && (!meta.filters?.sessionToken || session.session_token === meta.filters.sessionToken)
+          && (!meta.filters?.productId || session.product_id === meta.filters.productId)
+          && (!meta.filters?.accountId || session.account_id === meta.filters.accountId)
+          && (!meta.filters?.entitlementId || session.entitlement_id === meta.filters.entitlementId)
+          && (!meta.filters?.deviceId || session.device_id === meta.filters.deviceId)
+        );
+        if (matches) {
+          session.status = "expired";
+          session.revoked_reason = reason;
+        }
+      }
+      return [];
+    }
+
+    if (meta.repository === "sessions" && meta.operation === "touchSessionHeartbeat") {
+      const session = state.sessions.find((item) => item.id === params[4] && item.status === "active");
+      if (session) {
+        session.last_heartbeat_at = params[0];
+        session.expires_at = params[1];
+        session.last_seen_ip = params[2];
+        session.user_agent = params[3];
+      }
+      return [];
+    }
+
     return [];
   }
 
@@ -1018,6 +1108,18 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "sessions" && meta.operation === "listActiveSessionExpiryRows") {
+        return [
+          {
+            id: "sess_pg_1",
+            session_token: "session_pg_1",
+            expires_at: "2026-01-04T01:00:00.000Z",
+            last_heartbeat_at: "2026-01-04T00:10:00.000Z",
+            heartbeat_timeout_seconds: 180
+          }
+        ];
+      }
+
       return [];
     }
   };
@@ -1142,7 +1244,11 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(sessionManageRow.product_code, "PGAPP");
     assert.equal(sessionManageRow.username, "pguser");
 
-    assert.equal(queries.length, 17);
+    const activeSessionExpiryRows = await app.mainStore.sessions.listActiveSessionExpiryRows(app.db);
+    assert.equal(activeSessionExpiryRows.length, 1);
+    assert.equal(activeSessionExpiryRows[0].session_token, "session_pg_1");
+
+    assert.equal(queries.length, 19);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -1159,24 +1265,28 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[6].sql, /FROM entitlements e/i);
     assert.equal(queries[7].meta.operation, "getLatestEntitlementSnapshot");
     assert.match(queries[7].sql, /FROM entitlements e/i);
-    assert.equal(queries[8].meta.repository, "accounts");
-    assert.match(queries[8].sql, /FROM customer_accounts a/i);
-    assert.equal(queries[9].meta.operation, "queryBindingsForEntitlement");
-    assert.match(queries[9].sql, /FROM device_bindings b/i);
-    assert.equal(queries[10].meta.operation, "getActiveDeviceBlock");
-    assert.match(queries[10].sql, /FROM device_blocks/i);
-    assert.equal(queries[11].meta.operation, "getBindingManageRowById");
-    assert.match(queries[11].sql, /JOIN entitlements e ON e\.id = b\.entitlement_id/i);
-    assert.equal(queries[12].meta.operation, "getSessionRecordByProductToken");
-    assert.match(queries[12].sql, /FROM sessions/i);
-    assert.equal(queries[13].meta.operation, "getSessionRecordById");
-    assert.match(queries[13].sql, /WHERE id = \$1/i);
-    assert.equal(queries[14].meta.operation, "getSessionRecordByToken");
-    assert.match(queries[14].sql, /WHERE session_token = \$1/i);
-    assert.equal(queries[15].meta.operation, "getActiveSessionHeartbeatRow");
-    assert.match(queries[15].sql, /JOIN devices d ON d\.id = s\.device_id/i);
-    assert.equal(queries[16].meta.operation, "getSessionManageRowById");
-    assert.match(queries[16].sql, /JOIN products pr ON pr\.id = s\.product_id/i);
+    assert.equal(queries[8].meta.operation, "listActiveSessionExpiryRows");
+    assert.match(queries[8].sql, /JOIN policies p ON p\.id = e\.policy_id/i);
+    assert.equal(queries[9].meta.repository, "accounts");
+    assert.match(queries[9].sql, /FROM customer_accounts a/i);
+    assert.equal(queries[10].meta.operation, "queryBindingsForEntitlement");
+    assert.match(queries[10].sql, /FROM device_bindings b/i);
+    assert.equal(queries[11].meta.operation, "getActiveDeviceBlock");
+    assert.match(queries[11].sql, /FROM device_blocks/i);
+    assert.equal(queries[12].meta.operation, "getBindingManageRowById");
+    assert.match(queries[12].sql, /JOIN entitlements e ON e\.id = b\.entitlement_id/i);
+    assert.equal(queries[13].meta.operation, "getSessionRecordByProductToken");
+    assert.match(queries[13].sql, /FROM sessions/i);
+    assert.equal(queries[14].meta.operation, "getSessionRecordById");
+    assert.match(queries[14].sql, /WHERE id = \$1/i);
+    assert.equal(queries[15].meta.operation, "getSessionRecordByToken");
+    assert.match(queries[15].sql, /WHERE session_token = \$1/i);
+    assert.equal(queries[16].meta.operation, "getActiveSessionHeartbeatRow");
+    assert.match(queries[16].sql, /JOIN devices d ON d\.id = s\.device_id/i);
+    assert.equal(queries[17].meta.operation, "getSessionManageRowById");
+    assert.match(queries[17].sql, /JOIN products pr ON pr\.id = s\.product_id/i);
+    assert.equal(queries[18].meta.operation, "listActiveSessionExpiryRows");
+    assert.match(queries[18].sql, /JOIN policies p ON p\.id = e\.policy_id/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -1224,7 +1334,7 @@ test("postgres main store can write products and policies through a transaction-
       entitlements: "postgres",
       accounts: "postgres",
       devices: "postgres_partial",
-      sessions: "sqlite"
+      sessions: "postgres_partial"
     });
 
     const admin = app.services.adminLogin({
@@ -1334,7 +1444,7 @@ test("postgres main store can write products and policies through a transaction-
       entitlements: "postgres",
       accounts: "postgres",
       devices: "postgres_partial",
-      sessions: "sqlite"
+      sessions: "postgres_partial"
     });
 
     assert.equal(state.products.length, 1);
@@ -1376,6 +1486,41 @@ test("postgres main store can write products and policies through a transaction-
       "2026-01-15T00:00:00.000Z"
     );
     assert.equal(recentClientUnbinds, 1);
+
+    const issuedSession = await app.mainStore.sessions.createIssuedSession({
+      id: "sess_pg_write_1",
+      productId: product.id,
+      accountId: createdAccount.id,
+      entitlementId: "ent_pg_write_1",
+      deviceId: "dev_pg_write_1",
+      sessionToken: "session-pg-write-1",
+      licenseToken: "license-pg-write-1",
+      issuedAt: "2026-01-15T00:00:00.000Z",
+      expiresAt: "2026-01-15T01:00:00.000Z",
+      lastHeartbeatAt: "2026-01-15T00:00:00.000Z",
+      lastSeenIp: "203.0.113.30",
+      userAgent: "pg-session-write-test"
+    });
+    assert.equal(issuedSession.session_token, "session-pg-write-1");
+
+    const touchedSession = await app.mainStore.sessions.touchSessionHeartbeat("sess_pg_write_1", {
+      lastHeartbeatAt: "2026-01-15T00:10:00.000Z",
+      expiresAt: "2026-01-15T01:10:00.000Z",
+      lastSeenIp: "203.0.113.31",
+      userAgent: "pg-session-heartbeat-test"
+    });
+    assert.equal(touchedSession.last_heartbeat_at, "2026-01-15T00:10:00.000Z");
+    assert.equal(touchedSession.expires_at, "2026-01-15T01:10:00.000Z");
+    assert.equal(touchedSession.last_seen_ip, "203.0.113.31");
+
+    const expiredSessions = await app.mainStore.sessions.expireActiveSessions(
+      { sessionId: "sess_pg_write_1" },
+      "pg_session_revoke"
+    );
+    assert.equal(expiredSessions.length, 1);
+    assert.equal(expiredSessions[0].session_token, "session-pg-write-1");
+    assert.equal(state.sessions[0].status, "expired");
+    assert.equal(state.sessions[0].revoked_reason, "pg_session_revoke");
 
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "createProduct"),
@@ -1419,6 +1564,22 @@ test("postgres main store can write products and policies through a transaction-
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "countRecentClientUnbinds"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createIssuedSession"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "touchSessionHeartbeat"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "selectActiveSessionsForExpiry"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "expireActiveSessions"),
       true
     );
   } finally {
@@ -1530,7 +1691,7 @@ test("postgres main store can write cards and entitlements through a transaction
       entitlements: "postgres",
       accounts: "postgres",
       devices: "postgres_partial",
-      sessions: "sqlite"
+      sessions: "postgres_partial"
     });
 
     assert.equal(state.licenseKeys.length, 1);

@@ -12,6 +12,7 @@ import { createPostgresPolicyStore } from "./postgres-policy-store.js";
 import { createPostgresProductRepository } from "./postgres-product-repository.js";
 import { createPostgresProductStore } from "./postgres-product-store.js";
 import { createPostgresSessionRepository } from "./postgres-session-repository.js";
+import { createPostgresSessionStore } from "./postgres-session-store.js";
 import { createSqliteMainStore } from "./sqlite-main-store.js";
 
 export function createPostgresMainStore({ db, config, adapterResolution = null }) {
@@ -55,7 +56,8 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       },
       sessions: {
         ...fallbackStore.sessions,
-        ...createPostgresSessionRepository(adapter)
+        ...createPostgresSessionRepository(adapter),
+        ...createPostgresSessionStore(adapter)
       }
     };
 
@@ -86,7 +88,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         entitlements: coreWriteReady ? "postgres" : "sqlite",
         accounts: coreWriteReady ? "postgres" : "sqlite",
         devices: coreWriteReady ? "postgres_partial" : "sqlite",
-        sessions: "sqlite"
+        sessions: coreWriteReady ? "postgres_partial" : "sqlite"
       }
     };
 

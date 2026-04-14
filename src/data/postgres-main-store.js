@@ -25,7 +25,10 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         ...fallbackStore.cards,
         ...createPostgresCardRepository(adapter)
       },
-      entitlements: createPostgresEntitlementRepository(adapter)
+      entitlements: {
+        ...fallbackStore.entitlements,
+        ...createPostgresEntitlementRepository(adapter)
+      }
     };
 
     const metadata = {
@@ -48,7 +51,8 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       repositoryWriteDrivers: {
         products: "sqlite",
         policies: "sqlite",
-        cards: "sqlite"
+        cards: "sqlite",
+        entitlements: "sqlite"
       }
     };
 
@@ -90,7 +94,8 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
     repositoryWriteDrivers: {
       products: "sqlite",
       policies: "sqlite",
-      cards: "sqlite"
+      cards: "sqlite",
+      entitlements: "sqlite"
     }
   };
 

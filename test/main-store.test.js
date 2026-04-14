@@ -35,7 +35,8 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
       policies: "sqlite",
-      cards: "sqlite"
+      cards: "sqlite",
+      entitlements: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -146,6 +147,91 @@ test("app exposes sqlite main store and services read through it", async () => {
     });
     assert.equal(updatedCard.control.status, "frozen");
     assert.equal(updatedCard.card.displayStatus, "frozen");
+
+    const durationCard = directCards.items.find((item) => item.id !== updatedCard.card.id);
+    assert.ok(durationCard);
+    const accountId = "acct_store_main";
+    const now = new Date().toISOString();
+    const durationEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    app.db.prepare(`
+      INSERT INTO customer_accounts
+      (id, product_id, username, password_hash, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'active', ?, ?)
+    `).run(accountId, directProduct.id, "store_user", "test-hash", now, now);
+    app.db.prepare(`
+      UPDATE license_keys
+      SET status = 'redeemed', redeemed_by_account_id = ?, redeemed_at = ?
+      WHERE id = ?
+    `).run(accountId, now, durationCard.id);
+    app.db.prepare(`
+      INSERT INTO entitlements
+      (id, product_id, account_id, policy_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+    `).run("ent_store_duration", directProduct.id, accountId, directPolicy.id, durationCard.id, now, durationEndsAt, now, now);
+
+    const pointPolicy = app.mainStore.policies.createPolicy(directProduct, {
+      name: "Point Store Policy",
+      grantType: "points",
+      grantPoints: 5,
+      durationDays: 0,
+      maxDevices: 1
+    });
+    app.mainStore.cards.createCardBatch(directProduct, pointPolicy, {
+      count: 1,
+      prefix: "PSTORE"
+    });
+    const pointCard = app.mainStore.cards.queryCardRows(app.db, {
+      productCode: "STOREAPP2",
+      policyId: pointPolicy.id
+    }).items[0];
+    assert.ok(pointCard);
+    const pointEndsAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    app.db.prepare(`
+      UPDATE license_keys
+      SET status = 'redeemed', redeemed_by_account_id = ?, redeemed_at = ?
+      WHERE id = ?
+    `).run(accountId, now, pointCard.id);
+    app.db.prepare(`
+      INSERT INTO entitlements
+      (id, product_id, account_id, policy_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+    `).run("ent_store_points", directProduct.id, accountId, pointPolicy.id, pointCard.id, now, pointEndsAt, now, now);
+    app.db.prepare(`
+      INSERT INTO entitlement_metering
+      (entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at)
+      VALUES (?, 'points', ?, ?, ?, ?, ?)
+    `).run("ent_store_points", 5, 5, 0, now, now);
+
+    const entitlementRows = app.mainStore.entitlements.queryEntitlementRows(app.db, {
+      productCode: "STOREAPP2"
+    }).items;
+    const durationEntitlement = entitlementRows.find((item) => item.grantType === "duration");
+    const pointEntitlement = entitlementRows.find((item) => item.grantType === "points");
+    assert.ok(durationEntitlement);
+    assert.ok(pointEntitlement);
+
+    const frozenEntitlement = app.mainStore.entitlements.updateEntitlementStatus(durationEntitlement.id, {
+      status: "frozen"
+    });
+    assert.equal(frozenEntitlement.status, "frozen");
+    assert.equal(frozenEntitlement.changed, true);
+
+    const restoredEntitlement = app.mainStore.entitlements.updateEntitlementStatus(durationEntitlement.id, {
+      status: "active"
+    });
+    assert.equal(restoredEntitlement.status, "active");
+
+    const extendedEntitlement = app.mainStore.entitlements.extendEntitlement(durationEntitlement.id, {
+      days: 7
+    });
+    assert.equal(extendedEntitlement.addedDays, 7);
+
+    const adjustedEntitlement = app.mainStore.entitlements.adjustEntitlementPoints(pointEntitlement.id, {
+      mode: "add",
+      points: 2
+    });
+    assert.equal(adjustedEntitlement.current.totalPoints, 7);
+    assert.equal(adjustedEntitlement.current.remainingPoints, 7);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

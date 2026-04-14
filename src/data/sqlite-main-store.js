@@ -3,6 +3,7 @@ import * as policies from "./policy-repository.js";
 import * as cards from "./card-repository.js";
 import * as entitlements from "./entitlement-repository.js";
 import { createSqliteCardStore } from "./sqlite-card-store.js";
+import { createSqliteEntitlementStore } from "./sqlite-entitlement-store.js";
 import { createSqlitePolicyStore } from "./sqlite-policy-store.js";
 import { createSqliteProductStore } from "./sqlite-product-store.js";
 
@@ -20,7 +21,10 @@ export function createSqliteMainStore({ db }) {
       ...cards,
       ...createSqliteCardStore({ db })
     },
-    entitlements
+    entitlements: {
+      ...entitlements,
+      ...createSqliteEntitlementStore({ db })
+    }
   };
 
   const metadata = {
@@ -39,7 +43,8 @@ export function createSqliteMainStore({ db }) {
     repositoryWriteDrivers: {
       products: "sqlite",
       policies: "sqlite",
-      cards: "sqlite"
+      cards: "sqlite",
+      entitlements: "sqlite"
     }
   };
 

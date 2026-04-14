@@ -224,7 +224,8 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
       policies: "sqlite",
-      cards: "sqlite"
+      cards: "sqlite",
+      entitlements: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -281,7 +282,8 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
       policies: "sqlite",
-      cards: "sqlite"
+      cards: "sqlite",
+      entitlements: "sqlite"
     });
   } finally {
     await app.close();

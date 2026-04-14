@@ -24,8 +24,6 @@ import {
   formatEntitlementGrant,
   getLatestEntitlementSnapshot,
   getUsableEntitlement,
-  loadPointEntitlementForAdmin,
-  normalizeEntitlementStatus,
   queryEntitlementRows
 } from "./data/entitlement-repository.js";
 import {
@@ -1390,6 +1388,37 @@ function requireDeveloperOwnedCard(db, session, cardId, permission = "cards.read
   return row;
 }
 
+function requireDeveloperOwnedEntitlement(db, session, entitlementId, permission = "ops.read") {
+  const row = one(
+    db,
+    `
+      SELECT e.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id,
+             a.username, pol.name AS policy_name, lk.card_key
+      FROM entitlements e
+      JOIN products pr ON pr.id = e.product_id
+      JOIN customer_accounts a ON a.id = e.account_id
+      JOIN policies pol ON pol.id = e.policy_id
+      JOIN license_keys lk ON lk.id = e.source_license_key_id
+      WHERE e.id = ?
+    `,
+    entitlementId
+  );
+
+  if (!row) {
+    throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+  }
+  ensureDeveloperCanAccessProduct(
+    db,
+    session,
+    { id: row.product_id, owner_developer_id: row.owner_developer_id },
+    permission,
+    "DEVELOPER_OPS_FORBIDDEN",
+    "You can only manage entitlements under your assigned projects."
+  );
+
+  return row;
+}
+
 function requireDeveloperOwnedClientVersion(db, session, versionId, permission = "versions.read") {
   const row = one(
     db,
@@ -2447,14 +2476,6 @@ function queryNetworkRuleRows(db, filters = {}) {
     total: items.length,
     filters: normalizedFilters
   };
-}
-
-function normalizePointAdjustMode(value = "add") {
-  const mode = String(value ?? "add").trim().toLowerCase();
-  if (!["add", "subtract", "set"].includes(mode)) {
-    throw new AppError(400, "INVALID_POINT_ADJUST_MODE", "mode must be add, subtract, or set.");
-  }
-  return mode;
 }
 
 function findClientCardByKey(db, productId, cardKey) {
@@ -6115,34 +6136,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
       }
 
-      const nextStatus = normalizeEntitlementStatus(body.status ?? "active");
-      if (nextStatus === entitlement.status) {
-        return {
-          id: entitlement.id,
-          productCode: entitlement.product_code,
-          username: entitlement.username,
-          status: nextStatus,
-          changed: false,
-          revokedSessions: 0,
-          endsAt: entitlement.ends_at
-        };
-      }
-
       return withTransaction(db, () => {
-        const timestamp = nowIso();
-        run(
-          db,
-          `
-            UPDATE entitlements
-            SET status = ?, updated_at = ?
-            WHERE id = ?
-          `,
-          nextStatus,
-          timestamp,
-          entitlement.id
-        );
-
-        const revokedSessions = nextStatus === "frozen"
+        const result = store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso());
+        const revokedSessions = result.changed && result.status === "frozen"
           ? expireSessionsForEntitlement(db, stateStore, entitlement.id, "entitlement_frozen")
           : 0;
 
@@ -6156,21 +6152,15 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           {
             productCode: entitlement.product_code,
             username: entitlement.username,
-            status: nextStatus,
+            status: result.status,
             revokedSessions,
             sourceCardKeyMasked: maskCardKey(entitlement.card_key)
           }
         );
 
         return {
-          id: entitlement.id,
-          productCode: entitlement.product_code,
-          username: entitlement.username,
-          status: nextStatus,
-          changed: true,
-          revokedSessions,
-          endsAt: entitlement.ends_at,
-          updatedAt: timestamp
+          ...result,
+          revokedSessions
         };
       });
     },
@@ -6183,81 +6173,25 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage entitlements under your assigned projects."
       );
-      const entitlement = one(
-        db,
-        `
-          SELECT e.*, pr.code AS product_code, pr.owner_developer_id, a.username, pol.name AS policy_name, lk.card_key
-          FROM entitlements e
-          JOIN products pr ON pr.id = e.product_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN policies pol ON pol.id = e.policy_id
-          JOIN license_keys lk ON lk.id = e.source_license_key_id
-          WHERE e.id = ?
-        `,
-        entitlementId
-      );
-
-      if (!entitlement) {
-        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
-      }
-
-      ensureDeveloperCanAccessProduct(
-        db,
-        session,
-        { id: entitlement.product_id, owner_developer_id: entitlement.owner_developer_id },
-        "ops.write",
-        "DEVELOPER_OPS_FORBIDDEN",
-        "You can only manage entitlements under your assigned projects."
-      );
-
-      const nextStatus = normalizeEntitlementStatus(body.status ?? "active");
-      if (nextStatus === entitlement.status) {
-        return {
-          id: entitlement.id,
-          productCode: entitlement.product_code,
-          username: entitlement.username,
-          status: nextStatus,
-          changed: false,
-          revokedSessions: 0,
-          endsAt: entitlement.ends_at
-        };
-      }
+      const entitlement = requireDeveloperOwnedEntitlement(db, session, entitlementId, "ops.write");
 
       return withTransaction(db, () => {
-        const timestamp = nowIso();
-        run(
-          db,
-          `
-            UPDATE entitlements
-            SET status = ?, updated_at = ?
-            WHERE id = ?
-          `,
-          nextStatus,
-          timestamp,
-          entitlement.id
-        );
-
-        const revokedSessions = nextStatus === "frozen"
+        const result = store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso());
+        const revokedSessions = result.changed && result.status === "frozen"
           ? expireSessionsForEntitlement(db, stateStore, entitlement.id, "entitlement_frozen")
           : 0;
 
         auditDeveloperSession(db, session, "entitlement.status", "entitlement", entitlement.id, {
           productCode: entitlement.product_code,
           username: entitlement.username,
-          status: nextStatus,
+          status: result.status,
           revokedSessions,
           sourceCardKeyMasked: maskCardKey(entitlement.card_key)
         });
 
         return {
-          id: entitlement.id,
-          productCode: entitlement.product_code,
-          username: entitlement.username,
-          status: nextStatus,
-          changed: true,
-          revokedSessions,
-          endsAt: entitlement.ends_at,
-          updatedAt: timestamp
+          ...result,
+          revokedSessions
         };
       });
     },
@@ -6282,45 +6216,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
       }
 
-      const days = Number(body.days ?? body.extendDays ?? 0);
-      if (!Number.isInteger(days) || days < 1 || days > 3650) {
-        throw new AppError(400, "INVALID_EXTENSION_DAYS", "days must be an integer between 1 and 3650.");
-      }
-
-      const timestamp = nowIso();
-      const baseTime = entitlement.ends_at > timestamp ? entitlement.ends_at : timestamp;
-      const endsAt = addDays(baseTime, days);
-
-      run(
-        db,
-        `
-          UPDATE entitlements
-          SET ends_at = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        endsAt,
-        timestamp,
-        entitlement.id
-      );
+      const result = store.entitlements.extendEntitlement(entitlement.id, body, nowIso());
 
       audit(db, "admin", admin.admin_id, "entitlement.extend", "entitlement", entitlement.id, {
         productCode: entitlement.product_code,
         username: entitlement.username,
-        days,
+        days: result.addedDays,
         sourceCardKeyMasked: maskCardKey(entitlement.card_key),
-        endsAt
+        endsAt: result.endsAt
       });
 
-      return {
-        id: entitlement.id,
-        productCode: entitlement.product_code,
-        username: entitlement.username,
-        status: entitlement.status,
-        previousEndsAt: entitlement.ends_at,
-        endsAt,
-        addedDays: days,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     developerExtendEntitlement(token, entitlementId, body = {}) {
@@ -6331,148 +6237,59 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage entitlements under your assigned projects."
       );
-      const entitlement = one(
-        db,
-        `
-          SELECT e.*, pr.code AS product_code, pr.owner_developer_id, a.username, pol.name AS policy_name, lk.card_key
-          FROM entitlements e
-          JOIN products pr ON pr.id = e.product_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN policies pol ON pol.id = e.policy_id
-          JOIN license_keys lk ON lk.id = e.source_license_key_id
-          WHERE e.id = ?
-        `,
-        entitlementId
-      );
-
-      if (!entitlement) {
-        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
-      }
-
-      ensureDeveloperCanAccessProduct(
-        db,
-        session,
-        { id: entitlement.product_id, owner_developer_id: entitlement.owner_developer_id },
-        "ops.write",
-        "DEVELOPER_OPS_FORBIDDEN",
-        "You can only manage entitlements under your assigned projects."
-      );
-
-      const days = Number(body.days ?? body.extendDays ?? 0);
-      if (!Number.isInteger(days) || days < 1 || days > 3650) {
-        throw new AppError(400, "INVALID_EXTENSION_DAYS", "days must be an integer between 1 and 3650.");
-      }
-
-      const timestamp = nowIso();
-      const baseTime = entitlement.ends_at > timestamp ? entitlement.ends_at : timestamp;
-      const endsAt = addDays(baseTime, days);
-
-      run(
-        db,
-        `
-          UPDATE entitlements
-          SET ends_at = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        endsAt,
-        timestamp,
-        entitlement.id
-      );
+      const entitlement = requireDeveloperOwnedEntitlement(db, session, entitlementId, "ops.write");
+      const result = store.entitlements.extendEntitlement(entitlement.id, body, nowIso());
 
       auditDeveloperSession(db, session, "entitlement.extend", "entitlement", entitlement.id, {
         productCode: entitlement.product_code,
         username: entitlement.username,
-        days,
+        days: result.addedDays,
         sourceCardKeyMasked: maskCardKey(entitlement.card_key),
-        endsAt
+        endsAt: result.endsAt
       });
 
-      return {
-        id: entitlement.id,
-        productCode: entitlement.product_code,
-        username: entitlement.username,
-        status: entitlement.status,
-        previousEndsAt: entitlement.ends_at,
-        endsAt,
-        addedDays: days,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     adjustEntitlementPoints(token, entitlementId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const entitlement = loadPointEntitlementForAdmin(db, entitlementId);
-      if (!entitlement) {
-        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
-      }
-
-      if (normalizeGrantType(entitlement.grant_type ?? "duration") !== "points") {
-        throw new AppError(409, "ENTITLEMENT_NOT_POINTS", "This entitlement is not a point-based authorization.");
-      }
-
-      const mode = normalizePointAdjustMode(body.mode ?? "add");
-      const points = normalizeNonNegativeInteger(body.points, "points", 0, 1000000);
-      if (mode !== "set" && points < 1) {
-        throw new AppError(400, "INVALID_POINT_ADJUSTMENT", "points must be at least 1 for add or subtract mode.");
-      }
-
-      const previous = {
-        totalPoints: Number(entitlement.total_points ?? entitlement.grant_points ?? 0),
-        remainingPoints: Number(entitlement.remaining_points ?? entitlement.grant_points ?? 0),
-        consumedPoints: Number(entitlement.consumed_points ?? 0)
-      };
-
-      let nextRemainingPoints = previous.remainingPoints;
-      if (mode === "add") {
-        nextRemainingPoints = previous.remainingPoints + points;
-      } else if (mode === "subtract") {
-        nextRemainingPoints = Math.max(0, previous.remainingPoints - points);
-      } else {
-        nextRemainingPoints = points;
-      }
-
-      const nextTotalPoints = previous.consumedPoints + nextRemainingPoints;
-      const timestamp = nowIso();
-      upsertEntitlementMetering(
-        db,
-        entitlement.id,
-        "points",
-        nextTotalPoints,
-        nextRemainingPoints,
-        previous.consumedPoints,
-        timestamp
+      const result = store.entitlements.adjustEntitlementPoints(
+        entitlementId,
+        body,
+        nowIso(),
+        { totalStrategy: "preserve_consumed" }
       );
 
-      audit(db, "admin", admin.admin_id, "entitlement.points.adjust", "entitlement", entitlement.id, {
-        productCode: entitlement.product_code,
-        username: entitlement.username,
-        mode,
-        points,
-        previousTotalPoints: previous.totalPoints,
-        previousRemainingPoints: previous.remainingPoints,
-        previousConsumedPoints: previous.consumedPoints,
-        totalPoints: nextTotalPoints,
-        remainingPoints: nextRemainingPoints,
-        consumedPoints: previous.consumedPoints
+      audit(db, "admin", admin.admin_id, "entitlement.points.adjust", "entitlement", result.id, {
+        productCode: result.productCode,
+        username: result.username,
+        mode: result.mode,
+        points: result.points,
+        previousTotalPoints: result.previous.totalPoints,
+        previousRemainingPoints: result.previous.remainingPoints,
+        previousConsumedPoints: result.previous.consumedPoints,
+        totalPoints: result.current.totalPoints,
+        remainingPoints: result.current.remainingPoints,
+        consumedPoints: result.current.consumedPoints
       });
 
       return {
-        id: entitlement.id,
-        productCode: entitlement.product_code,
-        productName: entitlement.product_name,
-        username: entitlement.username,
-        policyName: entitlement.policy_name,
+        id: result.id,
+        productCode: result.productCode,
+        productName: result.productName,
+        username: result.username,
+        policyName: result.policyName,
         grantType: "points",
-        mode,
-        points,
-        totalPoints: nextTotalPoints,
-        remainingPoints: nextRemainingPoints,
-        consumedPoints: previous.consumedPoints,
-        previousTotalPoints: previous.totalPoints,
-        previousRemainingPoints: previous.remainingPoints,
-        previousConsumedPoints: previous.consumedPoints,
-        activeSessionCount: Number(entitlement.active_session_count ?? 0),
-        updatedAt: timestamp
+        mode: result.mode,
+        points: result.points,
+        totalPoints: result.current.totalPoints,
+        remainingPoints: result.current.remainingPoints,
+        consumedPoints: result.current.consumedPoints,
+        previousTotalPoints: result.previous.totalPoints,
+        previousRemainingPoints: result.previous.remainingPoints,
+        previousConsumedPoints: result.previous.consumedPoints,
+        activeSessionCount: result.activeSessionCount,
+        updatedAt: result.updatedAt
       };
     },
 
@@ -6705,122 +6522,33 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage point entitlements under your assigned projects."
       );
-      const entitlement = one(
-        db,
-        `
-          SELECT e.id, e.status, e.ends_at, e.account_id, e.product_id,
-                 pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id,
-                 a.username,
-                 pol.name AS policy_name,
-                 COALESCE(pgc.grant_type, 'duration') AS grant_type,
-                 COALESCE(pgc.grant_points, 0) AS grant_points,
-                 em.total_points, em.remaining_points, em.consumed_points,
-                 COALESCE(sess.active_session_count, 0) AS active_session_count
-          FROM entitlements e
-          JOIN products pr ON pr.id = e.product_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN policies pol ON pol.id = e.policy_id
-          LEFT JOIN policy_grant_configs pgc ON pgc.policy_id = e.policy_id
-          LEFT JOIN entitlement_metering em ON em.entitlement_id = e.id
-          LEFT JOIN (
-            SELECT entitlement_id, COUNT(*) AS active_session_count
-            FROM sessions
-            WHERE status = 'active'
-            GROUP BY entitlement_id
-          ) sess ON sess.entitlement_id = e.id
-          WHERE e.id = ?
-        `,
-        entitlementId
-      );
-      if (!entitlement) {
-        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
-      }
-
-      ensureDeveloperCanAccessProduct(
-        db,
-        session,
-        { id: entitlement.product_id, owner_developer_id: entitlement.owner_developer_id },
-        "ops.write",
-        "DEVELOPER_OPS_FORBIDDEN",
-        "You can only manage point entitlements under your assigned projects."
-      );
-
-      if (normalizeGrantType(entitlement.grant_type ?? "duration") !== "points") {
-        throw new AppError(409, "ENTITLEMENT_NOT_POINTS", "This entitlement is not a point-based authorization.");
-      }
-
-      const mode = normalizePointAdjustMode(body.mode ?? "add");
-      const points = normalizeNonNegativeInteger(body.points, "points", 0, 1000000);
-      if (mode !== "set" && points < 1) {
-        throw new AppError(400, "INVALID_POINT_ADJUSTMENT", "points must be at least 1 for add or subtract mode.");
-      }
-
-      const previous = {
-        totalPoints: Number(entitlement.total_points ?? entitlement.grant_points ?? 0),
-        remainingPoints: Number(entitlement.remaining_points ?? entitlement.grant_points ?? 0),
-        consumedPoints: Number(entitlement.consumed_points ?? 0)
-      };
-
-      let nextRemainingPoints = previous.remainingPoints;
-      if (mode === "add") {
-        nextRemainingPoints = previous.remainingPoints + points;
-      } else if (mode === "subtract") {
-        nextRemainingPoints = Math.max(0, previous.remainingPoints - points);
-      } else {
-        nextRemainingPoints = points;
-      }
-
-      const nextConsumedPoints = Math.max(0, previous.totalPoints - nextRemainingPoints);
-      const nextTotalPoints = Math.max(previous.totalPoints, nextRemainingPoints + nextConsumedPoints);
-      const timestamp = nowIso();
-
-      run(
-        db,
-        `
-          INSERT INTO entitlement_metering
-          (entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at)
-          VALUES (?, 'points', ?, ?, ?, ?, ?)
-          ON CONFLICT(entitlement_id) DO UPDATE SET
-            total_points = excluded.total_points,
-            remaining_points = excluded.remaining_points,
-            consumed_points = excluded.consumed_points,
-            updated_at = excluded.updated_at
-        `,
+      const entitlement = requireDeveloperOwnedEntitlement(db, session, entitlementId, "ops.write");
+      const result = store.entitlements.adjustEntitlementPoints(
         entitlement.id,
-        nextTotalPoints,
-        nextRemainingPoints,
-        nextConsumedPoints,
-        timestamp,
-        timestamp
+        body,
+        nowIso(),
+        { totalStrategy: "preserve_total" }
       );
 
-      auditDeveloperSession(db, session, "entitlement.points.adjust", "entitlement", entitlement.id, {
-        productCode: entitlement.product_code,
-        username: entitlement.username,
-        mode,
-        points,
-        previous,
-        next: {
-          totalPoints: nextTotalPoints,
-          remainingPoints: nextRemainingPoints,
-          consumedPoints: nextConsumedPoints
-        }
+      auditDeveloperSession(db, session, "entitlement.points.adjust", "entitlement", result.id, {
+        productCode: result.productCode,
+        username: result.username,
+        mode: result.mode,
+        points: result.points,
+        previous: result.previous,
+        next: result.current
       });
 
       return {
-        id: entitlement.id,
-        productCode: entitlement.product_code,
-        username: entitlement.username,
-        status: entitlement.status,
-        mode,
-        points,
-        previous,
-        current: {
-          totalPoints: nextTotalPoints,
-          remainingPoints: nextRemainingPoints,
-          consumedPoints: nextConsumedPoints
-        },
-        updatedAt: timestamp
+        id: result.id,
+        productCode: result.productCode,
+        username: result.username,
+        status: result.status,
+        mode: result.mode,
+        points: result.points,
+        previous: result.previous,
+        current: result.current,
+        updatedAt: result.updatedAt
       };
     },
 

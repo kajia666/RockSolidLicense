@@ -2865,6 +2865,7 @@ async function issueClientSession(
     lastSeenIp: meta.ip,
     userAgent: meta.userAgent
   }));
+  await Promise.resolve(store.accounts.touchAccountLastLogin(account.id, issuedAt));
 
   audit(db, "account", account.id, "session.login", "session", sessionId, {
     productCode: product.code,

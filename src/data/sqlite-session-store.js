@@ -77,18 +77,6 @@ export function createSqliteSessionStore({ db }) {
         session.userAgent ?? null
       );
 
-      run(
-        db,
-        `
-          UPDATE customer_accounts
-          SET last_login_at = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        session.issuedAt,
-        session.issuedAt,
-        session.accountId
-      );
-
       return getSessionRecordById(db, session.id);
     },
 

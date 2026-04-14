@@ -316,6 +316,10 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(sessionManageRow.product_code, "STOREAPP2");
     assert.equal(sessionManageRow.username, "store_direct_user");
 
+    const untouchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
+    assert.equal(untouchedAccount.last_login_at ?? null, null);
+
+    app.mainStore.accounts.touchAccountLastLogin(directAccount.id, "2026-01-05T00:00:00.000Z");
     const touchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
     assert.equal(touchedAccount.last_login_at, "2026-01-05T00:00:00.000Z");
 

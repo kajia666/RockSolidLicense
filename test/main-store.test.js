@@ -270,6 +270,17 @@ test("app exposes sqlite main store and services read through it", async () => {
     const touchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
     assert.equal(touchedAccount.last_login_at, "2026-01-05T00:00:00.000Z");
 
+    const heartbeatTouchedSession = app.mainStore.sessions.touchSessionHeartbeat("sess_store_main", {
+      lastHeartbeatAt: "2026-01-05T00:10:00.000Z",
+      expiresAt: "2026-01-05T01:10:00.000Z",
+      lastSeenIp: "127.0.0.2",
+      userAgent: "main-store-heartbeat-test"
+    });
+    assert.equal(heartbeatTouchedSession.last_heartbeat_at, "2026-01-05T00:10:00.000Z");
+    assert.equal(heartbeatTouchedSession.expires_at, "2026-01-05T01:10:00.000Z");
+    assert.equal(heartbeatTouchedSession.last_seen_ip, "127.0.0.2");
+    assert.equal(heartbeatTouchedSession.user_agent, "main-store-heartbeat-test");
+
     const directDevice = app.mainStore.devices.upsertDevice(
       directProduct.id,
       "store-direct-bind-device",
@@ -297,6 +308,17 @@ test("app exposes sqlite main store and services read through it", async () => {
     );
     assert.equal(directBinding.mode, "new_binding");
     assert.equal(directBinding.binding.status, "active");
+
+    const revokedSessions = app.mainStore.sessions.expireActiveSessions(
+      { sessionId: "sess_store_main" },
+      "main_store_revoke"
+    );
+    assert.equal(revokedSessions.length, 1);
+    assert.equal(revokedSessions[0].session_token, "session-token-store-main");
+
+    const revokedSession = app.mainStore.sessions.getSessionRecordById(app.db, "sess_store_main");
+    assert.equal(revokedSession.status, "expired");
+    assert.equal(revokedSession.revoked_reason, "main_store_revoke");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

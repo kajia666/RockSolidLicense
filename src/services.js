@@ -134,31 +134,10 @@ function appendInCondition(columnSql, values, conditions, params) {
   params.push(...normalized);
 }
 
-function expireActiveSessions(db, stateStore, whereSql, params, reason) {
-  const rows = many(
-    db,
-    `
-      SELECT id, session_token
-      FROM sessions
-      WHERE status = 'active' AND ${whereSql}
-    `,
-    ...params
-  );
-
-  if (!rows.length) {
-    return 0;
-  }
-
-  run(
-    db,
-    `
-      UPDATE sessions
-      SET status = 'expired', revoked_reason = ?
-      WHERE status = 'active' AND ${whereSql}
-    `,
-    reason,
-    ...params
-  );
+function expireActiveSessions(db, store, stateStore, filters, reason) {
+  const rows = store?.sessions?.expireActiveSessions
+    ? store.sessions.expireActiveSessions(filters, reason)
+    : [];
 
   for (const row of rows) {
     stateStore?.expireSession(row.session_token, reason, { sessionId: row.id });
@@ -167,12 +146,12 @@ function expireActiveSessions(db, stateStore, whereSql, params, reason) {
   return rows.length;
 }
 
-function expireSessionById(db, stateStore, sessionId, reason) {
-  return expireActiveSessions(db, stateStore, "id = ?", [sessionId], reason);
+function expireSessionById(db, store, stateStore, sessionId, reason) {
+  return expireActiveSessions(db, store, stateStore, { sessionId }, reason);
 }
 
-function expireSessionByToken(db, stateStore, sessionToken, reason) {
-  return expireActiveSessions(db, stateStore, "session_token = ?", [sessionToken], reason);
+function expireSessionByToken(db, store, stateStore, sessionToken, reason) {
+  return expireActiveSessions(db, store, stateStore, { sessionToken }, reason);
 }
 
 function revokeDeveloperSessions(db, whereSql, params = []) {
@@ -221,7 +200,7 @@ function revokeDeveloperMemberSessions(db, whereSql, params = []) {
   return rows.length;
 }
 
-async function finalizeIssuedSessionRuntime(db, stateStore, payload) {
+async function finalizeIssuedSessionRuntime(db, store, stateStore, payload) {
   const resolvedPayload = await Promise.resolve(payload);
   if (!resolvedPayload?.runtime) {
     return resolvedPayload;
@@ -233,7 +212,7 @@ async function finalizeIssuedSessionRuntime(db, stateStore, payload) {
       claimSingleOwner: runtime.claimSingleOwner
     });
     if (result?.previousSessionToken) {
-      expireSessionByToken(db, stateStore, result.previousSessionToken, "single_session_runtime");
+      expireSessionByToken(db, store, stateStore, result.previousSessionToken, "single_session_runtime");
     }
   } else if (stateStore?.recordSession) {
     stateStore.recordSession(runtime.session);
@@ -582,8 +561,8 @@ function buildMetricMap(rows, keyField = "product_id", valueField = "count") {
   return map;
 }
 
-function queryDeveloperDashboardPayload(db, session, runtimeState) {
-  expireStaleSessions(db, runtimeState);
+function queryDeveloperDashboardPayload(db, store, session, runtimeState) {
+  expireStaleSessions(db, store, runtimeState);
 
   const products = listDeveloperAccessibleProductRows(db, session);
   const summary = {
@@ -1857,7 +1836,7 @@ function throwEntitlementUnavailable(snapshot, referenceTime = nowIso()) {
   throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
 }
 
-function releaseBindingRecord(db, stateStore, binding, reason, timestamp = nowIso()) {
+function releaseBindingRecord(db, store, stateStore, binding, reason, timestamp = nowIso()) {
   run(
     db,
     `
@@ -1872,9 +1851,12 @@ function releaseBindingRecord(db, stateStore, binding, reason, timestamp = nowIs
 
   return expireActiveSessions(
     db,
+    store,
     stateStore,
-    "entitlement_id = ? AND device_id = ?",
-    [binding.entitlement_id, binding.device_id],
+    {
+      entitlementId: binding.entitlement_id,
+      deviceId: binding.device_id
+    },
     reason
   );
 }
@@ -2045,8 +2027,8 @@ async function resolveClientManagedAccount(db, store, product, body) {
 
   throw new AppError(400, "CLIENT_AUTH_REQUIRED", "Provide username/password or cardKey for this action.");
 }
-function queryDeviceBindingRows(db, filters = {}, runtimeState = null) {
-  expireStaleSessions(db, runtimeState);
+function queryDeviceBindingRows(db, store, filters = {}, runtimeState = null) {
+  expireStaleSessions(db, store, runtimeState);
 
   const conditions = [];
   const params = [];
@@ -2192,8 +2174,8 @@ function queryDeviceBlockRows(db, filters = {}) {
   };
 }
 
-function querySessionRows(db, filters = {}, runtimeState = null) {
-  expireStaleSessions(db, runtimeState);
+function querySessionRows(db, store, filters = {}, runtimeState = null) {
+  expireStaleSessions(db, store, runtimeState);
 
   const conditions = [];
   const params = [];
@@ -2425,7 +2407,7 @@ function findClientCardByKey(db, productId, cardKey) {
   );
 }
 
-function expireStaleSessions(db, stateStore) {
+function expireStaleSessions(db, store, stateStore) {
   const rows = many(
     db,
     `
@@ -2445,8 +2427,7 @@ function expireStaleSessions(db, stateStore) {
 
     if (expiresAt <= now || heartbeatDeadline <= now) {
       const reason = expiresAt <= now ? "token_expired" : "heartbeat_timeout";
-      run(db, "UPDATE sessions SET status = 'expired', revoked_reason = ? WHERE id = ?", reason, row.id);
-      stateStore?.expireSession(row.session_token, reason, { sessionId: row.id });
+      expireSessionById(db, store, stateStore, row.id, reason);
     }
   }
 }
@@ -2699,17 +2680,17 @@ function auditActivatedCardEntitlement(db, product, account, card, activation, e
   });
 }
 
-function expireSessionsForEntitlement(db, stateStore, entitlementId, reason) {
+function expireSessionsForEntitlement(db, store, stateStore, entitlementId, reason) {
   return expireActiveSessions(
     db,
+    store,
     stateStore,
-    "entitlement_id = ?",
-    [entitlementId],
+    { entitlementId },
     reason
   );
 }
 
-function expireSessionsForLicenseKey(db, stateStore, licenseKeyId, reason) {
+function expireSessionsForLicenseKey(db, store, stateStore, licenseKeyId, reason) {
   const entitlement = one(
     db,
     "SELECT id FROM entitlements WHERE source_license_key_id = ?",
@@ -2720,7 +2701,7 @@ function expireSessionsForLicenseKey(db, stateStore, licenseKeyId, reason) {
     return 0;
   }
 
-  return expireSessionsForEntitlement(db, stateStore, entitlement.id, reason);
+  return expireSessionsForEntitlement(db, store, stateStore, entitlement.id, reason);
 }
 
 async function issueClientSession(
@@ -2763,9 +2744,12 @@ async function issueClientSession(
     {
       releaseSessions: ({ entitlementId, deviceId, reason }) => expireActiveSessions(
         db,
+        store,
         stateStore,
-        "entitlement_id = ? AND device_id = ?",
-        [entitlementId, deviceId],
+        {
+          entitlementId,
+          deviceId
+        },
         reason ?? "binding_rebound"
       )
     }
@@ -2774,9 +2758,12 @@ async function issueClientSession(
   if (!entitlement.allow_concurrent_sessions) {
     expireActiveSessions(
       db,
+      store,
       stateStore,
-      "account_id = ? AND product_id = ?",
-      [account.id, product.id],
+      {
+        accountId: account.id,
+        productId: product.id
+      },
       "single_session_policy"
     );
   }
@@ -4276,7 +4263,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
   return {
     async health() {
-      expireStaleSessions(db, stateStore);
+      expireStaleSessions(db, store, stateStore);
       const mainStoreHealth = await Promise.resolve(
         typeof store.health === "function"
           ? store.health()
@@ -5039,7 +5026,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_PRODUCT_FORBIDDEN",
         "You can only view projects assigned to your developer account."
       );
-      return queryDeveloperDashboardPayload(db, session, stateStore);
+      return queryDeveloperDashboardPayload(db, store, session, stateStore);
     },
 
     developerIntegration(token) {
@@ -5439,6 +5426,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         if (!result.control.available) {
           revokedSessions = expireSessionsForLicenseKey(
             db,
+            store,
             stateStore,
             card.id,
             `card_${result.control.effectiveStatus}`
@@ -5488,6 +5476,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         if (!result.control.available) {
           revokedSessions = expireSessionsForLicenseKey(
             db,
+            store,
             stateStore,
             card.id,
             `card_${result.control.effectiveStatus}`
@@ -5596,7 +5585,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "ops.read"
         );
       }
-      expireStaleSessions(db, stateStore);
+      expireStaleSessions(db, store, stateStore);
       return Promise.resolve(store.accounts.queryAccountRows(
         db,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
@@ -5650,9 +5639,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         if (nextStatus === "disabled") {
           revokedSessions = expireActiveSessions(
             db,
+            store,
             stateStore,
-            "account_id = ?",
-            [account.id],
+            { accountId: account.id },
             "account_disabled"
           );
         }
@@ -5730,7 +5719,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return withTransaction(db, async () => {
         const result = await Promise.resolve(store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso()));
         const revokedSessions = result.changed && result.status === "frozen"
-          ? expireSessionsForEntitlement(db, stateStore, entitlement.id, "entitlement_frozen")
+          ? expireSessionsForEntitlement(db, store, stateStore, entitlement.id, "entitlement_frozen")
           : 0;
 
         audit(
@@ -5784,7 +5773,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return withTransaction(db, async () => {
         const result = await Promise.resolve(store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso()));
         const revokedSessions = result.changed && result.status === "frozen"
-          ? expireSessionsForEntitlement(db, stateStore, entitlement.id, "entitlement_frozen")
+          ? expireSessionsForEntitlement(db, store, stateStore, entitlement.id, "entitlement_frozen")
           : 0;
 
         auditDeveloperSession(db, session, "entitlement.status", "entitlement", entitlement.id, {
@@ -7539,7 +7528,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     async dashboard(token) {
       requireAdminSession(db, token);
-      expireStaleSessions(db, stateStore);
+      expireStaleSessions(db, store, stateStore);
 
       const summary = {
         products: one(db, "SELECT COUNT(*) AS count FROM products").count,
@@ -7615,7 +7604,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     async listAccounts(token, filters = {}) {
       requireAdminSession(db, token);
-      expireStaleSessions(db, stateStore);
+      expireStaleSessions(db, store, stateStore);
       return Promise.resolve(store.accounts.queryAccountRows(db, filters, stateStore));
     },
 
@@ -7651,9 +7640,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         if (nextStatus === "disabled") {
           revokedSessions = expireActiveSessions(
             db,
+            store,
             stateStore,
-            "account_id = ?",
-            [account.id],
+            { accountId: account.id },
             "account_disabled"
           );
         }
@@ -7684,7 +7673,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     listDeviceBindings(token, filters = {}) {
       requireAdminSession(db, token);
-      return queryDeviceBindingRows(db, filters, stateStore);
+      return queryDeviceBindingRows(db, store, filters, stateStore);
     },
 
     releaseDeviceBinding(token, bindingId, body = {}) {
@@ -7721,7 +7710,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return withTransaction(db, () => {
         const timestamp = nowIso();
         const reason = normalizeReason(body.reason, "device_binding_released");
-        const releasedSessions = releaseBindingRecord(db, stateStore, binding, reason, timestamp);
+        const releasedSessions = releaseBindingRecord(db, store, stateStore, binding, reason, timestamp);
 
         audit(db, "admin", admin.admin_id, "device-binding.release", "device_binding", binding.id, {
           productCode: binding.product_code,
@@ -7760,6 +7749,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
       return queryDeviceBindingRows(
         db,
+        store,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
         stateStore
       );
@@ -7814,7 +7804,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return withTransaction(db, () => {
         const timestamp = nowIso();
         const reason = normalizeReason(body.reason, "developer_binding_released");
-        const releasedSessions = releaseBindingRecord(db, stateStore, binding, reason, timestamp);
+        const releasedSessions = releaseBindingRecord(db, store, stateStore, binding, reason, timestamp);
 
         auditDeveloperSession(db, session, "device-binding.release", "device_binding", binding.id, {
           productCode: binding.product_code,
@@ -7939,9 +7929,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         if (device) {
           affectedSessions = expireActiveSessions(
             db,
+            store,
             stateStore,
-            "product_id = ? AND device_id = ?",
-            [product.id, device.id],
+            {
+              productId: product.id,
+              deviceId: device.id
+            },
             "device_blocked"
           );
 
@@ -8067,9 +8060,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         if (device) {
           affectedSessions = expireActiveSessions(
             db,
+            store,
             stateStore,
-            "product_id = ? AND device_id = ?",
-            [product.id, device.id],
+            {
+              productId: product.id,
+              deviceId: device.id
+            },
             "device_blocked"
           );
 
@@ -9183,7 +9179,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     listSessions(token, filters = {}) {
       requireAdminSession(db, token);
-      return querySessionRows(db, filters, stateStore);
+      return querySessionRows(db, store, filters, stateStore);
     },
 
     developerListSessions(token, filters = {}) {
@@ -9204,6 +9200,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
       return querySessionRows(
         db,
+        store,
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
         stateStore
       );
@@ -9240,7 +9237,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       }
 
-      expireSessionById(db, stateStore, session.id, reason);
+      expireSessionById(db, store, stateStore, session.id, reason);
 
       audit(db, "admin", admin.admin_id, "session.revoke", "session", session.id, {
         productCode: session.product_code,
@@ -9303,7 +9300,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       }
 
-      expireSessionById(db, stateStore, targetSession.id, reason);
+      expireSessionById(db, store, stateStore, targetSession.id, reason);
 
       auditDeveloperSession(db, session, "session.revoke", "session", targetSession.id, {
         productCode: targetSession.product_code,
@@ -9494,7 +9491,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const timestamp = nowIso();
         const reason = normalizeReason(body.reason, "client_unbind");
         let endsAt = subject.entitlement.ends_at;
-        let releasedSessions = releaseBindingRecord(db, stateStore, {
+        let releasedSessions = releaseBindingRecord(db, store, stateStore, {
           id: binding.id,
           entitlement_id: subject.entitlement.id,
           device_id: binding.deviceId
@@ -9518,6 +9515,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           if (endsAt <= timestamp) {
             releasedSessions += expireSessionsForEntitlement(
               db,
+              store,
               stateStore,
               subject.entitlement.id,
               "entitlement_expired_after_unbind"
@@ -9695,7 +9693,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const sessionResult = withTransaction(db, async () => {
-        expireStaleSessions(db, stateStore);
+        expireStaleSessions(db, store, stateStore);
 
         const card = findClientCardByKey(db, product.id, body.cardKey);
         if (!card || !["fresh", "redeemed"].includes(card.status)) {
@@ -9772,7 +9770,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           }
         };
       });
-      return finalizeIssuedSessionRuntime(db, stateStore, sessionResult);
+      return finalizeIssuedSessionRuntime(db, store, stateStore, sessionResult);
     },
 
     async loginClient(reqLike, body, rawBody, meta = {}) {
@@ -9804,7 +9802,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const sessionResult = withTransaction(db, async () => {
-        expireStaleSessions(db, stateStore);
+        expireStaleSessions(db, store, stateStore);
 
         const account = await getStoreAccountRecordByProductUsername(
           product.id,
@@ -9837,7 +9835,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           bindConfig
         });
       });
-      return finalizeIssuedSessionRuntime(db, stateStore, sessionResult);
+      return finalizeIssuedSessionRuntime(db, store, stateStore, sessionResult);
     },
 
     async heartbeatClient(reqLike, body, rawBody, meta) {
@@ -9856,7 +9854,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       return withTransaction(db, () => {
-        expireStaleSessions(db, stateStore);
+        expireStaleSessions(db, store, stateStore);
         const session = one(
           db,
           `
@@ -9881,13 +9879,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         }
 
         if (session.fingerprint !== String(body.deviceFingerprint).trim()) {
-          expireSessionById(db, stateStore, session.id, "device_mismatch");
+          expireSessionById(db, store, stateStore, session.id, "device_mismatch");
           throw new AppError(401, "DEVICE_MISMATCH", "Device fingerprint does not match this session.");
         }
 
         const block = activeDeviceBlock(db, product.id, session.fingerprint);
         if (block) {
-          expireSessionById(db, stateStore, session.id, "device_blocked");
+          expireSessionById(db, store, stateStore, session.id, "device_blocked");
           throw new AppError(403, "DEVICE_BLOCKED", "This device fingerprint has been blocked by the operator.", {
             reason: block.reason,
             blockedAt: block.created_at
@@ -9895,7 +9893,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         }
 
         if (session.entitlement_status !== "active") {
-          expireSessionById(db, stateStore, session.id, "entitlement_frozen");
+          expireSessionById(db, store, stateStore, session.id, "entitlement_frozen");
           throw new AppError(403, "LICENSE_FROZEN", "This authorization has been frozen by the operator.");
         }
 
@@ -9904,7 +9902,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           expires_at: session.card_expires_at
         });
         if (!cardControl.available) {
-          expireSessionById(db, stateStore, session.id, `card_${cardControl.effectiveStatus}`);
+          expireSessionById(db, store, stateStore, session.id, `card_${cardControl.effectiveStatus}`);
           ensureCardControlAvailable(cardControl);
         }
 
@@ -9917,19 +9915,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
         const now = nowIso();
         const expiresAt = addSeconds(now, session.token_ttl_seconds);
-        run(
-          db,
-          `
-            UPDATE sessions
-            SET last_heartbeat_at = ?, expires_at = ?, last_seen_ip = ?, user_agent = ?
-            WHERE id = ?
-          `,
-          now,
+        store.sessions.touchSessionHeartbeat(session.id, {
+          lastHeartbeatAt: now,
           expiresAt,
-          meta.ip,
-          meta.userAgent,
-          session.id
-        );
+          lastSeenIp: meta.ip,
+          userAgent: meta.userAgent
+        });
         stateStore.touchSession(session.session_token, {
           expiresAt,
           lastHeartbeatAt: now,
@@ -9961,7 +9952,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "SESSION_NOT_FOUND", "Session token does not exist.");
       }
 
-      expireSessionById(db, stateStore, session.id, "client_logout");
+      expireSessionById(db, store, stateStore, session.id, "client_logout");
 
       audit(db, "account", session.account_id, "session.logout", "session", session.id, {});
       return { status: "logged_out" };

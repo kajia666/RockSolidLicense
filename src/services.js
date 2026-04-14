@@ -16,9 +16,7 @@ import {
 } from "./data/product-repository.js";
 import {
   describeLicenseKeyControl,
-  getCardRowById,
   maskCardKey,
-  normalizeCardControlStatus,
   queryCardRows
 } from "./data/card-repository.js";
 import {
@@ -1788,45 +1786,6 @@ function buildCardsCsv(items = []) {
     ].map(toCsvCell).join(","));
   }
   return `\uFEFF${lines.join("\n")}`;
-}
-
-function upsertLicenseKeyControl(db, licenseKeyId, payload = {}, timestamp = nowIso()) {
-  const status = normalizeCardControlStatus(payload.status ?? "active");
-  const expiresAt = normalizeOptionalIsoDate(payload.expiresAt, "expiresAt");
-  const notes = normalizeOptionalText(payload.notes, 1000) || null;
-  const existing = one(db, "SELECT license_key_id FROM license_key_controls WHERE license_key_id = ?", licenseKeyId);
-
-  if (existing) {
-    run(
-      db,
-      `
-        UPDATE license_key_controls
-        SET status = ?, expires_at = ?, notes = ?, updated_at = ?
-        WHERE license_key_id = ?
-      `,
-      status,
-      expiresAt,
-      notes,
-      timestamp,
-      licenseKeyId
-    );
-  } else {
-    run(
-      db,
-      `
-        INSERT INTO license_key_controls (license_key_id, status, expires_at, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      licenseKeyId,
-      status,
-      expiresAt,
-      notes,
-      timestamp,
-      timestamp
-    );
-  }
-
-  return describeLicenseKeyControl({ status, expires_at: expiresAt, notes }, timestamp);
 }
 
 function ensureCardControlAvailable(controlState) {
@@ -5847,34 +5806,29 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       return withTransaction(db, () => {
-        const timestamp = nowIso();
-        const control = upsertLicenseKeyControl(db, card.id, {
-          status: body.status ?? "active",
-          expiresAt: body.expiresAt,
-          notes: body.notes
-        }, timestamp);
+        const result = store.cards.updateCardStatus(card.id, body, nowIso());
 
         let revokedSessions = 0;
-        if (!control.available) {
+        if (!result.control.available) {
           revokedSessions = expireSessionsForLicenseKey(
             db,
             stateStore,
             card.id,
-            `card_${control.effectiveStatus}`
+            `card_${result.control.effectiveStatus}`
           );
         }
 
         audit(db, "admin", admin.admin_id, "card.status", "license_key", card.id, {
           productCode: card.product_code,
           cardKeyMasked: maskCardKey(card.card_key),
-          status: control.status,
-          effectiveStatus: control.effectiveStatus,
-          expiresAt: control.expiresAt,
+          status: result.control.status,
+          effectiveStatus: result.control.effectiveStatus,
+          expiresAt: result.control.expiresAt,
           revokedSessions
         });
 
         return {
-          ...getCardRowById(db, card.id),
+          ...result.card,
           changed: true,
           revokedSessions
         };
@@ -5886,34 +5840,29 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const card = requireDeveloperOwnedCard(db, session, cardId, "cards.write");
 
       return withTransaction(db, () => {
-        const timestamp = nowIso();
-        const control = upsertLicenseKeyControl(db, card.id, {
-          status: body.status ?? "active",
-          expiresAt: body.expiresAt,
-          notes: body.notes
-        }, timestamp);
+        const result = store.cards.updateCardStatus(card.id, body, nowIso());
 
         let revokedSessions = 0;
-        if (!control.available) {
+        if (!result.control.available) {
           revokedSessions = expireSessionsForLicenseKey(
             db,
             stateStore,
             card.id,
-            `card_${control.effectiveStatus}`
+            `card_${result.control.effectiveStatus}`
           );
         }
 
         auditDeveloperSession(db, session, "card.status", "license_key", card.id, {
           productCode: card.product_code,
           cardKeyMasked: maskCardKey(card.card_key),
-          status: control.status,
-          effectiveStatus: control.effectiveStatus,
-          expiresAt: control.expiresAt,
+          status: result.control.status,
+          effectiveStatus: result.control.effectiveStatus,
+          expiresAt: result.control.expiresAt,
           revokedSessions
         });
 
         return {
-          ...getCardRowById(db, card.id),
+          ...result.card,
           changed: true,
           revokedSessions
         };
@@ -5939,52 +5888,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
       }
 
-      const count = Number(body.count ?? 1);
-      if (!Number.isInteger(count) || count < 1 || count > 5000) {
-        throw new AppError(400, "INVALID_BATCH_SIZE", "Batch count must be between 1 and 5000.");
-      }
-
-      const prefix = String(body.prefix ?? product.code.slice(0, 6)).replace(/[^A-Z0-9]/gi, "").toUpperCase();
-      const batchCode = `BATCH-${Date.now()}`;
-      const issuedAt = nowIso();
-      const expiresAt = normalizeOptionalIsoDate(body.expiresAt, "expiresAt");
-
-      const keys = withTransaction(db, () => {
-        const issued = issueLicenseKeys(db, {
-          productId: product.id,
-          policyId: policy.id,
-          prefix,
-          count,
-          batchCode,
-          notes: String(body.notes ?? ""),
-          issuedAt
-        });
-        if (expiresAt) {
-          for (const entry of issued) {
-            upsertLicenseKeyControl(db, entry.licenseKeyId, {
-              status: "active",
-              expiresAt,
-              notes: body.notes
-            }, issuedAt);
-          }
-        }
-        return issued;
-      });
+      const batch = withTransaction(db, () => store.cards.createCardBatch(product, policy, body, nowIso()));
 
       audit(db, "admin", admin.admin_id, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
-        batchCode,
-        count,
-        expiresAt
+        batchCode: batch.batchCode,
+        count: batch.count,
+        expiresAt: batch.expiresAt
       });
 
-      return {
-        batchCode,
-        count,
-        expiresAt,
-        preview: keys.slice(0, 10).map((entry) => entry.cardKey),
-        keys: keys.map((entry) => entry.cardKey)
-      };
+      return batch;
     },
 
     developerCreateCardBatch(token, body = {}) {
@@ -6012,52 +5925,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
       }
 
-      const count = Number(body.count ?? 1);
-      if (!Number.isInteger(count) || count < 1 || count > 5000) {
-        throw new AppError(400, "INVALID_BATCH_SIZE", "Batch count must be between 1 and 5000.");
-      }
-
-      const prefix = String(body.prefix ?? product.code.slice(0, 6)).replace(/[^A-Z0-9]/gi, "").toUpperCase();
-      const batchCode = `BATCH-${Date.now()}`;
-      const issuedAt = nowIso();
-      const expiresAt = normalizeOptionalIsoDate(body.expiresAt, "expiresAt");
-
-      const keys = withTransaction(db, () => {
-        const issued = issueLicenseKeys(db, {
-          productId: product.id,
-          policyId: policy.id,
-          prefix,
-          count,
-          batchCode,
-          notes: String(body.notes ?? ""),
-          issuedAt
-        });
-        if (expiresAt) {
-          for (const entry of issued) {
-            upsertLicenseKeyControl(db, entry.licenseKeyId, {
-              status: "active",
-              expiresAt,
-              notes: body.notes
-            }, issuedAt);
-          }
-        }
-        return issued;
-      });
+      const batch = withTransaction(db, () => store.cards.createCardBatch(product, policy, body, nowIso()));
 
       auditDeveloperSession(db, session, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
-        batchCode,
-        count,
-        expiresAt
+        batchCode: batch.batchCode,
+        count: batch.count,
+        expiresAt: batch.expiresAt
       });
 
-      return {
-        batchCode,
-        count,
-        expiresAt,
-        preview: keys.slice(0, 10).map((entry) => entry.cardKey),
-        keys: keys.map((entry) => entry.cardKey)
-      };
+      return batch;
     },
 
     developerListAccounts(token, filters = {}) {

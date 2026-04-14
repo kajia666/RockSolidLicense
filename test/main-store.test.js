@@ -34,7 +34,8 @@ test("app exposes sqlite main store and services read through it", async () => {
     );
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
-      policies: "sqlite"
+      policies: "sqlite",
+      cards: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -125,6 +126,26 @@ test("app exposes sqlite main store and services read through it", async () => {
     });
     assert.equal(updatedUnbind.allowClientUnbind, false);
     assert.equal(updatedUnbind.clientUnbindLimit, 0);
+
+    const directBatch = app.mainStore.cards.createCardBatch(directProduct, directPolicy, {
+      count: 2,
+      prefix: "STORE2",
+      notes: "Direct batch"
+    });
+    assert.equal(directBatch.count, 2);
+    assert.equal(directBatch.keys.length, 2);
+
+    const directCards = app.mainStore.cards.queryCardRows(app.db, {
+      productCode: "STOREAPP2"
+    });
+    assert.equal(directCards.items.length, 2);
+
+    const updatedCard = app.mainStore.cards.updateCardStatus(directCards.items[0].id, {
+      status: "frozen",
+      notes: "Frozen in direct store path"
+    });
+    assert.equal(updatedCard.control.status, "frozen");
+    assert.equal(updatedCard.card.displayStatus, "frozen");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

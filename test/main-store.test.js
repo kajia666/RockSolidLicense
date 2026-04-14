@@ -88,6 +88,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     );
     assert.equal(signedProduct.id, directProduct.id);
     assert.equal(signedProduct.code, "STOREAPP2");
+    assert.equal(signedProduct.featureConfig.allowRegister, true);
 
     const directAccount = app.mainStore.accounts.createAccount(directProduct, {
       username: "store_direct_user",

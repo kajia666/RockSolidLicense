@@ -649,6 +649,7 @@ test("postgres main store can serve all main-store read-side queries through ada
     const signedProduct = await app.mainStore.products.getActiveProductRowBySdkAppId(app.db, "app_pg_1");
     assert.equal(signedProduct.id, "prod_pg_1");
     assert.equal(signedProduct.code, "PGAPP");
+    assert.equal(signedProduct.featureConfig.allowRegister, true);
 
     const policies = await app.services.listPolicies(admin.token, { productCode: "PGAPP" });
     assert.equal(policies.length, 1);

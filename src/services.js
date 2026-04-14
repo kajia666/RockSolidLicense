@@ -1062,6 +1062,13 @@ function loadProductFeatureConfig(db, productId, fallbackUpdatedAt = null) {
   return parseProductFeatureConfigRow(row, fallbackUpdatedAt);
 }
 
+function resolveProductFeatureConfig(db, product) {
+  if (product?.featureConfig && typeof product.featureConfig === "object") {
+    return product.featureConfig;
+  }
+  return loadProductFeatureConfig(db, product.id, product.updated_at ?? product.updatedAt ?? null);
+}
+
 function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIso()) {
   const source = extractProductFeatureConfigInput(body);
   const config = {
@@ -1451,7 +1458,7 @@ function requireDeveloperOwnedNotice(db, session, noticeId, permission = "notice
 }
 
 function requireProductFeatureEnabled(db, product, featureKey, code, message, status = 403) {
-  const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
+  const featureConfig = resolveProductFeatureConfig(db, product);
   if (featureConfig[featureKey] !== false) {
     return featureConfig;
   }
@@ -8861,7 +8868,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireSignedProductCodeMatch(product, body);
 
-      const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
+      const featureConfig = resolveProductFeatureConfig(db, product);
       if (!featureConfig.allowNotices) {
         return buildDisabledNoticeManifest(product, body.channel);
       }
@@ -9345,7 +9352,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       requireField(body, "clientVersion");
       requireSignedProductCodeMatch(product, body);
 
-      const featureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
+      const featureConfig = resolveProductFeatureConfig(db, product);
       if (!featureConfig.allowVersionCheck) {
         return buildDisabledVersionManifest(product, String(body.clientVersion).trim(), body.channel);
       }
@@ -9362,7 +9369,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
       requireSignedProductCodeMatch(product, body);
 
-      const productFeatureConfig = loadProductFeatureConfig(db, product.id, product.updated_at ?? null);
+      const productFeatureConfig = resolveProductFeatureConfig(db, product);
       enforceNetworkRules(db, product, meta.ip, "login");
 
       return withTransaction(db, async () => {

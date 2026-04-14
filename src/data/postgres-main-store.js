@@ -1,6 +1,8 @@
 import path from "node:path";
 import { createPostgresCardRepository } from "./postgres-card-repository.js";
+import { createPostgresCardStore } from "./postgres-card-store.js";
 import { createPostgresEntitlementRepository } from "./postgres-entitlement-repository.js";
+import { createPostgresEntitlementStore } from "./postgres-entitlement-store.js";
 import { createPostgresPolicyRepository } from "./postgres-policy-repository.js";
 import { createPostgresPolicyStore } from "./postgres-policy-store.js";
 import { createPostgresProductRepository } from "./postgres-product-repository.js";
@@ -12,7 +14,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
   const adapter = adapterResolution?.adapter ?? config.postgresMainStoreAdapter ?? null;
   const adapterMetadata = adapterResolution?.metadata ?? {};
   const adapterReady = Boolean(adapter && typeof adapter.query === "function");
-  const productPolicyWriteReady = Boolean(adapterReady && typeof adapter.withTransaction === "function");
+  const coreWriteReady = Boolean(adapterReady && typeof adapter.withTransaction === "function");
 
   if (adapterReady) {
     const repositories = {
@@ -28,11 +30,13 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       },
       cards: {
         ...fallbackStore.cards,
-        ...createPostgresCardRepository(adapter)
+        ...createPostgresCardRepository(adapter),
+        ...createPostgresCardStore(adapter)
       },
       entitlements: {
         ...fallbackStore.entitlements,
-        ...createPostgresEntitlementRepository(adapter)
+        ...createPostgresEntitlementRepository(adapter),
+        ...createPostgresEntitlementStore(adapter)
       }
     };
 
@@ -40,8 +44,8 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       driver: "postgres",
       configuredDriver: "postgres",
       targetDriver: "postgres",
-      implementationStage: productPolicyWriteReady ? "product_policy_write_preview" : "read_side_preview",
-      fallbackReason: productPolicyWriteReady ? "cards_and_entitlements_still_use_sqlite" : "writes_still_use_sqlite",
+      implementationStage: coreWriteReady ? "core_write_preview" : "read_side_preview",
+      fallbackReason: coreWriteReady ? "non_main_store_tables_still_use_sqlite" : "writes_still_use_sqlite",
       ...adapterMetadata,
       adapterReady,
       postgresUrlConfigured: Boolean(config.postgresUrl),
@@ -54,10 +58,10 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         entitlements: "postgres"
       },
       repositoryWriteDrivers: {
-        products: productPolicyWriteReady ? "postgres" : "sqlite",
-        policies: productPolicyWriteReady ? "postgres" : "sqlite",
-        cards: "sqlite",
-        entitlements: "sqlite"
+        products: coreWriteReady ? "postgres" : "sqlite",
+        policies: coreWriteReady ? "postgres" : "sqlite",
+        cards: coreWriteReady ? "postgres" : "sqlite",
+        entitlements: coreWriteReady ? "postgres" : "sqlite"
       }
     };
 

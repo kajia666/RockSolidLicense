@@ -294,7 +294,7 @@ export function createApp(overrides = {}) {
 
       if (req.method === "POST" && url.pathname === "/api/admin/cards/batch") {
         const { body } = await readJsonBody(req);
-        sendJson(res, 201, { ok: true, data: services.createCardBatch(getBearerToken(req), body) });
+        sendJson(res, 201, { ok: true, data: await services.createCardBatch(getBearerToken(req), body) });
         return;
       }
 
@@ -686,7 +686,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateCardStatus(
+          data: await services.updateCardStatus(
             getBearerToken(req),
             cardStatusRoute.cardId,
             body
@@ -702,7 +702,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateEntitlementStatus(
+          data: await services.updateEntitlementStatus(
             getBearerToken(req),
             entitlementStatusRoute.entitlementId,
             body
@@ -718,7 +718,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.extendEntitlement(
+          data: await services.extendEntitlement(
             getBearerToken(req),
             entitlementExtendRoute.entitlementId,
             body
@@ -734,7 +734,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.adjustEntitlementPoints(
+          data: await services.adjustEntitlementPoints(
             getBearerToken(req),
             entitlementPointsRoute.entitlementId,
             body
@@ -1133,7 +1133,7 @@ export function createApp(overrides = {}) {
 
       if (req.method === "POST" && url.pathname === "/api/developer/cards/batch") {
         const { body } = await readJsonBody(req);
-        sendJson(res, 201, { ok: true, data: services.developerCreateCardBatch(getBearerToken(req), body) });
+        sendJson(res, 201, { ok: true, data: await services.developerCreateCardBatch(getBearerToken(req), body) });
         return;
       }
 
@@ -1144,7 +1144,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateCardStatus(
+          data: await services.developerUpdateCardStatus(
             getBearerToken(req),
             developerCardStatusRoute.cardId,
             body
@@ -1367,7 +1367,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateEntitlementStatus(
+          data: await services.developerUpdateEntitlementStatus(
             getBearerToken(req),
             developerEntitlementStatusRoute.entitlementId,
             body
@@ -1383,7 +1383,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerExtendEntitlement(
+          data: await services.developerExtendEntitlement(
             getBearerToken(req),
             developerEntitlementExtendRoute.entitlementId,
             body
@@ -1399,7 +1399,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerAdjustEntitlementPoints(
+          data: await services.developerAdjustEntitlementPoints(
             getBearerToken(req),
             developerEntitlementPointsRoute.entitlementId,
             body

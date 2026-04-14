@@ -32,7 +32,12 @@ function createWriteCapableAdapter() {
     policies: [],
     policyBindConfigs: new Map(),
     policyUnbindConfigs: new Map(),
-    policyGrantConfigs: new Map()
+    policyGrantConfigs: new Map(),
+    licenseKeys: [],
+    licenseKeyControls: new Map(),
+    customerAccounts: [],
+    entitlements: [],
+    entitlementMetering: new Map()
   };
 
   function productRows(filters = {}) {
@@ -86,6 +91,77 @@ function createWriteCapableAdapter() {
       })
       .filter((policy) => !filters.productCode || policy.product_code === filters.productCode)
       .filter((policy) => !filters.ownerDeveloperId || policy.owner_developer_id === filters.ownerDeveloperId);
+  }
+
+  function cardRows(filters = {}) {
+    return state.licenseKeys
+      .filter((card) => !filters.cardId || card.id === filters.cardId)
+      .filter((card) => !filters.productIds || filters.productIds.includes(card.product_id))
+      .map((card) => {
+        const product = state.products.find((item) => item.id === card.product_id);
+        const policy = state.policies.find((item) => item.id === card.policy_id);
+        const grantConfig = state.policyGrantConfigs.get(card.policy_id);
+        const account = state.customerAccounts.find((item) => item.id === card.redeemed_by_account_id);
+        const control = state.licenseKeyControls.get(card.id);
+        const entitlement = state.entitlements.find((item) => item.source_license_key_id === card.id);
+        return {
+          ...card,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          policy_name: policy?.name ?? null,
+          grant_type: grantConfig?.grant_type ?? "duration",
+          grant_points: grantConfig?.grant_points ?? 0,
+          redeemed_username: account?.username ?? null,
+          control_status: control?.status ?? null,
+          expires_at: control?.expires_at ?? null,
+          control_notes: control?.notes ?? null,
+          entitlement_id: entitlement?.id ?? null,
+          entitlement_status: entitlement?.status ?? null,
+          entitlement_ends_at: entitlement?.ends_at ?? null,
+          reseller_id: null,
+          reseller_code: null,
+          reseller_name: null
+        };
+      })
+      .filter((card) => !filters.productCode || card.product_code === filters.productCode)
+      .filter((card) => !filters.policyId || card.policy_id === filters.policyId)
+      .filter((card) => !filters.batchCode || card.batch_code === filters.batchCode)
+      .filter((card) => !filters.usageStatus || card.status === filters.usageStatus);
+  }
+
+  function entitlementRows(filters = {}) {
+    return state.entitlements
+      .filter((entitlement) => !filters.entitlementId || entitlement.id === filters.entitlementId)
+      .filter((entitlement) => !filters.productIds || filters.productIds.includes(entitlement.product_id))
+      .map((entitlement) => {
+        const product = state.products.find((item) => item.id === entitlement.product_id);
+        const account = state.customerAccounts.find((item) => item.id === entitlement.account_id);
+        const policy = state.policies.find((item) => item.id === entitlement.policy_id);
+        const card = state.licenseKeys.find((item) => item.id === entitlement.source_license_key_id);
+        const grantConfig = state.policyGrantConfigs.get(entitlement.policy_id);
+        const metering = state.entitlementMetering.get(entitlement.id);
+        const control = state.licenseKeyControls.get(entitlement.source_license_key_id);
+        return {
+          ...entitlement,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          username: account?.username ?? null,
+          policy_name: policy?.name ?? null,
+          card_key: card?.card_key ?? null,
+          license_key_id: card?.id ?? null,
+          card_control_status: control?.status ?? null,
+          card_expires_at: control?.expires_at ?? null,
+          grant_type: grantConfig?.grant_type ?? "duration",
+          grant_points: grantConfig?.grant_points ?? 0,
+          total_points: metering?.total_points ?? null,
+          remaining_points: metering?.remaining_points ?? null,
+          consumed_points: metering?.consumed_points ?? null,
+          active_session_count: 0
+        };
+      })
+      .filter((entitlement) => !filters.productCode || entitlement.product_code === filters.productCode)
+      .filter((entitlement) => !filters.username || entitlement.username === filters.username)
+      .filter((entitlement) => !filters.grantType || entitlement.grant_type === filters.grantType);
   }
 
   function recordQuery(sql, params = [], meta = {}) {
@@ -240,6 +316,91 @@ function createWriteCapableAdapter() {
 
     if (meta.repository === "policies" && (meta.operation === "queryPolicyRows" || meta.operation === "loadPolicyRow")) {
       return policyRows(meta.filters ?? { policyId: meta.policyId });
+    }
+
+    if (meta.repository === "cards" && meta.operation === "createCard") {
+      state.licenseKeys.push({
+        id: params[0],
+        product_id: params[1],
+        policy_id: params[2],
+        card_key: params[3],
+        batch_code: params[4],
+        status: "fresh",
+        notes: params[5],
+        issued_at: params[6],
+        redeemed_at: null,
+        redeemed_by_account_id: null
+      });
+      return [];
+    }
+
+    if (meta.repository === "cards" && meta.operation === "loadCardControl") {
+      const control = state.licenseKeyControls.get(params[0]);
+      return control ? [{ ...control }] : [];
+    }
+
+    if (meta.repository === "cards" && meta.operation === "upsertCardControl") {
+      state.licenseKeyControls.set(params[0], {
+        license_key_id: params[0],
+        status: params[1],
+        expires_at: params[2],
+        notes: params[3],
+        created_at: params[4],
+        updated_at: params[5]
+      });
+      return [];
+    }
+
+    if (meta.repository === "cards" && (meta.operation === "queryCardRows" || meta.operation === "loadCardRow" || meta.operation === "getCardRowById")) {
+      return cardRows(meta.filters ?? { cardId: meta.cardId });
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "loadEntitlementManageRow") {
+      return entitlementRows({ entitlementId: params[0] }).slice(0, 1);
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "updateEntitlementStatus") {
+      const entitlement = state.entitlements.find((item) => item.id === params[2]);
+      if (entitlement) {
+        entitlement.status = params[0];
+        entitlement.updated_at = params[1];
+      }
+      return [];
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "extendEntitlement") {
+      const entitlement = state.entitlements.find((item) => item.id === params[2]);
+      if (entitlement) {
+        entitlement.ends_at = params[0];
+        entitlement.updated_at = params[1];
+      }
+      return [];
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "loadPointEntitlementForAdmin") {
+      return entitlementRows({ entitlementId: params[0] }).slice(0, 1);
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "loadEntitlementMetering") {
+      const metering = state.entitlementMetering.get(params[0]);
+      return metering ? [{ ...metering }] : [];
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "upsertEntitlementMetering") {
+      state.entitlementMetering.set(params[0], {
+        entitlement_id: params[0],
+        grant_type: params[1],
+        total_points: params[2],
+        remaining_points: params[3],
+        consumed_points: params[4],
+        created_at: params[5],
+        updated_at: params[6]
+      });
+      return [];
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "queryEntitlementRows") {
+      return entitlementRows(meta.filters ?? {});
     }
 
     return [];
@@ -536,12 +697,12 @@ test("postgres main store can write products and policies through a transaction-
 
   try {
     assert.equal(app.mainStore.driver, "postgres");
-    assert.equal(app.mainStore.implementationStage, "product_policy_write_preview");
+    assert.equal(app.mainStore.implementationStage, "core_write_preview");
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "postgres",
       policies: "postgres",
-      cards: "sqlite",
-      entitlements: "sqlite"
+      cards: "postgres",
+      entitlements: "postgres"
     });
 
     const admin = app.services.adminLogin({
@@ -608,12 +769,12 @@ test("postgres main store can write products and policies through a transaction-
     assert.equal(listedPolicies[0].allowClientUnbind, false);
 
     const health = await app.services.health();
-    assert.equal(health.storage.mainStore.implementationStage, "product_policy_write_preview");
+    assert.equal(health.storage.mainStore.implementationStage, "core_write_preview");
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
       products: "postgres",
       policies: "postgres",
-      cards: "sqlite",
-      entitlements: "sqlite"
+      cards: "postgres",
+      entitlements: "postgres"
     });
 
     assert.equal(state.products.length, 1);
@@ -628,6 +789,129 @@ test("postgres main store can write products and policies through a transaction-
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "updatePolicyRuntimeConfig"),
+      true
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("postgres main store can write cards and entitlements through a transaction-capable adapter", async () => {
+  const { adapter, state } = createWriteCapableAdapter();
+  const { app, tempDir } = createTestApp({
+    mainStoreDriver: "postgres",
+    postgresUrl: "postgres://rocksolid:secret@127.0.0.1:5432/rocksolid",
+    postgresMainStoreAdapter: adapter
+  });
+
+  try {
+    const admin = app.services.adminLogin({
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await app.services.createProduct(admin.token, {
+      code: "PGCARD",
+      name: "PG Card Product"
+    });
+    const policy = await app.services.createPolicy(admin.token, {
+      productCode: "PGCARD",
+      name: "PG Card Policy",
+      durationDays: 30,
+      maxDevices: 1,
+      grantType: "points",
+      grantPoints: 5
+    });
+
+    const batch = await app.services.createCardBatch(admin.token, {
+      productCode: "PGCARD",
+      policyId: policy.id,
+      count: 1,
+      prefix: "PGCARD"
+    });
+    assert.equal(batch.count, 1);
+    assert.equal(batch.keys.length, 1);
+
+    const cards = await app.services.listCards(admin.token, { productCode: "PGCARD" });
+    assert.equal(cards.items.length, 1);
+
+    const frozenCard = await app.services.updateCardStatus(admin.token, cards.items[0].id, {
+      status: "frozen",
+      notes: "Freeze from postgres preview"
+    });
+    assert.equal(frozenCard.displayStatus, "frozen");
+    assert.equal(frozenCard.effectiveControlStatus, "frozen");
+
+    state.customerAccounts.push({
+      id: "acct_pg_cards",
+      product_id: product.id,
+      username: "pg-card-user"
+    });
+    state.entitlements.push({
+      id: "ent_pg_cards",
+      product_id: product.id,
+      policy_id: policy.id,
+      account_id: "acct_pg_cards",
+      source_license_key_id: cards.items[0].id,
+      status: "active",
+      starts_at: "2026-01-01T00:00:00.000Z",
+      ends_at: "2026-02-01T00:00:00.000Z",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z"
+    });
+    state.entitlementMetering.set("ent_pg_cards", {
+      entitlement_id: "ent_pg_cards",
+      grant_type: "points",
+      total_points: 5,
+      remaining_points: 5,
+      consumed_points: 0,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z"
+    });
+
+    const entitlements = await app.services.listEntitlements(admin.token, { productCode: "PGCARD" });
+    assert.equal(entitlements.items.length, 1);
+    assert.equal(entitlements.items[0].username, "pg-card-user");
+
+    const frozenEntitlement = await app.services.updateEntitlementStatus(admin.token, "ent_pg_cards", {
+      status: "frozen"
+    });
+    assert.equal(frozenEntitlement.status, "frozen");
+
+    const extendedEntitlement = await app.services.extendEntitlement(admin.token, "ent_pg_cards", {
+      days: 5
+    });
+    assert.equal(extendedEntitlement.addedDays, 5);
+
+    const adjustedEntitlement = await app.services.adjustEntitlementPoints(admin.token, "ent_pg_cards", {
+      mode: "add",
+      points: 2
+    });
+    assert.equal(adjustedEntitlement.totalPoints, 7);
+    assert.equal(adjustedEntitlement.remainingPoints, 7);
+
+    const health = await app.services.health();
+    assert.equal(health.storage.mainStore.implementationStage, "core_write_preview");
+    assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
+      products: "postgres",
+      policies: "postgres",
+      cards: "postgres",
+      entitlements: "postgres"
+    });
+
+    assert.equal(state.licenseKeys.length, 1);
+    assert.equal(state.entitlements.length, 1);
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createCard"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "updateEntitlementStatus"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "upsertEntitlementMetering"),
       true
     );
   } finally {

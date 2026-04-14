@@ -48,7 +48,7 @@ test("card repository formats card rows and control-state filters", async () => 
       durationDays: 30,
       maxDevices: 1
     });
-    app.services.createCardBatch(admin.token, {
+    await app.services.createCardBatch(admin.token, {
       productCode: "CARDREPO",
       policyId: policy.id,
       count: 2,
@@ -65,7 +65,7 @@ test("card repository formats card rows and control-state filters", async () => 
     assert.equal(initial.items[0].displayStatus, "unused");
     assert.equal(initial.items[0].maskedKey.startsWith("CRD"), true);
 
-    const frozen = app.services.updateCardStatus(admin.token, initial.items[0].id, {
+    const frozen = await app.services.updateCardStatus(admin.token, initial.items[0].id, {
       status: "frozen",
       notes: "Manual freeze"
     });
@@ -73,7 +73,7 @@ test("card repository formats card rows and control-state filters", async () => 
     assert.equal(frozen.effectiveControlStatus, "frozen");
 
     const expiredAt = new Date(Date.now() - 60_000).toISOString();
-    app.services.updateCardStatus(admin.token, initial.items[1].id, {
+    await app.services.updateCardStatus(admin.token, initial.items[1].id, {
       status: "active",
       expiresAt: expiredAt,
       notes: "Expired card"

@@ -51,6 +51,11 @@ export function createPostgresEntitlementRepository(adapter) {
       const conditions = [];
       const params = [];
 
+      if (filters.entitlementId) {
+        conditions.push(`e.id = $${params.length + 1}`);
+        params.push(String(filters.entitlementId).trim());
+      }
+
       if (normalizedFilters.productCode) {
         conditions.push(`pr.code = $${params.length + 1}`);
         params.push(normalizedFilters.productCode);

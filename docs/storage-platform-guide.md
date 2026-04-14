@@ -40,8 +40,8 @@ RSL_DB_PATH=./data/rocksolid.db
 
 - `read_side_preview`
   `products / policies / cards / entitlements` 读侧走 PostgreSQL；写侧仍在 SQLite
-- `product_policy_write_preview`
-  在上面的基础上，如果 adapter 支持 `withTransaction(...)`，则 `products / policies` 写侧也进入 PostgreSQL
+- `core_write_preview`
+  在上面的基础上，如果 adapter 支持 `withTransaction(...)`，则 `products / policies / cards / entitlements` 四组核心写侧也进入 PostgreSQL
 
 当前四块核心写侧边界都已经进入 `mainStore`：
 
@@ -54,7 +54,7 @@ RSL_DB_PATH=./data/rocksolid.db
 - `entitlements`
   授权冻结/恢复、续期、点数调账
 
-其中 `products / policies` 已经可以在事务型 PostgreSQL adapter 下真实写入 PostgreSQL；`cards / entitlements` 当前仍然由 SQLite main store 承担。
+其中 `products / policies / cards / entitlements` 已经可以在事务型 PostgreSQL adapter 下真实写入 PostgreSQL；当前仍未迁完的是 main-store 之外的辅助表。
 
 ## 运行时状态
 
@@ -112,9 +112,9 @@ npm run db:postgres:check
 
 ## 推荐推进顺序
 
-1. 继续把 `cards / entitlements` 写侧补成 PostgreSQL store
+1. 继续把客户账号、授权生成链路和更多辅助表逐步迁进 PostgreSQL
 2. 保留 SQLite 开发模式，避免本地调试成本突然升高
 3. 让 Redis runtime state 继续承担多实例一致性职责
-4. 等四块主数据读写都稳定后，再考虑把主业务默认库真正切到 PostgreSQL
+4. 等主要业务链路都稳定后，再考虑把主业务默认库真正切到 PostgreSQL
 
 这样改动面会更可控，也更容易保持现有 HTTP/TCP 协议、SDK 和回归测试稳定。

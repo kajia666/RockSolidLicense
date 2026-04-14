@@ -3,9 +3,9 @@
 当前仓库已经有一条可运行的 PostgreSQL main-store preview 链路，但它的定位需要说清楚：
 
 - `products / policies / cards / entitlements` 四组主数据读侧已经可以通过 PostgreSQL 风格查询运行
-- 当 adapter 支持事务接口 `withTransaction(...)` 时，`products / policies` 写侧也可以进入 PostgreSQL preview
-- `cards / entitlements` 写侧当前仍然保留在 SQLite
-- 所以健康检查里的 `implementationStage` 会根据 adapter 能力显示为 `read_side_preview` 或 `product_policy_write_preview`
+- 当 adapter 支持事务接口 `withTransaction(...)` 时，`products / policies / cards / entitlements` 四组核心主数据写侧都可以进入 PostgreSQL preview
+- 这仍然不是“整套系统已完整切到 PostgreSQL”，因为还有非 main-store 表仍在 SQLite
+- 所以健康检查里的 `implementationStage` 会根据 adapter 能力显示为 `read_side_preview` 或 `core_write_preview`
 
 ## 环境变量
 
@@ -63,9 +63,8 @@ withTransaction(async (tx) => {
 
 那么当前阶段会提升为：
 
-- `product_policy_write_preview`
-- `products / policies` 的创建和配置写入也走 PostgreSQL
-- `cards / entitlements` 写侧仍在 SQLite
+- `core_write_preview`
+- `products / policies / cards / entitlements` 的核心写侧都走 PostgreSQL
 
 内置的 `pg` 风格连接池 adapter 已经支持这层事务能力。
 
@@ -78,8 +77,8 @@ withTransaction(async (tx) => {
   "driver": "postgres",
   "configuredDriver": "postgres",
   "targetDriver": "postgres",
-  "implementationStage": "product_policy_write_preview",
-  "fallbackReason": "cards_and_entitlements_still_use_sqlite",
+      "implementationStage": "core_write_preview",
+      "fallbackReason": "non_main_store_tables_still_use_sqlite",
   "adapterReady": true,
   "writeAdapterReady": true,
   "adapterSource": "pg_pool",
@@ -90,12 +89,12 @@ withTransaction(async (tx) => {
     "cards": "postgres",
     "entitlements": "postgres"
   },
-  "repositoryWriteDrivers": {
-    "products": "postgres",
-    "policies": "postgres",
-    "cards": "sqlite",
-    "entitlements": "sqlite"
-  }
+      "repositoryWriteDrivers": {
+        "products": "postgres",
+        "policies": "postgres",
+        "cards": "postgres",
+        "entitlements": "postgres"
+      }
 }
 ```
 
@@ -104,11 +103,11 @@ withTransaction(async (tx) => {
 ## 当前限制
 
 - 这还不是“主库已经完整切到 PostgreSQL”
-- 当前只有 `products / policies` 写侧可以进入 PostgreSQL preview
-- `cards / entitlements` 写侧仍然由 SQLite main store 承担
+- 当前 preview 覆盖的是 `mainStore` 四组核心主数据，不代表所有辅助表都已迁完
+- 开发者账号、客户账号、会话、审计等非 main-store 表仍然主要依赖 SQLite / Redis
 
 ## 下一步建议
 
-1. 继续把 `cards / entitlements` 写侧补成 PostgreSQL store
+1. 继续把客户账号、授权生成链路和更多辅助表逐步迁进 PostgreSQL
 2. 保留 SQLite 开发模式，避免本地调试成本突然升高
-3. 等四块主数据读写都稳定后，再考虑把主业务默认库真正切到 PostgreSQL
+3. 等主要业务链路都稳定后，再考虑把主业务默认库真正切到 PostgreSQL

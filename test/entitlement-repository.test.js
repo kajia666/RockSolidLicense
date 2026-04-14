@@ -87,7 +87,7 @@ test("entitlement repository reads usable authorization and formatted grant stat
       grantType: "points",
       grantPoints: 8
     });
-    const batch = app.services.createCardBatch(admin.token, {
+    const batch = await app.services.createCardBatch(admin.token, {
       productCode: "ENTREPO",
       policyId: policy.id,
       count: 1,

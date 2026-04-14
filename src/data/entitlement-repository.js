@@ -179,6 +179,7 @@ export function formatEntitlementRow(row, referenceTime = nowIso()) {
 
   return {
     id: row.id,
+    productId: row.product_id,
     productCode: row.product_code,
     productName: row.product_name,
     accountId: row.account_id,
@@ -216,6 +217,11 @@ export function queryEntitlementRows(db, filters = {}, options = {}) {
   };
   const conditions = [];
   const params = [];
+
+  if (filters.entitlementId) {
+    conditions.push("e.id = ?");
+    params.push(String(filters.entitlementId).trim());
+  }
 
   if (normalizedFilters.productCode) {
     conditions.push("pr.code = ?");

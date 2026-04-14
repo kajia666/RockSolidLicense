@@ -246,6 +246,15 @@ function withTransaction(db, action) {
   db.exec("BEGIN IMMEDIATE");
   try {
     const result = action();
+    if (result && typeof result.then === "function") {
+      return result.then((value) => {
+        db.exec("COMMIT");
+        return value;
+      }, (error) => {
+        db.exec("ROLLBACK");
+        throw error;
+      });
+    }
     db.exec("COMMIT");
     return result;
   } catch (error) {
@@ -4710,6 +4719,19 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     return rows[0] ?? null;
   }
 
+  async function getStoreCardById(cardId) {
+    return Promise.resolve(store.cards.getCardRowById(db, cardId));
+  }
+
+  async function getStoreEntitlementById(entitlementId) {
+    const { items } = await Promise.resolve(store.entitlements.queryEntitlementRows(
+      db,
+      { entitlementId },
+      { limit: 1 }
+    ));
+    return items[0] ?? null;
+  }
+
   return {
     async health() {
       expireStaleSessions(db, stateStore);
@@ -5860,27 +5882,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return buildCardsCsv(items);
     },
 
-    updateCardStatus(token, cardId, body = {}) {
+    async updateCardStatus(token, cardId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const card = one(
-        db,
-        `
-          SELECT lk.id, lk.card_key, lk.status, lk.product_id, lk.redeemed_by_account_id,
-                 pr.code AS product_code, pol.name AS policy_name
-          FROM license_keys lk
-          JOIN products pr ON pr.id = lk.product_id
-          JOIN policies pol ON pol.id = lk.policy_id
-          WHERE lk.id = ?
-        `,
-        cardId
-      );
+      const card = await getStoreCardById(cardId);
 
       if (!card) {
         throw new AppError(404, "CARD_NOT_FOUND", "Card key does not exist.");
       }
 
-      return withTransaction(db, () => {
-        const result = store.cards.updateCardStatus(card.id, body, nowIso());
+      return withTransaction(db, async () => {
+        const result = await Promise.resolve(store.cards.updateCardStatus(card.id, body, nowIso()));
 
         let revokedSessions = 0;
         if (!result.control.available) {
@@ -5893,8 +5904,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         }
 
         audit(db, "admin", admin.admin_id, "card.status", "license_key", card.id, {
-          productCode: card.product_code,
-          cardKeyMasked: maskCardKey(card.card_key),
+          productCode: card.productCode,
+          cardKeyMasked: maskCardKey(card.cardKey),
           status: result.control.status,
           effectiveStatus: result.control.effectiveStatus,
           expiresAt: result.control.expiresAt,
@@ -5909,12 +5920,27 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    developerUpdateCardStatus(token, cardId, body = {}) {
+    async developerUpdateCardStatus(token, cardId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const card = requireDeveloperOwnedCard(db, session, cardId, "cards.write");
+      const card = await getStoreCardById(cardId);
+      if (!card) {
+        throw new AppError(404, "CARD_NOT_FOUND", "Card key does not exist.");
+      }
+      const product = await getStoreProductById(card.productId);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product?.id ?? null,
+          owner_developer_id: product?.ownerDeveloperId ?? product?.ownerDeveloper?.id ?? null
+        },
+        "cards.write",
+        "DEVELOPER_CARD_FORBIDDEN",
+        "You can only manage card keys under your own projects."
+      );
 
-      return withTransaction(db, () => {
-        const result = store.cards.updateCardStatus(card.id, body, nowIso());
+      return withTransaction(db, async () => {
+        const result = await Promise.resolve(store.cards.updateCardStatus(card.id, body, nowIso()));
 
         let revokedSessions = 0;
         if (!result.control.available) {
@@ -5927,8 +5953,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         }
 
         auditDeveloperSession(db, session, "card.status", "license_key", card.id, {
-          productCode: card.product_code,
-          cardKeyMasked: maskCardKey(card.card_key),
+          productCode: card.productCode,
+          cardKeyMasked: maskCardKey(card.cardKey),
           status: result.control.status,
           effectiveStatus: result.control.effectiveStatus,
           expiresAt: result.control.expiresAt,
@@ -5943,26 +5969,21 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    createCardBatch(token, body) {
+    async createCardBatch(token, body) {
       const admin = requireAdminSession(db, token);
       requireField(body, "policyId");
 
-      const product = requireProductByCode(db, readProductCodeInput(body));
-      const policy = one(
-        db,
-        `
-          SELECT * FROM policies
-          WHERE id = ? AND product_id = ? AND status = 'active'
-        `,
-        body.policyId,
-        product.id
-      );
+      const product = await getStoreActiveProductByCode(readProductCodeInput(body));
+      const policy = await getStorePolicyById(body.policyId);
 
-      if (!policy) {
+      if (!policy || policy.productId !== product.id || policy.status !== "active") {
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
       }
 
-      const batch = withTransaction(db, () => store.cards.createCardBatch(product, policy, body, nowIso()));
+      const batch = await withTransaction(
+        db,
+        () => Promise.resolve(store.cards.createCardBatch(product, policy, body, nowIso()))
+      );
 
       audit(db, "admin", admin.admin_id, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
@@ -5974,7 +5995,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return batch;
     },
 
-    developerCreateCardBatch(token, body = {}) {
+    async developerCreateCardBatch(token, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -5984,22 +6005,28 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
       requireField(body, "policyId");
 
-      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "cards.write");
-      const policy = one(
+      const product = await getStoreActiveProductByCode(readProductCodeInput(body));
+      ensureDeveloperCanAccessProduct(
         db,
-        `
-          SELECT * FROM policies
-          WHERE id = ? AND product_id = ? AND status = 'active'
-        `,
-        body.policyId,
-        product.id
+        session,
+        {
+          id: product.id,
+          owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+        },
+        "cards.write",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only manage products owned by your developer account."
       );
+      const policy = await getStorePolicyById(body.policyId);
 
-      if (!policy) {
+      if (!policy || policy.productId !== product.id || policy.status !== "active") {
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
       }
 
-      const batch = withTransaction(db, () => store.cards.createCardBatch(product, policy, body, nowIso()));
+      const batch = await withTransaction(
+        db,
+        () => Promise.resolve(store.cards.createCardBatch(product, policy, body, nowIso()))
+      );
 
       auditDeveloperSession(db, session, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
@@ -6169,28 +6196,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    updateEntitlementStatus(token, entitlementId, body = {}) {
+    async updateEntitlementStatus(token, entitlementId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const entitlement = one(
-        db,
-        `
-          SELECT e.*, pr.code AS product_code, a.username, pol.name AS policy_name, lk.card_key
-          FROM entitlements e
-          JOIN products pr ON pr.id = e.product_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN policies pol ON pol.id = e.policy_id
-          JOIN license_keys lk ON lk.id = e.source_license_key_id
-          WHERE e.id = ?
-        `,
-        entitlementId
-      );
+      const entitlement = await getStoreEntitlementById(entitlementId);
 
       if (!entitlement) {
         throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
       }
 
-      return withTransaction(db, () => {
-        const result = store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso());
+      return withTransaction(db, async () => {
+        const result = await Promise.resolve(store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso()));
         const revokedSessions = result.changed && result.status === "frozen"
           ? expireSessionsForEntitlement(db, stateStore, entitlement.id, "entitlement_frozen")
           : 0;
@@ -6203,11 +6218,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "entitlement",
           entitlement.id,
           {
-            productCode: entitlement.product_code,
+            productCode: entitlement.productCode,
             username: entitlement.username,
             status: result.status,
             revokedSessions,
-            sourceCardKeyMasked: maskCardKey(entitlement.card_key)
+            sourceCardKeyMasked: maskCardKey(entitlement.sourceCardKey)
           }
         );
 
@@ -6218,7 +6233,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    developerUpdateEntitlementStatus(token, entitlementId, body = {}) {
+    async developerUpdateEntitlementStatus(token, entitlementId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6226,20 +6241,35 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage entitlements under your assigned projects."
       );
-      const entitlement = requireDeveloperOwnedEntitlement(db, session, entitlementId, "ops.write");
+      const entitlement = await getStoreEntitlementById(entitlementId);
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+      const product = await getStoreProductById(entitlement.productId);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product?.id ?? null,
+          owner_developer_id: product?.ownerDeveloperId ?? product?.ownerDeveloper?.id ?? null
+        },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage entitlements under your assigned projects."
+      );
 
-      return withTransaction(db, () => {
-        const result = store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso());
+      return withTransaction(db, async () => {
+        const result = await Promise.resolve(store.entitlements.updateEntitlementStatus(entitlement.id, body, nowIso()));
         const revokedSessions = result.changed && result.status === "frozen"
           ? expireSessionsForEntitlement(db, stateStore, entitlement.id, "entitlement_frozen")
           : 0;
 
         auditDeveloperSession(db, session, "entitlement.status", "entitlement", entitlement.id, {
-          productCode: entitlement.product_code,
+          productCode: entitlement.productCode,
           username: entitlement.username,
           status: result.status,
           revokedSessions,
-          sourceCardKeyMasked: maskCardKey(entitlement.card_key)
+          sourceCardKeyMasked: maskCardKey(entitlement.sourceCardKey)
         });
 
         return {
@@ -6249,40 +6279,28 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    extendEntitlement(token, entitlementId, body = {}) {
+    async extendEntitlement(token, entitlementId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const entitlement = one(
-        db,
-        `
-          SELECT e.*, pr.code AS product_code, a.username, pol.name AS policy_name, lk.card_key
-          FROM entitlements e
-          JOIN products pr ON pr.id = e.product_id
-          JOIN customer_accounts a ON a.id = e.account_id
-          JOIN policies pol ON pol.id = e.policy_id
-          JOIN license_keys lk ON lk.id = e.source_license_key_id
-          WHERE e.id = ?
-        `,
-        entitlementId
-      );
+      const entitlement = await getStoreEntitlementById(entitlementId);
 
       if (!entitlement) {
         throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
       }
 
-      const result = store.entitlements.extendEntitlement(entitlement.id, body, nowIso());
+      const result = await Promise.resolve(store.entitlements.extendEntitlement(entitlement.id, body, nowIso()));
 
       audit(db, "admin", admin.admin_id, "entitlement.extend", "entitlement", entitlement.id, {
-        productCode: entitlement.product_code,
+        productCode: entitlement.productCode,
         username: entitlement.username,
         days: result.addedDays,
-        sourceCardKeyMasked: maskCardKey(entitlement.card_key),
+        sourceCardKeyMasked: maskCardKey(entitlement.sourceCardKey),
         endsAt: result.endsAt
       });
 
       return result;
     },
 
-    developerExtendEntitlement(token, entitlementId, body = {}) {
+    async developerExtendEntitlement(token, entitlementId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6290,28 +6308,43 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage entitlements under your assigned projects."
       );
-      const entitlement = requireDeveloperOwnedEntitlement(db, session, entitlementId, "ops.write");
-      const result = store.entitlements.extendEntitlement(entitlement.id, body, nowIso());
+      const entitlement = await getStoreEntitlementById(entitlementId);
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+      const product = await getStoreProductById(entitlement.productId);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product?.id ?? null,
+          owner_developer_id: product?.ownerDeveloperId ?? product?.ownerDeveloper?.id ?? null
+        },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage entitlements under your assigned projects."
+      );
+      const result = await Promise.resolve(store.entitlements.extendEntitlement(entitlement.id, body, nowIso()));
 
       auditDeveloperSession(db, session, "entitlement.extend", "entitlement", entitlement.id, {
-        productCode: entitlement.product_code,
+        productCode: entitlement.productCode,
         username: entitlement.username,
         days: result.addedDays,
-        sourceCardKeyMasked: maskCardKey(entitlement.card_key),
+        sourceCardKeyMasked: maskCardKey(entitlement.sourceCardKey),
         endsAt: result.endsAt
       });
 
       return result;
     },
 
-    adjustEntitlementPoints(token, entitlementId, body = {}) {
+    async adjustEntitlementPoints(token, entitlementId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const result = store.entitlements.adjustEntitlementPoints(
+      const result = await Promise.resolve(store.entitlements.adjustEntitlementPoints(
         entitlementId,
         body,
         nowIso(),
         { totalStrategy: "preserve_consumed" }
-      );
+      ));
 
       audit(db, "admin", admin.admin_id, "entitlement.points.adjust", "entitlement", result.id, {
         productCode: result.productCode,
@@ -6567,7 +6600,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    developerAdjustEntitlementPoints(token, entitlementId, body = {}) {
+    async developerAdjustEntitlementPoints(token, entitlementId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -6575,13 +6608,28 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage point entitlements under your assigned projects."
       );
-      const entitlement = requireDeveloperOwnedEntitlement(db, session, entitlementId, "ops.write");
-      const result = store.entitlements.adjustEntitlementPoints(
+      const entitlement = await getStoreEntitlementById(entitlementId);
+      if (!entitlement) {
+        throw new AppError(404, "ENTITLEMENT_NOT_FOUND", "Entitlement does not exist.");
+      }
+      const product = await getStoreProductById(entitlement.productId);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product?.id ?? null,
+          owner_developer_id: product?.ownerDeveloperId ?? product?.ownerDeveloper?.id ?? null
+        },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage point entitlements under your assigned projects."
+      );
+      const result = await Promise.resolve(store.entitlements.adjustEntitlementPoints(
         entitlement.id,
         body,
         nowIso(),
         { totalStrategy: "preserve_total" }
-      );
+      ));
 
       auditDeveloperSession(db, session, "entitlement.points.adjust", "entitlement", result.id, {
         productCode: result.productCode,

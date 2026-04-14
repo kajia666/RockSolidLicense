@@ -42,15 +42,15 @@ test("postgres runtime adapter can load a pg-style pool module and close it clea
 
   try {
     assert.equal(app.mainStore.driver, "postgres");
-    assert.equal(app.mainStore.implementationStage, "product_policy_write_preview");
+    assert.equal(app.mainStore.implementationStage, "core_write_preview");
     assert.equal(app.mainStore.adapterSource, "pg_pool");
     assert.equal(app.mainStore.pgModuleTarget, fakePgModulePath);
     assert.equal(app.mainStore.poolMax, 7);
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "postgres",
       policies: "postgres",
-      cards: "sqlite",
-      entitlements: "sqlite"
+      cards: "postgres",
+      entitlements: "postgres"
     });
 
     const admin = app.services.adminLogin({
@@ -75,7 +75,7 @@ test("postgres runtime adapter can load a pg-style pool module and close it clea
     assert.equal(health.storage.mainStore.adapterSource, "pg_pool");
     assert.equal(health.storage.mainStore.adapterState, "ready");
     assert.equal(health.storage.mainStore.connectionOk, true);
-    assert.equal(health.storage.mainStore.implementationStage, "product_policy_write_preview");
+    assert.equal(health.storage.mainStore.implementationStage, "core_write_preview");
     assert.equal(health.storage.mainStore.pgModuleTarget, fakePgModulePath);
     assert.equal(health.storage.mainStore.poolMax, 7);
 

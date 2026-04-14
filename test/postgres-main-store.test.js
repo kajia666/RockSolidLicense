@@ -436,7 +436,7 @@ test("postgres main store configuration falls back to sqlite implementation", as
     assert.match(app.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts"]
+      ["products", "policies", "cards", "entitlements", "accounts", "sessions"]
     );
   } finally {
     await app.close();
@@ -461,7 +461,7 @@ test("health reports configured postgres main store and sqlite fallback stage", 
     assert.match(health.storage.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       health.storage.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts"]
+      ["products", "policies", "cards", "entitlements", "accounts", "sessions"]
     );
   } finally {
     await app.close();
@@ -616,14 +616,16 @@ test("postgres main store can serve all main-store read-side queries through ada
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
       policies: "sqlite",
       cards: "sqlite",
       entitlements: "sqlite",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -676,14 +678,16 @@ test("postgres main store can serve all main-store read-side queries through ada
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
       policies: "sqlite",
       cards: "sqlite",
       entitlements: "sqlite",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
   } finally {
     await app.close();
@@ -707,7 +711,8 @@ test("postgres main store can write products and policies through a transaction-
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -780,7 +785,8 @@ test("postgres main store can write products and policies through a transaction-
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
 
     assert.equal(state.products.length, 1);
@@ -904,7 +910,8 @@ test("postgres main store can write cards and entitlements through a transaction
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
 
     assert.equal(state.licenseKeys.length, 1);

@@ -1,4 +1,5 @@
 import * as accounts from "./account-repository.js";
+import * as sessions from "./session-repository.js";
 import * as products from "./product-repository.js";
 import * as policies from "./policy-repository.js";
 import * as cards from "./card-repository.js";
@@ -8,6 +9,7 @@ import { createSqliteCardStore } from "./sqlite-card-store.js";
 import { createSqliteEntitlementStore } from "./sqlite-entitlement-store.js";
 import { createSqlitePolicyStore } from "./sqlite-policy-store.js";
 import { createSqliteProductStore } from "./sqlite-product-store.js";
+import { createSqliteSessionStore } from "./sqlite-session-store.js";
 
 export function createSqliteMainStore({ db }) {
   const repositories = {
@@ -30,6 +32,10 @@ export function createSqliteMainStore({ db }) {
     accounts: {
       ...accounts,
       ...createSqliteAccountStore({ db })
+    },
+    sessions: {
+      ...sessions,
+      ...createSqliteSessionStore({ db })
     }
   };
 
@@ -45,14 +51,16 @@ export function createSqliteMainStore({ db }) {
       policies: "sqlite",
       cards: "sqlite",
       entitlements: "sqlite",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     },
     repositoryWriteDrivers: {
       products: "sqlite",
       policies: "sqlite",
       cards: "sqlite",
       entitlements: "sqlite",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     }
   };
 

@@ -30,14 +30,15 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(app.mainStore.driver, "sqlite");
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts"]
+      ["products", "policies", "cards", "entitlements", "accounts", "sessions"]
     );
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
       policies: "sqlite",
       cards: "sqlite",
       entitlements: "sqlite",
-      accounts: "sqlite"
+      accounts: "sqlite",
+      sessions: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -234,6 +235,39 @@ test("app exposes sqlite main store and services read through it", async () => {
     });
     assert.equal(adjustedEntitlement.current.totalPoints, 7);
     assert.equal(adjustedEntitlement.current.remainingPoints, 7);
+
+    app.db.prepare(`
+      INSERT INTO devices
+      (id, product_id, fingerprint, device_name, first_seen_at, last_seen_at, last_seen_ip, metadata_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      "dev_store_session",
+      directProduct.id,
+      "store-session-device",
+      "Store Session Device",
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-01T00:00:00.000Z",
+      "127.0.0.1",
+      "{}"
+    );
+
+    const issuedSession = app.mainStore.sessions.createIssuedSession({
+      id: "sess_store_main",
+      productId: directProduct.id,
+      accountId: directAccount.id,
+      entitlementId: durationEntitlement.id,
+      deviceId: "dev_store_session",
+      sessionToken: "session-token-store-main",
+      licenseToken: "license-token-store-main",
+      issuedAt: "2026-01-05T00:00:00.000Z",
+      expiresAt: "2026-01-05T01:00:00.000Z",
+      lastSeenIp: "127.0.0.1",
+      userAgent: "main-store-test"
+    });
+    assert.equal(issuedSession.session_token, "session-token-store-main");
+
+    const touchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
+    assert.equal(touchedAccount.last_login_at, "2026-01-05T00:00:00.000Z");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

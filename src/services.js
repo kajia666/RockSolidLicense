@@ -2977,8 +2977,9 @@ function expireSessionsForLicenseKey(db, stateStore, licenseKeyId, reason) {
   return expireSessionsForEntitlement(db, stateStore, entitlement.id, reason);
 }
 
-function issueClientSession(
+async function issueClientSession(
   db,
+  store,
   config,
   stateStore,
   {
@@ -3083,35 +3084,20 @@ function issueClientSession(
     exp: expiresAt
   });
 
-  run(
-    db,
-    `
-      INSERT INTO sessions
-      (id, product_id, account_id, entitlement_id, device_id, session_token, license_token, status, issued_at,
-       expires_at, last_heartbeat_at, last_seen_ip, user_agent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
-    `,
-    sessionId,
-    product.id,
-    account.id,
-    entitlement.id,
-    device.id,
+  await Promise.resolve(store.sessions.createIssuedSession({
+    id: sessionId,
+    productId: product.id,
+    accountId: account.id,
+    entitlementId: entitlement.id,
+    deviceId: device.id,
     sessionToken,
     licenseToken,
     issuedAt,
     expiresAt,
-    issuedAt,
-    meta.ip,
-    meta.userAgent
-  );
-
-  run(
-    db,
-    "UPDATE customer_accounts SET last_login_at = ?, updated_at = ? WHERE id = ?",
-    issuedAt,
-    issuedAt,
-    account.id
-  );
+    lastHeartbeatAt: issuedAt,
+    lastSeenIp: meta.ip,
+    userAgent: meta.userAgent
+  }));
 
   audit(db, "account", account.id, "session.login", "session", sessionId, {
     productCode: product.code,
@@ -10013,7 +9999,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const maskedKey = maskCardKey(card.card_key);
         const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
         return {
-          ...(await issueClientSession(db, config, stateStore, {
+          ...(await issueClientSession(db, store, config, stateStore, {
             product,
             account,
             entitlement,
@@ -10082,7 +10068,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         }
 
         const bindConfig = loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode, entitlement.updated_at);
-        return issueClientSession(db, config, stateStore, {
+        return issueClientSession(db, store, config, stateStore, {
           product,
           account,
           entitlement,

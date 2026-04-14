@@ -914,6 +914,110 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "sessions" && meta.operation === "getSessionRecordByProductToken") {
+        return [
+          {
+            id: "sess_pg_1",
+            product_id: "prod_pg_1",
+            account_id: "acct_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            session_token: "session_pg_1",
+            license_token: "license_pg_1",
+            status: "active",
+            issued_at: "2026-01-04T00:00:00.000Z",
+            expires_at: "2026-01-04T01:00:00.000Z",
+            last_heartbeat_at: "2026-01-04T00:10:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            user_agent: "postgres-session-test"
+          }
+        ];
+      }
+
+      if (meta.repository === "sessions" && meta.operation === "getSessionRecordById") {
+        return [
+          {
+            id: "sess_pg_1",
+            product_id: "prod_pg_1",
+            account_id: "acct_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            session_token: "session_pg_1",
+            license_token: "license_pg_1",
+            status: "active",
+            issued_at: "2026-01-04T00:00:00.000Z",
+            expires_at: "2026-01-04T01:00:00.000Z",
+            last_heartbeat_at: "2026-01-04T00:10:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            user_agent: "postgres-session-test"
+          }
+        ];
+      }
+
+      if (meta.repository === "sessions" && meta.operation === "getSessionRecordByToken") {
+        return [
+          {
+            id: "sess_pg_1",
+            product_id: "prod_pg_1",
+            account_id: "acct_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            session_token: "session_pg_1",
+            license_token: "license_pg_1",
+            status: "active",
+            issued_at: "2026-01-04T00:00:00.000Z",
+            expires_at: "2026-01-04T01:00:00.000Z",
+            last_heartbeat_at: "2026-01-04T00:10:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            user_agent: "postgres-session-test"
+          }
+        ];
+      }
+
+      if (meta.repository === "sessions" && meta.operation === "getActiveSessionHeartbeatRow") {
+        return [
+          {
+            id: "sess_pg_1",
+            product_id: "prod_pg_1",
+            account_id: "acct_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            session_token: "session_pg_1",
+            license_token: "license_pg_1",
+            status: "active",
+            issued_at: "2026-01-04T00:00:00.000Z",
+            expires_at: "2026-01-04T01:00:00.000Z",
+            last_heartbeat_at: "2026-01-04T00:10:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            user_agent: "postgres-session-test",
+            fingerprint: "pg-device-001",
+            username: "pguser",
+            entitlement_status: "active",
+            heartbeat_interval_seconds: 60,
+            heartbeat_timeout_seconds: 180,
+            token_ttl_seconds: 300,
+            card_control_status: "active",
+            card_expires_at: null
+          }
+        ];
+      }
+
+      if (meta.repository === "sessions" && meta.operation === "getSessionManageRowById") {
+        return [
+          {
+            id: "sess_pg_1",
+            status: "active",
+            revoked_reason: null,
+            product_id: "prod_pg_1",
+            account_id: "acct_pg_1",
+            product_code: "PGAPP",
+            owner_developer_id: "dev_pg_1",
+            username: "pguser",
+            fingerprint: "pg-device-001"
+          }
+        ];
+      }
+
       return [];
     }
   };
@@ -934,7 +1038,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       entitlements: "postgres",
       accounts: "postgres",
       devices: "postgres",
-      sessions: "sqlite"
+      sessions: "postgres"
     });
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
@@ -1013,7 +1117,32 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(bindingManageRow.product_code, "PGAPP");
     assert.equal(bindingManageRow.username, "pguser");
 
-    assert.equal(queries.length, 12);
+    const sessionByProductToken = await app.mainStore.sessions.getSessionRecordByProductToken(
+      app.db,
+      "prod_pg_1",
+      "session_pg_1"
+    );
+    assert.equal(sessionByProductToken.id, "sess_pg_1");
+
+    const sessionById = await app.mainStore.sessions.getSessionRecordById(app.db, "sess_pg_1");
+    assert.equal(sessionById.session_token, "session_pg_1");
+
+    const sessionByToken = await app.mainStore.sessions.getSessionRecordByToken(app.db, "session_pg_1");
+    assert.equal(sessionByToken.id, "sess_pg_1");
+
+    const heartbeatSession = await app.mainStore.sessions.getActiveSessionHeartbeatRow(
+      app.db,
+      "prod_pg_1",
+      "session_pg_1"
+    );
+    assert.equal(heartbeatSession.fingerprint, "pg-device-001");
+    assert.equal(heartbeatSession.username, "pguser");
+
+    const sessionManageRow = await app.mainStore.sessions.getSessionManageRowById(app.db, "sess_pg_1");
+    assert.equal(sessionManageRow.product_code, "PGAPP");
+    assert.equal(sessionManageRow.username, "pguser");
+
+    assert.equal(queries.length, 17);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -1038,6 +1167,16 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[10].sql, /FROM device_blocks/i);
     assert.equal(queries[11].meta.operation, "getBindingManageRowById");
     assert.match(queries[11].sql, /JOIN entitlements e ON e\.id = b\.entitlement_id/i);
+    assert.equal(queries[12].meta.operation, "getSessionRecordByProductToken");
+    assert.match(queries[12].sql, /FROM sessions/i);
+    assert.equal(queries[13].meta.operation, "getSessionRecordById");
+    assert.match(queries[13].sql, /WHERE id = \$1/i);
+    assert.equal(queries[14].meta.operation, "getSessionRecordByToken");
+    assert.match(queries[14].sql, /WHERE session_token = \$1/i);
+    assert.equal(queries[15].meta.operation, "getActiveSessionHeartbeatRow");
+    assert.match(queries[15].sql, /JOIN devices d ON d\.id = s\.device_id/i);
+    assert.equal(queries[16].meta.operation, "getSessionManageRowById");
+    assert.match(queries[16].sql, /JOIN products pr ON pr\.id = s\.product_id/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -1050,7 +1189,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       entitlements: "postgres",
       accounts: "postgres",
       devices: "postgres",
-      sessions: "sqlite"
+      sessions: "postgres"
     });
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
       products: "sqlite",

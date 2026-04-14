@@ -101,6 +101,10 @@ function getCardField(card, camelKey, snakeKey = camelKey) {
   return card?.[camelKey] ?? card?.[snakeKey] ?? null;
 }
 
+function getEntitlementField(entitlement, camelKey, snakeKey = camelKey) {
+  return entitlement?.[camelKey] ?? entitlement?.[snakeKey] ?? null;
+}
+
 function loadLatestEntitlementEndsAt(db, accountId, productId, policyId) {
   return one(
     db,
@@ -214,6 +218,54 @@ export function createSqliteEntitlementStore({ db }) {
               allocatedAt: resellerAllocation.allocated_at
             }
           : null
+      };
+    },
+
+    consumeEntitlementLoginQuota(entitlement, timestamp = nowIso()) {
+      const grantType = normalizeGrantType(getEntitlementField(entitlement, "grantType", "grant_type") ?? "duration");
+      if (grantType !== "points") {
+        return {
+          grantType: "duration",
+          totalPoints: null,
+          remainingPoints: null,
+          consumedPoints: null,
+          consumedThisLogin: 0
+        };
+      }
+
+      const entitlementId = getEntitlementField(entitlement, "id");
+      const metering = one(
+        db,
+        "SELECT * FROM entitlement_metering WHERE entitlement_id = ?",
+        entitlementId
+      );
+      if (!metering || Number(metering.remaining_points ?? 0) <= 0) {
+        throw new AppError(403, "LICENSE_POINTS_EXHAUSTED", "This authorization has no remaining points.", {
+          entitlementId,
+          totalPoints: Number(metering?.total_points ?? 0),
+          remainingPoints: Number(metering?.remaining_points ?? 0),
+          consumedPoints: Number(metering?.consumed_points ?? 0)
+        });
+      }
+
+      const nextRemaining = Number(metering.remaining_points) - 1;
+      const nextConsumed = Number(metering.consumed_points ?? 0) + 1;
+      upsertEntitlementMetering(
+        db,
+        entitlementId,
+        "points",
+        Number(metering.total_points ?? 0),
+        nextRemaining,
+        nextConsumed,
+        timestamp
+      );
+
+      return {
+        grantType: "points",
+        totalPoints: Number(metering.total_points ?? 0),
+        remainingPoints: nextRemaining,
+        consumedPoints: nextConsumed,
+        consumedThisLogin: 1
       };
     },
 

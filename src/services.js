@@ -2651,42 +2651,6 @@ function formatResellerListRow(row) {
   };
 }
 
-function upsertEntitlementMetering(db, entitlementId, grantType, totalPoints, remainingPoints, consumedPoints, timestamp = nowIso()) {
-  const existing = one(db, "SELECT entitlement_id FROM entitlement_metering WHERE entitlement_id = ?", entitlementId);
-  if (existing) {
-    run(
-      db,
-      `
-        UPDATE entitlement_metering
-        SET grant_type = ?, total_points = ?, remaining_points = ?, consumed_points = ?, updated_at = ?
-        WHERE entitlement_id = ?
-      `,
-      grantType,
-      totalPoints,
-      remainingPoints,
-      consumedPoints,
-      timestamp,
-      entitlementId
-    );
-  } else {
-    run(
-      db,
-      `
-        INSERT INTO entitlement_metering
-        (entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
-      entitlementId,
-      grantType,
-      totalPoints,
-      remainingPoints,
-      consumedPoints,
-      timestamp,
-      timestamp
-    );
-  }
-}
-
 function auditActivatedCardEntitlement(db, product, account, card, activation, eventType = "card.redeem", metadata = {}) {
   audit(db, "account", account.id, eventType, "license_key", card.id, {
     cardKey: activation.cardKey ?? card.card_key ?? card.cardKey ?? null,
@@ -2790,49 +2754,7 @@ async function issueClientSession(
     );
   }
 
-  let quota = null;
-  if ((entitlement.grant_type ?? "duration") === "points") {
-    const metering = one(
-      db,
-      "SELECT * FROM entitlement_metering WHERE entitlement_id = ?",
-      entitlement.id
-    );
-    if (!metering || Number(metering.remaining_points ?? 0) <= 0) {
-      throw new AppError(403, "LICENSE_POINTS_EXHAUSTED", "This authorization has no remaining points.", {
-        entitlementId: entitlement.id,
-        totalPoints: Number(metering?.total_points ?? 0),
-        remainingPoints: Number(metering?.remaining_points ?? 0),
-        consumedPoints: Number(metering?.consumed_points ?? 0)
-      });
-    }
-
-    const nextRemaining = Number(metering.remaining_points) - 1;
-    const nextConsumed = Number(metering.consumed_points ?? 0) + 1;
-    upsertEntitlementMetering(
-      db,
-      entitlement.id,
-      "points",
-      Number(metering.total_points ?? 0),
-      nextRemaining,
-      nextConsumed,
-      nowIso()
-    );
-    quota = {
-      grantType: "points",
-      totalPoints: Number(metering.total_points ?? 0),
-      remainingPoints: nextRemaining,
-      consumedPoints: nextConsumed,
-      consumedThisLogin: 1
-    };
-  } else {
-    quota = {
-      grantType: "duration",
-      totalPoints: null,
-      remainingPoints: null,
-      consumedPoints: null,
-      consumedThisLogin: 0
-    };
-  }
+  const quota = await Promise.resolve(store.entitlements.consumeEntitlementLoginQuota(entitlement, nowIso()));
 
   const issuedAt = nowIso();
   const expiresAt = addSeconds(issuedAt, entitlement.token_ttl_seconds);

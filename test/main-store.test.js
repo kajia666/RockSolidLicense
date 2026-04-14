@@ -262,6 +262,18 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(adjustedEntitlement.current.totalPoints, 7);
     assert.equal(adjustedEntitlement.current.remainingPoints, 7);
 
+    const consumedQuota = app.mainStore.entitlements.consumeEntitlementLoginQuota(pointEntitlement);
+    assert.equal(consumedQuota.grantType, "points");
+    assert.equal(consumedQuota.remainingPoints, 6);
+    assert.equal(consumedQuota.consumedPoints, 1);
+    assert.equal(consumedQuota.consumedThisLogin, 1);
+
+    const meteringAfterConsume = app.mainStore.entitlements.queryEntitlementRows(app.db, {
+      entitlementId: pointEntitlement.id
+    }).items[0];
+    assert.equal(meteringAfterConsume.remainingPoints, 6);
+    assert.equal(meteringAfterConsume.consumedPoints, 1);
+
     app.db.prepare(`
       INSERT INTO devices
       (id, product_id, fingerprint, device_name, first_seen_at, last_seen_at, last_seen_ip, metadata_json)

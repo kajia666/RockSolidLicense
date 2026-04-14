@@ -37,12 +37,12 @@ test("card repository formats card rows and control-state filters", async () => 
       password: "Pass123!abc",
       displayName: "Card Dev"
     });
-    app.services.createProduct(admin.token, {
+    await app.services.createProduct(admin.token, {
       code: "CARDREPO",
       name: "Card Repo Product",
       ownerDeveloperId: developer.id
     });
-    const policy = app.services.createPolicy(admin.token, {
+    const policy = await app.services.createPolicy(admin.token, {
       productCode: "CARDREPO",
       name: "Card Policy",
       durationDays: 30,

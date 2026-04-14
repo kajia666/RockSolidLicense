@@ -4691,6 +4691,25 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     close() {}
   };
 
+  async function getStoreProductById(productId) {
+    const rows = await Promise.resolve(store.products.queryProductRows(db, { productId }));
+    return rows[0] ?? null;
+  }
+
+  async function getStoreActiveProductByCode(productCode) {
+    const rows = await Promise.resolve(store.products.queryProductRows(db, { productCode }));
+    const product = rows[0] ?? null;
+    if (!product || product.status !== "active") {
+      throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist or is inactive.");
+    }
+    return product;
+  }
+
+  async function getStorePolicyById(policyId) {
+    const rows = await Promise.resolve(store.policies.queryPolicyRows(db, { policyId }));
+    return rows[0] ?? null;
+  }
+
   return {
     async health() {
       expireStaleSessions(db, stateStore);
@@ -5362,12 +5381,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return await Promise.resolve(store.products.queryProductRows(db));
     },
 
-    createProduct(token, body) {
+    async createProduct(token, body) {
       const admin = requireAdminSession(db, token);
       const ownerDeveloperId = body.ownerDeveloperId === undefined
         ? null
         : resolveProductOwnerDeveloperId(db, body.ownerDeveloperId, true);
-      const product = store.products.createProduct(body, ownerDeveloperId);
+      const product = await Promise.resolve(store.products.createProduct(body, ownerDeveloperId));
 
       audit(db, "admin", admin.admin_id, "product.create", "product", product.id, {
         code: product.code,
@@ -5377,10 +5396,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return product;
     },
 
-    updateProductFeatureConfig(token, productId, body = {}) {
+    async updateProductFeatureConfig(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
       const timestamp = nowIso();
-      const result = store.products.updateProductFeatureConfig(productId, body, timestamp);
+      const result = await Promise.resolve(store.products.updateProductFeatureConfig(productId, body, timestamp));
 
       audit(db, "admin", admin.admin_id, "product.feature-config", "product", result.product.id, {
         code: result.product.code,
@@ -5393,9 +5412,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    rotateProductSdkCredentials(token, productId, body = {}) {
+    async rotateProductSdkCredentials(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const result = store.products.rotateProductSdkCredentials(productId, body, nowIso());
+      const result = await Promise.resolve(store.products.rotateProductSdkCredentials(productId, body, nowIso()));
 
       audit(db, "admin", admin.admin_id, "product.sdk-credentials.rotate", "product", result.product.id, {
         code: result.product.code,
@@ -5410,9 +5429,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    updateProductOwner(token, productId, body = {}) {
+    async updateProductOwner(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const product = getProductRowById(db, productId);
+      const product = await getStoreProductById(productId);
       if (!product) {
         throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
       }
@@ -5420,7 +5439,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const ownerDeveloperId = body.ownerDeveloperId === undefined
         ? product.ownerDeveloper?.id ?? null
         : resolveProductOwnerDeveloperId(db, body.ownerDeveloperId, true);
-      const nextProduct = store.products.updateProductOwner(productId, ownerDeveloperId, nowIso());
+      const nextProduct = await Promise.resolve(store.products.updateProductOwner(productId, ownerDeveloperId, nowIso()));
 
       audit(db, "admin", admin.admin_id, "product.owner.update", "product", productId, {
         code: nextProduct.code,
@@ -5517,9 +5536,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    developerCreateProduct(token, body = {}) {
+    async developerCreateProduct(token, body = {}) {
       const session = requireDeveloperOwnerSession(db, token);
-      const product = store.products.createProduct(body, session.developer_id);
+      const product = await Promise.resolve(store.products.createProduct(body, session.developer_id));
 
       auditDeveloperSession(db, session, "product.create", "product", product.id, {
         code: product.code,
@@ -5529,10 +5548,21 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return product;
     },
 
-    developerUpdateProductFeatureConfig(token, productId, body = {}) {
+    async developerUpdateProductFeatureConfig(token, productId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const ownedProduct = requireDeveloperOwnedProduct(db, session, productId, "products.write");
-      const result = store.products.updateProductFeatureConfig(ownedProduct.id, body, nowIso());
+      const ownedProduct = await getStoreProductById(productId);
+      if (!ownedProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: ownedProduct.id, owner_developer_id: ownedProduct.ownerDeveloperId ?? ownedProduct.ownerDeveloper?.id ?? null },
+        "products.write",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only manage products owned by your developer account."
+      );
+      const result = await Promise.resolve(store.products.updateProductFeatureConfig(ownedProduct.id, body, nowIso()));
 
       auditDeveloperSession(db, session, "product.feature-config", "product", ownedProduct.id, {
         code: result.product.code,
@@ -5545,10 +5575,21 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    developerRotateProductSdkCredentials(token, productId, body = {}) {
+    async developerRotateProductSdkCredentials(token, productId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const ownedProduct = requireDeveloperOwnedProduct(db, session, productId, "products.write");
-      const result = store.products.rotateProductSdkCredentials(ownedProduct.id, body, nowIso());
+      const ownedProduct = await getStoreProductById(productId);
+      if (!ownedProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: ownedProduct.id, owner_developer_id: ownedProduct.ownerDeveloperId ?? ownedProduct.ownerDeveloper?.id ?? null },
+        "products.write",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only manage products owned by your developer account."
+      );
+      const result = await Promise.resolve(store.products.rotateProductSdkCredentials(ownedProduct.id, body, nowIso()));
 
       auditDeveloperSession(db, session, "product.sdk-credentials.rotate", "product", result.product.id, {
         code: result.product.code,
@@ -5593,12 +5634,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }));
     },
 
-    createPolicy(token, body) {
+    async createPolicy(token, body) {
       const admin = requireAdminSession(db, token);
       requireField(body, "name");
 
-      const product = requireProductByCode(db, readProductCodeInput(body));
-      const policy = store.policies.createPolicy(product, body, nowIso());
+      const product = await getStoreActiveProductByCode(readProductCodeInput(body));
+      const policy = await Promise.resolve(store.policies.createPolicy(product, body, nowIso()));
 
       audit(db, "admin", admin.admin_id, "policy.create", "policy", policy.id, {
         productCode: product.code,
@@ -5616,7 +5657,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return policy;
     },
 
-    developerCreatePolicy(token, body = {}) {
+    async developerCreatePolicy(token, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -5626,8 +5667,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
       requireField(body, "name");
 
-      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "policies.write");
-      const policy = store.policies.createPolicy(product, body, nowIso());
+      const product = await getStoreActiveProductByCode(readProductCodeInput(body));
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: product.id, owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null },
+        "policies.write",
+        "DEVELOPER_POLICY_FORBIDDEN",
+        "You can only manage policies under your assigned projects."
+      );
+      const policy = await Promise.resolve(store.policies.createPolicy(product, body, nowIso()));
 
       auditDeveloperSession(db, session, "policy.create", "policy", policy.id, {
         productCode: product.code,
@@ -5646,27 +5695,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return policy;
     },
 
-    updatePolicyRuntimeConfig(token, policyId, body = {}) {
+    async updatePolicyRuntimeConfig(token, policyId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const policy = one(
-        db,
-        `
-          SELECT p.*, pr.code AS product_code, pr.name AS product_name
-          FROM policies p
-          JOIN products pr ON pr.id = p.product_id
-          WHERE p.id = ?
-        `,
-        policyId
-      );
+      const policy = await getStorePolicyById(policyId);
 
       if (!policy) {
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
       }
 
-      const result = store.policies.updatePolicyRuntimeConfig(policy, body, nowIso());
+      const result = await Promise.resolve(store.policies.updatePolicyRuntimeConfig(policy, body, nowIso()));
 
       audit(db, "admin", admin.admin_id, "policy.runtime.update", "policy", policy.id, {
-        productCode: policy.product_code,
+        productCode: policy.productCode,
         allowConcurrentSessions: result.allowConcurrentSessions,
         bindMode: result.bindMode,
         bindFields: result.bindFields
@@ -5675,27 +5715,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return result;
     },
 
-    updatePolicyUnbindConfig(token, policyId, body = {}) {
+    async updatePolicyUnbindConfig(token, policyId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const policy = one(
-        db,
-        `
-          SELECT p.*, pr.code AS product_code, pr.name AS product_name
-          FROM policies p
-          JOIN products pr ON pr.id = p.product_id
-          WHERE p.id = ?
-        `,
-        policyId
-      );
+      const policy = await getStorePolicyById(policyId);
 
       if (!policy) {
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
       }
 
-      const result = store.policies.updatePolicyUnbindConfig(policy, body, nowIso());
+      const result = await Promise.resolve(store.policies.updatePolicyUnbindConfig(policy, body, nowIso()));
 
       audit(db, "admin", admin.admin_id, "policy.unbind.update", "policy", policy.id, {
-        productCode: policy.product_code,
+        productCode: policy.productCode,
         allowClientUnbind: result.allowClientUnbind,
         clientUnbindLimit: result.clientUnbindLimit,
         clientUnbindWindowDays: result.clientUnbindWindowDays,
@@ -5705,13 +5736,24 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return result;
     },
 
-    developerUpdatePolicyRuntimeConfig(token, policyId, body = {}) {
+    async developerUpdatePolicyRuntimeConfig(token, policyId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const policy = requireDeveloperOwnedPolicy(db, session, policyId, "policies.write");
-      const result = store.policies.updatePolicyRuntimeConfig(policy, body, nowIso());
+      const policy = await getStorePolicyById(policyId);
+      if (!policy) {
+        throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: policy.productId, owner_developer_id: policy.ownerDeveloperId ?? null },
+        "policies.write",
+        "DEVELOPER_POLICY_FORBIDDEN",
+        "You can only manage policies under your assigned projects."
+      );
+      const result = await Promise.resolve(store.policies.updatePolicyRuntimeConfig(policy, body, nowIso()));
 
       auditDeveloperSession(db, session, "policy.runtime.update", "policy", policy.id, {
-        productCode: policy.product_code,
+        productCode: policy.productCode,
         allowConcurrentSessions: result.allowConcurrentSessions,
         bindMode: result.bindMode,
         bindFields: result.bindFields
@@ -5720,13 +5762,24 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return result;
     },
 
-    developerUpdatePolicyUnbindConfig(token, policyId, body = {}) {
+    async developerUpdatePolicyUnbindConfig(token, policyId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const policy = requireDeveloperOwnedPolicy(db, session, policyId, "policies.write");
-      const result = store.policies.updatePolicyUnbindConfig(policy, body, nowIso());
+      const policy = await getStorePolicyById(policyId);
+      if (!policy) {
+        throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: policy.productId, owner_developer_id: policy.ownerDeveloperId ?? null },
+        "policies.write",
+        "DEVELOPER_POLICY_FORBIDDEN",
+        "You can only manage policies under your assigned projects."
+      );
+      const result = await Promise.resolve(store.policies.updatePolicyUnbindConfig(policy, body, nowIso()));
 
       auditDeveloperSession(db, session, "policy.unbind.update", "policy", policy.id, {
-        productCode: policy.product_code,
+        productCode: policy.productCode,
         allowClientUnbind: result.allowClientUnbind,
         clientUnbindLimit: result.clientUnbindLimit,
         clientUnbindWindowDays: result.clientUnbindWindowDays,

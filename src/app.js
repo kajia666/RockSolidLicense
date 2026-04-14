@@ -193,7 +193,7 @@ export function createApp(overrides = {}) {
 
       if (req.method === "POST" && url.pathname === "/api/admin/products") {
         const { body } = await readJsonBody(req);
-        sendJson(res, 201, { ok: true, data: services.createProduct(getBearerToken(req), body) });
+        sendJson(res, 201, { ok: true, data: await services.createProduct(getBearerToken(req), body) });
         return;
       }
 
@@ -204,7 +204,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateProductFeatureConfig(
+          data: await services.updateProductFeatureConfig(
             getBearerToken(req),
             productFeatureRoute.productId,
             body
@@ -220,7 +220,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.rotateProductSdkCredentials(
+          data: await services.rotateProductSdkCredentials(
             getBearerToken(req),
             productSdkRotateRoute.productId,
             body
@@ -236,7 +236,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateProductOwner(
+          data: await services.updateProductOwner(
             getBearerToken(req),
             productOwnerRoute.productId,
             body
@@ -256,7 +256,7 @@ export function createApp(overrides = {}) {
 
       if (req.method === "POST" && url.pathname === "/api/admin/policies") {
         const { body } = await readJsonBody(req);
-        sendJson(res, 201, { ok: true, data: services.createPolicy(getBearerToken(req), body) });
+        sendJson(res, 201, { ok: true, data: await services.createPolicy(getBearerToken(req), body) });
         return;
       }
 
@@ -267,7 +267,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updatePolicyRuntimeConfig(
+          data: await services.updatePolicyRuntimeConfig(
             getBearerToken(req),
             policyRuntimeRoute.policyId,
             body
@@ -283,7 +283,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updatePolicyUnbindConfig(
+          data: await services.updatePolicyUnbindConfig(
             getBearerToken(req),
             policyUnbindRoute.policyId,
             body
@@ -1011,7 +1011,7 @@ export function createApp(overrides = {}) {
 
       if (req.method === "POST" && url.pathname === "/api/developer/products") {
         const { body } = await readJsonBody(req);
-        sendJson(res, 201, { ok: true, data: services.developerCreateProduct(getBearerToken(req), body) });
+        sendJson(res, 201, { ok: true, data: await services.developerCreateProduct(getBearerToken(req), body) });
         return;
       }
 
@@ -1022,7 +1022,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateProductFeatureConfig(
+          data: await services.developerUpdateProductFeatureConfig(
             getBearerToken(req),
             developerProductFeatureRoute.productId,
             body
@@ -1038,7 +1038,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerRotateProductSdkCredentials(
+          data: await services.developerRotateProductSdkCredentials(
             getBearerToken(req),
             developerProductSdkRotateRoute.productId,
             body
@@ -1059,7 +1059,7 @@ export function createApp(overrides = {}) {
 
       if (req.method === "POST" && url.pathname === "/api/developer/policies") {
         const { body } = await readJsonBody(req);
-        sendJson(res, 201, { ok: true, data: services.developerCreatePolicy(getBearerToken(req), body) });
+        sendJson(res, 201, { ok: true, data: await services.developerCreatePolicy(getBearerToken(req), body) });
         return;
       }
 
@@ -1070,7 +1070,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdatePolicyRuntimeConfig(
+          data: await services.developerUpdatePolicyRuntimeConfig(
             getBearerToken(req),
             developerPolicyRuntimeRoute.policyId,
             body
@@ -1086,7 +1086,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdatePolicyUnbindConfig(
+          data: await services.developerUpdatePolicyUnbindConfig(
             getBearerToken(req),
             developerPolicyUnbindRoute.policyId,
             body

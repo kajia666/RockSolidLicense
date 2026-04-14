@@ -17,6 +17,16 @@ function run(db, sql, ...params) {
   return db.prepare(sql).run(...params);
 }
 
+function resolvePolicyField(policy, snakeCaseKey, camelCaseKey, fallbackValue = undefined) {
+  if (policy && policy[snakeCaseKey] !== undefined) {
+    return policy[snakeCaseKey];
+  }
+  if (policy && camelCaseKey && policy[camelCaseKey] !== undefined) {
+    return policy[camelCaseKey];
+  }
+  return fallbackValue;
+}
+
 function parseOptionalBoolean(value, fieldName) {
   if (value === undefined || value === null) {
     return null;
@@ -324,7 +334,13 @@ export function createSqlitePolicyStore({ db }) {
     },
 
     updatePolicyRuntimeConfig(policy, body = {}, timestamp = nowIso()) {
-      const currentBindConfig = loadPolicyBindConfig(db, policy.id, policy.bind_mode, policy.updated_at);
+      const policyId = resolvePolicyField(policy, "id", "id");
+      const currentBindConfig = loadPolicyBindConfig(
+        db,
+        policyId,
+        resolvePolicyField(policy, "bind_mode", "bindMode", "strict"),
+        resolvePolicyField(policy, "updated_at", "updatedAt", null)
+      );
       const nextBindMode = body.bindMode !== undefined
         ? normalizeBindMode(body.bindMode)
         : currentBindConfig.bindMode;
@@ -333,7 +349,7 @@ export function createSqlitePolicyStore({ db }) {
         : currentBindConfig.bindFields;
       const allowConcurrentSessions = parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions");
       const nextAllowConcurrentSessions = allowConcurrentSessions === null
-        ? Number(policy.allow_concurrent_sessions)
+        ? Number(resolvePolicyField(policy, "allow_concurrent_sessions", "allowConcurrentSessions", 1))
         : allowConcurrentSessions ? 1 : 0;
 
       run(
@@ -346,17 +362,17 @@ export function createSqlitePolicyStore({ db }) {
         nextAllowConcurrentSessions,
         nextBindMode,
         timestamp,
-        policy.id
+        policyId
       );
 
-      persistPolicyBindConfig(db, policy.id, nextBindMode, nextBindFields, timestamp);
+      persistPolicyBindConfig(db, policyId, nextBindMode, nextBindFields, timestamp);
 
       return {
-        id: policy.id,
-        productId: policy.product_id,
-        productCode: policy.product_code,
-        productName: policy.product_name,
-        name: policy.name,
+        id: policyId,
+        productId: resolvePolicyField(policy, "product_id", "productId"),
+        productCode: resolvePolicyField(policy, "product_code", "productCode"),
+        productName: resolvePolicyField(policy, "product_name", "productName"),
+        name: resolvePolicyField(policy, "name", "name"),
         allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
         bindMode: nextBindMode,
         bindFields: nextBindFields,
@@ -365,7 +381,15 @@ export function createSqlitePolicyStore({ db }) {
     },
 
     updatePolicyUnbindConfig(policy, body = {}, timestamp = nowIso()) {
-      const currentConfig = loadPolicyUnbindConfig(db, policy.id, policy.updated_at);
+      const policyId = resolvePolicyField(policy, "id", "id");
+      const fallbackUpdatedAt = resolvePolicyField(policy, "updated_at", "updatedAt", null);
+      const loadedConfig = loadPolicyUnbindConfig(db, policyId, fallbackUpdatedAt);
+      const currentConfig = {
+        allowClientUnbind: resolvePolicyField(policy, "allow_client_unbind", "allowClientUnbind", loadedConfig.allowClientUnbind),
+        clientUnbindLimit: resolvePolicyField(policy, "client_unbind_limit", "clientUnbindLimit", loadedConfig.clientUnbindLimit),
+        clientUnbindWindowDays: resolvePolicyField(policy, "client_unbind_window_days", "clientUnbindWindowDays", loadedConfig.clientUnbindWindowDays),
+        clientUnbindDeductDays: resolvePolicyField(policy, "client_unbind_deduct_days", "clientUnbindDeductDays", loadedConfig.clientUnbindDeductDays)
+      };
       const nextConfig = {
         allowClientUnbind: body.allowClientUnbind === undefined
           ? currentConfig.allowClientUnbind
@@ -384,14 +408,14 @@ export function createSqlitePolicyStore({ db }) {
           : normalizeNonNegativeInteger(body.clientUnbindDeductDays, "clientUnbindDeductDays", 0, 3650)
       };
 
-      persistPolicyUnbindConfig(db, policy.id, nextConfig, timestamp);
+      persistPolicyUnbindConfig(db, policyId, nextConfig, timestamp);
 
       return {
-        id: policy.id,
-        productId: policy.product_id,
-        productCode: policy.product_code,
-        productName: policy.product_name,
-        name: policy.name,
+        id: policyId,
+        productId: resolvePolicyField(policy, "product_id", "productId"),
+        productCode: resolvePolicyField(policy, "product_code", "productCode"),
+        productName: resolvePolicyField(policy, "product_name", "productName"),
+        name: resolvePolicyField(policy, "name", "name"),
         ...nextConfig,
         updatedAt: timestamp
       };

@@ -37,13 +37,13 @@ test("policy repository formats scoped policy rows and ownership joins", async (
       password: "Pass123!abc",
       displayName: "Policy Dev"
     });
-    const product = app.services.createProduct(admin.token, {
+    const product = await app.services.createProduct(admin.token, {
       code: "POLREPO1",
       name: "Policy Repo Product",
       ownerDeveloperId: developer.id
     });
 
-    const policy = app.services.createPolicy(admin.token, {
+    const policy = await app.services.createPolicy(admin.token, {
       productCode: "POLREPO1",
       name: "Selected Bind Policy",
       durationDays: 45,

@@ -32,6 +32,10 @@ export function createPostgresPolicyRepository(adapter) {
       const conditions = [];
       const params = [];
 
+      if (filters.policyId) {
+        conditions.push(`p.id = $${params.length + 1}`);
+        params.push(String(filters.policyId).trim());
+      }
       if (filters.productCode) {
         conditions.push(`pr.code = $${params.length + 1}`);
         params.push(String(filters.productCode).trim().toUpperCase());
@@ -44,7 +48,7 @@ export function createPostgresPolicyRepository(adapter) {
 
       const rows = await Promise.resolve(adapter.query(
         `
-          SELECT p.*, pr.code AS product_code, pr.name AS product_name,
+          SELECT p.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id,
                  pbc.bind_fields_json,
                  puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
                  puc.client_unbind_deduct_days,

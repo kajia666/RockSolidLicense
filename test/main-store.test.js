@@ -48,7 +48,7 @@ test("app exposes sqlite main store and services read through it", async () => {
       password: "Pass123!abc",
       displayName: "Store Dev"
     });
-    const product = app.services.createProduct(admin.token, {
+    const product = await app.services.createProduct(admin.token, {
       code: "STOREAPP",
       name: "Main Store Product",
       ownerDeveloperId: developer.id

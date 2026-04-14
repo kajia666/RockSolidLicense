@@ -45,14 +45,14 @@ test("product repository exposes formatted rows and developer-scoped lookups", a
       displayName: "Repository Dev"
     });
 
-    const productA = app.services.createProduct(admin.token, {
+    const productA = await app.services.createProduct(admin.token, {
       code: "REPOUNITA",
       name: "Repository Product A",
       ownerDeveloperId: developer.id,
       allowRegister: false,
       allowNotices: false
     });
-    const productB = app.services.createProduct(admin.token, {
+    const productB = await app.services.createProduct(admin.token, {
       code: "REPOUNITB",
       name: "Repository Product B",
       ownerDeveloperId: developer.id

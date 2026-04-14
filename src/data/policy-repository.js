@@ -223,6 +223,7 @@ export function formatPolicyRow(row) {
   return {
     id: row.id,
     productId: row.product_id,
+    ownerDeveloperId: row.owner_developer_id ?? null,
     productCode: row.product_code,
     productName: row.product_name,
     name: row.name,
@@ -250,6 +251,10 @@ export function queryPolicyRows(db, filters = {}) {
   const conditions = [];
   const params = [];
 
+  if (filters.policyId) {
+    conditions.push("p.id = ?");
+    params.push(String(filters.policyId).trim());
+  }
   if (filters.productCode) {
     conditions.push("pr.code = ?");
     params.push(String(filters.productCode).trim().toUpperCase());
@@ -264,6 +269,7 @@ export function queryPolicyRows(db, filters = {}) {
     db,
     `
       SELECT p.*, pr.code AS product_code, pr.name AS product_name,
+             pr.owner_developer_id,
              pbc.bind_fields_json,
              puc.allow_client_unbind, puc.client_unbind_limit, puc.client_unbind_window_days,
              puc.client_unbind_deduct_days,

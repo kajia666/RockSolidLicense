@@ -152,7 +152,7 @@ npm test
 
 ### PostgreSQL 引导脚本
 
-主业务数据当前仍然跑在 SQLite 上，但仓库已经提供了 PostgreSQL 主库初始化脚本，便于后续迁移：
+仓库已经提供了 PostgreSQL 主库初始化脚本和 main-store 迁移边界，便于把当前单机 SQLite 逐步推进到更适合正式部署的结构：
 
 ```bash
 npm run db:postgres:init
@@ -163,10 +163,10 @@ npm run db:postgres:check
 
 - [init.sql](/D:/code/OnlineVerification/deploy/postgres/init.sql)
 - [render-postgres-init.mjs](/D:/code/OnlineVerification/scripts/render-postgres-init.mjs)
-- [storage-platform.md](/D:/code/OnlineVerification/docs/storage-platform.md)
-- [postgres-runtime-adapter.md](/D:/code/OnlineVerification/docs/postgres-runtime-adapter.md)
+- [storage-platform-guide.md](/D:/code/OnlineVerification/docs/storage-platform-guide.md)
+- [postgres-main-store-preview.md](/D:/code/OnlineVerification/docs/postgres-main-store-preview.md)
 
-当前主数据访问层也已经开始抽边界，第一块仓储是：
+当前主数据访问层已经统一收进 `mainStore`：
 
 - [main-store.js](/D:/code/OnlineVerification/src/data/main-store.js)
 - [sqlite-main-store.js](/D:/code/OnlineVerification/src/data/sqlite-main-store.js)
@@ -175,11 +175,13 @@ npm run db:postgres:check
 - [policy-repository.js](/D:/code/OnlineVerification/src/data/policy-repository.js)
 - [card-repository.js](/D:/code/OnlineVerification/src/data/card-repository.js)
 - [entitlement-repository.js](/D:/code/OnlineVerification/src/data/entitlement-repository.js)
+- [postgres-product-store.js](/D:/code/OnlineVerification/src/data/postgres-product-store.js)
+- [postgres-policy-store.js](/D:/code/OnlineVerification/src/data/postgres-policy-store.js)
 
 当前 `RSL_MAIN_STORE_DRIVER` 支持：
 
-- `sqlite`：默认主数据访问层，直接使用当前 SQLite 主库
-- `postgres`：当前支持 `products / policies / cards / entitlements` 的 PostgreSQL 读侧 adapter 预览；如果没有接入 adapter，运行时仍会安全回退到 SQLite，并继续在健康检查里明确显示当前阶段
+- `sqlite`：默认主数据访问层，读写都走当前 SQLite 主库
+- `postgres`：当前已经进入 PostgreSQL preview，阶段取决于 adapter 能力
 
 当前 PostgreSQL runtime adapter 已经支持直接加载 `pg` 风格连接池模块：
 
@@ -187,15 +189,19 @@ npm run db:postgres:check
 - 也可以用 `RSL_POSTGRES_PG_MODULE_PATH` 指向自定义模块路径
 - `RSL_POSTGRES_POOL_MAX` 控制查询池大小
 
-这条链路当前已经能让四块主数据读侧通过 runtime adapter 走 PostgreSQL 查询；写路径仍然保留在 SQLite，所以健康检查里的 `implementationStage` 会继续显示 `read_side_preview`。
-当前已经落进 `mainStore` 的写侧边界有四块：
+当前 PostgreSQL preview 分成两层：
+
+- `read_side_preview`：`products / policies / cards / entitlements` 四组主数据读侧走 PostgreSQL；写侧仍在 SQLite
+- `product_policy_write_preview`：如果 adapter 额外支持事务接口 `withTransaction(...)`，则 `products / policies` 写侧也会走 PostgreSQL；`cards / entitlements` 仍在 SQLite
+
+当前已经落进 `mainStore` 的四块核心写侧边界是：
 
 - `products`：项目创建、功能开关更新、SDK 凭据轮换、项目归属切换
 - `policies`：策略创建、运行时绑定/多开配置、自助解绑配置
 - `cards`：批量发卡、卡密冻结/恢复/过期控制
 - `entitlements`：授权冻结/恢复、续期、点数调账
 
-这四块当前底层驱动仍然是 SQLite，但服务层已经不再直接散写 SQL，后面继续迁到 PostgreSQL 会明显更顺。
+也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。`products / policies` 在具备事务型 PostgreSQL adapter 时，已经可以真实写入 PostgreSQL；后续继续迁 `cards / entitlements` 时，边界会更清楚。
 
 ## 终端用户主流程
 
@@ -470,8 +476,8 @@ cl /EHsc /std:c++17 ^
 - `docs/developer-members.md`
 - `docs/developer-ops.md`
 - `docs/developer-release.md`
-- `docs/storage-platform.md`
-- `docs/postgres-runtime-adapter.md`
+- `docs/storage-platform-guide.md`
+- `docs/postgres-main-store-preview.md`
 - `docs/linux-deployment.md`
 - `docs/windows-server-deployment.md`
 

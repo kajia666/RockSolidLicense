@@ -24,6 +24,241 @@ function createTestApp(overrides = {}) {
   return { app, tempDir };
 }
 
+function createWriteCapableAdapter() {
+  const state = {
+    queries: [],
+    products: [],
+    productFeatureConfigs: new Map(),
+    policies: [],
+    policyBindConfigs: new Map(),
+    policyUnbindConfigs: new Map(),
+    policyGrantConfigs: new Map()
+  };
+
+  function productRows(filters = {}) {
+    return state.products
+      .filter((product) => !filters.productId || product.id === filters.productId)
+      .filter((product) => !filters.productCode || product.code === filters.productCode)
+      .filter((product) => !filters.ownerDeveloperId || product.owner_developer_id === filters.ownerDeveloperId)
+      .filter((product) => !filters.productIds || filters.productIds.includes(product.id))
+      .map((product) => {
+        const feature = state.productFeatureConfigs.get(product.id);
+        return {
+          ...product,
+          allow_register: feature?.allow_register ?? 1,
+          allow_account_login: feature?.allow_account_login ?? 1,
+          allow_card_login: feature?.allow_card_login ?? 1,
+          allow_card_recharge: feature?.allow_card_recharge ?? 1,
+          allow_version_check: feature?.allow_version_check ?? 1,
+          allow_notices: feature?.allow_notices ?? 1,
+          allow_client_unbind: feature?.allow_client_unbind ?? 1,
+          feature_created_at: feature?.created_at ?? product.created_at,
+          feature_updated_at: feature?.updated_at ?? product.updated_at,
+          owner_developer_username: null,
+          owner_developer_display_name: "",
+          owner_developer_status: null
+        };
+      });
+  }
+
+  function policyRows(filters = {}) {
+    return state.policies
+      .filter((policy) => !filters.policyId || policy.id === filters.policyId)
+      .filter((policy) => !filters.productIds || filters.productIds.includes(policy.product_id))
+      .map((policy) => {
+        const product = state.products.find((item) => item.id === policy.product_id);
+        const bindConfig = state.policyBindConfigs.get(policy.id);
+        const unbindConfig = state.policyUnbindConfigs.get(policy.id);
+        const grantConfig = state.policyGrantConfigs.get(policy.id);
+        return {
+          ...policy,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          owner_developer_id: product?.owner_developer_id ?? null,
+          bind_fields_json: bindConfig?.bind_fields_json ?? JSON.stringify(["deviceFingerprint"]),
+          allow_client_unbind: unbindConfig?.allow_client_unbind ?? 0,
+          client_unbind_limit: unbindConfig?.client_unbind_limit ?? 0,
+          client_unbind_window_days: unbindConfig?.client_unbind_window_days ?? 30,
+          client_unbind_deduct_days: unbindConfig?.client_unbind_deduct_days ?? 0,
+          grant_type: grantConfig?.grant_type ?? "duration",
+          grant_points: grantConfig?.grant_points ?? 0
+        };
+      })
+      .filter((policy) => !filters.productCode || policy.product_code === filters.productCode)
+      .filter((policy) => !filters.ownerDeveloperId || policy.owner_developer_id === filters.ownerDeveloperId);
+  }
+
+  function recordQuery(sql, params = [], meta = {}) {
+    state.queries.push({
+      sql: String(sql ?? "").trim(),
+      params: [...params],
+      meta
+    });
+  }
+
+  async function handleQuery(sql, params = [], meta = {}) {
+    recordQuery(sql, params, meta);
+
+    if (meta.repository === "products" && meta.operation === "assertProductCodeAvailable") {
+      return state.products
+        .filter((product) => product.code === params[0])
+        .slice(0, 1)
+        .map((product) => ({ id: product.id }));
+    }
+
+    if (meta.repository === "products" && meta.operation === "createProduct") {
+      state.products.push({
+        id: params[0],
+        code: params[1],
+        name: params[2],
+        description: params[3],
+        status: params[4],
+        owner_developer_id: params[5],
+        sdk_app_id: params[6],
+        sdk_app_secret: params[7],
+        created_at: params[8],
+        updated_at: params[9]
+      });
+      return [];
+    }
+
+    if (meta.repository === "products" && meta.operation === "loadProductFeatureConfig") {
+      const feature = state.productFeatureConfigs.get(params[0]);
+      return feature ? [{ ...feature }] : [];
+    }
+
+    if (meta.repository === "products" && meta.operation === "persistProductFeatureConfig") {
+      state.productFeatureConfigs.set(params[0], {
+        product_id: params[0],
+        allow_register: params[1],
+        allow_account_login: params[2],
+        allow_card_login: params[3],
+        allow_card_recharge: params[4],
+        allow_version_check: params[5],
+        allow_notices: params[6],
+        allow_client_unbind: params[7],
+        created_at: params[8],
+        updated_at: params[9]
+      });
+      return [];
+    }
+
+    if (meta.repository === "products" && meta.operation === "touchProductUpdatedAt") {
+      const product = state.products.find((item) => item.id === params[1]);
+      if (product) {
+        product.updated_at = params[0];
+      }
+      return [];
+    }
+
+    if (meta.repository === "products" && meta.operation === "updateProductOwner") {
+      const product = state.products.find((item) => item.id === params[2]);
+      if (product) {
+        product.owner_developer_id = params[0];
+        product.updated_at = params[1];
+      }
+      return [];
+    }
+
+    if (meta.repository === "products" && meta.operation === "rotateProductSdkCredentials") {
+      const product = state.products.find((item) => item.id === params[3]);
+      if (product) {
+        product.sdk_app_id = params[0];
+        product.sdk_app_secret = params[1];
+        product.updated_at = params[2];
+      }
+      return [];
+    }
+
+    if (meta.repository === "products" && (meta.operation === "queryProductRows" || meta.operation === "loadProductRow")) {
+      return productRows(meta.filters ?? { productId: meta.productId });
+    }
+
+    if (meta.repository === "policies" && meta.operation === "createPolicy") {
+      state.policies.push({
+        id: params[0],
+        product_id: params[1],
+        name: params[2],
+        duration_days: params[3],
+        max_devices: params[4],
+        allow_concurrent_sessions: params[5],
+        heartbeat_interval_seconds: params[6],
+        heartbeat_timeout_seconds: params[7],
+        token_ttl_seconds: params[8],
+        bind_mode: params[9],
+        status: params[10],
+        created_at: params[11],
+        updated_at: params[12]
+      });
+      return [];
+    }
+
+    if (meta.repository === "policies" && meta.operation === "persistPolicyBindConfig") {
+      state.policyBindConfigs.set(params[0], {
+        policy_id: params[0],
+        bind_mode: params[1],
+        bind_fields_json: params[2],
+        created_at: params[3],
+        updated_at: params[4]
+      });
+      return [];
+    }
+
+    if (meta.repository === "policies" && meta.operation === "persistPolicyUnbindConfig") {
+      state.policyUnbindConfigs.set(params[0], {
+        policy_id: params[0],
+        allow_client_unbind: params[1],
+        client_unbind_limit: params[2],
+        client_unbind_window_days: params[3],
+        client_unbind_deduct_days: params[4],
+        created_at: params[5],
+        updated_at: params[6]
+      });
+      return [];
+    }
+
+    if (meta.repository === "policies" && meta.operation === "persistPolicyGrantConfig") {
+      state.policyGrantConfigs.set(params[0], {
+        policy_id: params[0],
+        grant_type: params[1],
+        grant_points: params[2],
+        created_at: params[3],
+        updated_at: params[4]
+      });
+      return [];
+    }
+
+    if (meta.repository === "policies" && meta.operation === "updatePolicyRuntimeConfig") {
+      const policy = state.policies.find((item) => item.id === params[3]);
+      if (policy) {
+        policy.allow_concurrent_sessions = params[0];
+        policy.bind_mode = params[1];
+        policy.updated_at = params[2];
+      }
+      return [];
+    }
+
+    if (meta.repository === "policies" && (meta.operation === "queryPolicyRows" || meta.operation === "loadPolicyRow")) {
+      return policyRows(meta.filters ?? { policyId: meta.policyId });
+    }
+
+    return [];
+  }
+
+  const adapter = {
+    async query(sql, params = [], meta = {}) {
+      return handleQuery(sql, params, meta);
+    },
+    async withTransaction(callback) {
+      return callback({
+        query: (sql, params = [], meta = {}) => handleQuery(sql, params, meta)
+      });
+    }
+  };
+
+  return { adapter, state };
+}
+
 test("postgres main store configuration falls back to sqlite implementation", async () => {
   const { app, tempDir } = createTestApp({
     mainStoreDriver: "postgres",
@@ -285,6 +520,116 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "sqlite",
       entitlements: "sqlite"
     });
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("postgres main store can write products and policies through a transaction-capable adapter", async () => {
+  const { adapter, state } = createWriteCapableAdapter();
+  const { app, tempDir } = createTestApp({
+    mainStoreDriver: "postgres",
+    postgresUrl: "postgres://rocksolid:secret@127.0.0.1:5432/rocksolid",
+    postgresMainStoreAdapter: adapter
+  });
+
+  try {
+    assert.equal(app.mainStore.driver, "postgres");
+    assert.equal(app.mainStore.implementationStage, "product_policy_write_preview");
+    assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
+      products: "postgres",
+      policies: "postgres",
+      cards: "sqlite",
+      entitlements: "sqlite"
+    });
+
+    const admin = app.services.adminLogin({
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await app.services.createProduct(admin.token, {
+      code: "PGWRITE",
+      name: "PG Write Product",
+      description: "Write-capable adapter",
+      allowRegister: false,
+      allowCardLogin: false
+    });
+    assert.equal(product.code, "PGWRITE");
+    assert.equal(product.featureConfig.allowRegister, false);
+    assert.equal(product.featureConfig.allowCardLogin, false);
+
+    const featureUpdated = await app.services.updateProductFeatureConfig(admin.token, product.id, {
+      allowRegister: true,
+      allowCardRecharge: false
+    });
+    assert.equal(featureUpdated.featureConfig.allowRegister, true);
+    assert.equal(featureUpdated.featureConfig.allowCardRecharge, false);
+
+    const policy = await app.services.createPolicy(admin.token, {
+      productCode: "PGWRITE",
+      name: "PG Write Policy",
+      durationDays: 15,
+      maxDevices: 2,
+      allowConcurrentSessions: true,
+      bindMode: "selected_fields",
+      bindFields: ["machineGuid"],
+      allowClientUnbind: true,
+      clientUnbindLimit: 2,
+      grantType: "points",
+      grantPoints: 9
+    });
+    assert.equal(policy.productCode, "PGWRITE");
+    assert.equal(policy.grantType, "points");
+
+    const runtimeUpdated = await app.services.updatePolicyRuntimeConfig(admin.token, policy.id, {
+      allowConcurrentSessions: false,
+      bindFields: ["machineGuid", "requestIp"]
+    });
+    assert.equal(runtimeUpdated.allowConcurrentSessions, false);
+    assert.deepEqual(runtimeUpdated.bindFields, ["machineGuid", "requestIp"]);
+
+    const unbindUpdated = await app.services.updatePolicyUnbindConfig(admin.token, policy.id, {
+      allowClientUnbind: false,
+      clientUnbindLimit: 0,
+      clientUnbindWindowDays: 7,
+      clientUnbindDeductDays: 0
+    });
+    assert.equal(unbindUpdated.allowClientUnbind, false);
+    assert.equal(unbindUpdated.clientUnbindWindowDays, 7);
+
+    const listedProducts = await app.services.listProducts(admin.token);
+    assert.equal(listedProducts.some((item) => item.code === "PGWRITE"), true);
+
+    const listedPolicies = await app.services.listPolicies(admin.token, { productCode: "PGWRITE" });
+    assert.equal(listedPolicies.length, 1);
+    assert.equal(listedPolicies[0].grantType, "points");
+    assert.equal(listedPolicies[0].allowClientUnbind, false);
+
+    const health = await app.services.health();
+    assert.equal(health.storage.mainStore.implementationStage, "product_policy_write_preview");
+    assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
+      products: "postgres",
+      policies: "postgres",
+      cards: "sqlite",
+      entitlements: "sqlite"
+    });
+
+    assert.equal(state.products.length, 1);
+    assert.equal(state.policies.length, 1);
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createProduct"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createPolicy"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "updatePolicyRuntimeConfig"),
+      true
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

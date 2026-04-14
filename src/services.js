@@ -1860,19 +1860,8 @@ function throwEntitlementUnavailable(snapshot, referenceTime = nowIso()) {
   throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
 }
 
-function releaseBindingRecord(db, store, stateStore, binding, reason, timestamp = nowIso()) {
-  run(
-    db,
-    `
-      UPDATE device_bindings
-      SET status = 'revoked', revoked_at = ?, last_bound_at = ?
-      WHERE id = ?
-    `,
-    timestamp,
-    timestamp,
-    binding.id
-  );
-
+async function releaseBindingRecord(db, store, stateStore, binding, reason, timestamp = nowIso()) {
+  await Promise.resolve(store.devices.releaseBinding(binding.id, timestamp));
   return expireActiveSessions(
     db,
     store,
@@ -1885,32 +1874,17 @@ function releaseBindingRecord(db, store, stateStore, binding, reason, timestamp 
   );
 }
 
-function countRecentClientUnbinds(db, entitlementId, windowDays) {
-  const since = addDays(nowIso(), -Math.max(1, windowDays));
-  const row = one(
+async function countRecentClientUnbinds(db, store, entitlementId, windowDays, referenceTime = nowIso()) {
+  return Promise.resolve(store.devices.countRecentClientUnbinds(
     db,
-    `
-      SELECT COUNT(*) AS count
-      FROM entitlement_unbind_logs
-      WHERE entitlement_id = ?
-        AND actor_type = 'client'
-        AND created_at >= ?
-    `,
     entitlementId,
-    since
-  );
-  return Number(row?.count ?? 0);
+    windowDays,
+    referenceTime
+  ));
 }
 
-function recordEntitlementUnbind(db, entitlementId, bindingId, actorType, actorId, reason, deductedDays, timestamp = nowIso()) {
-  run(
-    db,
-    `
-      INSERT INTO entitlement_unbind_logs
-      (id, entitlement_id, binding_id, actor_type, actor_id, reason, deducted_days, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    generateId("unbind"),
+async function recordEntitlementUnbind(store, entitlementId, bindingId, actorType, actorId, reason, deductedDays, timestamp = nowIso()) {
+  return Promise.resolve(store.devices.recordEntitlementUnbind(
     entitlementId,
     bindingId,
     actorType,
@@ -1918,7 +1892,7 @@ function recordEntitlementUnbind(db, entitlementId, bindingId, actorType, actorI
     reason,
     deductedDays,
     timestamp
-  );
+  ));
 }
 
 async function resolveClientManagedAccount(db, store, product, body) {
@@ -7658,10 +7632,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       }
 
-      return withTransaction(db, () => {
+      return withTransaction(db, async () => {
         const timestamp = nowIso();
         const reason = normalizeReason(body.reason, "device_binding_released");
-        const releasedSessions = releaseBindingRecord(db, store, stateStore, binding, reason, timestamp);
+        const releasedSessions = await releaseBindingRecord(db, store, stateStore, binding, reason, timestamp);
 
         audit(db, "admin", admin.admin_id, "device-binding.release", "device_binding", binding.id, {
           productCode: binding.product_code,
@@ -7752,10 +7726,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       }
 
-      return withTransaction(db, () => {
+      return withTransaction(db, async () => {
         const timestamp = nowIso();
         const reason = normalizeReason(body.reason, "developer_binding_released");
-        const releasedSessions = releaseBindingRecord(db, store, stateStore, binding, reason, timestamp);
+        const releasedSessions = await releaseBindingRecord(db, store, stateStore, binding, reason, timestamp);
 
         auditDeveloperSession(db, session, "device-binding.release", "device_binding", binding.id, {
           productCode: binding.product_code,
@@ -9314,10 +9288,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           subject.entitlement.updated_at
         );
         const bindings = await getStoreBindingsForEntitlement(subject.entitlement.id);
-        const recentClientUnbinds = countRecentClientUnbinds(
+        const recentClientUnbinds = await countRecentClientUnbinds(
           db,
+          store,
           subject.entitlement.id,
-          unbindConfig.clientUnbindWindowDays
+          unbindConfig.clientUnbindWindowDays,
+          nowIso()
         );
         const allowClientUnbind = productFeatureConfig.allowClientUnbind && unbindConfig.allowClientUnbind;
 
@@ -9375,10 +9351,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           throw new AppError(403, "CLIENT_UNBIND_DISABLED", "Self-service unbind is disabled for this policy.");
         }
 
-        const recentClientUnbinds = countRecentClientUnbinds(
+        const recentClientUnbinds = await countRecentClientUnbinds(
           db,
+          store,
           subject.entitlement.id,
-          unbindConfig.clientUnbindWindowDays
+          unbindConfig.clientUnbindWindowDays,
+          nowIso()
         );
         if (unbindConfig.clientUnbindLimit > 0 && recentClientUnbinds >= unbindConfig.clientUnbindLimit) {
           throw new AppError(
@@ -9424,7 +9402,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const timestamp = nowIso();
         const reason = normalizeReason(body.reason, "client_unbind");
         let endsAt = subject.entitlement.ends_at;
-        let releasedSessions = releaseBindingRecord(db, store, stateStore, {
+        let releasedSessions = await releaseBindingRecord(db, store, stateStore, {
           id: binding.id,
           entitlement_id: subject.entitlement.id,
           device_id: binding.deviceId
@@ -9456,8 +9434,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           }
         }
 
-        recordEntitlementUnbind(
-          db,
+        await recordEntitlementUnbind(
+          store,
           subject.entitlement.id,
           binding.id,
           "client",

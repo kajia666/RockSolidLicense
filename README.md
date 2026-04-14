@@ -201,7 +201,7 @@ npm run db:postgres:check
 - `cards`：批量发卡、卡密冻结/恢复/过期控制
 - `entitlements`：卡密充值生成授权、卡密直登激活授权、授权冻结/恢复、续期、点数调账
 - `accounts`：终端账号注册、卡密直登账号映射、账号列表、账号禁用/恢复、最近登录时间更新
-- `devices`：设备指纹记录、绑定身份快照、设备封禁查找、登录时设备绑定落点
+- `devices`：设备指纹记录、绑定身份快照、绑定列表/释放、自助解绑计数与日志、设备封禁查找、登录时设备绑定落点
 - `sessions`：登录会话写入、按 `product + sessionToken` 的会话查找、心跳续期、退出登录和会话失效状态更新落点
 
 也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 已经收进 `mainStore.entitlements`，而且登录前的 `usable entitlement` 选择和失败时的 `latest entitlement snapshot` 也已经通过这层边界提供；`device upsert -> binding profile -> session issuance -> heartbeat refresh -> logout/revoke` 也已经分别收进 `mainStore.devices / sessions`。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements` 这四组核心主数据都已经可以逐步走向 PostgreSQL write preview，`accounts` 也已经进入 PostgreSQL read-side preview。为了避免和设备、绑定、签名登录链路脱节，`accounts / devices / sessions` 的写侧当前仍然保留在 SQLite，等待下一阶段成组迁移。

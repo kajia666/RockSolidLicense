@@ -670,7 +670,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.releaseDeviceBinding(
+          data: await services.releaseDeviceBinding(
             getBearerToken(req),
             bindingReleaseRoute.bindingId,
             body
@@ -1351,7 +1351,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerReleaseDeviceBinding(
+          data: await services.developerReleaseDeviceBinding(
             getBearerToken(req),
             developerBindingReleaseRoute.bindingId,
             body

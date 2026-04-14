@@ -383,6 +383,33 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(listedBindings[0].fingerprint, "store-direct-bind-device");
     assert.deepEqual(listedBindings[0].matchFields, ["machineGuid"]);
 
+    const unbindLog = app.mainStore.devices.recordEntitlementUnbind(
+      durationEntitlement.id,
+      directBinding.binding.id,
+      "client",
+      directAccount.id,
+      "main_store_test_unbind",
+      1,
+      "2026-01-05T00:20:00.000Z"
+    );
+    assert.equal(unbindLog.binding_id, directBinding.binding.id);
+    assert.equal(unbindLog.actor_type, "client");
+
+    const recentClientUnbinds = app.mainStore.devices.countRecentClientUnbinds(
+      app.db,
+      durationEntitlement.id,
+      30,
+      "2026-01-06T00:00:00.000Z"
+    );
+    assert.equal(recentClientUnbinds, 1);
+
+    const releasedBinding = app.mainStore.devices.releaseBinding(
+      directBinding.binding.id,
+      "2026-01-05T00:30:00.000Z"
+    );
+    assert.equal(releasedBinding.status, "revoked");
+    assert.equal(releasedBinding.revoked_at, "2026-01-05T00:30:00.000Z");
+
     app.db.prepare(`
       INSERT INTO device_blocks
       (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)

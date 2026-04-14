@@ -1,5 +1,5 @@
 import { AppError } from "../http.js";
-import { generateId, nowIso } from "../security.js";
+import { addDays, generateId, nowIso } from "../security.js";
 
 function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
@@ -191,6 +191,59 @@ export function createSqliteDeviceStore({ db }) {
         bindRequestIp: row.request_ip ?? null,
         activeSessionCount: Number(row.active_session_count ?? 0)
       }));
+    },
+
+    releaseBinding(bindingId, timestamp = nowIso()) {
+      run(
+        db,
+        `
+          UPDATE device_bindings
+          SET status = 'revoked', revoked_at = ?, last_bound_at = ?
+          WHERE id = ?
+        `,
+        timestamp,
+        timestamp,
+        bindingId
+      );
+      return getBindingRowById(db, bindingId);
+    },
+
+    countRecentClientUnbinds(_db, entitlementId, windowDays, referenceTime = nowIso()) {
+      const since = addDays(referenceTime, -Math.max(1, Number(windowDays ?? 1)));
+      const row = one(
+        db,
+        `
+          SELECT COUNT(*) AS count
+          FROM entitlement_unbind_logs
+          WHERE entitlement_id = ?
+            AND actor_type = 'client'
+            AND created_at >= ?
+        `,
+        entitlementId,
+        since
+      );
+      return Number(row?.count ?? 0);
+    },
+
+    recordEntitlementUnbind(entitlementId, bindingId, actorType, actorId, reason, deductedDays, timestamp = nowIso()) {
+      const logId = generateId("unbind");
+      run(
+        db,
+        `
+          INSERT INTO entitlement_unbind_logs
+          (id, entitlement_id, binding_id, actor_type, actor_id, reason, deducted_days, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        logId,
+        entitlementId,
+        bindingId,
+        actorType,
+        actorId,
+        reason,
+        deductedDays,
+        timestamp
+      );
+      return one(db, "SELECT * FROM entitlement_unbind_logs WHERE id = ?", logId);
     },
 
     bindDeviceToEntitlement(entitlement, device, bindingIdentity, options = {}) {

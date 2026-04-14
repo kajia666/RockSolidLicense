@@ -32,6 +32,9 @@ test("app exposes sqlite main store and services read through it", async () => {
       app.mainStore.repositories,
       ["products", "policies", "cards", "entitlements"]
     );
+    assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
+      products: "sqlite"
+    });
 
     const admin = app.services.adminLogin({
       username: "admin",
@@ -65,6 +68,13 @@ test("app exposes sqlite main store and services read through it", async () => {
     const developerRows = await app.services.developerListProducts(developerLogin.token);
     assert.equal(developerRows.length, 1);
     assert.equal(developerRows[0].code, "STOREAPP");
+
+    const directProduct = app.mainStore.products.createProduct({
+      code: "STOREAPP2",
+      name: "Direct Store Product"
+    }, developer.id);
+    assert.equal(directProduct.code, "STOREAPP2");
+    assert.equal(directProduct.ownerDeveloper.id, developer.id);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

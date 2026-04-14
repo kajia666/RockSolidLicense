@@ -4,6 +4,7 @@
 
 - `products / policies / cards / entitlements` 这四组主数据读侧，已经可以通过 `pg` 风格连接池走 PostgreSQL 查询
 - 主业务写路径现在仍然保留在 SQLite
+- 其中 `products` 这一层虽然还没切到 PostgreSQL，但已经先收进了 `mainStore` 写侧边界
 - 所以健康检查里的 `implementationStage` 仍会显示 `read_side_preview`
 
 ## 环境变量
@@ -62,6 +63,9 @@ RSL_POSTGRES_POOL_MAX=10
         "policies": "postgres",
         "cards": "postgres",
         "entitlements": "postgres"
+      },
+      "repositoryWriteDrivers": {
+        "products": "sqlite"
       }
     }
   }
@@ -74,6 +78,7 @@ RSL_POSTGRES_POOL_MAX=10
 
 - 只有主数据读侧走 PostgreSQL runtime adapter
 - 写路径仍然是 SQLite
+- `products` 写路径已经进入 `mainStore`，但底层驱动仍然是 SQLite
 - 所以它现在适合做迁移过渡和读侧验证，不适合宣称“主库已经完整切到 PostgreSQL”
 
 ## 下一步建议

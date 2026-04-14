@@ -188,6 +188,7 @@ npm run db:postgres:check
 - `RSL_POSTGRES_POOL_MAX` 控制查询池大小
 
 这条链路当前已经能让四块主数据读侧通过 runtime adapter 走 PostgreSQL 查询；写路径仍然保留在 SQLite，所以健康检查里的 `implementationStage` 会继续显示 `read_side_preview`。
+当前已经落进 `mainStore` 的第一块写侧边界是 `products`，也就是项目创建、功能开关更新、SDK 凭据轮换和项目归属切换都已经统一走 store 层，便于继续往 PostgreSQL 写路径迁移。
 
 ## 终端用户主流程
 

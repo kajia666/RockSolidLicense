@@ -5387,7 +5387,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const ownerDeveloperId = body.ownerDeveloperId === undefined
         ? null
         : resolveProductOwnerDeveloperId(db, body.ownerDeveloperId, true);
-      const product = createProductRecord(db, body, ownerDeveloperId);
+      const product = store.products.createProduct(body, ownerDeveloperId);
 
       audit(db, "admin", admin.admin_id, "product.create", "product", product.id, {
         code: product.code,
@@ -5400,7 +5400,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     updateProductFeatureConfig(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
       const timestamp = nowIso();
-      const result = updateProductFeatureConfigRecord(db, productId, body, timestamp);
+      const result = store.products.updateProductFeatureConfig(productId, body, timestamp);
 
       audit(db, "admin", admin.admin_id, "product.feature-config", "product", result.product.id, {
         code: result.product.code,
@@ -5415,7 +5415,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     rotateProductSdkCredentials(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const result = rotateProductSdkCredentialsRecord(db, productId, body, nowIso());
+      const result = store.products.rotateProductSdkCredentials(productId, body, nowIso());
 
       audit(db, "admin", admin.admin_id, "product.sdk-credentials.rotate", "product", result.product.id, {
         code: result.product.code,
@@ -5440,7 +5440,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const ownerDeveloperId = body.ownerDeveloperId === undefined
         ? product.ownerDeveloper?.id ?? null
         : resolveProductOwnerDeveloperId(db, body.ownerDeveloperId, true);
-      const nextProduct = updateProductOwnerRecord(db, productId, ownerDeveloperId, nowIso());
+      const nextProduct = store.products.updateProductOwner(productId, ownerDeveloperId, nowIso());
 
       audit(db, "admin", admin.admin_id, "product.owner.update", "product", productId, {
         code: nextProduct.code,
@@ -5539,7 +5539,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     developerCreateProduct(token, body = {}) {
       const session = requireDeveloperOwnerSession(db, token);
-      const product = createProductRecord(db, body, session.developer_id);
+      const product = store.products.createProduct(body, session.developer_id);
 
       auditDeveloperSession(db, session, "product.create", "product", product.id, {
         code: product.code,
@@ -5552,7 +5552,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     developerUpdateProductFeatureConfig(token, productId, body = {}) {
       const session = requireDeveloperSession(db, token);
       const ownedProduct = requireDeveloperOwnedProduct(db, session, productId, "products.write");
-      const result = updateProductFeatureConfigRecord(db, ownedProduct.id, body, nowIso());
+      const result = store.products.updateProductFeatureConfig(ownedProduct.id, body, nowIso());
 
       auditDeveloperSession(db, session, "product.feature-config", "product", ownedProduct.id, {
         code: result.product.code,
@@ -5568,7 +5568,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     developerRotateProductSdkCredentials(token, productId, body = {}) {
       const session = requireDeveloperSession(db, token);
       const ownedProduct = requireDeveloperOwnedProduct(db, session, productId, "products.write");
-      const result = rotateProductSdkCredentialsRecord(db, ownedProduct.id, body, nowIso());
+      const result = store.products.rotateProductSdkCredentials(ownedProduct.id, body, nowIso());
 
       auditDeveloperSession(db, session, "product.sdk-credentials.rotate", "product", result.product.id, {
         code: result.product.code,

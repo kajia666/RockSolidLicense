@@ -33,7 +33,8 @@ test("app exposes sqlite main store and services read through it", async () => {
       ["products", "policies", "cards", "entitlements"]
     );
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
-      products: "sqlite"
+      products: "sqlite",
+      policies: "sqlite"
     });
 
     const admin = app.services.adminLogin({
@@ -75,6 +76,55 @@ test("app exposes sqlite main store and services read through it", async () => {
     }, developer.id);
     assert.equal(directProduct.code, "STOREAPP2");
     assert.equal(directProduct.ownerDeveloper.id, developer.id);
+
+    const directPolicy = app.mainStore.policies.createPolicy(directProduct, {
+      name: "Direct Store Policy",
+      durationDays: 45,
+      maxDevices: 2,
+      allowConcurrentSessions: true,
+      bindMode: "selected_fields",
+      bindFields: ["deviceFingerprint", "machineGuid"],
+      allowClientUnbind: true,
+      clientUnbindLimit: 2,
+      clientUnbindWindowDays: 14,
+      clientUnbindDeductDays: 1
+    });
+    assert.equal(directPolicy.productCode, "STOREAPP2");
+    assert.equal(directPolicy.bindMode, "selected_fields");
+    assert.deepEqual(directPolicy.bindFields, ["deviceFingerprint", "machineGuid"]);
+    assert.equal(directPolicy.allowClientUnbind, true);
+
+    const updatedRuntime = app.mainStore.policies.updatePolicyRuntimeConfig({
+      id: directPolicy.id,
+      product_id: directProduct.id,
+      product_code: directProduct.code,
+      product_name: directProduct.name,
+      name: directPolicy.name,
+      allow_concurrent_sessions: 1,
+      bind_mode: directPolicy.bindMode,
+      updated_at: directPolicy.updatedAt
+    }, {
+      allowConcurrentSessions: false,
+      bindFields: ["machineGuid"]
+    });
+    assert.equal(updatedRuntime.allowConcurrentSessions, false);
+    assert.deepEqual(updatedRuntime.bindFields, ["machineGuid"]);
+
+    const updatedUnbind = app.mainStore.policies.updatePolicyUnbindConfig({
+      id: directPolicy.id,
+      product_id: directProduct.id,
+      product_code: directProduct.code,
+      product_name: directProduct.name,
+      name: directPolicy.name,
+      updated_at: directPolicy.updatedAt
+    }, {
+      allowClientUnbind: false,
+      clientUnbindLimit: 0,
+      clientUnbindWindowDays: 30,
+      clientUnbindDeductDays: 0
+    });
+    assert.equal(updatedUnbind.allowClientUnbind, false);
+    assert.equal(updatedUnbind.clientUnbindLimit, 0);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

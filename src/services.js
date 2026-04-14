@@ -5618,118 +5618,22 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       requireField(body, "name");
 
       const product = requireProductByCode(db, readProductCodeInput(body));
-      const now = nowIso();
-      const grantType = normalizeGrantType(body.grantType ?? "duration");
-      const grantPoints = normalizeNonNegativeInteger(body.grantPoints, "grantPoints", 0, 1000000);
-      const policy = {
-        id: generateId("pol"),
-        productId: product.id,
-        name: String(body.name).trim(),
-        durationDays: Number(body.durationDays ?? (grantType === "duration" ? 30 : 0)),
-        maxDevices: Number(body.maxDevices ?? 1),
-        allowConcurrentSessions: parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions") === false ? 0 : 1,
-        heartbeatIntervalSeconds: Number(body.heartbeatIntervalSeconds ?? 60),
-        heartbeatTimeoutSeconds: Number(body.heartbeatTimeoutSeconds ?? 180),
-        tokenTtlSeconds: Number(body.tokenTtlSeconds ?? 300),
-        bindMode: normalizeBindMode(body.bindMode ?? "strict"),
-        bindFields: parseBindFieldsInput(body.bindFields, normalizeBindMode(body.bindMode ?? "strict")),
-        status: "active",
-        createdAt: now,
-        updatedAt: now
-      };
-
-      if (
-        policy.maxDevices <= 0 ||
-        policy.heartbeatIntervalSeconds <= 0 ||
-        policy.heartbeatTimeoutSeconds <= 0 ||
-        policy.tokenTtlSeconds <= 0
-      ) {
-        throw new AppError(400, "INVALID_POLICY", "Policy values must be positive numbers.");
-      }
-      if (grantType === "duration" && policy.durationDays <= 0) {
-        throw new AppError(400, "INVALID_POLICY", "durationDays must be a positive number for duration policies.");
-      }
-      if (grantType === "points" && grantPoints <= 0) {
-        throw new AppError(400, "INVALID_POLICY", "grantPoints must be a positive number for points policies.");
-      }
-      if (grantType === "points" && policy.durationDays < 0) {
-        throw new AppError(400, "INVALID_POLICY", "durationDays cannot be negative.");
-      }
-
-      run(
-        db,
-        `
-          INSERT INTO policies
-          (id, product_id, name, duration_days, max_devices, allow_concurrent_sessions, heartbeat_interval_seconds,
-           heartbeat_timeout_seconds, token_ttl_seconds, bind_mode, status, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        policy.id,
-        policy.productId,
-        policy.name,
-        policy.durationDays,
-        policy.maxDevices,
-        policy.allowConcurrentSessions,
-        policy.heartbeatIntervalSeconds,
-        policy.heartbeatTimeoutSeconds,
-        policy.tokenTtlSeconds,
-        policy.bindMode,
-        policy.status,
-        policy.createdAt,
-        policy.updatedAt
-      );
-
-      persistPolicyBindConfig(db, policy.id, policy.bindMode, policy.bindFields, now);
-      persistPolicyUnbindConfig(db, policy.id, body, now);
-      persistPolicyGrantConfig(db, policy.id, { grantType, grantPoints }, now);
+      const policy = store.policies.createPolicy(product, body, nowIso());
 
       audit(db, "admin", admin.admin_id, "policy.create", "policy", policy.id, {
         productCode: product.code,
         name: policy.name,
-        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
+        allowConcurrentSessions: policy.allowConcurrentSessions,
         bindMode: policy.bindMode,
         bindFields: policy.bindFields,
-        grantType,
-        grantPoints,
-        allowClientUnbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true,
-        clientUnbindLimit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
-        clientUnbindWindowDays: Math.max(
-          1,
-          normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
-        ),
-        clientUnbindDeductDays: normalizeNonNegativeInteger(
-          body.clientUnbindDeductDays,
-          "clientUnbindDeductDays",
-          0,
-          3650
-        )
+        grantType: policy.grantType,
+        grantPoints: policy.grantPoints,
+        allowClientUnbind: policy.allowClientUnbind,
+        clientUnbindLimit: policy.clientUnbindLimit,
+        clientUnbindWindowDays: policy.clientUnbindWindowDays,
+        clientUnbindDeductDays: policy.clientUnbindDeductDays
       });
-      return {
-        ...policy,
-        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
-        ...parsePolicyUnbindConfigRow({
-          allow_client_unbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true ? 1 : 0,
-          client_unbind_limit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
-          client_unbind_window_days: Math.max(
-            1,
-            normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
-          ),
-          client_unbind_deduct_days: normalizeNonNegativeInteger(
-            body.clientUnbindDeductDays,
-            "clientUnbindDeductDays",
-            0,
-            3650
-          ),
-          created_at: now,
-          updated_at: now
-        }),
-        ...parsePolicyGrantConfigRow({
-          grant_type: grantType,
-          grant_points: grantPoints,
-          created_at: now,
-          updated_at: now
-        })
-      };
+      return policy;
     },
 
     developerCreatePolicy(token, body = {}) {
@@ -5743,121 +5647,23 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       requireField(body, "name");
 
       const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "policies.write");
-      const now = nowIso();
-      const grantType = normalizeGrantType(body.grantType ?? "duration");
-      const grantPoints = normalizeNonNegativeInteger(body.grantPoints, "grantPoints", 0, 1000000);
-      const policy = {
-        id: generateId("pol"),
-        productId: product.id,
-        name: String(body.name).trim(),
-        durationDays: Number(body.durationDays ?? (grantType === "duration" ? 30 : 0)),
-        maxDevices: Number(body.maxDevices ?? 1),
-        allowConcurrentSessions: parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions") === false ? 0 : 1,
-        heartbeatIntervalSeconds: Number(body.heartbeatIntervalSeconds ?? 60),
-        heartbeatTimeoutSeconds: Number(body.heartbeatTimeoutSeconds ?? 180),
-        tokenTtlSeconds: Number(body.tokenTtlSeconds ?? 300),
-        bindMode: normalizeBindMode(body.bindMode ?? "strict"),
-        bindFields: parseBindFieldsInput(body.bindFields, normalizeBindMode(body.bindMode ?? "strict")),
-        status: "active",
-        createdAt: now,
-        updatedAt: now
-      };
-
-      if (
-        policy.maxDevices <= 0 ||
-        policy.heartbeatIntervalSeconds <= 0 ||
-        policy.heartbeatTimeoutSeconds <= 0 ||
-        policy.tokenTtlSeconds <= 0
-      ) {
-        throw new AppError(400, "INVALID_POLICY", "Policy values must be positive numbers.");
-      }
-      if (grantType === "duration" && policy.durationDays <= 0) {
-        throw new AppError(400, "INVALID_POLICY", "durationDays must be a positive number for duration policies.");
-      }
-      if (grantType === "points" && grantPoints <= 0) {
-        throw new AppError(400, "INVALID_POLICY", "grantPoints must be a positive number for points policies.");
-      }
-      if (grantType === "points" && policy.durationDays < 0) {
-        throw new AppError(400, "INVALID_POLICY", "durationDays cannot be negative.");
-      }
-
-      run(
-        db,
-        `
-          INSERT INTO policies
-          (id, product_id, name, duration_days, max_devices, allow_concurrent_sessions, heartbeat_interval_seconds,
-           heartbeat_timeout_seconds, token_ttl_seconds, bind_mode, status, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        policy.id,
-        policy.productId,
-        policy.name,
-        policy.durationDays,
-        policy.maxDevices,
-        policy.allowConcurrentSessions,
-        policy.heartbeatIntervalSeconds,
-        policy.heartbeatTimeoutSeconds,
-        policy.tokenTtlSeconds,
-        policy.bindMode,
-        policy.status,
-        policy.createdAt,
-        policy.updatedAt
-      );
-
-      persistPolicyBindConfig(db, policy.id, policy.bindMode, policy.bindFields, now);
-      persistPolicyUnbindConfig(db, policy.id, body, now);
-      persistPolicyGrantConfig(db, policy.id, { grantType, grantPoints }, now);
+      const policy = store.policies.createPolicy(product, body, nowIso());
 
       auditDeveloperSession(db, session, "policy.create", "policy", policy.id, {
         productCode: product.code,
         name: policy.name,
-        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
+        allowConcurrentSessions: policy.allowConcurrentSessions,
         bindMode: policy.bindMode,
         bindFields: policy.bindFields,
-        grantType,
-        grantPoints,
-        allowClientUnbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true,
-        clientUnbindLimit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
-        clientUnbindWindowDays: Math.max(
-          1,
-          normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
-        ),
-        clientUnbindDeductDays: normalizeNonNegativeInteger(
-          body.clientUnbindDeductDays,
-          "clientUnbindDeductDays",
-          0,
-          3650
-        )
+        grantType: policy.grantType,
+        grantPoints: policy.grantPoints,
+        allowClientUnbind: policy.allowClientUnbind,
+        clientUnbindLimit: policy.clientUnbindLimit,
+        clientUnbindWindowDays: policy.clientUnbindWindowDays,
+        clientUnbindDeductDays: policy.clientUnbindDeductDays
       });
 
-      return {
-        ...policy,
-        productCode: product.code,
-        productName: product.name,
-        allowConcurrentSessions: Boolean(policy.allowConcurrentSessions),
-        ...parsePolicyUnbindConfigRow({
-          allow_client_unbind: parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind") === true ? 1 : 0,
-          client_unbind_limit: normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
-          client_unbind_window_days: Math.max(
-            1,
-            normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
-          ),
-          client_unbind_deduct_days: normalizeNonNegativeInteger(
-            body.clientUnbindDeductDays,
-            "clientUnbindDeductDays",
-            0,
-            3650
-          ),
-          created_at: now,
-          updated_at: now
-        }),
-        ...parsePolicyGrantConfigRow({
-          grant_type: grantType,
-          grant_points: grantPoints,
-          created_at: now,
-          updated_at: now
-        })
-      };
+      return policy;
     },
 
     updatePolicyRuntimeConfig(token, policyId, body = {}) {
@@ -5877,52 +5683,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
       }
 
-      const currentBindConfig = loadPolicyBindConfig(db, policy.id, policy.bind_mode, policy.updated_at);
-      const nextBindMode = body.bindMode !== undefined
-        ? normalizeBindMode(body.bindMode)
-        : currentBindConfig.bindMode;
-      const nextBindFields = body.bindFields !== undefined
-        ? parseBindFieldsInput(body.bindFields, nextBindMode)
-        : currentBindConfig.bindFields;
-      const allowConcurrentSessions = parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions");
-      const nextAllowConcurrentSessions = allowConcurrentSessions === null
-        ? Number(policy.allow_concurrent_sessions)
-        : allowConcurrentSessions ? 1 : 0;
-      const timestamp = nowIso();
-
-      run(
-        db,
-        `
-          UPDATE policies
-          SET allow_concurrent_sessions = ?, bind_mode = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        nextAllowConcurrentSessions,
-        nextBindMode,
-        timestamp,
-        policy.id
-      );
-
-      persistPolicyBindConfig(db, policy.id, nextBindMode, nextBindFields, timestamp);
+      const result = store.policies.updatePolicyRuntimeConfig(policy, body, nowIso());
 
       audit(db, "admin", admin.admin_id, "policy.runtime.update", "policy", policy.id, {
         productCode: policy.product_code,
-        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
-        bindMode: nextBindMode,
-        bindFields: nextBindFields
+        allowConcurrentSessions: result.allowConcurrentSessions,
+        bindMode: result.bindMode,
+        bindFields: result.bindFields
       });
 
-      return {
-        id: policy.id,
-        productId: policy.product_id,
-        productCode: policy.product_code,
-        productName: policy.product_name,
-        name: policy.name,
-        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
-        bindMode: nextBindMode,
-        bindFields: nextBindFields,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     updatePolicyUnbindConfig(token, policyId, body = {}) {
@@ -5942,140 +5712,48 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist.");
       }
 
-      const currentConfig = loadPolicyUnbindConfig(db, policy.id, policy.updated_at);
-      const nextConfig = {
-        allowClientUnbind: body.allowClientUnbind === undefined
-          ? currentConfig.allowClientUnbind
-          : parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind"),
-        clientUnbindLimit: body.clientUnbindLimit === undefined
-          ? currentConfig.clientUnbindLimit
-          : normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
-        clientUnbindWindowDays: body.clientUnbindWindowDays === undefined
-          ? currentConfig.clientUnbindWindowDays
-          : Math.max(
-              1,
-              normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
-            ),
-        clientUnbindDeductDays: body.clientUnbindDeductDays === undefined
-          ? currentConfig.clientUnbindDeductDays
-          : normalizeNonNegativeInteger(body.clientUnbindDeductDays, "clientUnbindDeductDays", 0, 3650)
-      };
-      const timestamp = nowIso();
-
-      persistPolicyUnbindConfig(db, policy.id, nextConfig, timestamp);
+      const result = store.policies.updatePolicyUnbindConfig(policy, body, nowIso());
 
       audit(db, "admin", admin.admin_id, "policy.unbind.update", "policy", policy.id, {
         productCode: policy.product_code,
-        allowClientUnbind: nextConfig.allowClientUnbind,
-        clientUnbindLimit: nextConfig.clientUnbindLimit,
-        clientUnbindWindowDays: nextConfig.clientUnbindWindowDays,
-        clientUnbindDeductDays: nextConfig.clientUnbindDeductDays
+        allowClientUnbind: result.allowClientUnbind,
+        clientUnbindLimit: result.clientUnbindLimit,
+        clientUnbindWindowDays: result.clientUnbindWindowDays,
+        clientUnbindDeductDays: result.clientUnbindDeductDays
       });
 
-      return {
-        id: policy.id,
-        productId: policy.product_id,
-        productCode: policy.product_code,
-        productName: policy.product_name,
-        name: policy.name,
-        ...nextConfig,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     developerUpdatePolicyRuntimeConfig(token, policyId, body = {}) {
       const session = requireDeveloperSession(db, token);
       const policy = requireDeveloperOwnedPolicy(db, session, policyId, "policies.write");
-      const currentBindConfig = loadPolicyBindConfig(db, policy.id, policy.bind_mode, policy.updated_at);
-      const nextBindMode = body.bindMode !== undefined
-        ? normalizeBindMode(body.bindMode)
-        : currentBindConfig.bindMode;
-      const nextBindFields = body.bindFields !== undefined
-        ? parseBindFieldsInput(body.bindFields, nextBindMode)
-        : currentBindConfig.bindFields;
-      const allowConcurrentSessions = parseOptionalBoolean(body.allowConcurrentSessions, "allowConcurrentSessions");
-      const nextAllowConcurrentSessions = allowConcurrentSessions === null
-        ? Number(policy.allow_concurrent_sessions)
-        : allowConcurrentSessions ? 1 : 0;
-      const timestamp = nowIso();
-
-      run(
-        db,
-        `
-          UPDATE policies
-          SET allow_concurrent_sessions = ?, bind_mode = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        nextAllowConcurrentSessions,
-        nextBindMode,
-        timestamp,
-        policy.id
-      );
-
-      persistPolicyBindConfig(db, policy.id, nextBindMode, nextBindFields, timestamp);
+      const result = store.policies.updatePolicyRuntimeConfig(policy, body, nowIso());
 
       auditDeveloperSession(db, session, "policy.runtime.update", "policy", policy.id, {
         productCode: policy.product_code,
-        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
-        bindMode: nextBindMode,
-        bindFields: nextBindFields
+        allowConcurrentSessions: result.allowConcurrentSessions,
+        bindMode: result.bindMode,
+        bindFields: result.bindFields
       });
 
-      return {
-        id: policy.id,
-        productId: policy.product_id,
-        productCode: policy.product_code,
-        productName: policy.product_name,
-        name: policy.name,
-        allowConcurrentSessions: Boolean(nextAllowConcurrentSessions),
-        bindMode: nextBindMode,
-        bindFields: nextBindFields,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     developerUpdatePolicyUnbindConfig(token, policyId, body = {}) {
       const session = requireDeveloperSession(db, token);
       const policy = requireDeveloperOwnedPolicy(db, session, policyId, "policies.write");
-      const currentConfig = loadPolicyUnbindConfig(db, policy.id, policy.updated_at);
-      const nextConfig = {
-        allowClientUnbind: body.allowClientUnbind === undefined
-          ? currentConfig.allowClientUnbind
-          : parseOptionalBoolean(body.allowClientUnbind, "allowClientUnbind"),
-        clientUnbindLimit: body.clientUnbindLimit === undefined
-          ? currentConfig.clientUnbindLimit
-          : normalizeNonNegativeInteger(body.clientUnbindLimit, "clientUnbindLimit", 0, 1000),
-        clientUnbindWindowDays: body.clientUnbindWindowDays === undefined
-          ? currentConfig.clientUnbindWindowDays
-          : Math.max(
-              1,
-              normalizeNonNegativeInteger(body.clientUnbindWindowDays, "clientUnbindWindowDays", 30, 3650)
-            ),
-        clientUnbindDeductDays: body.clientUnbindDeductDays === undefined
-          ? currentConfig.clientUnbindDeductDays
-          : normalizeNonNegativeInteger(body.clientUnbindDeductDays, "clientUnbindDeductDays", 0, 3650)
-      };
-      const timestamp = nowIso();
-
-      persistPolicyUnbindConfig(db, policy.id, nextConfig, timestamp);
+      const result = store.policies.updatePolicyUnbindConfig(policy, body, nowIso());
 
       auditDeveloperSession(db, session, "policy.unbind.update", "policy", policy.id, {
         productCode: policy.product_code,
-        allowClientUnbind: nextConfig.allowClientUnbind,
-        clientUnbindLimit: nextConfig.clientUnbindLimit,
-        clientUnbindWindowDays: nextConfig.clientUnbindWindowDays,
-        clientUnbindDeductDays: nextConfig.clientUnbindDeductDays
+        allowClientUnbind: result.allowClientUnbind,
+        clientUnbindLimit: result.clientUnbindLimit,
+        clientUnbindWindowDays: result.clientUnbindWindowDays,
+        clientUnbindDeductDays: result.clientUnbindDeductDays
       });
 
-      return {
-        id: policy.id,
-        productId: policy.product_id,
-        productCode: policy.product_code,
-        productName: policy.product_name,
-        name: policy.name,
-        ...nextConfig,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     async listCards(token, filters = {}) {

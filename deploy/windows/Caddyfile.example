@@ -1,0 +1,22 @@
+example.com {
+  encode gzip zstd
+
+  reverse_proxy 127.0.0.1:3000
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  log {
+    output file C:\RockSolidLicense\logs\caddy-access.log
+    format console
+  }
+}
+
+# Notes:
+# - Replace example.com with your real domain.
+# - Keep the TCP gateway on port 4000 or place a separate TCP load balancer in front of it.
+# - If you already use IIS or another reverse proxy, keep only one HTTPS entry layer.

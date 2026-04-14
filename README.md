@@ -483,6 +483,12 @@ cl /EHsc /std:c++17 ^
 - `docs/postgres-main-store-preview.md`
 - `docs/linux-deployment.md`
 - `docs/windows-server-deployment.md`
+- `deploy/windows/run-rocksolid.ps1`
+- `deploy/windows/register-rocksolid-task.ps1`
+- `deploy/windows/backup-rocksolid.ps1`
+- `deploy/windows/register-rocksolid-backup-task.ps1`
+- `deploy/windows/healthcheck-rocksolid.ps1`
+- `deploy/windows/Caddyfile.example`
 
 ## 当前状态
 

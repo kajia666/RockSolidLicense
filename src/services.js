@@ -1843,10 +1843,6 @@ function ensureCardControlAvailable(controlState) {
   }
 }
 
-function defaultPointsEntitlementEndsAt(referenceTime = nowIso()) {
-  return addDays(referenceTime, 36500);
-}
-
 function throwEntitlementUnavailable(snapshot, referenceTime = nowIso()) {
   if (!snapshot) {
     throw new AppError(403, "LICENSE_INACTIVE", "No active subscription window is available for this account.");
@@ -2042,7 +2038,13 @@ async function resolveClientManagedAccount(db, store, product, body) {
         username: account.username,
         cardKeyMasked: maskCardKey(card.card_key)
       });
-      activateFreshCardEntitlement(db, product, account, card, "card.direct_redeem", {
+      const activation = await Promise.resolve(store.entitlements.activateFreshCardEntitlement(
+        product,
+        account,
+        card,
+        nowIso()
+      ));
+      auditActivatedCardEntitlement(db, product, account, card, activation, "card.direct_redeem", {
         authMode: "card"
       });
     }
@@ -2900,20 +2902,6 @@ function formatResellerListRow(row) {
   };
 }
 
-function getResellerAllocationByLicenseKey(db, licenseKeyId) {
-  return one(
-    db,
-    `
-      SELECT ri.id, ri.allocation_batch_code, ri.allocated_at,
-             r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name
-      FROM reseller_inventory ri
-      JOIN resellers r ON r.id = ri.reseller_id
-      WHERE ri.license_key_id = ? AND ri.status = 'active'
-    `,
-    licenseKeyId
-  );
-}
-
 function upsertEntitlementMetering(db, entitlementId, grantType, totalPoints, remainingPoints, consumedPoints, timestamp = nowIso()) {
   const existing = one(db, "SELECT entitlement_id FROM entitlement_metering WHERE entitlement_id = ?", entitlementId);
   if (existing) {
@@ -2950,106 +2938,19 @@ function upsertEntitlementMetering(db, entitlementId, grantType, totalPoints, re
   }
 }
 
-function activateFreshCardEntitlement(db, product, account, card, eventType = "card.redeem", metadata = {}) {
-  const now = nowIso();
-  const grantType = normalizeGrantType(card.grant_type ?? "duration");
-  let startsAt = now;
-  let endsAt = defaultPointsEntitlementEndsAt(now);
-  let totalPoints = null;
-  let remainingPoints = null;
-
-  if (grantType === "duration") {
-    const latest = one(
-      db,
-      `
-        SELECT ends_at
-        FROM entitlements
-        WHERE account_id = ? AND product_id = ? AND policy_id = ?
-        ORDER BY ends_at DESC
-        LIMIT 1
-      `,
-      account.id,
-      product.id,
-      card.policy_id
-    );
-    startsAt = latest && latest.ends_at > now ? latest.ends_at : now;
-    endsAt = addDays(startsAt, card.duration_days);
-  } else {
-    totalPoints = Number(card.grant_points ?? 0);
-    remainingPoints = totalPoints;
-    if (remainingPoints <= 0) {
-      throw new AppError(400, "INVALID_GRANT_POINTS", "Point-based policy must grant at least 1 point.");
-    }
-  }
-
-  const entitlementId = generateId("ent");
-  const resellerAllocation = getResellerAllocationByLicenseKey(db, card.id);
-
-  run(
-    db,
-    `
-      INSERT INTO entitlements
-      (id, product_id, policy_id, account_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `,
-    entitlementId,
-    product.id,
-    card.policy_id,
-    account.id,
-    card.id,
-    startsAt,
-    endsAt,
-    now,
-    now
-  );
-
-  if (grantType === "points") {
-    upsertEntitlementMetering(db, entitlementId, "points", totalPoints, remainingPoints, 0, now);
-  }
-
-  run(
-    db,
-    `
-      UPDATE license_keys
-      SET status = 'redeemed', redeemed_at = ?, redeemed_by_account_id = ?
-      WHERE id = ?
-    `,
-    now,
-    account.id,
-    card.id
-  );
-
+function auditActivatedCardEntitlement(db, product, account, card, activation, eventType = "card.redeem", metadata = {}) {
   audit(db, "account", account.id, eventType, "license_key", card.id, {
-    cardKey: card.card_key,
-    cardKeyMasked: maskCardKey(card.card_key),
-    policyName: card.policy_name,
-    grantType,
-    grantPoints: totalPoints,
-    resellerCode: resellerAllocation?.reseller_code ?? null,
-    resellerName: resellerAllocation?.reseller_name ?? null,
-    startsAt,
-    endsAt,
+    cardKey: activation.cardKey ?? card.card_key ?? card.cardKey ?? null,
+    cardKeyMasked: maskCardKey(activation.cardKey ?? card.card_key ?? card.cardKey),
+    policyName: activation.policyName ?? card.policy_name ?? card.policyName ?? null,
+    grantType: activation.grantType,
+    grantPoints: activation.totalPoints,
+    resellerCode: activation.reseller?.code ?? null,
+    resellerName: activation.reseller?.name ?? null,
+    startsAt: activation.startsAt,
+    endsAt: activation.endsAt,
     ...metadata
   });
-
-  return {
-    entitlementId,
-    policyName: card.policy_name,
-    grantType,
-    totalPoints,
-    remainingPoints,
-    reseller: resellerAllocation
-      ? {
-          id: resellerAllocation.reseller_id,
-          code: resellerAllocation.reseller_code,
-          name: resellerAllocation.reseller_name,
-          allocationBatchCode: resellerAllocation.allocation_batch_code,
-          allocatedAt: resellerAllocation.allocated_at
-        }
-      : null,
-    startsAt,
-    endsAt
-  };
 }
 
 function expireSessionsForEntitlement(db, stateStore, entitlementId, reason) {
@@ -10011,7 +9912,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           expires_at: card.expires_at
         }));
 
-        return activateFreshCardEntitlement(db, product, account, card, "card.redeem");
+        const activation = await Promise.resolve(store.entitlements.activateFreshCardEntitlement(
+          product,
+          account,
+          card,
+          nowIso()
+        ));
+        auditActivatedCardEntitlement(db, product, account, card, activation, "card.redeem");
+        return activation;
       });
     },
 
@@ -10082,7 +9990,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             username: account.username,
             cardKeyMasked: maskCardKey(card.card_key)
           });
-          activateFreshCardEntitlement(db, product, account, card, "card.direct_redeem", {
+          const activation = await Promise.resolve(store.entitlements.activateFreshCardEntitlement(
+            product,
+            account,
+            card,
+            nowIso()
+          ));
+          auditActivatedCardEntitlement(db, product, account, card, activation, "card.direct_redeem", {
             authMode: "card"
           });
         }

@@ -199,10 +199,10 @@ npm run db:postgres:check
 - `products`：项目创建、功能开关更新、SDK 凭据轮换、项目归属切换
 - `policies`：策略创建、运行时绑定/多开配置、自助解绑配置
 - `cards`：批量发卡、卡密冻结/恢复/过期控制
-- `entitlements`：授权冻结/恢复、续期、点数调账
+- `entitlements`：卡密充值生成授权、卡密直登激活授权、授权冻结/恢复、续期、点数调账
 - `accounts`：终端账号注册、卡密直登账号映射、账号列表、账号禁用/恢复
 
-也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements` 这四组核心主数据都已经可以真实写入 PostgreSQL；`accounts` 已经收进统一 store 边界，但为了避免和授权生成、会话外键链路脱节，当前仍然保留在 SQLite，等待和 `entitlement / session` 主链路一起迁移。
+也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 这段也已经收进 `mainStore.entitlements`；在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements` 这四组核心主数据都已经可以逐步走向 PostgreSQL preview。`accounts` 已经收进统一 store 边界，但为了避免和 `session issuance / last_login / signed auth` 外键链路脱节，当前仍然保留在 SQLite，等待下一阶段成组迁移。
 
 ## 终端用户主流程
 

@@ -169,18 +169,14 @@ test("app exposes sqlite main store and services read through it", async () => {
 
     const durationCard = directCards.items.find((item) => item.id !== updatedCard.card.id);
     assert.ok(durationCard);
-    const now = new Date().toISOString();
-    const durationEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    app.db.prepare(`
-      UPDATE license_keys
-      SET status = 'redeemed', redeemed_by_account_id = ?, redeemed_at = ?
-      WHERE id = ?
-    `).run(directAccount.id, now, durationCard.id);
-    app.db.prepare(`
-      INSERT INTO entitlements
-      (id, product_id, account_id, policy_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `).run("ent_store_duration", directProduct.id, directAccount.id, directPolicy.id, durationCard.id, now, durationEndsAt, now, now);
+    const durationActivation = app.mainStore.entitlements.activateFreshCardEntitlement(
+      directProduct,
+      directAccount,
+      durationCard,
+      new Date().toISOString()
+    );
+    assert.equal(durationActivation.grantType, "duration");
+    assert.equal(durationActivation.entitlementId.length > 0, true);
 
     const pointPolicy = app.mainStore.policies.createPolicy(directProduct, {
       name: "Point Store Policy",
@@ -198,22 +194,15 @@ test("app exposes sqlite main store and services read through it", async () => {
       policyId: pointPolicy.id
     }).items[0];
     assert.ok(pointCard);
-    const pointEndsAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-    app.db.prepare(`
-      UPDATE license_keys
-      SET status = 'redeemed', redeemed_by_account_id = ?, redeemed_at = ?
-      WHERE id = ?
-    `).run(directAccount.id, now, pointCard.id);
-    app.db.prepare(`
-      INSERT INTO entitlements
-      (id, product_id, account_id, policy_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `).run("ent_store_points", directProduct.id, directAccount.id, pointPolicy.id, pointCard.id, now, pointEndsAt, now, now);
-    app.db.prepare(`
-      INSERT INTO entitlement_metering
-      (entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at)
-      VALUES (?, 'points', ?, ?, ?, ?, ?)
-    `).run("ent_store_points", 5, 5, 0, now, now);
+    const pointActivation = app.mainStore.entitlements.activateFreshCardEntitlement(
+      directProduct,
+      directAccount,
+      pointCard,
+      new Date().toISOString()
+    );
+    assert.equal(pointActivation.grantType, "points");
+    assert.equal(pointActivation.totalPoints, 5);
+    assert.equal(pointActivation.remainingPoints, 5);
 
     const entitlementRows = app.mainStore.entitlements.queryEntitlementRows(app.db, {
       productCode: "STOREAPP2"

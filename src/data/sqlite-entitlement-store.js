@@ -1,5 +1,5 @@
 import { AppError } from "../http.js";
-import { addDays, nowIso } from "../security.js";
+import { addDays, generateId, nowIso } from "../security.js";
 import {
   loadPointEntitlementForAdmin,
   normalizeEntitlementStatus
@@ -93,8 +93,130 @@ function upsertEntitlementMetering(db, entitlementId, grantType, totalPoints, re
   );
 }
 
+function defaultPointsEntitlementEndsAt(referenceTime = nowIso()) {
+  return addDays(referenceTime, 36500);
+}
+
+function getCardField(card, camelKey, snakeKey = camelKey) {
+  return card?.[camelKey] ?? card?.[snakeKey] ?? null;
+}
+
+function loadLatestEntitlementEndsAt(db, accountId, productId, policyId) {
+  return one(
+    db,
+    `
+      SELECT ends_at
+      FROM entitlements
+      WHERE account_id = ? AND product_id = ? AND policy_id = ?
+      ORDER BY ends_at DESC
+      LIMIT 1
+    `,
+    accountId,
+    productId,
+    policyId
+  )?.ends_at ?? null;
+}
+
+function getResellerAllocationByLicenseKey(db, licenseKeyId) {
+  return one(
+    db,
+    `
+      SELECT ri.id, ri.allocation_batch_code, ri.allocated_at,
+             r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name
+      FROM reseller_inventory ri
+      JOIN resellers r ON r.id = ri.reseller_id
+      WHERE ri.license_key_id = ? AND ri.status = 'active'
+    `,
+    licenseKeyId
+  );
+}
+
 export function createSqliteEntitlementStore({ db }) {
   return {
+    activateFreshCardEntitlement(product, account, card, timestamp = nowIso()) {
+      const policyId = getCardField(card, "policyId", "policy_id");
+      const policyName = getCardField(card, "policyName", "policy_name");
+      const grantType = normalizeGrantType(getCardField(card, "grantType", "grant_type") ?? "duration");
+      const cardId = getCardField(card, "id");
+      const cardKey = getCardField(card, "cardKey", "card_key");
+      const durationDays = Number(getCardField(card, "durationDays", "duration_days") ?? 0);
+      const grantPoints = Number(getCardField(card, "grantPoints", "grant_points") ?? 0);
+
+      let startsAt = timestamp;
+      let endsAt = defaultPointsEntitlementEndsAt(timestamp);
+      let totalPoints = null;
+      let remainingPoints = null;
+
+      if (grantType === "duration") {
+        const latestEndsAt = loadLatestEntitlementEndsAt(db, account.id, product.id, policyId);
+        startsAt = latestEndsAt && latestEndsAt > timestamp ? latestEndsAt : timestamp;
+        endsAt = addDays(startsAt, durationDays);
+      } else {
+        totalPoints = grantPoints;
+        remainingPoints = totalPoints;
+        if (remainingPoints <= 0) {
+          throw new AppError(400, "INVALID_GRANT_POINTS", "Point-based policy must grant at least 1 point.");
+        }
+      }
+
+      const entitlementId = generateId("ent");
+      const resellerAllocation = getResellerAllocationByLicenseKey(db, cardId);
+
+      run(
+        db,
+        `
+          INSERT INTO entitlements
+          (id, product_id, policy_id, account_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+        `,
+        entitlementId,
+        product.id,
+        policyId,
+        account.id,
+        cardId,
+        startsAt,
+        endsAt,
+        timestamp,
+        timestamp
+      );
+
+      if (grantType === "points") {
+        upsertEntitlementMetering(db, entitlementId, "points", totalPoints, remainingPoints, 0, timestamp);
+      }
+
+      run(
+        db,
+        `
+          UPDATE license_keys
+          SET status = 'redeemed', redeemed_at = ?, redeemed_by_account_id = ?
+          WHERE id = ?
+        `,
+        timestamp,
+        account.id,
+        cardId
+      );
+
+      return {
+        entitlementId,
+        policyName,
+        grantType,
+        totalPoints,
+        remainingPoints,
+        startsAt,
+        endsAt,
+        cardKey,
+        reseller: resellerAllocation
+          ? {
+              id: resellerAllocation.reseller_id,
+              code: resellerAllocation.reseller_code,
+              name: resellerAllocation.reseller_name,
+              allocationBatchCode: resellerAllocation.allocation_batch_code,
+              allocatedAt: resellerAllocation.allocated_at
+            }
+          : null
+      };
+    },
+
     updateEntitlementStatus(entitlementId, body = {}, timestamp = nowIso()) {
       const entitlement = getEntitlementManageRowById(db, entitlementId);
       if (!entitlement) {

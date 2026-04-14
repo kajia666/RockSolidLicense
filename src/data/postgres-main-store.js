@@ -1,7 +1,9 @@
 import path from "node:path";
+import { createPostgresAccountStore } from "./postgres-account-store.js";
 import { createPostgresAccountRepository } from "./postgres-account-repository.js";
 import { createPostgresCardRepository } from "./postgres-card-repository.js";
 import { createPostgresCardStore } from "./postgres-card-store.js";
+import { createPostgresDeviceRepository } from "./postgres-device-repository.js";
 import { createPostgresEntitlementRepository } from "./postgres-entitlement-repository.js";
 import { createPostgresEntitlementStore } from "./postgres-entitlement-store.js";
 import { createPostgresPolicyRepository } from "./postgres-policy-repository.js";
@@ -41,10 +43,12 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       },
       accounts: {
         ...fallbackStore.accounts,
-        ...createPostgresAccountRepository(adapter)
+        ...createPostgresAccountRepository(adapter),
+        ...createPostgresAccountStore(adapter)
       },
       devices: {
-        ...fallbackStore.devices
+        ...fallbackStore.devices,
+        ...createPostgresDeviceRepository(adapter)
       },
       sessions: {
         ...fallbackStore.sessions
@@ -68,7 +72,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         cards: "postgres",
         entitlements: "postgres",
         accounts: "postgres",
-        devices: "sqlite",
+        devices: "postgres",
         sessions: "sqlite"
       },
       repositoryWriteDrivers: {
@@ -76,7 +80,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         policies: coreWriteReady ? "postgres" : "sqlite",
         cards: coreWriteReady ? "postgres" : "sqlite",
         entitlements: coreWriteReady ? "postgres" : "sqlite",
-        accounts: "sqlite",
+        accounts: coreWriteReady ? "postgres" : "sqlite",
         devices: "sqlite",
         sessions: "sqlite"
       }

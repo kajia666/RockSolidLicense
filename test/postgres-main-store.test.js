@@ -36,6 +36,7 @@ function createWriteCapableAdapter() {
     licenseKeys: [],
     licenseKeyControls: new Map(),
     customerAccounts: [],
+    cardLoginAccounts: [],
     sessions: [],
     entitlements: [],
     entitlementMetering: new Map()
@@ -500,7 +501,11 @@ function createWriteCapableAdapter() {
         .slice(0, 1);
     }
 
-    if (meta.repository === "accounts" && (meta.operation === "queryAccountRows" || meta.operation === "loadAccountManageRow")) {
+    if (meta.repository === "accounts" && (
+      meta.operation === "queryAccountRows"
+      || meta.operation === "loadAccountManageRow"
+      || meta.operation === "getAccountManageRowById"
+    )) {
       return accountRows(meta.filters ?? {}, params[0]);
     }
 
@@ -524,6 +529,62 @@ function createWriteCapableAdapter() {
         .filter((account) => account.product_id === params[0] && account.username === params[1])
         .slice(0, 1)
         .map((account) => ({ id: account.id }));
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "createAccount") {
+      state.customerAccounts.push({
+        id: params[0],
+        product_id: params[1],
+        username: params[2],
+        password_hash: params[3],
+        status: "active",
+        created_at: params[4],
+        updated_at: params[5],
+        last_login_at: null
+      });
+      return [];
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "createCardLoginAccount") {
+      state.customerAccounts.push({
+        id: params[0],
+        product_id: params[1],
+        username: params[2],
+        password_hash: params[3],
+        status: "active",
+        created_at: params[4],
+        updated_at: params[5],
+        last_login_at: null
+      });
+      return [];
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "linkCardLoginAccount") {
+      state.cardLoginAccounts.push({
+        license_key_id: params[0],
+        account_id: params[1],
+        product_id: params[2],
+        created_at: params[3]
+      });
+      return [];
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "updateAccountStatus") {
+      const account = state.customerAccounts.find((item) => item.id === params[2]);
+      if (account) {
+        account.status = params[0];
+        account.updated_at = params[1];
+      }
+      return [];
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "touchAccountLastLogin") {
+      const account = state.customerAccounts.find((item) => item.id === params[2]);
+      if (account) {
+        account.last_login_at = params[0];
+        account.updated_at = params[1];
+      }
+      return [];
     }
 
     return [];
@@ -748,6 +809,62 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "devices" && meta.operation === "queryBindingsForEntitlement") {
+        return [
+          {
+            id: "bind_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            status: "active",
+            first_bound_at: "2026-01-03T00:00:00.000Z",
+            last_bound_at: "2026-01-04T00:00:00.000Z",
+            revoked_at: null,
+            fingerprint: "pg-device-001",
+            device_name: "PG Desktop",
+            last_seen_at: "2026-01-04T00:05:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            match_fields_json: "[\"deviceFingerprint\",\"machineGuid\"]",
+            identity_json: "{\"machineGuid\":\"PG-MG-001\"}",
+            request_ip: "203.0.113.9",
+            active_session_count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "devices" && meta.operation === "getActiveDeviceBlock") {
+        return [
+          {
+            id: "block_pg_1",
+            product_id: "prod_pg_1",
+            fingerprint: "pg-device-001",
+            status: "active",
+            reason: "manual_review",
+            notes: "postgres device block",
+            created_at: "2026-01-04T00:00:00.000Z",
+            updated_at: "2026-01-04T00:00:00.000Z",
+            released_at: null
+          }
+        ];
+      }
+
+      if (meta.repository === "devices" && meta.operation === "getBindingManageRowById") {
+        return [
+          {
+            id: "bind_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            status: "active",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            owner_developer_id: "dev_pg_1",
+            account_id: "acct_pg_1",
+            username: "pguser",
+            fingerprint: "pg-device-001",
+            device_name: "PG Desktop"
+          }
+        ];
+      }
+
       return [];
     }
   };
@@ -767,7 +884,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      devices: "sqlite",
+      devices: "postgres",
       sessions: "sqlite"
     });
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
@@ -835,7 +952,19 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(accounts.items[0].username, "pguser");
     assert.equal(accounts.items[0].activeSessionCount, 2);
 
-    assert.equal(queries.length, 9);
+    const bindings = await app.mainStore.devices.queryBindingsForEntitlement(app.db, "ent_pg_1");
+    assert.equal(bindings.length, 1);
+    assert.equal(bindings[0].fingerprint, "pg-device-001");
+    assert.deepEqual(bindings[0].matchFields, ["deviceFingerprint", "machineGuid"]);
+
+    const activeBlock = await app.mainStore.devices.getActiveDeviceBlock(app.db, "prod_pg_1", "pg-device-001");
+    assert.equal(activeBlock.reason, "manual_review");
+
+    const bindingManageRow = await app.mainStore.devices.getBindingManageRowById(app.db, "bind_pg_1");
+    assert.equal(bindingManageRow.product_code, "PGAPP");
+    assert.equal(bindingManageRow.username, "pguser");
+
+    assert.equal(queries.length, 12);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -854,6 +983,12 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[7].sql, /FROM entitlements e/i);
     assert.equal(queries[8].meta.repository, "accounts");
     assert.match(queries[8].sql, /FROM customer_accounts a/i);
+    assert.equal(queries[9].meta.operation, "queryBindingsForEntitlement");
+    assert.match(queries[9].sql, /FROM device_bindings b/i);
+    assert.equal(queries[10].meta.operation, "getActiveDeviceBlock");
+    assert.match(queries[10].sql, /FROM device_blocks/i);
+    assert.equal(queries[11].meta.operation, "getBindingManageRowById");
+    assert.match(queries[11].sql, /JOIN entitlements e ON e\.id = b\.entitlement_id/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -865,7 +1000,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      devices: "sqlite",
+      devices: "postgres",
       sessions: "sqlite"
     });
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
@@ -899,7 +1034,7 @@ test("postgres main store can write products and policies through a transaction-
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite",
+      accounts: "postgres",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -919,6 +1054,41 @@ test("postgres main store can write products and policies through a transaction-
     assert.equal(product.code, "PGWRITE");
     assert.equal(product.featureConfig.allowRegister, false);
     assert.equal(product.featureConfig.allowCardLogin, false);
+
+    const createdAccount = await app.mainStore.accounts.createAccount(
+      product,
+      {
+        username: "pgwriteuser",
+        passwordHash: "hash_pgwriteuser"
+      },
+      "2026-01-10T00:00:00.000Z"
+    );
+    assert.equal(createdAccount.username, "pgwriteuser");
+    assert.equal(createdAccount.status, "active");
+
+    const touchedAccount = await app.mainStore.accounts.touchAccountLastLogin(
+      createdAccount.id,
+      "2026-01-11T00:00:00.000Z"
+    );
+    assert.equal(touchedAccount.last_login_at, "2026-01-11T00:00:00.000Z");
+
+    const disabledAccount = await app.mainStore.accounts.updateAccountStatus(
+      createdAccount.id,
+      "disabled",
+      "2026-01-12T00:00:00.000Z"
+    );
+    assert.equal(disabledAccount.status, "disabled");
+    assert.equal(disabledAccount.username, "pgwriteuser");
+
+    const cardLoginAccount = await app.mainStore.accounts.createCardLoginAccount(
+      product,
+      {
+        id: "card_login_pg_1",
+        card_key: "PGWRITE-LOGIN-0001"
+      },
+      "2026-01-13T00:00:00.000Z"
+    );
+    assert.match(cardLoginAccount.username, /^card_pgwrite_/);
 
     const featureUpdated = await app.services.updateProductFeatureConfig(admin.token, product.id, {
       allowRegister: true,
@@ -974,13 +1144,15 @@ test("postgres main store can write products and policies through a transaction-
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite",
+      accounts: "postgres",
       devices: "sqlite",
       sessions: "sqlite"
     });
 
     assert.equal(state.products.length, 1);
     assert.equal(state.policies.length, 1);
+    assert.equal(state.customerAccounts.length, 2);
+    assert.equal(state.cardLoginAccounts.length, 1);
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "createProduct"),
       true
@@ -991,6 +1163,26 @@ test("postgres main store can write products and policies through a transaction-
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "updatePolicyRuntimeConfig"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createAccount"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "touchAccountLastLogin"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "updateAccountStatus"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createCardLoginAccount"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "linkCardLoginAccount"),
       true
     );
   } finally {
@@ -1100,7 +1292,7 @@ test("postgres main store can write cards and entitlements through a transaction
       policies: "postgres",
       cards: "postgres",
       entitlements: "postgres",
-      accounts: "sqlite",
+      accounts: "postgres",
       devices: "sqlite",
       sessions: "sqlite"
     });

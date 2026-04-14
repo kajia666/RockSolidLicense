@@ -7601,9 +7601,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return queryDeviceBindingRows(db, store, filters, stateStore);
     },
 
-    releaseDeviceBinding(token, bindingId, body = {}) {
+    async releaseDeviceBinding(token, bindingId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const binding = store.devices.getBindingManageRowById(db, bindingId);
+      const binding = await Promise.resolve(store.devices.getBindingManageRowById(db, bindingId));
 
       if (!binding) {
         throw new AppError(404, "BINDING_NOT_FOUND", "Device binding does not exist.");
@@ -7665,7 +7665,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
     },
 
-    developerReleaseDeviceBinding(token, bindingId, body = {}) {
+    async developerReleaseDeviceBinding(token, bindingId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -7673,7 +7673,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage device bindings under your assigned projects."
       );
-      const binding = store.devices.getBindingManageRowById(db, bindingId);
+      const binding = await Promise.resolve(store.devices.getBindingManageRowById(db, bindingId));
 
       if (!binding) {
         throw new AppError(404, "BINDING_NOT_FOUND", "Device binding does not exist.");

@@ -5,6 +5,10 @@ function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
 }
 
+function many(db, sql, ...params) {
+  return db.prepare(sql).all(...params);
+}
+
 function run(db, sql, ...params) {
   return db.prepare(sql).run(...params);
 }
@@ -147,6 +151,46 @@ export function createSqliteDeviceStore({ db }) {
       );
 
       return one(db, "SELECT * FROM devices WHERE id = ?", deviceId);
+    },
+
+    queryBindingsForEntitlement(_db, entitlementId) {
+      return many(
+        db,
+        `
+          SELECT b.id, b.entitlement_id, b.device_id, b.status, b.first_bound_at, b.last_bound_at, b.revoked_at,
+                 d.fingerprint, d.device_name, d.last_seen_at, d.last_seen_ip,
+                 bp.match_fields_json, bp.identity_json, bp.request_ip,
+                 COALESCE(sess.active_session_count, 0) AS active_session_count
+          FROM device_bindings b
+          JOIN devices d ON d.id = b.device_id
+          LEFT JOIN device_binding_profiles bp ON bp.binding_id = b.id
+          LEFT JOIN (
+            SELECT entitlement_id, device_id, COUNT(*) AS active_session_count
+            FROM sessions
+            WHERE status = 'active'
+            GROUP BY entitlement_id, device_id
+          ) sess ON sess.entitlement_id = b.entitlement_id AND sess.device_id = b.device_id
+          WHERE b.entitlement_id = ?
+          ORDER BY CASE WHEN b.status = 'active' THEN 0 ELSE 1 END, b.last_bound_at DESC
+        `,
+        entitlementId
+      ).map((row) => ({
+        id: row.id,
+        entitlementId: row.entitlement_id,
+        deviceId: row.device_id,
+        status: row.status,
+        firstBoundAt: row.first_bound_at,
+        lastBoundAt: row.last_bound_at,
+        revokedAt: row.revoked_at ?? null,
+        fingerprint: row.fingerprint,
+        deviceName: row.device_name ?? null,
+        lastSeenAt: row.last_seen_at ?? null,
+        lastSeenIp: row.last_seen_ip ?? null,
+        matchFields: row.match_fields_json ? JSON.parse(row.match_fields_json) : [],
+        identity: row.identity_json ? JSON.parse(row.identity_json) : {},
+        bindRequestIp: row.request_ip ?? null,
+        activeSessionCount: Number(row.active_session_count ?? 0)
+      }));
     },
 
     bindDeviceToEntitlement(entitlement, device, bindingIdentity, options = {}) {

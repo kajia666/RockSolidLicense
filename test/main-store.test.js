@@ -374,6 +374,15 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(directBinding.mode, "new_binding");
     assert.equal(directBinding.binding.status, "active");
 
+    const listedBindings = app.mainStore.devices.queryBindingsForEntitlement(
+      app.db,
+      durationEntitlement.id
+    );
+    assert.equal(listedBindings.length, 1);
+    assert.equal(listedBindings[0].id, directBinding.binding.id);
+    assert.equal(listedBindings[0].fingerprint, "store-direct-bind-device");
+    assert.deepEqual(listedBindings[0].matchFields, ["machineGuid"]);
+
     app.db.prepare(`
       INSERT INTO device_blocks
       (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)

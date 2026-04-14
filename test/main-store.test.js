@@ -30,7 +30,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(app.mainStore.driver, "sqlite");
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "devices", "sessions"]
     );
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
@@ -38,6 +38,7 @@ test("app exposes sqlite main store and services read through it", async () => {
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
 
@@ -268,6 +269,34 @@ test("app exposes sqlite main store and services read through it", async () => {
 
     const touchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
     assert.equal(touchedAccount.last_login_at, "2026-01-05T00:00:00.000Z");
+
+    const directDevice = app.mainStore.devices.upsertDevice(
+      directProduct.id,
+      "store-direct-bind-device",
+      "Store Direct Bind Device",
+      { ip: "127.0.0.2", userAgent: "main-store-device-test" },
+      {
+        deviceFingerprint: "store-direct-bind-device",
+        machineGuid: "machine-guid-001",
+        requestIp: "127.0.0.2"
+      }
+    );
+    const directBinding = app.mainStore.devices.bindDeviceToEntitlement(
+      {
+        id: durationEntitlement.id,
+        max_devices: 2
+      },
+      directDevice,
+      {
+        bindMode: "selected_fields",
+        bindFields: ["machineGuid"],
+        identity: { machineGuid: "machine-guid-001" },
+        identityHash: "machine-guid-hash-001",
+        requestIp: "127.0.0.2"
+      }
+    );
+    assert.equal(directBinding.mode, "new_binding");
+    assert.equal(directBinding.binding.status, "active");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

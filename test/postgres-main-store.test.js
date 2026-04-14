@@ -436,7 +436,7 @@ test("postgres main store configuration falls back to sqlite implementation", as
     assert.match(app.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "devices", "sessions"]
     );
   } finally {
     await app.close();
@@ -461,7 +461,7 @@ test("health reports configured postgres main store and sqlite fallback stage", 
     assert.match(health.storage.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       health.storage.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "devices", "sessions"]
     );
   } finally {
     await app.close();
@@ -617,6 +617,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "postgres",
       entitlements: "postgres",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
@@ -625,6 +626,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
 
@@ -679,6 +681,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "postgres",
       entitlements: "postgres",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
@@ -687,6 +690,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
   } finally {
@@ -712,6 +716,7 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
 
@@ -786,6 +791,7 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
 
@@ -911,6 +917,7 @@ test("postgres main store can write cards and entitlements through a transaction
       cards: "postgres",
       entitlements: "postgres",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
 

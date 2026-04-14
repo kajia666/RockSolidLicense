@@ -41,6 +41,9 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       accounts: {
         ...fallbackStore.accounts
       },
+      devices: {
+        ...fallbackStore.devices
+      },
       sessions: {
         ...fallbackStore.sessions
       }
@@ -63,6 +66,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         cards: "postgres",
         entitlements: "postgres",
         accounts: "sqlite",
+        devices: "sqlite",
         sessions: "sqlite"
       },
       repositoryWriteDrivers: {
@@ -71,6 +75,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         cards: coreWriteReady ? "postgres" : "sqlite",
         entitlements: coreWriteReady ? "postgres" : "sqlite",
         accounts: "sqlite",
+        devices: "sqlite",
         sessions: "sqlite"
       }
     };
@@ -110,6 +115,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     },
     repositoryWriteDrivers: {
@@ -118,6 +124,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     }
   };

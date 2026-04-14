@@ -1023,20 +1023,6 @@ function requireProductByCode(db, code) {
   return product;
 }
 
-
-function safeParseJsonObject(value, fallback = {}) {
-  if (!value) {
-    return fallback;
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
 function normalizeOptionalText(value, maxLength = 256) {
   if (value === undefined || value === null) {
     return "";
@@ -1727,12 +1713,6 @@ function extractClientDeviceProfile(body, meta = {}) {
     publicIp: normalizeIpAddress(rawProfile.publicIp),
     localIp: normalizeIpAddress(rawProfile.localIp)
   };
-}
-
-function compactDeviceProfile(profile = {}) {
-  return Object.fromEntries(
-    Object.entries(profile).filter(([, value]) => value !== undefined && value !== null && value !== "")
-  );
 }
 
 function buildBindingIdentity(bindConfig, deviceProfile) {
@@ -2445,240 +2425,6 @@ function findClientCardByKey(db, productId, cardKey) {
   );
 }
 
-function upsertBindingProfile(db, binding, device, bindingIdentity) {
-  const timestamp = nowIso();
-  const existing = one(db, "SELECT binding_id FROM device_binding_profiles WHERE binding_id = ?", binding.id);
-  const matchFieldsJson = JSON.stringify(bindingIdentity.bindFields);
-  const identityJson = JSON.stringify(bindingIdentity.identity);
-
-  if (existing) {
-    run(
-      db,
-      `
-        UPDATE device_binding_profiles
-        SET entitlement_id = ?, device_id = ?, identity_hash = ?, match_fields_json = ?, identity_json = ?,
-            request_ip = ?, updated_at = ?
-        WHERE binding_id = ?
-      `,
-      binding.entitlement_id,
-      device.id,
-      bindingIdentity.identityHash,
-      matchFieldsJson,
-      identityJson,
-      bindingIdentity.requestIp,
-      timestamp,
-      binding.id
-    );
-    return;
-  }
-
-  run(
-    db,
-    `
-      INSERT INTO device_binding_profiles
-      (binding_id, entitlement_id, device_id, identity_hash, match_fields_json, identity_json, request_ip, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    binding.id,
-    binding.entitlement_id,
-    device.id,
-    bindingIdentity.identityHash,
-    matchFieldsJson,
-    identityJson,
-    bindingIdentity.requestIp,
-    timestamp,
-    timestamp
-  );
-}
-
-function upsertDevice(db, productId, fingerprint, deviceName, meta, deviceProfile = {}) {
-  const existing = one(
-    db,
-    "SELECT * FROM devices WHERE product_id = ? AND fingerprint = ?",
-    productId,
-    fingerprint
-  );
-
-  const timestamp = nowIso();
-  const previousMetadata = existing ? safeParseJsonObject(existing.metadata_json) : {};
-  const metadataJson = JSON.stringify({
-    ...previousMetadata,
-    userAgent: meta.userAgent,
-    requestIp: normalizeIpAddress(meta.ip),
-    deviceProfile: compactDeviceProfile(deviceProfile)
-  });
-
-  if (existing) {
-    run(
-      db,
-      `
-        UPDATE devices
-        SET device_name = ?, last_seen_at = ?, last_seen_ip = ?, metadata_json = ?
-        WHERE id = ?
-      `,
-      deviceName ?? existing.device_name,
-      timestamp,
-      meta.ip,
-      metadataJson,
-      existing.id
-    );
-    return one(db, "SELECT * FROM devices WHERE id = ?", existing.id);
-  }
-
-  const deviceId = generateId("dev");
-  run(
-    db,
-    `
-      INSERT INTO devices (id, product_id, fingerprint, device_name, first_seen_at, last_seen_at, last_seen_ip, metadata_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    deviceId,
-    productId,
-    fingerprint,
-    deviceName ?? "Unnamed Device",
-    timestamp,
-    timestamp,
-    meta.ip,
-    metadataJson
-  );
-  return one(db, "SELECT * FROM devices WHERE id = ?", deviceId);
-}
-
-function bindDeviceToEntitlement(db, stateStore, entitlement, device, bindingIdentity) {
-  const existing = one(
-    db,
-    `
-      SELECT * FROM device_bindings
-      WHERE entitlement_id = ? AND device_id = ?
-    `,
-    entitlement.id,
-    device.id
-  );
-
-  if (existing?.status === "active") {
-    run(db, "UPDATE device_bindings SET last_bound_at = ? WHERE id = ?", nowIso(), existing.id);
-    const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", existing.id);
-    upsertBindingProfile(db, binding, device, bindingIdentity);
-    return {
-      binding,
-      mode: "exact_active",
-      releasedSessions: 0
-    };
-  }
-
-  if (existing) {
-    const timestamp = nowIso();
-    run(
-      db,
-      `
-        UPDATE device_bindings
-        SET status = 'active', revoked_at = NULL, last_bound_at = ?
-        WHERE id = ?
-      `,
-      timestamp,
-      existing.id
-    );
-    const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", existing.id);
-    upsertBindingProfile(db, binding, device, bindingIdentity);
-    return {
-      binding,
-      mode: "exact_reactivated",
-      releasedSessions: 0
-    };
-  }
-
-  const profileMatch = one(
-    db,
-    `
-      SELECT b.*, bp.identity_hash
-      FROM device_binding_profiles bp
-      JOIN device_bindings b ON b.id = bp.binding_id
-      WHERE bp.entitlement_id = ? AND bp.identity_hash = ?
-    `,
-    entitlement.id,
-    bindingIdentity.identityHash
-  );
-
-  if (profileMatch) {
-    const timestamp = nowIso();
-    let releasedSessions = 0;
-
-    if (profileMatch.status === "active" && profileMatch.device_id !== device.id) {
-      releasedSessions = expireActiveSessions(
-        db,
-        stateStore,
-        "entitlement_id = ? AND device_id = ?",
-        [entitlement.id, profileMatch.device_id],
-        "binding_rebound"
-      );
-    }
-
-    run(
-      db,
-      `
-        UPDATE device_bindings
-        SET device_id = ?, status = 'active', revoked_at = NULL, last_bound_at = ?
-        WHERE id = ?
-      `,
-      device.id,
-      timestamp,
-      profileMatch.id
-    );
-
-    const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", profileMatch.id);
-    upsertBindingProfile(db, binding, device, bindingIdentity);
-    return {
-      binding,
-      mode: profileMatch.status === "active" ? "identity_rebound" : "identity_reactivated",
-      releasedSessions
-    };
-  }
-
-  const activeCount = one(
-    db,
-    `
-      SELECT COUNT(*) AS count
-      FROM device_bindings
-      WHERE entitlement_id = ? AND status = 'active'
-    `,
-    entitlement.id
-  );
-
-  if (activeCount.count >= entitlement.max_devices) {
-    throw new AppError(
-      409,
-      "DEVICE_LIMIT_REACHED",
-      `This license plan allows at most ${entitlement.max_devices} bound device(s).`,
-      {
-        bindMode: bindingIdentity.bindMode,
-        bindFields: bindingIdentity.bindFields
-      }
-    );
-  }
-
-  const timestamp = nowIso();
-  const bindingId = generateId("bind");
-  run(
-    db,
-    `
-      INSERT INTO device_bindings (id, entitlement_id, device_id, status, first_bound_at, last_bound_at)
-      VALUES (?, ?, ?, 'active', ?, ?)
-    `,
-    bindingId,
-    entitlement.id,
-    device.id,
-    timestamp,
-    timestamp
-  );
-  const binding = one(db, "SELECT * FROM device_bindings WHERE id = ?", bindingId);
-  upsertBindingProfile(db, binding, device, bindingIdentity);
-  return {
-    binding,
-    mode: "new_binding",
-    releasedSessions: 0
-  };
-}
-
 function expireStaleSessions(db, stateStore) {
   const rows = many(
     db,
@@ -3003,15 +2749,27 @@ async function issueClientSession(
   );
   const resolvedBindConfig = bindConfig ?? loadPolicyBindConfig(db, entitlement.policy_id, entitlement.bind_mode);
   const bindingIdentity = buildBindingIdentity(resolvedBindConfig, resolvedDeviceProfile);
-  const device = upsertDevice(
-    db,
+  const device = await Promise.resolve(store.devices.upsertDevice(
     product.id,
     resolvedDeviceProfile.deviceFingerprint,
     resolvedDeviceProfile.deviceName,
     meta,
     resolvedDeviceProfile
-  );
-  const bindingResult = bindDeviceToEntitlement(db, stateStore, entitlement, device, bindingIdentity);
+  ));
+  const bindingResult = await Promise.resolve(store.devices.bindDeviceToEntitlement(
+    entitlement,
+    device,
+    bindingIdentity,
+    {
+      releaseSessions: ({ entitlementId, deviceId, reason }) => expireActiveSessions(
+        db,
+        stateStore,
+        "entitlement_id = ? AND device_id = ?",
+        [entitlementId, deviceId],
+        reason ?? "binding_rebound"
+      )
+    }
+  ));
 
   if (!entitlement.allow_concurrent_sessions) {
     expireActiveSessions(

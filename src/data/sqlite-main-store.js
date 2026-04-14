@@ -6,6 +6,7 @@ import * as cards from "./card-repository.js";
 import * as entitlements from "./entitlement-repository.js";
 import { createSqliteAccountStore } from "./sqlite-account-store.js";
 import { createSqliteCardStore } from "./sqlite-card-store.js";
+import { createSqliteDeviceStore } from "./sqlite-device-store.js";
 import { createSqliteEntitlementStore } from "./sqlite-entitlement-store.js";
 import { createSqlitePolicyStore } from "./sqlite-policy-store.js";
 import { createSqliteProductStore } from "./sqlite-product-store.js";
@@ -33,6 +34,9 @@ export function createSqliteMainStore({ db }) {
       ...accounts,
       ...createSqliteAccountStore({ db })
     },
+    devices: {
+      ...createSqliteDeviceStore({ db })
+    },
     sessions: {
       ...sessions,
       ...createSqliteSessionStore({ db })
@@ -52,6 +56,7 @@ export function createSqliteMainStore({ db }) {
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     },
     repositoryWriteDrivers: {
@@ -60,6 +65,7 @@ export function createSqliteMainStore({ db }) {
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     }
   };

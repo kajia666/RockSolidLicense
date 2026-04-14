@@ -191,19 +191,20 @@ npm run db:postgres:check
 
 当前 PostgreSQL preview 分成两层：
 
-- `read_side_preview`：`products / policies / cards / entitlements` 四组主数据读侧走 PostgreSQL；`accounts / sessions` 和写侧仍在 SQLite
+- `read_side_preview`：`products / policies / cards / entitlements` 四组主数据读侧走 PostgreSQL；`accounts / devices / sessions` 和写侧仍在 SQLite
 - `core_write_preview`：如果 adapter 额外支持事务接口 `withTransaction(...)`，则 `products / policies / cards / entitlements` 四组核心主数据写侧也会走 PostgreSQL
 
-当前已经落进 `mainStore` 的六块主数据边界是：
+当前已经落进 `mainStore` 的七块主数据边界是：
 
 - `products`：项目创建、功能开关更新、SDK 凭据轮换、项目归属切换
 - `policies`：策略创建、运行时绑定/多开配置、自助解绑配置
 - `cards`：批量发卡、卡密冻结/恢复/过期控制
 - `entitlements`：卡密充值生成授权、卡密直登激活授权、授权冻结/恢复、续期、点数调账
 - `accounts`：终端账号注册、卡密直登账号映射、账号列表、账号禁用/恢复
+- `devices`：设备指纹记录、绑定身份快照、登录时设备绑定落点
 - `sessions`：登录会话写入、`last_login_at` 更新时间落点
 
-也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 已经收进 `mainStore.entitlements`，`session issuance -> last_login_at` 已经收进 `mainStore.sessions`；在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements` 这四组核心主数据都已经可以逐步走向 PostgreSQL preview。`accounts / sessions` 已经收进统一边界，但为了避免和设备、绑定、签名登录链路脱节，当前仍然保留在 SQLite，等待下一阶段成组迁移。
+也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 已经收进 `mainStore.entitlements`，`device upsert -> binding profile -> session issuance -> last_login_at` 也已经分别收进 `mainStore.devices / sessions`；在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements` 这四组核心主数据都已经可以逐步走向 PostgreSQL preview。`accounts / devices / sessions` 已经收进统一边界，但为了避免和设备、绑定、签名登录链路脱节，当前仍然保留在 SQLite，等待下一阶段成组迁移。
 
 ## 终端用户主流程
 

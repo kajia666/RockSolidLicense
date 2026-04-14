@@ -52,6 +52,7 @@ test("postgres runtime adapter can load a pg-style pool module and close it clea
       cards: "postgres",
       entitlements: "postgres",
       accounts: "sqlite",
+      devices: "sqlite",
       sessions: "sqlite"
     });
 

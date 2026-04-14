@@ -343,6 +343,21 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(sessionRows.items[0].policy_name, "Direct Store Policy");
     assert.equal(sessionRows.items[0].fingerprint, "store-session-device");
 
+    const recentSessionRows = await Promise.resolve(app.mainStore.sessions.querySessionRows(app.db, {
+      limit: 1,
+      sortBy: "issuedAtDesc"
+    }));
+    assert.equal(recentSessionRows.total, 1);
+    assert.equal(recentSessionRows.items[0].id, "sess_store_main");
+
+    const activeSessionCounts = app.mainStore.sessions.countActiveSessionsByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(activeSessionCounts.length, 1);
+    assert.equal(activeSessionCounts[0].product_id, directProduct.id);
+    assert.equal(activeSessionCounts[0].count, 1);
+
     const untouchedAccount = app.mainStore.accounts.getAccountRecordById(app.db, directAccount.id);
     assert.equal(untouchedAccount.last_login_at ?? null, null);
 

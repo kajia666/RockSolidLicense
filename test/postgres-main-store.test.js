@@ -675,6 +675,26 @@ function createWriteCapableAdapter() {
         }));
     }
 
+    if (meta.repository === "sessions" && meta.operation === "countActiveSessionsByProductIds") {
+      const counts = new Map();
+      for (const session of state.sessions) {
+        if (session.status !== "active") {
+          continue;
+        }
+
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(session.product_id)) {
+          continue;
+        }
+
+        counts.set(session.product_id, (counts.get(session.product_id) ?? 0) + 1);
+      }
+
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
     if (meta.repository === "sessions" && meta.operation === "selectActiveSessionsForExpiry") {
       return state.sessions
         .filter((session) => session.status === "active")
@@ -1133,6 +1153,15 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "sessions" && meta.operation === "countActiveSessionsByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
       if (meta.repository === "sessions" && meta.operation === "listActiveSessionExpiryRows") {
         return [
           {
@@ -1282,7 +1311,22 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(sessionRows.items[0].product_code, "PGAPP");
     assert.equal(sessionRows.items[0].policy_name, "PG Policy");
 
-    assert.equal(queries.length, 20);
+    const recentSessionRows = await app.mainStore.sessions.querySessionRows(app.db, {
+      limit: 1,
+      sortBy: "issuedAtDesc"
+    });
+    assert.equal(recentSessionRows.total, 1);
+    assert.equal(recentSessionRows.items[0].id, "sess_pg_1");
+
+    const activeSessionCounts = await app.mainStore.sessions.countActiveSessionsByProductIds(
+      app.db,
+      ["prod_pg_1"]
+    );
+    assert.equal(activeSessionCounts.length, 1);
+    assert.equal(activeSessionCounts[0].product_id, "prod_pg_1");
+    assert.equal(activeSessionCounts[0].count, 1);
+
+    assert.equal(queries.length, 22);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -1323,6 +1367,10 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[18].sql, /JOIN policies p ON p\.id = e\.policy_id/i);
     assert.equal(queries[19].meta.operation, "querySessionRows");
     assert.match(queries[19].sql, /ORDER BY s\.last_heartbeat_at DESC/i);
+    assert.equal(queries[20].meta.operation, "querySessionRows");
+    assert.match(queries[20].sql, /ORDER BY s\.issued_at DESC/i);
+    assert.equal(queries[21].meta.operation, "countActiveSessionsByProductIds");
+    assert.match(queries[21].sql, /GROUP BY product_id/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");

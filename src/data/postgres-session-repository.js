@@ -43,6 +43,25 @@ function likeFilter(value) {
   return `%${escapeLikeText(value)}%`;
 }
 
+function normalizeSessionQueryOptions(filters = {}) {
+  const rawLimit = Number(filters.limit ?? 100);
+  const limit = Number.isFinite(rawLimit)
+    ? Math.min(Math.max(Math.trunc(rawLimit), 1), 200)
+    : 100;
+  const sortByInput = String(filters.sortBy ?? "lastHeartbeatDesc").trim();
+  const sortBy = sortByInput === "issuedAtDesc" ? "issuedAtDesc" : "lastHeartbeatDesc";
+
+  return { limit, sortBy };
+}
+
+function sessionOrderBy(sortBy) {
+  if (sortBy === "issuedAtDesc") {
+    return "s.issued_at DESC";
+  }
+
+  return "s.last_heartbeat_at DESC";
+}
+
 export function createPostgresSessionRepository(adapter) {
   return {
     async getSessionRecordById(_db, sessionId) {
@@ -160,6 +179,7 @@ export function createPostgresSessionRepository(adapter) {
       const conditions = [];
       const params = [];
       const normalizedFilters = normalizeSessionFilters(filters);
+      const queryOptions = normalizeSessionQueryOptions(filters);
 
       if (normalizedFilters.productCode) {
         conditions.push(`pr.code = $${params.length + 1}`);
@@ -201,14 +221,16 @@ export function createPostgresSessionRepository(adapter) {
           JOIN entitlements e ON e.id = s.entitlement_id
           JOIN policies pol ON pol.id = e.policy_id
           ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-          ORDER BY s.last_heartbeat_at DESC
-          LIMIT 100
+          ORDER BY ${sessionOrderBy(queryOptions.sortBy)}
+          LIMIT ${queryOptions.limit}
         `,
         params,
         {
           repository: "sessions",
           operation: "querySessionRows",
-          filters: normalizedFilters
+          filters: normalizedFilters,
+          limit: queryOptions.limit,
+          sortBy: queryOptions.sortBy
         }
       ));
 
@@ -217,6 +239,33 @@ export function createPostgresSessionRepository(adapter) {
         total: rows.length,
         filters: normalizedFilters
       };
+    },
+
+    async countActiveSessionsByProductIds(_db, productIds = null) {
+      const conditions = ["status = 'active'"];
+      const params = [];
+
+      appendInCondition("product_id", productIds, conditions, params);
+
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT product_id, COUNT(*) AS count
+          FROM sessions
+          WHERE ${conditions.join(" AND ")}
+          GROUP BY product_id
+        `,
+        params,
+        {
+          repository: "sessions",
+          operation: "countActiveSessionsByProductIds",
+          productIds: Array.isArray(productIds) ? [...productIds] : null
+        }
+      ));
+
+      return rows.map((row) => ({
+        ...row,
+        count: Number(row.count ?? 0)
+      }));
     },
 
     async listActiveSessionExpiryRows() {

@@ -660,15 +660,8 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
     ...productIds,
     now
   ));
-  const activeSessionCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM sessions
-      WHERE product_id IN (${placeholders}) AND status = 'active'
-      GROUP BY product_id
-    `,
-    ...productIds
+  const activeSessionCounts = buildMetricMap(await Promise.resolve(
+    store.sessions.countActiveSessionsByProductIds(db, productIds)
   ));
   const activeBindingCounts = buildMetricMap(many(
     db,
@@ -7433,23 +7426,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         onlineSessions: await stateStore.countActiveSessions()
       };
 
-      const sessions = many(
-        db,
-        `
-          SELECT s.id, s.status, s.issued_at, s.expires_at, s.last_heartbeat_at, s.last_seen_ip,
-                 a.username, d.fingerprint, d.device_name, pr.code AS product_code, pol.name AS policy_name
-          FROM sessions s
-          JOIN customer_accounts a ON a.id = s.account_id
-          JOIN devices d ON d.id = s.device_id
-          JOIN products pr ON pr.id = s.product_id
-          JOIN entitlements e ON e.id = s.entitlement_id
-          JOIN policies pol ON pol.id = e.policy_id
-          ORDER BY s.issued_at DESC
-          LIMIT 25
-        `
-      );
+      const sessions = await Promise.resolve(store.sessions.querySessionRows(db, {
+        limit: 25,
+        sortBy: "issuedAtDesc"
+      }));
 
-      return { summary, sessions };
+      return { summary, sessions: sessions.items };
     },
 
     async listAccounts(token, filters = {}) {

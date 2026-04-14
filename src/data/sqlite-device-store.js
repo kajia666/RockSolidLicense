@@ -83,6 +83,19 @@ function upsertBindingProfile(db, binding, device, bindingIdentity, timestamp = 
 
 export function createSqliteDeviceStore({ db }) {
   return {
+    getActiveDeviceBlock(_db, productId, fingerprint) {
+      return one(
+        db,
+        `
+          SELECT *
+          FROM device_blocks
+          WHERE product_id = ? AND fingerprint = ? AND status = 'active'
+        `,
+        productId,
+        fingerprint
+      );
+    },
+
     upsertDevice(productId, fingerprint, deviceName, meta = {}, deviceProfile = {}, timestamp = nowIso()) {
       const existing = one(
         db,

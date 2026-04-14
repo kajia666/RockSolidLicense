@@ -3545,21 +3545,8 @@ function listEligibleResellerStatementSnapshots(db, filters = {}) {
   }));
 }
 
-function activeDeviceBlock(db, productId, fingerprint) {
-  return one(
-    db,
-    `
-      SELECT *
-      FROM device_blocks
-      WHERE product_id = ? AND fingerprint = ? AND status = 'active'
-    `,
-    productId,
-    fingerprint
-  );
-}
-
-function requireDeviceNotBlocked(db, productId, fingerprint) {
-  const block = activeDeviceBlock(db, productId, fingerprint);
+async function requireDeviceNotBlocked(db, store, productId, fingerprint) {
+  const block = await Promise.resolve(store.devices.getActiveDeviceBlock(db, productId, fingerprint));
   if (!block) {
     return;
   }
@@ -9728,7 +9715,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const now = nowIso();
         const deviceProfile = extractClientDeviceProfile(body, meta);
         const deviceFingerprint = deviceProfile.deviceFingerprint;
-        requireDeviceNotBlocked(db, product.id, deviceFingerprint);
+        await requireDeviceNotBlocked(db, store, product.id, deviceFingerprint);
         const entitlement = await getStoreUsableEntitlement(account.id, product.id, now);
         if (!entitlement) {
           throwEntitlementUnavailable(await getStoreLatestEntitlementSnapshot(account.id, product.id), now);
@@ -9805,7 +9792,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const now = nowIso();
         const deviceProfile = extractClientDeviceProfile(body, meta);
         const deviceFingerprint = deviceProfile.deviceFingerprint;
-        requireDeviceNotBlocked(db, product.id, deviceFingerprint);
+        await requireDeviceNotBlocked(db, store, product.id, deviceFingerprint);
         const entitlement = await getStoreUsableEntitlement(account.id, product.id, now);
         if (!entitlement) {
           throwEntitlementUnavailable(await getStoreLatestEntitlementSnapshot(account.id, product.id), now);
@@ -9860,7 +9847,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           throw new AppError(401, "DEVICE_MISMATCH", "Device fingerprint does not match this session.");
         }
 
-        const block = activeDeviceBlock(db, product.id, session.fingerprint);
+        const block = await Promise.resolve(store.devices.getActiveDeviceBlock(
+          db,
+          product.id,
+          session.fingerprint
+        ));
         if (block) {
           expireSessionById(db, store, stateStore, session.id, "device_blocked");
           throw new AppError(403, "DEVICE_BLOCKED", "This device fingerprint has been blocked by the operator.", {

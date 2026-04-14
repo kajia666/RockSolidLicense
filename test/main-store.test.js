@@ -374,6 +374,27 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(directBinding.mode, "new_binding");
     assert.equal(directBinding.binding.status, "active");
 
+    app.db.prepare(`
+      INSERT INTO device_blocks
+      (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)
+      VALUES (?, ?, ?, 'active', ?, ?, ?, ?, NULL)
+    `).run(
+      "block_store_main",
+      directProduct.id,
+      "store-direct-bind-device",
+      "manual-test-block",
+      "Inserted from main store test",
+      "2026-01-05T00:00:00.000Z",
+      "2026-01-05T00:00:00.000Z"
+    );
+    const activeBlock = app.mainStore.devices.getActiveDeviceBlock(
+      app.db,
+      directProduct.id,
+      "store-direct-bind-device"
+    );
+    assert.ok(activeBlock);
+    assert.equal(activeBlock.reason, "manual-test-block");
+
     const revokedSessions = app.mainStore.sessions.expireActiveSessions(
       { sessionId: "sess_store_main" },
       "main_store_revoke"

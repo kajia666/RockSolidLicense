@@ -657,16 +657,23 @@ async function queryProductBusinessMetricMaps(db, store, productIds = [], refere
   };
 }
 
+function countProductsWithEnabledFeature(products = [], featureKey) {
+  return products.filter((item) => item.featureConfig?.[featureKey] !== false).length;
+}
+
 async function queryDeveloperDashboardPayload(db, store, session, runtimeState) {
   await expireStaleSessions(db, store, runtimeState);
 
   const products = await listDeveloperAccessibleProductRows(db, store, session);
   const summary = {
     projects: products.length,
-    registerEnabledProjects: products.filter((item) => item.featureConfig?.allowRegister !== false).length,
-    cardLoginEnabledProjects: products.filter((item) => item.featureConfig?.allowCardLogin !== false).length,
-    noticesEnabledProjects: products.filter((item) => item.featureConfig?.allowNotices !== false).length,
-    versionCheckEnabledProjects: products.filter((item) => item.featureConfig?.allowVersionCheck !== false).length,
+    registerEnabledProjects: countProductsWithEnabledFeature(products, "allowRegister"),
+    accountLoginEnabledProjects: countProductsWithEnabledFeature(products, "allowAccountLogin"),
+    cardLoginEnabledProjects: countProductsWithEnabledFeature(products, "allowCardLogin"),
+    cardRechargeEnabledProjects: countProductsWithEnabledFeature(products, "allowCardRecharge"),
+    noticesEnabledProjects: countProductsWithEnabledFeature(products, "allowNotices"),
+    versionCheckEnabledProjects: countProductsWithEnabledFeature(products, "allowVersionCheck"),
+    clientUnbindEnabledProjects: countProductsWithEnabledFeature(products, "allowClientUnbind"),
     policies: 0,
     cardsFresh: 0,
     cardsRedeemed: 0,

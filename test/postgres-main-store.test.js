@@ -2848,6 +2848,13 @@ test("postgres main store can write products and policies through a transaction-
 
     const developerDashboard = await app.services.developerDashboard(developerSession.token);
     assert.equal(developerDashboard.summary.projects, 1);
+    assert.equal(developerDashboard.summary.registerEnabledProjects, 0);
+    assert.equal(developerDashboard.summary.accountLoginEnabledProjects, 1);
+    assert.equal(developerDashboard.summary.cardLoginEnabledProjects, 0);
+    assert.equal(developerDashboard.summary.cardRechargeEnabledProjects, 1);
+    assert.equal(developerDashboard.summary.noticesEnabledProjects, 1);
+    assert.equal(developerDashboard.summary.versionCheckEnabledProjects, 1);
+    assert.equal(developerDashboard.summary.clientUnbindEnabledProjects, 1);
     assert.equal(developerDashboard.projects.length, 1);
 
     const member = await app.services.developerCreateMember(developerSession.token, {

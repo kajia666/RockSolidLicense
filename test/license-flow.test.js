@@ -4773,6 +4773,12 @@ test("developer dashboard summarizes only scoped project operations", async () =
     const ownerDashboard = await getJson(baseUrl, "/api/developer/dashboard", ownerSession.token);
     assert.equal(ownerDashboard.summary.projects, 1);
     assert.equal(ownerDashboard.summary.registerEnabledProjects, 1);
+    assert.equal(ownerDashboard.summary.accountLoginEnabledProjects, 1);
+    assert.equal(ownerDashboard.summary.cardLoginEnabledProjects, 1);
+    assert.equal(ownerDashboard.summary.cardRechargeEnabledProjects, 1);
+    assert.equal(ownerDashboard.summary.noticesEnabledProjects, 1);
+    assert.equal(ownerDashboard.summary.versionCheckEnabledProjects, 1);
+    assert.equal(ownerDashboard.summary.clientUnbindEnabledProjects, 1);
     assert.equal(ownerDashboard.summary.cardsFresh, 1);
     assert.equal(ownerDashboard.summary.cardsRedeemed, 1);
     assert.equal(ownerDashboard.summary.accounts, 1);
@@ -4796,6 +4802,9 @@ test("developer dashboard summarizes only scoped project operations", async () =
 
     const viewerDashboard = await getJson(baseUrl, "/api/developer/dashboard", viewerSession.token);
     assert.equal(viewerDashboard.summary.projects, 1);
+    assert.equal(viewerDashboard.summary.accountLoginEnabledProjects, 1);
+    assert.equal(viewerDashboard.summary.cardRechargeEnabledProjects, 1);
+    assert.equal(viewerDashboard.summary.clientUnbindEnabledProjects, 1);
     assert.equal(viewerDashboard.summary.cardsFresh, 1);
     assert.equal(viewerDashboard.summary.cardsRedeemed, 1);
     assert.equal(viewerDashboard.summary.activeSessions, 1);

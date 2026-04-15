@@ -80,7 +80,12 @@ test("app exposes sqlite main store and services read through it", async () => {
 
     const directProduct = app.mainStore.products.createProduct({
       code: "STOREAPP2",
-      name: "Direct Store Product"
+      name: "Direct Store Product",
+      featureConfig: {
+        allowRegister: false,
+        allowAccountLogin: false,
+        allowCardRecharge: false
+      }
     }, developer.id);
     assert.equal(directProduct.code, "STOREAPP2");
     assert.equal(directProduct.ownerDeveloper.id, developer.id);
@@ -91,7 +96,19 @@ test("app exposes sqlite main store and services read through it", async () => {
     );
     assert.equal(signedProduct.id, directProduct.id);
     assert.equal(signedProduct.code, "STOREAPP2");
-    assert.equal(signedProduct.featureConfig.allowRegister, true);
+    assert.equal(signedProduct.featureConfig.allowRegister, false);
+    assert.equal(signedProduct.featureConfig.allowAccountLogin, false);
+    assert.equal(signedProduct.featureConfig.allowCardRecharge, false);
+
+    const updatedFeatureConfig = app.mainStore.products.updateProductFeatureConfig(directProduct.id, {
+      featureConfig: {
+        allowRegister: true,
+        allowClientUnbind: false
+      }
+    });
+    assert.equal(updatedFeatureConfig.featureConfig.allowRegister, true);
+    assert.equal(updatedFeatureConfig.featureConfig.allowAccountLogin, false);
+    assert.equal(updatedFeatureConfig.featureConfig.allowClientUnbind, false);
 
     const directAccount = app.mainStore.accounts.createAccount(directProduct, {
       username: "store_direct_user",

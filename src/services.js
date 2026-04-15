@@ -2,14 +2,11 @@ import { AppError } from "./http.js";
 import { rotateLicenseKeyStore } from "./license-keys.js";
 import { NonceReplayError } from "./runtime-state.js";
 import {
-  DEFAULT_PRODUCT_FEATURE_CONFIG,
   getActiveProductRecordByCode,
-  getProductRecordById,
   getProductRowById,
   listAssignedDeveloperProductIds,
   listOwnedProductIds,
   parseProductFeatureConfigRow,
-  productCodeExists,
   queryProductRows
 } from "./data/product-repository.js";
 import {
@@ -1450,19 +1447,6 @@ function parseOptionalBoolean(value, fieldName) {
   throw new AppError(400, "INVALID_BOOLEAN", `${fieldName} must be a boolean value.`);
 }
 
-function extractProductFeatureConfigInput(body = {}) {
-  if (
-    body &&
-    typeof body === "object" &&
-    body.featureConfig &&
-    typeof body.featureConfig === "object" &&
-    !Array.isArray(body.featureConfig)
-  ) {
-    return body.featureConfig;
-  }
-  return body ?? {};
-}
-
 function loadProductFeatureConfig(db, productId, fallbackUpdatedAt = null) {
   const row = one(db, "SELECT * FROM product_feature_configs WHERE product_id = ?", productId);
   return parseProductFeatureConfigRow(row, fallbackUpdatedAt);
@@ -1473,90 +1457,6 @@ function resolveProductFeatureConfig(db, product) {
     return product.featureConfig;
   }
   return loadProductFeatureConfig(db, product.id, product.updated_at ?? product.updatedAt ?? null);
-}
-
-function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIso()) {
-  const source = extractProductFeatureConfigInput(body);
-  const config = {
-    allowRegister: parseOptionalBoolean(source.allowRegister, "allowRegister"),
-    allowAccountLogin: parseOptionalBoolean(source.allowAccountLogin, "allowAccountLogin"),
-    allowCardLogin: parseOptionalBoolean(source.allowCardLogin, "allowCardLogin"),
-    allowCardRecharge: parseOptionalBoolean(source.allowCardRecharge, "allowCardRecharge"),
-    allowVersionCheck: parseOptionalBoolean(source.allowVersionCheck, "allowVersionCheck"),
-    allowNotices: parseOptionalBoolean(source.allowNotices, "allowNotices"),
-    allowClientUnbind: parseOptionalBoolean(source.allowClientUnbind, "allowClientUnbind")
-  };
-
-  const existing = one(db, "SELECT * FROM product_feature_configs WHERE product_id = ?", productId);
-  const current = existing
-    ? parseProductFeatureConfigRow(existing, timestamp)
-    : DEFAULT_PRODUCT_FEATURE_CONFIG;
-  const resolved = {
-    allowRegister: config.allowRegister ?? current.allowRegister,
-    allowAccountLogin: config.allowAccountLogin ?? current.allowAccountLogin,
-    allowCardLogin: config.allowCardLogin ?? current.allowCardLogin,
-    allowCardRecharge: config.allowCardRecharge ?? current.allowCardRecharge,
-    allowVersionCheck: config.allowVersionCheck ?? current.allowVersionCheck,
-    allowNotices: config.allowNotices ?? current.allowNotices,
-    allowClientUnbind: config.allowClientUnbind ?? current.allowClientUnbind
-  };
-
-  if (existing) {
-    run(
-      db,
-      `
-        UPDATE product_feature_configs
-        SET allow_register = ?, allow_account_login = ?, allow_card_login = ?, allow_card_recharge = ?,
-            allow_version_check = ?, allow_notices = ?, allow_client_unbind = ?, updated_at = ?
-        WHERE product_id = ?
-      `,
-      resolved.allowRegister ? 1 : 0,
-      resolved.allowAccountLogin ? 1 : 0,
-      resolved.allowCardLogin ? 1 : 0,
-      resolved.allowCardRecharge ? 1 : 0,
-      resolved.allowVersionCheck ? 1 : 0,
-      resolved.allowNotices ? 1 : 0,
-      resolved.allowClientUnbind ? 1 : 0,
-      timestamp,
-      productId
-    );
-  } else {
-    run(
-      db,
-      `
-        INSERT INTO product_feature_configs
-        (
-          product_id,
-          allow_register,
-          allow_account_login,
-          allow_card_login,
-          allow_card_recharge,
-          allow_version_check,
-          allow_notices,
-          allow_client_unbind,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      productId,
-      resolved.allowRegister ? 1 : 0,
-      resolved.allowAccountLogin ? 1 : 0,
-      resolved.allowCardLogin ? 1 : 0,
-      resolved.allowCardRecharge ? 1 : 0,
-      resolved.allowVersionCheck ? 1 : 0,
-      resolved.allowNotices ? 1 : 0,
-      resolved.allowClientUnbind ? 1 : 0,
-      timestamp,
-      timestamp
-    );
-  }
-
-  return {
-    ...resolved,
-    createdAt: existing?.created_at ?? timestamp,
-    updatedAt: timestamp
-  };
 }
 
 function resolveProductOwnerDeveloperId(db, ownerDeveloperId, allowNull = true) {
@@ -1582,121 +1482,6 @@ function resolveProductOwnerDeveloperId(db, ownerDeveloperId, allowNull = true) 
   return developer.id;
 }
 
-function createProductRecord(db, body = {}, ownerDeveloperId = null) {
-  requireField(body, "code");
-  requireField(body, "name");
-
-  const code = String(body.code).trim().toUpperCase();
-  if (!/^[A-Z0-9_]{3,32}$/.test(code)) {
-    throw new AppError(400, "INVALID_PRODUCT_CODE", "Product code must be 3-32 chars: A-Z, 0-9 or underscore.");
-  }
-
-  if (productCodeExists(db, code)) {
-    throw new AppError(409, "PRODUCT_EXISTS", "Product code already exists.");
-  }
-
-  const now = nowIso();
-  const product = {
-    id: generateId("prod"),
-    code,
-    name: String(body.name).trim(),
-    description: String(body.description ?? "").trim(),
-    status: "active",
-    ownerDeveloperId,
-    sdkAppId: randomAppId(),
-    sdkAppSecret: randomToken(24),
-    createdAt: now,
-    updatedAt: now
-  };
-
-  run(
-    db,
-    `
-      INSERT INTO products
-      (id, code, name, description, status, owner_developer_id, sdk_app_id, sdk_app_secret, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    product.id,
-    product.code,
-    product.name,
-    product.description,
-    product.status,
-    product.ownerDeveloperId,
-    product.sdkAppId,
-    product.sdkAppSecret,
-    product.createdAt,
-    product.updatedAt
-  );
-  persistProductFeatureConfig(db, product.id, body, now);
-
-  return getProductRowById(db, product.id);
-}
-
-function updateProductOwnerRecord(db, productId, ownerDeveloperId, timestamp = nowIso()) {
-  run(
-    db,
-    `
-      UPDATE products
-      SET owner_developer_id = ?, updated_at = ?
-      WHERE id = ?
-    `,
-    ownerDeveloperId,
-    timestamp,
-    productId
-  );
-  return getProductRowById(db, productId);
-}
-
-function updateProductFeatureConfigRecord(db, productId, body = {}, timestamp = nowIso()) {
-  const product = getProductRecordById(db, productId);
-  if (!product) {
-    throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
-  }
-
-  const featureConfig = persistProductFeatureConfig(db, product.id, body, timestamp);
-  run(db, "UPDATE products SET updated_at = ? WHERE id = ?", timestamp, product.id);
-
-  return {
-    product: getProductRowById(db, product.id),
-    featureConfig
-  };
-}
-
-function rotateProductSdkCredentialsRecord(db, productId, body = {}, timestamp = nowIso()) {
-  const product = getProductRecordById(db, productId);
-  if (!product) {
-    throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
-  }
-
-  const rotateAppId = parseOptionalBoolean(body.rotateAppId, "rotateAppId") === true;
-  const nextSdkAppId = rotateAppId ? randomAppId() : product.sdk_app_id;
-  const nextSdkAppSecret = randomToken(24);
-
-  run(
-    db,
-    `
-      UPDATE products
-      SET sdk_app_id = ?, sdk_app_secret = ?, updated_at = ?
-      WHERE id = ?
-    `,
-    nextSdkAppId,
-    nextSdkAppSecret,
-    timestamp,
-    product.id
-  );
-
-  return {
-    product: getProductRowById(db, product.id),
-    rotated: {
-      rotateAppId,
-      previousSdkAppId: product.sdk_app_id,
-      previousSdkAppSecretMasked: maskToken(product.sdk_app_secret),
-      sdkAppId: nextSdkAppId,
-      sdkAppSecret: nextSdkAppSecret,
-      updatedAt: timestamp
-    }
-  };
-}
 
 function requireDeveloperOwnedProduct(db, session, productId, permission = "products.read") {
   const product = getProductRowById(db, productId);

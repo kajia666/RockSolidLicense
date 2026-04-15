@@ -3,7 +3,10 @@ import { generateId, nowIso, randomAppId, randomToken } from "../security.js";
 import {
   DEFAULT_PRODUCT_FEATURE_CONFIG,
   formatProductRow,
-  parseProductFeatureConfigRow
+  mergeProductFeatureConfig,
+  parseProductFeatureConfigInput,
+  parseProductFeatureConfigRow,
+  serializeProductFeatureConfigValues
 } from "./product-repository.js";
 
 function parseOptionalBoolean(value, fieldName) {
@@ -24,19 +27,6 @@ function parseOptionalBoolean(value, fieldName) {
   }
 
   throw new AppError(400, "INVALID_BOOLEAN", `${fieldName} must be a boolean value.`);
-}
-
-function extractProductFeatureConfigInput(body = {}) {
-  if (
-    body
-    && typeof body === "object"
-    && body.featureConfig
-    && typeof body.featureConfig === "object"
-    && !Array.isArray(body.featureConfig)
-  ) {
-    return body.featureConfig;
-  }
-  return body ?? {};
 }
 
 async function loadProductRow(adapter, productId) {
@@ -67,7 +57,6 @@ async function loadProductRow(adapter, productId) {
 }
 
 async function persistProductFeatureConfig(adapter, productId, body = {}, timestamp = nowIso()) {
-  const source = extractProductFeatureConfigInput(body);
   const existingRows = await Promise.resolve(adapter.query(
     `
       SELECT allow_register, allow_account_login, allow_card_login, allow_card_recharge,
@@ -88,15 +77,11 @@ async function persistProductFeatureConfig(adapter, productId, body = {}, timest
   const current = existingRows[0]
     ? parseProductFeatureConfigRow(existingRows[0], timestamp)
     : DEFAULT_PRODUCT_FEATURE_CONFIG;
-  const resolved = {
-    allowRegister: parseOptionalBoolean(source.allowRegister, "allowRegister") ?? current.allowRegister,
-    allowAccountLogin: parseOptionalBoolean(source.allowAccountLogin, "allowAccountLogin") ?? current.allowAccountLogin,
-    allowCardLogin: parseOptionalBoolean(source.allowCardLogin, "allowCardLogin") ?? current.allowCardLogin,
-    allowCardRecharge: parseOptionalBoolean(source.allowCardRecharge, "allowCardRecharge") ?? current.allowCardRecharge,
-    allowVersionCheck: parseOptionalBoolean(source.allowVersionCheck, "allowVersionCheck") ?? current.allowVersionCheck,
-    allowNotices: parseOptionalBoolean(source.allowNotices, "allowNotices") ?? current.allowNotices,
-    allowClientUnbind: parseOptionalBoolean(source.allowClientUnbind, "allowClientUnbind") ?? current.allowClientUnbind
-  };
+  const resolved = mergeProductFeatureConfig(
+    current,
+    parseProductFeatureConfigInput(body, parseOptionalBoolean)
+  );
+  const values = serializeProductFeatureConfigValues(resolved);
 
   await Promise.resolve(adapter.query(
     `
@@ -126,13 +111,7 @@ async function persistProductFeatureConfig(adapter, productId, body = {}, timest
     `,
     [
       productId,
-      resolved.allowRegister,
-      resolved.allowAccountLogin,
-      resolved.allowCardLogin,
-      resolved.allowCardRecharge,
-      resolved.allowVersionCheck,
-      resolved.allowNotices,
-      resolved.allowClientUnbind,
+      ...values,
       existingRows[0]?.feature_created_at ?? timestamp,
       timestamp
     ],

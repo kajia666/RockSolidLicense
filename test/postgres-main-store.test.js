@@ -2910,11 +2910,15 @@ test("postgres main store can write products and policies through a transaction-
     assert.match(cardLoginAccount.username, /^card_pgwrite_/);
 
     const featureUpdated = await app.services.updateProductFeatureConfig(admin.token, product.id, {
-      allowRegister: true,
-      allowCardRecharge: false
+      featureConfig: {
+        allowRegister: true,
+        allowCardRecharge: false,
+        allowClientUnbind: false
+      }
     });
     assert.equal(featureUpdated.featureConfig.allowRegister, true);
     assert.equal(featureUpdated.featureConfig.allowCardRecharge, false);
+    assert.equal(featureUpdated.featureConfig.allowClientUnbind, false);
 
     const policy = await app.services.createPolicy(admin.token, {
       productCode: "PGWRITE",

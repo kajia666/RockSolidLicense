@@ -4,8 +4,11 @@ import {
   DEFAULT_PRODUCT_FEATURE_CONFIG,
   getProductRecordById,
   getProductRowById,
+  mergeProductFeatureConfig,
+  parseProductFeatureConfigInput,
   parseProductFeatureConfigRow,
-  productCodeExists
+  productCodeExists,
+  serializeProductFeatureConfigValues
 } from "./product-repository.js";
 
 function one(db, sql, ...params) {
@@ -36,44 +39,16 @@ function parseOptionalBoolean(value, fieldName) {
   throw new AppError(400, "INVALID_BOOLEAN", `${fieldName} must be a boolean value.`);
 }
 
-function extractProductFeatureConfigInput(body = {}) {
-  if (
-    body &&
-    typeof body === "object" &&
-    body.featureConfig &&
-    typeof body.featureConfig === "object" &&
-    !Array.isArray(body.featureConfig)
-  ) {
-    return body.featureConfig;
-  }
-  return body ?? {};
-}
-
 function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIso()) {
-  const source = extractProductFeatureConfigInput(body);
-  const config = {
-    allowRegister: parseOptionalBoolean(source.allowRegister, "allowRegister"),
-    allowAccountLogin: parseOptionalBoolean(source.allowAccountLogin, "allowAccountLogin"),
-    allowCardLogin: parseOptionalBoolean(source.allowCardLogin, "allowCardLogin"),
-    allowCardRecharge: parseOptionalBoolean(source.allowCardRecharge, "allowCardRecharge"),
-    allowVersionCheck: parseOptionalBoolean(source.allowVersionCheck, "allowVersionCheck"),
-    allowNotices: parseOptionalBoolean(source.allowNotices, "allowNotices"),
-    allowClientUnbind: parseOptionalBoolean(source.allowClientUnbind, "allowClientUnbind")
-  };
-
   const existing = one(db, "SELECT * FROM product_feature_configs WHERE product_id = ?", productId);
   const current = existing
     ? parseProductFeatureConfigRow(existing, timestamp)
     : DEFAULT_PRODUCT_FEATURE_CONFIG;
-  const resolved = {
-    allowRegister: config.allowRegister ?? current.allowRegister,
-    allowAccountLogin: config.allowAccountLogin ?? current.allowAccountLogin,
-    allowCardLogin: config.allowCardLogin ?? current.allowCardLogin,
-    allowCardRecharge: config.allowCardRecharge ?? current.allowCardRecharge,
-    allowVersionCheck: config.allowVersionCheck ?? current.allowVersionCheck,
-    allowNotices: config.allowNotices ?? current.allowNotices,
-    allowClientUnbind: config.allowClientUnbind ?? current.allowClientUnbind
-  };
+  const resolved = mergeProductFeatureConfig(
+    current,
+    parseProductFeatureConfigInput(body, parseOptionalBoolean)
+  );
+  const values = serializeProductFeatureConfigValues(resolved, (value) => (value ? 1 : 0));
 
   if (existing) {
     run(
@@ -84,13 +59,7 @@ function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIs
             allow_version_check = ?, allow_notices = ?, allow_client_unbind = ?, updated_at = ?
         WHERE product_id = ?
       `,
-      resolved.allowRegister ? 1 : 0,
-      resolved.allowAccountLogin ? 1 : 0,
-      resolved.allowCardLogin ? 1 : 0,
-      resolved.allowCardRecharge ? 1 : 0,
-      resolved.allowVersionCheck ? 1 : 0,
-      resolved.allowNotices ? 1 : 0,
-      resolved.allowClientUnbind ? 1 : 0,
+      ...values,
       timestamp,
       productId
     );
@@ -114,13 +83,7 @@ function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIs
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       productId,
-      resolved.allowRegister ? 1 : 0,
-      resolved.allowAccountLogin ? 1 : 0,
-      resolved.allowCardLogin ? 1 : 0,
-      resolved.allowCardRecharge ? 1 : 0,
-      resolved.allowVersionCheck ? 1 : 0,
-      resolved.allowNotices ? 1 : 0,
-      resolved.allowClientUnbind ? 1 : 0,
+      ...values,
       timestamp,
       timestamp
     );

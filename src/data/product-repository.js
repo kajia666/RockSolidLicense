@@ -1,12 +1,26 @@
-const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze({
-  allowRegister: true,
-  allowAccountLogin: true,
-  allowCardLogin: true,
-  allowCardRecharge: true,
-  allowVersionCheck: true,
-  allowNotices: true,
-  allowClientUnbind: true
+const PRODUCT_FEATURE_KEYS = Object.freeze([
+  "allowRegister",
+  "allowAccountLogin",
+  "allowCardLogin",
+  "allowCardRecharge",
+  "allowVersionCheck",
+  "allowNotices",
+  "allowClientUnbind"
+]);
+
+const PRODUCT_FEATURE_COLUMN_MAP = Object.freeze({
+  allowRegister: "allow_register",
+  allowAccountLogin: "allow_account_login",
+  allowCardLogin: "allow_card_login",
+  allowCardRecharge: "allow_card_recharge",
+  allowVersionCheck: "allow_version_check",
+  allowNotices: "allow_notices",
+  allowClientUnbind: "allow_client_unbind"
 });
+
+const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze(
+  Object.fromEntries(PRODUCT_FEATURE_KEYS.map((key) => [key, true]))
+);
 
 function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
@@ -43,17 +57,52 @@ function appendInCondition(columnSql, values, conditions, params) {
 }
 
 export function parseProductFeatureConfigRow(row, fallbackUpdatedAt = null) {
+  const featureConfig = Object.fromEntries(
+    PRODUCT_FEATURE_KEYS.map((key) => [
+      key,
+      row ? Boolean(row[PRODUCT_FEATURE_COLUMN_MAP[key]]) : DEFAULT_PRODUCT_FEATURE_CONFIG[key]
+    ])
+  );
+
   return {
-    allowRegister: row ? Boolean(row.allow_register) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowRegister,
-    allowAccountLogin: row ? Boolean(row.allow_account_login) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowAccountLogin,
-    allowCardLogin: row ? Boolean(row.allow_card_login) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowCardLogin,
-    allowCardRecharge: row ? Boolean(row.allow_card_recharge) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowCardRecharge,
-    allowVersionCheck: row ? Boolean(row.allow_version_check) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowVersionCheck,
-    allowNotices: row ? Boolean(row.allow_notices) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowNotices,
-    allowClientUnbind: row ? Boolean(row.allow_client_unbind) : DEFAULT_PRODUCT_FEATURE_CONFIG.allowClientUnbind,
+    ...featureConfig,
     createdAt: row?.feature_created_at ?? row?.created_at ?? fallbackUpdatedAt ?? null,
     updatedAt: row?.feature_updated_at ?? row?.updated_at ?? fallbackUpdatedAt ?? null
   };
+}
+
+export function extractProductFeatureConfigInput(body = {}) {
+  if (
+    body &&
+    typeof body === "object" &&
+    body.featureConfig &&
+    typeof body.featureConfig === "object" &&
+    !Array.isArray(body.featureConfig)
+  ) {
+    return body.featureConfig;
+  }
+  return body ?? {};
+}
+
+export function parseProductFeatureConfigInput(body = {}, parseOptionalBoolean = (value) => value) {
+  const source = extractProductFeatureConfigInput(body);
+  return Object.fromEntries(
+    PRODUCT_FEATURE_KEYS.map((key) => [key, parseOptionalBoolean(source[key], key)])
+  );
+}
+
+export function mergeProductFeatureConfig(current = DEFAULT_PRODUCT_FEATURE_CONFIG, overrides = {}) {
+  const baseline = current && typeof current === "object"
+    ? current
+    : DEFAULT_PRODUCT_FEATURE_CONFIG;
+
+  return Object.fromEntries(
+    PRODUCT_FEATURE_KEYS.map((key) => [key, overrides[key] ?? baseline[key] ?? DEFAULT_PRODUCT_FEATURE_CONFIG[key]])
+  );
+}
+
+export function serializeProductFeatureConfigValues(config = DEFAULT_PRODUCT_FEATURE_CONFIG, mapValue = (value) => value) {
+  return PRODUCT_FEATURE_KEYS.map((key) => mapValue(config[key] !== false, key));
 }
 
 export function formatProductRow(row) {
@@ -199,4 +248,8 @@ export function findOwnedProductIdByCode(db, ownerDeveloperId, productCode) {
   )?.id ?? null;
 }
 
-export { DEFAULT_PRODUCT_FEATURE_CONFIG };
+export {
+  DEFAULT_PRODUCT_FEATURE_CONFIG,
+  PRODUCT_FEATURE_COLUMN_MAP,
+  PRODUCT_FEATURE_KEYS
+};

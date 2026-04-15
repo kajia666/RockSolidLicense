@@ -300,3 +300,24 @@ export function getPolicyAccessRowById(db, policyId) {
     policyId
   );
 }
+
+export function countPoliciesByProductIds(db, productIds = null) {
+  const conditions = [];
+  const params = [];
+
+  appendInCondition("product_id", productIds, conditions, params);
+
+  return many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM policies
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      GROUP BY product_id
+    `,
+    ...params
+  ).map((row) => ({
+    ...row,
+    count: Number(row.count ?? 0)
+  }));
+}

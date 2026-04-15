@@ -108,6 +108,23 @@ test("app exposes sqlite main store and services read through it", async () => {
     const disabledAccount = app.mainStore.accounts.updateAccountStatus(directAccount.id, "disabled");
     assert.equal(disabledAccount.status, "disabled");
 
+    const accountCounts = app.mainStore.accounts.countAccountsByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(accountCounts.length, 1);
+    assert.equal(accountCounts[0].product_id, directProduct.id);
+    assert.equal(accountCounts[0].count, 1);
+
+    const disabledAccountCounts = app.mainStore.accounts.countAccountsByProductIds(
+      app.db,
+      [directProduct.id],
+      "disabled"
+    );
+    assert.equal(disabledAccountCounts.length, 1);
+    assert.equal(disabledAccountCounts[0].product_id, directProduct.id);
+    assert.equal(disabledAccountCounts[0].count, 1);
+
     const restoredAccount = app.mainStore.accounts.updateAccountStatus(directAccount.id, "active");
     assert.equal(restoredAccount.status, "active");
 
@@ -337,6 +354,14 @@ test("app exposes sqlite main store and services read through it", async () => {
       count: 1,
       prefix: "PSTORE"
     });
+    const policyCounts = app.mainStore.policies.countPoliciesByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(policyCounts.length, 1);
+    assert.equal(policyCounts[0].product_id, directProduct.id);
+    assert.equal(policyCounts[0].count, 2);
+
     const pointCard = app.mainStore.cards.queryCardRows(app.db, {
       productCode: "STOREAPP2",
       policyId: pointPolicy.id
@@ -351,6 +376,24 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(pointActivation.grantType, "points");
     assert.equal(pointActivation.totalPoints, 5);
     assert.equal(pointActivation.remainingPoints, 5);
+
+    const freshCardCounts = app.mainStore.cards.countCardsByProductIds(
+      app.db,
+      [directProduct.id],
+      "fresh"
+    );
+    assert.equal(freshCardCounts.length, 1);
+    assert.equal(freshCardCounts[0].product_id, directProduct.id);
+    assert.equal(freshCardCounts[0].count, 1);
+
+    const redeemedCardCounts = app.mainStore.cards.countCardsByProductIds(
+      app.db,
+      [directProduct.id],
+      "redeemed"
+    );
+    assert.equal(redeemedCardCounts.length, 1);
+    assert.equal(redeemedCardCounts[0].product_id, directProduct.id);
+    assert.equal(redeemedCardCounts[0].count, 2);
 
     const entitlementRows = app.mainStore.entitlements.queryEntitlementRows(app.db, {
       productCode: "STOREAPP2"
@@ -376,6 +419,15 @@ test("app exposes sqlite main store and services read through it", async () => {
     );
     assert.ok(latestEntitlement);
     assert.equal(latestEntitlement.account_id, directAccount.id);
+
+    const activeEntitlementCounts = app.mainStore.entitlements.countActiveEntitlementsByProductIds(
+      app.db,
+      [directProduct.id],
+      new Date().toISOString()
+    );
+    assert.equal(activeEntitlementCounts.length, 1);
+    assert.equal(activeEntitlementCounts[0].product_id, directProduct.id);
+    assert.equal(activeEntitlementCounts[0].count, 1);
 
     const frozenEntitlement = app.mainStore.entitlements.updateEntitlementStatus(durationEntitlement.id, {
       status: "frozen"

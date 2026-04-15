@@ -235,6 +235,34 @@ export function createPostgresEntitlementRepository(adapter) {
         items,
         filters: normalizedFilters
       };
+    },
+
+    async countActiveEntitlementsByProductIds(_db, productIds = null, referenceTime = nowIso()) {
+      const conditions = ["status = 'active'", `ends_at > $1`];
+      const params = [referenceTime];
+
+      appendInCondition("product_id", productIds, conditions, params);
+
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT product_id, COUNT(*) AS count
+          FROM entitlements
+          WHERE ${conditions.join(" AND ")}
+          GROUP BY product_id
+        `,
+        params,
+        {
+          repository: "entitlements",
+          operation: "countActiveEntitlementsByProductIds",
+          productIds: Array.isArray(productIds) ? [...productIds] : null,
+          referenceTime
+        }
+      ));
+
+      return rows.map((row) => ({
+        ...row,
+        count: Number(row.count ?? 0)
+      }));
     }
   };
 }

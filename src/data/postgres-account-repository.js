@@ -198,6 +198,42 @@ export function createPostgresAccountRepository(adapter) {
       ));
 
       return Boolean(rows[0]);
+    },
+
+    async countAccountsByProductIds(_db, productIds = null, status = null) {
+      const conditions = [];
+      const params = [];
+      const normalizedStatus = status !== null && status !== undefined && String(status).trim() !== ""
+        ? normalizeAccountStatus(status)
+        : null;
+
+      appendInCondition("product_id", productIds, conditions, params);
+
+      if (normalizedStatus) {
+        conditions.push(`status = $${params.length + 1}`);
+        params.push(normalizedStatus);
+      }
+
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT product_id, COUNT(*) AS count
+          FROM customer_accounts
+          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+          GROUP BY product_id
+        `,
+        params,
+        {
+          repository: "accounts",
+          operation: "countAccountsByProductIds",
+          productIds: Array.isArray(productIds) ? [...productIds] : null,
+          status: normalizedStatus
+        }
+      ));
+
+      return rows.map((row) => ({
+        ...row,
+        count: Number(row.count ?? 0)
+      }));
     }
   };
 }

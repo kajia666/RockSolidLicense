@@ -70,6 +70,33 @@ export function createPostgresPolicyRepository(adapter) {
       ));
 
       return rows.map(formatPolicyRow);
+    },
+
+    async countPoliciesByProductIds(_db, productIds = null) {
+      const conditions = [];
+      const params = [];
+
+      appendInCondition("product_id", productIds, conditions, params);
+
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT product_id, COUNT(*) AS count
+          FROM policies
+          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+          GROUP BY product_id
+        `,
+        params,
+        {
+          repository: "policies",
+          operation: "countPoliciesByProductIds",
+          productIds: Array.isArray(productIds) ? [...productIds] : null
+        }
+      ));
+
+      return rows.map((row) => ({
+        ...row,
+        count: Number(row.count ?? 0)
+      }));
     }
   };
 }

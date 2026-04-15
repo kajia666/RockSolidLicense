@@ -199,6 +199,45 @@ export function createPostgresCardRepository(adapter) {
         status: row.status,
         notes: row.control_notes ?? row.notes
       }) : null;
+    },
+
+    async countCardsByProductIds(_db, productIds = null, usageStatus = null) {
+      const conditions = [];
+      const params = [];
+      const normalizedUsageStatus = usageStatus === null || usageStatus === undefined || String(usageStatus).trim() === ""
+        ? null
+        : String(usageStatus).trim().toLowerCase();
+
+      appendInCondition("product_id", productIds, conditions, params);
+
+      if (normalizedUsageStatus) {
+        if (!["fresh", "redeemed"].includes(normalizedUsageStatus)) {
+          throw new AppError(400, "INVALID_CARD_USAGE_STATUS", "usageStatus must be fresh or redeemed.");
+        }
+        conditions.push(`status = $${params.length + 1}`);
+        params.push(normalizedUsageStatus);
+      }
+
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT product_id, COUNT(*) AS count
+          FROM license_keys
+          ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+          GROUP BY product_id
+        `,
+        params,
+        {
+          repository: "cards",
+          operation: "countCardsByProductIds",
+          productIds: Array.isArray(productIds) ? [...productIds] : null,
+          usageStatus: normalizedUsageStatus
+        }
+      ));
+
+      return rows.map((row) => ({
+        ...row,
+        count: Number(row.count ?? 0)
+      }));
     }
   };
 }

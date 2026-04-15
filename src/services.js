@@ -611,6 +611,52 @@ async function queryProductOperationalMetricMaps(db, store, productIds = [], ref
   };
 }
 
+async function queryProductBusinessMetricMaps(db, store, productIds = [], referenceTime = nowIso()) {
+  const normalizedProductIds = Array.from(
+    new Set(
+      (Array.isArray(productIds) ? productIds : [])
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!normalizedProductIds.length) {
+    return {
+      policyCounts: new Map(),
+      freshCardCounts: new Map(),
+      redeemedCardCounts: new Map(),
+      accountCounts: new Map(),
+      disabledAccountCounts: new Map(),
+      activeEntitlementCounts: new Map()
+    };
+  }
+
+  const [
+    policyRows,
+    freshCardRows,
+    redeemedCardRows,
+    accountRows,
+    disabledAccountRows,
+    activeEntitlementRows
+  ] = await Promise.all([
+    Promise.resolve(store.policies.countPoliciesByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.cards.countCardsByProductIds(db, normalizedProductIds, "fresh")),
+    Promise.resolve(store.cards.countCardsByProductIds(db, normalizedProductIds, "redeemed")),
+    Promise.resolve(store.accounts.countAccountsByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.accounts.countAccountsByProductIds(db, normalizedProductIds, "disabled")),
+    Promise.resolve(store.entitlements.countActiveEntitlementsByProductIds(db, normalizedProductIds, referenceTime))
+  ]);
+
+  return {
+    policyCounts: buildMetricMap(policyRows),
+    freshCardCounts: buildMetricMap(freshCardRows),
+    redeemedCardCounts: buildMetricMap(redeemedCardRows),
+    accountCounts: buildMetricMap(accountRows),
+    disabledAccountCounts: buildMetricMap(disabledAccountRows),
+    activeEntitlementCounts: buildMetricMap(activeEntitlementRows)
+  };
+}
+
 async function queryDeveloperDashboardPayload(db, store, session, runtimeState) {
   await expireStaleSessions(db, store, runtimeState);
 
@@ -650,70 +696,15 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
   }
 
   const productIds = products.map((item) => item.id);
-  const placeholders = makeSqlPlaceholders(productIds.length);
   const now = nowIso();
-
-  const policyCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM policies
-      WHERE product_id IN (${placeholders})
-      GROUP BY product_id
-    `,
-    ...productIds
-  ));
-  const freshCardCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM license_keys
-      WHERE product_id IN (${placeholders}) AND status = 'fresh'
-      GROUP BY product_id
-    `,
-    ...productIds
-  ));
-  const redeemedCardCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM license_keys
-      WHERE product_id IN (${placeholders}) AND status = 'redeemed'
-      GROUP BY product_id
-    `,
-    ...productIds
-  ));
-  const accountCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM customer_accounts
-      WHERE product_id IN (${placeholders})
-      GROUP BY product_id
-    `,
-    ...productIds
-  ));
-  const disabledAccountCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM customer_accounts
-      WHERE product_id IN (${placeholders}) AND status = 'disabled'
-      GROUP BY product_id
-    `,
-    ...productIds
-  ));
-  const activeEntitlementCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM entitlements
-      WHERE product_id IN (${placeholders}) AND status = 'active' AND ends_at > ?
-      GROUP BY product_id
-    `,
-    ...productIds,
-    now
-  ));
+  const {
+    policyCounts,
+    freshCardCounts,
+    redeemedCardCounts,
+    accountCounts,
+    disabledAccountCounts,
+    activeEntitlementCounts
+  } = await queryProductBusinessMetricMaps(db, store, productIds, now);
   const {
     activeSessionCounts,
     activeBindingCounts,
@@ -7636,8 +7627,20 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       requireAdminSession(db, token);
       await expireStaleSessions(db, store, stateStore);
       const products = await Promise.resolve(store.products.queryProductRows(db, {}));
-      const policies = await Promise.resolve(store.policies.queryPolicyRows(db, {}));
       const now = nowIso();
+      const {
+        policyCounts,
+        freshCardCounts,
+        redeemedCardCounts,
+        accountCounts,
+        disabledAccountCounts,
+        activeEntitlementCounts
+      } = await queryProductBusinessMetricMaps(
+        db,
+        store,
+        products.map((item) => item.id),
+        now
+      );
       const {
         activeBindingCounts,
         releasedBindingCounts,
@@ -7656,14 +7659,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       const summary = {
         products: products.length,
-        policies: policies.length,
-        cardsFresh: one(db, "SELECT COUNT(*) AS count FROM license_keys WHERE status = 'fresh'").count,
-        cardsRedeemed: one(db, "SELECT COUNT(*) AS count FROM license_keys WHERE status = 'redeemed'").count,
-        accounts: one(db, "SELECT COUNT(*) AS count FROM customer_accounts").count,
-        disabledAccounts: one(
-          db,
-          "SELECT COUNT(*) AS count FROM customer_accounts WHERE status = 'disabled'"
-        ).count,
+        policies: sumMetricMap(policyCounts),
+        cardsFresh: sumMetricMap(freshCardCounts),
+        cardsRedeemed: sumMetricMap(redeemedCardCounts),
+        accounts: sumMetricMap(accountCounts),
+        disabledAccounts: sumMetricMap(disabledAccountCounts),
+        activeEntitlements: sumMetricMap(activeEntitlementCounts),
         activeBindings: sumMetricMap(activeBindingCounts),
         releasedBindings: sumMetricMap(releasedBindingCounts),
         blockedDevices: sumMetricMap(blockedDeviceCounts),

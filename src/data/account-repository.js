@@ -203,3 +203,29 @@ export function accountUsernameExists(db, productId, username) {
     )
   );
 }
+
+export function countAccountsByProductIds(db, productIds = null, status = null) {
+  const conditions = [];
+  const params = [];
+
+  appendInCondition("product_id", productIds, conditions, params);
+
+  if (status !== null && status !== undefined && String(status).trim() !== "") {
+    conditions.push("status = ?");
+    params.push(normalizeAccountStatus(status));
+  }
+
+  return many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM customer_accounts
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      GROUP BY product_id
+    `,
+    ...params
+  ).map((row) => ({
+    ...row,
+    count: Number(row.count ?? 0)
+  }));
+}

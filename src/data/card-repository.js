@@ -304,3 +304,35 @@ export function getCardRowById(db, cardId) {
     notes: row.control_notes ?? row.notes
   }) : null;
 }
+
+export function countCardsByProductIds(db, productIds = null, usageStatus = null) {
+  const conditions = [];
+  const params = [];
+  const normalizedUsageStatus = usageStatus === null || usageStatus === undefined || String(usageStatus).trim() === ""
+    ? null
+    : String(usageStatus).trim().toLowerCase();
+
+  appendInCondition("product_id", productIds, conditions, params);
+
+  if (normalizedUsageStatus) {
+    if (!["fresh", "redeemed"].includes(normalizedUsageStatus)) {
+      throw new AppError(400, "INVALID_CARD_USAGE_STATUS", "usageStatus must be fresh or redeemed.");
+    }
+    conditions.push("status = ?");
+    params.push(normalizedUsageStatus);
+  }
+
+  return many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM license_keys
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      GROUP BY product_id
+    `,
+    ...params
+  ).map((row) => ({
+    ...row,
+    count: Number(row.count ?? 0)
+  }));
+}

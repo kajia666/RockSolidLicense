@@ -617,6 +617,20 @@ function createWriteCapableAdapter() {
       return policyRows(meta.filters ?? { policyId: meta.policyId });
     }
 
+    if (meta.repository === "policies" && meta.operation === "countPoliciesByProductIds") {
+      const counts = new Map();
+      for (const policy of state.policies) {
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(policy.product_id)) {
+          continue;
+        }
+        counts.set(policy.product_id, (counts.get(policy.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
     if (meta.repository === "versions" && meta.operation === "assertClientVersionAvailable") {
       return state.clientVersions
         .filter((version) =>
@@ -896,6 +910,23 @@ function createWriteCapableAdapter() {
       return cardRows(meta.filters ?? { cardId: meta.cardId });
     }
 
+    if (meta.repository === "cards" && meta.operation === "countCardsByProductIds") {
+      const counts = new Map();
+      for (const card of state.licenseKeys) {
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(card.product_id)) {
+          continue;
+        }
+        if (meta.usageStatus && card.status !== meta.usageStatus) {
+          continue;
+        }
+        counts.set(card.product_id, (counts.get(card.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
     if (meta.repository === "entitlements" && meta.operation === "loadEntitlementManageRow") {
       return entitlementRows({ entitlementId: params[0] }).slice(0, 1);
     }
@@ -980,6 +1011,24 @@ function createWriteCapableAdapter() {
       return entitlementRows(meta.filters ?? {});
     }
 
+    if (meta.repository === "entitlements" && meta.operation === "countActiveEntitlementsByProductIds") {
+      const counts = new Map();
+      const referenceTime = params[0] ?? meta.referenceTime ?? "9999-12-31T23:59:59.999Z";
+      for (const entitlement of state.entitlements) {
+        if (entitlement.status !== "active" || String(entitlement.ends_at ?? "") <= referenceTime) {
+          continue;
+        }
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(entitlement.product_id)) {
+          continue;
+        }
+        counts.set(entitlement.product_id, (counts.get(entitlement.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
     if (meta.repository === "entitlements" && meta.operation === "getUsableDurationEntitlement") {
       return entitlementRows({})
         .filter((entitlement) => entitlement.account_id === params[0])
@@ -1027,6 +1076,23 @@ function createWriteCapableAdapter() {
       || meta.operation === "getAccountManageRowById"
     )) {
       return accountRows(meta.filters ?? {}, params[0]);
+    }
+
+    if (meta.repository === "accounts" && meta.operation === "countAccountsByProductIds") {
+      const counts = new Map();
+      for (const account of state.customerAccounts) {
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(account.product_id)) {
+          continue;
+        }
+        if (meta.status && account.status !== meta.status) {
+          continue;
+        }
+        counts.set(account.product_id, (counts.get(account.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
     }
 
     if (meta.repository === "accounts" && meta.operation === "getAccountRecordById") {
@@ -1656,6 +1722,15 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "policies" && meta.operation === "countPoliciesByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
       if (meta.repository === "policies") {
         return [
           {
@@ -1681,6 +1756,18 @@ test("postgres main store can serve all main-store read-side queries through ada
             status: "active",
             created_at: "2026-01-01T00:00:00.000Z",
             updated_at: "2026-01-02T00:00:00.000Z"
+          }
+        ];
+      }
+
+      if (meta.repository === "cards" && meta.operation === "countCardsByProductIds") {
+        if (meta.usageStatus === "redeemed") {
+          return [];
+        }
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
           }
         ];
       }
@@ -1717,6 +1804,15 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "entitlements" && meta.operation === "countActiveEntitlementsByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
       if (meta.repository === "entitlements") {
         return [
           {
@@ -1749,6 +1845,18 @@ test("postgres main store can serve all main-store read-side queries through ada
             card_expires_at: null,
             created_at: "2026-01-01T00:00:00.000Z",
             updated_at: "2026-01-02T00:00:00.000Z"
+          }
+        ];
+      }
+
+      if (meta.repository === "accounts" && meta.operation === "countAccountsByProductIds") {
+        if (meta.status === "disabled") {
+          return [];
+        }
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
           }
         ];
       }
@@ -2521,7 +2629,41 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(activeNetworkRuleCounts[0].product_id, "prod_pg_1");
     assert.equal(activeNetworkRuleCounts[0].count, 1);
 
-    assert.equal(queries.length, 38);
+    const policyCounts = await app.mainStore.policies.countPoliciesByProductIds(app.db, ["prod_pg_1"]);
+    assert.equal(policyCounts.length, 1);
+    assert.equal(policyCounts[0].product_id, "prod_pg_1");
+    assert.equal(policyCounts[0].count, 1);
+
+    const freshCardCounts = await app.mainStore.cards.countCardsByProductIds(app.db, ["prod_pg_1"], "fresh");
+    assert.equal(freshCardCounts.length, 1);
+    assert.equal(freshCardCounts[0].product_id, "prod_pg_1");
+    assert.equal(freshCardCounts[0].count, 1);
+
+    const redeemedCardCounts = await app.mainStore.cards.countCardsByProductIds(app.db, ["prod_pg_1"], "redeemed");
+    assert.equal(redeemedCardCounts.length, 0);
+
+    const accountCounts = await app.mainStore.accounts.countAccountsByProductIds(app.db, ["prod_pg_1"]);
+    assert.equal(accountCounts.length, 1);
+    assert.equal(accountCounts[0].product_id, "prod_pg_1");
+    assert.equal(accountCounts[0].count, 1);
+
+    const disabledAccountCounts = await app.mainStore.accounts.countAccountsByProductIds(
+      app.db,
+      ["prod_pg_1"],
+      "disabled"
+    );
+    assert.equal(disabledAccountCounts.length, 0);
+
+    const activeEntitlementCounts = await app.mainStore.entitlements.countActiveEntitlementsByProductIds(
+      app.db,
+      ["prod_pg_1"],
+      "2026-01-15T00:00:00.000Z"
+    );
+    assert.equal(activeEntitlementCounts.length, 1);
+    assert.equal(activeEntitlementCounts[0].product_id, "prod_pg_1");
+    assert.equal(activeEntitlementCounts[0].count, 1);
+
+    assert.equal(queries.length, 44);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -2598,6 +2740,18 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[36].sql, /nr\.decision = 'block'/i);
     assert.equal(queries[37].meta.operation, "countActiveNetworkRulesByProductIds");
     assert.match(queries[37].sql, /FROM network_rules/i);
+    assert.equal(queries[38].meta.operation, "countPoliciesByProductIds");
+    assert.match(queries[38].sql, /FROM policies/i);
+    assert.equal(queries[39].meta.operation, "countCardsByProductIds");
+    assert.match(queries[39].sql, /FROM license_keys/i);
+    assert.equal(queries[40].meta.operation, "countCardsByProductIds");
+    assert.match(queries[40].sql, /status = \$2/i);
+    assert.equal(queries[41].meta.operation, "countAccountsByProductIds");
+    assert.match(queries[41].sql, /FROM customer_accounts/i);
+    assert.equal(queries[42].meta.operation, "countAccountsByProductIds");
+    assert.match(queries[42].sql, /status = \$2/i);
+    assert.equal(queries[43].meta.operation, "countActiveEntitlementsByProductIds");
+    assert.match(queries[43].sql, /FROM entitlements/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -3001,6 +3155,11 @@ test("postgres main store can write products and policies through a transaction-
     const dashboard = await app.services.dashboard(admin.token);
     assert.equal(dashboard.summary.products, 1);
     assert.equal(dashboard.summary.policies, 1);
+    assert.equal(dashboard.summary.accounts, 2);
+    assert.equal(dashboard.summary.disabledAccounts, 1);
+    assert.equal(dashboard.summary.activeEntitlements, 0);
+    assert.equal(dashboard.summary.cardsFresh, 0);
+    assert.equal(dashboard.summary.cardsRedeemed, 0);
     assert.equal(dashboard.summary.activeBindings, 0);
     assert.equal(dashboard.summary.blockedDevices, 0);
     assert.equal(dashboard.summary.activeClientVersions, 0);
@@ -3109,6 +3268,22 @@ test("postgres main store can write products and policies through a transaction-
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "countActiveSessionsByProductIds"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countPoliciesByProductIds"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countCardsByProductIds"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countAccountsByProductIds"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countActiveEntitlementsByProductIds"),
       true
     );
     assert.equal(

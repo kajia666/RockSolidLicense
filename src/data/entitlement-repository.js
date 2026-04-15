@@ -323,3 +323,24 @@ export function loadPointEntitlementForAdmin(db, entitlementId) {
     entitlementId
   );
 }
+
+export function countActiveEntitlementsByProductIds(db, productIds = null, referenceTime = nowIso()) {
+  const conditions = ["status = 'active'", "ends_at > ?"];
+  const params = [referenceTime];
+
+  appendInCondition("product_id", productIds, conditions, params);
+
+  return many(
+    db,
+    `
+      SELECT product_id, COUNT(*) AS count
+      FROM entitlements
+      WHERE ${conditions.join(" AND ")}
+      GROUP BY product_id
+    `,
+    ...params
+  ).map((row) => ({
+    ...row,
+    count: Number(row.count ?? 0)
+  }));
+}

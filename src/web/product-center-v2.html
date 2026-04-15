@@ -318,6 +318,7 @@
         <div class="pill-row">
           <div class="pill">Route: <code>/admin/products</code></div>
           <div class="pill">Product code = projectCode = softwareCode</div>
+          <div class="pill">Status API: <code>POST /api/admin/products/:productId/status</code></div>
           <div class="pill">Profile API: <code>POST /api/admin/products/:productId/profile</code></div>
           <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
           <div class="pill">Credential Rotate API: <code>POST /api/admin/products/:productId/sdk-credentials/rotate</code></div>
@@ -405,6 +406,13 @@
           <label>Product / Project Code<input id="edit-product-code" placeholder="Selected product code" /></label>
           <label>Product Name<input id="edit-product-name" placeholder="Selected product name" /></label>
           <label>Description<textarea id="edit-product-description" placeholder="Project description for operators or software authors."></textarea></label>
+          <label>Project Status
+            <select id="edit-product-status">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
           <label>Owner Developer
             <select id="edit-owner-developer-id">
               <option value="">Unassigned</option>
@@ -456,6 +464,7 @@
           </div>
           <div class="actions">
             <button id="save-profile-btn">Save Project Profile</button>
+            <button id="save-status-btn">Save Project Status</button>
             <button id="assign-owner-btn">Save Owner</button>
             <button class="secondary" id="update-btn">Save Feature Config</button>
             <button class="secondary" id="rotate-sdk-btn">Rotate SDK Credentials</button>
@@ -467,7 +476,7 @@
               <option value="true">true</option>
             </select>
           </label>
-          <div class="hint">Each project can belong to one developer account. Profile, owner, feature toggles, and SDK credentials stay scoped to the project, not to the whole developer.</div>
+          <div class="hint">Each project can belong to one developer account. Profile, status, owner, feature toggles, and SDK credentials stay scoped to the project, not to the whole developer.</div>
         </article>
 
         <article class="card">
@@ -695,6 +704,7 @@
           el("edit-product-code").value = "";
           el("edit-product-name").value = "";
           el("edit-product-description").value = "";
+          el("edit-product-status").value = "active";
           el("edit-owner-developer-id").value = "";
           el("rotate-sdk-app-id").value = "false";
           writeFeatureConfig("edit", {});
@@ -706,6 +716,7 @@
         el("edit-product-code").value = product.code;
         el("edit-product-name").value = product.name || "";
         el("edit-product-description").value = product.description || "";
+        el("edit-product-status").value = product.status || "active";
         el("edit-owner-developer-id").value = product.ownerDeveloperId || "";
         writeFeatureConfig("edit", product.featureConfig || {});
         renderDetails(product);
@@ -933,6 +944,25 @@
         });
         setOutput(data);
         setStatus(`Saved profile for ${data.code}.`);
+        await refreshAll();
+        const updated = productsCache.find((item) => item.id === productId) || data;
+        setSelection(updated);
+      }));
+
+      el("save-status-btn").addEventListener("click", () => guarded(async () => {
+        const productId = el("edit-product-id").value.trim();
+        if (!productId) {
+          throw new Error("Select a project before saving status.");
+        }
+
+        const data = await callApi(`/api/admin/products/${encodeURIComponent(productId)}/status`, {
+          method: "POST",
+          body: {
+            status: el("edit-product-status").value
+          }
+        });
+        setOutput(data);
+        setStatus(`Saved project status for ${data.code}.`);
         await refreshAll();
         const updated = productsCache.find((item) => item.id === productId) || data;
         setSelection(updated);

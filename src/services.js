@@ -6,6 +6,7 @@ import {
   getProductRowById,
   listAssignedDeveloperProductIds,
   listOwnedProductIds,
+  normalizeProductStatus,
   parseProductFeatureConfigRow,
   queryProductRows
 } from "./data/product-repository.js";
@@ -4842,6 +4843,46 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return nextProduct;
     },
 
+    async updateProductStatus(token, productId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const currentProduct = await getStoreProductById(productId);
+      if (!currentProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+
+      const nextStatus = normalizeProductStatus(body.status);
+      if (currentProduct.status === nextStatus) {
+        return {
+          ...currentProduct,
+          status: nextStatus,
+          changed: false,
+          revokedSessions: 0
+        };
+      }
+
+      return withTransaction(db, async () => {
+        const updatedProduct = await Promise.resolve(
+          store.products.updateProductStatus(productId, nextStatus, nowIso())
+        );
+        const revokedSessions = nextStatus === "active"
+          ? 0
+          : await expireActiveSessions(db, store, stateStore, { productId: currentProduct.id }, `product_${nextStatus}`);
+
+        audit(db, "admin", admin.admin_id, "product.status", "product", productId, {
+          previousStatus: currentProduct.status,
+          status: nextStatus,
+          code: updatedProduct.code,
+          revokedSessions
+        });
+
+        return {
+          ...updatedProduct,
+          changed: true,
+          revokedSessions
+        };
+      });
+    },
+
     async updateProductFeatureConfig(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
       const timestamp = nowIso();
@@ -5017,6 +5058,54 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         description: nextProduct.description
       });
       return nextProduct;
+    },
+
+    async developerUpdateProductStatus(token, productId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const ownedProduct = await getStoreProductById(productId);
+      if (!ownedProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: ownedProduct.id, owner_developer_id: ownedProduct.ownerDeveloperId ?? ownedProduct.ownerDeveloper?.id ?? null },
+        "products.write",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only manage products owned by your developer account."
+      );
+
+      const nextStatus = normalizeProductStatus(body.status);
+      if (ownedProduct.status === nextStatus) {
+        return {
+          ...ownedProduct,
+          status: nextStatus,
+          changed: false,
+          revokedSessions: 0
+        };
+      }
+
+      return withTransaction(db, async () => {
+        const updatedProduct = await Promise.resolve(
+          store.products.updateProductStatus(ownedProduct.id, nextStatus, nowIso())
+        );
+        const revokedSessions = nextStatus === "active"
+          ? 0
+          : await expireActiveSessions(db, store, stateStore, { productId: ownedProduct.id }, `product_${nextStatus}`);
+
+        auditDeveloperSession(db, session, "product.status", "product", ownedProduct.id, {
+          previousStatus: ownedProduct.status,
+          status: nextStatus,
+          code: updatedProduct.code,
+          revokedSessions
+        });
+
+        return {
+          ...updatedProduct,
+          changed: true,
+          revokedSessions
+        };
+      });
     },
 
     async developerUpdateProductFeatureConfig(token, productId, body = {}) {

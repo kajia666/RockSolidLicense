@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/projects</code></div>
-          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
+          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
           <div class="pill">Owner creates projects. Owner and admin members can edit product settings.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -40,7 +40,7 @@
             <label>Rotate SDK App ID Too<select id="rotate-sdk-app-id"><option value="false">false</option><option value="true">true</option></select></label>
           </div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-filter-btn">Apply Filter</button><button id="clear-selection-btn">Clear Selection</button></div>
-          <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, feature toggles, and rotate SDK credentials inside assigned projects.</div>
+          <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, status, feature toggles, and rotate SDK credentials inside assigned projects.</div>
         </article>
       </section>
 
@@ -72,6 +72,7 @@
             <label>Project Code<input id="edit-product-code" placeholder="ALPHA_APP" /></label>
             <label>Project Name<input id="edit-product-name" placeholder="Alpha Desktop" /></label>
             <label>SDK App ID<input id="edit-sdk-app-id" placeholder="Filled from selection" /></label>
+            <label>Project Status<select id="edit-product-status"><option value="active">active</option><option value="disabled">disabled</option><option value="archived">archived</option></select></label>
           </div>
           <label style="margin-top:12px;">Description<textarea id="edit-product-description" placeholder="Optional project description"></textarea></label>
           <div class="hint" style="margin:12px 0 8px;">FeatureConfig</div>
@@ -84,7 +85,7 @@
             <label>Allow Notices<select id="edit-allow-notices"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Client Unbind<select id="edit-allow-client-unbind"><option value="true">true</option><option value="false">false</option></select></label>
           </div>
-          <div class="actions" style="margin-top:12px;"><button id="save-profile-btn">Save Project Profile</button><button class="secondary" id="save-feature-btn">Save Feature Config</button><button class="danger" id="rotate-sdk-btn">Rotate SDK Credentials</button></div>
+          <div class="actions" style="margin-top:12px;"><button id="save-profile-btn">Save Project Profile</button><button id="save-status-btn">Save Project Status</button><button class="secondary" id="save-feature-btn">Save Feature Config</button><button class="danger" id="rotate-sdk-btn">Rotate SDK Credentials</button></div>
         </article>
       </section>
 
@@ -105,7 +106,7 @@
       </section>
 
       <section class="wide">
-        <article class="card"><h2>Workspace Notes</h2><div class="hint"><p>Creating a new project is owner-only. The owner account automatically becomes the project owner developer.</p><p>Project profile editing, feature toggles, and SDK credential rotation require product write permission. In the current role model that means the owner account or an assigned `admin` member.</p><p>The detail panel merges project settings with the scoped dashboard metrics already exposed by the developer summary API.</p></div></article>
+        <article class="card"><h2>Workspace Notes</h2><div class="hint"><p>Creating a new project is owner-only. The owner account automatically becomes the project owner developer.</p><p>Project profile editing, status switching, feature toggles, and SDK credential rotation require product write permission. In the current role model that means the owner account or an assigned `admin` member.</p><p>The detail panel merges project settings with the scoped dashboard metrics already exposed by the developer summary API.</p></div></article>
         <article class="card"><h2>API Output</h2><pre id="output">Waiting for actions...</pre></article>
       </section>
     </main>
@@ -223,10 +224,11 @@
         ["create-code", "create-name", "create-description"].forEach((id) => {
           el(id).disabled = createDisabled;
         });
-        ["edit-product-code", "edit-product-name", "edit-product-description"].forEach((id) => {
+        ["edit-product-code", "edit-product-name", "edit-product-description", "edit-product-status"].forEach((id) => {
           el(id).disabled = editDisabled;
         });
         el("save-profile-btn").disabled = editDisabled;
+        el("save-status-btn").disabled = editDisabled;
         el("save-feature-btn").disabled = editDisabled;
         el("rotate-sdk-btn").disabled = editDisabled;
         el("rotate-sdk-app-id").disabled = editDisabled;
@@ -340,6 +342,7 @@
           el("edit-product-name").value = "";
           el("edit-product-description").value = "";
           el("edit-sdk-app-id").value = "";
+          el("edit-product-status").value = "active";
           writeFeatureConfig("edit", {});
           renderDetail(null);
           return;
@@ -350,6 +353,7 @@
         el("edit-product-name").value = product.name || "";
         el("edit-product-description").value = product.description || "";
         el("edit-sdk-app-id").value = product.sdkAppId;
+        el("edit-product-status").value = product.status || "active";
         writeFeatureConfig("edit", product.featureConfig || {});
         renderDetail(product);
       }
@@ -527,6 +531,29 @@
               description: el("edit-product-description").value.trim()
             },
             "Project profile updated."
+          );
+          const updated = products.find((item) => item.id === productId);
+          if (updated) {
+            setSelection(updated);
+          }
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("save-status-btn").addEventListener("click", async () => {
+        try {
+          const productId = el("edit-product-id").value.trim();
+          if (!productId) {
+            throw new Error("Select a project before saving status.");
+          }
+          await postAndRefresh(
+            `/api/developer/products/${encodeURIComponent(productId)}/status`,
+            {
+              status: el("edit-product-status").value
+            },
+            "Project status updated."
           );
           const updated = products.find((item) => item.id === productId);
           if (updated) {

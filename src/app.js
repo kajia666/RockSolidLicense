@@ -203,6 +203,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      const productStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/products/:productId/status")
+        : null;
+      if (productStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.updateProductStatus(
+            getBearerToken(req),
+            productStatusRoute.productId,
+            body
+          )
+        });
+        return;
+      }
+
       const productProfileRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/admin/products/:productId/profile")
         : null;
@@ -1034,6 +1050,22 @@ export function createApp(overrides = {}) {
       if (req.method === "POST" && url.pathname === "/api/developer/products") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, { ok: true, data: await services.developerCreateProduct(getBearerToken(req), body) });
+        return;
+      }
+
+      const developerProductStatusRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/products/:productId/status")
+        : null;
+      if (developerProductStatusRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerUpdateProductStatus(
+            getBearerToken(req),
+            developerProductStatusRoute.productId,
+            body
+          )
+        });
         return;
       }
 

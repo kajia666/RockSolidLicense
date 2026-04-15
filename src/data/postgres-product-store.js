@@ -5,6 +5,7 @@ import {
   formatProductRow,
   mergeProductFeatureConfig,
   normalizeProductProfileInput,
+  normalizeProductStatus,
   parseProductFeatureConfigInput,
   parseProductFeatureConfigRow,
   serializeProductFeatureConfigValues
@@ -236,6 +237,33 @@ export function createPostgresProductStore(adapter) {
         ));
 
         return loadProductRow(tx, product.id);
+      });
+    },
+
+    async updateProductStatus(productId, status, timestamp = nowIso()) {
+      const nextStatus = normalizeProductStatus(status);
+
+      return adapter.withTransaction(async (tx) => {
+        await Promise.resolve(tx.query(
+          `
+            UPDATE products
+            SET status = $1, updated_at = $2
+            WHERE id = $3
+          `,
+          [nextStatus, timestamp, productId],
+          {
+            repository: "products",
+            operation: "updateProductStatus",
+            productId,
+            status: nextStatus
+          }
+        ));
+
+        const product = await loadProductRow(tx, productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+        }
+        return product;
       });
     },
 

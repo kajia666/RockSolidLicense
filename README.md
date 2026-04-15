@@ -44,6 +44,7 @@
 ### 软件管理
 
 - 项目编码 / 名称 / 描述编辑
+- 项目启用 / 停用 / 归档
 - 产品级功能开关
 - 项目 SDK 凭据轮换
 - 开发者多项目归属
@@ -259,6 +260,7 @@ HTTP：
 - `GET /api/admin/products`
 - `POST /api/admin/products`
 - `POST /api/admin/products/:productId/profile`
+- `POST /api/admin/products/:productId/status`
 - `POST /api/admin/products/:productId/feature-config`
 - `POST /api/admin/products/:productId/sdk-credentials/rotate`
 - `POST /api/admin/products/:productId/owner`
@@ -299,7 +301,7 @@ TCP：
 - `allowClientUnbind`
 
 软件作者可以按产品维度选择是否开放这些终端能力。关闭 `allowVersionCheck` 或 `allowNotices` 后，客户端对应接口会返回“disabled by product”，登录链路也不会再继续应用该产品的版本限制或维护公告阻断。
-仓库现在还提供了一个专门的产品中心页面：`/admin/products`，可直接创建开发者账号、分配项目归属、编辑项目资料并调整产品级功能开关，同时在页头汇总展示注册、账号登录、卡密登录、卡密充值、版本检查、公告和客户端解绑这 7 个项目级开关的覆盖情况。
+仓库现在还提供了一个专门的产品中心页面：`/admin/products`，可直接创建开发者账号、分配项目归属、编辑项目资料、切换项目状态并调整产品级功能开关，同时在页头汇总展示注册、账号登录、卡密登录、卡密充值、版本检查、公告和客户端解绑这 7 个项目级开关的覆盖情况。
 
 开发者项目管理接口：
 
@@ -316,6 +318,7 @@ TCP：
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/profile`
+- `POST /api/developer/products/:productId/status`
 - `POST /api/developer/products/:productId/feature-config`
 - `POST /api/developer/products/:productId/sdk-credentials/rotate`
 - `GET /api/developer/policies`
@@ -358,7 +361,7 @@ TCP：
 - `operator`：可管理已分配项目的策略、卡密、版本、公告和终端用户授权运营动作，但不能改产品功能开关
 - `viewer`：只读查看已分配项目及其策略、卡密、版本、公告，以及授权运营数据
 
-开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者中心现在还会通过 `GET /api/developer/dashboard` 拉取按项目范围隔离的总览统计，直接展示项目数、在线会话、卡密、强更规则、阻断公告和网络规则概况，同时额外汇总 `allowRegister / allowAccountLogin / allowCardLogin / allowCardRecharge / allowVersionCheck / allowNotices / allowClientUnbind` 这些项目级功能开关当前启用了多少个项目。开发者接入中心位于 `/developer/integration`，适合软件作者集中查看项目 SDK 凭据、公钥集、HTTP/TCP 连接信息和接入示例，并且会按当前可见项目汇总这 7 个项目级功能开关的启用覆盖情况，页面示例请求也已经对齐运行时使用的 `x-rs-*` 验签请求头。开发者项目中心位于 `/developer/projects`，适合软件作者集中处理项目创建、项目资料编辑、产品级功能开关和 SDK 凭据轮换。开发者授权中心位于 `/developer/licenses`，适合软件作者集中维护策略、卡密批次、卡密状态和卡密导出。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者发版中心位于 `/developer/releases`，适合软件作者维护客户端版本、强更规则和启动公告。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
+开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者中心现在还会通过 `GET /api/developer/dashboard` 拉取按项目范围隔离的总览统计，直接展示项目数、在线会话、卡密、强更规则、阻断公告和网络规则概况，同时额外汇总 `allowRegister / allowAccountLogin / allowCardLogin / allowCardRecharge / allowVersionCheck / allowNotices / allowClientUnbind` 这些项目级功能开关当前启用了多少个项目。开发者接入中心位于 `/developer/integration`，适合软件作者集中查看项目 SDK 凭据、公钥集、HTTP/TCP 连接信息和接入示例，并且会按当前可见项目汇总这 7 个项目级功能开关的启用覆盖情况，页面示例请求也已经对齐运行时使用的 `x-rs-*` 验签请求头。开发者项目中心位于 `/developer/projects`，适合软件作者集中处理项目创建、项目资料编辑、项目状态切换、产品级功能开关和 SDK 凭据轮换。项目状态现在支持 `active / disabled / archived`，其中停用或归档项目时会同步回收该项目下的活跃会话。开发者授权中心位于 `/developer/licenses`，适合软件作者集中维护策略、卡密批次、卡密状态和卡密导出。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者发版中心位于 `/developer/releases`，适合软件作者维护客户端版本、强更规则和启动公告。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
 
 ## Windows C/C++ SDK
 

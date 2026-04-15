@@ -7,6 +7,7 @@ import {
   getProductRowById,
   mergeProductFeatureConfig,
   normalizeProductProfileInput,
+  normalizeProductStatus,
   parseProductFeatureConfigInput,
   parseProductFeatureConfigRow,
   productCodeExists,
@@ -165,6 +166,28 @@ export function createSqliteProductStore({ db }) {
         profile.code,
         profile.name,
         profile.description,
+        timestamp,
+        product.id
+      );
+
+      return getProductRowById(db, product.id);
+    },
+
+    updateProductStatus(productId, status, timestamp = nowIso()) {
+      const product = getProductRecordById(db, productId);
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+
+      const nextStatus = normalizeProductStatus(status);
+      run(
+        db,
+        `
+          UPDATE products
+          SET status = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        nextStatus,
         timestamp,
         product.id
       );

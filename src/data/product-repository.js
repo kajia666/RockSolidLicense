@@ -24,6 +24,7 @@ const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze(
   Object.fromEntries(PRODUCT_FEATURE_KEYS.map((key) => [key, true]))
 );
 const PRODUCT_CODE_PATTERN = /^[A-Z0-9_]{3,32}$/;
+const PRODUCT_STATUS_VALUES = Object.freeze(["active", "disabled", "archived"]);
 
 function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
@@ -165,6 +166,18 @@ export function normalizeProductProfileInput(body = {}, current = null) {
   };
 }
 
+export function normalizeProductStatus(value, fieldName = "status") {
+  const status = String(value ?? "").trim().toLowerCase();
+  if (!PRODUCT_STATUS_VALUES.includes(status)) {
+    throw new AppError(
+      400,
+      "INVALID_PRODUCT_STATUS",
+      `${fieldName} must be active, disabled, or archived.`
+    );
+  }
+  return status;
+}
+
 function productSelectSql(whereClause = "") {
   return `
     SELECT p.*, pfc.allow_register, pfc.allow_account_login, pfc.allow_card_login, pfc.allow_card_recharge,
@@ -280,5 +293,6 @@ export function findOwnedProductIdByCode(db, ownerDeveloperId, productCode) {
 export {
   DEFAULT_PRODUCT_FEATURE_CONFIG,
   PRODUCT_FEATURE_COLUMN_MAP,
-  PRODUCT_FEATURE_KEYS
+  PRODUCT_FEATURE_KEYS,
+  PRODUCT_STATUS_VALUES
 };

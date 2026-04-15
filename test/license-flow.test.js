@@ -6136,6 +6136,229 @@ test("admin and developers can update project profile with scoped permission che
   }
 });
 
+test("project status control can disable runtime and revoke scoped sessions", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "status.owner",
+        password: "StatusOwner123!",
+        displayName: "Status Owner"
+      },
+      adminSession.token
+    );
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "STATUS_APP",
+        name: "Status App",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "STATUS_APP",
+        name: "Status Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const batch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "STATUS_APP",
+        policyId: policy.id,
+        count: 1,
+        prefix: "STATUS"
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "STATUS_APP",
+      username: "status_user",
+      password: "StatusUser123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "STATUS_APP",
+      username: "status_user",
+      password: "StatusUser123!",
+      cardKey: batch.keys[0]
+    });
+
+    const activeLogin = await signedClientPost(baseUrl, "/api/client/login", product.sdkAppId, product.sdkAppSecret, {
+      productCode: "STATUS_APP",
+      username: "status_user",
+      password: "StatusUser123!",
+      deviceFingerprint: "status-device-001",
+      deviceName: "Status Desktop"
+    });
+    assert.ok(activeLogin.sessionToken);
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "status.owner",
+      password: "StatusOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "status.admin",
+        password: "StatusAdmin123!",
+        displayName: "Status Admin",
+        role: "admin",
+        productCodes: ["STATUS_APP"]
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "status.operator",
+        password: "StatusOperator123!",
+        displayName: "Status Operator",
+        role: "operator",
+        productCodes: ["STATUS_APP"]
+      },
+      ownerSession.token
+    );
+
+    const adminMemberSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "status.admin",
+      password: "StatusAdmin123!"
+    });
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "status.operator",
+      password: "StatusOperator123!"
+    });
+
+    const activeSessionsBeforeDisable = await getJson(
+      baseUrl,
+      "/api/admin/sessions?productCode=STATUS_APP&status=active",
+      adminSession.token
+    );
+    assert.equal(activeSessionsBeforeDisable.total, 1);
+
+    const disabledProject = await postJson(
+      baseUrl,
+      `/api/developer/products/${product.id}/status`,
+      { status: "disabled" },
+      adminMemberSession.token
+    );
+    assert.equal(disabledProject.status, "disabled");
+    assert.equal(disabledProject.changed, true);
+    assert.ok(disabledProject.revokedSessions >= 1);
+
+    const activeSessionsAfterDisable = await getJson(
+      baseUrl,
+      "/api/admin/sessions?productCode=STATUS_APP&status=active",
+      adminSession.token
+    );
+    assert.equal(activeSessionsAfterDisable.total, 0);
+
+    const expiredSessionsAfterDisable = await getJson(
+      baseUrl,
+      "/api/admin/sessions?productCode=STATUS_APP&status=expired",
+      adminSession.token
+    );
+    assert.equal(expiredSessionsAfterDisable.total, 1);
+    assert.equal(expiredSessionsAfterDisable.items[0].revoked_reason, "product_disabled");
+
+    const ownerProductsAfterDisable = await getJson(baseUrl, "/api/developer/products", ownerSession.token);
+    assert.equal(ownerProductsAfterDisable.length, 1);
+    assert.equal(ownerProductsAfterDisable[0].status, "disabled");
+
+    const disabledRegister = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/register",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "STATUS_APP",
+        username: "status_user_disabled",
+        password: "StatusUser123!"
+      }
+    );
+    assert.equal(disabledRegister.status, 401);
+    assert.equal(disabledRegister.error.code, "SDK_APP_INVALID");
+
+    const disabledHeartbeat = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/heartbeat",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "STATUS_APP",
+        sessionToken: activeLogin.sessionToken,
+        deviceFingerprint: "status-device-001"
+      }
+    );
+    assert.equal(disabledHeartbeat.status, 401);
+    assert.equal(disabledHeartbeat.error.code, "SDK_APP_INVALID");
+
+    const operatorForbidden = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/products/${product.id}/status`,
+      { status: "active" },
+      operatorSession.token
+    );
+    assert.equal(operatorForbidden.status, 403);
+    assert.equal(operatorForbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const reenabledProject = await postJson(
+      baseUrl,
+      `/api/admin/products/${product.id}/status`,
+      { status: "active" },
+      adminSession.token
+    );
+    assert.equal(reenabledProject.status, "active");
+    assert.equal(reenabledProject.changed, true);
+    assert.equal(reenabledProject.revokedSessions, 0);
+
+    const registerAfterEnable = await signedClientPost(
+      baseUrl,
+      "/api/client/register",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "STATUS_APP",
+        username: "status_user_reenabled",
+        password: "StatusUser123!"
+      }
+    );
+    assert.equal(registerAfterEnable.username, "status_user_reenabled");
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=120", adminSession.token);
+    const developerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=120", ownerSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.status"));
+    assert.ok(developerAuditLogs.items.some((entry) => entry.event_type === "product.status"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -6149,8 +6372,10 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /Developer Accounts/);
     assert.match(html, /api\/admin\/developers/);
     assert.match(html, /developers\/:developerId\/status/);
+    assert.match(html, /products\/:productId\/status/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
+    assert.match(html, /Save Project Status/);
     assert.match(html, /Save Project Profile/);
     assert.match(html, /Rotate SDK Credentials/);
     assert.match(html, /\/assets\/product-features\.js/);
@@ -6281,10 +6506,12 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Developer Project Workspace/);
     assert.match(html, /api\/developer\/products/);
     assert.match(html, /feature-config/);
+    assert.match(html, /products\/:productId\/status/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
+    assert.match(html, /Save Project Status/);
     assert.match(html, /Save Project Profile/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);

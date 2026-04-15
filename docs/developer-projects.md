@@ -2,13 +2,14 @@
 
 The developer project workspace is available at `/developer/projects`.
 
-It is intended for software authors who need a dedicated place to manage project creation, project profile editing, product-level feature toggles, and SDK signing credentials.
+It is intended for software authors who need a dedicated place to manage project creation, project profile editing, project status changes, product-level feature toggles, and SDK signing credentials.
 
 ## Scoped APIs
 
 - `GET /api/developer/products`
 - `POST /api/developer/products`
 - `POST /api/developer/products/:productId/profile`
+- `POST /api/developer/products/:productId/status`
 - `POST /api/developer/products/:productId/feature-config`
 - `POST /api/developer/products/:productId/sdk-credentials/rotate`
 - `GET /api/developer/dashboard`
@@ -16,9 +17,9 @@ It is intended for software authors who need a dedicated place to manage project
 ## Role behavior
 
 - owner account
-  Can create new projects, edit project profile, edit feature toggles, and rotate SDK credentials for owned projects.
+  Can create new projects, edit project profile, switch project status, edit feature toggles, and rotate SDK credentials for owned projects.
 - admin member
-  Can edit project profile, feature toggles, and rotate SDK credentials inside assigned projects.
+  Can edit project profile, switch project status, edit feature toggles, and rotate SDK credentials inside assigned projects.
 - operator member
   Read-only for project settings.
 - viewer member
@@ -78,6 +79,30 @@ Notes:
 - the endpoint keeps the same `productId`
 - only project metadata changes, so member/project bindings stay intact
 - if the project code changes, client requests must use the new `productCode` / `projectCode` / `softwareCode`
+
+## Project status switching
+
+`POST /api/developer/products/:productId/status`
+
+Typical body:
+
+```json
+{
+  "status": "disabled"
+}
+```
+
+Supported status values:
+
+- `active`
+- `disabled`
+- `archived`
+
+Effects:
+
+- non-`active` projects stop accepting client register, login, recharge, heartbeat, notice, and version-check runtime traffic
+- switching a project to `disabled` or `archived` revokes active sessions for that project
+- switching back to `active` restores normal client access with the same SDK credentials
 
 ## SDK credential rotation
 

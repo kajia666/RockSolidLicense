@@ -596,6 +596,14 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(releasedBinding.status, "revoked");
     assert.equal(releasedBinding.revoked_at, "2026-01-05T00:30:00.000Z");
 
+    const releasedBindingCounts = app.mainStore.devices.countReleasedBindingsByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(releasedBindingCounts.length, 1);
+    assert.equal(releasedBindingCounts[0].product_id, directProduct.id);
+    assert.equal(releasedBindingCounts[0].count, 1);
+
     const bindingManageRow = app.mainStore.devices.getBindingManageRowById(
       app.db,
       directBinding.binding.id

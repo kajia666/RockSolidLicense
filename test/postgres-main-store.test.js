@@ -1409,6 +1409,31 @@ function createWriteCapableAdapter() {
         .map((entry) => ({ ...entry }));
     }
 
+    if (meta.repository === "devices" && meta.operation === "countReleasedBindingsByProductIds") {
+      const counts = new Map();
+      for (const binding of state.deviceBindings) {
+        if (binding.status !== "revoked") {
+          continue;
+        }
+
+        const productId = state.entitlements.find((entitlement) => entitlement.id === binding.entitlement_id)?.product_id;
+        if (!productId) {
+          continue;
+        }
+
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(productId)) {
+          continue;
+        }
+
+        counts.set(productId, (counts.get(productId) ?? 0) + 1);
+      }
+
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
     if (meta.repository === "sessions" && meta.operation === "createIssuedSession") {
       state.sessions.push({
         id: params[0],
@@ -2035,6 +2060,15 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "devices" && meta.operation === "countReleasedBindingsByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
       if (meta.repository === "devices" && meta.operation === "countActiveBlocksByProductIds") {
         return [
           {
@@ -2378,6 +2412,14 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(activeBindingCounts[0].product_id, "prod_pg_1");
     assert.equal(activeBindingCounts[0].count, 1);
 
+    const releasedBindingCounts = await app.mainStore.devices.countReleasedBindingsByProductIds(
+      app.db,
+      ["prod_pg_1"]
+    );
+    assert.equal(releasedBindingCounts.length, 1);
+    assert.equal(releasedBindingCounts[0].product_id, "prod_pg_1");
+    assert.equal(releasedBindingCounts[0].count, 1);
+
     const activeBlockCounts = await app.mainStore.devices.countActiveBlocksByProductIds(
       app.db,
       ["prod_pg_1"]
@@ -2479,7 +2521,7 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(activeNetworkRuleCounts[0].product_id, "prod_pg_1");
     assert.equal(activeNetworkRuleCounts[0].count, 1);
 
-    assert.equal(queries.length, 37);
+    assert.equal(queries.length, 38);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -2530,30 +2572,32 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[23].sql, /FROM device_blocks b/i);
     assert.equal(queries[24].meta.operation, "countActiveBindingsByProductIds");
     assert.match(queries[24].sql, /GROUP BY e\.product_id/i);
-    assert.equal(queries[25].meta.operation, "countActiveBlocksByProductIds");
-    assert.match(queries[25].sql, /GROUP BY product_id/i);
-    assert.equal(queries[26].meta.operation, "listProductVersions");
-    assert.match(queries[26].sql, /FROM client_versions/i);
-    assert.equal(queries[27].meta.operation, "queryClientVersionRows");
-    assert.match(queries[27].sql, /FROM client_versions v/i);
-    assert.equal(queries[28].meta.operation, "countActiveVersionsByProductIds");
-    assert.match(queries[28].sql, /GROUP BY product_id/i);
-    assert.equal(queries[29].meta.operation, "countForceUpdateVersionsByProductIds");
-    assert.match(queries[29].sql, /force_update = 1/i);
-    assert.equal(queries[30].meta.operation, "listActiveNoticesForProduct");
-    assert.match(queries[30].sql, /FROM notices n/i);
-    assert.equal(queries[31].meta.operation, "queryNoticeRows");
+    assert.equal(queries[25].meta.operation, "countReleasedBindingsByProductIds");
+    assert.match(queries[25].sql, /GROUP BY e\.product_id/i);
+    assert.equal(queries[26].meta.operation, "countActiveBlocksByProductIds");
+    assert.match(queries[26].sql, /GROUP BY product_id/i);
+    assert.equal(queries[27].meta.operation, "listProductVersions");
+    assert.match(queries[27].sql, /FROM client_versions/i);
+    assert.equal(queries[28].meta.operation, "queryClientVersionRows");
+    assert.match(queries[28].sql, /FROM client_versions v/i);
+    assert.equal(queries[29].meta.operation, "countActiveVersionsByProductIds");
+    assert.match(queries[29].sql, /GROUP BY product_id/i);
+    assert.equal(queries[30].meta.operation, "countForceUpdateVersionsByProductIds");
+    assert.match(queries[30].sql, /force_update = 1/i);
+    assert.equal(queries[31].meta.operation, "listActiveNoticesForProduct");
     assert.match(queries[31].sql, /FROM notices n/i);
-    assert.equal(queries[32].meta.operation, "countActiveNoticesByProductIds");
-    assert.match(queries[32].sql, /GROUP BY product_id/i);
-    assert.equal(queries[33].meta.operation, "countBlockingNoticesByProductIds");
-    assert.match(queries[33].sql, /block_login = 1/i);
-    assert.equal(queries[34].meta.operation, "queryNetworkRuleRows");
-    assert.match(queries[34].sql, /FROM network_rules nr/i);
-    assert.equal(queries[35].meta.operation, "listBlockingNetworkRulesForProduct");
-    assert.match(queries[35].sql, /nr\.decision = 'block'/i);
-    assert.equal(queries[36].meta.operation, "countActiveNetworkRulesByProductIds");
-    assert.match(queries[36].sql, /FROM network_rules/i);
+    assert.equal(queries[32].meta.operation, "queryNoticeRows");
+    assert.match(queries[32].sql, /FROM notices n/i);
+    assert.equal(queries[33].meta.operation, "countActiveNoticesByProductIds");
+    assert.match(queries[33].sql, /GROUP BY product_id/i);
+    assert.equal(queries[34].meta.operation, "countBlockingNoticesByProductIds");
+    assert.match(queries[34].sql, /block_login = 1/i);
+    assert.equal(queries[35].meta.operation, "queryNetworkRuleRows");
+    assert.match(queries[35].sql, /FROM network_rules nr/i);
+    assert.equal(queries[36].meta.operation, "listBlockingNetworkRulesForProduct");
+    assert.match(queries[36].sql, /nr\.decision = 'block'/i);
+    assert.equal(queries[37].meta.operation, "countActiveNetworkRulesByProductIds");
+    assert.match(queries[37].sql, /FROM network_rules/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");

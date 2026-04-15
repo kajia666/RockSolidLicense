@@ -566,6 +566,7 @@ async function queryProductOperationalMetricMaps(db, store, productIds = [], ref
     return {
       activeSessionCounts: new Map(),
       activeBindingCounts: new Map(),
+      releasedBindingCounts: new Map(),
       blockedDeviceCounts: new Map(),
       activeClientVersionCounts: new Map(),
       forceUpdateVersionCounts: new Map(),
@@ -578,6 +579,7 @@ async function queryProductOperationalMetricMaps(db, store, productIds = [], ref
   const [
     activeSessionRows,
     activeBindingRows,
+    releasedBindingRows,
     blockedDeviceRows,
     activeClientVersionRows,
     forceUpdateVersionRows,
@@ -587,6 +589,7 @@ async function queryProductOperationalMetricMaps(db, store, productIds = [], ref
   ] = await Promise.all([
     Promise.resolve(store.sessions.countActiveSessionsByProductIds(db, normalizedProductIds)),
     Promise.resolve(store.devices.countActiveBindingsByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.devices.countReleasedBindingsByProductIds(db, normalizedProductIds)),
     Promise.resolve(store.devices.countActiveBlocksByProductIds(db, normalizedProductIds)),
     Promise.resolve(store.versions.countActiveVersionsByProductIds(db, normalizedProductIds)),
     Promise.resolve(store.versions.countForceUpdateVersionsByProductIds(db, normalizedProductIds)),
@@ -598,6 +601,7 @@ async function queryProductOperationalMetricMaps(db, store, productIds = [], ref
   return {
     activeSessionCounts: buildMetricMap(activeSessionRows),
     activeBindingCounts: buildMetricMap(activeBindingRows),
+    releasedBindingCounts: buildMetricMap(releasedBindingRows),
     blockedDeviceCounts: buildMetricMap(blockedDeviceRows),
     activeClientVersionCounts: buildMetricMap(activeClientVersionRows),
     forceUpdateVersionCounts: buildMetricMap(forceUpdateVersionRows),
@@ -625,6 +629,7 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
     activeEntitlements: 0,
     activeSessions: 0,
     activeBindings: 0,
+    releasedBindings: 0,
     blockedDevices: 0,
     activeClientVersions: 0,
     forceUpdateVersions: 0,
@@ -712,6 +717,7 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
   const {
     activeSessionCounts,
     activeBindingCounts,
+    releasedBindingCounts,
     blockedDeviceCounts,
     activeClientVersionCounts,
     forceUpdateVersionCounts,
@@ -731,6 +737,7 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
       activeEntitlements: activeEntitlementCounts.get(key) ?? 0,
       activeSessions: activeSessionCounts.get(key) ?? 0,
       activeBindings: activeBindingCounts.get(key) ?? 0,
+      releasedBindings: releasedBindingCounts.get(key) ?? 0,
       blockedDevices: blockedDeviceCounts.get(key) ?? 0,
       activeClientVersions: activeClientVersionCounts.get(key) ?? 0,
       forceUpdateVersions: forceUpdateVersionCounts.get(key) ?? 0,
@@ -747,6 +754,7 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
     summary.activeEntitlements += metrics.activeEntitlements;
     summary.activeSessions += metrics.activeSessions;
     summary.activeBindings += metrics.activeBindings;
+    summary.releasedBindings += metrics.releasedBindings;
     summary.blockedDevices += metrics.blockedDevices;
     summary.activeClientVersions += metrics.activeClientVersions;
     summary.forceUpdateVersions += metrics.forceUpdateVersions;
@@ -7632,6 +7640,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const now = nowIso();
       const {
         activeBindingCounts,
+        releasedBindingCounts,
         blockedDeviceCounts,
         activeClientVersionCounts,
         forceUpdateVersionCounts,
@@ -7656,10 +7665,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "SELECT COUNT(*) AS count FROM customer_accounts WHERE status = 'disabled'"
         ).count,
         activeBindings: sumMetricMap(activeBindingCounts),
-        releasedBindings: one(
-          db,
-          "SELECT COUNT(*) AS count FROM device_bindings WHERE status = 'revoked'"
-        ).count,
+        releasedBindings: sumMetricMap(releasedBindingCounts),
         blockedDevices: sumMetricMap(blockedDeviceCounts),
         activeClientVersions: sumMetricMap(activeClientVersionCounts),
         forceUpdateVersions: sumMetricMap(forceUpdateVersionCounts),

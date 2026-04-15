@@ -446,6 +446,28 @@ export function createSqliteDeviceStore({ db }) {
       }));
     },
 
+    countReleasedBindingsByProductIds(_db, productIds = null) {
+      const conditions = ["b.status = 'revoked'"];
+      const params = [];
+
+      appendSqliteInCondition("e.product_id", productIds, conditions, params);
+
+      return many(
+        db,
+        `
+          SELECT e.product_id, COUNT(*) AS count
+          FROM device_bindings b
+          JOIN entitlements e ON e.id = b.entitlement_id
+          WHERE ${conditions.join(" AND ")}
+          GROUP BY e.product_id
+        `,
+        ...params
+      ).map((row) => ({
+        ...row,
+        count: Number(row.count ?? 0)
+      }));
+    },
+
     countActiveBlocksByProductIds(_db, productIds = null) {
       const conditions = ["status = 'active'"];
       const params = [];

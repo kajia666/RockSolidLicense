@@ -287,6 +287,34 @@ export function createPostgresDeviceRepository(adapter) {
       }));
     },
 
+    async countReleasedBindingsByProductIds(_db, productIds = null) {
+      const conditions = ["b.status = 'revoked'"];
+      const params = [];
+
+      appendPostgresInCondition("e.product_id", productIds, conditions, params);
+
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT e.product_id, COUNT(*) AS count
+          FROM device_bindings b
+          JOIN entitlements e ON e.id = b.entitlement_id
+          WHERE ${conditions.join(" AND ")}
+          GROUP BY e.product_id
+        `,
+        params,
+        {
+          repository: "devices",
+          operation: "countReleasedBindingsByProductIds",
+          productIds: Array.isArray(productIds) ? [...productIds] : null
+        }
+      ));
+
+      return rows.map((row) => ({
+        ...row,
+        count: Number(row.count ?? 0)
+      }));
+    },
+
     async countActiveBlocksByProductIds(_db, productIds = null) {
       const conditions = ["status = 'active'"];
       const params = [];

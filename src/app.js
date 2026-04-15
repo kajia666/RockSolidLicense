@@ -401,7 +401,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.createResellerPriceRule(getBearerToken(req), body)
+          data: await services.createResellerPriceRule(getBearerToken(req), body)
         });
         return;
       }
@@ -766,7 +766,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.allocateResellerInventory(
+          data: await services.allocateResellerInventory(
             getBearerToken(req),
             resellerAllocationRoute.resellerId,
             body

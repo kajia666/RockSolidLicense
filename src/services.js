@@ -15,6 +15,7 @@ import {
 import {
   describeLicenseKeyControl,
   maskCardKey,
+  normalizeCardControlStatus,
   queryCardRows
 } from "./data/card-repository.js";
 import {
@@ -41,7 +42,6 @@ import {
   issueLicenseToken,
   nowIso,
   randomAppId,
-  randomCardKey,
   randomToken,
   sha256Hex,
   signClientRequest,
@@ -255,34 +255,6 @@ function audit(db, actorType, actorId, eventType, entityType, entityId, metadata
     JSON.stringify(metadata),
     nowIso()
   );
-}
-
-function issueLicenseKeys(db, { productId, policyId, prefix, count, batchCode, notes, issuedAt }) {
-  const created = [];
-  for (let index = 0; index < count; index += 1) {
-    const licenseKeyId = generateId("card");
-    const cardKey = randomCardKey(prefix);
-    run(
-      db,
-      `
-        INSERT INTO license_keys
-        (id, product_id, policy_id, card_key, batch_code, status, notes, issued_at)
-        VALUES (?, ?, ?, ?, ?, 'fresh', ?, ?)
-      `,
-      licenseKeyId,
-      productId,
-      policyId,
-      cardKey,
-      batchCode,
-      notes,
-      issuedAt
-    );
-    created.push({
-      licenseKeyId,
-      cardKey
-    });
-  }
-  return created;
 }
 
 function requireField(body, field, message) {
@@ -926,6 +898,277 @@ function ensureSqliteProductShadowRecords(db, products = []) {
       product.createdAt,
       product.updatedAt
     );
+  }
+}
+
+function ensureSqlitePolicyShadowRecords(db, policies = []) {
+  for (const policy of policies) {
+    const existing = one(db, "SELECT id FROM policies WHERE id = ?", policy.id);
+    const bindFieldsJson = JSON.stringify(
+      Array.isArray(policy.bindFields) && policy.bindFields.length
+        ? policy.bindFields
+        : ["deviceFingerprint"]
+    );
+
+    if (existing) {
+      run(
+        db,
+        `
+          UPDATE policies
+          SET product_id = ?, name = ?, duration_days = ?, max_devices = ?, allow_concurrent_sessions = ?,
+              heartbeat_interval_seconds = ?, heartbeat_timeout_seconds = ?, token_ttl_seconds = ?,
+              bind_mode = ?, status = ?, created_at = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        policy.productId,
+        policy.name,
+        Number(policy.durationDays ?? 0),
+        Number(policy.maxDevices ?? 1),
+        policy.allowConcurrentSessions ? 1 : 0,
+        Number(policy.heartbeatIntervalSeconds ?? 60),
+        Number(policy.heartbeatTimeoutSeconds ?? 180),
+        Number(policy.tokenTtlSeconds ?? 300),
+        policy.bindMode ?? "strict",
+        policy.status ?? "active",
+        policy.createdAt,
+        policy.updatedAt,
+        policy.id
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO policies
+          (id, product_id, name, duration_days, max_devices, allow_concurrent_sessions,
+           heartbeat_interval_seconds, heartbeat_timeout_seconds, token_ttl_seconds,
+           bind_mode, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        policy.id,
+        policy.productId,
+        policy.name,
+        Number(policy.durationDays ?? 0),
+        Number(policy.maxDevices ?? 1),
+        policy.allowConcurrentSessions ? 1 : 0,
+        Number(policy.heartbeatIntervalSeconds ?? 60),
+        Number(policy.heartbeatTimeoutSeconds ?? 180),
+        Number(policy.tokenTtlSeconds ?? 300),
+        policy.bindMode ?? "strict",
+        policy.status ?? "active",
+        policy.createdAt,
+        policy.updatedAt
+      );
+    }
+
+    const bindConfig = one(db, "SELECT policy_id FROM policy_bind_configs WHERE policy_id = ?", policy.id);
+    if (bindConfig) {
+      run(
+        db,
+        `
+          UPDATE policy_bind_configs
+          SET bind_mode = ?, bind_fields_json = ?, updated_at = ?
+          WHERE policy_id = ?
+        `,
+        policy.bindMode ?? "strict",
+        bindFieldsJson,
+        policy.updatedAt,
+        policy.id
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO policy_bind_configs (policy_id, bind_mode, bind_fields_json, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+        `,
+        policy.id,
+        policy.bindMode ?? "strict",
+        bindFieldsJson,
+        policy.createdAt,
+        policy.updatedAt
+      );
+    }
+
+    const unbindConfig = one(db, "SELECT policy_id FROM policy_unbind_configs WHERE policy_id = ?", policy.id);
+    if (unbindConfig) {
+      run(
+        db,
+        `
+          UPDATE policy_unbind_configs
+          SET allow_client_unbind = ?, client_unbind_limit = ?, client_unbind_window_days = ?,
+              client_unbind_deduct_days = ?, updated_at = ?
+          WHERE policy_id = ?
+        `,
+        policy.allowClientUnbind ? 1 : 0,
+        Number(policy.clientUnbindLimit ?? 0),
+        Number(policy.clientUnbindWindowDays ?? 30),
+        Number(policy.clientUnbindDeductDays ?? 0),
+        policy.updatedAt,
+        policy.id
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO policy_unbind_configs
+          (policy_id, allow_client_unbind, client_unbind_limit, client_unbind_window_days,
+           client_unbind_deduct_days, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        policy.id,
+        policy.allowClientUnbind ? 1 : 0,
+        Number(policy.clientUnbindLimit ?? 0),
+        Number(policy.clientUnbindWindowDays ?? 30),
+        Number(policy.clientUnbindDeductDays ?? 0),
+        policy.createdAt,
+        policy.updatedAt
+      );
+    }
+
+    const grantConfig = one(db, "SELECT policy_id FROM policy_grant_configs WHERE policy_id = ?", policy.id);
+    if (grantConfig) {
+      run(
+        db,
+        `
+          UPDATE policy_grant_configs
+          SET grant_type = ?, grant_points = ?, updated_at = ?
+          WHERE policy_id = ?
+        `,
+        policy.grantType ?? "duration",
+        Number(policy.grantPoints ?? 0),
+        policy.updatedAt,
+        policy.id
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO policy_grant_configs (policy_id, grant_type, grant_points, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+        `,
+        policy.id,
+        policy.grantType ?? "duration",
+        Number(policy.grantPoints ?? 0),
+        policy.createdAt,
+        policy.updatedAt
+      );
+    }
+  }
+}
+
+function ensureSqliteLicenseKeyShadowRecords(db, cards = []) {
+  for (const card of cards) {
+    const licenseKeyId = card.id ?? card.licenseKeyId ?? null;
+    if (!licenseKeyId) {
+      continue;
+    }
+
+    const existing = one(db, "SELECT * FROM license_keys WHERE id = ?", licenseKeyId);
+    const rawStatus = card.status ?? card.usageStatus ?? card.usage_status ?? existing?.status ?? "fresh";
+    const status = ["redeemed", "used"].includes(String(rawStatus).trim().toLowerCase())
+      ? "redeemed"
+      : "fresh";
+    const productId = card.productId ?? card.product_id ?? existing?.product_id ?? null;
+    const policyId = card.policyId ?? card.policy_id ?? existing?.policy_id ?? null;
+    const cardKey = String(card.cardKey ?? card.card_key ?? existing?.card_key ?? "")
+      .trim()
+      .toUpperCase();
+    const batchCode = card.batchCode ?? card.batch_code ?? existing?.batch_code ?? null;
+    const notes = card.notes ?? existing?.notes ?? null;
+    const redeemedByAccountId = card.redeemedByAccountId ?? card.redeemed_by_account_id ?? existing?.redeemed_by_account_id ?? null;
+    const issuedAt = card.issuedAt ?? card.issued_at ?? existing?.issued_at ?? nowIso();
+    const redeemedAt = card.redeemedAt ?? card.redeemed_at ?? existing?.redeemed_at ?? null;
+
+    if (!productId || !policyId || !cardKey) {
+      continue;
+    }
+
+    if (existing) {
+      run(
+        db,
+        `
+          UPDATE license_keys
+          SET product_id = ?, policy_id = ?, card_key = ?, batch_code = ?, status = ?, notes = ?,
+              redeemed_by_account_id = ?, issued_at = ?, redeemed_at = ?
+          WHERE id = ?
+        `,
+        productId,
+        policyId,
+        cardKey,
+        batchCode,
+        status,
+        notes,
+        redeemedByAccountId,
+        issuedAt,
+        redeemedAt,
+        licenseKeyId
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO license_keys
+          (id, product_id, policy_id, card_key, batch_code, status, notes, redeemed_by_account_id, issued_at, redeemed_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        licenseKeyId,
+        productId,
+        policyId,
+        cardKey,
+        batchCode,
+        status,
+        notes,
+        redeemedByAccountId,
+        issuedAt,
+        redeemedAt
+      );
+    }
+  }
+}
+
+function ensureSqliteLicenseKeyControlShadowRecords(db, controls = [], timestamp = nowIso()) {
+  for (const control of controls) {
+    const licenseKeyId = control.licenseKeyId ?? control.license_key_id ?? control.cardId ?? control.card_id ?? null;
+    if (!licenseKeyId) {
+      continue;
+    }
+
+    const status = normalizeCardControlStatus(control.status ?? "active");
+    const expiresAt = control.expiresAt ?? control.expires_at ?? null;
+    const notes = control.notes ?? null;
+    const createdAt = control.createdAt ?? control.created_at ?? timestamp;
+    const updatedAt = control.updatedAt ?? control.updated_at ?? timestamp;
+    const existing = one(db, "SELECT license_key_id, created_at FROM license_key_controls WHERE license_key_id = ?", licenseKeyId);
+
+    if (existing) {
+      run(
+        db,
+        `
+          UPDATE license_key_controls
+          SET status = ?, expires_at = ?, notes = ?, updated_at = ?
+          WHERE license_key_id = ?
+        `,
+        status,
+        expiresAt,
+        notes,
+        updatedAt,
+        licenseKeyId
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO license_key_controls (license_key_id, status, expires_at, notes, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+        licenseKeyId,
+        status,
+        expiresAt,
+        notes,
+        existing?.created_at ?? createdAt,
+        updatedAt
+      );
+    }
   }
 }
 
@@ -3800,6 +4043,81 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     return Promise.resolve(store.sessions.getSessionManageRowById(db, sessionId));
   }
 
+  async function createShadowedCardBatch(product, policy, body = {}, timestamp = nowIso()) {
+    const notes = normalizeOptionalText(body.notes, 1000) || null;
+    const batch = await Promise.resolve(store.cards.createCardBatch(
+      product,
+      policy,
+      {
+        ...body,
+        batchCode: body.batchCode,
+        includeIssuedEntries: true
+      },
+      timestamp
+    ));
+    const issued = Array.isArray(batch?.issued) ? batch.issued : [];
+
+    if (issued.length !== Number(batch?.count ?? 0)) {
+      throw new AppError(500, "CARD_BATCH_INCOMPLETE", "Card batch creation did not return the full issued-card set.");
+    }
+
+    ensureSqliteProductShadowRecords(db, [product]);
+    ensureSqlitePolicyShadowRecords(db, [policy]);
+    ensureSqliteLicenseKeyShadowRecords(
+      db,
+      issued.map((entry) => ({
+        id: entry.licenseKeyId,
+        productId: product.id,
+        policyId: policy.id,
+        cardKey: entry.cardKey,
+        batchCode: batch.batchCode,
+        status: "fresh",
+        notes,
+        issuedAt: timestamp
+      }))
+    );
+
+    if (batch.expiresAt) {
+      ensureSqliteLicenseKeyControlShadowRecords(
+        db,
+        issued.map((entry) => ({
+          licenseKeyId: entry.licenseKeyId,
+          status: "active",
+          expiresAt: batch.expiresAt,
+          notes
+        })),
+        timestamp
+      );
+    }
+
+    return batch;
+  }
+
+  function syncSqliteCardControlShadow(card, control, timestamp = nowIso()) {
+    if (!card?.id || !control) {
+      return;
+    }
+
+    ensureSqliteLicenseKeyShadowRecords(db, [{
+      id: card.id,
+      productId: card.productId,
+      policyId: card.policyId,
+      cardKey: card.cardKey,
+      batchCode: card.batchCode,
+      status: card.usageStatus,
+      notes: card.notes ?? control.notes ?? null,
+      issuedAt: card.issuedAt,
+      redeemedAt: card.redeemedAt,
+      redeemedByAccountId: card.redeemedByAccountId
+    }]);
+    ensureSqliteLicenseKeyControlShadowRecords(db, [{
+      licenseKeyId: card.id,
+      status: control.status,
+      expiresAt: control.expiresAt,
+      notes: control.notes ?? card.notes ?? null
+    }], timestamp);
+  }
+
   return {
     async health() {
       await expireStaleSessions(db, store, stateStore);
@@ -4964,7 +5282,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       return withTransaction(db, async () => {
-        const result = await Promise.resolve(store.cards.updateCardStatus(card.id, body, nowIso()));
+        const timestamp = nowIso();
+        const result = await Promise.resolve(store.cards.updateCardStatus(card.id, body, timestamp));
+        syncSqliteCardControlShadow(result.card, result.control, timestamp);
 
         let revokedSessions = 0;
         if (!result.control.available) {
@@ -5014,7 +5334,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
 
       return withTransaction(db, async () => {
-        const result = await Promise.resolve(store.cards.updateCardStatus(card.id, body, nowIso()));
+        const timestamp = nowIso();
+        const result = await Promise.resolve(store.cards.updateCardStatus(card.id, body, timestamp));
+        syncSqliteCardControlShadow(result.card, result.control, timestamp);
 
         let revokedSessions = 0;
         if (!result.control.available) {
@@ -5055,19 +5377,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
       }
 
-      const batch = await withTransaction(
-        db,
-        () => Promise.resolve(store.cards.createCardBatch(product, policy, body, nowIso()))
-      );
+      const batch = await withTransaction(db, () => createShadowedCardBatch(product, policy, body, nowIso()));
+      const { issued: _issued, ...publicBatch } = batch;
 
       audit(db, "admin", admin.admin_id, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
-        batchCode: batch.batchCode,
-        count: batch.count,
-        expiresAt: batch.expiresAt
+        batchCode: publicBatch.batchCode,
+        count: publicBatch.count,
+        expiresAt: publicBatch.expiresAt
       });
 
-      return batch;
+      return publicBatch;
     },
 
     async developerCreateCardBatch(token, body = {}) {
@@ -5098,19 +5418,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
       }
 
-      const batch = await withTransaction(
-        db,
-        () => Promise.resolve(store.cards.createCardBatch(product, policy, body, nowIso()))
-      );
+      const batch = await withTransaction(db, () => createShadowedCardBatch(product, policy, body, nowIso()));
+      const { issued: _issued, ...publicBatch } = batch;
 
       auditDeveloperSession(db, session, "card.batch.create", "policy", policy.id, {
         productCode: product.code,
-        batchCode: batch.batchCode,
-        count: batch.count,
-        expiresAt: batch.expiresAt
+        batchCode: publicBatch.batchCode,
+        count: publicBatch.count,
+        expiresAt: publicBatch.expiresAt
       });
 
-      return batch;
+      return publicBatch;
     },
 
     async developerListAccounts(token, filters = {}) {
@@ -6222,7 +6540,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    createResellerPriceRule(token, body = {}) {
+    async createResellerPriceRule(token, body = {}) {
       const admin = requireAdminSession(db, token);
       requireField(body, "resellerId");
       requireField(body, "unitPrice");
@@ -6232,13 +6550,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(404, "RESELLER_NOT_FOUND", "Reseller does not exist.");
       }
 
-      const product = requireProductByCode(db, readProductCodeInput(body));
+      const product = await getStoreActiveProductByCode(readProductCodeInput(body));
       const policyId = body.policyId ? String(body.policyId).trim() : null;
       const policy = policyId
-        ? one(db, "SELECT * FROM policies WHERE id = ? AND product_id = ?", policyId, product.id)
+        ? await getStorePolicyById(policyId)
         : null;
-      if (policyId && !policy) {
+      if (policyId && (!policy || policy.productId !== product.id)) {
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
+      }
+      if (policy && policy.status !== "active") {
+        throw new AppError(409, "POLICY_INACTIVE", "Only active policies can be used for reseller pricing.");
       }
 
       const status = String(body.status ?? "active").trim().toLowerCase();
@@ -6274,6 +6595,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       const timestamp = nowIso();
       const id = generateId("rprice");
+      ensureSqliteProductShadowRecords(db, [product]);
+      if (policy) {
+        ensureSqlitePolicyShadowRecords(db, [policy]);
+      }
       run(
         db,
         `
@@ -6395,7 +6720,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    allocateResellerInventory(token, resellerId, body) {
+    async allocateResellerInventory(token, resellerId, body) {
       const admin = requireAdminSession(db, token);
       requireField(body, "policyId");
 
@@ -6407,17 +6732,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(409, "RESELLER_DISABLED", "Reseller is disabled and cannot receive inventory.");
       }
 
-      const product = requireProductByCode(db, readProductCodeInput(body));
-      const policy = one(
-        db,
-        `
-          SELECT * FROM policies
-          WHERE id = ? AND product_id = ? AND status = 'active'
-        `,
-        body.policyId,
-        product.id
-      );
-      if (!policy) {
+      const product = await getStoreActiveProductByCode(readProductCodeInput(body));
+      const policy = await getStorePolicyById(body.policyId);
+      if (!policy || policy.productId !== product.id || policy.status !== "active") {
         throw new AppError(404, "POLICY_NOT_FOUND", "Policy does not exist for the product.");
       }
 
@@ -6433,17 +6750,22 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const allocationBatchCode = `ALLOC-${Date.now()}`;
       const allocatedAt = nowIso();
 
-      const allocationResult = withTransaction(db, () => {
+      const notes = normalizeOptionalText(body.notes, 1000) || null;
+      const allocationResult = await withTransaction(db, async () => {
+        ensureSqliteProductShadowRecords(db, [product]);
+        ensureSqlitePolicyShadowRecords(db, [policy]);
         const priceRule = resolveResellerPriceRule(db, reseller.id, product.id, policy.id);
-        const issued = issueLicenseKeys(db, {
-          productId: product.id,
-          policyId: policy.id,
+        const batch = await createShadowedCardBatch(product, policy, {
           prefix,
           count,
           batchCode: allocationBatchCode,
-          notes: String(body.notes ?? ""),
-          issuedAt: allocatedAt
-        });
+          notes
+        }, allocatedAt);
+        const issued = Array.isArray(batch.issued) ? batch.issued : [];
+
+        if (issued.length !== count) {
+          throw new AppError(500, "CARD_BATCH_INCOMPLETE", "Reseller allocation did not issue the expected number of cards.");
+        }
 
         for (const entry of issued) {
           const inventoryId = generateId("rstock");
@@ -6460,7 +6782,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             policy.id,
             entry.licenseKeyId,
             allocationBatchCode,
-            String(body.notes ?? "") || null,
+            notes,
             allocatedAt
           );
 

@@ -207,7 +207,7 @@ npm run db:postgres:check
 
 - `products`：项目创建、功能开关更新、SDK 凭据轮换、项目归属切换、签名入口 `sdkAppId` 查找
 - `policies`：策略创建、运行时绑定/多开配置、自助解绑配置
-- `cards`：批量发卡、卡密冻结/恢复/过期控制
+- `cards`：批量发卡、卡密冻结/恢复/过期控制，以及 PostgreSQL preview 下给 SQLite 兼容链路补齐卡密 shadow
 - `entitlements`：卡密充值生成授权、卡密直登激活授权、授权冻结/恢复、续期、点数调账
 - `accounts`：终端账号注册、卡密直登账号映射、账号列表、账号禁用/恢复、最近登录时间更新
 - `versions`：客户端版本创建、状态切换、版本列表、产品级版本规则读取、强更规则聚合统计
@@ -216,7 +216,7 @@ npm run db:postgres:check
 - `devices`：设备指纹记录、绑定身份快照、绑定管理查询、绑定列表/释放、自助解绑计数与日志、设备封禁查找与列表、项目级活跃绑定/封禁聚合统计、登录时设备绑定落点
 - `sessions`：登录会话写入、会话列表查询、按 `product + sessionToken` 的会话查找、心跳续期、会话过期扫描、退出登录、会话失效状态更新和项目级在线会话聚合统计
 
-也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 已经收进 `mainStore.entitlements`，而且登录前的 `usable entitlement` 选择和失败时的 `latest entitlement snapshot` 也已经通过这层边界提供；`version rows / notice rows / network rule rows / binding/block list query / session issuance / heartbeat refresh / logout/revoke` 也已经分别收进 `mainStore.versions / notices / networkRules / devices / sessions`。开发者看板里和项目运行状态直接相关的 `activeSessions / activeBindings / blockedDevices / activeClientVersions / forceUpdateVersions / activeNotices / blockingNotices / activeNetworkRules` 统计，也已经通过 `mainStore.sessions / devices / versions / notices / networkRules` 提供项目级聚合入口。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements / accounts / versions / notices / networkRules` 这八组主数据都已经可以逐步走向 PostgreSQL write preview，其中 `versions / notices / networkRules` 已经覆盖后台创建、状态切换，以及客户端版本检查 / 公告阻断 / 网络规则拦截这类运行读取链路；`devices` 目前已经对设备指纹 upsert、绑定身份快照、identity rebound、绑定释放、设备封禁激活/解封、活跃绑定撤销与自助解绑日志提供 `postgres_partial` 写侧预览，`sessions` 则已经对会话创建、会话列表查询、心跳续期、按条件失效回收这条运行主链提供 `postgres_partial` 写侧预览。剩余还没有完全迁走的部分，主要集中在 `devices / sessions` 更深层的 PostgreSQL 写侧收口，以及更多后台运营链路按边界继续迁移，后续会继续按模块推进。
+也就是说，现在这套系统已经不是“所有主数据都直接散写 SQLite SQL”了。当前 `卡密充值 -> entitlement 生成 -> 点数计量` 已经收进 `mainStore.entitlements`，而且登录前的 `usable entitlement` 选择和失败时的 `latest entitlement snapshot` 也已经通过这层边界提供；`version rows / notice rows / network rule rows / binding/block list query / session issuance / heartbeat refresh / logout/revoke` 也已经分别收进 `mainStore.versions / notices / networkRules / devices / sessions`。开发者看板里和项目运行状态直接相关的 `activeSessions / activeBindings / blockedDevices / activeClientVersions / forceUpdateVersions / activeNotices / blockingNotices / activeNetworkRules` 统计，也已经通过 `mainStore.sessions / devices / versions / notices / networkRules` 提供项目级聚合入口。在具备事务型 PostgreSQL adapter 时，`products / policies / cards / entitlements / accounts / versions / notices / networkRules` 这八组主数据都已经可以逐步走向 PostgreSQL write preview，其中 `versions / notices / networkRules` 已经覆盖后台创建、状态切换，以及客户端版本检查 / 公告阻断 / 网络规则拦截这类运行读取链路；`cards` 这层现在还会把策略、卡密和卡密控制信息补一份 SQLite shadow，保证 PostgreSQL preview 下原先仍依赖 SQLite 的 `findClientCardByKey`、分销库存、分销价格规则和相关报表链路继续可用；`devices` 目前已经对设备指纹 upsert、绑定身份快照、identity rebound、绑定释放、设备封禁激活/解封、活跃绑定撤销与自助解绑日志提供 `postgres_partial` 写侧预览，`sessions` 则已经对会话创建、会话列表查询、心跳续期、按条件失效回收这条运行主链提供 `postgres_partial` 写侧预览。剩余还没有完全迁走的部分，主要集中在 `devices / sessions` 更深层的 PostgreSQL 写侧收口，以及更多后台运营链路按边界继续迁移，后续会继续按模块推进。
 
 ## 终端用户主流程
 

@@ -131,9 +131,10 @@ export function createPostgresCardStore(adapter) {
       const prefix = String(body.prefix ?? String(product.code ?? "").slice(0, 6))
         .replace(/[^A-Z0-9]/gi, "")
         .toUpperCase();
-      const batchCode = `BATCH-${Date.now()}`;
+      const batchCode = String(body.batchCode ?? `BATCH-${Date.now()}`).trim() || `BATCH-${Date.now()}`;
       const expiresAt = normalizeOptionalIsoDate(body.expiresAt, "expiresAt");
       const notes = normalizeOptionalText(body.notes, 1000);
+      const includeIssuedEntries = Boolean(body.includeIssuedEntries);
 
       return adapter.withTransaction(async (tx) => {
         const issued = [];
@@ -182,7 +183,8 @@ export function createPostgresCardStore(adapter) {
           count,
           expiresAt,
           preview: issued.slice(0, 10).map((entry) => entry.cardKey),
-          keys: issued.map((entry) => entry.cardKey)
+          keys: issued.map((entry) => entry.cardKey),
+          ...(includeIssuedEntries ? { issued } : {})
         };
       });
     },

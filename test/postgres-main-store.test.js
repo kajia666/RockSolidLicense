@@ -24,6 +24,26 @@ function createTestApp(overrides = {}) {
   return { app, tempDir };
 }
 
+async function startHttpApp(app) {
+  await app.listen();
+  const address = app.server.address();
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function postJson(baseUrl, requestPath, body, token = null) {
+  const response = await fetch(`${baseUrl}${requestPath}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(body)
+  });
+  const json = await response.json();
+  assert.equal(response.ok, true, JSON.stringify(json));
+  return json.data;
+}
+
 function createWriteCapableAdapter() {
   const state = {
     queries: [],
@@ -3239,6 +3259,133 @@ test("postgres main store can write cards and entitlements through a transaction
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "upsertEntitlementMetering"),
+      true
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("postgres main store keeps sqlite card shadows and reseller routes usable during preview", async () => {
+  const { adapter, state } = createWriteCapableAdapter();
+  const { app, tempDir } = createTestApp({
+    mainStoreDriver: "postgres",
+    postgresUrl: "postgres://rocksolid:secret@127.0.0.1:5432/rocksolid",
+    postgresMainStoreAdapter: adapter
+  });
+
+  try {
+    const baseUrl = await startHttpApp(app);
+    const admin = app.services.adminLogin({
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await app.services.createProduct(admin.token, {
+      code: "PGSELL",
+      name: "PG Reseller Product"
+    });
+    const policy = await app.services.createPolicy(admin.token, {
+      productCode: "PGSELL",
+      name: "PG Reseller Policy",
+      durationDays: 30,
+      maxDevices: 1,
+      grantType: "points",
+      grantPoints: 9
+    });
+
+    const batch = await app.services.createCardBatch(admin.token, {
+      productCode: "PGSELL",
+      policyId: policy.id,
+      count: 1,
+      prefix: "PGSELL",
+      expiresAt: "2026-02-01T00:00:00.000Z"
+    });
+    assert.equal(batch.count, 1);
+
+    const shadowCard = app.db.prepare(
+      "SELECT * FROM license_keys WHERE batch_code = ? LIMIT 1"
+    ).get(batch.batchCode);
+    assert.ok(shadowCard);
+    assert.equal(shadowCard.product_id, product.id);
+    assert.equal(shadowCard.policy_id, policy.id);
+
+    const shadowPolicyGrant = app.db.prepare(
+      "SELECT * FROM policy_grant_configs WHERE policy_id = ?"
+    ).get(policy.id);
+    assert.ok(shadowPolicyGrant);
+    assert.equal(shadowPolicyGrant.grant_type, "points");
+    assert.equal(Number(shadowPolicyGrant.grant_points), 9);
+
+    const shadowControl = app.db.prepare(
+      "SELECT * FROM license_key_controls WHERE license_key_id = ?"
+    ).get(shadowCard.id);
+    assert.ok(shadowControl);
+    assert.equal(shadowControl.status, "active");
+    assert.equal(shadowControl.expires_at, "2026-02-01T00:00:00.000Z");
+
+    const frozenCard = await app.services.updateCardStatus(admin.token, shadowCard.id, {
+      status: "frozen",
+      notes: "freeze shadow"
+    });
+    assert.equal(frozenCard.effectiveControlStatus, "frozen");
+    const frozenControl = app.db.prepare(
+      "SELECT * FROM license_key_controls WHERE license_key_id = ?"
+    ).get(shadowCard.id);
+    assert.equal(frozenControl.status, "frozen");
+
+    const reseller = app.services.createReseller(admin.token, {
+      code: "PG_ROUTE",
+      name: "PG Route Reseller"
+    });
+
+    const priceRule = await postJson(baseUrl, "/api/admin/reseller-price-rules", {
+      resellerId: reseller.id,
+      productCode: "PGSELL",
+      policyId: policy.id,
+      unitPrice: 59,
+      unitCost: 41
+    }, admin.token);
+    assert.equal(priceRule.productCode, "PGSELL");
+    assert.equal(priceRule.policyId, policy.id);
+    assert.equal(priceRule.unitPriceCents, 5900);
+
+    const allocation = await postJson(
+      baseUrl,
+      `/api/admin/resellers/${reseller.id}/allocate-cards`,
+      {
+        productCode: "PGSELL",
+        policyId: policy.id,
+        count: 2,
+        prefix: "PGRTE"
+      },
+      admin.token
+    );
+    assert.equal(allocation.count, 2);
+    assert.equal(allocation.pricing.unitPriceCents, 5900);
+    assert.equal(allocation.keys.length, 2);
+
+    const inventoryCount = app.db.prepare(
+      "SELECT COUNT(*) AS count FROM reseller_inventory WHERE reseller_id = ?"
+    ).get(reseller.id).count;
+    assert.equal(inventoryCount, 2);
+
+    const allocationCardCount = app.db.prepare(
+      "SELECT COUNT(*) AS count FROM license_keys WHERE batch_code = ?"
+    ).get(allocation.allocationBatchCode).count;
+    assert.equal(allocationCardCount, 2);
+
+    const listedInventory = app.services.listResellerInventory(admin.token, {
+      resellerId: reseller.id,
+      productCode: "PGSELL"
+    });
+    assert.equal(listedInventory.items.length, 2);
+    assert.equal(listedInventory.items[0].productCode, "PGSELL");
+
+    assert.equal(state.licenseKeys.length, 3);
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createCard"),
       true
     );
   } finally {

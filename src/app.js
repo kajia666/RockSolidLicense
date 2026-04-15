@@ -640,7 +640,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.createClientVersion(getBearerToken(req), body)
+          data: await services.createClientVersion(getBearerToken(req), body)
         });
         return;
       }
@@ -649,7 +649,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.createNotice(getBearerToken(req), body)
+          data: await services.createNotice(getBearerToken(req), body)
         });
         return;
       }
@@ -658,7 +658,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.createNetworkRule(getBearerToken(req), body)
+          data: await services.createNetworkRule(getBearerToken(req), body)
         });
         return;
       }
@@ -830,7 +830,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateClientVersionStatus(
+          data: await services.updateClientVersionStatus(
             getBearerToken(req),
             clientVersionStatusRoute.versionId,
             body
@@ -846,7 +846,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateNoticeStatus(
+          data: await services.updateNoticeStatus(
             getBearerToken(req),
             noticeStatusRoute.noticeId,
             body
@@ -862,7 +862,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.updateNetworkRuleStatus(
+          data: await services.updateNetworkRuleStatus(
             getBearerToken(req),
             networkRuleStatusRoute.ruleId,
             body
@@ -1170,7 +1170,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.developerCreateClientVersion(getBearerToken(req), body)
+          data: await services.developerCreateClientVersion(getBearerToken(req), body)
         });
         return;
       }
@@ -1182,7 +1182,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateClientVersionStatus(
+          data: await services.developerUpdateClientVersionStatus(
             getBearerToken(req),
             developerClientVersionStatusRoute.versionId,
             body
@@ -1222,7 +1222,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.developerCreateNotice(getBearerToken(req), body)
+          data: await services.developerCreateNotice(getBearerToken(req), body)
         });
         return;
       }
@@ -1231,7 +1231,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, {
           ok: true,
-          data: services.developerCreateNetworkRule(getBearerToken(req), body)
+          data: await services.developerCreateNetworkRule(getBearerToken(req), body)
         });
         return;
       }
@@ -1243,7 +1243,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateNoticeStatus(
+          data: await services.developerUpdateNoticeStatus(
             getBearerToken(req),
             developerNoticeStatusRoute.noticeId,
             body
@@ -1259,7 +1259,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateNetworkRuleStatus(
+          data: await services.developerUpdateNetworkRuleStatus(
             getBearerToken(req),
             developerNetworkRuleStatusRoute.ruleId,
             body

@@ -160,7 +160,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(updatedUnbind.allowClientUnbind, false);
     assert.equal(updatedUnbind.clientUnbindLimit, 0);
 
-    const directVersion = app.services.createClientVersion(admin.token, {
+    const directVersion = await app.services.createClientVersion(admin.token, {
       productCode: "STOREAPP2",
       channel: "stable",
       version: "2.0.0",
@@ -207,7 +207,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(forceUpdateVersionCounts[0].product_id, directProduct.id);
     assert.equal(forceUpdateVersionCounts[0].count, 1);
 
-    const directNotice = app.services.createNotice(admin.token, {
+    const directNotice = await app.services.createNotice(admin.token, {
       productCode: "STOREAPP2",
       channel: "stable",
       kind: "maintenance",
@@ -260,7 +260,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(blockingNoticeCounts[0].product_id, directProduct.id);
     assert.equal(blockingNoticeCounts[0].count, 1);
 
-    const directNetworkRule = app.services.createNetworkRule(admin.token, {
+    const directNetworkRule = await app.services.createNetworkRule(admin.token, {
       productCode: "STOREAPP2",
       targetType: "cidr",
       pattern: "10.10.0.0/16",

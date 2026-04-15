@@ -1,4 +1,5 @@
 import {
+  formatNetworkRuleManageRow,
   formatNetworkRuleRow,
   normalizeNetworkRuleStatus
 } from "./network-rule-repository.js";
@@ -113,6 +114,26 @@ export function createPostgresNetworkRuleRepository(adapter) {
         ...row,
         count: Number(row.count ?? 0)
       }));
+    },
+
+    async getNetworkRuleRowById(_db, ruleId) {
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT nr.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id
+          FROM network_rules nr
+          LEFT JOIN products pr ON pr.id = nr.product_id
+          WHERE nr.id = $1
+          LIMIT 1
+        `,
+        [ruleId],
+        {
+          repository: "networkRules",
+          operation: "getNetworkRuleRowById",
+          ruleId
+        }
+      ));
+
+      return rows[0] ? formatNetworkRuleManageRow(rows[0]) : null;
     }
   };
 }

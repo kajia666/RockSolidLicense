@@ -32,6 +32,14 @@ export function formatNetworkRuleRow(row) {
   };
 }
 
+export function formatNetworkRuleManageRow(row) {
+  return {
+    ...formatNetworkRuleRow(row),
+    productId: row.product_id ?? null,
+    ownerDeveloperId: row.owner_developer_id ?? null
+  };
+}
+
 export function queryNetworkRuleRows(db, filters = {}) {
   const conditions = [];
   const params = [];
@@ -85,6 +93,20 @@ export function queryNetworkRuleRows(db, filters = {}) {
     total: items.length,
     filters: normalizedFilters
   };
+}
+
+export function getNetworkRuleRowById(db, ruleId) {
+  const row = db.prepare(
+    `
+      SELECT nr.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id
+      FROM network_rules nr
+      LEFT JOIN products pr ON pr.id = nr.product_id
+      WHERE nr.id = ?
+      LIMIT 1
+    `
+  ).get(ruleId);
+
+  return row ? formatNetworkRuleManageRow(row) : null;
 }
 
 export function listBlockingNetworkRulesForProduct(db, productId, actionScope) {

@@ -3231,23 +3231,13 @@ function selectHighestVersion(rows) {
   , null);
 }
 
-function listProductVersions(db, productId, channel) {
-  return many(
-    db,
-    `
-      SELECT *
-      FROM client_versions
-      WHERE product_id = ? AND channel = ?
-      ORDER BY released_at DESC, created_at DESC
-    `,
-    productId,
-    channel
-  );
+async function listProductVersions(db, store, productId, channel) {
+  return Promise.resolve(store.versions.listProductVersions(db, productId, channel));
 }
 
-function buildVersionManifest(db, product, clientVersion, channel = "stable") {
+async function buildVersionManifest(db, store, product, clientVersion, channel = "stable") {
   const normalizedChannel = normalizeChannel(channel);
-  const rows = listProductVersions(db, product.id, normalizedChannel);
+  const rows = await listProductVersions(db, store, product.id, normalizedChannel);
   const activeRows = rows.filter((row) => row.status === "active");
   const latestVersion = selectHighestVersion(activeRows);
   const minimumAllowedVersion = selectHighestVersion(activeRows.filter((row) => row.force_update));
@@ -3321,12 +3311,12 @@ function buildVersionManifest(db, product, clientVersion, channel = "stable") {
   };
 }
 
-function requireClientVersionAllowed(db, product, clientVersion, channel = "stable") {
+async function requireClientVersionAllowed(db, store, product, clientVersion, channel = "stable") {
   if (!clientVersion) {
     return null;
   }
 
-  const manifest = buildVersionManifest(db, product, clientVersion, channel);
+  const manifest = await buildVersionManifest(db, store, product, clientVersion, channel);
   if (!manifest.allowed) {
     throw new AppError(426, "CLIENT_VERSION_REJECTED", manifest.message, {
       status: manifest.status,
@@ -3340,27 +3330,13 @@ function requireClientVersionAllowed(db, product, clientVersion, channel = "stab
   return manifest;
 }
 
-function activeNoticesForProduct(db, productId, channel = "all") {
-  const now = nowIso();
-  const normalizedChannel = normalizeNoticeChannel(channel, "stable");
-  return many(
+async function activeNoticesForProduct(db, store, productId, channel = "all") {
+  return Promise.resolve(store.notices.listActiveNoticesForProduct(
     db,
-    `
-      SELECT n.*, pr.code AS product_code, pr.name AS product_name
-      FROM notices n
-      LEFT JOIN products pr ON pr.id = n.product_id
-      WHERE n.status = 'active'
-        AND n.starts_at <= ?
-        AND (n.ends_at IS NULL OR n.ends_at > ?)
-        AND (n.product_id IS NULL OR n.product_id = ?)
-        AND (n.channel = 'all' OR n.channel = ?)
-      ORDER BY n.block_login DESC, n.starts_at DESC, n.created_at DESC
-    `,
-    now,
-    now,
     productId,
-    normalizedChannel
-  );
+    channel,
+    nowIso()
+  ));
 }
 
 function formatNotice(row) {
@@ -3391,14 +3367,15 @@ async function queryNoticeRows(db, store, filters = {}) {
   return Promise.resolve(store.notices.queryNoticeRows(db, filters));
 }
 
-function requireNoBlockingNotices(db, product, channel = "all") {
-  const blocking = activeNoticesForProduct(db, product.id, channel).filter((row) => row.block_login);
+async function requireNoBlockingNotices(db, store, product, channel = "all") {
+  const blocking = (await activeNoticesForProduct(db, store, product.id, channel))
+    .filter((row) => row.blockLogin);
   if (!blocking.length) {
     return [];
   }
 
   throw new AppError(503, "LOGIN_BLOCKED_BY_NOTICE", blocking[0].title, {
-    notices: blocking.map(formatNotice)
+    notices: blocking
   });
 }
 
@@ -3617,9 +3594,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     return rows[0] ?? null;
   }
 
-  async function getStoreActiveProductByCode(productCode) {
+  async function getStoreProductByCode(productCode) {
     const rows = await Promise.resolve(store.products.queryProductRows(db, { productCode }));
-    const product = rows[0] ?? null;
+    return rows[0] ?? null;
+  }
+
+  async function getStoreActiveProductByCode(productCode) {
+    const product = await getStoreProductByCode(productCode);
     if (!product || product.status !== "active") {
       throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist or is inactive.");
     }
@@ -3633,6 +3614,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
   async function getStoreCardById(cardId) {
     return Promise.resolve(store.cards.getCardRowById(db, cardId));
+  }
+
+  async function getStoreClientVersionById(versionId) {
+    return Promise.resolve(store.versions.getClientVersionRowById(db, versionId));
+  }
+
+  async function getStoreNoticeById(noticeId) {
+    return Promise.resolve(store.notices.getNoticeRowById(db, noticeId));
+  }
+
+  async function getStoreNetworkRuleById(ruleId) {
+    return Promise.resolve(store.networkRules.getNetworkRuleRowById(db, ruleId));
   }
 
   async function getStoreEntitlementById(entitlementId) {
@@ -7647,11 +7640,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view client versions under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        const product = await getStoreProductByCode(String(filters.productCode).trim().toUpperCase());
+        ensureDeveloperCanAccessProduct(
           db,
           session,
-          String(filters.productCode).trim().toUpperCase(),
-          "versions.read"
+          product,
+          "versions.read",
+          "DEVELOPER_CLIENT_VERSION_FORBIDDEN",
+          "You can only view client versions under your assigned projects."
         );
       }
       return queryClientVersionRows(db, store, {
@@ -7660,87 +7656,95 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    createClientVersion(token, body = {}) {
+    async createClientVersion(token, body = {}) {
       const admin = requireAdminSession(db, token);
       requireField(body, "version");
 
-      const product = requireProductByCode(db, readProductCodeInput(body));
-      const version = String(body.version).trim();
-      const channel = normalizeChannel(body.channel);
-      const status = String(body.status ?? "active").trim().toLowerCase();
-      const forceUpdate = body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true" ? 1 : 0;
-      const downloadUrl = String(body.downloadUrl ?? "").trim();
-      const releaseNotes = String(body.releaseNotes ?? "").trim();
-      const noticeTitle = String(body.noticeTitle ?? "").trim();
-      const noticeBody = String(body.noticeBody ?? "").trim();
-      const releasedAt = body.releasedAt ? new Date(body.releasedAt).toISOString() : nowIso();
-
-      if (!/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/.test(version)) {
-        throw new AppError(400, "INVALID_CLIENT_VERSION", "Version must be 1-32 chars using letters, digits, dot, underscore, or hyphen.");
+      const product = await getStoreProductByCode(readProductCodeInput(body));
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
       }
 
-      if (!["active", "disabled"].includes(status)) {
-        throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
-      }
+      const result = typeof store.versions.createClientVersion === "function"
+        ? await Promise.resolve(store.versions.createClientVersion(product, body, nowIso()))
+        : (() => {
+            const version = String(body.version).trim();
+            const channel = normalizeChannel(body.channel);
+            const status = String(body.status ?? "active").trim().toLowerCase();
+            const forceUpdate = body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true" ? 1 : 0;
+            const downloadUrl = String(body.downloadUrl ?? "").trim();
+            const releaseNotes = String(body.releaseNotes ?? "").trim();
+            const noticeTitle = String(body.noticeTitle ?? "").trim();
+            const noticeBody = String(body.noticeBody ?? "").trim();
+            const releasedAt = body.releasedAt ? new Date(body.releasedAt).toISOString() : nowIso();
 
-      if (one(
-        db,
-        "SELECT id FROM client_versions WHERE product_id = ? AND channel = ? AND version = ?",
-        product.id,
-        channel,
-        version
-      )) {
-        throw new AppError(409, "CLIENT_VERSION_EXISTS", "This version already exists for the product channel.");
-      }
+            if (!/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/.test(version)) {
+              throw new AppError(400, "INVALID_CLIENT_VERSION", "Version must be 1-32 chars using letters, digits, dot, underscore, or hyphen.");
+            }
+            if (!["active", "disabled"].includes(status)) {
+              throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
+            }
+            if (one(
+              db,
+              "SELECT id FROM client_versions WHERE product_id = ? AND channel = ? AND version = ?",
+              product.id,
+              channel,
+              version
+            )) {
+              throw new AppError(409, "CLIENT_VERSION_EXISTS", "This version already exists for the product channel.");
+            }
 
-      const timestamp = nowIso();
-      const id = generateId("ver");
-      run(
-        db,
-        `
-          INSERT INTO client_versions
-          (id, product_id, channel, version, status, force_update, download_url, release_notes, notice_title, notice_body, released_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        id,
-        product.id,
-        channel,
-        version,
-        status,
-        forceUpdate,
-        downloadUrl || null,
-        releaseNotes || null,
-        noticeTitle || null,
-        noticeBody || null,
-        releasedAt,
-        timestamp,
-        timestamp
-      );
+            const timestamp = nowIso();
+            const id = generateId("ver");
+            run(
+              db,
+              `
+                INSERT INTO client_versions
+                (id, product_id, channel, version, status, force_update, download_url, release_notes, notice_title, notice_body, released_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              id,
+              product.id,
+              channel,
+              version,
+              status,
+              forceUpdate,
+              downloadUrl || null,
+              releaseNotes || null,
+              noticeTitle || null,
+              noticeBody || null,
+              releasedAt,
+              timestamp,
+              timestamp
+            );
 
-      audit(db, "admin", admin.admin_id, "client-version.create", "client_version", id, {
-        productCode: product.code,
-        channel,
-        version,
-        status,
-        forceUpdate: Boolean(forceUpdate)
+            return {
+              id,
+              productCode: product.code,
+              channel,
+              version,
+              status,
+              forceUpdate: Boolean(forceUpdate),
+              downloadUrl: downloadUrl || null,
+              noticeTitle: noticeTitle || null,
+              noticeBody: noticeBody || null,
+              releaseNotes: releaseNotes || null,
+              releasedAt
+            };
+          })();
+
+      audit(db, "admin", admin.admin_id, "client-version.create", "client_version", result.id, {
+        productCode: result.productCode,
+        channel: result.channel,
+        version: result.version,
+        status: result.status,
+        forceUpdate: result.forceUpdate
       });
 
-      return {
-        id,
-        productCode: product.code,
-        channel,
-        version,
-        status,
-        forceUpdate: Boolean(forceUpdate),
-        downloadUrl: downloadUrl || null,
-        noticeTitle: noticeTitle || null,
-        noticeBody: noticeBody || null,
-        releaseNotes: releaseNotes || null,
-        releasedAt
-      };
+      return result;
     },
 
-    developerCreateClientVersion(token, body = {}) {
+    async developerCreateClientVersion(token, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -7750,191 +7754,220 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
       requireField(body, "version");
 
-      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "versions.write");
-      const version = String(body.version).trim();
-      const channel = normalizeChannel(body.channel);
-      const status = String(body.status ?? "active").trim().toLowerCase();
-      const forceUpdate = body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true" ? 1 : 0;
-      const downloadUrl = String(body.downloadUrl ?? "").trim();
-      const releaseNotes = String(body.releaseNotes ?? "").trim();
-      const noticeTitle = String(body.noticeTitle ?? "").trim();
-      const noticeBody = String(body.noticeBody ?? "").trim();
-      const releasedAt = body.releasedAt ? new Date(body.releasedAt).toISOString() : nowIso();
-
-      if (!/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/.test(version)) {
-        throw new AppError(400, "INVALID_CLIENT_VERSION", "Version must be 1-32 chars using letters, digits, dot, underscore, or hyphen.");
+      const product = await getStoreProductByCode(readProductCodeInput(body));
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
       }
-
-      if (!["active", "disabled"].includes(status)) {
-        throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
-      }
-
-      if (one(
+      ensureDeveloperCanAccessProduct(
         db,
-        "SELECT id FROM client_versions WHERE product_id = ? AND channel = ? AND version = ?",
-        product.id,
-        channel,
-        version
-      )) {
-        throw new AppError(409, "CLIENT_VERSION_EXISTS", "This version already exists for the product channel.");
-      }
-
-      const timestamp = nowIso();
-      const id = generateId("ver");
-      run(
-        db,
-        `
-          INSERT INTO client_versions
-          (id, product_id, channel, version, status, force_update, download_url, release_notes, notice_title, notice_body, released_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        id,
-        product.id,
-        channel,
-        version,
-        status,
-        forceUpdate,
-        downloadUrl || null,
-        releaseNotes || null,
-        noticeTitle || null,
-        noticeBody || null,
-        releasedAt,
-        timestamp,
-        timestamp
+        session,
+        product,
+        "versions.write",
+        "DEVELOPER_CLIENT_VERSION_FORBIDDEN",
+        "You can only manage client versions under your assigned projects."
       );
 
-      auditDeveloperSession(db, session, "client-version.create", "client_version", id, {
-        productCode: product.code,
-        channel,
-        version,
-        status,
-        forceUpdate: Boolean(forceUpdate)
+      const result = typeof store.versions.createClientVersion === "function"
+        ? await Promise.resolve(store.versions.createClientVersion(product, body, nowIso()))
+        : (() => {
+            const version = String(body.version).trim();
+            const channel = normalizeChannel(body.channel);
+            const status = String(body.status ?? "active").trim().toLowerCase();
+            const forceUpdate = body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true" ? 1 : 0;
+            const downloadUrl = String(body.downloadUrl ?? "").trim();
+            const releaseNotes = String(body.releaseNotes ?? "").trim();
+            const noticeTitle = String(body.noticeTitle ?? "").trim();
+            const noticeBody = String(body.noticeBody ?? "").trim();
+            const releasedAt = body.releasedAt ? new Date(body.releasedAt).toISOString() : nowIso();
+
+            if (!/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/.test(version)) {
+              throw new AppError(400, "INVALID_CLIENT_VERSION", "Version must be 1-32 chars using letters, digits, dot, underscore, or hyphen.");
+            }
+            if (!["active", "disabled"].includes(status)) {
+              throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
+            }
+            if (one(
+              db,
+              "SELECT id FROM client_versions WHERE product_id = ? AND channel = ? AND version = ?",
+              product.id,
+              channel,
+              version
+            )) {
+              throw new AppError(409, "CLIENT_VERSION_EXISTS", "This version already exists for the product channel.");
+            }
+
+            const timestamp = nowIso();
+            const id = generateId("ver");
+            run(
+              db,
+              `
+                INSERT INTO client_versions
+                (id, product_id, channel, version, status, force_update, download_url, release_notes, notice_title, notice_body, released_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              id,
+              product.id,
+              channel,
+              version,
+              status,
+              forceUpdate,
+              downloadUrl || null,
+              releaseNotes || null,
+              noticeTitle || null,
+              noticeBody || null,
+              releasedAt,
+              timestamp,
+              timestamp
+            );
+
+            return {
+              id,
+              productCode: product.code,
+              channel,
+              version,
+              status,
+              forceUpdate: Boolean(forceUpdate),
+              downloadUrl: downloadUrl || null,
+              noticeTitle: noticeTitle || null,
+              noticeBody: noticeBody || null,
+              releaseNotes: releaseNotes || null,
+              releasedAt
+            };
+          })();
+
+      auditDeveloperSession(db, session, "client-version.create", "client_version", result.id, {
+        productCode: result.productCode,
+        channel: result.channel,
+        version: result.version,
+        status: result.status,
+        forceUpdate: result.forceUpdate
       });
 
-      return {
-        id,
-        productCode: product.code,
-        channel,
-        version,
-        status,
-        forceUpdate: Boolean(forceUpdate),
-        downloadUrl: downloadUrl || null,
-        noticeTitle: noticeTitle || null,
-        noticeBody: noticeBody || null,
-        releaseNotes: releaseNotes || null,
-        releasedAt
-      };
+      return result;
     },
 
-    updateClientVersionStatus(token, versionId, body = {}) {
+    async updateClientVersionStatus(token, versionId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const row = one(
-        db,
-        `
-          SELECT v.*, pr.code AS product_code
-          FROM client_versions v
-          JOIN products pr ON pr.id = v.product_id
-          WHERE v.id = ?
-        `,
-        versionId
-      );
-
+      const row = await getStoreClientVersionById(versionId);
       if (!row) {
         throw new AppError(404, "CLIENT_VERSION_NOT_FOUND", "Client version does not exist.");
       }
 
-      const nextStatus = String(body.status ?? "").trim().toLowerCase();
-      if (!["active", "disabled"].includes(nextStatus)) {
-        throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
-      }
+      const result = typeof store.versions.updateClientVersionStatus === "function"
+        ? await Promise.resolve(store.versions.updateClientVersionStatus(versionId, body, nowIso()))
+        : (() => {
+            const nextStatus = String(body.status ?? "").trim().toLowerCase();
+            if (!["active", "disabled"].includes(nextStatus)) {
+              throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
+            }
 
-      const forceUpdate = body.forceUpdate === undefined
-        ? Number(row.force_update)
-        : body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true"
-          ? 1
-          : 0;
+            const forceUpdate = body.forceUpdate === undefined
+              ? (row.forceUpdate ? 1 : 0)
+              : body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true"
+                ? 1
+                : 0;
 
-      const timestamp = nowIso();
-      run(
-        db,
-        `
-          UPDATE client_versions
-          SET status = ?, force_update = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        nextStatus,
-        forceUpdate,
-        timestamp,
-        row.id
-      );
+            const timestamp = nowIso();
+            run(
+              db,
+              `
+                UPDATE client_versions
+                SET status = ?, force_update = ?, updated_at = ?
+                WHERE id = ?
+              `,
+              nextStatus,
+              forceUpdate,
+              timestamp,
+              row.id
+            );
 
-      audit(db, "admin", admin.admin_id, "client-version.status", "client_version", row.id, {
-        productCode: row.product_code,
-        version: row.version,
-        channel: row.channel,
-        status: nextStatus,
-        forceUpdate: Boolean(forceUpdate)
+            return {
+              id: row.id,
+              productCode: row.productCode,
+              channel: row.channel,
+              version: row.version,
+              status: nextStatus,
+              forceUpdate: Boolean(forceUpdate),
+              changed: nextStatus !== row.status || forceUpdate !== (row.forceUpdate ? 1 : 0),
+              updatedAt: timestamp
+            };
+          })();
+
+      audit(db, "admin", admin.admin_id, "client-version.status", "client_version", result.id, {
+        productCode: result.productCode,
+        version: result.version,
+        channel: result.channel,
+        status: result.status,
+        forceUpdate: result.forceUpdate
       });
 
-      return {
-        id: row.id,
-        productCode: row.product_code,
-        channel: row.channel,
-        version: row.version,
-        status: nextStatus,
-        forceUpdate: Boolean(forceUpdate),
-        changed: nextStatus !== row.status || forceUpdate !== Number(row.force_update),
-        updatedAt: timestamp
-      };
+      return result;
     },
 
-    developerUpdateClientVersionStatus(token, versionId, body = {}) {
+    async developerUpdateClientVersionStatus(token, versionId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const row = requireDeveloperOwnedClientVersion(db, session, versionId, "versions.write");
-
-      const nextStatus = String(body.status ?? "").trim().toLowerCase();
-      if (!["active", "disabled"].includes(nextStatus)) {
-        throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
+      const row = await getStoreClientVersionById(versionId);
+      if (!row) {
+        throw new AppError(404, "CLIENT_VERSION_NOT_FOUND", "Client version does not exist.");
       }
-
-      const forceUpdate = body.forceUpdate === undefined
-        ? Number(row.force_update)
-        : body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true"
-          ? 1
-          : 0;
-
-      const timestamp = nowIso();
-      run(
+      ensureDeveloperCanAccessProduct(
         db,
-        `
-          UPDATE client_versions
-          SET status = ?, force_update = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        nextStatus,
-        forceUpdate,
-        timestamp,
-        row.id
+        session,
+        { id: row.productId, owner_developer_id: row.ownerDeveloperId },
+        "versions.write",
+        "DEVELOPER_CLIENT_VERSION_FORBIDDEN",
+        "You can only manage client versions under your assigned projects."
       );
 
-      auditDeveloperSession(db, session, "client-version.status", "client_version", row.id, {
-        productCode: row.product_code,
-        version: row.version,
-        channel: row.channel,
-        status: nextStatus,
-        forceUpdate: Boolean(forceUpdate)
+      const result = typeof store.versions.updateClientVersionStatus === "function"
+        ? await Promise.resolve(store.versions.updateClientVersionStatus(versionId, body, nowIso()))
+        : (() => {
+            const nextStatus = String(body.status ?? "").trim().toLowerCase();
+            if (!["active", "disabled"].includes(nextStatus)) {
+              throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
+            }
+
+            const forceUpdate = body.forceUpdate === undefined
+              ? (row.forceUpdate ? 1 : 0)
+              : body.forceUpdate === true || body.forceUpdate === 1 || body.forceUpdate === "true"
+                ? 1
+                : 0;
+
+            const timestamp = nowIso();
+            run(
+              db,
+              `
+                UPDATE client_versions
+                SET status = ?, force_update = ?, updated_at = ?
+                WHERE id = ?
+              `,
+              nextStatus,
+              forceUpdate,
+              timestamp,
+              row.id
+            );
+
+            return {
+              id: row.id,
+              productCode: row.productCode,
+              channel: row.channel,
+              version: row.version,
+              status: nextStatus,
+              forceUpdate: Boolean(forceUpdate),
+              changed: nextStatus !== row.status || forceUpdate !== (row.forceUpdate ? 1 : 0),
+              updatedAt: timestamp
+            };
+          })();
+
+      auditDeveloperSession(db, session, "client-version.status", "client_version", result.id, {
+        productCode: result.productCode,
+        version: result.version,
+        channel: result.channel,
+        status: result.status,
+        forceUpdate: result.forceUpdate
       });
 
-      return {
-        id: row.id,
-        productCode: row.product_code,
-        channel: row.channel,
-        version: row.version,
-        status: nextStatus,
-        forceUpdate: Boolean(forceUpdate),
-        changed: nextStatus !== row.status || forceUpdate !== Number(row.force_update),
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     async listNotices(token, filters = {}) {
@@ -7951,11 +7984,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view notices under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        const product = await getStoreProductByCode(String(filters.productCode).trim().toUpperCase());
+        ensureDeveloperCanAccessProduct(
           db,
           session,
-          String(filters.productCode).trim().toUpperCase(),
-          "notices.read"
+          product,
+          "notices.read",
+          "DEVELOPER_NOTICE_FORBIDDEN",
+          "You can only view notices under your assigned projects."
         );
       }
       return queryNoticeRows(db, store, {
@@ -7964,88 +8000,98 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    createNotice(token, body = {}) {
+    async createNotice(token, body = {}) {
       const admin = requireAdminSession(db, token);
       requireField(body, "title");
       requireField(body, "body");
 
       const productCode = readProductCodeInput(body, false);
-      const product = productCode ? requireProductByCode(db, productCode) : null;
-      const kind = String(body.kind ?? "announcement").trim().toLowerCase();
-      const severity = String(body.severity ?? "info").trim().toLowerCase();
-      const status = String(body.status ?? "active").trim().toLowerCase();
-      const channel = normalizeNoticeChannel(body.channel, "all");
-      const blockLogin = body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true" ? 1 : 0;
-      const title = String(body.title).trim();
-      const content = String(body.body).trim();
-      const actionUrl = String(body.actionUrl ?? "").trim();
-      const startsAt = body.startsAt ? new Date(body.startsAt).toISOString() : nowIso();
-      const endsAt = body.endsAt ? new Date(body.endsAt).toISOString() : null;
-
-      if (!["announcement", "maintenance"].includes(kind)) {
-        throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
-      }
-      if (!["info", "warning", "critical"].includes(severity)) {
-        throw new AppError(400, "INVALID_NOTICE_SEVERITY", "Notice severity must be info, warning, or critical.");
-      }
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
-      }
-      if (endsAt && endsAt <= startsAt) {
-        throw new AppError(400, "INVALID_NOTICE_WINDOW", "Notice end time must be later than start time.");
+      const product = productCode ? await getStoreProductByCode(productCode) : null;
+      if (productCode && !product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
       }
 
-      const timestamp = nowIso();
-      const id = generateId("notice");
-      run(
-        db,
-        `
-          INSERT INTO notices
-          (id, product_id, channel, kind, severity, title, body, action_url, status, block_login, starts_at, ends_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        id,
-        product?.id ?? null,
-        channel,
-        kind,
-        severity,
-        title,
-        content,
-        actionUrl || null,
-        status,
-        blockLogin,
-        startsAt,
-        endsAt,
-        timestamp,
-        timestamp
-      );
+      const result = typeof store.notices.createNotice === "function"
+        ? await Promise.resolve(store.notices.createNotice(product, body, nowIso()))
+        : (() => {
+            const kind = String(body.kind ?? "announcement").trim().toLowerCase();
+            const severity = String(body.severity ?? "info").trim().toLowerCase();
+            const status = String(body.status ?? "active").trim().toLowerCase();
+            const channel = normalizeNoticeChannel(body.channel, "all");
+            const blockLogin = body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true" ? 1 : 0;
+            const title = String(body.title).trim();
+            const content = String(body.body).trim();
+            const actionUrl = String(body.actionUrl ?? "").trim();
+            const startsAt = body.startsAt ? new Date(body.startsAt).toISOString() : nowIso();
+            const endsAt = body.endsAt ? new Date(body.endsAt).toISOString() : null;
 
-      audit(db, "admin", admin.admin_id, "notice.create", "notice", id, {
-        productCode: product?.code ?? null,
-        channel,
-        kind,
-        severity,
-        status,
-        blockLogin: Boolean(blockLogin)
+            if (!["announcement", "maintenance"].includes(kind)) {
+              throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
+            }
+            if (!["info", "warning", "critical"].includes(severity)) {
+              throw new AppError(400, "INVALID_NOTICE_SEVERITY", "Notice severity must be info, warning, or critical.");
+            }
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+            }
+            if (endsAt && endsAt <= startsAt) {
+              throw new AppError(400, "INVALID_NOTICE_WINDOW", "Notice end time must be later than start time.");
+            }
+
+            const timestamp = nowIso();
+            const id = generateId("notice");
+            run(
+              db,
+              `
+                INSERT INTO notices
+                (id, product_id, channel, kind, severity, title, body, action_url, status, block_login, starts_at, ends_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              id,
+              product?.id ?? null,
+              channel,
+              kind,
+              severity,
+              title,
+              content,
+              actionUrl || null,
+              status,
+              blockLogin,
+              startsAt,
+              endsAt,
+              timestamp,
+              timestamp
+            );
+
+            return {
+              id,
+              productCode: product?.code ?? null,
+              channel,
+              kind,
+              severity,
+              title,
+              body: content,
+              actionUrl: actionUrl || null,
+              status,
+              blockLogin: Boolean(blockLogin),
+              startsAt,
+              endsAt
+            };
+          })();
+
+      audit(db, "admin", admin.admin_id, "notice.create", "notice", result.id, {
+        productCode: result.productCode,
+        channel: result.channel,
+        kind: result.kind,
+        severity: result.severity,
+        status: result.status,
+        blockLogin: result.blockLogin
       });
 
-      return {
-        id,
-        productCode: product?.code ?? null,
-        channel,
-        kind,
-        severity,
-        title,
-        body: content,
-        actionUrl: actionUrl || null,
-        status,
-        blockLogin: Boolean(blockLogin),
-        startsAt,
-        endsAt
-      };
+      return result;
     },
 
-    developerCreateNotice(token, body = {}) {
+    async developerCreateNotice(token, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -8056,186 +8102,217 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       requireField(body, "title");
       requireField(body, "body");
 
-      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "notices.write");
-      const kind = String(body.kind ?? "announcement").trim().toLowerCase();
-      const severity = String(body.severity ?? "info").trim().toLowerCase();
-      const status = String(body.status ?? "active").trim().toLowerCase();
-      const channel = normalizeNoticeChannel(body.channel, "all");
-      const blockLogin = body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true" ? 1 : 0;
-      const title = String(body.title).trim();
-      const content = String(body.body).trim();
-      const actionUrl = String(body.actionUrl ?? "").trim();
-      const startsAt = body.startsAt ? new Date(body.startsAt).toISOString() : nowIso();
-      const endsAt = body.endsAt ? new Date(body.endsAt).toISOString() : null;
-
-      if (!["announcement", "maintenance"].includes(kind)) {
-        throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
+      const product = await getStoreProductByCode(readProductCodeInput(body));
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
       }
-      if (!["info", "warning", "critical"].includes(severity)) {
-        throw new AppError(400, "INVALID_NOTICE_SEVERITY", "Notice severity must be info, warning, or critical.");
-      }
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
-      }
-      if (endsAt && endsAt <= startsAt) {
-        throw new AppError(400, "INVALID_NOTICE_WINDOW", "Notice end time must be later than start time.");
-      }
-
-      const timestamp = nowIso();
-      const id = generateId("notice");
-      run(
+      ensureDeveloperCanAccessProduct(
         db,
-        `
-          INSERT INTO notices
-          (id, product_id, channel, kind, severity, title, body, action_url, status, block_login, starts_at, ends_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        id,
-        product.id,
-        channel,
-        kind,
-        severity,
-        title,
-        content,
-        actionUrl || null,
-        status,
-        blockLogin,
-        startsAt,
-        endsAt,
-        timestamp,
-        timestamp
+        session,
+        product,
+        "notices.write",
+        "DEVELOPER_NOTICE_FORBIDDEN",
+        "You can only manage notices under your assigned projects."
       );
 
-      auditDeveloperSession(db, session, "notice.create", "notice", id, {
-        productCode: product.code,
-        channel,
-        kind,
-        severity,
-        status,
-        blockLogin: Boolean(blockLogin)
+      const result = typeof store.notices.createNotice === "function"
+        ? await Promise.resolve(store.notices.createNotice(product, body, nowIso()))
+        : (() => {
+            const kind = String(body.kind ?? "announcement").trim().toLowerCase();
+            const severity = String(body.severity ?? "info").trim().toLowerCase();
+            const status = String(body.status ?? "active").trim().toLowerCase();
+            const channel = normalizeNoticeChannel(body.channel, "all");
+            const blockLogin = body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true" ? 1 : 0;
+            const title = String(body.title).trim();
+            const content = String(body.body).trim();
+            const actionUrl = String(body.actionUrl ?? "").trim();
+            const startsAt = body.startsAt ? new Date(body.startsAt).toISOString() : nowIso();
+            const endsAt = body.endsAt ? new Date(body.endsAt).toISOString() : null;
+
+            if (!["announcement", "maintenance"].includes(kind)) {
+              throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
+            }
+            if (!["info", "warning", "critical"].includes(severity)) {
+              throw new AppError(400, "INVALID_NOTICE_SEVERITY", "Notice severity must be info, warning, or critical.");
+            }
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+            }
+            if (endsAt && endsAt <= startsAt) {
+              throw new AppError(400, "INVALID_NOTICE_WINDOW", "Notice end time must be later than start time.");
+            }
+
+            const timestamp = nowIso();
+            const id = generateId("notice");
+            run(
+              db,
+              `
+                INSERT INTO notices
+                (id, product_id, channel, kind, severity, title, body, action_url, status, block_login, starts_at, ends_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              id,
+              product.id,
+              channel,
+              kind,
+              severity,
+              title,
+              content,
+              actionUrl || null,
+              status,
+              blockLogin,
+              startsAt,
+              endsAt,
+              timestamp,
+              timestamp
+            );
+
+            return {
+              id,
+              productCode: product.code,
+              channel,
+              kind,
+              severity,
+              title,
+              body: content,
+              actionUrl: actionUrl || null,
+              status,
+              blockLogin: Boolean(blockLogin),
+              startsAt,
+              endsAt
+            };
+          })();
+
+      auditDeveloperSession(db, session, "notice.create", "notice", result.id, {
+        productCode: result.productCode,
+        channel: result.channel,
+        kind: result.kind,
+        severity: result.severity,
+        status: result.status,
+        blockLogin: result.blockLogin
       });
 
-      return {
-        id,
-        productCode: product.code,
-        channel,
-        kind,
-        severity,
-        title,
-        body: content,
-        actionUrl: actionUrl || null,
-        status,
-        blockLogin: Boolean(blockLogin),
-        startsAt,
-        endsAt
-      };
+      return result;
     },
 
-    updateNoticeStatus(token, noticeId, body = {}) {
+    async updateNoticeStatus(token, noticeId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const row = one(
-        db,
-        `
-          SELECT n.*, pr.code AS product_code
-          FROM notices n
-          LEFT JOIN products pr ON pr.id = n.product_id
-          WHERE n.id = ?
-        `,
-        noticeId
-      );
-
+      const row = await getStoreNoticeById(noticeId);
       if (!row) {
         throw new AppError(404, "NOTICE_NOT_FOUND", "Notice does not exist.");
       }
 
-      const status = String(body.status ?? "").trim().toLowerCase();
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
-      }
+      const result = typeof store.notices.updateNoticeStatus === "function"
+        ? await Promise.resolve(store.notices.updateNoticeStatus(noticeId, body, nowIso()))
+        : (() => {
+            const status = String(body.status ?? "").trim().toLowerCase();
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+            }
 
-      const blockLogin = body.blockLogin === undefined
-        ? Number(row.block_login)
-        : body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true"
-          ? 1
-          : 0;
+            const blockLogin = body.blockLogin === undefined
+              ? (row.blockLogin ? 1 : 0)
+              : body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true"
+                ? 1
+                : 0;
 
-      const timestamp = nowIso();
-      run(
-        db,
-        `
-          UPDATE notices
-          SET status = ?, block_login = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        status,
-        blockLogin,
-        timestamp,
-        row.id
-      );
+            const timestamp = nowIso();
+            run(
+              db,
+              `
+                UPDATE notices
+                SET status = ?, block_login = ?, updated_at = ?
+                WHERE id = ?
+              `,
+              status,
+              blockLogin,
+              timestamp,
+              row.id
+            );
 
-      audit(db, "admin", admin.admin_id, "notice.status", "notice", row.id, {
-        productCode: row.product_code ?? null,
-        channel: row.channel,
-        status,
-        blockLogin: Boolean(blockLogin)
+            return {
+              id: row.id,
+              productCode: row.productCode,
+              channel: row.channel,
+              status,
+              blockLogin: Boolean(blockLogin),
+              changed: status !== row.status || blockLogin !== (row.blockLogin ? 1 : 0),
+              updatedAt: timestamp
+            };
+          })();
+
+      audit(db, "admin", admin.admin_id, "notice.status", "notice", result.id, {
+        productCode: result.productCode,
+        channel: result.channel,
+        status: result.status,
+        blockLogin: result.blockLogin
       });
 
-      return {
-        id: row.id,
-        productCode: row.product_code ?? null,
-        channel: row.channel,
-        status,
-        blockLogin: Boolean(blockLogin),
-        changed: status !== row.status || blockLogin !== Number(row.block_login),
-        updatedAt: timestamp
-      };
+      return result;
     },
 
-    developerUpdateNoticeStatus(token, noticeId, body = {}) {
+    async developerUpdateNoticeStatus(token, noticeId, body = {}) {
       const session = requireDeveloperSession(db, token);
-      const row = requireDeveloperOwnedNotice(db, session, noticeId, "notices.write");
-
-      const status = String(body.status ?? "").trim().toLowerCase();
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+      const row = await getStoreNoticeById(noticeId);
+      if (!row) {
+        throw new AppError(404, "NOTICE_NOT_FOUND", "Notice does not exist.");
       }
-
-      const blockLogin = body.blockLogin === undefined
-        ? Number(row.block_login)
-        : body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true"
-          ? 1
-          : 0;
-
-      const timestamp = nowIso();
-      run(
+      ensureDeveloperCanAccessProduct(
         db,
-        `
-          UPDATE notices
-          SET status = ?, block_login = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        status,
-        blockLogin,
-        timestamp,
-        row.id
+        session,
+        { id: row.productId, owner_developer_id: row.ownerDeveloperId },
+        "notices.write",
+        "DEVELOPER_NOTICE_FORBIDDEN",
+        "You can only manage notices under your assigned projects."
       );
 
-      auditDeveloperSession(db, session, "notice.status", "notice", row.id, {
-        productCode: row.product_code ?? null,
-        channel: row.channel,
-        status,
-        blockLogin: Boolean(blockLogin)
+      const result = typeof store.notices.updateNoticeStatus === "function"
+        ? await Promise.resolve(store.notices.updateNoticeStatus(noticeId, body, nowIso()))
+        : (() => {
+            const status = String(body.status ?? "").trim().toLowerCase();
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
+            }
+
+            const blockLogin = body.blockLogin === undefined
+              ? (row.blockLogin ? 1 : 0)
+              : body.blockLogin === true || body.blockLogin === 1 || body.blockLogin === "true"
+                ? 1
+                : 0;
+
+            const timestamp = nowIso();
+            run(
+              db,
+              `
+                UPDATE notices
+                SET status = ?, block_login = ?, updated_at = ?
+                WHERE id = ?
+              `,
+              status,
+              blockLogin,
+              timestamp,
+              row.id
+            );
+
+            return {
+              id: row.id,
+              productCode: row.productCode,
+              channel: row.channel,
+              status,
+              blockLogin: Boolean(blockLogin),
+              changed: status !== row.status || blockLogin !== (row.blockLogin ? 1 : 0),
+              updatedAt: timestamp
+            };
+          })();
+
+      auditDeveloperSession(db, session, "notice.status", "notice", result.id, {
+        productCode: result.productCode,
+        channel: result.channel,
+        status: result.status,
+        blockLogin: result.blockLogin
       });
 
-      return {
-        id: row.id,
-        productCode: row.product_code ?? null,
-        channel: row.channel,
-        status,
-        blockLogin: Boolean(blockLogin),
-        changed: status !== row.status || blockLogin !== Number(row.block_login),
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     async clientNotices(reqLike, body, rawBody) {
@@ -8247,7 +8324,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         return buildDisabledNoticeManifest(product, body.channel);
       }
 
-      const notices = activeNoticesForProduct(db, product.id, body.channel).map(formatNotice);
+      const notices = await activeNoticesForProduct(db, store, product.id, body.channel);
       return {
         productCode: product.code,
         channel: normalizeNoticeChannel(body.channel, "stable"),
@@ -8270,11 +8347,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view network rules under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        const product = await getStoreProductByCode(String(filters.productCode).trim().toUpperCase());
+        ensureDeveloperCanAccessProduct(
           db,
           session,
-          String(filters.productCode).trim().toUpperCase(),
-          "products.read"
+          product,
+          "products.read",
+          "DEVELOPER_NETWORK_RULE_FORBIDDEN",
+          "You can only view network rules under your assigned projects."
         );
       }
       return queryNetworkRuleRows(db, store, {
@@ -8283,83 +8363,92 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    createNetworkRule(token, body = {}) {
+    async createNetworkRule(token, body = {}) {
       const admin = requireAdminSession(db, token);
       requireField(body, "pattern");
 
       const productCode = readProductCodeInput(body, false);
-      const product = productCode ? requireProductByCode(db, productCode) : null;
-      const targetType = String(body.targetType ?? (String(body.pattern).includes("/") ? "cidr" : "ip"))
-        .trim()
-        .toLowerCase();
-      const pattern = String(body.pattern).trim();
-      const actionScope = String(body.actionScope ?? "all").trim().toLowerCase();
-      const decision = String(body.decision ?? "block").trim().toLowerCase();
-      const status = String(body.status ?? "active").trim().toLowerCase();
-      const notes = String(body.notes ?? "").trim();
-
-      if (!["ip", "cidr"].includes(targetType)) {
-        throw new AppError(400, "INVALID_NETWORK_TARGET_TYPE", "Target type must be ip or cidr.");
-      }
-      if (!["all", "register", "recharge", "login", "heartbeat"].includes(actionScope)) {
-        throw new AppError(400, "INVALID_NETWORK_ACTION_SCOPE", "Action scope is not supported.");
-      }
-      if (decision !== "block") {
-        throw new AppError(400, "INVALID_NETWORK_DECISION", "Only block rules are supported in this version.");
-      }
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+      const product = productCode ? await getStoreProductByCode(productCode) : null;
+      if (productCode && !product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
       }
 
-      if (targetType === "ip" && !normalizeIpAddress(pattern)) {
-        throw new AppError(400, "INVALID_NETWORK_PATTERN", "IP pattern is invalid.");
-      }
-      if (targetType === "cidr" && !ipv4CidrMatch(pattern.split("/")[0], pattern)) {
-        throw new AppError(400, "INVALID_NETWORK_PATTERN", "CIDR pattern must be a valid IPv4 CIDR.");
-      }
+      const result = typeof store.networkRules.createNetworkRule === "function"
+        ? await Promise.resolve(store.networkRules.createNetworkRule(product, body, nowIso()))
+        : (() => {
+            const targetType = String(body.targetType ?? (String(body.pattern).includes("/") ? "cidr" : "ip"))
+              .trim()
+              .toLowerCase();
+            const pattern = String(body.pattern).trim();
+            const actionScope = String(body.actionScope ?? "all").trim().toLowerCase();
+            const decision = String(body.decision ?? "block").trim().toLowerCase();
+            const status = String(body.status ?? "active").trim().toLowerCase();
+            const notes = String(body.notes ?? "").trim();
 
-      const timestamp = nowIso();
-      const id = generateId("nrule");
-      run(
-        db,
-        `
-          INSERT INTO network_rules
-          (id, product_id, target_type, pattern, action_scope, decision, status, notes, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        id,
-        product?.id ?? null,
-        targetType,
-        pattern,
-        actionScope,
-        decision,
-        status,
-        notes || null,
-        timestamp,
-        timestamp
-      );
+            if (!["ip", "cidr"].includes(targetType)) {
+              throw new AppError(400, "INVALID_NETWORK_TARGET_TYPE", "Target type must be ip or cidr.");
+            }
+            if (!["all", "register", "recharge", "login", "heartbeat"].includes(actionScope)) {
+              throw new AppError(400, "INVALID_NETWORK_ACTION_SCOPE", "Action scope is not supported.");
+            }
+            if (decision !== "block") {
+              throw new AppError(400, "INVALID_NETWORK_DECISION", "Only block rules are supported in this version.");
+            }
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+            }
+            if (targetType === "ip" && !normalizeIpAddress(pattern)) {
+              throw new AppError(400, "INVALID_NETWORK_PATTERN", "IP pattern is invalid.");
+            }
+            if (targetType === "cidr" && !ipv4CidrMatch(pattern.split("/")[0], pattern)) {
+              throw new AppError(400, "INVALID_NETWORK_PATTERN", "CIDR pattern must be a valid IPv4 CIDR.");
+            }
 
-      audit(db, "admin", admin.admin_id, "network-rule.create", "network_rule", id, {
-        productCode: product?.code ?? null,
-        targetType,
-        pattern,
-        actionScope,
-        status
+            const timestamp = nowIso();
+            const id = generateId("nrule");
+            run(
+              db,
+              `
+                INSERT INTO network_rules
+                (id, product_id, target_type, pattern, action_scope, decision, status, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              id,
+              product?.id ?? null,
+              targetType,
+              pattern,
+              actionScope,
+              decision,
+              status,
+              notes || null,
+              timestamp,
+              timestamp
+            );
+
+            return {
+              id,
+              productCode: product?.code ?? null,
+              targetType,
+              pattern,
+              actionScope,
+              decision,
+              status,
+              notes: notes || null
+            };
+          })();
+
+      audit(db, "admin", admin.admin_id, "network-rule.create", "network_rule", result.id, {
+        productCode: result.productCode,
+        targetType: result.targetType,
+        pattern: result.pattern,
+        actionScope: result.actionScope,
+        status: result.status
       });
 
-      return {
-        id,
-        productCode: product?.code ?? null,
-        targetType,
-        pattern,
-        actionScope,
-        decision,
-        status,
-        notes: notes || null
-      };
+      return result;
     },
 
-    developerCreateNetworkRule(token, body = {}) {
+    async developerCreateNetworkRule(token, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -8369,136 +8458,144 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
       requireField(body, "pattern");
 
-      const product = requireDeveloperOwnedProductByCode(
+      const product = await getStoreProductByCode(readProductCodeInput(body));
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
         db,
         session,
-        readProductCodeInput(body),
-        "products.write"
-      );
-      const targetType = String(body.targetType ?? (String(body.pattern).includes("/") ? "cidr" : "ip"))
-        .trim()
-        .toLowerCase();
-      const pattern = String(body.pattern).trim();
-      const actionScope = String(body.actionScope ?? "all").trim().toLowerCase();
-      const decision = String(body.decision ?? "block").trim().toLowerCase();
-      const status = String(body.status ?? "active").trim().toLowerCase();
-      const notes = String(body.notes ?? "").trim();
-
-      if (!["ip", "cidr"].includes(targetType)) {
-        throw new AppError(400, "INVALID_NETWORK_TARGET_TYPE", "Target type must be ip or cidr.");
-      }
-      if (!["all", "register", "recharge", "login", "heartbeat"].includes(actionScope)) {
-        throw new AppError(400, "INVALID_NETWORK_ACTION_SCOPE", "Action scope is not supported.");
-      }
-      if (decision !== "block") {
-        throw new AppError(400, "INVALID_NETWORK_DECISION", "Only block rules are supported in this version.");
-      }
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
-      }
-
-      if (targetType === "ip" && !normalizeIpAddress(pattern)) {
-        throw new AppError(400, "INVALID_NETWORK_PATTERN", "IP pattern is invalid.");
-      }
-      if (targetType === "cidr" && !ipv4CidrMatch(pattern.split("/")[0], pattern)) {
-        throw new AppError(400, "INVALID_NETWORK_PATTERN", "CIDR pattern must be a valid IPv4 CIDR.");
-      }
-
-      const timestamp = nowIso();
-      const id = generateId("nrule");
-      run(
-        db,
-        `
-          INSERT INTO network_rules
-          (id, product_id, target_type, pattern, action_scope, decision, status, notes, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        id,
-        product.id,
-        targetType,
-        pattern,
-        actionScope,
-        decision,
-        status,
-        notes || null,
-        timestamp,
-        timestamp
+        product,
+        "products.write",
+        "DEVELOPER_NETWORK_RULE_FORBIDDEN",
+        "You can only manage network rules under your assigned projects."
       );
 
-      auditDeveloperSession(db, session, "network-rule.create", "network_rule", id, {
-        productCode: product.code,
-        targetType,
-        pattern,
-        actionScope,
-        status
+      const result = typeof store.networkRules.createNetworkRule === "function"
+        ? await Promise.resolve(store.networkRules.createNetworkRule(product, body, nowIso()))
+        : (() => {
+            const targetType = String(body.targetType ?? (String(body.pattern).includes("/") ? "cidr" : "ip"))
+              .trim()
+              .toLowerCase();
+            const pattern = String(body.pattern).trim();
+            const actionScope = String(body.actionScope ?? "all").trim().toLowerCase();
+            const decision = String(body.decision ?? "block").trim().toLowerCase();
+            const status = String(body.status ?? "active").trim().toLowerCase();
+            const notes = String(body.notes ?? "").trim();
+
+            if (!["ip", "cidr"].includes(targetType)) {
+              throw new AppError(400, "INVALID_NETWORK_TARGET_TYPE", "Target type must be ip or cidr.");
+            }
+            if (!["all", "register", "recharge", "login", "heartbeat"].includes(actionScope)) {
+              throw new AppError(400, "INVALID_NETWORK_ACTION_SCOPE", "Action scope is not supported.");
+            }
+            if (decision !== "block") {
+              throw new AppError(400, "INVALID_NETWORK_DECISION", "Only block rules are supported in this version.");
+            }
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+            }
+            if (targetType === "ip" && !normalizeIpAddress(pattern)) {
+              throw new AppError(400, "INVALID_NETWORK_PATTERN", "IP pattern is invalid.");
+            }
+            if (targetType === "cidr" && !ipv4CidrMatch(pattern.split("/")[0], pattern)) {
+              throw new AppError(400, "INVALID_NETWORK_PATTERN", "CIDR pattern must be a valid IPv4 CIDR.");
+            }
+
+            const timestamp = nowIso();
+            const id = generateId("nrule");
+            run(
+              db,
+              `
+                INSERT INTO network_rules
+                (id, product_id, target_type, pattern, action_scope, decision, status, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+              id,
+              product.id,
+              targetType,
+              pattern,
+              actionScope,
+              decision,
+              status,
+              notes || null,
+              timestamp,
+              timestamp
+            );
+
+            return {
+              id,
+              productCode: product.code,
+              targetType,
+              pattern,
+              actionScope,
+              decision,
+              status,
+              notes: notes || null
+            };
+          })();
+
+      auditDeveloperSession(db, session, "network-rule.create", "network_rule", result.id, {
+        productCode: result.productCode,
+        targetType: result.targetType,
+        pattern: result.pattern,
+        actionScope: result.actionScope,
+        status: result.status
       });
 
-      return {
-        id,
-        productCode: product.code,
-        targetType,
-        pattern,
-        actionScope,
-        decision,
-        status,
-        notes: notes || null
-      };
+      return result;
     },
 
-    updateNetworkRuleStatus(token, ruleId, body = {}) {
+    async updateNetworkRuleStatus(token, ruleId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const row = one(
-        db,
-        `
-          SELECT nr.*, pr.code AS product_code
-          FROM network_rules nr
-          LEFT JOIN products pr ON pr.id = nr.product_id
-          WHERE nr.id = ?
-        `,
-        ruleId
-      );
-
+      const row = await getStoreNetworkRuleById(ruleId);
       if (!row) {
         throw new AppError(404, "NETWORK_RULE_NOT_FOUND", "Network rule does not exist.");
       }
 
-      const status = String(body.status ?? "").trim().toLowerCase();
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
-      }
+      const result = typeof store.networkRules.updateNetworkRuleStatus === "function"
+        ? await Promise.resolve(store.networkRules.updateNetworkRuleStatus(ruleId, body, nowIso()))
+        : (() => {
+            const status = String(body.status ?? "").trim().toLowerCase();
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+            }
 
-      const timestamp = nowIso();
-      run(
-        db,
-        `
-          UPDATE network_rules
-          SET status = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        status,
-        timestamp,
-        row.id
-      );
+            const timestamp = nowIso();
+            run(
+              db,
+              `
+                UPDATE network_rules
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+              `,
+              status,
+              timestamp,
+              row.id
+            );
 
-      audit(db, "admin", admin.admin_id, "network-rule.status", "network_rule", row.id, {
-        productCode: row.product_code ?? null,
-        pattern: row.pattern,
-        actionScope: row.action_scope,
-        status
+            return {
+              id: row.id,
+              productCode: row.productCode,
+              pattern: row.pattern,
+              actionScope: row.actionScope,
+              status,
+              changed: status !== row.status,
+              updatedAt: timestamp
+            };
+          })();
+
+      audit(db, "admin", admin.admin_id, "network-rule.status", "network_rule", result.id, {
+        productCode: result.productCode,
+        pattern: result.pattern,
+        actionScope: result.actionScope,
+        status: result.status
       });
 
-      return {
-        id: row.id,
-        productCode: row.product_code ?? null,
-        pattern: row.pattern,
-        actionScope: row.action_scope,
-        status,
-        changed: status !== row.status,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
-    developerUpdateNetworkRuleStatus(token, ruleId, body = {}) {
+    async developerUpdateNetworkRuleStatus(token, ruleId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -8506,67 +8603,63 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_NETWORK_RULE_FORBIDDEN",
         "You can only manage network rules under your assigned projects."
       );
-      const row = one(
-        db,
-        `
-          SELECT nr.*, pr.code AS product_code, pr.owner_developer_id
-          FROM network_rules nr
-          LEFT JOIN products pr ON pr.id = nr.product_id
-          WHERE nr.id = ?
-        `,
-        ruleId
-      );
-
+      const row = await getStoreNetworkRuleById(ruleId);
       if (!row) {
         throw new AppError(404, "NETWORK_RULE_NOT_FOUND", "Network rule does not exist.");
       }
-      if (!row.product_id) {
+      if (!row.productId) {
         throw new AppError(403, "DEVELOPER_NETWORK_RULE_FORBIDDEN", "Developers cannot manage global network rules.");
       }
 
       ensureDeveloperCanAccessProduct(
         db,
         session,
-        { id: row.product_id, owner_developer_id: row.owner_developer_id },
+        { id: row.productId, owner_developer_id: row.ownerDeveloperId },
         "products.write",
         "DEVELOPER_NETWORK_RULE_FORBIDDEN",
         "You can only manage network rules under your assigned projects."
       );
 
-      const status = String(body.status ?? "").trim().toLowerCase();
-      if (!["active", "archived"].includes(status)) {
-        throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
-      }
+      const result = typeof store.networkRules.updateNetworkRuleStatus === "function"
+        ? await Promise.resolve(store.networkRules.updateNetworkRuleStatus(ruleId, body, nowIso()))
+        : (() => {
+            const status = String(body.status ?? "").trim().toLowerCase();
+            if (!["active", "archived"].includes(status)) {
+              throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
+            }
 
-      const timestamp = nowIso();
-      run(
-        db,
-        `
-          UPDATE network_rules
-          SET status = ?, updated_at = ?
-          WHERE id = ?
-        `,
-        status,
-        timestamp,
-        row.id
-      );
+            const timestamp = nowIso();
+            run(
+              db,
+              `
+                UPDATE network_rules
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+              `,
+              status,
+              timestamp,
+              row.id
+            );
 
-      auditDeveloperSession(db, session, "network-rule.status", "network_rule", row.id, {
-        productCode: row.product_code ?? null,
-        pattern: row.pattern,
-        actionScope: row.action_scope,
-        status
+            return {
+              id: row.id,
+              productCode: row.productCode,
+              pattern: row.pattern,
+              actionScope: row.actionScope,
+              status,
+              changed: status !== row.status,
+              updatedAt: timestamp
+            };
+          })();
+
+      auditDeveloperSession(db, session, "network-rule.status", "network_rule", result.id, {
+        productCode: result.productCode,
+        pattern: result.pattern,
+        actionScope: result.actionScope,
+        status: result.status
       });
 
-      return {
-        id: row.id,
-        productCode: row.product_code ?? null,
-        pattern: row.pattern,
-        actionScope: row.action_scope,
-        status,
-        changed: status !== row.status,
-        updatedAt: timestamp
-      };
+      return result;
     },
 
     async listSessions(token, filters = {}) {
@@ -8731,8 +8824,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         return buildDisabledVersionManifest(product, String(body.clientVersion).trim(), body.channel);
       }
 
-      return buildVersionManifest(
+      return await buildVersionManifest(
         db,
+        store,
         product,
         String(body.clientVersion).trim(),
         body.channel
@@ -9059,11 +9153,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       await enforceNetworkRules(db, store, product, meta.ip, "login");
       if (featureConfig.allowNotices) {
-        requireNoBlockingNotices(db, product, body.channel);
+        await requireNoBlockingNotices(db, store, product, body.channel);
       }
       if (featureConfig.allowVersionCheck) {
-        requireClientVersionAllowed(
+        await requireClientVersionAllowed(
           db,
+          store,
           product,
           body.clientVersion ? String(body.clientVersion).trim() : null,
           body.channel
@@ -9174,11 +9269,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       await enforceNetworkRules(db, store, product, meta.ip, "login");
       if (featureConfig.allowNotices) {
-        requireNoBlockingNotices(db, product, body.channel);
+        await requireNoBlockingNotices(db, store, product, body.channel);
       }
       if (featureConfig.allowVersionCheck) {
-        requireClientVersionAllowed(
+        await requireClientVersionAllowed(
           db,
+          store,
           product,
           body.clientVersion ? String(body.clientVersion).trim() : null,
           body.channel
@@ -9283,8 +9379,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           ensureCardControlAvailable(cardControl);
         }
 
-        requireClientVersionAllowed(
+        await requireClientVersionAllowed(
           db,
+          store,
           product,
           body.clientVersion ? String(body.clientVersion).trim() : null,
           body.channel

@@ -1,5 +1,6 @@
 import {
   formatNotice,
+  formatNoticeManageRow,
   normalizeNoticeChannel,
   normalizeNoticeKind,
   normalizeNoticeStatus
@@ -179,6 +180,26 @@ export function createPostgresNoticeRepository(adapter) {
         ...row,
         count: Number(row.count ?? 0)
       }));
+    },
+
+    async getNoticeRowById(_db, noticeId) {
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT n.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id
+          FROM notices n
+          LEFT JOIN products pr ON pr.id = n.product_id
+          WHERE n.id = $1
+          LIMIT 1
+        `,
+        [noticeId],
+        {
+          repository: "notices",
+          operation: "getNoticeRowById",
+          noticeId
+        }
+      ));
+
+      return rows[0] ? formatNoticeManageRow(rows[0]) : null;
     }
   };
 }

@@ -93,6 +93,27 @@ export function formatClientVersionRow(row) {
   };
 }
 
+export function formatClientVersionManageRow(row) {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    productCode: row.product_code ?? null,
+    productName: row.product_name ?? null,
+    ownerDeveloperId: row.owner_developer_id ?? null,
+    channel: row.channel,
+    version: row.version,
+    status: row.status,
+    forceUpdate: Boolean(row.force_update),
+    downloadUrl: row.download_url ?? null,
+    releaseNotes: row.release_notes ?? null,
+    noticeTitle: row.notice_title ?? null,
+    noticeBody: row.notice_body ?? null,
+    releasedAt: row.released_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 export function listProductVersions(db, productId, channel) {
   return many(
     db,
@@ -173,6 +194,20 @@ export function queryClientVersionRows(db, filters = {}) {
       search: normalizedFilters.search
     }
   };
+}
+
+export function getClientVersionRowById(db, versionId) {
+  const row = db.prepare(
+    `
+      SELECT v.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id
+      FROM client_versions v
+      JOIN products pr ON pr.id = v.product_id
+      WHERE v.id = ?
+      LIMIT 1
+    `
+  ).get(versionId);
+
+  return row ? formatClientVersionManageRow(row) : null;
 }
 
 function countByProductIds(db, conditions, params) {

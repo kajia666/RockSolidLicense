@@ -33,6 +33,9 @@ function createWriteCapableAdapter() {
     policyBindConfigs: new Map(),
     policyUnbindConfigs: new Map(),
     policyGrantConfigs: new Map(),
+    clientVersions: [],
+    notices: [],
+    networkRules: [],
     licenseKeys: [],
     licenseKeyControls: new Map(),
     customerAccounts: [],
@@ -219,6 +222,110 @@ function createWriteCapableAdapter() {
       });
   }
 
+  function versionRows(filters = {}) {
+    const normalizedSearch = String(filters.search ?? "").trim().toLowerCase();
+
+    return state.clientVersions
+      .filter((version) => !filters.versionId || version.id === filters.versionId)
+      .filter((version) => !filters.productIds || filters.productIds.includes(version.product_id))
+      .map((version) => {
+        const product = state.products.find((item) => item.id === version.product_id);
+        return {
+          ...version,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          owner_developer_id: product?.owner_developer_id ?? null
+        };
+      })
+      .filter((version) => !filters.productCode || version.product_code === filters.productCode)
+      .filter((version) => !filters.ownerDeveloperId || version.owner_developer_id === filters.ownerDeveloperId)
+      .filter((version) => !filters.channel || version.channel === filters.channel)
+      .filter((version) => !filters.status || version.status === filters.status)
+      .filter((version) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+        return String(version.version ?? "").toLowerCase().includes(normalizedSearch)
+          || String(version.notice_title ?? "").toLowerCase().includes(normalizedSearch)
+          || String(version.release_notes ?? "").toLowerCase().includes(normalizedSearch);
+      })
+      .sort((left, right) => {
+        const productOrder = String(left.product_code ?? "").localeCompare(String(right.product_code ?? ""));
+        if (productOrder !== 0) {
+          return productOrder;
+        }
+        const channelOrder = String(left.channel ?? "").localeCompare(String(right.channel ?? ""));
+        if (channelOrder !== 0) {
+          return channelOrder;
+        }
+        const releasedOrder = String(right.released_at ?? "").localeCompare(String(left.released_at ?? ""));
+        return releasedOrder || String(right.created_at ?? "").localeCompare(String(left.created_at ?? ""));
+      });
+  }
+
+  function noticeRows(filters = {}) {
+    const normalizedSearch = String(filters.search ?? "").trim().toLowerCase();
+
+    return state.notices
+      .filter((notice) => !filters.noticeId || notice.id === filters.noticeId)
+      .filter((notice) => !filters.productIds || filters.productIds.includes(notice.product_id))
+      .map((notice) => {
+        const product = state.products.find((item) => item.id === notice.product_id);
+        return {
+          ...notice,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          owner_developer_id: product?.owner_developer_id ?? null
+        };
+      })
+      .filter((notice) => !filters.productCode || notice.product_code === filters.productCode)
+      .filter((notice) => !filters.ownerDeveloperId || notice.owner_developer_id === filters.ownerDeveloperId)
+      .filter((notice) => !filters.channel || filters.channel === "all" || notice.channel === filters.channel)
+      .filter((notice) => !filters.kind || notice.kind === filters.kind)
+      .filter((notice) => !filters.status || notice.status === filters.status)
+      .filter((notice) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+        return String(notice.title ?? "").toLowerCase().includes(normalizedSearch)
+          || String(notice.body ?? "").toLowerCase().includes(normalizedSearch)
+          || String(notice.product_code ?? "").toLowerCase().includes(normalizedSearch);
+      })
+      .sort((left, right) => {
+        const startsOrder = String(right.starts_at ?? "").localeCompare(String(left.starts_at ?? ""));
+        return startsOrder || String(right.created_at ?? "").localeCompare(String(left.created_at ?? ""));
+      });
+  }
+
+  function networkRuleRows(filters = {}) {
+    const normalizedSearch = String(filters.search ?? "").trim().toLowerCase();
+
+    return state.networkRules
+      .filter((rule) => !filters.ruleId || rule.id === filters.ruleId)
+      .filter((rule) => !filters.productIds || filters.productIds.includes(rule.product_id))
+      .map((rule) => {
+        const product = state.products.find((item) => item.id === rule.product_id);
+        return {
+          ...rule,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          owner_developer_id: product?.owner_developer_id ?? null
+        };
+      })
+      .filter((rule) => !filters.productCode || rule.product_code === filters.productCode)
+      .filter((rule) => !filters.actionScope || rule.action_scope === filters.actionScope)
+      .filter((rule) => !filters.status || rule.status === filters.status)
+      .filter((rule) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+        return String(rule.pattern ?? "").toLowerCase().includes(normalizedSearch)
+          || String(rule.notes ?? "").toLowerCase().includes(normalizedSearch)
+          || String(rule.product_code ?? "").toLowerCase().includes(normalizedSearch);
+      })
+      .sort((left, right) => String(right.created_at ?? "").localeCompare(String(left.created_at ?? "")));
+  }
+
   function recordQuery(sql, params = [], meta = {}) {
     state.queries.push({
       sql: String(sql ?? "").trim(),
@@ -375,6 +482,248 @@ function createWriteCapableAdapter() {
 
     if (meta.repository === "policies" && (meta.operation === "queryPolicyRows" || meta.operation === "loadPolicyRow")) {
       return policyRows(meta.filters ?? { policyId: meta.policyId });
+    }
+
+    if (meta.repository === "versions" && meta.operation === "assertClientVersionAvailable") {
+      return state.clientVersions
+        .filter((version) =>
+          version.product_id === params[0]
+          && version.channel === params[1]
+          && version.version === params[2]
+        )
+        .slice(0, 1)
+        .map((version) => ({ id: version.id }));
+    }
+
+    if (meta.repository === "versions" && meta.operation === "createClientVersion") {
+      state.clientVersions.push({
+        id: params[0],
+        product_id: params[1],
+        channel: params[2],
+        version: params[3],
+        status: params[4],
+        force_update: params[5],
+        download_url: params[6],
+        release_notes: params[7],
+        notice_title: params[8],
+        notice_body: params[9],
+        released_at: params[10],
+        created_at: params[11],
+        updated_at: params[12]
+      });
+      return [];
+    }
+
+    if (meta.repository === "versions" && meta.operation === "updateClientVersionStatus") {
+      const version = state.clientVersions.find((item) => item.id === params[3]);
+      if (version) {
+        version.status = params[0];
+        version.force_update = params[1];
+        version.updated_at = params[2];
+      }
+      return [];
+    }
+
+    if (meta.repository === "versions" && meta.operation === "listProductVersions") {
+      return versionRows({ productIds: [params[0]], channel: params[1] });
+    }
+
+    if (meta.repository === "versions" && meta.operation === "queryClientVersionRows") {
+      return versionRows(meta.filters ?? {});
+    }
+
+    if (meta.repository === "versions" && meta.operation === "getClientVersionRowById") {
+      return versionRows({ versionId: params[0] }).slice(0, 1);
+    }
+
+    if (meta.repository === "versions" && meta.operation === "countActiveVersionsByProductIds") {
+      const counts = new Map();
+      for (const version of state.clientVersions) {
+        if (version.status !== "active") {
+          continue;
+        }
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(version.product_id)) {
+          continue;
+        }
+        counts.set(version.product_id, (counts.get(version.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
+    if (meta.repository === "versions" && meta.operation === "countForceUpdateVersionsByProductIds") {
+      const counts = new Map();
+      for (const version of state.clientVersions) {
+        if (version.status !== "active" || !version.force_update) {
+          continue;
+        }
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(version.product_id)) {
+          continue;
+        }
+        counts.set(version.product_id, (counts.get(version.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
+    if (meta.repository === "notices" && meta.operation === "createNotice") {
+      state.notices.push({
+        id: params[0],
+        product_id: params[1],
+        channel: params[2],
+        kind: params[3],
+        severity: params[4],
+        title: params[5],
+        body: params[6],
+        action_url: params[7],
+        status: params[8],
+        block_login: params[9],
+        starts_at: params[10],
+        ends_at: params[11],
+        created_at: params[12],
+        updated_at: params[13]
+      });
+      return [];
+    }
+
+    if (meta.repository === "notices" && meta.operation === "updateNoticeStatus") {
+      const notice = state.notices.find((item) => item.id === params[3]);
+      if (notice) {
+        notice.status = params[0];
+        notice.block_login = params[1];
+        notice.updated_at = params[2];
+      }
+      return [];
+    }
+
+    if (meta.repository === "notices" && meta.operation === "listActiveNoticesForProduct") {
+      return noticeRows({})
+        .filter((notice) => notice.status === "active")
+        .filter((notice) => notice.starts_at <= params[0] && (!notice.ends_at || notice.ends_at > params[1]))
+        .filter((notice) => notice.product_id === null || notice.product_id === params[2])
+        .filter((notice) => notice.channel === "all" || notice.channel === params[3])
+        .sort((left, right) => {
+          const blockOrder = Number(right.block_login ?? 0) - Number(left.block_login ?? 0);
+          if (blockOrder !== 0) {
+            return blockOrder;
+          }
+          const startsOrder = String(right.starts_at ?? "").localeCompare(String(left.starts_at ?? ""));
+          return startsOrder || String(right.created_at ?? "").localeCompare(String(left.created_at ?? ""));
+        });
+    }
+
+    if (meta.repository === "notices" && meta.operation === "queryNoticeRows") {
+      return noticeRows(meta.filters ?? {});
+    }
+
+    if (meta.repository === "notices" && meta.operation === "getNoticeRowById") {
+      return noticeRows({ noticeId: params[0] }).slice(0, 1);
+    }
+
+    if (meta.repository === "notices" && meta.operation === "countActiveNoticesByProductIds") {
+      const counts = new Map();
+      for (const notice of state.notices) {
+        if (!notice.product_id || notice.status !== "active") {
+          continue;
+        }
+        if (!(notice.starts_at <= params[0] && (!notice.ends_at || notice.ends_at > params[1]))) {
+          continue;
+        }
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(notice.product_id)) {
+          continue;
+        }
+        counts.set(notice.product_id, (counts.get(notice.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
+    if (meta.repository === "notices" && meta.operation === "countBlockingNoticesByProductIds") {
+      const counts = new Map();
+      for (const notice of state.notices) {
+        if (!notice.product_id || notice.status !== "active" || !notice.block_login) {
+          continue;
+        }
+        if (!(notice.starts_at <= params[0] && (!notice.ends_at || notice.ends_at > params[1]))) {
+          continue;
+        }
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(notice.product_id)) {
+          continue;
+        }
+        counts.set(notice.product_id, (counts.get(notice.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
+    }
+
+    if (meta.repository === "networkRules" && meta.operation === "createNetworkRule") {
+      state.networkRules.push({
+        id: params[0],
+        product_id: params[1],
+        target_type: params[2],
+        pattern: params[3],
+        action_scope: params[4],
+        decision: params[5],
+        status: params[6],
+        notes: params[7],
+        created_at: params[8],
+        updated_at: params[9]
+      });
+      return [];
+    }
+
+    if (meta.repository === "networkRules" && meta.operation === "updateNetworkRuleStatus") {
+      const rule = state.networkRules.find((item) => item.id === params[2]);
+      if (rule) {
+        rule.status = params[0];
+        rule.updated_at = params[1];
+      }
+      return [];
+    }
+
+    if (meta.repository === "networkRules" && meta.operation === "queryNetworkRuleRows") {
+      return networkRuleRows(meta.filters ?? {});
+    }
+
+    if (meta.repository === "networkRules" && meta.operation === "getNetworkRuleRowById") {
+      return networkRuleRows({ ruleId: params[0] }).slice(0, 1);
+    }
+
+    if (meta.repository === "networkRules" && meta.operation === "listBlockingNetworkRulesForProduct") {
+      return networkRuleRows({})
+        .filter((rule) => rule.status === "active")
+        .filter((rule) => rule.decision === "block")
+        .filter((rule) => rule.product_id === null || rule.product_id === params[0])
+        .filter((rule) => rule.action_scope === "all" || rule.action_scope === params[1])
+        .sort((left, right) => {
+          const globalOrder = Number(left.product_id === null) - Number(right.product_id === null);
+          return globalOrder || String(right.created_at ?? "").localeCompare(String(left.created_at ?? ""));
+        });
+    }
+
+    if (meta.repository === "networkRules" && meta.operation === "countActiveNetworkRulesByProductIds") {
+      const counts = new Map();
+      for (const rule of state.networkRules) {
+        if (!rule.product_id || rule.status !== "active") {
+          continue;
+        }
+        if (Array.isArray(meta.productIds) && meta.productIds.length && !meta.productIds.includes(rule.product_id)) {
+          continue;
+        }
+        counts.set(rule.product_id, (counts.get(rule.product_id) ?? 0) + 1);
+      }
+      return Array.from(counts.entries()).map(([productId, count]) => ({
+        product_id: productId,
+        count
+      }));
     }
 
     if (meta.repository === "cards" && meta.operation === "createCard") {
@@ -1826,9 +2175,9 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      versions: "sqlite",
-      notices: "sqlite",
-      networkRules: "sqlite",
+      versions: "postgres",
+      notices: "postgres",
+      networkRules: "postgres",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });
@@ -1931,6 +2280,72 @@ test("postgres main store can write products and policies through a transaction-
     assert.equal(listedPolicies[0].grantType, "points");
     assert.equal(listedPolicies[0].allowClientUnbind, false);
 
+    const clientVersion = await app.services.createClientVersion(admin.token, {
+      productCode: "PGWRITE",
+      channel: "stable",
+      version: "2.5.0",
+      forceUpdate: true,
+      noticeTitle: "PG write release"
+    });
+    assert.equal(clientVersion.productCode, "PGWRITE");
+    assert.equal(clientVersion.forceUpdate, true);
+
+    const updatedClientVersion = await app.services.updateClientVersionStatus(admin.token, clientVersion.id, {
+      status: "disabled",
+      forceUpdate: false
+    });
+    assert.equal(updatedClientVersion.status, "disabled");
+    assert.equal(updatedClientVersion.forceUpdate, false);
+
+    const listedVersions = await app.services.listClientVersions(admin.token, { productCode: "PGWRITE" });
+    assert.equal(listedVersions.items.length, 1);
+    assert.equal(listedVersions.items[0].version, "2.5.0");
+    assert.equal(listedVersions.items[0].status, "disabled");
+
+    const notice = await app.services.createNotice(admin.token, {
+      productCode: "PGWRITE",
+      channel: "stable",
+      kind: "maintenance",
+      severity: "warning",
+      title: "PG write notice",
+      body: "maintenance window",
+      blockLogin: true
+    });
+    assert.equal(notice.productCode, "PGWRITE");
+    assert.equal(notice.blockLogin, true);
+
+    const updatedNotice = await app.services.updateNoticeStatus(admin.token, notice.id, {
+      status: "archived",
+      blockLogin: false
+    });
+    assert.equal(updatedNotice.status, "archived");
+    assert.equal(updatedNotice.blockLogin, false);
+
+    const listedNotices = await app.services.listNotices(admin.token, { productCode: "PGWRITE" });
+    assert.equal(listedNotices.items.length, 1);
+    assert.equal(listedNotices.items[0].title, "PG write notice");
+    assert.equal(listedNotices.items[0].status, "archived");
+
+    const networkRule = await app.services.createNetworkRule(admin.token, {
+      productCode: "PGWRITE",
+      targetType: "ip",
+      pattern: "203.0.113.90",
+      actionScope: "login",
+      notes: "pg write rule"
+    });
+    assert.equal(networkRule.productCode, "PGWRITE");
+    assert.equal(networkRule.actionScope, "login");
+
+    const updatedNetworkRule = await app.services.updateNetworkRuleStatus(admin.token, networkRule.id, {
+      status: "archived"
+    });
+    assert.equal(updatedNetworkRule.status, "archived");
+
+    const listedNetworkRules = await app.services.listNetworkRules(admin.token, { productCode: "PGWRITE" });
+    assert.equal(listedNetworkRules.items.length, 1);
+    assert.equal(listedNetworkRules.items[0].pattern, "203.0.113.90");
+    assert.equal(listedNetworkRules.items[0].status, "archived");
+
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.implementationStage, "core_write_preview");
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
@@ -1939,15 +2354,18 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      versions: "sqlite",
-      notices: "sqlite",
-      networkRules: "sqlite",
+      versions: "postgres",
+      notices: "postgres",
+      networkRules: "postgres",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });
 
     assert.equal(state.products.length, 1);
     assert.equal(state.policies.length, 1);
+    assert.equal(state.clientVersions.length, 1);
+    assert.equal(state.notices.length, 1);
+    assert.equal(state.networkRules.length, 1);
     assert.equal(state.customerAccounts.length, 2);
     assert.equal(state.cardLoginAccounts.length, 1);
     state.deviceBindings.push({
@@ -2031,6 +2449,30 @@ test("postgres main store can write products and policies through a transaction-
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "updatePolicyRuntimeConfig"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createClientVersion"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "updateClientVersionStatus"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createNotice"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "updateNoticeStatus"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createNetworkRule"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "updateNetworkRuleStatus"),
       true
     );
     assert.equal(
@@ -2189,9 +2631,9 @@ test("postgres main store can write cards and entitlements through a transaction
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
-      versions: "sqlite",
-      notices: "sqlite",
-      networkRules: "sqlite",
+      versions: "postgres",
+      notices: "postgres",
+      networkRules: "postgres",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });

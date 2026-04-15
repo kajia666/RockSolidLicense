@@ -56,6 +56,14 @@ export function formatNotice(row) {
   };
 }
 
+export function formatNoticeManageRow(row) {
+  return {
+    ...formatNotice(row),
+    productId: row.product_id ?? null,
+    ownerDeveloperId: row.owner_developer_id ?? null
+  };
+}
+
 export function listActiveNoticesForProduct(db, productId, channel = "all", referenceTime = nowIso()) {
   const normalizedChannel = normalizeNoticeChannel(channel, "stable");
   return many(
@@ -149,6 +157,20 @@ export function queryNoticeRows(db, filters = {}) {
       search: normalizedFilters.search
     }
   };
+}
+
+export function getNoticeRowById(db, noticeId) {
+  const row = db.prepare(
+    `
+      SELECT n.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id
+      FROM notices n
+      LEFT JOIN products pr ON pr.id = n.product_id
+      WHERE n.id = ?
+      LIMIT 1
+    `
+  ).get(noticeId);
+
+  return row ? formatNoticeManageRow(row) : null;
 }
 
 function countByProductIds(db, conditions, params) {

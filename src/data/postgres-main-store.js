@@ -4,12 +4,15 @@ import { createPostgresAccountRepository } from "./postgres-account-repository.j
 import { createPostgresCardRepository } from "./postgres-card-repository.js";
 import { createPostgresCardStore } from "./postgres-card-store.js";
 import { createPostgresClientVersionRepository } from "./postgres-client-version-repository.js";
+import { createPostgresClientVersionStore } from "./postgres-client-version-store.js";
 import { createPostgresDeviceRepository } from "./postgres-device-repository.js";
 import { createPostgresDeviceStore } from "./postgres-device-store.js";
 import { createPostgresEntitlementRepository } from "./postgres-entitlement-repository.js";
 import { createPostgresEntitlementStore } from "./postgres-entitlement-store.js";
 import { createPostgresNetworkRuleRepository } from "./postgres-network-rule-repository.js";
+import { createPostgresNetworkRuleStore } from "./postgres-network-rule-store.js";
 import { createPostgresNoticeRepository } from "./postgres-notice-repository.js";
+import { createPostgresNoticeStore } from "./postgres-notice-store.js";
 import { createPostgresPolicyRepository } from "./postgres-policy-repository.js";
 import { createPostgresPolicyStore } from "./postgres-policy-store.js";
 import { createPostgresProductRepository } from "./postgres-product-repository.js";
@@ -54,15 +57,18 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       },
       versions: {
         ...fallbackStore.versions,
-        ...createPostgresClientVersionRepository(adapter)
+        ...createPostgresClientVersionRepository(adapter),
+        ...createPostgresClientVersionStore(adapter)
       },
       notices: {
         ...fallbackStore.notices,
-        ...createPostgresNoticeRepository(adapter)
+        ...createPostgresNoticeRepository(adapter),
+        ...createPostgresNoticeStore(adapter)
       },
       networkRules: {
         ...fallbackStore.networkRules,
-        ...createPostgresNetworkRuleRepository(adapter)
+        ...createPostgresNetworkRuleRepository(adapter),
+        ...createPostgresNetworkRuleStore(adapter)
       },
       devices: {
         ...fallbackStore.devices,
@@ -105,9 +111,9 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         cards: coreWriteReady ? "postgres" : "sqlite",
         entitlements: coreWriteReady ? "postgres" : "sqlite",
         accounts: coreWriteReady ? "postgres" : "sqlite",
-        versions: "sqlite",
-        notices: "sqlite",
-        networkRules: "sqlite",
+        versions: coreWriteReady ? "postgres" : "sqlite",
+        notices: coreWriteReady ? "postgres" : "sqlite",
+        networkRules: coreWriteReady ? "postgres" : "sqlite",
         devices: coreWriteReady ? "postgres_partial" : "sqlite",
         sessions: coreWriteReady ? "postgres_partial" : "sqlite"
       }

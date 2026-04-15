@@ -1,4 +1,5 @@
 import {
+  formatClientVersionManageRow,
   formatClientVersionRow,
   normalizeChannel,
   normalizeClientVersionStatus,
@@ -151,6 +152,26 @@ export function createPostgresClientVersionRepository(adapter) {
         ...row,
         count: Number(row.count ?? 0)
       }));
+    },
+
+    async getClientVersionRowById(_db, versionId) {
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT v.*, pr.code AS product_code, pr.name AS product_name, pr.owner_developer_id
+          FROM client_versions v
+          JOIN products pr ON pr.id = v.product_id
+          WHERE v.id = $1
+          LIMIT 1
+        `,
+        [versionId],
+        {
+          repository: "versions",
+          operation: "getClientVersionRowById",
+          versionId
+        }
+      ));
+
+      return rows[0] ? formatClientVersionManageRow(rows[0]) : null;
     }
   };
 }

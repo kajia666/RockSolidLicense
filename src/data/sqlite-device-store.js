@@ -49,6 +49,28 @@ function getBindingRowById(db, bindingId) {
   return one(db, "SELECT * FROM device_bindings WHERE id = ?", bindingId);
 }
 
+function getDeviceRecordByFingerprintRow(db, productId, fingerprint) {
+  return one(
+    db,
+    "SELECT * FROM devices WHERE product_id = ? AND fingerprint = ?",
+    productId,
+    fingerprint
+  );
+}
+
+function getDeviceBlockRowById(db, blockId) {
+  return one(db, "SELECT * FROM device_blocks WHERE id = ?", blockId);
+}
+
+function getDeviceBlockByProductFingerprint(db, productId, fingerprint) {
+  return one(
+    db,
+    "SELECT * FROM device_blocks WHERE product_id = ? AND fingerprint = ?",
+    productId,
+    fingerprint
+  );
+}
+
 function upsertBindingProfile(db, binding, device, bindingIdentity, timestamp = nowIso()) {
   const existing = one(db, "SELECT binding_id FROM device_binding_profiles WHERE binding_id = ?", binding.id);
   const matchFieldsJson = JSON.stringify(bindingIdentity.bindFields);
@@ -109,13 +131,72 @@ export function createSqliteDeviceStore({ db }) {
       );
     },
 
-    upsertDevice(productId, fingerprint, deviceName, meta = {}, deviceProfile = {}, timestamp = nowIso()) {
-      const existing = one(
+    getDeviceRecordByFingerprint(_db, productId, fingerprint) {
+      return getDeviceRecordByFingerprintRow(db, productId, fingerprint);
+    },
+
+    getDeviceBlockManageRowById(_db, blockId) {
+      return one(
         db,
-        "SELECT * FROM devices WHERE product_id = ? AND fingerprint = ?",
-        productId,
-        fingerprint
+        `
+          SELECT b.*, pr.code AS product_code, pr.owner_developer_id,
+                 d.id AS device_id, d.device_name, d.last_seen_at, d.last_seen_ip
+          FROM device_blocks b
+          JOIN products pr ON pr.id = b.product_id
+          LEFT JOIN devices d ON d.product_id = b.product_id AND d.fingerprint = b.fingerprint
+          WHERE b.id = ?
+        `,
+        blockId
       );
+    },
+
+    activateDeviceBlock(productId, fingerprint, reason, notes, timestamp = nowIso()) {
+      const existing = getDeviceBlockByProductFingerprint(db, productId, fingerprint);
+      let blockId = existing?.id ?? generateId("dblock");
+      let changed = false;
+
+      if (!existing) {
+        run(
+          db,
+          `
+            INSERT INTO device_blocks
+            (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)
+            VALUES (?, ?, ?, 'active', ?, ?, ?, ?, NULL)
+          `,
+          blockId,
+          productId,
+          fingerprint,
+          reason,
+          notes,
+          timestamp,
+          timestamp
+        );
+        changed = true;
+      } else if (existing.status !== "active" || existing.reason !== reason || String(existing.notes ?? "") !== notes) {
+        run(
+          db,
+          `
+            UPDATE device_blocks
+            SET status = 'active', reason = ?, notes = ?, updated_at = ?, released_at = NULL
+            WHERE id = ?
+          `,
+          reason,
+          notes,
+          timestamp,
+          existing.id
+        );
+        blockId = existing.id;
+        changed = true;
+      }
+
+      return {
+        ...getDeviceBlockRowById(db, blockId),
+        changed
+      };
+    },
+
+    upsertDevice(productId, fingerprint, deviceName, meta = {}, deviceProfile = {}, timestamp = nowIso()) {
+      const existing = getDeviceRecordByFingerprintRow(db, productId, fingerprint);
 
       const previousMetadata = existing ? safeParseJsonObject(existing.metadata_json) : {};
       const metadataJson = JSON.stringify({
@@ -160,6 +241,21 @@ export function createSqliteDeviceStore({ db }) {
       );
 
       return one(db, "SELECT * FROM devices WHERE id = ?", deviceId);
+    },
+
+    revokeActiveBindingsByDevice(deviceId, timestamp = nowIso()) {
+      const result = run(
+        db,
+        `
+          UPDATE device_bindings
+          SET status = 'revoked', revoked_at = ?, last_bound_at = ?
+          WHERE device_id = ? AND status = 'active'
+        `,
+        timestamp,
+        timestamp,
+        deviceId
+      );
+      return Number(result.changes ?? 0);
     },
 
     queryBindingsForEntitlement(_db, entitlementId) {
@@ -369,6 +465,21 @@ export function createSqliteDeviceStore({ db }) {
         ...row,
         count: Number(row.count ?? 0)
       }));
+    },
+
+    releaseDeviceBlock(blockId, timestamp = nowIso()) {
+      run(
+        db,
+        `
+          UPDATE device_blocks
+          SET status = 'released', updated_at = ?, released_at = ?
+          WHERE id = ?
+        `,
+        timestamp,
+        timestamp,
+        blockId
+      );
+      return getDeviceBlockRowById(db, blockId);
     },
 
     releaseBinding(bindingId, timestamp = nowIso()) {

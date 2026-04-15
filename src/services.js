@@ -3645,6 +3645,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     return Promise.resolve(store.accounts.getAccountRecordById(db, accountId));
   }
 
+  async function getStoreDeviceRecordByFingerprint(productId, fingerprint) {
+    return Promise.resolve(store.devices.getDeviceRecordByFingerprint(db, productId, fingerprint));
+  }
+
+  async function getStoreDeviceBlockManageRowById(blockId) {
+    return Promise.resolve(store.devices.getDeviceBlockManageRowById(db, blockId));
+  }
+
   async function getStoreAccountRecordByProductUsername(productId, username, status = null) {
     return Promise.resolve(store.accounts.getAccountRecordByProductUsername(
       db,
@@ -7241,7 +7249,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const admin = requireAdminSession(db, token);
       requireField(body, "deviceFingerprint");
 
-      const product = requireProductByCode(db, readProductCodeInput(body));
+      const product = await getStoreProductByCode(readProductCodeInput(body));
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
       const fingerprint = String(body.deviceFingerprint).trim();
       if (fingerprint.length < 6) {
         throw new AppError(400, "INVALID_DEVICE_FINGERPRINT", "Device fingerprint must be at least 6 characters.");
@@ -7249,117 +7260,52 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       const reason = normalizeReason(body.reason, "operator_blocked");
       const notes = String(body.notes ?? "").trim();
-      const existing = one(
-        db,
-        `
-          SELECT *
-          FROM device_blocks
-          WHERE product_id = ? AND fingerprint = ?
-        `,
-        product.id,
-        fingerprint
+      const timestamp = nowIso();
+      const block = await Promise.resolve(
+        store.devices.activateDeviceBlock(product.id, fingerprint, reason, notes, timestamp)
       );
-      const device = one(
-        db,
-        `
-          SELECT *
-          FROM devices
-          WHERE product_id = ? AND fingerprint = ?
-        `,
-        product.id,
-        fingerprint
-      );
+      const device = await getStoreDeviceRecordByFingerprint(product.id, fingerprint);
 
-      return withTransaction(db, async () => {
-        const timestamp = nowIso();
-        let blockId = existing?.id ?? generateId("dblock");
-        let changed = false;
+      let affectedSessions = 0;
+      let affectedBindings = 0;
+      if (device) {
+        affectedSessions = await expireActiveSessions(
+          db,
+          store,
+          stateStore,
+          {
+            productId: product.id,
+            deviceId: device.id
+          },
+          "device_blocked"
+        );
+        affectedBindings = Number(
+          await Promise.resolve(store.devices.revokeActiveBindingsByDevice(device.id, timestamp)) ?? 0
+        );
+      }
 
-        if (!existing) {
-          run(
-            db,
-            `
-              INSERT INTO device_blocks
-              (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)
-              VALUES (?, ?, ?, 'active', ?, ?, ?, ?, NULL)
-            `,
-            blockId,
-            product.id,
-            fingerprint,
-            reason,
-            notes,
-            timestamp,
-            timestamp
-          );
-          changed = true;
-        } else if (existing.status !== "active" || existing.reason !== reason || String(existing.notes ?? "") !== notes) {
-          run(
-            db,
-            `
-              UPDATE device_blocks
-              SET status = 'active', reason = ?, notes = ?, updated_at = ?, released_at = NULL
-              WHERE id = ?
-            `,
-            reason,
-            notes,
-            timestamp,
-            existing.id
-          );
-          blockId = existing.id;
-          changed = true;
-        }
-
-        let affectedSessions = 0;
-        let affectedBindings = 0;
-        if (device) {
-          affectedSessions = await expireActiveSessions(
-            db,
-            store,
-            stateStore,
-            {
-              productId: product.id,
-              deviceId: device.id
-            },
-            "device_blocked"
-          );
-
-          const bindingResult = run(
-            db,
-            `
-              UPDATE device_bindings
-              SET status = 'revoked', revoked_at = ?, last_bound_at = ?
-              WHERE device_id = ? AND status = 'active'
-            `,
-            timestamp,
-            timestamp,
-            device.id
-          );
-          affectedBindings = Number(bindingResult.changes ?? 0);
-        }
-
-        if (changed || affectedSessions > 0 || affectedBindings > 0) {
-          audit(db, "admin", admin.admin_id, "device-block.activate", "device_block", blockId, {
-            productCode: product.code,
-            fingerprint,
-            reason,
-            notes,
-            affectedSessions,
-            affectedBindings
-          });
-        }
-
-        return {
-          id: blockId,
+      if (block.changed || affectedSessions > 0 || affectedBindings > 0) {
+        audit(db, "admin", admin.admin_id, "device-block.activate", "device_block", block.id, {
           productCode: product.code,
           fingerprint,
-          status: "active",
           reason,
           notes,
-          changed,
           affectedSessions,
           affectedBindings
-        };
-      });
+        });
+      }
+
+      return {
+        id: block.id,
+        productCode: product.code,
+        fingerprint,
+        status: "active",
+        reason,
+        notes,
+        changed: Boolean(block.changed),
+        affectedSessions,
+        affectedBindings
+      };
     },
 
     async developerBlockDevice(token, body = {}) {
@@ -7372,7 +7318,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
       requireField(body, "deviceFingerprint");
 
-      const product = requireDeveloperOwnedProductByCode(db, session, readProductCodeInput(body), "ops.write");
+      const product = await getStoreProductByCode(readProductCodeInput(body));
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        product,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage device blocks under your assigned projects."
+      );
       const fingerprint = String(body.deviceFingerprint).trim();
       if (fingerprint.length < 6) {
         throw new AppError(400, "INVALID_DEVICE_FINGERPRINT", "Device fingerprint must be at least 6 characters.");
@@ -7380,131 +7337,57 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       const reason = normalizeReason(body.reason, "developer_blocked");
       const notes = String(body.notes ?? "").trim();
-      const existing = one(
-        db,
-        `
-          SELECT *
-          FROM device_blocks
-          WHERE product_id = ? AND fingerprint = ?
-        `,
-        product.id,
-        fingerprint
+      const timestamp = nowIso();
+      const block = await Promise.resolve(
+        store.devices.activateDeviceBlock(product.id, fingerprint, reason, notes, timestamp)
       );
-      const device = one(
-        db,
-        `
-          SELECT *
-          FROM devices
-          WHERE product_id = ? AND fingerprint = ?
-        `,
-        product.id,
-        fingerprint
-      );
+      const device = await getStoreDeviceRecordByFingerprint(product.id, fingerprint);
 
-      return withTransaction(db, async () => {
-        const timestamp = nowIso();
-        let blockId = existing?.id ?? generateId("dblock");
-        let changed = false;
+      let affectedSessions = 0;
+      let affectedBindings = 0;
+      if (device) {
+        affectedSessions = await expireActiveSessions(
+          db,
+          store,
+          stateStore,
+          {
+            productId: product.id,
+            deviceId: device.id
+          },
+          "device_blocked"
+        );
+        affectedBindings = Number(
+          await Promise.resolve(store.devices.revokeActiveBindingsByDevice(device.id, timestamp)) ?? 0
+        );
+      }
 
-        if (!existing) {
-          run(
-            db,
-            `
-              INSERT INTO device_blocks
-              (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)
-              VALUES (?, ?, ?, 'active', ?, ?, ?, ?, NULL)
-            `,
-            blockId,
-            product.id,
-            fingerprint,
-            reason,
-            notes,
-            timestamp,
-            timestamp
-          );
-          changed = true;
-        } else if (existing.status !== "active" || existing.reason !== reason || String(existing.notes ?? "") !== notes) {
-          run(
-            db,
-            `
-              UPDATE device_blocks
-              SET status = 'active', reason = ?, notes = ?, updated_at = ?, released_at = NULL
-              WHERE id = ?
-            `,
-            reason,
-            notes,
-            timestamp,
-            existing.id
-          );
-          blockId = existing.id;
-          changed = true;
-        }
-
-        let affectedSessions = 0;
-        let affectedBindings = 0;
-        if (device) {
-          affectedSessions = await expireActiveSessions(
-            db,
-            store,
-            stateStore,
-            {
-              productId: product.id,
-              deviceId: device.id
-            },
-            "device_blocked"
-          );
-
-          const bindingResult = run(
-            db,
-            `
-              UPDATE device_bindings
-              SET status = 'revoked', revoked_at = ?, last_bound_at = ?
-              WHERE device_id = ? AND status = 'active'
-            `,
-            timestamp,
-            timestamp,
-            device.id
-          );
-          affectedBindings = Number(bindingResult.changes ?? 0);
-        }
-
-        if (changed || affectedSessions > 0 || affectedBindings > 0) {
-          auditDeveloperSession(db, session, "device-block.activate", "device_block", blockId, {
-            productCode: product.code,
-            fingerprint,
-            reason,
-            notes,
-            affectedSessions,
-            affectedBindings
-          });
-        }
-
-        return {
-          id: blockId,
+      if (block.changed || affectedSessions > 0 || affectedBindings > 0) {
+        auditDeveloperSession(db, session, "device-block.activate", "device_block", block.id, {
           productCode: product.code,
           fingerprint,
-          status: "active",
           reason,
           notes,
-          changed,
           affectedSessions,
           affectedBindings
-        };
-      });
+        });
+      }
+
+      return {
+        id: block.id,
+        productCode: product.code,
+        fingerprint,
+        status: "active",
+        reason,
+        notes,
+        changed: Boolean(block.changed),
+        affectedSessions,
+        affectedBindings
+      };
     },
 
-    unblockDevice(token, blockId, body = {}) {
+    async unblockDevice(token, blockId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const block = one(
-        db,
-        `
-          SELECT b.*, pr.code AS product_code
-          FROM device_blocks b
-          JOIN products pr ON pr.id = b.product_id
-          WHERE b.id = ?
-        `,
-        blockId
-      );
+      const block = await getStoreDeviceBlockManageRowById(blockId);
 
       if (!block) {
         throw new AppError(404, "DEVICE_BLOCK_NOT_FOUND", "Device block does not exist.");
@@ -7523,17 +7406,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const timestamp = nowIso();
-      run(
-        db,
-        `
-          UPDATE device_blocks
-          SET status = 'released', updated_at = ?, released_at = ?
-          WHERE id = ?
-        `,
-        timestamp,
-        timestamp,
-        block.id
-      );
+      await Promise.resolve(store.devices.releaseDeviceBlock(block.id, timestamp));
 
       audit(db, "admin", admin.admin_id, "device-block.release", "device_block", block.id, {
         productCode: block.product_code,
@@ -7552,7 +7425,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    developerUnblockDevice(token, blockId, body = {}) {
+    async developerUnblockDevice(token, blockId, body = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -7560,16 +7433,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only manage device blocks under your assigned projects."
       );
-      const block = one(
-        db,
-        `
-          SELECT b.*, pr.code AS product_code, pr.owner_developer_id
-          FROM device_blocks b
-          JOIN products pr ON pr.id = b.product_id
-          WHERE b.id = ?
-        `,
-        blockId
-      );
+      const block = await getStoreDeviceBlockManageRowById(blockId);
 
       if (!block) {
         throw new AppError(404, "DEVICE_BLOCK_NOT_FOUND", "Device block does not exist.");
@@ -7597,17 +7461,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const timestamp = nowIso();
-      run(
-        db,
-        `
-          UPDATE device_blocks
-          SET status = 'released', updated_at = ?, released_at = ?
-          WHERE id = ?
-        `,
-        timestamp,
-        timestamp,
-        block.id
-      );
+      await Promise.resolve(store.devices.releaseDeviceBlock(block.id, timestamp));
 
       auditDeveloperSession(db, session, "device-block.release", "device_block", block.id, {
         productCode: block.product_code,

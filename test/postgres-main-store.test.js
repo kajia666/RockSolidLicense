@@ -41,6 +41,7 @@ function createWriteCapableAdapter() {
     customerAccounts: [],
     cardLoginAccounts: [],
     devices: [],
+    deviceBlocks: [],
     deviceBindings: [],
     deviceBindingProfiles: new Map(),
     entitlementUnbindLogs: [],
@@ -269,6 +270,34 @@ function createWriteCapableAdapter() {
           identity_json: profile?.identity_json ?? null,
           request_ip: profile?.request_ip ?? null,
           bind_request_ip: profile?.request_ip ?? null,
+          active_session_count: activeSessionCount
+        };
+      });
+  }
+
+  function deviceBlockRows(filters = {}) {
+    return state.deviceBlocks
+      .filter((block) => !filters.blockId || block.id === filters.blockId)
+      .filter((block) => !filters.productId || block.product_id === filters.productId)
+      .filter((block) => !filters.fingerprint || block.fingerprint === filters.fingerprint)
+      .map((block) => {
+        const product = state.products.find((item) => item.id === block.product_id);
+        const device = state.devices.find((item) =>
+          item.product_id === block.product_id && item.fingerprint === block.fingerprint
+        );
+        const activeSessionCount = device
+          ? state.sessions.filter((session) => session.status === "active" && session.device_id === device.id).length
+          : 0;
+
+        return {
+          ...block,
+          product_code: product?.code ?? null,
+          product_name: product?.name ?? null,
+          owner_developer_id: product?.owner_developer_id ?? null,
+          device_id: device?.id ?? null,
+          device_name: device?.device_name ?? null,
+          last_seen_at: device?.last_seen_at ?? null,
+          last_seen_ip: device?.last_seen_ip ?? null,
           active_session_count: activeSessionCount
         };
       });
@@ -994,6 +1023,10 @@ function createWriteCapableAdapter() {
       return deviceRows({ productId: params[0], fingerprint: params[1] }).slice(0, 1);
     }
 
+    if (meta.repository === "devices" && meta.operation === "getDeviceRecordByFingerprint") {
+      return deviceRows({ productId: params[0], fingerprint: params[1] }).slice(0, 1);
+    }
+
     if (meta.repository === "devices" && meta.operation === "createDevice") {
       state.devices.push({
         id: params[0],
@@ -1021,6 +1054,87 @@ function createWriteCapableAdapter() {
 
     if (meta.repository === "devices" && meta.operation === "loadDeviceRecordById") {
       return deviceRows({ deviceId: params[0] }).slice(0, 1);
+    }
+
+    if (meta.repository === "devices" && meta.operation === "loadDeviceBlockByProductFingerprint") {
+      return deviceBlockRows({ productId: params[0], fingerprint: params[1] })
+        .slice(0, 1)
+        .map((block) => ({
+          id: block.id,
+          product_id: block.product_id,
+          fingerprint: block.fingerprint,
+          status: block.status,
+          reason: block.reason,
+          notes: block.notes,
+          created_at: block.created_at,
+          updated_at: block.updated_at,
+          released_at: block.released_at
+        }));
+    }
+
+    if (meta.repository === "devices" && meta.operation === "createDeviceBlock") {
+      state.deviceBlocks.push({
+        id: params[0],
+        product_id: params[1],
+        fingerprint: params[2],
+        status: "active",
+        reason: params[3],
+        notes: params[4],
+        created_at: params[5],
+        updated_at: params[6],
+        released_at: null
+      });
+      return [];
+    }
+
+    if (meta.repository === "devices" && meta.operation === "updateDeviceBlock") {
+      const block = state.deviceBlocks.find((item) => item.id === params[3]);
+      if (block) {
+        block.status = "active";
+        block.reason = params[0];
+        block.notes = params[1];
+        block.updated_at = params[2];
+        block.released_at = null;
+      }
+      return [];
+    }
+
+    if (meta.repository === "devices" && meta.operation === "loadDeviceBlockRecordById") {
+      return deviceBlockRows({ blockId: params[0] })
+        .slice(0, 1)
+        .map((block) => ({
+          id: block.id,
+          product_id: block.product_id,
+          fingerprint: block.fingerprint,
+          status: block.status,
+          reason: block.reason,
+          notes: block.notes,
+          created_at: block.created_at,
+          updated_at: block.updated_at,
+          released_at: block.released_at
+        }));
+    }
+
+    if (meta.repository === "devices" && meta.operation === "getDeviceBlockManageRowById") {
+      return deviceBlockRows({ blockId: params[0] })
+        .slice(0, 1)
+        .map((block) => ({
+          id: block.id,
+          product_id: block.product_id,
+          fingerprint: block.fingerprint,
+          status: block.status,
+          reason: block.reason,
+          notes: block.notes,
+          created_at: block.created_at,
+          updated_at: block.updated_at,
+          released_at: block.released_at,
+          product_code: block.product_code,
+          owner_developer_id: block.owner_developer_id,
+          device_id: block.device_id,
+          device_name: block.device_name,
+          last_seen_at: block.last_seen_at,
+          last_seen_ip: block.last_seen_ip
+        }));
     }
 
     if (meta.repository === "devices" && meta.operation === "loadBindingByEntitlementDevice") {
@@ -1092,6 +1206,23 @@ function createWriteCapableAdapter() {
       return [];
     }
 
+    if (meta.repository === "devices" && meta.operation === "selectActiveBindingsForDeviceRevoke") {
+      return state.deviceBindings
+        .filter((binding) => binding.device_id === params[0] && binding.status === "active")
+        .map((binding) => ({ id: binding.id }));
+    }
+
+    if (meta.repository === "devices" && meta.operation === "revokeActiveBindingsByDevice") {
+      for (const binding of state.deviceBindings) {
+        if (binding.device_id === params[2] && binding.status === "active") {
+          binding.status = "revoked";
+          binding.revoked_at = params[0];
+          binding.last_bound_at = params[1];
+        }
+      }
+      return [];
+    }
+
     if (meta.repository === "devices" && meta.operation === "upsertBindingProfile") {
       const existing = state.deviceBindingProfiles.get(params[0]);
       state.deviceBindingProfiles.set(params[0], {
@@ -1139,6 +1270,16 @@ function createWriteCapableAdapter() {
         binding.status = "revoked";
         binding.revoked_at = params[0];
         binding.last_bound_at = params[1];
+      }
+      return [];
+    }
+
+    if (meta.repository === "devices" && meta.operation === "releaseDeviceBlock") {
+      const block = state.deviceBlocks.find((item) => item.id === params[2]);
+      if (block) {
+        block.status = "released";
+        block.updated_at = params[0];
+        block.released_at = params[1];
       }
       return [];
     }
@@ -2561,6 +2702,49 @@ test("postgres main store can write products and policies through a transaction-
     assert.deepEqual(bindingRows[0].matchFields, ["machineGuid"]);
     assert.deepEqual(bindingRows[0].identity, { machineGuid: "PG-MACHINE-1" });
 
+    state.sessions.push({
+      id: "sess_pg_device_block_1",
+      product_id: product.id,
+      account_id: createdAccount.id,
+      entitlement_id: "ent_pg_write_1",
+      device_id: secondDevice.id,
+      session_token: "sess-pg-device-block-1",
+      license_token: "license-pg-device-block-1",
+      status: "active",
+      issued_at: "2026-01-13T00:05:00.000Z",
+      expires_at: "2026-01-13T01:05:00.000Z",
+      last_heartbeat_at: "2026-01-13T00:05:00.000Z",
+      last_seen_ip: "203.0.113.41",
+      user_agent: "pg-device-block-test",
+      revoked_reason: null
+    });
+
+    const blockedDevice = await app.services.blockDevice(admin.token, {
+      productCode: "PGWRITE",
+      deviceFingerprint: "pg-device-write-2",
+      reason: "manual_review",
+      notes: "blocked during pg write preview"
+    });
+    assert.equal(blockedDevice.status, "active");
+    assert.equal(blockedDevice.changed, true);
+    assert.equal(blockedDevice.affectedSessions, 1);
+    assert.equal(blockedDevice.affectedBindings, 1);
+    const blockedSession = state.sessions.find((entry) => entry.id === "sess_pg_device_block_1");
+    assert.equal(blockedSession?.status, "expired");
+    assert.equal(blockedSession?.revoked_reason, "device_blocked");
+    assert.equal(
+      state.deviceBindings.find((entry) => entry.id === reboundBinding.binding.id)?.status,
+      "revoked"
+    );
+
+    const unblockedDevice = await app.services.unblockDevice(admin.token, blockedDevice.id, {
+      reason: "manual_release"
+    });
+    assert.equal(unblockedDevice.status, "released");
+    assert.equal(unblockedDevice.changed, true);
+    assert.equal(state.deviceBlocks.length, 1);
+    assert.equal(state.deviceBlocks[0].status, "released");
+
     const listedProducts = await app.services.listProducts(admin.token);
     assert.equal(listedProducts.some((item) => item.code === "PGWRITE"), true);
 
@@ -2656,6 +2840,7 @@ test("postgres main store can write products and policies through a transaction-
     assert.equal(state.notices.length, 1);
     assert.equal(state.networkRules.length, 1);
     assert.equal(state.devices.length, 2);
+    assert.equal(state.deviceBlocks.length, 1);
     assert.equal(state.customerAccounts.length, 2);
     assert.equal(state.cardLoginAccounts.length, 1);
     state.deviceBindings.push({
@@ -2771,7 +2956,15 @@ test("postgres main store can write products and policies through a transaction-
       true
     );
     assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "getDeviceRecordByFingerprint"),
+      true
+    );
+    assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "createBinding"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createDeviceBlock"),
       true
     );
     assert.equal(
@@ -2780,6 +2973,22 @@ test("postgres main store can write products and policies through a transaction-
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "rebindIdentityMatch"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "selectActiveBindingsForDeviceRevoke"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "revokeActiveBindingsByDevice"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "getDeviceBlockManageRowById"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "releaseDeviceBlock"),
       true
     );
     assert.equal(

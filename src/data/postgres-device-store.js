@@ -67,6 +67,45 @@ async function loadDeviceByFingerprint(tx, productId, fingerprint) {
   return rows[0] ?? null;
 }
 
+async function loadDeviceBlockRecord(tx, blockId) {
+  const rows = await Promise.resolve(tx.query(
+    `
+      SELECT *
+      FROM device_blocks
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [blockId],
+    {
+      repository: "devices",
+      operation: "loadDeviceBlockRecordById",
+      blockId
+    }
+  ));
+
+  return rows[0] ?? null;
+}
+
+async function loadDeviceBlockByProductFingerprint(tx, productId, fingerprint) {
+  const rows = await Promise.resolve(tx.query(
+    `
+      SELECT *
+      FROM device_blocks
+      WHERE product_id = $1 AND fingerprint = $2
+      LIMIT 1
+    `,
+    [productId, fingerprint],
+    {
+      repository: "devices",
+      operation: "loadDeviceBlockByProductFingerprint",
+      productId,
+      fingerprint
+    }
+  ));
+
+  return rows[0] ?? null;
+}
+
 async function loadBindingRecord(tx, bindingId) {
   const rows = await Promise.resolve(tx.query(
     `
@@ -206,6 +245,54 @@ export function createPostgresDeviceStore(adapter) {
   }
 
   return {
+    async activateDeviceBlock(productId, fingerprint, reason, notes, timestamp = nowIso()) {
+      return adapter.withTransaction(async (tx) => {
+        const existing = await loadDeviceBlockByProductFingerprint(tx, productId, fingerprint);
+        let blockId = existing?.id ?? generateId("dblock");
+        let changed = false;
+
+        if (!existing) {
+          await Promise.resolve(tx.query(
+            `
+              INSERT INTO device_blocks
+              (id, product_id, fingerprint, status, reason, notes, created_at, updated_at, released_at)
+              VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, NULL)
+            `,
+            [blockId, productId, fingerprint, reason, notes, timestamp, timestamp],
+            {
+              repository: "devices",
+              operation: "createDeviceBlock",
+              blockId,
+              productId,
+              fingerprint
+            }
+          ));
+          changed = true;
+        } else if (existing.status !== "active" || existing.reason !== reason || String(existing.notes ?? "") !== notes) {
+          await Promise.resolve(tx.query(
+            `
+              UPDATE device_blocks
+              SET status = 'active', reason = $1, notes = $2, updated_at = $3, released_at = NULL
+              WHERE id = $4
+            `,
+            [reason, notes, timestamp, existing.id],
+            {
+              repository: "devices",
+              operation: "updateDeviceBlock",
+              blockId: existing.id
+            }
+          ));
+          blockId = existing.id;
+          changed = true;
+        }
+
+        return {
+          ...await loadDeviceBlockRecord(tx, blockId),
+          changed
+        };
+      });
+    },
+
     async upsertDevice(productId, fingerprint, deviceName, meta = {}, deviceProfile = {}, timestamp = nowIso()) {
       return adapter.withTransaction(async (tx) => {
         const existing = await loadDeviceByFingerprint(tx, productId, fingerprint);
@@ -269,6 +356,64 @@ export function createPostgresDeviceStore(adapter) {
         ));
 
         return loadDeviceRecord(tx, deviceId);
+      });
+    },
+
+    async revokeActiveBindingsByDevice(deviceId, timestamp = nowIso()) {
+      return adapter.withTransaction(async (tx) => {
+        const rows = await Promise.resolve(tx.query(
+          `
+            SELECT id
+            FROM device_bindings
+            WHERE device_id = $1 AND status = 'active'
+          `,
+          [deviceId],
+          {
+            repository: "devices",
+            operation: "selectActiveBindingsForDeviceRevoke",
+            deviceId
+          }
+        ));
+
+        if (!rows.length) {
+          return 0;
+        }
+
+        await Promise.resolve(tx.query(
+          `
+            UPDATE device_bindings
+            SET status = 'revoked', revoked_at = $1, last_bound_at = $2
+            WHERE device_id = $3 AND status = 'active'
+          `,
+          [timestamp, timestamp, deviceId],
+          {
+            repository: "devices",
+            operation: "revokeActiveBindingsByDevice",
+            deviceId
+          }
+        ));
+
+        return rows.length;
+      });
+    },
+
+    async releaseDeviceBlock(blockId, timestamp = nowIso()) {
+      return adapter.withTransaction(async (tx) => {
+        await Promise.resolve(tx.query(
+          `
+            UPDATE device_blocks
+            SET status = 'released', updated_at = $1, released_at = $2
+            WHERE id = $3
+          `,
+          [timestamp, timestamp, blockId],
+          {
+            repository: "devices",
+            operation: "releaseDeviceBlock",
+            blockId
+          }
+        ));
+
+        return loadDeviceBlockRecord(tx, blockId);
       });
     },
 

@@ -814,7 +814,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.unblockDevice(
+          data: await services.unblockDevice(
             getBearerToken(req),
             deviceUnblockRoute.blockId,
             body
@@ -1415,7 +1415,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUnblockDevice(
+          data: await services.developerUnblockDevice(
             getBearerToken(req),
             developerDeviceUnblockRoute.blockId,
             body

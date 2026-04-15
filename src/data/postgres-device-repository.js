@@ -30,6 +30,48 @@ export function createPostgresDeviceRepository(adapter) {
       return rows[0] ?? null;
     },
 
+    async getDeviceRecordByFingerprint(_db, productId, fingerprint) {
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT *
+          FROM devices
+          WHERE product_id = $1 AND fingerprint = $2
+          LIMIT 1
+        `,
+        [productId, fingerprint],
+        {
+          repository: "devices",
+          operation: "getDeviceRecordByFingerprint",
+          productId,
+          fingerprint
+        }
+      ));
+
+      return rows[0] ?? null;
+    },
+
+    async getDeviceBlockManageRowById(_db, blockId) {
+      const rows = await Promise.resolve(adapter.query(
+        `
+          SELECT b.*, pr.code AS product_code, pr.owner_developer_id,
+                 d.id AS device_id, d.device_name, d.last_seen_at, d.last_seen_ip
+          FROM device_blocks b
+          JOIN products pr ON pr.id = b.product_id
+          LEFT JOIN devices d ON d.product_id = b.product_id AND d.fingerprint = b.fingerprint
+          WHERE b.id = $1
+          LIMIT 1
+        `,
+        [blockId],
+        {
+          repository: "devices",
+          operation: "getDeviceBlockManageRowById",
+          blockId
+        }
+      ));
+
+      return rows[0] ?? null;
+    },
+
     async queryBindingsForEntitlement(_db, entitlementId) {
       const rows = await Promise.resolve(adapter.query(
         `

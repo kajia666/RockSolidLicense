@@ -4,6 +4,7 @@ import {
   DEFAULT_PRODUCT_FEATURE_CONFIG,
   formatProductRow,
   mergeProductFeatureConfig,
+  normalizeProductProfileInput,
   parseProductFeatureConfigInput,
   parseProductFeatureConfigRow,
   serializeProductFeatureConfigValues
@@ -136,26 +137,16 @@ export function createPostgresProductStore(adapter) {
 
   return {
     async createProduct(body = {}, ownerDeveloperId = null) {
-      if (body.code === undefined || body.code === null || String(body.code).trim() === "") {
-        throw new AppError(400, "FIELD_REQUIRED", "code is required.");
-      }
-      if (body.name === undefined || body.name === null || String(body.name).trim() === "") {
-        throw new AppError(400, "FIELD_REQUIRED", "name is required.");
-      }
-
-      const code = String(body.code).trim().toUpperCase();
-      if (!/^[A-Z0-9_]{3,32}$/.test(code)) {
-        throw new AppError(400, "INVALID_PRODUCT_CODE", "Product code must be 3-32 chars: A-Z, 0-9 or underscore.");
-      }
+      const profile = normalizeProductProfileInput(body);
 
       return adapter.withTransaction(async (tx) => {
         const existing = await Promise.resolve(tx.query(
           "SELECT id FROM products WHERE code = $1 LIMIT 1",
-          [code],
+          [profile.code],
           {
             repository: "products",
             operation: "assertProductCodeAvailable",
-            code
+            code: profile.code
           }
         ));
         if (existing[0]) {
@@ -165,9 +156,9 @@ export function createPostgresProductStore(adapter) {
         const timestamp = nowIso();
         const product = {
           id: generateId("prod"),
-          code,
-          name: String(body.name).trim(),
-          description: String(body.description ?? "").trim(),
+          code: profile.code,
+          name: profile.name,
+          description: profile.description,
           status: "active",
           ownerDeveloperId,
           sdkAppId: randomAppId(),
@@ -202,6 +193,48 @@ export function createPostgresProductStore(adapter) {
         ));
 
         await persistProductFeatureConfig(tx, product.id, body, timestamp);
+        return loadProductRow(tx, product.id);
+      });
+    },
+
+    async updateProductProfile(productId, body = {}, timestamp = nowIso()) {
+      return adapter.withTransaction(async (tx) => {
+        const product = await loadProductRow(tx, productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+        }
+
+        const profile = normalizeProductProfileInput(body, product);
+        if (profile.code !== product.code) {
+          const existing = await Promise.resolve(tx.query(
+            "SELECT id FROM products WHERE code = $1 AND id <> $2 LIMIT 1",
+            [profile.code, product.id],
+            {
+              repository: "products",
+              operation: "assertProductCodeAvailableForUpdate",
+              productId: product.id,
+              code: profile.code
+            }
+          ));
+          if (existing[0]) {
+            throw new AppError(409, "PRODUCT_EXISTS", "Product code already exists.");
+          }
+        }
+
+        await Promise.resolve(tx.query(
+          `
+            UPDATE products
+            SET code = $1, name = $2, description = $3, updated_at = $4
+            WHERE id = $5
+          `,
+          [profile.code, profile.name, profile.description, timestamp, product.id],
+          {
+            repository: "products",
+            operation: "updateProductProfile",
+            productId: product.id
+          }
+        ));
+
         return loadProductRow(tx, product.id);
       });
     },

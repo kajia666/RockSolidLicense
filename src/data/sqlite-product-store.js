@@ -2,9 +2,11 @@ import { AppError } from "../http.js";
 import { generateId, nowIso, randomAppId, randomToken } from "../security.js";
 import {
   DEFAULT_PRODUCT_FEATURE_CONFIG,
+  getProductRecordByCode,
   getProductRecordById,
   getProductRowById,
   mergeProductFeatureConfig,
+  normalizeProductProfileInput,
   parseProductFeatureConfigInput,
   parseProductFeatureConfigRow,
   productCodeExists,
@@ -99,27 +101,17 @@ function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIs
 export function createSqliteProductStore({ db }) {
   return {
     createProduct(body = {}, ownerDeveloperId = null) {
-      if (body.code === undefined || body.code === null || String(body.code).trim() === "") {
-        throw new AppError(400, "FIELD_REQUIRED", "code is required.");
-      }
-      if (body.name === undefined || body.name === null || String(body.name).trim() === "") {
-        throw new AppError(400, "FIELD_REQUIRED", "name is required.");
-      }
-
-      const code = String(body.code).trim().toUpperCase();
-      if (!/^[A-Z0-9_]{3,32}$/.test(code)) {
-        throw new AppError(400, "INVALID_PRODUCT_CODE", "Product code must be 3-32 chars: A-Z, 0-9 or underscore.");
-      }
-      if (productCodeExists(db, code)) {
+      const profile = normalizeProductProfileInput(body);
+      if (productCodeExists(db, profile.code)) {
         throw new AppError(409, "PRODUCT_EXISTS", "Product code already exists.");
       }
 
       const timestamp = nowIso();
       const product = {
         id: generateId("prod"),
-        code,
-        name: String(body.name).trim(),
-        description: String(body.description ?? "").trim(),
+        code: profile.code,
+        name: profile.name,
+        description: profile.description,
         status: "active",
         ownerDeveloperId,
         sdkAppId: randomAppId(),
@@ -147,6 +139,35 @@ export function createSqliteProductStore({ db }) {
         product.updatedAt
       );
       persistProductFeatureConfig(db, product.id, body, timestamp);
+
+      return getProductRowById(db, product.id);
+    },
+
+    updateProductProfile(productId, body = {}, timestamp = nowIso()) {
+      const product = getProductRecordById(db, productId);
+      if (!product) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+
+      const profile = normalizeProductProfileInput(body, product);
+      const conflicting = getProductRecordByCode(db, profile.code);
+      if (conflicting && conflicting.id !== product.id) {
+        throw new AppError(409, "PRODUCT_EXISTS", "Product code already exists.");
+      }
+
+      run(
+        db,
+        `
+          UPDATE products
+          SET code = ?, name = ?, description = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        profile.code,
+        profile.name,
+        profile.description,
+        timestamp,
+        product.id
+      );
 
       return getProductRowById(db, product.id);
     },

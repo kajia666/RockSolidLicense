@@ -80,17 +80,9 @@
       </section>
     </main>
 
+    <script src="/assets/product-features.js"></script>
     <script>
-      const FEATURE_ENTRIES = [
-        { key: "allowRegister", tagLabel: "register", summaryLabel: "Register Open" },
-        { key: "allowAccountLogin", tagLabel: "account", summaryLabel: "Account Login Open" },
-        { key: "allowCardLogin", tagLabel: "card", summaryLabel: "Card Login Open" },
-        { key: "allowCardRecharge", tagLabel: "recharge", summaryLabel: "Recharge Open" },
-        { key: "allowVersionCheck", tagLabel: "version", summaryLabel: "Version Check Open" },
-        { key: "allowNotices", tagLabel: "notices", summaryLabel: "Notices Open" },
-        { key: "allowClientUnbind", tagLabel: "unbind", summaryLabel: "Client Unbind Open" }
-      ];
-
+      const FEATURE_ENTRIES = window.RSProductFeatures.entries;
       let token = "";
       let snapshot = null;
       let selectedProduct = null;
@@ -133,13 +125,11 @@
       }
 
       function renderFeatureTags(featureConfig = {}) {
-        return FEATURE_ENTRIES
-          .map(({ key, tagLabel }) => tag(tagLabel, featureConfig[key] !== false))
-          .join("");
+        return window.RSProductFeatures.renderTagList(featureConfig, tag);
       }
 
       function countFeatureEnabled(items = [], featureKey) {
-        return items.filter((item) => item.featureConfig?.[featureKey] !== false).length;
+        return window.RSProductFeatures.countEnabled(items, featureKey);
       }
 
       async function api(path, options = {}) {

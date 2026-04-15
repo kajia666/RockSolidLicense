@@ -1,3 +1,5 @@
+import { AppError } from "../http.js";
+
 const PRODUCT_FEATURE_KEYS = Object.freeze([
   "allowRegister",
   "allowAccountLogin",
@@ -21,6 +23,7 @@ const PRODUCT_FEATURE_COLUMN_MAP = Object.freeze({
 const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze(
   Object.fromEntries(PRODUCT_FEATURE_KEYS.map((key) => [key, true]))
 );
+const PRODUCT_CODE_PATTERN = /^[A-Z0-9_]{3,32}$/;
 
 function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
@@ -133,6 +136,32 @@ export function formatProductRow(row) {
     sdk_app_secret: row.sdk_app_secret,
     created_at: row.created_at,
     updated_at: row.updated_at
+  };
+}
+
+export function normalizeProductProfileInput(body = {}, current = null) {
+  const rawCode = body.code === undefined ? current?.code : body.code;
+  const rawName = body.name === undefined ? current?.name : body.name;
+  const rawDescription = body.description === undefined
+    ? current?.description ?? ""
+    : body.description;
+
+  if (rawCode === undefined || rawCode === null || String(rawCode).trim() === "") {
+    throw new AppError(400, "FIELD_REQUIRED", "code is required.");
+  }
+  if (rawName === undefined || rawName === null || String(rawName).trim() === "") {
+    throw new AppError(400, "FIELD_REQUIRED", "name is required.");
+  }
+
+  const code = String(rawCode).trim().toUpperCase();
+  if (!PRODUCT_CODE_PATTERN.test(code)) {
+    throw new AppError(400, "INVALID_PRODUCT_CODE", "Product code must be 3-32 chars: A-Z, 0-9 or underscore.");
+  }
+
+  return {
+    code,
+    name: String(rawName).trim(),
+    description: String(rawDescription ?? "").trim()
   };
 }
 

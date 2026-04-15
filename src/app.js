@@ -16,6 +16,7 @@ const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), 
 const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center-v2.html"), "utf8");
 const developerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "developer-center.html"), "utf8");
 const developerIntegrationHtml = fs.readFileSync(path.join(currentDir, "web", "developer-integration.html"), "utf8");
+const productFeaturesJs = fs.readFileSync(path.join(currentDir, "web", "product-features.js"), "utf8");
 const developerProjectsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-projects.html"), "utf8");
 const developerLicenseHtml = fs.readFileSync(path.join(currentDir, "web", "developer-license.html"), "utf8");
 const developerOpsHtml = fs.readFileSync(path.join(currentDir, "web", "developer-ops.html"), "utf8");
@@ -90,6 +91,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/developer/integration") {
         sendHtml(res, 200, developerIntegrationHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/assets/product-features.js") {
+        sendText(res, 200, productFeaturesJs, "application/javascript; charset=utf-8");
         return;
       }
 
@@ -194,6 +200,22 @@ export function createApp(overrides = {}) {
       if (req.method === "POST" && url.pathname === "/api/admin/products") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, { ok: true, data: await services.createProduct(getBearerToken(req), body) });
+        return;
+      }
+
+      const productProfileRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/admin/products/:productId/profile")
+        : null;
+      if (productProfileRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.updateProductProfile(
+            getBearerToken(req),
+            productProfileRoute.productId,
+            body
+          )
+        });
         return;
       }
 
@@ -1012,6 +1034,22 @@ export function createApp(overrides = {}) {
       if (req.method === "POST" && url.pathname === "/api/developer/products") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, { ok: true, data: await services.developerCreateProduct(getBearerToken(req), body) });
+        return;
+      }
+
+      const developerProductProfileRoute = req.method === "POST"
+        ? matchPath(url.pathname, "/api/developer/products/:productId/profile")
+        : null;
+      if (developerProductProfileRoute) {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerUpdateProductProfile(
+            getBearerToken(req),
+            developerProductProfileRoute.productId,
+            body
+          )
+        });
         return;
       }
 

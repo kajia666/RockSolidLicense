@@ -4825,6 +4825,23 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return product;
     },
 
+    async updateProductProfile(token, productId, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const currentProduct = await getStoreProductById(productId);
+      if (!currentProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+
+      const nextProduct = await Promise.resolve(store.products.updateProductProfile(productId, body, nowIso()));
+      audit(db, "admin", admin.admin_id, "product.profile.update", "product", productId, {
+        previousCode: currentProduct.code,
+        code: nextProduct.code,
+        name: nextProduct.name,
+        description: nextProduct.description
+      });
+      return nextProduct;
+    },
+
     async updateProductFeatureConfig(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
       const timestamp = nowIso();
@@ -4975,6 +4992,31 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
 
       return product;
+    },
+
+    async developerUpdateProductProfile(token, productId, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const ownedProduct = await getStoreProductById(productId);
+      if (!ownedProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        { id: ownedProduct.id, owner_developer_id: ownedProduct.ownerDeveloperId ?? ownedProduct.ownerDeveloper?.id ?? null },
+        "products.write",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only manage products owned by your developer account."
+      );
+
+      const nextProduct = await Promise.resolve(store.products.updateProductProfile(ownedProduct.id, body, nowIso()));
+      auditDeveloperSession(db, session, "product.profile.update", "product", ownedProduct.id, {
+        previousCode: ownedProduct.code,
+        code: nextProduct.code,
+        name: nextProduct.name,
+        description: nextProduct.description
+      });
+      return nextProduct;
     },
 
     async developerUpdateProductFeatureConfig(token, productId, body = {}) {

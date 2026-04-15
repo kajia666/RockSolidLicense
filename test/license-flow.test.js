@@ -5982,6 +5982,160 @@ test("admin and developers can rotate project sdk credentials with scoped permis
   }
 });
 
+test("admin and developers can update project profile with scoped permission checks", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "profile.owner",
+        password: "ProfileOwner123!",
+        displayName: "Profile Owner"
+      },
+      adminSession.token
+    );
+
+    const product = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "PROFILE_APP",
+        name: "Profile App",
+        description: "Original profile description",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "profile.owner",
+      password: "ProfileOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "profile.admin",
+        password: "ProfileAdmin123!",
+        displayName: "Profile Admin",
+        role: "admin",
+        productCodes: ["PROFILE_APP"]
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "profile.operator",
+        password: "ProfileOperator123!",
+        displayName: "Profile Operator",
+        role: "operator",
+        productCodes: ["PROFILE_APP"]
+      },
+      ownerSession.token
+    );
+
+    const adminMemberSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "profile.admin",
+      password: "ProfileAdmin123!"
+    });
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "profile.operator",
+      password: "ProfileOperator123!"
+    });
+
+    const developerProfileUpdate = await postJson(
+      baseUrl,
+      `/api/developer/products/${product.id}/profile`,
+      {
+        code: "PROFILE_MEMBER_APP",
+        name: "Profile Member App",
+        description: "Updated by developer admin"
+      },
+      adminMemberSession.token
+    );
+    assert.equal(developerProfileUpdate.code, "PROFILE_MEMBER_APP");
+    assert.equal(developerProfileUpdate.projectCode, "PROFILE_MEMBER_APP");
+    assert.equal(developerProfileUpdate.softwareCode, "PROFILE_MEMBER_APP");
+    assert.equal(developerProfileUpdate.name, "Profile Member App");
+    assert.equal(developerProfileUpdate.description, "Updated by developer admin");
+
+    const forbiddenOperatorUpdate = await postJsonExpectError(
+      baseUrl,
+      `/api/developer/products/${product.id}/profile`,
+      {
+        name: "Operator should not update this"
+      },
+      operatorSession.token
+    );
+    assert.equal(forbiddenOperatorUpdate.status, 403);
+    assert.equal(forbiddenOperatorUpdate.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const adminProfileUpdate = await postJson(
+      baseUrl,
+      `/api/admin/products/${product.id}/profile`,
+      {
+        code: "PROFILE_ADMIN_APP",
+        name: "Profile Admin App",
+        description: "Updated by administrator"
+      },
+      adminSession.token
+    );
+    assert.equal(adminProfileUpdate.code, "PROFILE_ADMIN_APP");
+    assert.equal(adminProfileUpdate.name, "Profile Admin App");
+    assert.equal(adminProfileUpdate.description, "Updated by administrator");
+
+    const ownerProducts = await getJson(baseUrl, "/api/developer/products", ownerSession.token);
+    assert.equal(ownerProducts.length, 1);
+    assert.equal(ownerProducts[0].code, "PROFILE_ADMIN_APP");
+    assert.equal(ownerProducts[0].description, "Updated by administrator");
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/register",
+      adminProfileUpdate.sdkAppId,
+      adminProfileUpdate.sdkAppSecret,
+      {
+        productCode: "PROFILE_ADMIN_APP",
+        username: "profile_user",
+        password: "ProfileUser123!"
+      }
+    );
+
+    const oldCodeFailure = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/register",
+      adminProfileUpdate.sdkAppId,
+      adminProfileUpdate.sdkAppSecret,
+      {
+        productCode: "PROFILE_MEMBER_APP",
+        username: "old_profile_user",
+        password: "ProfileUser123!"
+      }
+    );
+    assert.equal(oldCodeFailure.status, 400);
+    assert.equal(oldCodeFailure.error.code, "PRODUCT_MISMATCH");
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=120", adminSession.token);
+    const developerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=120", ownerSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.profile.update"));
+    assert.ok(developerAuditLogs.items.some((entry) => entry.event_type === "product.profile.update"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -5995,11 +6149,13 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /Developer Accounts/);
     assert.match(html, /api\/admin\/developers/);
     assert.match(html, /developers\/:developerId\/status/);
+    assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
+    assert.match(html, /Save Project Profile/);
     assert.match(html, /Rotate SDK Credentials/);
-    assert.match(html, /Account Login Open/);
-    assert.match(html, /Recharge Open/);
-    assert.match(html, /Client Unbind Open/);
+    assert.match(html, /\/assets\/product-features\.js/);
+    assert.match(html, /window\.RSProductFeatures/);
+    assert.match(html, /feature-summary-box/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6022,10 +6178,11 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/members/);
     assert.match(html, /change-password/);
     assert.match(html, /Create Team Member/);
+    assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Rotate SDK Credentials/);
-    assert.match(html, /Account Login Open/);
-    assert.match(html, /Client Unbind Open/);
+    assert.match(html, /window\.RSProductFeatures/);
+    assert.match(html, /feature-summary-box/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6124,10 +6281,13 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Developer Project Workspace/);
     assert.match(html, /api\/developer\/products/);
     assert.match(html, /feature-config/);
+    assert.match(html, /products\/:productId\/profile/);
+    assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
-    assert.match(html, /Account Login Open/);
-    assert.match(html, /Client Unbind Open/);
+    assert.match(html, /Save Project Profile/);
+    assert.match(html, /window\.RSProductFeatures/);
+    assert.match(html, /feature-summary-box/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6145,10 +6305,28 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Developer Integration Center/);
     assert.match(html, /api\/developer\/integration/);
     assert.match(html, /api\/client\/login/);
+    assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Token Keys/);
     assert.match(html, /x-rs-app-id/);
-    assert.match(html, /Recharge Open/);
-    assert.match(html, /Client Unbind Open/);
+    assert.match(html, /window\.RSProductFeatures/);
+    assert.match(html, /feature-summary-box/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("shared product feature helper asset is served for dashboard pages", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/assets/product-features.js`);
+    const script = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^application\/javascript/);
+    assert.match(script, /globalThisRef\.RSProductFeatures/);
+    assert.match(script, /summaryLabel/);
+    assert.match(script, /fieldId/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

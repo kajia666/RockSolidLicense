@@ -515,16 +515,9 @@
       </section>
     </main>
 
+    <script src="/assets/product-features.js"></script>
     <script>
-      const FEATURE_KEYS = [
-        "allowRegister",
-        "allowAccountLogin",
-        "allowCardLogin",
-        "allowCardRecharge",
-        "allowVersionCheck",
-        "allowNotices",
-        "allowClientUnbind"
-      ];
+      const FEATURE_KEYS = window.RSProductFeatures.keys;
 
       let developerToken = "";
       let developerProfile = null;
@@ -598,7 +591,7 @@
       }
 
       function featureEnabledCount(items = [], featureKey) {
-        return items.filter((item) => item.featureConfig?.[featureKey] !== false).length;
+        return window.RSProductFeatures.countEnabled(items, featureKey);
       }
 
       function emptyDashboardSummary(items = []) {
@@ -634,17 +627,17 @@
       }
 
       function renderFeatureSummary(stats) {
-        const entries = [
-          ["Register Open", stats.registerEnabledProjects ?? 0],
-          ["Account Login Open", stats.accountLoginEnabledProjects ?? 0],
-          ["Card Login Open", stats.cardLoginEnabledProjects ?? 0],
-          ["Recharge Open", stats.cardRechargeEnabledProjects ?? 0],
-          ["Version Check Open", stats.versionCheckEnabledProjects ?? 0],
-          ["Notices Open", stats.noticesEnabledProjects ?? 0],
-          ["Client Unbind Open", stats.clientUnbindEnabledProjects ?? 0]
-        ];
-        el("feature-summary-box").innerHTML = entries
-          .map(([label, value]) => `<div class="pill"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`)
+        const counts = {
+          allowRegister: stats.registerEnabledProjects ?? 0,
+          allowAccountLogin: stats.accountLoginEnabledProjects ?? 0,
+          allowCardLogin: stats.cardLoginEnabledProjects ?? 0,
+          allowCardRecharge: stats.cardRechargeEnabledProjects ?? 0,
+          allowVersionCheck: stats.versionCheckEnabledProjects ?? 0,
+          allowNotices: stats.noticesEnabledProjects ?? 0,
+          allowClientUnbind: stats.clientUnbindEnabledProjects ?? 0
+        };
+        el("feature-summary-box").innerHTML = window.RSProductFeatures.entries
+          .map((entry) => `<div class="pill"><strong>${escapeHtml(counts[entry.key] ?? 0)}</strong><span>${escapeHtml(entry.summaryLabel)}</span></div>`)
           .join("");
       }
 
@@ -667,24 +660,16 @@
       }
 
       function readFeatureConfig(prefix) {
-        return {
-          allowRegister: el(`${prefix}-allow-register`).value === "true",
-          allowAccountLogin: el(`${prefix}-allow-account-login`).value === "true",
-          allowCardLogin: el(`${prefix}-allow-card-login`).value === "true",
-          allowCardRecharge: el(`${prefix}-allow-card-recharge`).value === "true",
-          allowVersionCheck: el(`${prefix}-allow-version-check`).value === "true",
-          allowNotices: el(`${prefix}-allow-notices`).value === "true",
-          allowClientUnbind: el(`${prefix}-allow-client-unbind`).value === "true"
-        };
+        return window.RSProductFeatures.readConfig(prefix, (fieldId) => el(fieldId).value);
       }
 
       function writeFeatureConfig(prefix, featureConfig = {}) {
-        for (const key of FEATURE_KEYS) {
-          const element = el(`${prefix}-${key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`)}`);
+        window.RSProductFeatures.writeConfig(prefix, featureConfig, (fieldId, value) => {
+          const element = el(fieldId);
           if (element) {
-            element.value = String(featureConfig[key] !== false);
+            element.value = value;
           }
-        }
+        });
       }
 
       function renderDetails(product) {
@@ -706,7 +691,7 @@
           <div class="split-line"><span>Notices & Rules</span><span>${escapeHtml(metrics.activeNotices ?? 0)} notices | ${escapeHtml(metrics.blockingNotices ?? 0)} blocking | ${escapeHtml(metrics.activeNetworkRules ?? 0)} rules</span></div>
           <div class="hint" style="margin-top: 14px;">Current featureConfig</div>
           <div style="margin-top: 8px;">
-            ${FEATURE_KEYS.map((key) => renderTag(key, featureConfig[key] !== false)).join("")}
+            ${window.RSProductFeatures.renderTagList(featureConfig, renderTag, "detailLabel")}
           </div>
         `;
       }

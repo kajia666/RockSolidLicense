@@ -10,6 +10,16 @@ It is designed to help software authors connect the SDK to their own software by
 - public token keys
 - example request payloads
 
+The page now also summarizes how many visible projects currently have each of the 7 product-level switches enabled:
+
+- `allowRegister`
+- `allowAccountLogin`
+- `allowCardLogin`
+- `allowCardRecharge`
+- `allowVersionCheck`
+- `allowNotices`
+- `allowClientUnbind`
+
 ## API
 
 - `GET /api/developer/integration`
@@ -68,3 +78,13 @@ The page and API are useful when the software author needs to:
 - confirm whether HTTP or TCP endpoints are enabled
 - fetch the current public key set used for `licenseToken` verification
 - adapt example register/login/card-login/heartbeat requests for their own client
+- confirm whether recharge and client-unbind are open for a scoped project before exposing those SDK flows
+
+## Request signing headers
+
+The HTTP integration example uses the same request signing headers as the runtime client APIs:
+
+- `x-rs-app-id`
+- `x-rs-timestamp`
+- `x-rs-nonce`
+- `x-rs-signature`

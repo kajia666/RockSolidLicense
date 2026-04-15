@@ -6146,6 +6146,9 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /api\/developer\/integration/);
     assert.match(html, /api\/client\/login/);
     assert.match(html, /Token Keys/);
+    assert.match(html, /x-rs-app-id/);
+    assert.match(html, /Recharge Open/);
+    assert.match(html, /Client Unbind Open/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

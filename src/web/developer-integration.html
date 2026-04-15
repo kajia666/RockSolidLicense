@@ -20,6 +20,7 @@
           <div class="pill">Includes scoped projects, token keys, and transport bootstrap data.</div>
         </div>
         <div class="stats" id="stats-box"></div>
+        <div class="pill-row" id="feature-summary-box"></div>
       </section>
 
       <section class="grid">
@@ -80,24 +81,373 @@
     </main>
 
     <script>
-      let token="",snapshot=null,selectedProduct=null; const el=(id)=>document.getElementById(id); const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;"); const setOutput=(v)=>{el("output").textContent=typeof v==="string"?v:JSON.stringify(v,null,2)}; const setStatus=(m,w=false)=>{const box=el("status-box"); box.textContent=m; box.className=`status${w?" warn":""}`}; const fmt=(v)=>{if(!v)return"-"; const d=new Date(v); return Number.isNaN(d.getTime())?String(v):d.toLocaleString("zh-CN",{hour12:false})}; const tag=(v,ok=true)=>`<span class="tag${ok?" ok":""}">${esc(v)}</span>`;
-      async function api(path,options={}){const headers={...(options.headers||{})}; if(options.body!==undefined) headers["Content-Type"]="application/json"; if(token) headers.Authorization=`Bearer ${token}`; const response=await fetch(path,{method:options.method||"GET",headers,body:options.body!==undefined?JSON.stringify(options.body):undefined}); const payload=await response.json().catch(()=>({})); if(!response.ok||payload.ok===false){const error=new Error(payload?.error?.message||`Request failed: ${response.status}`); error.code=payload?.error?.code||"REQUEST_FAILED"; throw error} return payload.data}
-      function setMeta(){if(!token||!snapshot){el("session-meta").textContent="No developer session yet."; return} const actor=snapshot.actor||{}; const developer=snapshot.developer||{}; const scope=actor.type==="member"?`member/${actor.role}`:"owner"; el("session-meta").textContent=`${actor.username||developer.username} | ${scope} | developer=${developer.username}`;}
-      function renderStats(){const items=snapshot?.products||[]; const keys=snapshot?.tokenKeys?.keys||[]; el("stats-box").innerHTML=`<div class="stat"><strong>${items.length}</strong><span>Visible Projects</span></div><div class="stat"><strong>${keys.length}</strong><span>Public Keys</span></div><div class="stat"><strong>${snapshot?.transport?.tcp?.enabled?1:0}</strong><span>TCP Enabled</span></div><div class="stat"><strong>${snapshot?.signing?.requestSkewSeconds??0}</strong><span>Skew Seconds</span></div>`}
-      function renderTransport(){if(!snapshot){el("transport-box").textContent="Integration transport data will appear here after sign-in.";return} const http=snapshot.transport?.http||{}; const tcp=snapshot.transport?.tcp||{}; const signing=snapshot.signing||{}; el("transport-box").innerHTML=`<div class="split-line"><span>HTTP Base</span><span class="mono">${esc(http.baseUrl||"-")}</span></div><div class="split-line"><span>Listener</span><span>${esc(http.host||"-")}:${esc(http.port||"-")}</span></div><div class="split-line"><span>TCP Gateway</span><span>${esc(String(tcp.enabled))} | ${esc(tcp.host||"-")}:${esc(tcp.port||"-")}</span></div><div class="split-line"><span>Request Signing</span><span>${esc(signing.requestAlgorithm||"-")} | skew ${esc(signing.requestSkewSeconds||"-")}s</span></div><div class="split-line"><span>Token Signing</span><span>${esc(signing.tokenAlgorithm||"-")} | issuer ${esc(signing.tokenIssuer||"-")}</span></div><div class="split-line"><span>Active Key ID</span><span class="mono">${esc(signing.activeKeyId||"-")}</span></div>`}
-      function renderProjects(){const items=snapshot?.products||[]; const body=el("projects-body"); const select=el("project-select"); if(!items.length){body.innerHTML='<tr><td colspan="4">No scoped projects found.</td></tr>'; select.innerHTML='<option value="">No scoped projects</option>'; selectedProduct=null; renderSelected(); return} body.innerHTML=items.map((item)=>{const features=item.featureConfig||{}; return `<tr data-id="${esc(item.id)}"><td><strong>${esc(item.code)}</strong><div>${esc(item.name)}</div><div class="hint">${esc(item.description||"No description")}</div></td><td><div class="mono">${esc(item.sdkAppId)}</div><div class="hint">${esc(item.status)}</div></td><td>${tag("register",features.allowRegister!==false)}${tag("account",features.allowAccountLogin!==false)}${tag("card",features.allowCardLogin!==false)}${tag("version",features.allowVersionCheck!==false)}${tag("notices",features.allowNotices!==false)}</td><td>${esc(fmt(item.updatedAt))}</td></tr>`}).join(""); select.innerHTML=items.map((item)=>`<option value="${esc(item.id)}">${esc(item.code)} | ${esc(item.name)}</option>`).join(""); for(const row of body.querySelectorAll("tr[data-id]")){row.addEventListener("click",()=>{select.value=row.dataset.id; chooseSelected(); setStatus(`Loaded integration data for ${(selectedProduct||{}).code || "project"}.`)})} if(!selectedProduct || !items.find((item)=>item.id===selectedProduct.id)){selectedProduct=items[0]} select.value=selectedProduct.id; renderSelected()}
-      function renderTokenKeys(){const keys=snapshot?.tokenKeys?.keys||[]; const activeId=snapshot?.tokenKeys?.activeKeyId; const body=el("token-keys-body"); body.innerHTML=keys.length?keys.map((item)=>`<tr><td><strong>${esc(item.keyId)}</strong><div>${item.keyId===activeId?tag("active"):tag(item.status||"stored",item.status==="active")}</div></td><td>${esc(item.status||"-")}</td><td class="mono">${esc(item.publicKeyFingerprint||"-")}</td><td>${esc(fmt(item.createdAt))}</td></tr>`).join(""):'<tr><td colspan="4">No public keys loaded.</td></tr>'}
-      function buildHttpExample(product){if(!product||!snapshot) return "Sign in to generate an example request."; const base=snapshot.transport?.http?.baseUrl||"http://127.0.0.1:3000"; return `POST ${base}/api/client/login\nHeaders:\n  x-rsl-app-id: ${product.sdkAppId}\n  x-rsl-timestamp: 1713024000\n  x-rsl-nonce: random-16-bytes\n  x-rsl-signature: <HMAC-SHA256 of raw body>\nBody:\n${JSON.stringify({productCode:product.code,username:"demo_user",password:"demo_password",deviceFingerprint:"machine-guid-hash",deviceProfile:{machineGuid:"machine-guid",requestIp:"<client-ip>"},clientVersion:"1.0.0",channel:"stable"},null,2)}`;}
-      function buildTcpExample(product){if(!product||!snapshot) return "Sign in to generate a TCP frame example."; return JSON.stringify({action:"client.login",requestId:"req_demo_001",payload:{productCode:product.code,username:"demo_user",password:"demo_password",deviceFingerprint:"machine-guid-hash",deviceProfile:{machineGuid:"machine-guid"},clientVersion:"1.0.0",channel:"stable"}},null,2);}
-      function renderSelected(){const product=selectedProduct; if(!product){el("project-detail").innerHTML='<div class="hint">Select a project to inspect credentials and feature toggles.</div>'; el("http-example").textContent="Sign in to generate an example request."; el("tcp-example").textContent="Sign in to generate a TCP frame example."; return} const features=product.featureConfig||{}; el("project-detail").innerHTML=`<div class="split-line"><span>Project</span><span><strong>${esc(product.code)}</strong> | ${esc(product.name)}</span></div><div class="split-line"><span>SDK App ID</span><span class="mono">${esc(product.sdkAppId)}</span></div><div class="split-line"><span>SDK App Secret</span><span class="mono">${esc(product.sdkAppSecret)}</span></div><div class="split-line"><span>Status</span><span>${esc(product.status)}</span></div><div class="hint" style="margin-top:14px;">Feature toggles</div><div style="margin-top:8px;">${Object.entries(features).map(([k,v])=>tag(k,v!==false)).join("")}</div>`; el("http-example").textContent=buildHttpExample(product); el("tcp-example").textContent=buildTcpExample(product);}
-      function chooseSelected(){const id=el("project-select").value; selectedProduct=(snapshot?.products||[]).find((item)=>item.id===id)||null; renderSelected(); setOutput(snapshot)}
-      function clear(){token="";snapshot=null;selectedProduct=null; setMeta(); renderStats(); renderTransport(); renderProjects(); renderTokenKeys(); setOutput("Waiting for actions...")}
-      async function refresh(){if(!token){clear(); setStatus("Sign in to load integration bootstrap data."); return} snapshot=await api("/api/developer/integration"); setMeta(); renderStats(); renderTransport(); renderProjects(); renderTokenKeys(); setOutput(snapshot)}
-      el("login-btn").addEventListener("click",async()=>{try{const data=await api("/api/developer/login",{method:"POST",body:{username:el("username").value.trim(),password:el("password").value}}); token=data.token; await refresh(); setStatus("Developer integration snapshot loaded.")}catch(error){clear(); setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
-      el("refresh-btn").addEventListener("click",async()=>{try{await refresh(); setStatus("Developer integration snapshot refreshed.")}catch(error){setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
-      el("logout-btn").addEventListener("click",async()=>{try{if(token) await api("/api/developer/logout",{method:"POST"}); clear(); setStatus("Developer session closed."); setOutput("Logged out.")}catch(error){setStatus(`${error.code}: ${error.message}`,true); setOutput({code:error.code,message:error.message})}});
-      el("use-selected-btn").addEventListener("click",()=>{chooseSelected(); setStatus(`Using ${(selectedProduct||{}).code || "selected project"} for examples.`)});
-      clear(); renderStats(); renderTransport(); renderProjects(); renderTokenKeys();
+      const FEATURE_ENTRIES = [
+        { key: "allowRegister", tagLabel: "register", summaryLabel: "Register Open" },
+        { key: "allowAccountLogin", tagLabel: "account", summaryLabel: "Account Login Open" },
+        { key: "allowCardLogin", tagLabel: "card", summaryLabel: "Card Login Open" },
+        { key: "allowCardRecharge", tagLabel: "recharge", summaryLabel: "Recharge Open" },
+        { key: "allowVersionCheck", tagLabel: "version", summaryLabel: "Version Check Open" },
+        { key: "allowNotices", tagLabel: "notices", summaryLabel: "Notices Open" },
+        { key: "allowClientUnbind", tagLabel: "unbind", summaryLabel: "Client Unbind Open" }
+      ];
+
+      let token = "";
+      let snapshot = null;
+      let selectedProduct = null;
+
+      function el(id) {
+        return document.getElementById(id);
+      }
+
+      function esc(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function setOutput(value) {
+        el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function fmt(value) {
+        if (!value) {
+          return "-";
+        }
+        const date = new Date(value);
+        return Number.isNaN(date.getTime())
+          ? String(value)
+          : date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function tag(value, ok = true) {
+        return `<span class="tag${ok ? " ok" : ""}">${esc(value)}</span>`;
+      }
+
+      function renderFeatureTags(featureConfig = {}) {
+        return FEATURE_ENTRIES
+          .map(({ key, tagLabel }) => tag(tagLabel, featureConfig[key] !== false))
+          .join("");
+      }
+
+      function countFeatureEnabled(items = [], featureKey) {
+        return items.filter((item) => item.featureConfig?.[featureKey] !== false).length;
+      }
+
+      async function api(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (options.body !== undefined) {
+          headers["Content-Type"] = "application/json";
+        }
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers,
+          body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.ok === false) {
+          const error = new Error(payload?.error?.message || `Request failed: ${response.status}`);
+          error.code = payload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        return payload.data;
+      }
+
+      function setMeta() {
+        if (!token || !snapshot) {
+          el("session-meta").textContent = "No developer session yet.";
+          return;
+        }
+
+        const actor = snapshot.actor || {};
+        const developer = snapshot.developer || {};
+        const scope = actor.type === "member" ? `member/${actor.role}` : "owner";
+        el("session-meta").textContent = `${actor.username || developer.username} | ${scope} | developer=${developer.username}`;
+      }
+
+      function renderFeatureSummary() {
+        const items = snapshot?.products || [];
+        el("feature-summary-box").innerHTML = FEATURE_ENTRIES
+          .map(({ key, summaryLabel }) => {
+            const count = countFeatureEnabled(items, key);
+            return `<div class="pill"><strong>${esc(count)}</strong><span>${esc(summaryLabel)}</span></div>`;
+          })
+          .join("");
+      }
+
+      function renderStats() {
+        const items = snapshot?.products || [];
+        const keys = snapshot?.tokenKeys?.keys || [];
+
+        el("stats-box").innerHTML = `
+          <div class="stat"><strong>${items.length}</strong><span>Visible Projects</span></div>
+          <div class="stat"><strong>${keys.length}</strong><span>Public Keys</span></div>
+          <div class="stat"><strong>${snapshot?.transport?.tcp?.enabled ? 1 : 0}</strong><span>TCP Enabled</span></div>
+          <div class="stat"><strong>${snapshot?.signing?.requestSkewSeconds ?? 0}</strong><span>Skew Seconds</span></div>
+        `;
+        renderFeatureSummary();
+      }
+
+      function renderTransport() {
+        if (!snapshot) {
+          el("transport-box").textContent = "Integration transport data will appear here after sign-in.";
+          return;
+        }
+
+        const http = snapshot.transport?.http || {};
+        const tcp = snapshot.transport?.tcp || {};
+        const signing = snapshot.signing || {};
+
+        el("transport-box").innerHTML = `
+          <div class="split-line"><span>HTTP Base</span><span class="mono">${esc(http.baseUrl || "-")}</span></div>
+          <div class="split-line"><span>Listener</span><span>${esc(http.host || "-")}:${esc(http.port || "-")}</span></div>
+          <div class="split-line"><span>TCP Gateway</span><span>${esc(String(tcp.enabled))} | ${esc(tcp.host || "-")}:${esc(tcp.port || "-")}</span></div>
+          <div class="split-line"><span>Request Signing</span><span>${esc(signing.requestAlgorithm || "-")} | skew ${esc(signing.requestSkewSeconds || "-")}s</span></div>
+          <div class="split-line"><span>Token Signing</span><span>${esc(signing.tokenAlgorithm || "-")} | issuer ${esc(signing.tokenIssuer || "-")}</span></div>
+          <div class="split-line"><span>Active Key ID</span><span class="mono">${esc(signing.activeKeyId || "-")}</span></div>
+        `;
+      }
+
+      function renderProjects() {
+        const items = snapshot?.products || [];
+        const body = el("projects-body");
+        const select = el("project-select");
+
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="4">No scoped projects found.</td></tr>';
+          select.innerHTML = '<option value="">No scoped projects</option>';
+          selectedProduct = null;
+          renderSelected();
+          return;
+        }
+
+        body.innerHTML = items.map((item) => {
+          const features = item.featureConfig || {};
+          return `
+            <tr data-id="${esc(item.id)}">
+              <td>
+                <strong>${esc(item.code)}</strong>
+                <div>${esc(item.name)}</div>
+                <div class="hint">${esc(item.description || "No description")}</div>
+              </td>
+              <td>
+                <div class="mono">${esc(item.sdkAppId)}</div>
+                <div class="hint">${esc(item.status)}</div>
+              </td>
+              <td>${renderFeatureTags(features)}</td>
+              <td>${esc(fmt(item.updatedAt))}</td>
+            </tr>
+          `;
+        }).join("");
+
+        select.innerHTML = items
+          .map((item) => `<option value="${esc(item.id)}">${esc(item.code)} | ${esc(item.name)}</option>`)
+          .join("");
+
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            select.value = row.dataset.id;
+            chooseSelected();
+            setStatus(`Loaded integration data for ${(selectedProduct || {}).code || "project"}.`);
+          });
+        }
+
+        if (!selectedProduct || !items.find((item) => item.id === selectedProduct.id)) {
+          selectedProduct = items[0];
+        }
+        select.value = selectedProduct.id;
+        renderSelected();
+      }
+
+      function renderTokenKeys() {
+        const keys = snapshot?.tokenKeys?.keys || [];
+        const activeId = snapshot?.tokenKeys?.activeKeyId;
+        const body = el("token-keys-body");
+
+        body.innerHTML = keys.length
+          ? keys.map((item) => `
+            <tr>
+              <td>
+                <strong>${esc(item.keyId)}</strong>
+                <div>${item.keyId === activeId ? tag("active") : tag(item.status || "stored", item.status === "active")}</div>
+              </td>
+              <td>${esc(item.status || "-")}</td>
+              <td class="mono">${esc(item.publicKeyFingerprint || "-")}</td>
+              <td>${esc(fmt(item.createdAt))}</td>
+            </tr>
+          `).join("")
+          : '<tr><td colspan="4">No public keys loaded.</td></tr>';
+      }
+
+      function buildHttpExample(product) {
+        if (!product || !snapshot) {
+          return "Sign in to generate an example request.";
+        }
+
+        const base = snapshot.transport?.http?.baseUrl || "http://127.0.0.1:3000";
+        return `POST ${base}/api/client/login
+Headers:
+  x-rs-app-id: ${product.sdkAppId}
+  x-rs-timestamp: 1713024000
+  x-rs-nonce: random-16-bytes
+  x-rs-signature: <HMAC-SHA256 of raw body>
+Body:
+${JSON.stringify({
+  productCode: product.code,
+  username: "demo_user",
+  password: "demo_password",
+  deviceFingerprint: "machine-guid-hash",
+  deviceProfile: {
+    machineGuid: "machine-guid",
+    requestIp: "<client-ip>"
+  },
+  clientVersion: "1.0.0",
+  channel: "stable"
+}, null, 2)}`;
+      }
+
+      function buildTcpExample(product) {
+        if (!product || !snapshot) {
+          return "Sign in to generate a TCP frame example.";
+        }
+
+        return JSON.stringify({
+          action: "client.login",
+          requestId: "req_demo_001",
+          payload: {
+            productCode: product.code,
+            username: "demo_user",
+            password: "demo_password",
+            deviceFingerprint: "machine-guid-hash",
+            deviceProfile: { machineGuid: "machine-guid" },
+            clientVersion: "1.0.0",
+            channel: "stable"
+          }
+        }, null, 2);
+      }
+
+      function renderSelected() {
+        const product = selectedProduct;
+        if (!product) {
+          el("project-detail").innerHTML = '<div class="hint">Select a project to inspect credentials and feature toggles.</div>';
+          el("http-example").textContent = "Sign in to generate an example request.";
+          el("tcp-example").textContent = "Sign in to generate a TCP frame example.";
+          return;
+        }
+
+        const features = product.featureConfig || {};
+        el("project-detail").innerHTML = `
+          <div class="split-line"><span>Project</span><span><strong>${esc(product.code)}</strong> | ${esc(product.name)}</span></div>
+          <div class="split-line"><span>SDK App ID</span><span class="mono">${esc(product.sdkAppId)}</span></div>
+          <div class="split-line"><span>SDK App Secret</span><span class="mono">${esc(product.sdkAppSecret)}</span></div>
+          <div class="split-line"><span>Status</span><span>${esc(product.status)}</span></div>
+          <div class="hint" style="margin-top:14px;">Feature toggles</div>
+          <div style="margin-top:8px;">${renderFeatureTags(features)}</div>
+        `;
+        el("http-example").textContent = buildHttpExample(product);
+        el("tcp-example").textContent = buildTcpExample(product);
+      }
+
+      function chooseSelected() {
+        const id = el("project-select").value;
+        selectedProduct = (snapshot?.products || []).find((item) => item.id === id) || null;
+        renderSelected();
+        setOutput(snapshot);
+      }
+
+      function clear() {
+        token = "";
+        snapshot = null;
+        selectedProduct = null;
+        setMeta();
+        renderStats();
+        renderTransport();
+        renderProjects();
+        renderTokenKeys();
+        setOutput("Waiting for actions...");
+      }
+
+      async function refresh() {
+        if (!token) {
+          clear();
+          setStatus("Sign in to load integration bootstrap data.");
+          return;
+        }
+
+        snapshot = await api("/api/developer/integration");
+        setMeta();
+        renderStats();
+        renderTransport();
+        renderProjects();
+        renderTokenKeys();
+        setOutput(snapshot);
+      }
+
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await api("/api/developer/login", {
+            method: "POST",
+            body: {
+              username: el("username").value.trim(),
+              password: el("password").value
+            }
+          });
+          token = data.token;
+          await refresh();
+          setStatus("Developer integration snapshot loaded.");
+        } catch (error) {
+          clear();
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("refresh-btn").addEventListener("click", async () => {
+        try {
+          await refresh();
+          setStatus("Developer integration snapshot refreshed.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("logout-btn").addEventListener("click", async () => {
+        try {
+          if (token) {
+            await api("/api/developer/logout", { method: "POST" });
+          }
+          clear();
+          setStatus("Developer session closed.");
+          setOutput("Logged out.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("use-selected-btn").addEventListener("click", () => {
+        chooseSelected();
+        setStatus(`Using ${(selectedProduct || {}).code || "selected project"} for examples.`);
+      });
+
+      clear();
+      renderStats();
+      renderTransport();
+      renderProjects();
+      renderTokenKeys();
     </script>
   </body>
 </html>

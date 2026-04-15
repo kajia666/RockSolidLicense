@@ -229,7 +229,38 @@ export class NonceReplayError extends Error {
   }
 }
 
-export function createRuntimeStateStore({ db, config }) {
+function formatDatabaseSessionState(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    status: row.status ?? null,
+    revokedReason: row.revoked_reason ?? null,
+    expiresAt: row.expires_at ?? null,
+    lastHeartbeatAt: row.last_heartbeat_at ?? null
+  };
+}
+
+async function getMainStoreSessionState(db, mainStore, sessionToken) {
+  if (!mainStore?.sessions?.getSessionRecordByToken) {
+    return null;
+  }
+
+  const row = await Promise.resolve(mainStore.sessions.getSessionRecordByToken(db, sessionToken));
+  return formatDatabaseSessionState(row);
+}
+
+async function countMainStoreActiveSessions(db, mainStore) {
+  if (!mainStore?.sessions?.countActiveSessionsByProductIds) {
+    return countSqliteActiveSessions(db);
+  }
+
+  const rows = await Promise.resolve(mainStore.sessions.countActiveSessionsByProductIds(db, null));
+  return rows.reduce((total, row) => total + Number(row.count ?? 0), 0);
+}
+
+export function createRuntimeStateStore({ db, config, mainStore = null }) {
   const driver = normalizeStateStoreDriver(config.stateStoreDriver);
   if (driver === "memory") {
     return createMemoryRuntimeStateStore(db, config);
@@ -237,10 +268,10 @@ export function createRuntimeStateStore({ db, config }) {
   if (driver === "redis") {
     return createRedisRuntimeStateStore(db, config);
   }
-  return createSqliteRuntimeStateStore(db, config);
+  return createSqliteRuntimeStateStore(db, config, mainStore);
 }
 
-function createSqliteRuntimeStateStore(db, config) {
+function createSqliteRuntimeStateStore(db, config, mainStore = null) {
   return {
     driver: "sqlite",
 
@@ -269,6 +300,11 @@ function createSqliteRuntimeStateStore(db, config) {
     expireSession() {},
 
     async getSessionState(sessionToken) {
+      const storeRow = await getMainStoreSessionState(db, mainStore, sessionToken);
+      if (storeRow) {
+        return storeRow;
+      }
+
       const row = db.prepare(
         `
           SELECT status, revoked_reason, expires_at, last_heartbeat_at
@@ -276,20 +312,11 @@ function createSqliteRuntimeStateStore(db, config) {
           WHERE session_token = ?
         `
       ).get(sessionToken);
-      if (!row) {
-        return null;
-      }
-
-      return {
-        status: row.status ?? null,
-        revokedReason: row.revoked_reason ?? null,
-        expiresAt: row.expires_at ?? null,
-        lastHeartbeatAt: row.last_heartbeat_at ?? null
-      };
+      return formatDatabaseSessionState(row);
     },
 
     async countActiveSessions() {
-      return countSqliteActiveSessions(db);
+      return countMainStoreActiveSessions(db, mainStore);
     },
 
     async health() {

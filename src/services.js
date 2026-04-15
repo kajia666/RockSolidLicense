@@ -196,6 +196,19 @@ function revokeDeveloperMemberSessions(db, whereSql, params = []) {
   return rows.length;
 }
 
+function formatDatabaseSessionState(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    status: row.status ?? null,
+    revokedReason: row.revoked_reason ?? null,
+    expiresAt: row.expires_at ?? null,
+    lastHeartbeatAt: row.last_heartbeat_at ?? null
+  };
+}
+
 async function finalizeIssuedSessionRuntime(db, store, stateStore, payload) {
   const resolvedPayload = await Promise.resolve(payload);
   if (!resolvedPayload?.runtime) {
@@ -4013,6 +4026,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     touchSession() {},
     expireSession() {},
     async getSessionState(sessionToken) {
+      if (store?.sessions?.getSessionRecordByToken) {
+        const row = await Promise.resolve(store.sessions.getSessionRecordByToken(db, sessionToken));
+        const sessionState = formatDatabaseSessionState(row);
+        if (sessionState) {
+          return sessionState;
+        }
+      }
+
       const row = one(
         db,
         `
@@ -4022,17 +4043,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         `,
         sessionToken
       );
-      if (!row) {
-        return null;
-      }
-      return {
-        status: row.status ?? null,
-        revokedReason: row.revoked_reason ?? null,
-        expiresAt: row.expires_at ?? null,
-        lastHeartbeatAt: row.last_heartbeat_at ?? null
-      };
+      return formatDatabaseSessionState(row);
     },
     async countActiveSessions() {
+      if (store?.sessions?.countActiveSessionsByProductIds) {
+        const rows = await Promise.resolve(store.sessions.countActiveSessionsByProductIds(db, null));
+        return rows.reduce((total, row) => total + Number(row.count ?? 0), 0);
+      }
+
       return Number(one(db, "SELECT COUNT(*) AS count FROM sessions WHERE status = 'active'")?.count ?? 0);
     },
     async health() {

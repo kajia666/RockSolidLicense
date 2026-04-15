@@ -1436,6 +1436,13 @@ function createWriteCapableAdapter() {
         .map((session) => ({ ...session }));
     }
 
+    if (meta.repository === "sessions" && meta.operation === "getSessionRecordByToken") {
+      return state.sessions
+        .filter((session) => session.session_token === params[0])
+        .slice(0, 1)
+        .map((session) => ({ ...session }));
+    }
+
     if (meta.repository === "sessions" && meta.operation === "listActiveSessionExpiryRows") {
       return state.sessions
         .filter((session) => session.status === "active")
@@ -3647,6 +3654,104 @@ test("postgres preview supports signed client register, recharge, login, and car
     );
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "markCardRedeemed"),
+      true
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("postgres preview keeps sqlite runtime-state session visibility aligned with main store", async () => {
+  const { adapter, state } = createWriteCapableAdapter();
+  const { app, tempDir } = createTestApp({
+    mainStoreDriver: "postgres",
+    postgresUrl: "postgres://rocksolid:secret@127.0.0.1:5432/rocksolid",
+    postgresMainStoreAdapter: adapter,
+    stateStoreDriver: "sqlite"
+  });
+
+  try {
+    const admin = app.services.adminLogin({
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await app.services.createProduct(admin.token, {
+      code: "PGRSTATE",
+      name: "PG Runtime State Product"
+    });
+    const policy = await app.services.createPolicy(admin.token, {
+      productCode: "PGRSTATE",
+      name: "PG Runtime State Policy",
+      durationDays: 7,
+      maxDevices: 1
+    });
+
+    const batch = await app.services.createCardBatch(admin.token, {
+      productCode: "PGRSTATE",
+      policyId: policy.id,
+      count: 1,
+      prefix: "PGRS"
+    });
+    assert.equal(batch.count, 1);
+
+    await callSignedClientService(
+      app,
+      product,
+      "/api/client/register",
+      "registerClient",
+      {
+        productCode: "PGRSTATE",
+        username: "runtime-user",
+        password: "StrongPass123"
+      },
+      { ip: "203.0.113.90", userAgent: "pg-runtime-register" }
+    );
+
+    await callSignedClientService(
+      app,
+      product,
+      "/api/client/recharge",
+      "redeemCard",
+      {
+        productCode: "PGRSTATE",
+        username: "runtime-user",
+        password: "StrongPass123",
+        cardKey: batch.keys[0]
+      },
+      { ip: "203.0.113.90", userAgent: "pg-runtime-recharge" }
+    );
+
+    const login = await callSignedClientService(
+      app,
+      product,
+      "/api/client/login",
+      "loginClient",
+      {
+        productCode: "PGRSTATE",
+        username: "runtime-user",
+        password: "StrongPass123",
+        deviceFingerprint: "pg-runtime-device-001",
+        deviceName: "PG Runtime Device"
+      },
+      { ip: "203.0.113.90", userAgent: "pg-runtime-login" }
+    );
+
+    const runtimeSession = await app.runtimeState.getSessionState(login.sessionToken);
+    assert.ok(runtimeSession);
+    assert.equal(runtimeSession.status, "active");
+
+    const health = await app.services.health();
+    assert.equal(health.storage.runtimeState.driver, "sqlite");
+    assert.equal(health.storage.runtimeState.activeSessions, 1);
+
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "getSessionRecordByToken"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countActiveSessionsByProductIds"),
       true
     );
   } finally {

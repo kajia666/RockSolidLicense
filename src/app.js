@@ -55,7 +55,7 @@ export function createApp(overrides = {}) {
   config.licenseKeys = loadOrCreateLicenseKeyStore(config);
   const db = createDatabase(config);
   const mainStore = createMainStore({ db, config });
-  const runtimeState = createRuntimeStateStore({ db, config });
+  const runtimeState = createRuntimeStateStore({ db, config, mainStore });
   const services = createServices(db, config, runtimeState, mainStore);
   const tcpServer = createTcpServer({ services, config });
 

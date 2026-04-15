@@ -1,4 +1,6 @@
 import * as accounts from "./account-repository.js";
+import * as versions from "./client-version-repository.js";
+import * as notices from "./notice-repository.js";
 import * as sessions from "./session-repository.js";
 import * as products from "./product-repository.js";
 import * as policies from "./policy-repository.js";
@@ -34,6 +36,12 @@ export function createSqliteMainStore({ db }) {
       ...accounts,
       ...createSqliteAccountStore({ db })
     },
+    versions: {
+      ...versions
+    },
+    notices: {
+      ...notices
+    },
     devices: {
       ...createSqliteDeviceStore({ db })
     },
@@ -56,6 +64,8 @@ export function createSqliteMainStore({ db }) {
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     },
@@ -65,6 +75,8 @@ export function createSqliteMainStore({ db }) {
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     }

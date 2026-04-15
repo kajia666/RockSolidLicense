@@ -590,7 +590,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/client-versions") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listClientVersions(getBearerToken(req), {
+          data: await services.listClientVersions(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             channel: url.searchParams.get("channel"),
             status: url.searchParams.get("status"),
@@ -603,7 +603,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/notices") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listNotices(getBearerToken(req), {
+          data: await services.listNotices(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             channel: url.searchParams.get("channel"),
             kind: url.searchParams.get("kind"),
@@ -1156,7 +1156,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/client-versions") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListClientVersions(getBearerToken(req), {
+          data: await services.developerListClientVersions(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             channel: url.searchParams.get("channel"),
             status: url.searchParams.get("status"),
@@ -1194,7 +1194,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/notices") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListNotices(getBearerToken(req), {
+          data: await services.developerListNotices(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             channel: url.searchParams.get("channel"),
             kind: url.searchParams.get("kind"),

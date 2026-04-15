@@ -30,7 +30,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(app.mainStore.driver, "sqlite");
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "devices", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "devices", "sessions"]
     );
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
@@ -38,6 +38,8 @@ test("app exposes sqlite main store and services read through it", async () => {
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -156,6 +158,106 @@ test("app exposes sqlite main store and services read through it", async () => {
     });
     assert.equal(updatedUnbind.allowClientUnbind, false);
     assert.equal(updatedUnbind.clientUnbindLimit, 0);
+
+    const directVersion = app.services.createClientVersion(admin.token, {
+      productCode: "STOREAPP2",
+      channel: "stable",
+      version: "2.0.0",
+      status: "active",
+      forceUpdate: true,
+      downloadUrl: "https://example.invalid/storeapp2/2.0.0.zip",
+      releaseNotes: "Store main-store release notes",
+      noticeTitle: "Store main-store release",
+      noticeBody: "Important runtime update",
+      releasedAt: "2026-01-05T00:00:00.000Z"
+    });
+    assert.equal(directVersion.productCode, "STOREAPP2");
+    assert.equal(directVersion.forceUpdate, true);
+
+    const versionRows = await Promise.resolve(app.mainStore.versions.queryClientVersionRows(app.db, {
+      productCode: "STOREAPP2",
+      channel: "stable",
+      status: "active"
+    }));
+    assert.equal(versionRows.total, 1);
+    assert.equal(versionRows.items[0].product_code, "STOREAPP2");
+    assert.equal(versionRows.items[0].forceUpdate, true);
+
+    const listedProductVersions = await Promise.resolve(
+      app.mainStore.versions.listProductVersions(app.db, directProduct.id, "stable")
+    );
+    assert.equal(listedProductVersions.length, 1);
+    assert.equal(listedProductVersions[0].version, "2.0.0");
+    assert.equal(listedProductVersions[0].forceUpdate, true);
+
+    const activeVersionCounts = app.mainStore.versions.countActiveVersionsByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(activeVersionCounts.length, 1);
+    assert.equal(activeVersionCounts[0].product_id, directProduct.id);
+    assert.equal(activeVersionCounts[0].count, 1);
+
+    const forceUpdateVersionCounts = app.mainStore.versions.countForceUpdateVersionsByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(forceUpdateVersionCounts.length, 1);
+    assert.equal(forceUpdateVersionCounts[0].product_id, directProduct.id);
+    assert.equal(forceUpdateVersionCounts[0].count, 1);
+
+    const directNotice = app.services.createNotice(admin.token, {
+      productCode: "STOREAPP2",
+      channel: "stable",
+      kind: "maintenance",
+      severity: "critical",
+      title: "Store Main Notice",
+      body: "Scheduled maintenance for main-store test",
+      status: "active",
+      blockLogin: true,
+      startsAt: "2026-01-05T00:00:00.000Z",
+      endsAt: "2026-02-05T00:00:00.000Z"
+    });
+    assert.equal(directNotice.productCode, "STOREAPP2");
+    assert.equal(directNotice.blockLogin, true);
+
+    const noticeRows = await Promise.resolve(app.mainStore.notices.queryNoticeRows(app.db, {
+      productCode: "STOREAPP2",
+      channel: "stable",
+      status: "active"
+    }));
+    assert.equal(noticeRows.total, 1);
+    assert.equal(noticeRows.items[0].productCode, "STOREAPP2");
+    assert.equal(noticeRows.items[0].blockLogin, true);
+
+    const activeNotices = await Promise.resolve(
+      app.mainStore.notices.listActiveNoticesForProduct(
+        app.db,
+        directProduct.id,
+        "stable",
+        "2026-01-10T00:00:00.000Z"
+      )
+    );
+    assert.equal(activeNotices.length, 1);
+    assert.equal(activeNotices[0].title, "Store Main Notice");
+
+    const activeNoticeCounts = app.mainStore.notices.countActiveNoticesByProductIds(
+      app.db,
+      [directProduct.id],
+      "2026-01-10T00:00:00.000Z"
+    );
+    assert.equal(activeNoticeCounts.length, 1);
+    assert.equal(activeNoticeCounts[0].product_id, directProduct.id);
+    assert.equal(activeNoticeCounts[0].count, 1);
+
+    const blockingNoticeCounts = app.mainStore.notices.countBlockingNoticesByProductIds(
+      app.db,
+      [directProduct.id],
+      "2026-01-10T00:00:00.000Z"
+    );
+    assert.equal(blockingNoticeCounts.length, 1);
+    assert.equal(blockingNoticeCounts[0].product_id, directProduct.id);
+    assert.equal(blockingNoticeCounts[0].count, 1);
 
     const directBatch = app.mainStore.cards.createCardBatch(directProduct, directPolicy, {
       count: 2,

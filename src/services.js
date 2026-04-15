@@ -669,45 +669,17 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
   const blockedDeviceCounts = buildMetricMap(await Promise.resolve(
     store.devices.countActiveBlocksByProductIds(db, productIds)
   ));
-  const activeClientVersionCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM client_versions
-      WHERE product_id IN (${placeholders}) AND status = 'active'
-      GROUP BY product_id
-    `,
-    ...productIds
+  const activeClientVersionCounts = buildMetricMap(await Promise.resolve(
+    store.versions.countActiveVersionsByProductIds(db, productIds)
   ));
-  const forceUpdateVersionCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM client_versions
-      WHERE product_id IN (${placeholders}) AND status = 'active' AND force_update = 1
-      GROUP BY product_id
-    `,
-    ...productIds
+  const forceUpdateVersionCounts = buildMetricMap(await Promise.resolve(
+    store.versions.countForceUpdateVersionsByProductIds(db, productIds)
   ));
-  const activeNoticeCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM notices
-      WHERE product_id IN (${placeholders}) AND status = 'active'
-      GROUP BY product_id
-    `,
-    ...productIds
+  const activeNoticeCounts = buildMetricMap(await Promise.resolve(
+    store.notices.countActiveNoticesByProductIds(db, productIds, now)
   ));
-  const blockingNoticeCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM notices
-      WHERE product_id IN (${placeholders}) AND status = 'active' AND block_login = 1
-      GROUP BY product_id
-    `,
-    ...productIds
+  const blockingNoticeCounts = buildMetricMap(await Promise.resolve(
+    store.notices.countBlockingNoticesByProductIds(db, productIds, now)
   ));
   const activeNetworkRuleCounts = buildMetricMap(many(
     db,
@@ -3484,156 +3456,12 @@ function formatNotice(row) {
   };
 }
 
-function queryClientVersionRows(db, filters = {}) {
-  const conditions = [];
-  const params = [];
-  const normalizedFilters = {
-    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-    channel: normalizeOptionalChannel(filters.channel),
-    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-    search: filters.search ? String(filters.search).trim() : null,
-    ownerDeveloperId: filters.ownerDeveloperId ? String(filters.ownerDeveloperId).trim() : null
-  };
-
-  if (normalizedFilters.productCode) {
-    conditions.push("pr.code = ?");
-    params.push(normalizedFilters.productCode);
-  }
-
-  if (normalizedFilters.ownerDeveloperId) {
-    conditions.push("pr.owner_developer_id = ?");
-    params.push(normalizedFilters.ownerDeveloperId);
-  }
-  appendInCondition("pr.id", filters.productIds, conditions, params);
-
-  if (normalizedFilters.channel) {
-    conditions.push("v.channel = ?");
-    params.push(normalizedFilters.channel);
-  }
-
-  if (normalizedFilters.status) {
-    if (!["active", "disabled"].includes(normalizedFilters.status)) {
-      throw new AppError(400, "INVALID_CLIENT_VERSION_STATUS", "Version status must be active or disabled.");
-    }
-    conditions.push("v.status = ?");
-    params.push(normalizedFilters.status);
-  }
-
-  if (normalizedFilters.search) {
-    const pattern = likeFilter(normalizedFilters.search);
-    conditions.push(
-      "(v.version LIKE ? ESCAPE '\\' OR COALESCE(v.notice_title, '') LIKE ? ESCAPE '\\' OR COALESCE(v.release_notes, '') LIKE ? ESCAPE '\\')"
-    );
-    params.push(pattern, pattern, pattern);
-  }
-
-  const items = many(
-    db,
-    `
-      SELECT v.id, v.channel, v.version, v.status, v.force_update, v.download_url, v.release_notes,
-             v.notice_title, v.notice_body, v.released_at, v.created_at, v.updated_at,
-             pr.code AS product_code, pr.name AS product_name
-      FROM client_versions v
-      JOIN products pr ON pr.id = v.product_id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY pr.code ASC, v.channel ASC, v.released_at DESC, v.created_at DESC
-      LIMIT 100
-    `,
-    ...params
-  ).map((row) => ({
-    ...row,
-    force_update: Boolean(row.force_update),
-    forceUpdate: Boolean(row.force_update)
-  }));
-
-  return {
-    items,
-    total: items.length,
-    filters: {
-      productCode: normalizedFilters.productCode,
-      channel: normalizedFilters.channel,
-      status: normalizedFilters.status,
-      search: normalizedFilters.search
-    }
-  };
+async function queryClientVersionRows(db, store, filters = {}) {
+  return Promise.resolve(store.versions.queryClientVersionRows(db, filters));
 }
 
-function queryNoticeRows(db, filters = {}) {
-  const conditions = [];
-  const params = [];
-  const normalizedFilters = {
-    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-    channel: normalizeOptionalChannel(filters.channel) ?? "all",
-    kind: filters.kind ? String(filters.kind).trim().toLowerCase() : null,
-    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-    search: filters.search ? String(filters.search).trim() : null,
-    ownerDeveloperId: filters.ownerDeveloperId ? String(filters.ownerDeveloperId).trim() : null
-  };
-
-  if (normalizedFilters.productCode) {
-    conditions.push("pr.code = ?");
-    params.push(normalizedFilters.productCode);
-  }
-
-  if (normalizedFilters.ownerDeveloperId) {
-    conditions.push("pr.owner_developer_id = ?");
-    params.push(normalizedFilters.ownerDeveloperId);
-  }
-  appendInCondition("n.product_id", filters.productIds, conditions, params);
-
-  if (filters.channel !== undefined && filters.channel !== null && String(filters.channel).trim() !== "") {
-    conditions.push("n.channel = ?");
-    params.push(normalizedFilters.channel);
-  }
-
-  if (normalizedFilters.kind) {
-    if (!["announcement", "maintenance"].includes(normalizedFilters.kind)) {
-      throw new AppError(400, "INVALID_NOTICE_KIND", "Notice kind must be announcement or maintenance.");
-    }
-    conditions.push("n.kind = ?");
-    params.push(normalizedFilters.kind);
-  }
-
-  if (normalizedFilters.status) {
-    if (!["active", "archived"].includes(normalizedFilters.status)) {
-      throw new AppError(400, "INVALID_NOTICE_STATUS", "Notice status must be active or archived.");
-    }
-    conditions.push("n.status = ?");
-    params.push(normalizedFilters.status);
-  }
-
-  if (normalizedFilters.search) {
-    const pattern = likeFilter(normalizedFilters.search);
-    conditions.push(
-      "(n.title LIKE ? ESCAPE '\\' OR n.body LIKE ? ESCAPE '\\' OR COALESCE(pr.code, '') LIKE ? ESCAPE '\\')"
-    );
-    params.push(pattern, pattern, pattern);
-  }
-
-  const items = many(
-    db,
-    `
-      SELECT n.*, pr.code AS product_code, pr.name AS product_name
-      FROM notices n
-      LEFT JOIN products pr ON pr.id = n.product_id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY n.starts_at DESC, n.created_at DESC
-      LIMIT 100
-    `,
-    ...params
-  ).map(formatNotice);
-
-  return {
-    items,
-    total: items.length,
-    filters: {
-      productCode: normalizedFilters.productCode,
-      channel: normalizedFilters.channel,
-      kind: normalizedFilters.kind,
-      status: normalizedFilters.status,
-      search: normalizedFilters.search
-    }
-  };
+async function queryNoticeRows(db, store, filters = {}) {
+  return Promise.resolve(store.notices.queryNoticeRows(db, filters));
 }
 
 function requireNoBlockingNotices(db, product, channel = "all") {
@@ -7890,12 +7718,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    listClientVersions(token, filters = {}) {
+    async listClientVersions(token, filters = {}) {
       requireAdminSession(db, token);
-      return queryClientVersionRows(db, filters);
+      return queryClientVersionRows(db, store, filters);
     },
 
-    developerListClientVersions(token, filters = {}) {
+    async developerListClientVersions(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -7911,7 +7739,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "versions.read"
         );
       }
-      return queryClientVersionRows(db, {
+      return queryClientVersionRows(db, store, {
         ...filters,
         productIds: listDeveloperAccessibleProductIds(db, session)
       });
@@ -8194,12 +8022,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    listNotices(token, filters = {}) {
+    async listNotices(token, filters = {}) {
       requireAdminSession(db, token);
-      return queryNoticeRows(db, filters);
+      return queryNoticeRows(db, store, filters);
     },
 
-    developerListNotices(token, filters = {}) {
+    async developerListNotices(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -8215,7 +8043,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "notices.read"
         );
       }
-      return queryNoticeRows(db, {
+      return queryNoticeRows(db, store, {
         ...filters,
         productIds: listDeveloperAccessibleProductIds(db, session)
       });

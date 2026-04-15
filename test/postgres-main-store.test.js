@@ -779,7 +779,7 @@ test("postgres main store configuration falls back to sqlite implementation", as
     assert.match(app.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "devices", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "devices", "sessions"]
     );
   } finally {
     await app.close();
@@ -804,7 +804,7 @@ test("health reports configured postgres main store and sqlite fallback stage", 
     assert.match(health.storage.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       health.storage.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "devices", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "devices", "sessions"]
     );
   } finally {
     await app.close();
@@ -964,6 +964,129 @@ test("postgres main store can serve all main-store read-side queries through ada
             active_entitlement_count: 1,
             latest_entitlement_ends_at: "2026-02-01T00:00:00.000Z",
             active_session_count: 2
+          }
+        ];
+      }
+
+      if (meta.repository === "versions" && meta.operation === "listProductVersions") {
+        return [
+          {
+            id: "ver_pg_1",
+            product_id: "prod_pg_1",
+            channel: "stable",
+            version: "2.0.0",
+            status: "active",
+            force_update: 1,
+            download_url: "https://example.invalid/pgapp/2.0.0.zip",
+            release_notes: "postgres release notes",
+            notice_title: "PG Release",
+            notice_body: "postgres runtime notice",
+            released_at: "2026-01-10T00:00:00.000Z",
+            created_at: "2026-01-10T00:00:00.000Z",
+            updated_at: "2026-01-10T00:00:00.000Z"
+          }
+        ];
+      }
+
+      if (meta.repository === "versions" && meta.operation === "queryClientVersionRows") {
+        return [
+          {
+            id: "ver_pg_1",
+            channel: "stable",
+            version: "2.0.0",
+            status: "active",
+            force_update: 1,
+            download_url: "https://example.invalid/pgapp/2.0.0.zip",
+            release_notes: "postgres release notes",
+            notice_title: "PG Release",
+            notice_body: "postgres runtime notice",
+            released_at: "2026-01-10T00:00:00.000Z",
+            created_at: "2026-01-10T00:00:00.000Z",
+            updated_at: "2026-01-10T00:00:00.000Z",
+            product_code: "PGAPP",
+            product_name: "Postgres Product"
+          }
+        ];
+      }
+
+      if (meta.repository === "versions" && meta.operation === "countActiveVersionsByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "versions" && meta.operation === "countForceUpdateVersionsByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "notices" && meta.operation === "listActiveNoticesForProduct") {
+        return [
+          {
+            id: "notice_pg_1",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            channel: "stable",
+            kind: "maintenance",
+            severity: "critical",
+            title: "PG Maintenance",
+            body: "postgres notice body",
+            action_url: "https://example.invalid/pgapp/status",
+            status: "active",
+            block_login: 1,
+            starts_at: "2026-01-10T00:00:00.000Z",
+            ends_at: "2026-02-10T00:00:00.000Z",
+            created_at: "2026-01-10T00:00:00.000Z",
+            updated_at: "2026-01-10T00:00:00.000Z"
+          }
+        ];
+      }
+
+      if (meta.repository === "notices" && meta.operation === "queryNoticeRows") {
+        return [
+          {
+            id: "notice_pg_1",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            channel: "stable",
+            kind: "maintenance",
+            severity: "critical",
+            title: "PG Maintenance",
+            body: "postgres notice body",
+            action_url: "https://example.invalid/pgapp/status",
+            status: "active",
+            block_login: 1,
+            starts_at: "2026-01-10T00:00:00.000Z",
+            ends_at: "2026-02-10T00:00:00.000Z",
+            created_at: "2026-01-10T00:00:00.000Z",
+            updated_at: "2026-01-10T00:00:00.000Z"
+          }
+        ];
+      }
+
+      if (meta.repository === "notices" && meta.operation === "countActiveNoticesByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "notices" && meta.operation === "countBlockingNoticesByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
           }
         ];
       }
@@ -1264,6 +1387,8 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
+      versions: "postgres",
+      notices: "postgres",
       devices: "postgres",
       sessions: "postgres"
     });
@@ -1273,6 +1398,8 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -1431,7 +1558,74 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(activeBlockCounts[0].product_id, "prod_pg_1");
     assert.equal(activeBlockCounts[0].count, 1);
 
-    assert.equal(queries.length, 26);
+    const listedVersions = await app.mainStore.versions.listProductVersions(app.db, "prod_pg_1", "stable");
+    assert.equal(listedVersions.length, 1);
+    assert.equal(listedVersions[0].version, "2.0.0");
+    assert.equal(listedVersions[0].forceUpdate, true);
+
+    const versionRows = await app.mainStore.versions.queryClientVersionRows(app.db, {
+      productCode: "PGAPP",
+      channel: "stable",
+      status: "active"
+    });
+    assert.equal(versionRows.total, 1);
+    assert.equal(versionRows.items[0].product_code, "PGAPP");
+    assert.equal(versionRows.items[0].forceUpdate, true);
+
+    const activeVersionCounts = await app.mainStore.versions.countActiveVersionsByProductIds(
+      app.db,
+      ["prod_pg_1"]
+    );
+    assert.equal(activeVersionCounts.length, 1);
+    assert.equal(activeVersionCounts[0].product_id, "prod_pg_1");
+    assert.equal(activeVersionCounts[0].count, 1);
+
+    const forceUpdateVersionCounts = await app.mainStore.versions.countForceUpdateVersionsByProductIds(
+      app.db,
+      ["prod_pg_1"]
+    );
+    assert.equal(forceUpdateVersionCounts.length, 1);
+    assert.equal(forceUpdateVersionCounts[0].product_id, "prod_pg_1");
+    assert.equal(forceUpdateVersionCounts[0].count, 1);
+
+    const activeNotices = await app.mainStore.notices.listActiveNoticesForProduct(
+      app.db,
+      "prod_pg_1",
+      "stable",
+      "2026-01-15T00:00:00.000Z"
+    );
+    assert.equal(activeNotices.length, 1);
+    assert.equal(activeNotices[0].title, "PG Maintenance");
+    assert.equal(activeNotices[0].blockLogin, true);
+
+    const noticeRows = await app.mainStore.notices.queryNoticeRows(app.db, {
+      productCode: "PGAPP",
+      channel: "stable",
+      status: "active"
+    });
+    assert.equal(noticeRows.total, 1);
+    assert.equal(noticeRows.items[0].productCode, "PGAPP");
+    assert.equal(noticeRows.items[0].blockLogin, true);
+
+    const activeNoticeCounts = await app.mainStore.notices.countActiveNoticesByProductIds(
+      app.db,
+      ["prod_pg_1"],
+      "2026-01-15T00:00:00.000Z"
+    );
+    assert.equal(activeNoticeCounts.length, 1);
+    assert.equal(activeNoticeCounts[0].product_id, "prod_pg_1");
+    assert.equal(activeNoticeCounts[0].count, 1);
+
+    const blockingNoticeCounts = await app.mainStore.notices.countBlockingNoticesByProductIds(
+      app.db,
+      ["prod_pg_1"],
+      "2026-01-15T00:00:00.000Z"
+    );
+    assert.equal(blockingNoticeCounts.length, 1);
+    assert.equal(blockingNoticeCounts[0].product_id, "prod_pg_1");
+    assert.equal(blockingNoticeCounts[0].count, 1);
+
+    assert.equal(queries.length, 34);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -1484,6 +1678,22 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[24].sql, /GROUP BY e\.product_id/i);
     assert.equal(queries[25].meta.operation, "countActiveBlocksByProductIds");
     assert.match(queries[25].sql, /GROUP BY product_id/i);
+    assert.equal(queries[26].meta.operation, "listProductVersions");
+    assert.match(queries[26].sql, /FROM client_versions/i);
+    assert.equal(queries[27].meta.operation, "queryClientVersionRows");
+    assert.match(queries[27].sql, /FROM client_versions v/i);
+    assert.equal(queries[28].meta.operation, "countActiveVersionsByProductIds");
+    assert.match(queries[28].sql, /GROUP BY product_id/i);
+    assert.equal(queries[29].meta.operation, "countForceUpdateVersionsByProductIds");
+    assert.match(queries[29].sql, /force_update = 1/i);
+    assert.equal(queries[30].meta.operation, "listActiveNoticesForProduct");
+    assert.match(queries[30].sql, /FROM notices n/i);
+    assert.equal(queries[31].meta.operation, "queryNoticeRows");
+    assert.match(queries[31].sql, /FROM notices n/i);
+    assert.equal(queries[32].meta.operation, "countActiveNoticesByProductIds");
+    assert.match(queries[32].sql, /GROUP BY product_id/i);
+    assert.equal(queries[33].meta.operation, "countBlockingNoticesByProductIds");
+    assert.match(queries[33].sql, /block_login = 1/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -1495,6 +1705,8 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
+      versions: "postgres",
+      notices: "postgres",
       devices: "postgres",
       sessions: "postgres"
     });
@@ -1504,6 +1716,8 @@ test("postgres main store can serve all main-store read-side queries through ada
       cards: "sqlite",
       entitlements: "sqlite",
       accounts: "sqlite",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -1530,6 +1744,8 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });
@@ -1640,6 +1856,8 @@ test("postgres main store can write products and policies through a transaction-
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });
@@ -1887,6 +2105,8 @@ test("postgres main store can write cards and entitlements through a transaction
       cards: "postgres",
       entitlements: "postgres",
       accounts: "postgres",
+      versions: "sqlite",
+      notices: "sqlite",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });

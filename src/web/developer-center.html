@@ -287,6 +287,7 @@
           <div class="pill">APIs: <code>/api/developer/policies</code> | <code>/cards</code> | <code>/client-versions</code> | <code>/notices</code></div>
         </div>
         <div class="stats" id="stats-box"></div>
+        <div class="pill-row" id="feature-summary-box"></div>
       </section>
 
       <section class="grid">
@@ -596,13 +597,20 @@
           .filter(Boolean);
       }
 
+      function featureEnabledCount(items = [], featureKey) {
+        return items.filter((item) => item.featureConfig?.[featureKey] !== false).length;
+      }
+
       function emptyDashboardSummary(items = []) {
         return {
           projects: items.length,
-          registerEnabledProjects: items.filter((item) => item.featureConfig?.allowRegister !== false).length,
-          cardLoginEnabledProjects: items.filter((item) => item.featureConfig?.allowCardLogin !== false).length,
-          noticesEnabledProjects: items.filter((item) => item.featureConfig?.allowNotices !== false).length,
-          versionCheckEnabledProjects: items.filter((item) => item.featureConfig?.allowVersionCheck !== false).length,
+          registerEnabledProjects: featureEnabledCount(items, "allowRegister"),
+          accountLoginEnabledProjects: featureEnabledCount(items, "allowAccountLogin"),
+          cardLoginEnabledProjects: featureEnabledCount(items, "allowCardLogin"),
+          cardRechargeEnabledProjects: featureEnabledCount(items, "allowCardRecharge"),
+          noticesEnabledProjects: featureEnabledCount(items, "allowNotices"),
+          versionCheckEnabledProjects: featureEnabledCount(items, "allowVersionCheck"),
+          clientUnbindEnabledProjects: featureEnabledCount(items, "allowClientUnbind"),
           policies: 0,
           cardsFresh: 0,
           cardsRedeemed: 0,
@@ -625,6 +633,21 @@
         return (dashboardCache.projects || []).find((item) => item.code === productCode) || null;
       }
 
+      function renderFeatureSummary(stats) {
+        const entries = [
+          ["Register Open", stats.registerEnabledProjects ?? 0],
+          ["Account Login Open", stats.accountLoginEnabledProjects ?? 0],
+          ["Card Login Open", stats.cardLoginEnabledProjects ?? 0],
+          ["Recharge Open", stats.cardRechargeEnabledProjects ?? 0],
+          ["Version Check Open", stats.versionCheckEnabledProjects ?? 0],
+          ["Notices Open", stats.noticesEnabledProjects ?? 0],
+          ["Client Unbind Open", stats.clientUnbindEnabledProjects ?? 0]
+        ];
+        el("feature-summary-box").innerHTML = entries
+          .map(([label, value]) => `<div class="pill"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`)
+          .join("");
+      }
+
       function renderStats(items) {
         const stats = dashboardCache.summary || emptyDashboardSummary(items);
         const tail = currentActor?.type === "owner"
@@ -640,6 +663,7 @@
           <div class="stat"><strong>${stats.activeNetworkRules}</strong><span>Active Net Rules</span></div>
           ${tail}
         `;
+        renderFeatureSummary(stats);
       }
 
       function readFeatureConfig(prefix) {

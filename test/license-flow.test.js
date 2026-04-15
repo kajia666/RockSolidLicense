@@ -6021,6 +6021,8 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /Create Team Member/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Rotate SDK Credentials/);
+    assert.match(html, /Account Login Open/);
+    assert.match(html, /Client Unbind Open/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6121,6 +6123,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /feature-config/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
+    assert.match(html, /Account Login Open/);
+    assert.match(html, /Client Unbind Open/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

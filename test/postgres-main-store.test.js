@@ -779,7 +779,7 @@ test("postgres main store configuration falls back to sqlite implementation", as
     assert.match(app.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "devices", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "networkRules", "devices", "sessions"]
     );
   } finally {
     await app.close();
@@ -804,7 +804,7 @@ test("health reports configured postgres main store and sqlite fallback stage", 
     assert.match(health.storage.mainStore.schemaScriptPath, /deploy[\\/]+postgres[\\/]+init\.sql$/);
     assert.deepEqual(
       health.storage.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "devices", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "networkRules", "devices", "sessions"]
     );
   } finally {
     await app.close();
@@ -1083,6 +1083,52 @@ test("postgres main store can serve all main-store read-side queries through ada
       }
 
       if (meta.repository === "notices" && meta.operation === "countBlockingNoticesByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "networkRules" && meta.operation === "queryNetworkRuleRows") {
+        return [
+          {
+            id: "nrule_pg_1",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            target_type: "cidr",
+            pattern: "10.0.0.0/24",
+            action_scope: "login",
+            decision: "block",
+            status: "active",
+            notes: "postgres network rule",
+            created_at: "2026-01-10T00:00:00.000Z",
+            updated_at: "2026-01-10T00:00:00.000Z"
+          }
+        ];
+      }
+
+      if (meta.repository === "networkRules" && meta.operation === "listBlockingNetworkRulesForProduct") {
+        return [
+          {
+            id: "nrule_pg_1",
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            target_type: "cidr",
+            pattern: "10.0.0.0/24",
+            action_scope: "login",
+            decision: "block",
+            status: "active",
+            notes: "postgres network rule",
+            created_at: "2026-01-10T00:00:00.000Z",
+            updated_at: "2026-01-10T00:00:00.000Z"
+          }
+        ];
+      }
+
+      if (meta.repository === "networkRules" && meta.operation === "countActiveNetworkRulesByProductIds") {
         return [
           {
             product_id: "prod_pg_1",
@@ -1389,6 +1435,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       accounts: "postgres",
       versions: "postgres",
       notices: "postgres",
+      networkRules: "postgres",
       devices: "postgres",
       sessions: "postgres"
     });
@@ -1400,6 +1447,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       accounts: "sqlite",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -1625,7 +1673,33 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(blockingNoticeCounts[0].product_id, "prod_pg_1");
     assert.equal(blockingNoticeCounts[0].count, 1);
 
-    assert.equal(queries.length, 34);
+    const networkRuleRows = await app.mainStore.networkRules.queryNetworkRuleRows(app.db, {
+      productCode: "PGAPP",
+      actionScope: "login",
+      status: "active"
+    });
+    assert.equal(networkRuleRows.total, 1);
+    assert.equal(networkRuleRows.items[0].productCode, "PGAPP");
+    assert.equal(networkRuleRows.items[0].pattern, "10.0.0.0/24");
+
+    const blockingRules = await app.mainStore.networkRules.listBlockingNetworkRulesForProduct(
+      app.db,
+      "prod_pg_1",
+      "login"
+    );
+    assert.equal(blockingRules.length, 1);
+    assert.equal(blockingRules[0].pattern, "10.0.0.0/24");
+    assert.equal(blockingRules[0].product_code, "PGAPP");
+
+    const activeNetworkRuleCounts = await app.mainStore.networkRules.countActiveNetworkRulesByProductIds(
+      app.db,
+      ["prod_pg_1"]
+    );
+    assert.equal(activeNetworkRuleCounts.length, 1);
+    assert.equal(activeNetworkRuleCounts[0].product_id, "prod_pg_1");
+    assert.equal(activeNetworkRuleCounts[0].count, 1);
+
+    assert.equal(queries.length, 37);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -1694,6 +1768,12 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[32].sql, /GROUP BY product_id/i);
     assert.equal(queries[33].meta.operation, "countBlockingNoticesByProductIds");
     assert.match(queries[33].sql, /block_login = 1/i);
+    assert.equal(queries[34].meta.operation, "queryNetworkRuleRows");
+    assert.match(queries[34].sql, /FROM network_rules nr/i);
+    assert.equal(queries[35].meta.operation, "listBlockingNetworkRulesForProduct");
+    assert.match(queries[35].sql, /nr\.decision = 'block'/i);
+    assert.equal(queries[36].meta.operation, "countActiveNetworkRulesByProductIds");
+    assert.match(queries[36].sql, /FROM network_rules/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");
@@ -1707,6 +1787,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       accounts: "postgres",
       versions: "postgres",
       notices: "postgres",
+      networkRules: "postgres",
       devices: "postgres",
       sessions: "postgres"
     });
@@ -1718,6 +1799,7 @@ test("postgres main store can serve all main-store read-side queries through ada
       accounts: "sqlite",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -1746,6 +1828,7 @@ test("postgres main store can write products and policies through a transaction-
       accounts: "postgres",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });
@@ -1858,6 +1941,7 @@ test("postgres main store can write products and policies through a transaction-
       accounts: "postgres",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });
@@ -2107,6 +2191,7 @@ test("postgres main store can write cards and entitlements through a transaction
       accounts: "postgres",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });

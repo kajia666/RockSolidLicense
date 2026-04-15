@@ -54,6 +54,7 @@ test("postgres runtime adapter can load a pg-style pool module and close it clea
       accounts: "postgres",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "postgres_partial",
       sessions: "postgres_partial"
     });

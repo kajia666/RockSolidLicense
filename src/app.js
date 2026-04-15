@@ -617,7 +617,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/network-rules") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listNetworkRules(getBearerToken(req), {
+          data: await services.listNetworkRules(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             actionScope: url.searchParams.get("actionScope"),
             status: url.searchParams.get("status"),
@@ -1208,7 +1208,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/network-rules") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListNetworkRules(getBearerToken(req), {
+          data: await services.developerListNetworkRules(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             actionScope: url.searchParams.get("actionScope"),
             status: url.searchParams.get("status"),

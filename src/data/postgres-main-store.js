@@ -8,6 +8,7 @@ import { createPostgresDeviceRepository } from "./postgres-device-repository.js"
 import { createPostgresDeviceStore } from "./postgres-device-store.js";
 import { createPostgresEntitlementRepository } from "./postgres-entitlement-repository.js";
 import { createPostgresEntitlementStore } from "./postgres-entitlement-store.js";
+import { createPostgresNetworkRuleRepository } from "./postgres-network-rule-repository.js";
 import { createPostgresNoticeRepository } from "./postgres-notice-repository.js";
 import { createPostgresPolicyRepository } from "./postgres-policy-repository.js";
 import { createPostgresPolicyStore } from "./postgres-policy-store.js";
@@ -59,6 +60,10 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         ...fallbackStore.notices,
         ...createPostgresNoticeRepository(adapter)
       },
+      networkRules: {
+        ...fallbackStore.networkRules,
+        ...createPostgresNetworkRuleRepository(adapter)
+      },
       devices: {
         ...fallbackStore.devices,
         ...createPostgresDeviceRepository(adapter),
@@ -90,6 +95,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         accounts: "postgres",
         versions: "postgres",
         notices: "postgres",
+        networkRules: "postgres",
         devices: "postgres",
         sessions: "postgres"
       },
@@ -101,6 +107,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
         accounts: coreWriteReady ? "postgres" : "sqlite",
         versions: "sqlite",
         notices: "sqlite",
+        networkRules: "sqlite",
         devices: coreWriteReady ? "postgres_partial" : "sqlite",
         sessions: coreWriteReady ? "postgres_partial" : "sqlite"
       }
@@ -143,6 +150,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       accounts: "sqlite",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     },
@@ -154,6 +162,7 @@ export function createPostgresMainStore({ db, config, adapterResolution = null }
       accounts: "sqlite",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     }

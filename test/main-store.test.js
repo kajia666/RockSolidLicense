@@ -30,7 +30,7 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(app.mainStore.driver, "sqlite");
     assert.deepEqual(
       app.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "devices", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "networkRules", "devices", "sessions"]
     );
     assert.deepEqual(app.mainStore.repositoryWriteDrivers, {
       products: "sqlite",
@@ -40,6 +40,7 @@ test("app exposes sqlite main store and services read through it", async () => {
       accounts: "sqlite",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     });
@@ -258,6 +259,41 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(blockingNoticeCounts.length, 1);
     assert.equal(blockingNoticeCounts[0].product_id, directProduct.id);
     assert.equal(blockingNoticeCounts[0].count, 1);
+
+    const directNetworkRule = app.services.createNetworkRule(admin.token, {
+      productCode: "STOREAPP2",
+      targetType: "cidr",
+      pattern: "10.10.0.0/16",
+      actionScope: "login",
+      status: "active",
+      notes: "Store main-store network rule"
+    });
+    assert.equal(directNetworkRule.productCode, "STOREAPP2");
+    assert.equal(directNetworkRule.actionScope, "login");
+
+    const networkRuleRows = await Promise.resolve(app.mainStore.networkRules.queryNetworkRuleRows(app.db, {
+      productCode: "STOREAPP2",
+      actionScope: "login",
+      status: "active"
+    }));
+    assert.equal(networkRuleRows.total, 1);
+    assert.equal(networkRuleRows.items[0].productCode, "STOREAPP2");
+    assert.equal(networkRuleRows.items[0].pattern, "10.10.0.0/16");
+
+    const blockingRules = await Promise.resolve(
+      app.mainStore.networkRules.listBlockingNetworkRulesForProduct(app.db, directProduct.id, "login")
+    );
+    assert.equal(blockingRules.length, 1);
+    assert.equal(blockingRules[0].pattern, "10.10.0.0/16");
+    assert.equal(blockingRules[0].product_code, "STOREAPP2");
+
+    const activeNetworkRuleCounts = app.mainStore.networkRules.countActiveNetworkRulesByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(activeNetworkRuleCounts.length, 1);
+    assert.equal(activeNetworkRuleCounts[0].product_id, directProduct.id);
+    assert.equal(activeNetworkRuleCounts[0].count, 1);
 
     const directBatch = app.mainStore.cards.createCardBatch(directProduct, directPolicy, {
       count: 2,

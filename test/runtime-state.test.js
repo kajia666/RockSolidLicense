@@ -330,7 +330,7 @@ test("health exposes storage profile and runtime state configuration", async () 
     assert.equal(health.storage.mainStore.driver, "sqlite");
     assert.deepEqual(
       health.storage.mainStore.repositories,
-      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "devices", "sessions"]
+      ["products", "policies", "cards", "entitlements", "accounts", "versions", "notices", "networkRules", "devices", "sessions"]
     );
     assert.equal(health.storage.runtimeState.driver, "memory");
     assert.equal(health.storage.runtimeState.nonceReplayStore, "process_memory");

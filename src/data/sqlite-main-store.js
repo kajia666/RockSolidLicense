@@ -1,6 +1,7 @@
 import * as accounts from "./account-repository.js";
 import * as versions from "./client-version-repository.js";
 import * as notices from "./notice-repository.js";
+import * as networkRules from "./network-rule-repository.js";
 import * as sessions from "./session-repository.js";
 import * as products from "./product-repository.js";
 import * as policies from "./policy-repository.js";
@@ -42,6 +43,9 @@ export function createSqliteMainStore({ db }) {
     notices: {
       ...notices
     },
+    networkRules: {
+      ...networkRules
+    },
     devices: {
       ...createSqliteDeviceStore({ db })
     },
@@ -66,6 +70,7 @@ export function createSqliteMainStore({ db }) {
       accounts: "sqlite",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     },
@@ -77,6 +82,7 @@ export function createSqliteMainStore({ db }) {
       accounts: "sqlite",
       versions: "sqlite",
       notices: "sqlite",
+      networkRules: "sqlite",
       devices: "sqlite",
       sessions: "sqlite"
     }

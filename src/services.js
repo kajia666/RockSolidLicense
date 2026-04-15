@@ -681,15 +681,8 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
   const blockingNoticeCounts = buildMetricMap(await Promise.resolve(
     store.notices.countBlockingNoticesByProductIds(db, productIds, now)
   ));
-  const activeNetworkRuleCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM network_rules
-      WHERE product_id IN (${placeholders}) AND status = 'active'
-      GROUP BY product_id
-    `,
-    ...productIds
+  const activeNetworkRuleCounts = buildMetricMap(await Promise.resolve(
+    store.networkRules.countActiveNetworkRulesByProductIds(db, productIds)
   ));
 
   const projectSummaries = products.map((product) => {
@@ -2031,74 +2024,8 @@ function queryAuditLogRows(db, filters = {}) {
   };
 }
 
-function queryNetworkRuleRows(db, filters = {}) {
-  const conditions = [];
-  const params = [];
-  const normalizedFilters = {
-    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-    actionScope: filters.actionScope ? String(filters.actionScope).trim().toLowerCase() : null,
-    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-    search: filters.search ? String(filters.search).trim() : null
-  };
-
-  if (normalizedFilters.productCode) {
-    conditions.push("pr.code = ?");
-    params.push(normalizedFilters.productCode);
-  }
-
-  appendInCondition("pr.id", filters.productIds, conditions, params);
-
-  if (normalizedFilters.actionScope) {
-    conditions.push("nr.action_scope = ?");
-    params.push(normalizedFilters.actionScope);
-  }
-
-  if (normalizedFilters.status) {
-    if (!["active", "archived"].includes(normalizedFilters.status)) {
-      throw new AppError(400, "INVALID_NETWORK_RULE_STATUS", "Rule status must be active or archived.");
-    }
-    conditions.push("nr.status = ?");
-    params.push(normalizedFilters.status);
-  }
-
-  if (normalizedFilters.search) {
-    const pattern = likeFilter(normalizedFilters.search);
-    conditions.push(
-      "(nr.pattern LIKE ? ESCAPE '\\' OR COALESCE(nr.notes, '') LIKE ? ESCAPE '\\' OR COALESCE(pr.code, '') LIKE ? ESCAPE '\\')"
-    );
-    params.push(pattern, pattern, pattern);
-  }
-
-  const items = many(
-    db,
-    `
-      SELECT nr.*, pr.code AS product_code, pr.name AS product_name
-      FROM network_rules nr
-      LEFT JOIN products pr ON pr.id = nr.product_id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY nr.created_at DESC
-      LIMIT 100
-    `,
-    ...params
-  ).map((row) => ({
-    id: row.id,
-    productCode: row.product_code ?? null,
-    productName: row.product_name ?? null,
-    targetType: row.target_type,
-    pattern: row.pattern,
-    actionScope: row.action_scope,
-    decision: row.decision,
-    status: row.status,
-    notes: row.notes ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  }));
-
-  return {
-    items,
-    total: items.length,
-    filters: normalizedFilters
-  };
+async function queryNetworkRuleRows(db, store, filters = {}) {
+  return Promise.resolve(store.networkRules.queryNetworkRuleRows(db, filters));
 }
 
 function findClientCardByKey(db, productId, cardKey) {
@@ -3543,26 +3470,14 @@ function networkRuleMatchesIp(rule, ip) {
   return normalizeIpAddress(rule.pattern) === normalizedIp;
 }
 
-function enforceNetworkRules(db, product, ip, actionScope) {
+async function enforceNetworkRules(db, store, product, ip, actionScope) {
   const normalizedIp = normalizeIpAddress(ip);
   if (!normalizedIp) {
     return;
   }
 
-  const rules = many(
-    db,
-    `
-      SELECT nr.*, pr.code AS product_code
-      FROM network_rules nr
-      LEFT JOIN products pr ON pr.id = nr.product_id
-      WHERE nr.status = 'active'
-        AND nr.decision = 'block'
-        AND (nr.product_id IS NULL OR nr.product_id = ?)
-        AND (nr.action_scope = 'all' OR nr.action_scope = ?)
-      ORDER BY CASE WHEN nr.product_id IS NULL THEN 1 ELSE 0 END, nr.created_at DESC
-    `,
-    product.id,
-    actionScope
+  const rules = await Promise.resolve(
+    store.networkRules.listBlockingNetworkRulesForProduct(db, product.id, actionScope)
   );
 
   const matched = rules.find((rule) => networkRuleMatchesIp(rule, normalizedIp));
@@ -8341,12 +8256,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    listNetworkRules(token, filters = {}) {
+    async listNetworkRules(token, filters = {}) {
       requireAdminSession(db, token);
-      return queryNetworkRuleRows(db, filters);
+      return queryNetworkRuleRows(db, store, filters);
     },
 
-    developerListNetworkRules(token, filters = {}) {
+    async developerListNetworkRules(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -8362,7 +8277,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "products.read"
         );
       }
-      return queryNetworkRuleRows(db, {
+      return queryNetworkRuleRows(db, store, {
         ...filters,
         productIds: listDeveloperAccessibleProductIds(db, session)
       });
@@ -8829,7 +8744,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       requireSignedProductCodeMatch(product, body);
 
       const productFeatureConfig = resolveProductFeatureConfig(db, product);
-      enforceNetworkRules(db, product, meta.ip, "login");
+      await enforceNetworkRules(db, store, product, meta.ip, "login");
 
       return withTransaction(db, async () => {
         const subject = await resolveClientManagedAccount(db, store, product, body);
@@ -8889,7 +8804,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "Client self-unbind is disabled for this product."
       );
 
-      enforceNetworkRules(db, product, meta.ip, "login");
+      await enforceNetworkRules(db, store, product, meta.ip, "login");
 
       return withTransaction(db, async () => {
         const subject = await resolveClientManagedAccount(db, store, product, body);
@@ -9053,7 +8968,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "Account registration is disabled for this product."
       );
 
-      enforceNetworkRules(db, product, meta.ip, "register");
+      await enforceNetworkRules(db, store, product, meta.ip, "register");
 
       const username = String(body.username).trim();
       const password = String(body.password);
@@ -9094,7 +9009,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "Card recharge is disabled for this product."
       );
 
-      enforceNetworkRules(db, product, meta.ip, "recharge");
+      await enforceNetworkRules(db, store, product, meta.ip, "recharge");
 
       return withTransaction(db, async () => {
         const account = await getStoreAccountRecordByProductUsername(
@@ -9142,7 +9057,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "Card direct login is disabled for this product."
       );
 
-      enforceNetworkRules(db, product, meta.ip, "login");
+      await enforceNetworkRules(db, store, product, meta.ip, "login");
       if (featureConfig.allowNotices) {
         requireNoBlockingNotices(db, product, body.channel);
       }
@@ -9257,7 +9172,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "Account login is disabled for this product."
       );
 
-      enforceNetworkRules(db, product, meta.ip, "login");
+      await enforceNetworkRules(db, store, product, meta.ip, "login");
       if (featureConfig.allowNotices) {
         requireNoBlockingNotices(db, product, body.channel);
       }
@@ -9320,7 +9235,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const sessionToken = String(body.sessionToken).trim();
       requireSignedProductCodeMatch(product, body);
 
-      enforceNetworkRules(db, product, meta.ip, "heartbeat");
+      await enforceNetworkRules(db, store, product, meta.ip, "heartbeat");
       const runtimeSession = await stateStore.getSessionState(sessionToken);
       if (runtimeSession?.status === "expired") {
         throw new AppError(401, "SESSION_INVALID", "Session token is invalid or expired.", {

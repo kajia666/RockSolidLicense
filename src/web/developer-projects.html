@@ -294,11 +294,18 @@
           .join("");
       }
 
+      function countProjectsByStatus(items = [], status) {
+        return items.filter((item) => (item.status || "active") === status).length;
+      }
+
       function renderStats() {
         const visible = filteredProducts();
         const summary = dashboard.summary || {};
         el("stats-box").innerHTML = `
           <div class="stat"><strong>${visible.length}</strong><span>Visible Projects</span></div>
+          <div class="stat"><strong>${countProjectsByStatus(visible, "active")}</strong><span>Active Projects</span></div>
+          <div class="stat"><strong>${countProjectsByStatus(visible, "disabled")}</strong><span>Disabled Projects</span></div>
+          <div class="stat"><strong>${countProjectsByStatus(visible, "archived")}</strong><span>Archived Projects</span></div>
           <div class="stat"><strong>${summary.activeSessions ?? 0}</strong><span>Active Sessions</span></div>
           <div class="stat"><strong>${summary.cardsFresh ?? 0}</strong><span>Fresh Cards</span></div>
           <div class="stat"><strong>${summary.forceUpdateVersions ?? 0}</strong><span>Force Updates</span></div>

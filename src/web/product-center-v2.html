@@ -597,6 +597,10 @@
         return window.RSProductFeatures.countEnabled(items, featureKey);
       }
 
+      function countProjectsByStatus(items = [], status) {
+        return items.filter((item) => (item.status || "active") === status).length;
+      }
+
       function renderFeatureSummary(stats) {
         const counts = {
           allowRegister: stats.registerOpen ?? 0,
@@ -618,6 +622,9 @@
           total: items.length,
           assigned: items.filter((item) => item.ownerDeveloperId).length,
           developers: developersCache.length,
+          activeProjects: countProjectsByStatus(items, "active"),
+          disabledProjects: countProjectsByStatus(items, "disabled"),
+          archivedProjects: countProjectsByStatus(items, "archived"),
           registerOpen: featureEnabledCount(items, "allowRegister"),
           accountLoginOpen: featureEnabledCount(items, "allowAccountLogin"),
           cardLoginOpen: featureEnabledCount(items, "allowCardLogin"),
@@ -631,6 +638,9 @@
           <div class="stat"><strong>${stats.total}</strong><span>Projects</span></div>
           <div class="stat"><strong>${stats.assigned}</strong><span>Owned Projects</span></div>
           <div class="stat"><strong>${stats.developers}</strong><span>Developers</span></div>
+          <div class="stat"><strong>${stats.activeProjects}</strong><span>Active Projects</span></div>
+          <div class="stat"><strong>${stats.disabledProjects}</strong><span>Disabled Projects</span></div>
+          <div class="stat"><strong>${stats.archivedProjects}</strong><span>Archived Projects</span></div>
           <div class="stat"><strong>${stats.registerOpen}</strong><span>Register Enabled</span></div>
           <div class="stat"><strong>${stats.cardLoginOpen}</strong><span>Card Login Enabled</span></div>
           <div class="stat"><strong>${stats.noticesOpen}</strong><span>Notices Enabled</span></div>

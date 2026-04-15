@@ -91,7 +91,22 @@
 - `test/`：Node 端到端回归测试
 - `deploy/`：Windows / Linux 部署骨架
 
-开发者子账号和项目级权限说明见 [docs/developer-members.md](/D:/code/OnlineVerification/docs/developer-members.md)，开发者接入中心说明见 [docs/developer-integration.md](/D:/code/OnlineVerification/docs/developer-integration.md)，开发者项目工作台说明见 [docs/developer-projects.md](/D:/code/OnlineVerification/docs/developer-projects.md)，开发者授权策略与卡密工作台说明见 [docs/developer-license.md](/D:/code/OnlineVerification/docs/developer-license.md)，开发者授权运营台说明见 [docs/developer-ops.md](/D:/code/OnlineVerification/docs/developer-ops.md)，开发者发版工作台说明见 [docs/developer-release.md](/D:/code/OnlineVerification/docs/developer-release.md)。
+常用说明文档：
+
+- [开发者子账号与项目级权限](docs/developer-members.md)
+- [开发者接入中心](docs/developer-integration.md)
+- [开发者项目工作台](docs/developer-projects.md)
+- [开发者授权策略与卡密工作台](docs/developer-license.md)
+- [开发者授权运营台](docs/developer-ops.md)
+- [开发者发版工作台](docs/developer-release.md)
+
+## 快速导航
+
+- 想先跑起来：直接看 [本地运行](#本地运行)
+- 想理解终端主链路：直接看 [终端用户主流程](#终端用户主流程)
+- 想找接口：直接看 [接口摘要](#接口摘要)
+- 想看 SDK 能力：直接看 [Windows C/C++ SDK](#windows-cc-sdk)
+- 想部署到服务器：直接看 [部署建议](#部署建议) 和 [重点文档](#重点文档)
 
 ## 本地运行
 
@@ -163,31 +178,31 @@ npm run db:postgres:check
 
 对应文件：
 
-- [init.sql](/D:/code/OnlineVerification/deploy/postgres/init.sql)
-- [render-postgres-init.mjs](/D:/code/OnlineVerification/scripts/render-postgres-init.mjs)
-- [storage-platform-guide.md](/D:/code/OnlineVerification/docs/storage-platform-guide.md)
-- [postgres-main-store-preview.md](/D:/code/OnlineVerification/docs/postgres-main-store-preview.md)
+- [init.sql](deploy/postgres/init.sql)
+- [render-postgres-init.mjs](scripts/render-postgres-init.mjs)
+- [storage-platform-guide.md](docs/storage-platform-guide.md)
+- [postgres-main-store-preview.md](docs/postgres-main-store-preview.md)
 
 当前主数据访问层已经统一收进 `mainStore`：
 
-- [main-store.js](/D:/code/OnlineVerification/src/data/main-store.js)
-- [sqlite-main-store.js](/D:/code/OnlineVerification/src/data/sqlite-main-store.js)
-- [postgres-main-store.js](/D:/code/OnlineVerification/src/data/postgres-main-store.js)
-- [product-repository.js](/D:/code/OnlineVerification/src/data/product-repository.js)
-- [policy-repository.js](/D:/code/OnlineVerification/src/data/policy-repository.js)
-- [card-repository.js](/D:/code/OnlineVerification/src/data/card-repository.js)
-- [entitlement-repository.js](/D:/code/OnlineVerification/src/data/entitlement-repository.js)
-- [client-version-repository.js](/D:/code/OnlineVerification/src/data/client-version-repository.js)
-- [notice-repository.js](/D:/code/OnlineVerification/src/data/notice-repository.js)
-- [network-rule-repository.js](/D:/code/OnlineVerification/src/data/network-rule-repository.js)
-- [postgres-product-store.js](/D:/code/OnlineVerification/src/data/postgres-product-store.js)
-- [postgres-policy-store.js](/D:/code/OnlineVerification/src/data/postgres-policy-store.js)
-- [postgres-client-version-repository.js](/D:/code/OnlineVerification/src/data/postgres-client-version-repository.js)
-- [postgres-client-version-store.js](/D:/code/OnlineVerification/src/data/postgres-client-version-store.js)
-- [postgres-notice-repository.js](/D:/code/OnlineVerification/src/data/postgres-notice-repository.js)
-- [postgres-notice-store.js](/D:/code/OnlineVerification/src/data/postgres-notice-store.js)
-- [postgres-network-rule-repository.js](/D:/code/OnlineVerification/src/data/postgres-network-rule-repository.js)
-- [postgres-network-rule-store.js](/D:/code/OnlineVerification/src/data/postgres-network-rule-store.js)
+- [main-store.js](src/data/main-store.js)
+- [sqlite-main-store.js](src/data/sqlite-main-store.js)
+- [postgres-main-store.js](src/data/postgres-main-store.js)
+- [product-repository.js](src/data/product-repository.js)
+- [policy-repository.js](src/data/policy-repository.js)
+- [card-repository.js](src/data/card-repository.js)
+- [entitlement-repository.js](src/data/entitlement-repository.js)
+- [client-version-repository.js](src/data/client-version-repository.js)
+- [notice-repository.js](src/data/notice-repository.js)
+- [network-rule-repository.js](src/data/network-rule-repository.js)
+- [postgres-product-store.js](src/data/postgres-product-store.js)
+- [postgres-policy-store.js](src/data/postgres-policy-store.js)
+- [postgres-client-version-repository.js](src/data/postgres-client-version-repository.js)
+- [postgres-client-version-store.js](src/data/postgres-client-version-store.js)
+- [postgres-notice-repository.js](src/data/postgres-notice-repository.js)
+- [postgres-notice-store.js](src/data/postgres-notice-store.js)
+- [postgres-network-rule-repository.js](src/data/postgres-network-rule-repository.js)
+- [postgres-network-rule-store.js](src/data/postgres-network-rule-store.js)
 
 当前 `RSL_MAIN_STORE_DRIVER` 支持：
 
@@ -240,9 +255,9 @@ npm run db:postgres:check
 4. 返回 `sessionToken`、`licenseToken`
 5. 客户端持续心跳
 
-## 主要客户端接口
+## 接口摘要
 
-HTTP：
+### HTTP 客户端
 
 - `POST /api/client/register`
 - `POST /api/client/recharge`
@@ -255,7 +270,7 @@ HTTP：
 - `POST /api/client/heartbeat`
 - `POST /api/client/logout`
 
-后台产品配置：
+### 管理后台 API
 
 - `GET /api/admin/products`
 - `POST /api/admin/products`
@@ -268,13 +283,13 @@ HTTP：
 - `POST /api/admin/developers`
 - `POST /api/admin/developers/:developerId/status`
 
-说明：
+管理口径说明：
 
 - 绝大多数写接口仍然兼容 `productCode`
 - 现在也接受 `projectCode`、`softwareCode` 作为同义字段
 - 管理员现在可以创建开发者账号，并把项目归属到某个开发者名下
 
-TCP：
+### TCP 客户端
 
 - `client.register`
 - `client.recharge`
@@ -285,25 +300,12 @@ TCP：
 - `client.heartbeat`
 - `client.logout`
 
-系统接口：
+### 系统接口
 
 - `GET /api/system/token-key`
 - `GET /api/system/token-keys`
 
-产品级功能开关当前支持：
-
-- `allowRegister`
-- `allowAccountLogin`
-- `allowCardLogin`
-- `allowCardRecharge`
-- `allowVersionCheck`
-- `allowNotices`
-- `allowClientUnbind`
-
-软件作者可以按产品维度选择是否开放这些终端能力。关闭 `allowVersionCheck` 或 `allowNotices` 后，客户端对应接口会返回“disabled by product”，登录链路也不会再继续应用该产品的版本限制或维护公告阻断。
-仓库现在还提供了一个专门的产品中心页面：`/admin/products`，可直接创建开发者账号、分配项目归属、编辑项目资料、切换项目状态并调整产品级功能开关，同时在页头汇总展示注册、账号登录、卡密登录、卡密充值、版本检查、公告和客户端解绑这 7 个项目级开关的覆盖情况。
-
-开发者项目管理接口：
+### 开发者 API
 
 - `POST /api/developer/login`
 - `GET /api/developer/me`
@@ -353,7 +355,30 @@ TCP：
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
 
-这组接口用于“一个开发者管理多个项目”的场景。现在除了开发者主账号，也支持开发者创建子账号，并按项目分配访问范围。子账号统一走 `/api/developer/login`，但只能看到被分配到自己名下的项目。
+## 项目级功能和状态
+
+- `products.code` 是对外稳定的项目编码，接口里也兼容 `projectCode` / `softwareCode`
+- 项目维度目前支持 `active / disabled / archived` 三种状态
+- 项目停用或归档时，会同步回收该项目下的活跃会话，避免旧授权继续在线
+- 软件作者可以按项目控制 `allowRegister / allowAccountLogin / allowCardLogin / allowCardRecharge / allowVersionCheck / allowNotices / allowClientUnbind`
+- 项目级功能开关关闭后，对应客户端接口会返回“disabled by product”，运行链路也不会继续套用该项目的相关规则
+- 管理员产品中心、开发者总览、开发者项目中心和开发者接入中心都会直接汇总 `active / disabled / archived` 项目数量
+
+产品级功能开关当前支持：
+
+- `allowRegister`
+- `allowAccountLogin`
+- `allowCardLogin`
+- `allowCardRecharge`
+- `allowVersionCheck`
+- `allowNotices`
+- `allowClientUnbind`
+
+### 开发者多项目模型
+
+- 这组接口用于“一个开发者管理多个项目”的场景
+- 现在除了开发者主账号，也支持开发者创建子账号，并按项目分配访问范围
+- 子账号统一走 `/api/developer/login`，但只能看到被分配到自己名下的项目
 
 当前开发者子账号角色：
 
@@ -361,7 +386,18 @@ TCP：
 - `operator`：可管理已分配项目的策略、卡密、版本、公告和终端用户授权运营动作，但不能改产品功能开关
 - `viewer`：只读查看已分配项目及其策略、卡密、版本、公告，以及授权运营数据
 
-开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。开发者中心现在还会通过 `GET /api/developer/dashboard` 拉取按项目范围隔离的总览统计，直接展示项目数、在线会话、卡密、强更规则、阻断公告和网络规则概况，同时额外汇总 `allowRegister / allowAccountLogin / allowCardLogin / allowCardRecharge / allowVersionCheck / allowNotices / allowClientUnbind` 这些项目级功能开关当前启用了多少个项目。开发者接入中心位于 `/developer/integration`，适合软件作者集中查看项目 SDK 凭据、公钥集、HTTP/TCP 连接信息和接入示例，并且会按当前可见项目汇总这 7 个项目级功能开关的启用覆盖情况，页面示例请求也已经对齐运行时使用的 `x-rs-*` 验签请求头。开发者项目中心位于 `/developer/projects`，适合软件作者集中处理项目创建、项目资料编辑、项目状态切换、产品级功能开关和 SDK 凭据轮换。项目状态现在支持 `active / disabled / archived`，其中停用或归档项目时会同步回收该项目下的活跃会话。开发者授权中心位于 `/developer/licenses`，适合软件作者集中维护策略、卡密批次、卡密状态和卡密导出。开发者授权运营台位于 `/developer/ops`，适合软件作者直接处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁。开发者发版中心位于 `/developer/releases`，适合软件作者维护客户端版本、强更规则和启动公告。开发者安全中心位于 `/developer/security`，用于维护项目级 IP / CIDR 网络规则；拥有 `products.write` 权限的开发者或子账号可以创建和归档规则，`operator` 和 `viewer` 仍可按项目范围读取规则，但不能修改。
+开发者主账号可以自助改密、改资料、创建/禁用子账号、调整项目授权，并轮换自己项目的 `sdkAppSecret` 或整组 SDK 凭据；管理员仍然可以禁用或恢复开发者主账号，也可以在产品中心直接轮换项目凭据。
+
+### 页面入口
+
+- `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换项目状态并调整项目级功能开关
+- `/developer`：开发者总览中心，展示项目数、在线会话、卡密、强更规则、阻断公告、网络规则和功能开关覆盖情况
+- `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息与示例请求
+- `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、状态切换、功能开关和 SDK 凭据轮换
+- `/developer/licenses`：开发者授权中心，维护策略、卡密批次、卡密状态和卡密导出
+- `/developer/ops`：开发者授权运营台，处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁
+- `/developer/releases`：开发者发版中心，维护客户端版本、强更规则和启动公告
+- `/developer/security`：开发者安全中心，维护项目级 IP / CIDR 网络规则
 
 ## Windows C/C++ SDK
 
@@ -486,27 +522,31 @@ cl /EHsc /std:c++17 ^
 
 ## 重点文档
 
-- `docs/architecture.md`
-- `docs/tcp-protocol.md`
-- `docs/client-auth-modes.md`
-- `docs/client-unbind.md`
-- `docs/client-versioning.md`
-- `docs/notice-center.md`
-- `docs/license-ops.md`
-- `docs/admin-operations.md`
-- `docs/developer-members.md`
-- `docs/developer-ops.md`
-- `docs/developer-release.md`
-- `docs/storage-platform-guide.md`
-- `docs/postgres-main-store-preview.md`
-- `docs/linux-deployment.md`
-- `docs/windows-server-deployment.md`
-- `deploy/windows/run-rocksolid.ps1`
-- `deploy/windows/register-rocksolid-task.ps1`
-- `deploy/windows/backup-rocksolid.ps1`
-- `deploy/windows/register-rocksolid-backup-task.ps1`
-- `deploy/windows/healthcheck-rocksolid.ps1`
-- `deploy/windows/Caddyfile.example`
+- [architecture.md](docs/architecture.md)
+- [tcp-protocol.md](docs/tcp-protocol.md)
+- [client-auth-modes.md](docs/client-auth-modes.md)
+- [client-unbind.md](docs/client-unbind.md)
+- [client-versioning.md](docs/client-versioning.md)
+- [notice-center.md](docs/notice-center.md)
+- [license-ops.md](docs/license-ops.md)
+- [admin-operations.md](docs/admin-operations.md)
+- [developer-members.md](docs/developer-members.md)
+- [developer-projects.md](docs/developer-projects.md)
+- [developer-integration.md](docs/developer-integration.md)
+- [developer-ops.md](docs/developer-ops.md)
+- [developer-release.md](docs/developer-release.md)
+- [storage-platform-guide.md](docs/storage-platform-guide.md)
+- [postgres-main-store-preview.md](docs/postgres-main-store-preview.md)
+- [server-os-choice.md](docs/server-os-choice.md)
+- [vs2022-checklist.md](docs/vs2022-checklist.md)
+- [linux-deployment.md](docs/linux-deployment.md)
+- [windows-server-deployment.md](docs/windows-server-deployment.md)
+- [run-rocksolid.ps1](deploy/windows/run-rocksolid.ps1)
+- [register-rocksolid-task.ps1](deploy/windows/register-rocksolid-task.ps1)
+- [backup-rocksolid.ps1](deploy/windows/backup-rocksolid.ps1)
+- [register-rocksolid-backup-task.ps1](deploy/windows/register-rocksolid-backup-task.ps1)
+- [healthcheck-rocksolid.ps1](deploy/windows/healthcheck-rocksolid.ps1)
+- [Caddyfile.example](deploy/windows/Caddyfile.example)
 
 ## 当前状态
 

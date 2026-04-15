@@ -626,6 +626,10 @@
         return (dashboardCache.projects || []).find((item) => item.code === productCode) || null;
       }
 
+      function countProjectsByStatus(items = [], status) {
+        return items.filter((item) => (item.status || "active") === status).length;
+      }
+
       function renderFeatureSummary(stats) {
         const counts = {
           allowRegister: stats.registerEnabledProjects ?? 0,
@@ -643,12 +647,18 @@
 
       function renderStats(items) {
         const stats = dashboardCache.summary || emptyDashboardSummary(items);
+        const activeProjects = countProjectsByStatus(items, "active");
+        const disabledProjects = countProjectsByStatus(items, "disabled");
+        const archivedProjects = countProjectsByStatus(items, "archived");
         const tail = currentActor?.type === "owner"
           ? `<div class="stat"><strong>${stats.teamMembers ?? membersCache.length}</strong><span>Team Members</span></div>`
           : `<div class="stat"><strong>${escapeHtml(currentActor?.role || "-")}</strong><span>Actor Role</span></div>`;
 
         el("stats-box").innerHTML = `
           <div class="stat"><strong>${stats.projects}</strong><span>My Projects</span></div>
+          <div class="stat"><strong>${activeProjects}</strong><span>Active Projects</span></div>
+          <div class="stat"><strong>${disabledProjects}</strong><span>Disabled Projects</span></div>
+          <div class="stat"><strong>${archivedProjects}</strong><span>Archived Projects</span></div>
           <div class="stat"><strong>${stats.activeSessions}</strong><span>Active Sessions</span></div>
           <div class="stat"><strong>${stats.cardsFresh}</strong><span>Fresh Cards</span></div>
           <div class="stat"><strong>${stats.forceUpdateVersions}</strong><span>Force Updates</span></div>

@@ -177,12 +177,19 @@
           .join("");
       }
 
+      function countProjectsByStatus(items = [], status) {
+        return items.filter((item) => (item.status || "active") === status).length;
+      }
+
       function renderStats() {
         const items = snapshot?.products || [];
         const keys = snapshot?.tokenKeys?.keys || [];
 
         el("stats-box").innerHTML = `
           <div class="stat"><strong>${items.length}</strong><span>Visible Projects</span></div>
+          <div class="stat"><strong>${countProjectsByStatus(items, "active")}</strong><span>Active Projects</span></div>
+          <div class="stat"><strong>${countProjectsByStatus(items, "disabled")}</strong><span>Disabled Projects</span></div>
+          <div class="stat"><strong>${countProjectsByStatus(items, "archived")}</strong><span>Archived Projects</span></div>
           <div class="stat"><strong>${keys.length}</strong><span>Public Keys</span></div>
           <div class="stat"><strong>${snapshot?.transport?.tcp?.enabled ? 1 : 0}</strong><span>TCP Enabled</span></div>
           <div class="stat"><strong>${snapshot?.signing?.requestSkewSeconds ?? 0}</strong><span>Skew Seconds</span></div>

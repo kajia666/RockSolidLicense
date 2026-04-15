@@ -2819,6 +2819,15 @@ test("postgres main store can write products and policies through a transaction-
     assert.equal(listedNetworkRules.items[0].pattern, "203.0.113.90");
     assert.equal(listedNetworkRules.items[0].status, "archived");
 
+    const dashboard = await app.services.dashboard(admin.token);
+    assert.equal(dashboard.summary.products, 1);
+    assert.equal(dashboard.summary.policies, 1);
+    assert.equal(dashboard.summary.activeBindings, 0);
+    assert.equal(dashboard.summary.blockedDevices, 0);
+    assert.equal(dashboard.summary.activeClientVersions, 0);
+    assert.equal(dashboard.summary.activeNotices, 0);
+    assert.equal(dashboard.summary.activeNetworkRules, 0);
+
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.implementationStage, "core_write_preview");
     assert.deepEqual(health.storage.mainStore.repositoryWriteDrivers, {
@@ -2920,7 +2929,19 @@ test("postgres main store can write products and policies through a transaction-
       true
     );
     assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countActiveSessionsByProductIds"),
+      true
+    );
+    assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "createPolicy"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countActiveVersionsByProductIds"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countForceUpdateVersionsByProductIds"),
       true
     );
     assert.equal(
@@ -2948,7 +2969,19 @@ test("postgres main store can write products and policies through a transaction-
       true
     );
     assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countActiveNoticesByProductIds"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countBlockingNoticesByProductIds"),
+      true
+    );
+    assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "updateNetworkRuleStatus"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "countActiveNetworkRulesByProductIds"),
       true
     );
     assert.equal(

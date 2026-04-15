@@ -558,6 +558,68 @@ function buildMetricMap(rows, keyField = "product_id", valueField = "count") {
   return map;
 }
 
+function sumMetricMap(map) {
+  let total = 0;
+  for (const value of map.values()) {
+    total += numberCount(value);
+  }
+  return total;
+}
+
+async function queryProductOperationalMetricMaps(db, store, productIds = [], referenceTime = nowIso()) {
+  const normalizedProductIds = Array.from(
+    new Set(
+      (Array.isArray(productIds) ? productIds : [])
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!normalizedProductIds.length) {
+    return {
+      activeSessionCounts: new Map(),
+      activeBindingCounts: new Map(),
+      blockedDeviceCounts: new Map(),
+      activeClientVersionCounts: new Map(),
+      forceUpdateVersionCounts: new Map(),
+      activeNoticeCounts: new Map(),
+      blockingNoticeCounts: new Map(),
+      activeNetworkRuleCounts: new Map()
+    };
+  }
+
+  const [
+    activeSessionRows,
+    activeBindingRows,
+    blockedDeviceRows,
+    activeClientVersionRows,
+    forceUpdateVersionRows,
+    activeNoticeRows,
+    blockingNoticeRows,
+    activeNetworkRuleRows
+  ] = await Promise.all([
+    Promise.resolve(store.sessions.countActiveSessionsByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.devices.countActiveBindingsByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.devices.countActiveBlocksByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.versions.countActiveVersionsByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.versions.countForceUpdateVersionsByProductIds(db, normalizedProductIds)),
+    Promise.resolve(store.notices.countActiveNoticesByProductIds(db, normalizedProductIds, referenceTime)),
+    Promise.resolve(store.notices.countBlockingNoticesByProductIds(db, normalizedProductIds, referenceTime)),
+    Promise.resolve(store.networkRules.countActiveNetworkRulesByProductIds(db, normalizedProductIds))
+  ]);
+
+  return {
+    activeSessionCounts: buildMetricMap(activeSessionRows),
+    activeBindingCounts: buildMetricMap(activeBindingRows),
+    blockedDeviceCounts: buildMetricMap(blockedDeviceRows),
+    activeClientVersionCounts: buildMetricMap(activeClientVersionRows),
+    forceUpdateVersionCounts: buildMetricMap(forceUpdateVersionRows),
+    activeNoticeCounts: buildMetricMap(activeNoticeRows),
+    blockingNoticeCounts: buildMetricMap(blockingNoticeRows),
+    activeNetworkRuleCounts: buildMetricMap(activeNetworkRuleRows)
+  };
+}
+
 async function queryDeveloperDashboardPayload(db, store, session, runtimeState) {
   await expireStaleSessions(db, store, runtimeState);
 
@@ -660,30 +722,16 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
     ...productIds,
     now
   ));
-  const activeSessionCounts = buildMetricMap(await Promise.resolve(
-    store.sessions.countActiveSessionsByProductIds(db, productIds)
-  ));
-  const activeBindingCounts = buildMetricMap(await Promise.resolve(
-    store.devices.countActiveBindingsByProductIds(db, productIds)
-  ));
-  const blockedDeviceCounts = buildMetricMap(await Promise.resolve(
-    store.devices.countActiveBlocksByProductIds(db, productIds)
-  ));
-  const activeClientVersionCounts = buildMetricMap(await Promise.resolve(
-    store.versions.countActiveVersionsByProductIds(db, productIds)
-  ));
-  const forceUpdateVersionCounts = buildMetricMap(await Promise.resolve(
-    store.versions.countForceUpdateVersionsByProductIds(db, productIds)
-  ));
-  const activeNoticeCounts = buildMetricMap(await Promise.resolve(
-    store.notices.countActiveNoticesByProductIds(db, productIds, now)
-  ));
-  const blockingNoticeCounts = buildMetricMap(await Promise.resolve(
-    store.notices.countBlockingNoticesByProductIds(db, productIds, now)
-  ));
-  const activeNetworkRuleCounts = buildMetricMap(await Promise.resolve(
-    store.networkRules.countActiveNetworkRulesByProductIds(db, productIds)
-  ));
+  const {
+    activeSessionCounts,
+    activeBindingCounts,
+    blockedDeviceCounts,
+    activeClientVersionCounts,
+    forceUpdateVersionCounts,
+    activeNoticeCounts,
+    blockingNoticeCounts,
+    activeNetworkRuleCounts
+  } = await queryProductOperationalMetricMaps(db, store, productIds, now);
 
   const projectSummaries = products.map((product) => {
     const key = String(product.id);
@@ -6963,10 +7011,27 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     async dashboard(token) {
       requireAdminSession(db, token);
       await expireStaleSessions(db, store, stateStore);
+      const products = await Promise.resolve(store.products.queryProductRows(db, {}));
+      const policies = await Promise.resolve(store.policies.queryPolicyRows(db, {}));
+      const now = nowIso();
+      const {
+        activeBindingCounts,
+        blockedDeviceCounts,
+        activeClientVersionCounts,
+        forceUpdateVersionCounts,
+        activeNoticeCounts,
+        blockingNoticeCounts,
+        activeNetworkRuleCounts
+      } = await queryProductOperationalMetricMaps(
+        db,
+        store,
+        products.map((item) => item.id),
+        now
+      );
 
       const summary = {
-        products: one(db, "SELECT COUNT(*) AS count FROM products").count,
-        policies: one(db, "SELECT COUNT(*) AS count FROM policies").count,
+        products: products.length,
+        policies: policies.length,
         cardsFresh: one(db, "SELECT COUNT(*) AS count FROM license_keys WHERE status = 'fresh'").count,
         cardsRedeemed: one(db, "SELECT COUNT(*) AS count FROM license_keys WHERE status = 'redeemed'").count,
         accounts: one(db, "SELECT COUNT(*) AS count FROM customer_accounts").count,
@@ -6974,38 +7039,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           db,
           "SELECT COUNT(*) AS count FROM customer_accounts WHERE status = 'disabled'"
         ).count,
-        activeBindings: one(
-          db,
-          "SELECT COUNT(*) AS count FROM device_bindings WHERE status = 'active'"
-        ).count,
+        activeBindings: sumMetricMap(activeBindingCounts),
         releasedBindings: one(
           db,
           "SELECT COUNT(*) AS count FROM device_bindings WHERE status = 'revoked'"
         ).count,
-        blockedDevices: one(
-          db,
-          "SELECT COUNT(*) AS count FROM device_blocks WHERE status = 'active'"
-        ).count,
-        activeClientVersions: one(
-          db,
-          "SELECT COUNT(*) AS count FROM client_versions WHERE status = 'active'"
-        ).count,
-        forceUpdateVersions: one(
-          db,
-          "SELECT COUNT(*) AS count FROM client_versions WHERE status = 'active' AND force_update = 1"
-        ).count,
-        activeNotices: one(
-          db,
-          "SELECT COUNT(*) AS count FROM notices WHERE status = 'active'"
-        ).count,
-        blockingNotices: one(
-          db,
-          "SELECT COUNT(*) AS count FROM notices WHERE status = 'active' AND block_login = 1"
-        ).count,
-        activeNetworkRules: one(
-          db,
-          "SELECT COUNT(*) AS count FROM network_rules WHERE status = 'active'"
-        ).count,
+        blockedDevices: sumMetricMap(blockedDeviceCounts),
+        activeClientVersions: sumMetricMap(activeClientVersionCounts),
+        forceUpdateVersions: sumMetricMap(forceUpdateVersionCounts),
+        activeNotices: sumMetricMap(activeNoticeCounts),
+        blockingNotices: sumMetricMap(blockingNoticeCounts),
+        activeNetworkRules: sumMetricMap(activeNetworkRuleCounts),
         resellers: one(
           db,
           "SELECT COUNT(*) AS count FROM resellers"

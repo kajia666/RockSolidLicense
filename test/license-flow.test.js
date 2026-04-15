@@ -5997,6 +5997,9 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /developers\/:developerId\/status/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Rotate SDK Credentials/);
+    assert.match(html, /Account Login Open/);
+    assert.match(html, /Recharge Open/);
+    assert.match(html, /Client Unbind Open/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

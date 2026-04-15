@@ -315,6 +315,7 @@
           <div class="pill">Client-side switches are evaluated per product</div>
         </div>
         <div class="stats" id="stats-box"></div>
+        <div class="pill-row" id="feature-summary-box"></div>
       </section>
 
       <section class="grid">
@@ -518,20 +519,45 @@
         return `<span class="tag ${enabled ? "ok" : "danger"}">${escapeHtml(label)}: ${enabled ? "on" : "off"}</span>`;
       }
 
+      function featureEnabledCount(items = [], featureKey) {
+        return items.filter((item) => item.featureConfig?.[featureKey] !== false).length;
+      }
+
+      function renderFeatureSummary(stats) {
+        const entries = [
+          ["Register Open", stats.registerOpen ?? 0],
+          ["Account Login Open", stats.accountLoginOpen ?? 0],
+          ["Card Login Open", stats.cardLoginOpen ?? 0],
+          ["Recharge Open", stats.cardRechargeOpen ?? 0],
+          ["Version Check Open", stats.versionCheckOpen ?? 0],
+          ["Notices Open", stats.noticesOpen ?? 0],
+          ["Client Unbind Open", stats.clientUnbindOpen ?? 0]
+        ];
+
+        el("feature-summary-box").innerHTML = entries
+          .map(([label, value]) => `<div class="pill"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`)
+          .join("");
+      }
+
       function renderStats(items) {
         const stats = {
           total: items.length,
-          registerOpen: items.filter((item) => item.featureConfig?.allowRegister).length,
-          directCardOpen: items.filter((item) => item.featureConfig?.allowCardLogin).length,
-          noticesOpen: items.filter((item) => item.featureConfig?.allowNotices).length
+          registerOpen: featureEnabledCount(items, "allowRegister"),
+          accountLoginOpen: featureEnabledCount(items, "allowAccountLogin"),
+          cardLoginOpen: featureEnabledCount(items, "allowCardLogin"),
+          cardRechargeOpen: featureEnabledCount(items, "allowCardRecharge"),
+          versionCheckOpen: featureEnabledCount(items, "allowVersionCheck"),
+          noticesOpen: featureEnabledCount(items, "allowNotices"),
+          clientUnbindOpen: featureEnabledCount(items, "allowClientUnbind")
         };
 
         el("stats-box").innerHTML = `
           <div class="stat"><strong>${stats.total}</strong><span>Products</span></div>
           <div class="stat"><strong>${stats.registerOpen}</strong><span>Register Enabled</span></div>
-          <div class="stat"><strong>${stats.directCardOpen}</strong><span>Card Login Enabled</span></div>
+          <div class="stat"><strong>${stats.cardLoginOpen}</strong><span>Card Login Enabled</span></div>
           <div class="stat"><strong>${stats.noticesOpen}</strong><span>Notices Enabled</span></div>
         `;
+        renderFeatureSummary(stats);
       }
 
       function readFeatureConfig(prefix) {

@@ -578,7 +578,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/admin/device-blocks") {
         sendJson(res, 200, {
           ok: true,
-          data: services.listDeviceBlocks(getBearerToken(req), {
+          data: await services.listDeviceBlocks(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             status: url.searchParams.get("status"),
             search: url.searchParams.get("search")
@@ -1326,7 +1326,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/device-blocks") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListDeviceBlocks(getBearerToken(req), {
+          data: await services.developerListDeviceBlocks(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
             status: url.searchParams.get("status"),
             search: url.searchParams.get("search")

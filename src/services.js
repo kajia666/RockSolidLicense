@@ -663,26 +663,11 @@ async function queryDeveloperDashboardPayload(db, store, session, runtimeState) 
   const activeSessionCounts = buildMetricMap(await Promise.resolve(
     store.sessions.countActiveSessionsByProductIds(db, productIds)
   ));
-  const activeBindingCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT e.product_id, COUNT(*) AS count
-      FROM device_bindings b
-      JOIN entitlements e ON e.id = b.entitlement_id
-      WHERE e.product_id IN (${placeholders}) AND b.status = 'active'
-      GROUP BY e.product_id
-    `,
-    ...productIds
+  const activeBindingCounts = buildMetricMap(await Promise.resolve(
+    store.devices.countActiveBindingsByProductIds(db, productIds)
   ));
-  const blockedDeviceCounts = buildMetricMap(many(
-    db,
-    `
-      SELECT product_id, COUNT(*) AS count
-      FROM device_blocks
-      WHERE product_id IN (${placeholders}) AND status = 'active'
-      GROUP BY product_id
-    `,
-    ...productIds
+  const blockedDeviceCounts = buildMetricMap(await Promise.resolve(
+    store.devices.countActiveBlocksByProductIds(db, productIds)
   ));
   const activeClientVersionCounts = buildMetricMap(many(
     db,
@@ -1998,149 +1983,11 @@ async function resolveClientManagedAccount(db, store, product, body) {
 }
 async function queryDeviceBindingRows(db, store, filters = {}, runtimeState = null) {
   await expireStaleSessions(db, store, runtimeState);
-
-  const conditions = [];
-  const params = [];
-  const normalizedFilters = {
-    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-    username: filters.username ? String(filters.username).trim() : null,
-    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-    search: filters.search ? String(filters.search).trim() : null
-  };
-
-  if (normalizedFilters.status && !["active", "revoked"].includes(normalizedFilters.status)) {
-    throw new AppError(400, "INVALID_BINDING_STATUS", "Binding status must be active or revoked.");
-  }
-
-  if (normalizedFilters.productCode) {
-    conditions.push("pr.code = ?");
-    params.push(normalizedFilters.productCode);
-  }
-
-  appendInCondition("pr.id", filters.productIds, conditions, params);
-
-  if (normalizedFilters.username) {
-    conditions.push("a.username = ?");
-    params.push(normalizedFilters.username);
-  }
-
-  if (normalizedFilters.status) {
-    conditions.push("b.status = ?");
-    params.push(normalizedFilters.status);
-  }
-
-  if (normalizedFilters.search) {
-    const pattern = likeFilter(normalizedFilters.search);
-    conditions.push(
-      "(d.fingerprint LIKE ? ESCAPE '\\' OR d.device_name LIKE ? ESCAPE '\\' OR a.username LIKE ? ESCAPE '\\')"
-    );
-    params.push(pattern, pattern, pattern);
-  }
-
-  const items = many(
-    db,
-    `
-      SELECT b.id, b.entitlement_id, b.device_id, b.status, b.first_bound_at, b.last_bound_at, b.revoked_at,
-             pr.id AS product_id, pr.code AS product_code, pr.name AS product_name,
-             a.id AS account_id, a.username,
-             pol.name AS policy_name,
-             e.ends_at AS entitlement_ends_at,
-             d.fingerprint, d.device_name, d.last_seen_at, d.last_seen_ip,
-             bp.identity_hash, bp.match_fields_json, bp.identity_json, bp.request_ip AS bind_request_ip,
-             COALESCE(sess.active_session_count, 0) AS active_session_count
-      FROM device_bindings b
-      JOIN entitlements e ON e.id = b.entitlement_id
-      JOIN customer_accounts a ON a.id = e.account_id
-      JOIN products pr ON pr.id = e.product_id
-      JOIN policies pol ON pol.id = e.policy_id
-      JOIN devices d ON d.id = b.device_id
-      LEFT JOIN device_binding_profiles bp ON bp.binding_id = b.id
-      LEFT JOIN (
-        SELECT entitlement_id, device_id, COUNT(*) AS active_session_count
-        FROM sessions
-        WHERE status = 'active'
-        GROUP BY entitlement_id, device_id
-      ) sess ON sess.entitlement_id = b.entitlement_id AND sess.device_id = b.device_id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY b.last_bound_at DESC
-      LIMIT 100
-    `,
-    ...params
-  );
-
-  return {
-    items: items.map((row) => ({
-      ...row,
-      matchFields: row.match_fields_json ? JSON.parse(row.match_fields_json) : [],
-      identity: row.identity_json ? JSON.parse(row.identity_json) : {},
-      bindRequestIp: row.bind_request_ip ?? null
-    })),
-    total: items.length,
-    filters: normalizedFilters
-  };
+  return Promise.resolve(store.devices.queryDeviceBindingRows(db, filters));
 }
 
-function queryDeviceBlockRows(db, filters = {}) {
-  const conditions = [];
-  const params = [];
-  const normalizedFilters = {
-    productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
-    status: filters.status ? String(filters.status).trim().toLowerCase() : null,
-    search: filters.search ? String(filters.search).trim() : null
-  };
-
-  if (normalizedFilters.status && !["active", "released"].includes(normalizedFilters.status)) {
-    throw new AppError(400, "INVALID_DEVICE_BLOCK_STATUS", "Device block status must be active or released.");
-  }
-
-  if (normalizedFilters.productCode) {
-    conditions.push("pr.code = ?");
-    params.push(normalizedFilters.productCode);
-  }
-
-  appendInCondition("pr.id", filters.productIds, conditions, params);
-
-  if (normalizedFilters.status) {
-    conditions.push("b.status = ?");
-    params.push(normalizedFilters.status);
-  }
-
-  if (normalizedFilters.search) {
-    const pattern = likeFilter(normalizedFilters.search);
-    conditions.push(
-      "(b.fingerprint LIKE ? ESCAPE '\\' OR b.reason LIKE ? ESCAPE '\\' OR COALESCE(b.notes, '') LIKE ? ESCAPE '\\')"
-    );
-    params.push(pattern, pattern, pattern);
-  }
-
-  const items = many(
-    db,
-    `
-      SELECT b.id, b.product_id, b.fingerprint, b.status, b.reason, b.notes, b.created_at, b.updated_at, b.released_at,
-             pr.code AS product_code, pr.name AS product_name,
-             d.id AS device_id, d.device_name, d.last_seen_at, d.last_seen_ip,
-             COALESCE(sess.active_session_count, 0) AS active_session_count
-      FROM device_blocks b
-      JOIN products pr ON pr.id = b.product_id
-      LEFT JOIN devices d ON d.product_id = b.product_id AND d.fingerprint = b.fingerprint
-      LEFT JOIN (
-        SELECT device_id, COUNT(*) AS active_session_count
-        FROM sessions
-        WHERE status = 'active'
-        GROUP BY device_id
-      ) sess ON sess.device_id = d.id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY CASE WHEN b.status = 'active' THEN 0 ELSE 1 END, b.updated_at DESC
-      LIMIT 100
-    `,
-    ...params
-  );
-
-  return {
-    items,
-    total: items.length,
-    filters: normalizedFilters
-  };
+async function queryDeviceBlockRows(db, store, filters = {}) {
+  return Promise.resolve(store.devices.queryDeviceBlockRows(db, filters));
 }
 
 async function querySessionRows(db, store, filters = {}, runtimeState = null) {
@@ -7629,7 +7476,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     listDeviceBlocks(token, filters = {}) {
       requireAdminSession(db, token);
-      return queryDeviceBlockRows(db, filters);
+      return queryDeviceBlockRows(db, store, filters);
     },
 
     developerListDeviceBlocks(token, filters = {}) {
@@ -7648,7 +7495,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "ops.read"
         );
       }
-      return queryDeviceBlockRows(db, {
+      return queryDeviceBlockRows(db, store, {
         ...filters,
         productIds: listDeveloperAccessibleProductIds(db, session)
       });

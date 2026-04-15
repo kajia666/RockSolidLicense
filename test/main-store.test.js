@@ -413,6 +413,24 @@ test("app exposes sqlite main store and services read through it", async () => {
     assert.equal(listedBindings[0].fingerprint, "store-direct-bind-device");
     assert.deepEqual(listedBindings[0].matchFields, ["machineGuid"]);
 
+    const bindingRows = await Promise.resolve(app.mainStore.devices.queryDeviceBindingRows(app.db, {
+      productCode: "STOREAPP2",
+      username: "store_direct_user",
+      status: "active"
+    }));
+    assert.equal(bindingRows.total, 1);
+    assert.equal(bindingRows.items[0].id, directBinding.binding.id);
+    assert.equal(bindingRows.items[0].product_code, "STOREAPP2");
+    assert.equal(bindingRows.items[0].bindRequestIp, "127.0.0.2");
+
+    const activeBindingCounts = app.mainStore.devices.countActiveBindingsByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(activeBindingCounts.length, 1);
+    assert.equal(activeBindingCounts[0].product_id, directProduct.id);
+    assert.equal(activeBindingCounts[0].count, 1);
+
     const unbindLog = app.mainStore.devices.recordEntitlementUnbind(
       durationEntitlement.id,
       directBinding.binding.id,
@@ -469,6 +487,23 @@ test("app exposes sqlite main store and services read through it", async () => {
     );
     assert.ok(activeBlock);
     assert.equal(activeBlock.reason, "manual-test-block");
+
+    const blockRows = await Promise.resolve(app.mainStore.devices.queryDeviceBlockRows(app.db, {
+      productCode: "STOREAPP2",
+      status: "active"
+    }));
+    assert.equal(blockRows.total, 1);
+    assert.equal(blockRows.items[0].id, "block_store_main");
+    assert.equal(blockRows.items[0].product_code, "STOREAPP2");
+    assert.equal(blockRows.items[0].active_session_count, 0);
+
+    const activeBlockCounts = app.mainStore.devices.countActiveBlocksByProductIds(
+      app.db,
+      [directProduct.id]
+    );
+    assert.equal(activeBlockCounts.length, 1);
+    assert.equal(activeBlockCounts[0].product_id, directProduct.id);
+    assert.equal(activeBlockCounts[0].count, 1);
 
     const revokedSessions = app.mainStore.sessions.expireActiveSessions(
       { sessionId: "sess_store_main" },

@@ -1024,6 +1024,77 @@ test("postgres main store can serve all main-store read-side queries through ada
         ];
       }
 
+      if (meta.repository === "devices" && meta.operation === "queryDeviceBindingRows") {
+        return [
+          {
+            id: "bind_pg_1",
+            entitlement_id: "ent_pg_1",
+            device_id: "dev_pg_1",
+            status: "active",
+            first_bound_at: "2026-01-03T00:00:00.000Z",
+            last_bound_at: "2026-01-04T00:00:00.000Z",
+            revoked_at: null,
+            product_id: "prod_pg_1",
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            account_id: "acct_pg_1",
+            username: "pguser",
+            policy_name: "PG Policy",
+            entitlement_ends_at: "2026-02-01T00:00:00.000Z",
+            fingerprint: "pg-device-001",
+            device_name: "PG Desktop",
+            last_seen_at: "2026-01-04T00:05:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            identity_hash: "pg-device-hash-001",
+            match_fields_json: "[\"deviceFingerprint\",\"machineGuid\"]",
+            identity_json: "{\"machineGuid\":\"PG-MG-001\"}",
+            bind_request_ip: "203.0.113.9",
+            active_session_count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "devices" && meta.operation === "queryDeviceBlockRows") {
+        return [
+          {
+            id: "block_pg_1",
+            product_id: "prod_pg_1",
+            fingerprint: "pg-device-001",
+            status: "active",
+            reason: "manual_review",
+            notes: "postgres device block",
+            created_at: "2026-01-04T00:00:00.000Z",
+            updated_at: "2026-01-04T00:00:00.000Z",
+            released_at: null,
+            product_code: "PGAPP",
+            product_name: "Postgres Product",
+            device_id: "dev_pg_1",
+            device_name: "PG Desktop",
+            last_seen_at: "2026-01-04T00:05:00.000Z",
+            last_seen_ip: "203.0.113.9",
+            active_session_count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "devices" && meta.operation === "countActiveBindingsByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
+      if (meta.repository === "devices" && meta.operation === "countActiveBlocksByProductIds") {
+        return [
+          {
+            product_id: "prod_pg_1",
+            count: 1
+          }
+        ];
+      }
+
       if (meta.repository === "sessions" && meta.operation === "getSessionRecordByProductToken") {
         return [
           {
@@ -1326,7 +1397,41 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.equal(activeSessionCounts[0].product_id, "prod_pg_1");
     assert.equal(activeSessionCounts[0].count, 1);
 
-    assert.equal(queries.length, 22);
+    const bindingRows = await app.mainStore.devices.queryDeviceBindingRows(app.db, {
+      productCode: "PGAPP",
+      username: "pguser",
+      status: "active"
+    });
+    assert.equal(bindingRows.total, 1);
+    assert.equal(bindingRows.items[0].product_code, "PGAPP");
+    assert.equal(bindingRows.items[0].bindRequestIp, "203.0.113.9");
+    assert.deepEqual(bindingRows.items[0].matchFields, ["deviceFingerprint", "machineGuid"]);
+
+    const blockRows = await app.mainStore.devices.queryDeviceBlockRows(app.db, {
+      productCode: "PGAPP",
+      status: "active"
+    });
+    assert.equal(blockRows.total, 1);
+    assert.equal(blockRows.items[0].product_code, "PGAPP");
+    assert.equal(blockRows.items[0].reason, "manual_review");
+
+    const activeBindingCounts = await app.mainStore.devices.countActiveBindingsByProductIds(
+      app.db,
+      ["prod_pg_1"]
+    );
+    assert.equal(activeBindingCounts.length, 1);
+    assert.equal(activeBindingCounts[0].product_id, "prod_pg_1");
+    assert.equal(activeBindingCounts[0].count, 1);
+
+    const activeBlockCounts = await app.mainStore.devices.countActiveBlocksByProductIds(
+      app.db,
+      ["prod_pg_1"]
+    );
+    assert.equal(activeBlockCounts.length, 1);
+    assert.equal(activeBlockCounts[0].product_id, "prod_pg_1");
+    assert.equal(activeBlockCounts[0].count, 1);
+
+    assert.equal(queries.length, 26);
     assert.equal(queries[0].meta.repository, "products");
     assert.match(queries[0].sql, /FROM products p/i);
     assert.equal(queries[1].meta.operation, "getActiveProductRowBySdkAppId");
@@ -1371,6 +1476,14 @@ test("postgres main store can serve all main-store read-side queries through ada
     assert.match(queries[20].sql, /ORDER BY s\.issued_at DESC/i);
     assert.equal(queries[21].meta.operation, "countActiveSessionsByProductIds");
     assert.match(queries[21].sql, /GROUP BY product_id/i);
+    assert.equal(queries[22].meta.operation, "queryDeviceBindingRows");
+    assert.match(queries[22].sql, /FROM device_bindings b/i);
+    assert.equal(queries[23].meta.operation, "queryDeviceBlockRows");
+    assert.match(queries[23].sql, /FROM device_blocks b/i);
+    assert.equal(queries[24].meta.operation, "countActiveBindingsByProductIds");
+    assert.match(queries[24].sql, /GROUP BY e\.product_id/i);
+    assert.equal(queries[25].meta.operation, "countActiveBlocksByProductIds");
+    assert.match(queries[25].sql, /GROUP BY product_id/i);
 
     const health = await app.services.health();
     assert.equal(health.storage.mainStore.driver, "postgres");

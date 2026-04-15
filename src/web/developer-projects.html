@@ -35,8 +35,9 @@
 
         <article class="card">
           <h2>Project Filter</h2>
-          <div class="two">
+          <div class="three">
             <label>Search<input id="filter-search" placeholder="project code or name" /></label>
+            <label>Status Filter<select id="filter-status"><option value="all">all statuses</option><option value="active">active</option><option value="disabled">disabled</option><option value="archived">archived</option></select></label>
             <label>Rotate SDK App ID Too<select id="rotate-sdk-app-id"><option value="false">false</option><option value="true">true</option></select></label>
           </div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-filter-btn">Apply Filter</button><button id="clear-selection-btn">Clear Selection</button></div>
@@ -168,12 +169,13 @@
 
       function filteredProducts() {
         const query = el("filter-search").value.trim().toLowerCase();
-        if (!query) {
-          return products;
-        }
-        return products.filter((item) =>
-          `${item.code} ${item.name} ${item.description || ""}`.toLowerCase().includes(query)
-        );
+        const status = el("filter-status").value;
+        return products.filter((item) => {
+          const matchesQuery = !query
+            || `${item.code} ${item.name} ${item.description || ""}`.toLowerCase().includes(query);
+          const matchesStatus = status === "all" || (item.status || "active") === status;
+          return matchesQuery && matchesStatus;
+        });
       }
 
       function featureFieldId(prefix, key) {
@@ -278,15 +280,15 @@
       }
 
       function renderFeatureSummary() {
-        const summary = dashboard.summary || {};
+        const visible = filteredProducts();
         const counts = {
-          allowRegister: summary.registerEnabledProjects ?? 0,
-          allowAccountLogin: summary.accountLoginEnabledProjects ?? 0,
-          allowCardLogin: summary.cardLoginEnabledProjects ?? 0,
-          allowCardRecharge: summary.cardRechargeEnabledProjects ?? 0,
-          allowVersionCheck: summary.versionCheckEnabledProjects ?? 0,
-          allowNotices: summary.noticesEnabledProjects ?? 0,
-          allowClientUnbind: summary.clientUnbindEnabledProjects ?? 0
+          allowRegister: window.RSProductFeatures.countEnabled(visible, "allowRegister"),
+          allowAccountLogin: window.RSProductFeatures.countEnabled(visible, "allowAccountLogin"),
+          allowCardLogin: window.RSProductFeatures.countEnabled(visible, "allowCardLogin"),
+          allowCardRecharge: window.RSProductFeatures.countEnabled(visible, "allowCardRecharge"),
+          allowVersionCheck: window.RSProductFeatures.countEnabled(visible, "allowVersionCheck"),
+          allowNotices: window.RSProductFeatures.countEnabled(visible, "allowNotices"),
+          allowClientUnbind: window.RSProductFeatures.countEnabled(visible, "allowClientUnbind")
         };
 
         el("feature-summary-box").innerHTML = window.RSProductFeatures.entries
@@ -298,19 +300,26 @@
         return items.filter((item) => (item.status || "active") === status).length;
       }
 
+      function sumVisibleMetric(items = [], key) {
+        return items.reduce((total, item) => total + Number(findProjectMetrics(item.code)?.[key] || 0), 0);
+      }
+
+      function findVisibleProductById(productId) {
+        return filteredProducts().find((item) => item.id === productId) || null;
+      }
+
       function renderStats() {
         const visible = filteredProducts();
-        const summary = dashboard.summary || {};
         el("stats-box").innerHTML = `
           <div class="stat"><strong>${visible.length}</strong><span>Visible Projects</span></div>
           <div class="stat"><strong>${countProjectsByStatus(visible, "active")}</strong><span>Active Projects</span></div>
           <div class="stat"><strong>${countProjectsByStatus(visible, "disabled")}</strong><span>Disabled Projects</span></div>
           <div class="stat"><strong>${countProjectsByStatus(visible, "archived")}</strong><span>Archived Projects</span></div>
-          <div class="stat"><strong>${summary.activeSessions ?? 0}</strong><span>Active Sessions</span></div>
-          <div class="stat"><strong>${summary.cardsFresh ?? 0}</strong><span>Fresh Cards</span></div>
-          <div class="stat"><strong>${summary.forceUpdateVersions ?? 0}</strong><span>Force Updates</span></div>
-          <div class="stat"><strong>${summary.blockingNotices ?? 0}</strong><span>Blocking Notices</span></div>
-          <div class="stat"><strong>${summary.activeNetworkRules ?? 0}</strong><span>Active Net Rules</span></div>
+          <div class="stat"><strong>${sumVisibleMetric(visible, "activeSessions")}</strong><span>Active Sessions</span></div>
+          <div class="stat"><strong>${sumVisibleMetric(visible, "cardsFresh")}</strong><span>Fresh Cards</span></div>
+          <div class="stat"><strong>${sumVisibleMetric(visible, "forceUpdateVersions")}</strong><span>Force Updates</span></div>
+          <div class="stat"><strong>${sumVisibleMetric(visible, "blockingNotices")}</strong><span>Blocking Notices</span></div>
+          <div class="stat"><strong>${sumVisibleMetric(visible, "activeNetworkRules")}</strong><span>Active Net Rules</span></div>
         `;
         renderFeatureSummary();
       }
@@ -369,10 +378,10 @@
         const body = el("projects-body");
         const items = filteredProducts();
         if (!items.length) {
-          body.innerHTML = '<tr><td colspan="4">No scoped projects found.</td></tr>';
+          body.innerHTML = `<tr><td colspan="4">${products.length ? "No scoped projects match current filter." : "No scoped projects found."}</td></tr>`;
           renderStats();
           setSelection(null);
-          return;
+          return items;
         }
 
         body.innerHTML = items.map((item) => {
@@ -396,7 +405,12 @@
             }
           });
         }
+        const selectedProductId = el("edit-product-id").value.trim();
+        if (selectedProductId && !items.some((item) => item.id === selectedProductId)) {
+          setSelection(null);
+        }
         renderStats();
+        return items;
       }
 
       function clearSession() {
@@ -418,6 +432,7 @@
       }
 
       async function refreshProjects() {
+        const selectedProductId = el("edit-product-id").value.trim();
         const [productItems, dashboardData] = await Promise.all([
           api("/api/developer/products"),
           api("/api/developer/dashboard")
@@ -425,6 +440,9 @@
         products = Array.isArray(productItems) ? productItems : [];
         dashboard = dashboardData || { summary: null, projects: [], generatedAt: null };
         renderProjects();
+        if (selectedProductId) {
+          setSelection(findVisibleProductById(selectedProductId));
+        }
         setOutput({ products, dashboard });
       }
 
@@ -495,16 +513,23 @@
       });
 
       el("apply-filter-btn").addEventListener("click", () => {
-        renderProjects();
-        setStatus("Project filter applied.");
-        setOutput({ visibleProjects: filteredProducts().map((item) => item.code) });
+        const visibleProjects = renderProjects();
+        setStatus(`Project filter applied. ${visibleProjects.length} visible project(s).`);
+        setOutput({
+          filter: {
+            query: el("filter-search").value.trim(),
+            status: el("filter-status").value
+          },
+          visibleProjects: visibleProjects.map((item) => item.code)
+        });
       });
 
       el("clear-selection-btn").addEventListener("click", () => {
         el("filter-search").value = "";
+        el("filter-status").value = "all";
         renderProjects();
         setSelection(null);
-        setStatus("Project selection cleared.");
+        setStatus("Project filters and selection cleared.");
       });
 
       el("create-project-btn").addEventListener("click", async () => {
@@ -539,10 +564,7 @@
             },
             "Project profile updated."
           );
-          const updated = products.find((item) => item.id === productId);
-          if (updated) {
-            setSelection(updated);
-          }
+          setSelection(findVisibleProductById(productId));
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -562,10 +584,7 @@
             },
             "Project status updated."
           );
-          const updated = products.find((item) => item.id === productId);
-          if (updated) {
-            setSelection(updated);
-          }
+          setSelection(findVisibleProductById(productId));
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -583,10 +602,7 @@
             readFeatureConfig("edit"),
             "Feature config updated."
           );
-          const updated = products.find((item) => item.id === productId);
-          if (updated) {
-            setSelection(updated);
-          }
+          setSelection(findVisibleProductById(productId));
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -604,10 +620,7 @@
             { rotateAppId: el("rotate-sdk-app-id").value === "true" },
             "SDK credentials rotated."
           );
-          const updated = products.find((item) => item.id === productId);
-          if (updated) {
-            setSelection(updated);
-          }
+          setSelection(findVisibleProductById(productId));
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

@@ -6376,6 +6376,8 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Save Project Status/);
+    assert.match(html, /Status Filter/);
+    assert.match(html, /Apply Filter/);
     assert.match(html, /Save Project Profile/);
     assert.match(html, /Rotate SDK Credentials/);
     assert.match(html, /\/assets\/product-features\.js/);
@@ -6512,6 +6514,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
     assert.match(html, /Save Project Status/);
+    assert.match(html, /Status Filter/);
+    assert.match(html, /Apply Filter/);
     assert.match(html, /Save Project Profile/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);

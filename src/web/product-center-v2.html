@@ -65,6 +65,12 @@
         gap: 18px;
       }
 
+      .two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
       .table-grid {
         display: grid;
         grid-template-columns: 1.15fr 0.85fr;
@@ -290,6 +296,7 @@
       }
 
       @media (max-width: 760px) {
+        .two,
         .toggle-grid {
           grid-template-columns: 1fr;
         }
@@ -503,6 +510,24 @@
       <section class="table-grid">
         <article class="card">
           <h2>Products</h2>
+          <div class="two" style="margin: 14px 0 12px;">
+            <label>Search
+              <input id="filter-search" placeholder="product code, name, or description" />
+            </label>
+            <label>Status Filter
+              <select id="filter-status">
+                <option value="all">all statuses</option>
+                <option value="active">active</option>
+                <option value="disabled">disabled</option>
+                <option value="archived">archived</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions" style="margin-bottom: 12px;">
+            <button class="secondary" id="apply-filter-btn">Apply Filter</button>
+            <button id="clear-filter-btn">Clear Filter</button>
+          </div>
+          <div class="hint" style="margin-bottom: 12px;">Filter products by project code, display name, description, and lifecycle status.</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -601,6 +626,28 @@
         return items.filter((item) => (item.status || "active") === status).length;
       }
 
+      function readProductFilter() {
+        return {
+          query: el("filter-search")?.value.trim().toLowerCase() || "",
+          status: el("filter-status")?.value || "all"
+        };
+      }
+
+      function filterProducts(items = []) {
+        const { query, status } = readProductFilter();
+        return items.filter((item) => {
+          const normalizedStatus = item.status || "active";
+          const matchesStatus = status === "all" || normalizedStatus === status;
+          const matchesQuery = !query
+            || `${item.code} ${item.name} ${item.description || ""}`.toLowerCase().includes(query);
+          return matchesStatus && matchesQuery;
+        });
+      }
+
+      function findVisibleProductById(productId) {
+        return filterProducts(productsCache).find((item) => item.id === productId) || null;
+      }
+
       function renderFeatureSummary(stats) {
         const counts = {
           allowRegister: stats.registerOpen ?? 0,
@@ -635,7 +682,7 @@
         };
 
         el("stats-box").innerHTML = `
-          <div class="stat"><strong>${stats.total}</strong><span>Projects</span></div>
+          <div class="stat"><strong>${stats.total}</strong><span>Visible Projects</span></div>
           <div class="stat"><strong>${stats.assigned}</strong><span>Owned Projects</span></div>
           <div class="stat"><strong>${stats.developers}</strong><span>Developers</span></div>
           <div class="stat"><strong>${stats.activeProjects}</strong><span>Active Projects</span></div>
@@ -752,14 +799,15 @@
 
       function renderProducts(items) {
         const body = el("products-body");
-        if (!items.length) {
-          body.innerHTML = '<tr><td colspan="7">No products yet.</td></tr>';
+        const visibleItems = filterProducts(items);
+        if (!visibleItems.length) {
+          body.innerHTML = `<tr><td colspan="7">${items.length ? "No products match current filter." : "No products yet."}</td></tr>`;
           renderStats([]);
           setSelection(null);
-          return;
+          return visibleItems;
         }
 
-        body.innerHTML = items.map((item) => {
+        body.innerHTML = visibleItems.map((item) => {
           const features = item.featureConfig || {};
           const owner = ownerSummary(item);
           return `
@@ -795,6 +843,11 @@
           `;
         }).join("");
 
+        const selectedProductId = el("edit-product-id").value.trim();
+        if (selectedProductId && !visibleItems.some((item) => item.id === selectedProductId)) {
+          setSelection(null);
+        }
+
         for (const row of body.querySelectorAll("tr[data-id]")) {
           row.addEventListener("click", () => {
             const product = productsCache.find((item) => item.id === row.dataset.id);
@@ -805,7 +858,8 @@
           });
         }
 
-        renderStats(items);
+        renderStats(visibleItems);
+        return visibleItems;
       }
 
       async function callApi(path, options = {}) {
@@ -842,12 +896,11 @@
         developersCache = Array.isArray(developerData?.items) ? developerData.items : [];
         renderDeveloperOptions();
         renderDevelopers(developersCache);
-        renderProducts(productsCache);
-        renderStats(productsCache);
+        const visibleProducts = renderProducts(productsCache);
         setOutput({ products: productsCache, developers: developersCache });
 
         if (selectedProductId) {
-          const selected = productsCache.find((item) => item.id === selectedProductId);
+          const selected = visibleProducts.find((item) => item.id === selectedProductId);
           setSelection(selected || null);
         }
 
@@ -898,8 +951,7 @@
         el("create-description").value = "";
         el("create-owner-developer-id").value = "";
         await refreshAll();
-        const created = productsCache.find((item) => item.id === data.id) || data;
-        setSelection(created);
+        setSelection(findVisibleProductById(data.id));
       }));
 
       el("create-developer-btn").addEventListener("click", () => guarded(async () => {
@@ -955,8 +1007,7 @@
         setOutput(data);
         setStatus(`Saved profile for ${data.code}.`);
         await refreshAll();
-        const updated = productsCache.find((item) => item.id === productId) || data;
-        setSelection(updated);
+        setSelection(findVisibleProductById(productId));
       }));
 
       el("save-status-btn").addEventListener("click", () => guarded(async () => {
@@ -974,8 +1025,7 @@
         setOutput(data);
         setStatus(`Saved project status for ${data.code}.`);
         await refreshAll();
-        const updated = productsCache.find((item) => item.id === productId) || data;
-        setSelection(updated);
+        setSelection(findVisibleProductById(productId));
       }));
 
       el("assign-owner-btn").addEventListener("click", () => guarded(async () => {
@@ -993,8 +1043,7 @@
         setOutput(data);
         setStatus(`Saved owner for ${data.code}.`);
         await refreshAll();
-        const updated = productsCache.find((item) => item.id === productId) || data;
-        setSelection(updated);
+        setSelection(findVisibleProductById(productId));
       }));
 
       el("update-btn").addEventListener("click", () => guarded(async () => {
@@ -1010,8 +1059,7 @@
         setOutput(data);
         setStatus(`Saved feature config for ${data.code}.`);
         await refreshAll();
-        const updated = productsCache.find((item) => item.id === productId) || data;
-        setSelection(updated);
+        setSelection(findVisibleProductById(productId));
       }));
 
       el("rotate-sdk-btn").addEventListener("click", () => guarded(async () => {
@@ -1029,13 +1077,33 @@
         setOutput(data);
         setStatus(`Rotated SDK credentials for ${data.code}.`);
         await refreshAll();
-        const updated = productsCache.find((item) => item.id === productId) || data;
-        setSelection(updated);
+        setSelection(findVisibleProductById(productId));
       }));
 
       el("clear-selection-btn").addEventListener("click", () => {
         setSelection(null);
         setStatus("Selection cleared.");
+      });
+
+      el("apply-filter-btn").addEventListener("click", () => {
+        const visibleProducts = renderProducts(productsCache);
+        const filter = readProductFilter();
+        setStatus(`Product filter applied. ${visibleProducts.length} visible project(s).`);
+        setOutput({
+          filter,
+          visibleProjects: visibleProducts.map((item) => item.code)
+        });
+      });
+
+      el("clear-filter-btn").addEventListener("click", () => {
+        el("filter-search").value = "";
+        el("filter-status").value = "all";
+        const visibleProducts = renderProducts(productsCache);
+        setStatus("Product filter cleared.");
+        setOutput({
+          filter: readProductFilter(),
+          visibleProjects: visibleProducts.map((item) => item.code)
+        });
       });
 
       renderStats([]);

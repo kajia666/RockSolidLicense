@@ -2522,17 +2522,57 @@ test("postgres main store can write products and policies through a transaction-
       username: "admin",
       password: "Pass123!abc"
     });
+    const developer = app.services.createDeveloper(admin.token, {
+      username: "pgwriter",
+      password: "Pass123!abc",
+      displayName: "PG Writer"
+    });
 
     const product = await app.services.createProduct(admin.token, {
       code: "PGWRITE",
       name: "PG Write Product",
       description: "Write-capable adapter",
+      ownerDeveloperId: developer.id,
       allowRegister: false,
       allowCardLogin: false
     });
     assert.equal(product.code, "PGWRITE");
     assert.equal(product.featureConfig.allowRegister, false);
     assert.equal(product.featureConfig.allowCardLogin, false);
+    assert.equal(product.ownerDeveloper?.id, developer.id);
+
+    const developerSession = app.services.developerLogin({
+      username: "pgwriter",
+      password: "Pass123!abc"
+    });
+    const developerProducts = await app.services.developerListProducts(developerSession.token);
+    assert.equal(developerProducts.length, 1);
+    assert.equal(developerProducts[0].code, "PGWRITE");
+
+    const developerIntegration = await app.services.developerIntegration(developerSession.token);
+    assert.equal(developerIntegration.products.length, 1);
+    assert.equal(developerIntegration.products[0].code, "PGWRITE");
+
+    const developerDashboard = await app.services.developerDashboard(developerSession.token);
+    assert.equal(developerDashboard.summary.projects, 1);
+    assert.equal(developerDashboard.projects.length, 1);
+
+    const member = await app.services.developerCreateMember(developerSession.token, {
+      username: "pgmember",
+      password: "Pass123!abc",
+      role: "viewer",
+      productCodes: ["PGWRITE"]
+    });
+    assert.equal(member.productAccess.length, 1);
+    assert.equal(member.productAccess[0].productCode, "PGWRITE");
+
+    const memberSession = app.services.developerLogin({
+      username: "pgmember",
+      password: "Pass123!abc"
+    });
+    const memberProducts = await app.services.developerListProducts(memberSession.token);
+    assert.equal(memberProducts.length, 1);
+    assert.equal(memberProducts[0].code, "PGWRITE");
 
     const createdAccount = await app.mainStore.accounts.createAccount(
       product,

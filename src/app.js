@@ -954,7 +954,7 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/developer/integration") {
-        const data = services.developerIntegration(getBearerToken(req));
+        const data = await services.developerIntegration(getBearerToken(req));
         if (data?.transport?.http) {
           data.transport.http.baseUrl = url.origin;
           data.transport.http.publicHost = url.hostname;
@@ -982,13 +982,13 @@ export function createApp(overrides = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/developer/members") {
-        sendJson(res, 200, { ok: true, data: services.developerListMembers(getBearerToken(req)) });
+        sendJson(res, 200, { ok: true, data: await services.developerListMembers(getBearerToken(req)) });
         return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/developer/members") {
         const { body } = await readJsonBody(req);
-        sendJson(res, 201, { ok: true, data: services.developerCreateMember(getBearerToken(req), body) });
+        sendJson(res, 201, { ok: true, data: await services.developerCreateMember(getBearerToken(req), body) });
         return;
       }
 
@@ -999,7 +999,7 @@ export function createApp(overrides = {}) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
           ok: true,
-          data: services.developerUpdateMember(getBearerToken(req), developerMemberRoute.memberId, body)
+          data: await services.developerUpdateMember(getBearerToken(req), developerMemberRoute.memberId, body)
         });
         return;
       }
@@ -1456,7 +1456,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/audit-logs") {
         sendJson(res, 200, {
           ok: true,
-          data: services.developerListAuditLogs(getBearerToken(req), {
+          data: await services.developerListAuditLogs(getBearerToken(req), {
             actorType: url.searchParams.get("actorType"),
             eventType: url.searchParams.get("eventType"),
             limit: url.searchParams.get("limit")

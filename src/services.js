@@ -3,7 +3,6 @@ import { rotateLicenseKeyStore } from "./license-keys.js";
 import { NonceReplayError } from "./runtime-state.js";
 import {
   DEFAULT_PRODUCT_FEATURE_CONFIG,
-  findOwnedProductIdByCode,
   getActiveProductRecordByCode,
   getProductRecordById,
   getProductRowById,
@@ -533,17 +532,20 @@ function listDeveloperAccessibleProductIds(db, session) {
   return listAssignedDeveloperProductIds(db, session.member_id, session.developer_id);
 }
 
-function listDeveloperAccessibleProductRows(db, session) {
+async function listDeveloperAccessibleProductRows(db, store, session) {
   if (session.actor_scope === "owner") {
-    return queryProductRows(db, { ownerDeveloperId: session.developer_id });
+    return await Promise.resolve(store.products.queryProductRows(db, {
+      ownerDeveloperId: session.developer_id
+    }));
   }
 
   const productIds = listDeveloperAccessibleProductIds(db, session);
-  return queryProductRows(db, { productIds });
+  return await Promise.resolve(store.products.queryProductRows(db, { productIds }));
 }
 
-function listDeveloperAccessibleProductCodes(db, session) {
-  return listDeveloperAccessibleProductRows(db, session).map((item) => item.code);
+async function listDeveloperAccessibleProductCodes(db, store, session) {
+  const products = await listDeveloperAccessibleProductRows(db, store, session);
+  return products.map((item) => item.code);
 }
 
 function numberCount(value) {
@@ -623,7 +625,7 @@ async function queryProductOperationalMetricMaps(db, store, productIds = [], ref
 async function queryDeveloperDashboardPayload(db, store, session, runtimeState) {
   await expireStaleSessions(db, store, runtimeState);
 
-  const products = listDeveloperAccessibleProductRows(db, session);
+  const products = await listDeveloperAccessibleProductRows(db, store, session);
   const summary = {
     projects: products.length,
     registerEnabledProjects: products.filter((item) => item.featureConfig?.allowRegister !== false).length,
@@ -818,12 +820,19 @@ function ensureDeveloperCanAccessProduct(db, session, product, permission, code,
   return product;
 }
 
-function resolveDeveloperAccessibleProductByCode(db, session, productCode, permission, code, message) {
-  const product = requireProductByCode(db, productCode);
+async function resolveDeveloperAccessibleProductByCode(db, store, session, productCode, permission, code, message) {
+  const rows = await Promise.resolve(store.products.queryProductRows(db, {
+    productCode,
+    status: "active"
+  }));
+  const product = rows[0] ?? null;
+  if (!product) {
+    throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist or is inactive.");
+  }
   return ensureDeveloperCanAccessProduct(db, session, product, permission, code, message);
 }
 
-function queryDeveloperMemberRows(db, developerId) {
+async function queryDeveloperMemberRows(db, store, developerId) {
   const members = many(
     db,
     `
@@ -842,24 +851,27 @@ function queryDeveloperMemberRows(db, developerId) {
   const accessRows = many(
     db,
     `
-      SELECT dmp.member_id, dmp.product_id, dmp.created_at,
-             p.code AS product_code, p.name AS product_name
+      SELECT dmp.member_id, dmp.product_id, dmp.created_at
       FROM developer_member_products dmp
       JOIN developer_members dm ON dm.id = dmp.member_id
-      JOIN products p ON p.id = dmp.product_id
       WHERE dm.developer_id = ?
-      ORDER BY p.created_at DESC
+      ORDER BY dmp.created_at DESC
     `,
     developerId
   );
 
+  const productRows = await Promise.resolve(store.products.queryProductRows(db, {
+    productIds: accessRows.map((row) => row.product_id)
+  }));
+  const productMap = new Map(productRows.map((product) => [product.id, product]));
   const accessMap = new Map();
   for (const row of accessRows) {
     const items = accessMap.get(row.member_id) ?? [];
+    const product = productMap.get(row.product_id);
     items.push({
       productId: row.product_id,
-      productCode: row.product_code,
-      productName: row.product_name,
+      productCode: product?.code ?? null,
+      productName: product?.name ?? null,
       assignedAt: row.created_at
     });
     accessMap.set(row.member_id, items);
@@ -868,7 +880,56 @@ function queryDeveloperMemberRows(db, developerId) {
   return members.map((row) => formatDeveloperMemberRow(row, accessMap.get(row.id) ?? []));
 }
 
-function syncDeveloperMemberProductAccess(db, developerId, memberId, productIds = [], timestamp = nowIso()) {
+function ensureSqliteProductShadowRecords(db, products = []) {
+  for (const product of products) {
+    const existing = one(db, "SELECT id FROM products WHERE id = ?", product.id);
+    const ownerDeveloperId = product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null;
+
+    if (existing) {
+      run(
+        db,
+        `
+          UPDATE products
+          SET code = ?, name = ?, description = ?, status = ?, owner_developer_id = ?,
+              sdk_app_id = ?, sdk_app_secret = ?, created_at = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        product.code,
+        product.name,
+        product.description ?? "",
+        product.status,
+        ownerDeveloperId,
+        product.sdkAppId,
+        product.sdkAppSecret,
+        product.createdAt,
+        product.updatedAt,
+        product.id
+      );
+      continue;
+    }
+
+    run(
+      db,
+      `
+        INSERT INTO products
+        (id, code, name, description, status, owner_developer_id, sdk_app_id, sdk_app_secret, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      product.id,
+      product.code,
+      product.name,
+      product.description ?? "",
+      product.status,
+      ownerDeveloperId,
+      product.sdkAppId,
+      product.sdkAppSecret,
+      product.createdAt,
+      product.updatedAt
+    );
+  }
+}
+
+async function syncDeveloperMemberProductAccess(db, store, developerId, memberId, productIds = [], timestamp = nowIso()) {
   const normalizedIds = Array.from(
     new Set(
       (Array.isArray(productIds) ? productIds : [])
@@ -878,21 +939,14 @@ function syncDeveloperMemberProductAccess(db, developerId, memberId, productIds 
   );
 
   if (normalizedIds.length) {
-    const rows = many(
-      db,
-      `
-        SELECT id
-        FROM products
-        WHERE owner_developer_id = ?
-          AND id IN (${makeSqlPlaceholders(normalizedIds.length)})
-      `,
-      developerId,
-      ...normalizedIds
-    );
-
+    const rows = await Promise.resolve(store.products.queryProductRows(db, {
+      ownerDeveloperId: developerId,
+      productIds: normalizedIds
+    }));
     if (rows.length !== normalizedIds.length) {
       throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only assign member access to your own projects.");
     }
+    ensureSqliteProductShadowRecords(db, rows);
   }
 
   const existingRows = many(
@@ -935,7 +989,7 @@ function syncDeveloperMemberProductAccess(db, developerId, memberId, productIds 
   }
 }
 
-function resolveDeveloperOwnedProductIdsInput(db, developerId, body = {}) {
+async function resolveDeveloperOwnedProductIdsInput(db, store, developerId, body = {}) {
   const productIds = Array.isArray(body.productIds) ? body.productIds : [];
   const productCodes = Array.isArray(body.productCodes)
     ? body.productCodes
@@ -963,11 +1017,13 @@ function resolveDeveloperOwnedProductIdsInput(db, developerId, body = {}) {
 
   const resolved = new Set(normalizedIds);
   for (const productCode of normalizedCodes) {
-    const productId = findOwnedProductIdByCode(db, developerId, productCode);
-    if (!productId) {
+    const rows = await Promise.resolve(store.products.queryProductRows(db, { productCode }));
+    const product = rows[0] ?? null;
+    const ownerDeveloperId = product?.ownerDeveloperId ?? product?.ownerDeveloper?.id ?? null;
+    if (!product || ownerDeveloperId !== developerId) {
       throw new AppError(403, "DEVELOPER_PRODUCT_FORBIDDEN", "You can only assign member access to your own projects.");
     }
-    resolved.add(productId);
+    resolved.add(product.id);
   }
 
   return [...resolved];
@@ -1299,9 +1355,10 @@ function requireDeveloperOwnedProduct(db, session, productId, permission = "prod
   );
 }
 
-function requireDeveloperOwnedProductByCode(db, session, productCode, permission = "products.read") {
+async function requireDeveloperOwnedProductByCode(db, store, session, productCode, permission = "products.read") {
   return resolveDeveloperAccessibleProductByCode(
     db,
+    store,
     session,
     productCode,
     permission,
@@ -4274,16 +4331,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
     },
 
-    developerListMembers(token) {
+    async developerListMembers(token) {
       const session = requireDeveloperOwnerSession(db, token);
-      const items = queryDeveloperMemberRows(db, session.developer_id);
+      const items = await queryDeveloperMemberRows(db, store, session.developer_id);
       return {
         items,
         total: items.length
       };
     },
 
-    developerCreateMember(token, body = {}) {
+    async developerCreateMember(token, body = {}) {
       const session = requireDeveloperOwnerSession(db, token);
       requireField(body, "username");
       requireField(body, "password");
@@ -4306,7 +4363,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       const role = normalizeDeveloperMemberRole(body.role ?? "viewer");
       const status = normalizeDeveloperMemberStatus(body.status ?? "active");
-      const productIds = resolveDeveloperOwnedProductIdsInput(db, session.developer_id, body) ?? [];
+      const productIds = await resolveDeveloperOwnedProductIdsInput(db, store, session.developer_id, body) ?? [];
       const timestamp = nowIso();
       const memberId = generateId("devm");
 
@@ -4327,9 +4384,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         timestamp,
         timestamp
       );
-      syncDeveloperMemberProductAccess(db, session.developer_id, memberId, productIds, timestamp);
+      await syncDeveloperMemberProductAccess(db, store, session.developer_id, memberId, productIds, timestamp);
 
-      const member = queryDeveloperMemberRows(db, session.developer_id).find((item) => item.id === memberId);
+      const member = (await queryDeveloperMemberRows(db, store, session.developer_id))
+        .find((item) => item.id === memberId);
       auditDeveloperSession(db, session, "developer-member.create", "developer_member", memberId, {
         username,
         role,
@@ -4340,7 +4398,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return member;
     },
 
-    developerUpdateMember(token, memberId, body = {}) {
+    async developerUpdateMember(token, memberId, body = {}) {
       const session = requireDeveloperOwnerSession(db, token);
       const current = one(
         db,
@@ -4361,7 +4419,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const status = body.status === undefined
         ? normalizeDeveloperMemberStatus(current.status)
         : normalizeDeveloperMemberStatus(body.status);
-      const nextProductIds = resolveDeveloperOwnedProductIdsInput(db, session.developer_id, body);
+      const nextProductIds = await resolveDeveloperOwnedProductIdsInput(db, store, session.developer_id, body);
       const newPasswordProvided = body.newPassword !== undefined && String(body.newPassword).trim() !== "";
 
       if (newPasswordProvided && String(body.newPassword).length < 8) {
@@ -4385,7 +4443,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
 
       if (nextProductIds !== null) {
-        syncDeveloperMemberProductAccess(db, session.developer_id, current.id, nextProductIds, timestamp);
+        await syncDeveloperMemberProductAccess(db, store, session.developer_id, current.id, nextProductIds, timestamp);
       }
 
       let revokedSessions = 0;
@@ -4393,7 +4451,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         revokedSessions = revokeDeveloperMemberSessions(db, "member_id = ?", [current.id]);
       }
 
-      const member = queryDeveloperMemberRows(db, session.developer_id).find((item) => item.id === current.id);
+      const member = (await queryDeveloperMemberRows(db, store, session.developer_id))
+        .find((item) => item.id === current.id);
       auditDeveloperSession(db, session, "developer-member.update", "developer_member", current.id, {
         username: current.username,
         role,
@@ -4511,7 +4570,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return queryDeveloperDashboardPayload(db, store, session, stateStore);
     },
 
-    developerIntegration(token) {
+    async developerIntegration(token) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -4519,7 +4578,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_PRODUCT_FORBIDDEN",
         "You can only view projects assigned to your developer account."
       );
-      const products = listDeveloperAccessibleProductRows(db, session);
+      const products = await listDeveloperAccessibleProductRows(db, store, session);
       return {
         developer: {
           id: session.developer_id,
@@ -4654,8 +4713,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view policies under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "policies.read"
@@ -4850,8 +4910,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view cards under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "cards.read"
@@ -4878,8 +4939,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view cards under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "cards.read"
@@ -5060,8 +5122,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view customer accounts under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "ops.read"
@@ -5172,8 +5235,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view entitlements under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "ops.read"
@@ -7192,8 +7256,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view device bindings under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "ops.read"
@@ -7267,7 +7332,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return queryDeviceBlockRows(db, store, filters);
     },
 
-    developerListDeviceBlocks(token, filters = {}) {
+    async developerListDeviceBlocks(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -7276,8 +7341,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view device blocks under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "ops.read"
@@ -8574,8 +8640,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view sessions under your assigned projects."
       );
       if (filters.productCode) {
-        requireDeveloperOwnedProductByCode(
+        await requireDeveloperOwnedProductByCode(
           db,
+          store,
           session,
           String(filters.productCode).trim().toUpperCase(),
           "ops.read"
@@ -8677,7 +8744,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return queryAuditLogRows(db, filters);
     },
 
-    developerListAuditLogs(token, filters = {}) {
+    async developerListAuditLogs(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -8688,7 +8755,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return queryAuditLogRows(db, {
         ...filters,
         developerId: session.developer_id,
-        productCodes: listDeveloperAccessibleProductCodes(db, session)
+        productCodes: await listDeveloperAccessibleProductCodes(db, store, session)
       });
     },
 

@@ -77,7 +77,7 @@ test("product repository exposes formatted rows and developer-scoped lookups", a
       username: "repodev",
       password: "Pass123!abc"
     });
-    const member = app.services.developerCreateMember(ownerSession.token, {
+    const member = await app.services.developerCreateMember(ownerSession.token, {
       username: "repomember",
       password: "Pass123!abc",
       role: "viewer",

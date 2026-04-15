@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createApp } from "../src/app.js";
+import { signClientRequest } from "../src/security.js";
 
 function createTestApp(overrides = {}) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rocksolid-postgres-main-store-"));
@@ -42,6 +43,37 @@ async function postJson(baseUrl, requestPath, body, token = null) {
   const json = await response.json();
   assert.equal(response.ok, true, JSON.stringify(json));
   return json.data;
+}
+
+let signedClientNonceCounter = 0;
+
+async function callSignedClientService(app, product, routePath, serviceMethod, payload, meta = {}) {
+  const body = JSON.stringify(payload);
+  const timestamp = new Date(Date.now() + signedClientNonceCounter).toISOString();
+  const nonce = `pg-preview-${signedClientNonceCounter += 1}`;
+  const signature = signClientRequest(product.sdkAppSecret, {
+    method: "POST",
+    path: routePath,
+    timestamp,
+    nonce,
+    body
+  });
+
+  return app.services[serviceMethod](
+    {
+      method: "POST",
+      path: routePath,
+      headers: {
+        "x-rs-app-id": product.sdkAppId,
+        "x-rs-timestamp": timestamp,
+        "x-rs-nonce": nonce,
+        "x-rs-signature": signature
+      }
+    },
+    payload,
+    body,
+    meta
+  );
 }
 
 function createWriteCapableAdapter() {
@@ -866,6 +898,42 @@ function createWriteCapableAdapter() {
 
     if (meta.repository === "entitlements" && meta.operation === "loadEntitlementManageRow") {
       return entitlementRows({ entitlementId: params[0] }).slice(0, 1);
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "loadLatestEntitlementEndsAtByPolicy") {
+      return state.entitlements
+        .filter((entitlement) => entitlement.account_id === params[0])
+        .filter((entitlement) => entitlement.product_id === params[1])
+        .filter((entitlement) => entitlement.policy_id === params[2])
+        .sort((left, right) => String(right.ends_at).localeCompare(String(left.ends_at)))
+        .slice(0, 1)
+        .map((entitlement) => ({ ends_at: entitlement.ends_at }));
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "createEntitlement") {
+      state.entitlements.push({
+        id: params[0],
+        product_id: params[1],
+        policy_id: params[2],
+        account_id: params[3],
+        source_license_key_id: params[4],
+        status: "active",
+        starts_at: params[5],
+        ends_at: params[6],
+        created_at: params[7],
+        updated_at: params[8]
+      });
+      return [];
+    }
+
+    if (meta.repository === "entitlements" && meta.operation === "markCardRedeemed") {
+      const card = state.licenseKeys.find((item) => item.id === params[2]);
+      if (card) {
+        card.status = "redeemed";
+        card.redeemed_at = params[0];
+        card.redeemed_by_account_id = params[1];
+      }
+      return [];
     }
 
     if (meta.repository === "entitlements" && meta.operation === "updateEntitlementStatus") {
@@ -3386,6 +3454,199 @@ test("postgres main store keeps sqlite card shadows and reseller routes usable d
     assert.equal(state.licenseKeys.length, 3);
     assert.equal(
       state.queries.some((entry) => entry.meta?.operation === "createCard"),
+      true
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("postgres preview supports signed client register, recharge, login, and card-login reuse", async () => {
+  const { adapter, state } = createWriteCapableAdapter();
+  const { app, tempDir } = createTestApp({
+    mainStoreDriver: "postgres",
+    postgresUrl: "postgres://rocksolid:secret@127.0.0.1:5432/rocksolid",
+    postgresMainStoreAdapter: adapter
+  });
+
+  try {
+    const admin = app.services.adminLogin({
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const product = await app.services.createProduct(admin.token, {
+      code: "PGCLIENT",
+      name: "PG Client Flow Product"
+    });
+    const policy = await app.services.createPolicy(admin.token, {
+      productCode: "PGCLIENT",
+      name: "PG Client Flow Policy",
+      durationDays: 0,
+      maxDevices: 1,
+      grantType: "points",
+      grantPoints: 3
+    });
+
+    const batch = await app.services.createCardBatch(admin.token, {
+      productCode: "PGCLIENT",
+      policyId: policy.id,
+      count: 2,
+      prefix: "PGCLNT"
+    });
+    assert.equal(batch.count, 2);
+
+    const registration = await callSignedClientService(
+      app,
+      product,
+      "/api/client/register",
+      "registerClient",
+      {
+        productCode: "PGCLIENT",
+        username: "pguser",
+        password: "StrongPass123"
+      },
+      { ip: "203.0.113.70", userAgent: "pg-preview-register" }
+    );
+    assert.equal(registration.username, "pguser");
+
+    const recharge = await callSignedClientService(
+      app,
+      product,
+      "/api/client/recharge",
+      "redeemCard",
+      {
+        productCode: "PGCLIENT",
+        username: "pguser",
+        password: "StrongPass123",
+        cardKey: batch.keys[0]
+      },
+      { ip: "203.0.113.70", userAgent: "pg-preview-recharge" }
+    );
+    assert.equal(recharge.grantType, "points");
+    assert.equal(recharge.remainingPoints, 3);
+
+    const accountLogin = await callSignedClientService(
+      app,
+      product,
+      "/api/client/login",
+      "loginClient",
+      {
+        productCode: "PGCLIENT",
+        username: "pguser",
+        password: "StrongPass123",
+        deviceFingerprint: "pg-preview-device-001",
+        deviceName: "PG Preview Desktop"
+      },
+      { ip: "203.0.113.70", userAgent: "pg-preview-login" }
+    );
+    assert.ok(accountLogin.sessionToken);
+    assert.equal(accountLogin.quota.grantType, "points");
+    assert.equal(accountLogin.quota.remainingPoints, 2);
+
+    const rechargedCardShadow = app.db.prepare(
+      "SELECT status, redeemed_by_account_id FROM license_keys WHERE card_key = ?"
+    ).get(batch.keys[0]);
+    assert.equal(rechargedCardShadow.status, "redeemed");
+    assert.ok(rechargedCardShadow.redeemed_by_account_id);
+
+    const accountShadow = app.db.prepare(
+      "SELECT username, status, last_login_at FROM customer_accounts WHERE username = ?"
+    ).get("pguser");
+    assert.ok(accountShadow);
+    assert.equal(accountShadow.status, "active");
+    assert.ok(accountShadow.last_login_at);
+
+    const directLogin = await callSignedClientService(
+      app,
+      product,
+      "/api/client/card-login",
+      "cardLoginClient",
+      {
+        productCode: "PGCLIENT",
+        cardKey: batch.keys[1],
+        deviceFingerprint: "pg-preview-card-device-001",
+        deviceName: "PG Preview Card Client"
+      },
+      { ip: "203.0.113.71", userAgent: "pg-preview-card-login-1" }
+    );
+    assert.equal(directLogin.authMode, "card");
+    assert.ok(directLogin.sessionToken);
+
+    const directCardShadow = app.db.prepare(
+      "SELECT id, status, redeemed_by_account_id FROM license_keys WHERE card_key = ?"
+    ).get(batch.keys[1]);
+    assert.ok(directCardShadow);
+    assert.equal(directCardShadow.status, "redeemed");
+    assert.ok(directCardShadow.redeemed_by_account_id);
+
+    const cardLoginLink = app.db.prepare(
+      "SELECT * FROM card_login_accounts WHERE license_key_id = ?"
+    ).get(directCardShadow.id);
+    assert.ok(cardLoginLink);
+    assert.equal(cardLoginLink.product_id, product.id);
+
+    const cardLoginAccountShadow = app.db.prepare(
+      "SELECT * FROM customer_accounts WHERE id = ?"
+    ).get(cardLoginLink.account_id);
+    assert.ok(cardLoginAccountShadow);
+    assert.equal(cardLoginAccountShadow.status, "active");
+
+    const directRelogin = await callSignedClientService(
+      app,
+      product,
+      "/api/client/card-login",
+      "cardLoginClient",
+      {
+        productCode: "PGCLIENT",
+        cardKey: batch.keys[1],
+        deviceFingerprint: "pg-preview-card-device-001",
+        deviceName: "PG Preview Card Client"
+      },
+      { ip: "203.0.113.71", userAgent: "pg-preview-card-login-2" }
+    );
+    assert.equal(directRelogin.authMode, "card");
+    assert.notEqual(directRelogin.sessionToken, directLogin.sessionToken);
+
+    const disabledCardLoginAccount = await app.services.updateAccountStatus(admin.token, cardLoginLink.account_id, {
+      status: "disabled"
+    });
+    assert.equal(disabledCardLoginAccount.status, "disabled");
+
+    const disabledCardLoginShadow = app.db.prepare(
+      "SELECT status FROM customer_accounts WHERE id = ?"
+    ).get(cardLoginLink.account_id);
+    assert.equal(disabledCardLoginShadow.status, "disabled");
+
+    await assert.rejects(
+      () => callSignedClientService(
+        app,
+        product,
+        "/api/client/card-login",
+        "cardLoginClient",
+        {
+          productCode: "PGCLIENT",
+          cardKey: batch.keys[1],
+          deviceFingerprint: "pg-preview-card-device-001",
+          deviceName: "PG Preview Card Client"
+        },
+        { ip: "203.0.113.71", userAgent: "pg-preview-card-login-disabled" }
+      ),
+      (error) => {
+        assert.equal(error.status, 403);
+        assert.equal(error.code, "CARD_LOGIN_DISABLED");
+        return true;
+      }
+    );
+
+    assert.ok(state.entitlements.length >= 2);
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "createEntitlement"),
+      true
+    );
+    assert.equal(
+      state.queries.some((entry) => entry.meta?.operation === "markCardRedeemed"),
       true
     );
   } finally {

@@ -1172,6 +1172,105 @@ function ensureSqliteLicenseKeyControlShadowRecords(db, controls = [], timestamp
   }
 }
 
+function ensureSqliteCustomerAccountShadowRecords(db, accounts = []) {
+  for (const account of accounts) {
+    const accountId = account.id ?? null;
+    if (!accountId) {
+      continue;
+    }
+
+    const existing = one(db, "SELECT * FROM customer_accounts WHERE id = ?", accountId);
+    const productId = account.productId ?? account.product_id ?? existing?.product_id ?? null;
+    const username = String(account.username ?? existing?.username ?? "").trim();
+    const passwordHash = account.passwordHash ?? account.password_hash ?? existing?.password_hash ?? null;
+    const status = account.status ?? existing?.status ?? "active";
+    const createdAt = account.createdAt ?? account.created_at ?? existing?.created_at ?? nowIso();
+    const updatedAt = account.updatedAt ?? account.updated_at ?? existing?.updated_at ?? createdAt;
+    const lastLoginAt = account.lastLoginAt ?? account.last_login_at ?? existing?.last_login_at ?? null;
+
+    if (!productId || !username || !passwordHash) {
+      continue;
+    }
+
+    if (existing) {
+      run(
+        db,
+        `
+          UPDATE customer_accounts
+          SET product_id = ?, username = ?, password_hash = ?, status = ?, created_at = ?, updated_at = ?, last_login_at = ?
+          WHERE id = ?
+        `,
+        productId,
+        username,
+        passwordHash,
+        status,
+        createdAt,
+        updatedAt,
+        lastLoginAt,
+        accountId
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO customer_accounts
+          (id, product_id, username, password_hash, status, created_at, updated_at, last_login_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        accountId,
+        productId,
+        username,
+        passwordHash,
+        status,
+        createdAt,
+        updatedAt,
+        lastLoginAt
+      );
+    }
+  }
+}
+
+function ensureSqliteCardLoginAccountShadowRecords(db, links = []) {
+  for (const link of links) {
+    const licenseKeyId = link.licenseKeyId ?? link.license_key_id ?? null;
+    const accountId = link.accountId ?? link.account_id ?? null;
+    const productId = link.productId ?? link.product_id ?? null;
+    const createdAt = link.createdAt ?? link.created_at ?? nowIso();
+
+    if (!licenseKeyId || !accountId || !productId) {
+      continue;
+    }
+
+    const existing = one(db, "SELECT license_key_id FROM card_login_accounts WHERE license_key_id = ?", licenseKeyId);
+    if (existing) {
+      run(
+        db,
+        `
+          UPDATE card_login_accounts
+          SET account_id = ?, product_id = ?, created_at = ?
+          WHERE license_key_id = ?
+        `,
+        accountId,
+        productId,
+        createdAt,
+        licenseKeyId
+      );
+    } else {
+      run(
+        db,
+        `
+          INSERT INTO card_login_accounts (license_key_id, account_id, product_id, created_at)
+          VALUES (?, ?, ?, ?)
+        `,
+        licenseKeyId,
+        accountId,
+        productId,
+        createdAt
+      );
+    }
+  }
+}
+
 async function syncDeveloperMemberProductAccess(db, store, developerId, memberId, productIds = [], timestamp = nowIso()) {
   const normalizedIds = Array.from(
     new Set(
@@ -2669,7 +2768,8 @@ async function issueClientSession(
     meta,
     authMode = "account",
     tokenSubject,
-    bindConfig = null
+    bindConfig = null,
+    syncAccountShadow = null
   }
 ) {
   const resolvedDeviceProfile = extractClientDeviceProfile(
@@ -2759,7 +2859,20 @@ async function issueClientSession(
     lastSeenIp: meta.ip,
     userAgent: meta.userAgent
   }));
-  await Promise.resolve(store.accounts.touchAccountLastLogin(account.id, issuedAt));
+  const touchedAccount = await Promise.resolve(store.accounts.touchAccountLastLogin(account.id, issuedAt));
+  if (typeof syncAccountShadow === "function") {
+    await syncAccountShadow(
+      touchedAccount ?? {
+        ...account,
+        productId: account.productId ?? account.product_id ?? product.id,
+        updatedAt: issuedAt,
+        updated_at: issuedAt,
+        lastLoginAt: issuedAt,
+        last_login_at: issuedAt
+      },
+      product
+    );
+  }
 
   audit(db, "account", account.id, "session.login", "session", sessionId, {
     productCode: product.code,
@@ -4116,6 +4229,103 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       expiresAt: control.expiresAt,
       notes: control.notes ?? card.notes ?? null
     }], timestamp);
+  }
+
+  function getSqliteResellerAllocationByLicenseKey(licenseKeyId) {
+    return one(
+      db,
+      `
+        SELECT ri.id, ri.allocation_batch_code, ri.allocated_at,
+               r.id AS reseller_id, r.code AS reseller_code, r.name AS reseller_name
+        FROM reseller_inventory ri
+        JOIN resellers r ON r.id = ri.reseller_id
+        WHERE ri.license_key_id = ? AND ri.status = 'active'
+      `,
+      licenseKeyId
+    );
+  }
+
+  async function syncSqliteAccountRecordShadow(account, product = null) {
+    if (!account?.id) {
+      return;
+    }
+
+    const resolvedProduct = product ?? await getStoreProductById(account.productId ?? account.product_id);
+    if (resolvedProduct) {
+      ensureSqliteProductShadowRecords(db, [resolvedProduct]);
+    }
+
+    ensureSqliteCustomerAccountShadowRecords(db, [account]);
+  }
+
+  async function syncSqliteCardActivationShadow(
+    product,
+    account,
+    card,
+    timestamp = nowIso(),
+    options = {}
+  ) {
+    const resolvedPolicyId = card?.policyId ?? card?.policy_id ?? null;
+    if (resolvedPolicyId) {
+      const policy = await getStorePolicyById(resolvedPolicyId);
+      if (policy) {
+        ensureSqlitePolicyShadowRecords(db, [policy]);
+      }
+    }
+
+    await syncSqliteAccountRecordShadow(account, product);
+    ensureSqliteLicenseKeyShadowRecords(db, [{
+      id: card.id,
+      productId: product.id,
+      policyId: resolvedPolicyId,
+      cardKey: card.cardKey ?? card.card_key,
+      batchCode: card.batchCode ?? card.batch_code ?? null,
+      status: "redeemed",
+      notes: card.notes ?? card.control_notes ?? null,
+      issuedAt: card.issuedAt ?? card.issued_at ?? null,
+      redeemedAt: timestamp,
+      redeemedByAccountId: account.id
+    }]);
+
+    if (options.linkCardLoginAccount) {
+      ensureSqliteCardLoginAccountShadowRecords(db, [{
+        licenseKeyId: card.id,
+        accountId: account.id,
+        productId: product.id,
+        createdAt: timestamp
+      }]);
+    }
+  }
+
+  async function activateFreshCardEntitlementWithShadow(
+    product,
+    account,
+    card,
+    timestamp = nowIso(),
+    options = {}
+  ) {
+    const activation = await Promise.resolve(store.entitlements.activateFreshCardEntitlement(
+      product,
+      account,
+      card,
+      timestamp
+    ));
+    await syncSqliteCardActivationShadow(product, account, card, timestamp, options);
+
+    if (!activation.reseller) {
+      const resellerAllocation = getSqliteResellerAllocationByLicenseKey(card.id);
+      if (resellerAllocation) {
+        activation.reseller = {
+          id: resellerAllocation.reseller_id,
+          code: resellerAllocation.reseller_code,
+          name: resellerAllocation.reseller_name,
+          allocationBatchCode: resellerAllocation.allocation_batch_code,
+          allocatedAt: resellerAllocation.allocated_at
+        };
+      }
+    }
+
+    return activation;
   }
 
   return {
@@ -5497,6 +5707,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return withTransaction(db, async () => {
         const timestamp = nowIso();
         await Promise.resolve(store.accounts.updateAccountStatus(account.id, nextStatus, timestamp));
+        const updatedAccountRecord = await getStoreAccountRecordById(account.id);
+        await syncSqliteAccountRecordShadow(updatedAccountRecord, await getStoreProductById(account.productId));
 
         let revokedSessions = 0;
         if (nextStatus === "disabled") {
@@ -7488,6 +7700,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return withTransaction(db, async () => {
         const timestamp = nowIso();
         await Promise.resolve(store.accounts.updateAccountStatus(account.id, nextStatus, timestamp));
+        const updatedAccountRecord = await getStoreAccountRecordById(account.id);
+        await syncSqliteAccountRecordShadow(updatedAccountRecord, await getStoreProductById(account.productId));
 
         let revokedSessions = 0;
         if (nextStatus === "disabled") {
@@ -9362,6 +9576,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         username,
         passwordHash: hashPassword(password)
       }, now));
+      await syncSqliteAccountRecordShadow(account, product);
 
       audit(db, "account", account.id, "account.register", "account", account.id, {
         productCode: product.code,
@@ -9413,12 +9628,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           expires_at: card.expires_at
         }));
 
-        const activation = await Promise.resolve(store.entitlements.activateFreshCardEntitlement(
-          product,
-          account,
-          card,
-          nowIso()
-        ));
+        const activation = await activateFreshCardEntitlementWithShadow(product, account, card, nowIso());
         auditActivatedCardEntitlement(db, product, account, card, activation, "card.redeem");
         return activation;
       });
@@ -9492,12 +9702,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             username: account.username,
             cardKeyMasked: maskCardKey(card.card_key)
           });
-          const activation = await Promise.resolve(store.entitlements.activateFreshCardEntitlement(
+          const activation = await activateFreshCardEntitlementWithShadow(
             product,
             account,
             card,
-            nowIso()
-          ));
+            nowIso(),
+            { linkCardLoginAccount: true }
+          );
           auditActivatedCardEntitlement(db, product, account, card, activation, "card.direct_redeem", {
             authMode: "card"
           });
@@ -9529,7 +9740,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             meta,
             authMode: "card",
             tokenSubject: account.username,
-            bindConfig
+            bindConfig,
+            syncAccountShadow: syncSqliteAccountRecordShadow
           })),
           card: {
             maskedKey
@@ -9605,7 +9817,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           meta,
           authMode: "account",
           tokenSubject: account.username,
-          bindConfig
+          bindConfig,
+          syncAccountShadow: syncSqliteAccountRecordShadow
         });
       });
       return finalizeIssuedSessionRuntime(db, store, stateStore, sessionResult);

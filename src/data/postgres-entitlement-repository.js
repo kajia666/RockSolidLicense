@@ -112,8 +112,17 @@ export function createPostgresEntitlementRepository(adapter) {
     },
 
     async getUsableEntitlement(db, accountId, productId, referenceTime = nowIso()) {
-      return this.getUsableDurationEntitlement(db, accountId, productId, referenceTime)
-        ?? this.getUsablePointsEntitlement(db, accountId, productId, referenceTime);
+      const durationEntitlement = await this.getUsableDurationEntitlement(
+        db,
+        accountId,
+        productId,
+        referenceTime
+      );
+      if (durationEntitlement) {
+        return durationEntitlement;
+      }
+
+      return this.getUsablePointsEntitlement(db, accountId, productId, referenceTime);
     },
 
     async getLatestEntitlementSnapshot(_db, accountId, productId) {

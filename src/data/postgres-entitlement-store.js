@@ -1,5 +1,5 @@
 import { AppError } from "../http.js";
-import { addDays, nowIso } from "../security.js";
+import { addDays, generateId, nowIso } from "../security.js";
 import { normalizeEntitlementStatus } from "./entitlement-repository.js";
 import { normalizeGrantType } from "./policy-repository.js";
 
@@ -25,6 +25,59 @@ function normalizePointAdjustMode(value = "add") {
     throw new AppError(400, "INVALID_POINT_ADJUST_MODE", "mode must be add, subtract, or set.");
   }
   return mode;
+}
+
+function defaultPointsEntitlementEndsAt(referenceTime = nowIso()) {
+  return addDays(referenceTime, 36500);
+}
+
+function getCardField(card, camelKey, snakeKey = camelKey) {
+  return card?.[camelKey] ?? card?.[snakeKey] ?? null;
+}
+
+function getEntitlementField(entitlement, camelKey, snakeKey = camelKey) {
+  return entitlement?.[camelKey] ?? entitlement?.[snakeKey] ?? null;
+}
+
+async function loadLatestEntitlementEndsAtByPolicy(adapter, accountId, productId, policyId) {
+  const rows = await Promise.resolve(adapter.query(
+    `
+      SELECT ends_at
+      FROM entitlements
+      WHERE account_id = $1 AND product_id = $2 AND policy_id = $3
+      ORDER BY ends_at DESC
+      LIMIT 1
+    `,
+    [accountId, productId, policyId],
+    {
+      repository: "entitlements",
+      operation: "loadLatestEntitlementEndsAtByPolicy",
+      accountId,
+      productId,
+      policyId
+    }
+  ));
+
+  return rows[0]?.ends_at ?? null;
+}
+
+async function loadEntitlementMetering(adapter, entitlementId) {
+  const rows = await Promise.resolve(adapter.query(
+    `
+      SELECT entitlement_id, grant_type, total_points, remaining_points, consumed_points, created_at, updated_at
+      FROM entitlement_metering
+      WHERE entitlement_id = $1
+      LIMIT 1
+    `,
+    [entitlementId],
+    {
+      repository: "entitlements",
+      operation: "loadEntitlementMetering",
+      entitlementId
+    }
+  ));
+
+  return rows[0] ?? null;
 }
 
 async function loadEntitlementManageRow(adapter, entitlementId) {
@@ -89,20 +142,7 @@ async function loadPointEntitlementForAdmin(adapter, entitlementId) {
 }
 
 async function upsertEntitlementMetering(adapter, entitlementId, grantType, totalPoints, remainingPoints, consumedPoints, timestamp) {
-  const existingRows = await Promise.resolve(adapter.query(
-    `
-      SELECT entitlement_id, created_at
-      FROM entitlement_metering
-      WHERE entitlement_id = $1
-      LIMIT 1
-    `,
-    [entitlementId],
-    {
-      repository: "entitlements",
-      operation: "loadEntitlementMetering",
-      entitlementId
-    }
-  ));
+  const existing = await loadEntitlementMetering(adapter, entitlementId);
 
   await Promise.resolve(adapter.query(
     `
@@ -122,7 +162,7 @@ async function upsertEntitlementMetering(adapter, entitlementId, grantType, tota
       totalPoints,
       remainingPoints,
       consumedPoints,
-      existingRows[0]?.created_at ?? timestamp,
+      existing?.created_at ?? timestamp,
       timestamp
     ],
     {
@@ -139,6 +179,141 @@ export function createPostgresEntitlementStore(adapter) {
   }
 
   return {
+    async activateFreshCardEntitlement(product, account, card, timestamp = nowIso()) {
+      return adapter.withTransaction(async (tx) => {
+        const policyId = getCardField(card, "policyId", "policy_id");
+        const policyName = getCardField(card, "policyName", "policy_name");
+        const grantType = normalizeGrantType(getCardField(card, "grantType", "grant_type") ?? "duration");
+        const cardId = getCardField(card, "id");
+        const cardKey = getCardField(card, "cardKey", "card_key");
+        const durationDays = Number(getCardField(card, "durationDays", "duration_days") ?? 0);
+        const grantPoints = Number(getCardField(card, "grantPoints", "grant_points") ?? 0);
+
+        let startsAt = timestamp;
+        let endsAt = defaultPointsEntitlementEndsAt(timestamp);
+        let totalPoints = null;
+        let remainingPoints = null;
+
+        if (grantType === "duration") {
+          const latestEndsAt = await loadLatestEntitlementEndsAtByPolicy(tx, account.id, product.id, policyId);
+          startsAt = latestEndsAt && latestEndsAt > timestamp ? latestEndsAt : timestamp;
+          endsAt = addDays(startsAt, durationDays);
+        } else {
+          totalPoints = grantPoints;
+          remainingPoints = totalPoints;
+          if (remainingPoints <= 0) {
+            throw new AppError(400, "INVALID_GRANT_POINTS", "Point-based policy must grant at least 1 point.");
+          }
+        }
+
+        const entitlementId = generateId("ent");
+        await Promise.resolve(tx.query(
+          `
+            INSERT INTO entitlements
+            (id, product_id, policy_id, account_id, source_license_key_id, status, starts_at, ends_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, $8, $9)
+          `,
+          [
+            entitlementId,
+            product.id,
+            policyId,
+            account.id,
+            cardId,
+            startsAt,
+            endsAt,
+            timestamp,
+            timestamp
+          ],
+          {
+            repository: "entitlements",
+            operation: "createEntitlement",
+            entitlementId,
+            accountId: account.id,
+            productId: product.id,
+            cardId
+          }
+        ));
+
+        if (grantType === "points") {
+          await upsertEntitlementMetering(tx, entitlementId, "points", totalPoints, remainingPoints, 0, timestamp);
+        }
+
+        await Promise.resolve(tx.query(
+          `
+            UPDATE license_keys
+            SET status = 'redeemed', redeemed_at = $1, redeemed_by_account_id = $2
+            WHERE id = $3
+          `,
+          [timestamp, account.id, cardId],
+          {
+            repository: "entitlements",
+            operation: "markCardRedeemed",
+            entitlementId,
+            accountId: account.id,
+            cardId
+          }
+        ));
+
+        return {
+          entitlementId,
+          policyName,
+          grantType,
+          totalPoints,
+          remainingPoints,
+          startsAt,
+          endsAt,
+          cardKey,
+          reseller: null
+        };
+      });
+    },
+
+    async consumeEntitlementLoginQuota(entitlement, timestamp = nowIso()) {
+      return adapter.withTransaction(async (tx) => {
+        const grantType = normalizeGrantType(getEntitlementField(entitlement, "grantType", "grant_type") ?? "duration");
+        if (grantType !== "points") {
+          return {
+            grantType: "duration",
+            totalPoints: null,
+            remainingPoints: null,
+            consumedPoints: null,
+            consumedThisLogin: 0
+          };
+        }
+
+        const entitlementId = getEntitlementField(entitlement, "id");
+        const metering = await loadEntitlementMetering(tx, entitlementId);
+        if (!metering || Number(metering.remaining_points ?? 0) <= 0) {
+          throw new AppError(403, "LICENSE_POINTS_EXHAUSTED", "This authorization has no remaining points.", {
+            entitlementId,
+            totalPoints: Number(metering?.total_points ?? 0),
+            remainingPoints: Number(metering?.remaining_points ?? 0),
+            consumedPoints: Number(metering?.consumed_points ?? 0)
+          });
+        }
+
+        const nextRemaining = Number(metering.remaining_points) - 1;
+        const nextConsumed = Number(metering.consumed_points ?? 0) + 1;
+        await upsertEntitlementMetering(
+          tx,
+          entitlementId,
+          "points",
+          Number(metering.total_points ?? 0),
+          nextRemaining,
+          nextConsumed,
+          timestamp
+        );
+
+        return {
+          grantType: "points",
+          totalPoints: Number(metering.total_points ?? 0),
+          remainingPoints: nextRemaining,
+          consumedPoints: nextConsumed,
+          consumedThisLogin: 1
+        };
+      });
+    },
+
     async updateEntitlementStatus(entitlementId, body = {}, timestamp = nowIso()) {
       return adapter.withTransaction(async (tx) => {
         const entitlement = await loadEntitlementManageRow(tx, entitlementId);

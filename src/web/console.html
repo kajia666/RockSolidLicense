@@ -483,13 +483,32 @@
               <option value="released">released</option>
             </select>
           </label>
+          <label>审计事件<input id="ops-event-type" placeholder="例如 session.revoke" /></label>
+          <label>
+            审计角色
+            <select id="ops-actor-type">
+              <option value="">全部</option>
+              <option value="admin">admin</option>
+              <option value="developer">developer</option>
+              <option value="developer_member">developer_member</option>
+              <option value="account">account</option>
+              <option value="license_key">license_key</option>
+              <option value="reseller">reseller</option>
+            </select>
+          </label>
           <label>日志条数<input id="audit-limit" type="number" min="1" max="200" value="30" /></label>
           <div class="actions">
             <button class="ghost" id="load-accounts-btn">加载账号</button>
             <button class="ghost" id="load-bindings-btn">加载设备</button>
             <button class="ghost" id="load-blocks-btn">加载封禁</button>
             <button class="ghost" id="load-sessions-btn">加载会话</button>
+            <button class="secondary" id="preview-ops-export-btn">Preview Ops Snapshot</button>
+            <button class="ghost" id="download-ops-json-btn">Download JSON</button>
+            <button class="ghost" id="download-ops-summary-btn">Download Summary</button>
+            <button class="ghost" id="download-ops-checksums-btn">Download Checksums</button>
+            <button class="ghost" id="download-ops-zip-btn">Download Zip</button>
           </div>
+          <div class="hint">支持通过 <code>/api/admin/ops/export</code> 和 <code>/api/admin/ops/export/download</code> 预览或下载管理员授权运营快照包。</div>
         </article>
       </section>
 
@@ -770,6 +789,54 @@
         return text ? `?${text}` : "";
       }
 
+      function fileNameFromDisposition(value, fallback = "download.txt") {
+        const text = String(value || "");
+        const utf8Match = text.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {}
+        }
+        const asciiMatch = text.match(/filename="?([^\";]+)"?/i);
+        return asciiMatch ? asciiMatch[1] : fallback;
+      }
+
+      async function downloadApiFile(path, fallbackName = "download.txt") {
+        const headers = {};
+        if (adminToken) {
+          headers.Authorization = `Bearer ${adminToken}`;
+        }
+
+        const response = await fetch(path, { headers });
+        if (!response.ok) {
+          let message = "Download failed.";
+          try {
+            const payload = await response.json();
+            message = payload?.error?.message || message;
+          } catch {
+            message = await response.text() || message;
+          }
+          throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const fileName = fileNameFromDisposition(response.headers.get("content-disposition"), fallbackName);
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+
+        return {
+          fileName,
+          size: blob.size,
+          contentType: response.headers.get("content-type") || "application/octet-stream"
+        };
+      }
+
       function renderStats(summary = {}) {
         const stats = el("stats");
         stats.innerHTML = "";
@@ -959,6 +1026,17 @@
         };
       }
 
+      function readAdminOpsExportFilters() {
+        return {
+          productCode: el("ops-product-code").value,
+          username: el("ops-username").value,
+          search: el("ops-search").value,
+          eventType: el("ops-event-type").value,
+          actorType: el("ops-actor-type").value,
+          limit: el("audit-limit").value
+        };
+      }
+
       async function refreshDashboard() {
         const data = await callApi("/api/admin/dashboard");
         renderStats(data.summary);
@@ -1017,10 +1095,35 @@
       }
 
       async function loadAuditLogs() {
-        const data = await callApi(`/api/admin/audit-logs${buildQuery({ limit: el("audit-limit").value })}`);
+        const data = await callApi(`/api/admin/audit-logs${buildQuery({
+          actorType: el("ops-actor-type").value,
+          eventType: el("ops-event-type").value,
+          limit: el("audit-limit").value
+        })}`);
         renderAuditLogs(data.items);
         setOutput(data);
         setStatus(`审计日志已刷新，共 ${data.total} 条。`);
+      }
+
+      async function previewOpsExport() {
+        const data = await callApi(`/api/admin/ops/export${buildQuery(readAdminOpsExportFilters())}`);
+        setOutput(data);
+        setStatus(`授权运营快照已生成，覆盖 ${data.summary.projects} 个项目和 ${data.summary.auditLogs} 条审计记录。`);
+      }
+
+      async function downloadOpsExport(format, fallbackName) {
+        const details = await downloadApiFile(
+          `/api/admin/ops/export/download${buildQuery({
+            ...readAdminOpsExportFilters(),
+            format
+          })}`,
+          fallbackName
+        );
+        setOutput({
+          download: details,
+          filters: readAdminOpsExportFilters()
+        });
+        setStatus(`授权运营快照已下载：${details.fileName}`);
       }
 
       async function refreshAllPanels() {
@@ -1064,6 +1167,11 @@
       el("load-bindings-btn").addEventListener("click", () => guarded(loadBindings));
       el("load-blocks-btn").addEventListener("click", () => guarded(loadBlocks));
       el("load-sessions-btn").addEventListener("click", () => guarded(loadSessions));
+      el("preview-ops-export-btn").addEventListener("click", () => guarded(previewOpsExport));
+      el("download-ops-json-btn").addEventListener("click", () => guarded(() => downloadOpsExport("json", "admin-ops.json")));
+      el("download-ops-summary-btn").addEventListener("click", () => guarded(() => downloadOpsExport("summary", "admin-ops-summary.txt")));
+      el("download-ops-checksums-btn").addEventListener("click", () => guarded(() => downloadOpsExport("checksums", "admin-ops-sha256sums.txt")));
+      el("download-ops-zip-btn").addEventListener("click", () => guarded(() => downloadOpsExport("zip", "admin-ops.zip")));
       if (el("load-versions-btn")) {
         el("load-versions-btn").addEventListener("click", () => guarded(loadVersions));
       }

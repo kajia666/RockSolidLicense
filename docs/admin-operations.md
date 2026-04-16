@@ -32,6 +32,7 @@ Terminology:
 - trace whether reseller-allocated cards remain fresh or have been redeemed
 - create IP / CIDR access rules for login, register, recharge, or heartbeat
 - read recent audit logs
+- export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints
 
@@ -227,6 +228,28 @@ Effects:
 
 - switching to `disabled` immediately expires the account's active sessions
 - switching back to `active` allows the customer to log in again
+
+### Admin ops snapshot export
+
+- `GET /api/admin/ops/export`
+- `GET /api/admin/ops/export/download`
+
+Supported query parameters:
+
+- `productCode`
+- `username`
+- `search`
+- `eventType`
+- `actorType`
+- `limit`
+- `format` for the `/download` route, one of `json`, `summary`, `checksums`, or `zip`
+
+Effects:
+
+- returns one admin-scoped snapshot that combines products, accounts, entitlements, sessions, bindings, blocks, and recent audit logs
+- when `productCode` is set, both the exported project list and the audit log view stay scoped to that one project
+- when `productCode` is omitted, the audit log view stays platform-wide so operators can capture cross-project incidents
+- `/admin` now exposes preview and download buttons for the same snapshot bundle, making it easier to hand off incidents or archive a point-in-time authorization view
 
 ### Device bindings
 

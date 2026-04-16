@@ -6308,6 +6308,240 @@ test("developer ops export bundles scoped data and downloadable assets", async (
   }
 });
 
+test("admin ops export bundles platform snapshots and filtered downloadable assets", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "admin.export.owner",
+        password: "AdminExportOwner123!",
+        displayName: "Admin Export Owner"
+      },
+      adminSession.token
+    );
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "ADMIN_EXPORT_ALPHA",
+        name: "Admin Export Alpha"
+      },
+      adminSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "ADMIN_EXPORT_BETA",
+        name: "Admin Export Beta"
+      },
+      adminSession.token
+    );
+
+    const alphaPolicy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "ADMIN_EXPORT_ALPHA",
+        name: "Admin Export Alpha Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const betaPolicy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "ADMIN_EXPORT_BETA",
+        name: "Admin Export Beta Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const alphaCards = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "ADMIN_EXPORT_ALPHA",
+        policyId: alphaPolicy.id,
+        count: 1,
+        prefix: "AEXA"
+      },
+      adminSession.token
+    );
+
+    const betaCards = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "ADMIN_EXPORT_BETA",
+        policyId: betaPolicy.id,
+        count: 1,
+        prefix: "AEXB"
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "ADMIN_EXPORT_ALPHA",
+      username: "adminalpha",
+      password: "AdminAlpha123!"
+    });
+    await signedClientPost(baseUrl, "/api/client/register", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "ADMIN_EXPORT_BETA",
+      username: "adminbeta",
+      password: "AdminBeta123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "ADMIN_EXPORT_ALPHA",
+      username: "adminalpha",
+      password: "AdminAlpha123!",
+      cardKey: alphaCards.keys[0]
+    });
+    await signedClientPost(baseUrl, "/api/client/recharge", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "ADMIN_EXPORT_BETA",
+      username: "adminbeta",
+      password: "AdminBeta123!",
+      cardKey: betaCards.keys[0]
+    });
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "ADMIN_EXPORT_ALPHA",
+        username: "adminalpha",
+        password: "AdminAlpha123!",
+        deviceFingerprint: "admin-export-alpha-device-01",
+        deviceName: "Admin Export Alpha Desktop"
+      }
+    );
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      betaProduct.sdkAppId,
+      betaProduct.sdkAppSecret,
+      {
+        productCode: "ADMIN_EXPORT_BETA",
+        username: "adminbeta",
+        password: "AdminBeta123!",
+        deviceFingerprint: "admin-export-beta-device-01",
+        deviceName: "Admin Export Beta Desktop"
+      }
+    );
+
+    const alphaSessions = await getJson(
+      baseUrl,
+      "/api/admin/sessions?productCode=ADMIN_EXPORT_ALPHA&status=active&username=adminalpha",
+      adminSession.token
+    );
+    assert.equal(alphaSessions.total, 1);
+
+    const revoked = await postJson(
+      baseUrl,
+      `/api/admin/sessions/${alphaSessions.items[0].id}/revoke`,
+      { reason: "admin_ops_export_snapshot" },
+      adminSession.token
+    );
+    assert.equal(revoked.status, "expired");
+
+    const blocked = await postJson(
+      baseUrl,
+      "/api/admin/device-blocks",
+      {
+        productCode: "ADMIN_EXPORT_ALPHA",
+        deviceFingerprint: "admin-export-alpha-device-01",
+        reason: "admin_ops_export_review",
+        notes: "captured for admin export snapshot"
+      },
+      adminSession.token
+    );
+    assert.equal(blocked.productCode, "ADMIN_EXPORT_ALPHA");
+
+    const exportSnapshot = await getJson(
+      baseUrl,
+      "/api/admin/ops/export?productCode=ADMIN_EXPORT_ALPHA&eventType=session.revoke&limit=20",
+      adminSession.token
+    );
+    assert.equal(exportSnapshot.scope.productCode, "ADMIN_EXPORT_ALPHA");
+    assert.equal(exportSnapshot.summary.projects, 1);
+    assert.equal(exportSnapshot.accounts.total, 1);
+    assert.equal(exportSnapshot.sessions.total, 1);
+    assert.equal(exportSnapshot.bindings.total, 1);
+    assert.equal(exportSnapshot.blocks.total, 1);
+    assert.ok(exportSnapshot.auditLogs.total >= 1);
+    assert.equal(exportSnapshot.accounts.items[0].productCode, "ADMIN_EXPORT_ALPHA");
+    assert.equal(exportSnapshot.sessions.items[0].productCode, "ADMIN_EXPORT_ALPHA");
+    assert.equal(exportSnapshot.bindings.items[0].productCode, "ADMIN_EXPORT_ALPHA");
+    assert.equal(exportSnapshot.blocks.items[0].productCode, "ADMIN_EXPORT_ALPHA");
+    assert.ok(exportSnapshot.auditLogs.items.every((item) => item.eventType === "session.revoke"));
+    assert.ok(exportSnapshot.auditLogs.items.every((item) => item.metadata?.productCode === "ADMIN_EXPORT_ALPHA"));
+    assert.match(exportSnapshot.summaryText, /RockSolid Admin Ops Snapshot/);
+    assert.match(exportSnapshot.summaryText, /Project Filter: ADMIN_EXPORT_ALPHA/);
+
+    const fullSnapshot = await getJson(
+      baseUrl,
+      "/api/admin/ops/export?limit=120",
+      adminSession.token
+    );
+    assert.ok(fullSnapshot.summary.projects >= 2);
+    assert.ok(fullSnapshot.auditLogs.items.some((item) => item.eventType === "developer.create"));
+
+    const summaryDownload = await getText(
+      baseUrl,
+      "/api/admin/ops/export/download?productCode=ADMIN_EXPORT_ALPHA&eventType=session.revoke&format=summary",
+      adminSession.token
+    );
+    assert.equal(summaryDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(summaryDownload.contentDisposition || "", /admin-ops/i);
+    assert.match(summaryDownload.body, /RockSolid Admin Ops Snapshot/);
+    assert.match(summaryDownload.body, /Project Filter: ADMIN_EXPORT_ALPHA/);
+
+    const checksumsDownload = await getText(
+      baseUrl,
+      "/api/admin/ops/export/download?productCode=ADMIN_EXPORT_ALPHA&eventType=session.revoke&format=checksums",
+      adminSession.token
+    );
+    assert.equal(checksumsDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(checksumsDownload.body, /csv\/projects\.csv/);
+    assert.match(checksumsDownload.body, /csv\/audit-logs\.csv/);
+
+    const zipDownload = await getBinary(
+      baseUrl,
+      "/api/admin/ops/export/download?productCode=ADMIN_EXPORT_ALPHA&eventType=session.revoke&format=zip",
+      adminSession.token
+    );
+    assert.equal(zipDownload.contentType, "application/zip");
+    assert.equal(zipDownload.body.subarray(0, 2).toString("utf8"), "PK");
+    const zipText = zipDownload.body.toString("latin1");
+    assert.match(zipText, /csv\/projects\.csv/);
+    assert.match(zipText, /csv\/accounts\.csv/);
+    assert.match(zipText, /csv\/audit-logs\.csv/);
+    assert.match(zipText, /SHA256SUMS\.txt/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("admin and developers can rotate project sdk credentials with scoped permission checks", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -8257,6 +8491,27 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Save Project Profile/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("admin console page exposes admin ops export controls", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/admin`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /RockSolidLicense Console/);
+    assert.match(html, /api\/admin\/ops\/export/);
+    assert.match(html, /api\/admin\/ops\/export\/download/);
+    assert.match(html, /Preview Ops Snapshot/);
+    assert.match(html, /Download Summary/);
+    assert.match(html, /Download Checksums/);
+    assert.match(html, /Download Zip/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

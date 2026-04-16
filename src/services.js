@@ -457,6 +457,15 @@ function buildAdminActorPayload(adminSession = {}) {
   };
 }
 
+function buildAdminIdentityPayload(adminSession = {}) {
+  return {
+    id: adminSession.admin_id ?? null,
+    username: adminSession.username ?? "admin",
+    role: "admin",
+    permissions: ["*"]
+  };
+}
+
 function buildIntegrationTransportSnapshot(config) {
   return {
     http: {
@@ -1954,6 +1963,230 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
 
   return {
     fileName: payload.fileName || "developer-ops.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
+function buildAdminOpsSummaryText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const lines = [
+    "RockSolid Admin Ops Snapshot",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Admin: ${payload.admin?.username || "-"}`,
+    `Actor: ${payload.actor?.username || "-"}`,
+    `Actor Role: ${payload.actor?.role || "-"}`,
+    `Visible Projects: ${scope.accessibleProjectCount ?? 0}`,
+    `Exported Projects: ${scope.exportedProjectCount ?? 0}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Username Filter: ${scope.username || "-"}`,
+    `Search Filter: ${scope.search || "-"}`,
+    `Audit Event Filter: ${scope.eventType || "-"}`,
+    `Audit Actor Filter: ${scope.actorType || "-"}`,
+    `Audit Limit: ${scope.auditLimit ?? 0}`,
+    "",
+    `Projects: ${summary.projects ?? 0}`,
+    `Accounts: ${summary.accounts ?? 0}`,
+    `Entitlements: ${summary.entitlements ?? 0}`,
+    `Sessions: ${summary.sessions ?? 0}`,
+    `Bindings: ${summary.bindings ?? 0}`,
+    `Blocks: ${summary.blocks ?? 0}`,
+    `Audit Logs: ${summary.auditLogs ?? 0}`
+  ];
+
+  if (Array.isArray(payload.projects) && payload.projects.length) {
+    lines.push("");
+    lines.push("Projects:");
+    for (const item of payload.projects) {
+      lines.push(`- ${item.code || "-"} (${item.name || ""}) [${item.status || "unknown"}]`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function buildAdminOpsSnapshotPayload({
+  generatedAt = nowIso(),
+  admin = null,
+  actor = null,
+  accessibleProjects = [],
+  projects = [],
+  filters = {},
+  accounts = {},
+  entitlements = {},
+  sessions = {},
+  bindings = {},
+  blocks = {},
+  auditLogs = {}
+} = {}) {
+  const normalizedProjects = projects.map((item) => normalizeDeveloperOpsProjectItem(item));
+  const normalizedAccounts = (accounts.items || []).map((item) => normalizeDeveloperOpsAccountItem(item));
+  const normalizedEntitlements = (entitlements.items || []).map((item) => normalizeDeveloperOpsEntitlementItem(item));
+  const normalizedSessions = (sessions.items || []).map((item) => normalizeDeveloperOpsSessionItem(item));
+  const normalizedBindings = (bindings.items || []).map((item) => normalizeDeveloperOpsBindingItem(item));
+  const normalizedBlocks = (blocks.items || []).map((item) => normalizeDeveloperOpsBlockItem(item));
+  const normalizedAuditLogs = (auditLogs.items || []).map((item) => normalizeDeveloperOpsAuditLogItem(item));
+  const scopeTag = sanitizeExportNameSegment(filters.productCode || "all-projects", "admin-ops");
+  const timestampTag = buildExportTimestampTag(generatedAt);
+
+  const payload = {
+    generatedAt,
+    fileName: `rocksolid-admin-ops-${scopeTag}-${timestampTag}.json`,
+    summaryFileName: `rocksolid-admin-ops-${scopeTag}-${timestampTag}-summary.txt`,
+    admin,
+    actor,
+    scope: {
+      accessibleProjectCount: accessibleProjects.length,
+      exportedProjectCount: normalizedProjects.length,
+      productCode: filters.productCode || null,
+      username: filters.username || null,
+      search: filters.search || null,
+      eventType: filters.eventType || null,
+      actorType: filters.actorType || null,
+      auditLimit: Number(filters.limit ?? auditLogs.filters?.limit ?? 0)
+    },
+    summary: {
+      projects: normalizedProjects.length,
+      accounts: normalizedAccounts.length,
+      entitlements: normalizedEntitlements.length,
+      sessions: normalizedSessions.length,
+      bindings: normalizedBindings.length,
+      blocks: normalizedBlocks.length,
+      auditLogs: normalizedAuditLogs.length
+    },
+    projects: normalizedProjects,
+    accounts: {
+      total: Number(accounts.total ?? normalizedAccounts.length),
+      filters: accounts.filters || {},
+      items: normalizedAccounts
+    },
+    entitlements: {
+      total: Number(entitlements.total ?? normalizedEntitlements.length),
+      filters: entitlements.filters || {},
+      items: normalizedEntitlements
+    },
+    sessions: {
+      total: Number(sessions.total ?? normalizedSessions.length),
+      filters: sessions.filters || {},
+      items: normalizedSessions
+    },
+    bindings: {
+      total: Number(bindings.total ?? normalizedBindings.length),
+      filters: bindings.filters || {},
+      items: normalizedBindings
+    },
+    blocks: {
+      total: Number(blocks.total ?? normalizedBlocks.length),
+      filters: blocks.filters || {},
+      items: normalizedBlocks
+    },
+    auditLogs: {
+      total: Number(auditLogs.total ?? normalizedAuditLogs.length),
+      filters: auditLogs.filters || {},
+      items: normalizedAuditLogs
+    },
+    csv: {
+      projects: buildDeveloperOpsProjectsCsv(normalizedProjects),
+      accounts: buildDeveloperOpsAccountsCsv(normalizedAccounts),
+      entitlements: buildDeveloperOpsEntitlementsCsv(normalizedEntitlements),
+      sessions: buildDeveloperOpsSessionsCsv(normalizedSessions),
+      bindings: buildDeveloperOpsBindingsCsv(normalizedBindings),
+      blocks: buildDeveloperOpsBlocksCsv(normalizedBlocks),
+      auditLogs: buildDeveloperOpsAuditLogsCsv(normalizedAuditLogs)
+    },
+    notes: [
+      "This export is generated from the admin console and can cover every project on the platform.",
+      "Use the zip archive when you need a support handoff bundle with JSON, summary, and CSV snapshots.",
+      "Audit logs stay platform-wide unless you apply a project filter to scope them to one product."
+    ]
+  };
+
+  payload.summaryText = buildAdminOpsSummaryText(payload);
+  return payload;
+}
+
+function buildAdminOpsExportFiles(payload) {
+  return [
+    {
+      path: payload.fileName || "admin-ops.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: payload.summaryFileName || "admin-ops-summary.txt",
+      body: payload.summaryText || ""
+    },
+    {
+      path: "csv/projects.csv",
+      body: payload.csv?.projects || ""
+    },
+    {
+      path: "csv/accounts.csv",
+      body: payload.csv?.accounts || ""
+    },
+    {
+      path: "csv/entitlements.csv",
+      body: payload.csv?.entitlements || ""
+    },
+    {
+      path: "csv/sessions.csv",
+      body: payload.csv?.sessions || ""
+    },
+    {
+      path: "csv/device-bindings.csv",
+      body: payload.csv?.bindings || ""
+    },
+    {
+      path: "csv/device-blocks.csv",
+      body: payload.csv?.blocks || ""
+    },
+    {
+      path: "csv/audit-logs.csv",
+      body: payload.csv?.auditLogs || ""
+    }
+  ];
+}
+
+function buildAdminOpsExportZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "admin-ops");
+  return buildZipEntriesFromFiles(root, buildAdminOpsExportFiles(payload));
+}
+
+function buildAdminOpsExportDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "zip", "checksums"],
+    "json",
+    "INVALID_ADMIN_OPS_EXPORT_FORMAT",
+    "Admin ops export format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "admin-ops")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildAdminOpsExportZipEntries(payload))
+    };
+  }
+
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "admin-ops"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildAdminOpsExportFiles(payload))
+    };
+  }
+
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "admin-ops-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "admin-ops.json",
     contentType: "application/json; charset=utf-8",
     body: JSON.stringify(payload, null, 2)
   };
@@ -11567,6 +11800,108 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     listAuditLogs(token, filters = {}) {
       requireAdminSession(db, token);
       return queryAuditLogRows(db, filters);
+    },
+
+    async exportAdminOpsSnapshot(token, filters = {}) {
+      const admin = requireAdminSession(db, token);
+      const normalizedFilters = {
+        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+        username: filters.username ? String(filters.username).trim() : null,
+        search: filters.search ? String(filters.search).trim() : null,
+        eventType: filters.eventType ? String(filters.eventType).trim() : null,
+        actorType: filters.actorType ? String(filters.actorType).trim() : null,
+        limit: Math.min(Math.max(Number(filters.limit ?? 60), 1), 200)
+      };
+
+      const accessibleProjects = await Promise.resolve(store.products.queryProductRows(db, {}));
+      const scopedProjects = normalizedFilters.productCode
+        ? accessibleProjects.filter((item) => item.code === normalizedFilters.productCode)
+        : accessibleProjects;
+
+      const emptyPayload = buildAdminOpsSnapshotPayload({
+        admin: buildAdminIdentityPayload(admin),
+        actor: buildAdminActorPayload(admin),
+        accessibleProjects,
+        projects: scopedProjects,
+        filters: normalizedFilters,
+        accounts: { items: [], total: 0, filters: {} },
+        entitlements: { items: [], total: 0, filters: {} },
+        sessions: { items: [], total: 0, filters: {} },
+        bindings: { items: [], total: 0, filters: {} },
+        blocks: { items: [], total: 0, filters: {} },
+        auditLogs: { items: [], total: 0, filters: { limit: normalizedFilters.limit } }
+      });
+
+      if (!scopedProjects.length) {
+        return emptyPayload;
+      }
+
+      const scopedProductIds = scopedProjects.map((item) => item.id);
+      const scopedProductCodes = scopedProjects.map((item) => item.code).filter(Boolean);
+
+      await expireStaleSessions(db, store, stateStore);
+
+      const [accounts, entitlements, sessions, bindings, blocks, auditLogs] = await Promise.all([
+        Promise.resolve(store.accounts.queryAccountRows(
+          db,
+          {
+            productIds: scopedProductIds,
+            productCode: normalizedFilters.productCode,
+            search: normalizedFilters.search
+          },
+          stateStore
+        )),
+        Promise.resolve(store.entitlements.queryEntitlementRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(store.sessions.querySessionRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(store.devices.queryDeviceBindingRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(store.devices.queryDeviceBlockRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(queryAuditLogRows(db, {
+          actorType: normalizedFilters.actorType,
+          eventType: normalizedFilters.eventType,
+          limit: normalizedFilters.limit,
+          productCodes: normalizedFilters.productCode ? scopedProductCodes : null
+        }))
+      ]);
+
+      return buildAdminOpsSnapshotPayload({
+        admin: buildAdminIdentityPayload(admin),
+        actor: buildAdminActorPayload(admin),
+        accessibleProjects,
+        projects: scopedProjects,
+        filters: normalizedFilters,
+        accounts,
+        entitlements: {
+          ...entitlements,
+          total: entitlements.items?.length ?? 0
+        },
+        sessions,
+        bindings,
+        blocks,
+        auditLogs
+      });
+    },
+
+    adminOpsExportDownloadAsset(payload, format = "json") {
+      return buildAdminOpsExportDownloadAsset(payload, format);
     },
 
     async developerListAuditLogs(token, filters = {}) {

@@ -1033,6 +1033,34 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/admin/ops/export") {
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.exportAdminOpsSnapshot(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            search: url.searchParams.get("search"),
+            eventType: url.searchParams.get("eventType"),
+            actorType: url.searchParams.get("actorType"),
+            limit: url.searchParams.get("limit")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/ops/export/download") {
+        const data = await services.exportAdminOpsSnapshot(getBearerToken(req), {
+          productCode: url.searchParams.get("productCode"),
+          username: url.searchParams.get("username"),
+          search: url.searchParams.get("search"),
+          eventType: url.searchParams.get("eventType"),
+          actorType: url.searchParams.get("actorType"),
+          limit: url.searchParams.get("limit")
+        });
+        sendAttachment(res, services.adminOpsExportDownloadAsset(data, url.searchParams.get("format")));
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/admin/token-keys/rotate") {
         sendJson(res, 200, { ok: true, data: services.rotateTokenKey(getBearerToken(req)) });
         return;

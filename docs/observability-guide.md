@@ -9,6 +9,7 @@ Read this together with:
 - [production-operations-runbook.md](/D:/code/OnlineVerification/docs/production-operations-runbook.md)
 - [daily-operations-checklist.md](/D:/code/OnlineVerification/docs/daily-operations-checklist.md)
 - [incident-response-playbook.md](/D:/code/OnlineVerification/docs/incident-response-playbook.md)
+- [alert-priority-guide.md](/D:/code/OnlineVerification/docs/alert-priority-guide.md)
 
 ## What to observe first
 
@@ -116,6 +117,10 @@ Recommended warning-level alerts:
 - heartbeat failure rate suddenly spikes
 - proxy upstream failures increase sharply
 - token verification failures suddenly appear across many clients
+
+For severity routing after an alert fires, also see:
+
+- [alert-priority-guide.md](/D:/code/OnlineVerification/docs/alert-priority-guide.md)
 
 ## Alert routing advice
 

@@ -15,6 +15,8 @@ It is meant for day-one and early-production operations, where the main goal is 
 - [incident-response-playbook.md](/D:/code/OnlineVerification/docs/incident-response-playbook.md)
 - [daily-operations-checklist.md](/D:/code/OnlineVerification/docs/daily-operations-checklist.md)
 - [observability-guide.md](/D:/code/OnlineVerification/docs/observability-guide.md)
+- [alert-priority-guide.md](/D:/code/OnlineVerification/docs/alert-priority-guide.md)
+- [shift-handover-template.md](/D:/code/OnlineVerification/docs/shift-handover-template.md)
 - [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
 
 ## What healthy looks like
@@ -73,6 +75,7 @@ Look for repeated patterns such as:
 For logging, dashboard, and alert suggestions, also see:
 
 - [observability-guide.md](/D:/code/OnlineVerification/docs/observability-guide.md)
+- [alert-priority-guide.md](/D:/code/OnlineVerification/docs/alert-priority-guide.md)
 
 ## Weekly checks
 
@@ -95,6 +98,10 @@ Suggested weekly order:
 3. Verify both backup schedules are still enabled.
 4. Run one small restore drill on a non-production target.
 5. Confirm the health endpoint and one real client login still work after the drill.
+
+For shift-to-shift communication, also keep:
+
+- [shift-handover-template.md](/D:/code/OnlineVerification/docs/shift-handover-template.md)
 
 ## Backup expectations by storage topology
 

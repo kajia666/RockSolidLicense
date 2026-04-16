@@ -318,3 +318,34 @@ test("legacy deployment and storage docs point to the maintained guides", () => 
   assert.match(legacyStorage, /storage-deployment-guide\.md/);
   assert.match(legacyStorage, /postgres-backup-restore\.md/);
 });
+
+test("alert priority and handover docs connect severity routing with shift communication", () => {
+  const readme = readText("README.md");
+  const runbook = readText("docs/production-operations-runbook.md");
+  const observability = readText("docs/observability-guide.md");
+  const alertGuide = readText("docs/alert-priority-guide.md");
+  const handoverTemplate = readText("docs/shift-handover-template.md");
+
+  assert.match(readme, /alert-priority-guide\.md/);
+  assert.match(readme, /shift-handover-template\.md/);
+
+  assert.match(runbook, /alert-priority-guide\.md/);
+  assert.match(runbook, /shift-handover-template\.md/);
+  assert.match(observability, /alert-priority-guide\.md/);
+
+  assert.match(alertGuide, /Priority levels/);
+  assert.match(alertGuide, /P1/);
+  assert.match(alertGuide, /P2/);
+  assert.match(alertGuide, /P3/);
+  assert.match(alertGuide, /P4/);
+  assert.match(alertGuide, /health endpoint failing/i);
+  assert.match(alertGuide, /Reclassification rule/);
+  assert.match(alertGuide, /Routing suggestion/);
+
+  assert.match(handoverTemplate, /Copy template/);
+  assert.match(handoverTemplate, /Current health/);
+  assert.match(handoverTemplate, /Current severity \(P1\/P2\/P3\/P4\)/);
+  assert.match(handoverTemplate, /Good handover example/);
+  assert.match(handoverTemplate, /Bad handover example/);
+  assert.match(handoverTemplate, /alert-priority-guide\.md/);
+});

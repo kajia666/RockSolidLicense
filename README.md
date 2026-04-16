@@ -570,6 +570,8 @@ cl /EHsc /std:c++17 ^
 - [incident-response-playbook.md](docs/incident-response-playbook.md)
 - [daily-operations-checklist.md](docs/daily-operations-checklist.md)
 - [observability-guide.md](docs/observability-guide.md)
+- [alert-priority-guide.md](docs/alert-priority-guide.md)
+- [shift-handover-template.md](docs/shift-handover-template.md)
 - [launch-timeline-playbook.md](docs/launch-timeline-playbook.md)
 - [server-os-choice.md](docs/server-os-choice.md)
 - [production-launch-checklist.md](docs/production-launch-checklist.md)

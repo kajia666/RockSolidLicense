@@ -146,7 +146,7 @@
         </div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/releases</code></div>
-          <div class="pill">APIs: <code>/api/developer/client-versions</code>, <code>/api/developer/notices</code>, and <code>/api/developer/release-package</code></div>
+          <div class="pill">APIs: <code>/api/developer/client-versions</code>, <code>/api/developer/notices</code>, <code>/api/developer/release-package</code>, and <code>/api/developer/release-package/download</code></div>
           <div class="pill">Scoped to assigned projects. Viewer members stay read-only.</div>
         </div>
         <div class="project-list" id="project-list"></div>
@@ -435,7 +435,7 @@
         const productCode = el("package-product-code").value.trim();
         const channel = el("package-channel").value.trim() || "stable";
         el("release-package-hint").textContent = productCode
-          ? `Generate the ${productCode} release handoff package for channel ${channel}, including integration config, version manifest, and active notices.`
+          ? `Generate the ${productCode} release handoff package for channel ${channel}, then download server-generated attachments for JSON, summary, env, or C++ quickstart.`
           : "Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.";
       }
 
@@ -497,8 +497,7 @@
         });
       }
 
-      function downloadBlob(filename, content, contentType) {
-        const blob = new Blob([content], { type: contentType });
+      function downloadBlob(filename, blob) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -507,6 +506,20 @@
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
+      }
+
+      function downloadFileNameFromHeaders(headerValue, fallback) {
+        const raw = String(headerValue || "");
+        const utf8Match = raw.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const plainMatch = raw.match(/filename="([^"]+)"/i) || raw.match(/filename=([^;]+)/i);
+        return plainMatch ? plainMatch[1].trim() : fallback;
       }
 
       function renderTag(value, truthy = false) {
@@ -536,6 +549,29 @@
           throw error;
         }
         return payload.data;
+      }
+
+      async function downloadApiFile(path, fallbackFileName) {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(path, { headers });
+        if (!response.ok) {
+          let errorPayload = null;
+          try {
+            errorPayload = await response.json();
+          } catch {
+            errorPayload = null;
+          }
+          const error = new Error(errorPayload?.error?.message || `Request failed: ${response.status}`);
+          error.code = errorPayload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        const blob = await response.blob();
+        const fileName = downloadFileNameFromHeaders(
+          response.headers.get("content-disposition"),
+          fallbackFileName
+        );
+        downloadBlob(fileName, blob);
+        return { fileName };
       }
 
       function renderProjects() {
@@ -795,36 +831,76 @@
         }
       });
 
-      el("download-release-package-json-btn").addEventListener("click", () => {
-        if (!releasePackage) {
-          return;
+      el("download-release-package-json-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "json" })}`,
+            releasePackage.fileName || "release-package.json"
+          );
+          setStatus(`Release package JSON downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
-        downloadBlob(releasePackage.fileName || "release-package.json", JSON.stringify(releasePackage.manifest, null, 2), "application/json;charset=utf-8");
-        setStatus("Release package JSON downloaded.");
       });
 
-      el("download-release-package-summary-btn").addEventListener("click", () => {
-        if (!releasePackage) {
-          return;
+      el("download-release-package-summary-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "summary" })}`,
+            releasePackage.summaryFileName || "release-package.txt"
+          );
+          setStatus(`Release package summary downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
-        downloadBlob(releasePackage.summaryFileName || "release-package.txt", releasePackage.summaryText || "", "text/plain;charset=utf-8");
-        setStatus("Release package summary downloaded.");
       });
 
-      el("download-release-package-env-btn").addEventListener("click", () => {
-        if (!releasePackage) {
-          return;
+      el("download-release-package-env-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "env" })}`,
+            releasePackage.snippets?.envFileName || "project.env"
+          );
+          setStatus(`Release package env template downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
-        downloadBlob(releasePackage.snippets?.envFileName || "project.env", releasePackage.snippets?.envTemplate || "", "text/plain;charset=utf-8");
-        setStatus("Release package env template downloaded.");
       });
 
-      el("download-release-package-cpp-btn").addEventListener("click", () => {
-        if (!releasePackage) {
-          return;
+      el("download-release-package-cpp-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "cpp" })}`,
+            releasePackage.snippets?.cppFileName || "project.cpp"
+          );
+          setStatus(`Release package C++ quickstart downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
-        downloadBlob(releasePackage.snippets?.cppFileName || "project.cpp", releasePackage.snippets?.cppQuickstart || "", "text/plain;charset=utf-8");
-        setStatus("Release package C++ quickstart downloaded.");
       });
 
       el("create-version-btn").addEventListener("click", async () => {

@@ -101,6 +101,26 @@ async function getText(baseUrl, path, token) {
   return {
     status: response.status,
     contentType: response.headers.get("content-type"),
+    contentDisposition: response.headers.get("content-disposition"),
+    body: text
+  };
+}
+
+async function postText(baseUrl, path, body, token = null) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(body)
+  });
+  const text = await response.text();
+  assert.equal(response.ok, true, text);
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    contentDisposition: response.headers.get("content-disposition"),
     body: text
   };
 }
@@ -5093,6 +5113,24 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Latest Version: 5.4.0/);
     assert.match(releasePackage.summaryText, /Blocking Notices: 1/);
 
+    const releaseSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=summary",
+      viewerSession.token
+    );
+    assert.match(releaseSummaryDownload.contentType || "", /^text\/plain/);
+    assert.match(releaseSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*\.txt"/);
+    assert.match(releaseSummaryDownload.body, /Latest Version: 5.4.0/);
+    assert.match(releaseSummaryDownload.body, /Blocking Notices: 1/);
+
+    const releaseEnvDownload = await getText(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=env",
+      viewerSession.token
+    );
+    assert.match(releaseEnvDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.env"/);
+    assert.match(releaseEnvDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/release-package?productCode=RELPKG_BETA&channel=stable",
@@ -7365,6 +7403,20 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerExport.manifestBundleText, /### rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(developerExport.cppBundleText, /### INTBUNDLE_ALPHA\.cpp/);
 
+    const manifestDownload = await postText(
+      baseUrl,
+      "/api/developer/products/integration-packages/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "manifests"
+      },
+      viewerSession.token
+    );
+    assert.match(manifestDownload.contentType || "", /^text\/plain/);
+    assert.match(manifestDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*-manifests\.txt"/);
+    assert.match(manifestDownload.body, /### rocksolid-integration-INTBUNDLE_ALPHA\.json/);
+    assert.match(manifestDownload.body, /"code": "INTBUNDLE_ALPHA"/);
+
     const viewerForbidden = await postJsonExpectError(
       baseUrl,
       "/api/developer/products/integration-packages/export",
@@ -7394,6 +7446,20 @@ test("batch project integration package export can bundle selected projects with
     assert.equal(adminExport.cppFiles.length, 2);
     assert.match(adminExport.manifestBundleText, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(adminExport.manifestBundleText, /rocksolid-integration-INTBUNDLE_BETA\.json/);
+
+    const adminCppDownload = await postText(
+      baseUrl,
+      "/api/admin/products/integration-packages/export/download",
+      {
+        projectCodes: ["INTBUNDLE_ALPHA", "INTBUNDLE_BETA"],
+        format: "cpp"
+      },
+      adminSession.token
+    );
+    assert.match(adminCppDownload.contentType || "", /^text\/plain/);
+    assert.match(adminCppDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*-cpp\.txt"/);
+    assert.match(adminCppDownload.body, /### INTBUNDLE_ALPHA\.cpp/);
+    assert.match(adminCppDownload.body, /### INTBUNDLE_BETA\.cpp/);
 
     const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
     const ownerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", ownerSession.token);
@@ -7790,6 +7856,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/client-versions/);
     assert.match(html, /api\/developer\/notices/);
     assert.match(html, /api\/developer\/release-package/);
+    assert.match(html, /api\/developer\/release-package\/download/);
     assert.match(html, /Scoped to assigned projects/);
     assert.match(html, /Release Delivery Package/);
     assert.match(html, /Generate Release Package/);

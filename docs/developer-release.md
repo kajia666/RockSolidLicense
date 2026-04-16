@@ -20,6 +20,7 @@ Route:
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
 - `GET /api/developer/release-package`
+- `GET /api/developer/release-package/download`
 
 Common filters:
 
@@ -115,8 +116,13 @@ The package route accepts:
 - `softwareCode`
 - `channel`
 
+The download route accepts the same selectors plus:
+
+- `format=json|summary|env|cpp`
+
 Typical uses:
 
 - hand the release manager a single deployment snapshot for one software project
 - verify that the download URL, force-update floor, and maintenance notices match the latest SDK credentials
 - export release coordination material for viewer members without giving them write access
+- let the browser download server-generated attachments instead of building files locally in the page

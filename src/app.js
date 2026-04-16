@@ -51,6 +51,19 @@ function matchPath(pathname, pattern) {
   return params;
 }
 
+function sendAttachment(res, asset) {
+  const fileName = String(asset?.fileName || "download.txt").replace(/["\r\n]/g, "_");
+  sendText(
+    res,
+    200,
+    asset?.body ?? "",
+    asset?.contentType || "text/plain; charset=utf-8",
+    {
+      "content-disposition": `attachment; filename="${fileName}"`
+    }
+  );
+}
+
 export function createApp(overrides = {}) {
   const config = loadConfig(overrides);
   config.licenseKeys = loadOrCreateLicenseKeyStore(config);
@@ -302,6 +315,16 @@ export function createApp(overrides = {}) {
             publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
           })
         });
+        return;
+      }
+      if (req.method === "POST" && url.pathname === "/api/admin/products/integration-packages/export/download") {
+        const { body } = await readJsonBody(req);
+        const data = await services.exportProductIntegrationPackages(getBearerToken(req), body, {
+          publicBaseUrl: url.origin,
+          publicHost: url.hostname,
+          publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+        });
+        sendAttachment(res, services.integrationPackageExportDownloadAsset(data, body.format));
         return;
       }
       if (productSdkRotateRoute) {
@@ -1082,6 +1105,21 @@ export function createApp(overrides = {}) {
         sendJson(res, 200, { ok: true, data });
         return;
       }
+      if (req.method === "GET" && url.pathname === "/api/developer/release-package/download") {
+        const data = await services.developerReleasePackage(getBearerToken(req), {
+          productId: url.searchParams.get("productId"),
+          productCode: url.searchParams.get("productCode"),
+          projectCode: url.searchParams.get("projectCode"),
+          softwareCode: url.searchParams.get("softwareCode"),
+          channel: url.searchParams.get("channel")
+        }, {
+          publicBaseUrl: url.origin,
+          publicHost: url.hostname,
+          publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+        });
+        sendAttachment(res, services.releasePackageDownloadAsset(data, url.searchParams.get("format")));
+        return;
+      }
 
       if (req.method === "POST" && url.pathname === "/api/developer/logout") {
         sendJson(res, 200, { ok: true, data: services.developerLogout(getBearerToken(req)) });
@@ -1247,6 +1285,20 @@ export function createApp(overrides = {}) {
             }
           )
         });
+        return;
+      }
+      if (req.method === "POST" && url.pathname === "/api/developer/products/integration-packages/export/download") {
+        const { body } = await readJsonBody(req);
+        const data = await services.developerExportProductIntegrationPackages(
+          getBearerToken(req),
+          body,
+          {
+            publicBaseUrl: url.origin,
+            publicHost: url.hostname,
+            publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+          }
+        );
+        sendAttachment(res, services.integrationPackageExportDownloadAsset(data, body.format));
         return;
       }
       if (developerProductSdkRotateRoute) {

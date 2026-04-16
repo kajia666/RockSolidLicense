@@ -972,6 +972,90 @@ function buildReleasePackagePayload({
   };
 }
 
+function normalizeDownloadFormat(value, supported = [], fallback = "json", code = "INVALID_EXPORT_FORMAT", label = "Export format") {
+  const normalized = String(value ?? fallback).trim().toLowerCase() || fallback;
+  if (!supported.includes(normalized)) {
+    throw new AppError(400, code, `${label} must be ${supported.join(", ")}.`);
+  }
+  return normalized;
+}
+
+function buildReleasePackageDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "env", "cpp"],
+    "json",
+    "INVALID_RELEASE_PACKAGE_FORMAT",
+    "Release package format"
+  );
+
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "release-package.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "env") {
+    return {
+      fileName: payload.snippets?.envFileName || "project.env",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.envTemplate || ""
+    };
+  }
+  if (normalizedFormat === "cpp") {
+    return {
+      fileName: payload.snippets?.cppFileName || "project.cpp",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.cppQuickstart || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "release-package.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
+function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "manifests", "env", "cpp"],
+    "json",
+    "INVALID_INTEGRATION_EXPORT_FORMAT",
+    "Integration export format"
+  );
+
+  if (normalizedFormat === "manifests") {
+    return {
+      fileName: payload.manifestArchiveName || "integration-manifests.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.manifestBundleText || ""
+    };
+  }
+  if (normalizedFormat === "env") {
+    return {
+      fileName: payload.envArchiveName || "integration-env.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.envBundleText || ""
+    };
+  }
+  if (normalizedFormat === "cpp") {
+    return {
+      fileName: payload.cppArchiveName || "integration-cpp.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.cppBundleText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "integration-packages.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
 function auditDeveloperSession(db, session, eventType, entityType, entityId, metadata = {}) {
   const actorType = session.actor_scope === "member" ? "developer_member" : "developer";
   audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
@@ -6099,6 +6183,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         fileName: payload.fileName
       });
       return payload;
+    },
+
+    releasePackageDownloadAsset(payload, format = "json") {
+      return buildReleasePackageDownloadAsset(payload, format);
+    },
+
+    integrationPackageExportDownloadAsset(payload, format = "json") {
+      return buildIntegrationPackageExportDownloadAsset(payload, format);
     },
 
     async developerCreateProduct(token, body = {}) {

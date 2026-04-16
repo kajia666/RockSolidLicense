@@ -26,6 +26,8 @@ The page now also summarizes how many visible projects currently have each of th
 - `GET /api/developer/integration/package`
 - `POST /api/developer/products/integration-packages/export`
 - `POST /api/admin/products/integration-packages/export`
+- `POST /api/developer/products/integration-packages/export/download`
+- `POST /api/admin/products/integration-packages/export/download`
 
 This route requires a normal developer bearer token and is scoped to projects visible to the current actor.
 
@@ -64,6 +66,10 @@ The batch package export routes return:
 - `manifestBundleText`
 - `envBundleText`
 - `cppBundleText`
+
+The batch package download routes accept the same body selectors as the export routes plus:
+
+- `format=json|manifests|env|cpp`
 
 Typical shape:
 

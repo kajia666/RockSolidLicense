@@ -280,6 +280,7 @@ npm run db:postgres:check
 - `POST /api/admin/products/sdk-credentials/rotate/batch`
 - `POST /api/admin/products/sdk-credentials/export`
 - `POST /api/admin/products/integration-packages/export`
+- `POST /api/admin/products/integration-packages/export/download`
 - `POST /api/admin/products/:productId/profile`
 - `POST /api/admin/products/:productId/status`
 - `POST /api/admin/products/:productId/feature-config`
@@ -331,6 +332,7 @@ npm run db:postgres:check
 - `POST /api/developer/products/sdk-credentials/rotate/batch`
 - `POST /api/developer/products/sdk-credentials/export`
 - `POST /api/developer/products/integration-packages/export`
+- `POST /api/developer/products/integration-packages/export/download`
 - `POST /api/developer/products/:productId/profile`
 - `POST /api/developer/products/:productId/status`
 - `POST /api/developer/products/:productId/feature-config`
@@ -367,6 +369,7 @@ npm run db:postgres:check
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
 - `GET /api/developer/release-package`
+- `GET /api/developer/release-package/download`
 
 ## 项目级功能和状态
 
@@ -379,6 +382,7 @@ npm run db:postgres:check
 - 项目 SDK 凭据支持只轮换 `sdkAppSecret`，也支持连同 `sdkAppId` 一起轮换；旧凭据会立即失效，因此更适合在软件作者完成 SDK 配置更新后统一切换
 - 项目中心里的 SDK 凭据批量导出会同时生成 JSON、CSV 和 `.env` 片段，方便软件作者在轮换后把新凭据快速同步给接入工程
 - 项目中心现在也支持批量导出集成包，单次导出会包含每个项目的接入清单 JSON、`.env` 模板和 C/C++ 快速接入片段，适合给多个软件项目同时下发最新 SDK 配置
+- 集成包批量导出现在也支持服务端附件下载，可以直接拿到整包 JSON、manifest 合集、`.env` 合集或 C/C++ 片段合集，而不需要前端自己拼文本
 - 管理员产品中心、开发者总览、开发者项目中心和开发者接入中心都会直接汇总 `active / disabled / archived` 项目数量
 
 产品级功能开关当前支持：

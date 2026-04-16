@@ -7,6 +7,10 @@ It is intentionally practical and is designed for both:
 - a first Windows Server launch
 - a first Linux single-node launch
 
+After the first launch is complete, continue with:
+
+- [production-operations-runbook.md](/D:/code/OnlineVerification/docs/production-operations-runbook.md)
+
 ## Phase 1: Server ready
 
 - Buy a server with enough headroom for launch traffic.
@@ -53,7 +57,7 @@ Useful reverse proxy examples in this repo:
 ## Phase 4: First boot checks
 
 - Start the service manually once.
-- Verify `GET /api/health` returns `status=ok`.
+- Verify `GET /api/health` returns `ok=true` and `data.status=ok`.
 - Verify the admin page opens through the intended URL.
 - Verify the log file is being written.
 - Verify token key files were created in the expected data directory.
@@ -83,7 +87,7 @@ Recommended smoke tests:
 
 - HTTPS certificate is valid.
 - Admin login works through the public HTTPS URL.
-- `/api/health` is healthy behind the proxy path you actually use.
+- `/api/health` is healthy behind the proxy path you actually use, with `ok=true` and `data.status=ok`.
 - Firewall or security group rules match your intended exposure.
 - Time on the server is correct within a few seconds.
 - At least one test client can:

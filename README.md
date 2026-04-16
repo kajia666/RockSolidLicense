@@ -567,6 +567,7 @@ cl /EHsc /std:c++17 ^
 - [postgres-main-store-preview.md](docs/postgres-main-store-preview.md)
 - [server-os-choice.md](docs/server-os-choice.md)
 - [production-launch-checklist.md](docs/production-launch-checklist.md)
+- [production-operations-runbook.md](docs/production-operations-runbook.md)
 - [vs2022-checklist.md](docs/vs2022-checklist.md)
 - [linux-deployment.md](docs/linux-deployment.md)
 - [windows-server-deployment.md](docs/windows-server-deployment.md)

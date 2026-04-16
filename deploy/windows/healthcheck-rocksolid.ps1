@@ -10,9 +10,11 @@ $ErrorActionPreference = "Stop"
 
 $healthUrl = "$($BaseUrl.TrimEnd('/'))/api/health"
 $response = Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec $TimeoutSeconds
+$healthData = if ($null -ne $response.data) { $response.data } else { $response }
+$status = if ($null -ne $healthData.status) { $healthData.status } else { $null }
 
-if ($response.status -ne "ok") {
-  throw "Health endpoint returned unexpected status: $($response.status)"
+if ($status -ne "ok") {
+  throw "Health endpoint returned unexpected status: $status"
 }
 
 $tcpOk = $true
@@ -29,12 +31,15 @@ if (-not $SkipTcp) {
   }
 }
 
+$httpOk = if ($null -ne $response.ok) { [bool]$response.ok } else { $status -eq "ok" }
+
 $result = [ordered]@{
   checkedAt = (Get-Date).ToString("o")
   http = @{
     url = $healthUrl
-    status = $response.status
-    env = $response.env
+    ok = $httpOk
+    status = $status
+    env = $healthData.env
   }
   tcp = @{
     checked = (-not $SkipTcp)
@@ -42,7 +47,7 @@ $result = [ordered]@{
     port = $TcpPort
     ok = $tcpOk
   }
-  storage = $response.storage
+  storage = $healthData.storage
 }
 
 $result | ConvertTo-Json -Depth 8

@@ -107,3 +107,27 @@ test("storage deployment guide and compose examples cover redis runtime and post
   assert.match(linuxGuide, /docker-compose\.redis-runtime\.yml/);
   assert.match(linuxGuide, /docker-compose\.pg-redis\.preview\.yml/);
 });
+
+test("operations runbook and windows healthcheck document the real health response shape", () => {
+  const readme = readText("README.md");
+  const checklist = readText("docs/production-launch-checklist.md");
+  const runbook = readText("docs/production-operations-runbook.md");
+  const windowsHealthcheck = readText("deploy/windows/healthcheck-rocksolid.ps1");
+
+  assert.match(readme, /production-operations-runbook\.md/);
+
+  assert.match(checklist, /ok=true/);
+  assert.match(checklist, /data\.status=ok/);
+
+  assert.match(runbook, /healthcheck-rocksolid\.sh/);
+  assert.match(runbook, /healthcheck-rocksolid\.ps1/);
+  assert.match(runbook, /SQLite \+ Redis/);
+  assert.match(runbook, /PostgreSQL Preview \+ Redis/);
+  assert.match(runbook, /token-key-rotation\.md/);
+  assert.match(runbook, /data\.storage\.mainStore\.driver/);
+
+  assert.match(windowsHealthcheck, /\$response\.data/);
+  assert.match(windowsHealthcheck, /\$healthData\.status/);
+  assert.match(windowsHealthcheck, /\$healthData\.storage/);
+  assert.match(windowsHealthcheck, /\$response\.ok/);
+});

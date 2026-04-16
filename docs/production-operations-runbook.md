@@ -1,0 +1,272 @@
+# Production Operations Runbook
+
+Use this runbook after the first-launch checklist has already been completed.
+
+It is meant for day-one and early-production operations, where the main goal is to keep licensing, login, heartbeat, and token signing stable while the service starts taking real traffic.
+
+## Read this together with
+
+- [production-launch-checklist.md](/D:/code/OnlineVerification/docs/production-launch-checklist.md)
+- [linux-deployment.md](/D:/code/OnlineVerification/docs/linux-deployment.md)
+- [windows-server-deployment.md](/D:/code/OnlineVerification/docs/windows-server-deployment.md)
+- [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
+- [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
+
+## What healthy looks like
+
+The main liveness endpoint is:
+
+- `GET /api/health`
+
+The response should include both:
+
+- `ok=true`
+- `data.status=ok`
+
+The storage section should also match the deployment you intended to run:
+
+- `data.storage.mainStore.driver`
+- `data.storage.runtimeState.driver`
+
+If the service says `sqlite + sqlite` while you expected `sqlite + redis`, stop and verify your env file before taking more traffic.
+
+## Daily 5-minute checks
+
+1. Run the local healthcheck script.
+2. Confirm the newest backup file exists and is recent enough.
+3. Check the last `100` to `200` lines of the service log.
+4. Confirm the public HTTPS entrypoint and `/api/health` both still work.
+5. Check disk space for the data directory and backup directory.
+
+Linux examples:
+
+```bash
+/opt/rocksolidlicense/deploy/linux/healthcheck-rocksolid.sh
+tail -n 150 /var/log/rocksolid/rocksolid-server.log
+ls -lt /var/lib/rocksolid/backups | head
+```
+
+Windows examples:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\windows\healthcheck-rocksolid.ps1
+Get-Content C:\RockSolidLicense\logs\rocksolid-server.log -Tail 150
+Get-ChildItem C:\RockSolidLicense\backups | Sort-Object LastWriteTime -Descending | Select-Object -First 5
+```
+
+Look for repeated patterns such as:
+
+- login failures across many users
+- heartbeat failures after login succeeds
+- signature or timestamp validation failures
+- repeated device-block or network-rule denials that were not expected
+
+## Weekly checks
+
+1. Run one manual backup and verify the archive opens.
+2. Perform one restore drill in a non-production path, VM, or staging machine.
+3. Confirm scheduled backup automation is still enabled.
+4. Review certificate expiry and proxy logs.
+5. Review token key state and confirm the published key set still matches the active signer.
+
+Recommended weekly endpoints:
+
+- `GET /api/health`
+- `GET /api/system/token-key`
+- `GET /api/system/token-keys`
+
+## Backup expectations by storage topology
+
+### SQLite + SQLite
+
+The current Linux and Windows backup scripts already cover the most important recovery inputs:
+
+- `rocksolid.db`
+- `license_private.pem`
+- `license_public.pem`
+- `license_keyring.json`
+- runtime env file copy
+
+### SQLite + Redis
+
+Treat SQLite as the system of record for business data.
+
+Redis in this topology is runtime state, not the main source of truth for:
+
+- accounts
+- cards
+- entitlements
+- policies
+- product configuration
+
+If Redis is lost, users may need to log in again and live session state may be rebuilt, but the main business data should still recover from SQLite plus the key files.
+
+### PostgreSQL Preview + Redis
+
+The current app backup scripts still matter because they preserve:
+
+- token signing keys
+- keyring metadata
+- env configuration
+- any file-based fallback data under the configured data directory
+
+But they are not enough on their own for the PostgreSQL main store.
+
+If `RSL_MAIN_STORE_DRIVER=postgres`, add one of these to your production backup plan:
+
+- regular `pg_dump` exports
+- volume snapshots for the PostgreSQL data volume
+- database-level backup automation provided by your managed PostgreSQL service
+
+For Redis in this topology, losing runtime state is usually survivable, but expect active sessions and heartbeat state to be rebuilt.
+
+## Manual backup commands
+
+Linux:
+
+```bash
+PROJECT_ROOT=/opt/rocksolidlicense \
+ENV_FILE=/etc/rocksolidlicense/rocksolid.env \
+/opt/rocksolidlicense/deploy/linux/backup-rocksolid.sh
+```
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\windows\backup-rocksolid.ps1
+```
+
+After each manual backup, verify:
+
+- a new archive exists
+- the archive contains the expected database and key files
+- the archive timestamp matches the run you just performed
+
+## Restore drill: SQLite-based deployments
+
+Use this for:
+
+- `sqlite + sqlite`
+- `sqlite + redis`
+
+Suggested drill:
+
+1. Prepare a separate restore path or a staging machine.
+2. Stop the app service before replacing files.
+3. Extract the newest backup archive.
+4. Restore `rocksolid.db`, token keys, keyring, and env file to the configured paths.
+5. Start the app again.
+6. Run the healthcheck script.
+7. Log into the admin console with a known test account.
+8. Verify one test client can log in and send one heartbeat.
+
+If runtime state uses Redis, it is acceptable for online session state to start empty after the drill.
+
+## Restore drill: PostgreSQL Preview + Redis
+
+Use this when:
+
+- `RSL_MAIN_STORE_DRIVER=postgres`
+- `RSL_STATE_STORE_DRIVER=redis`
+
+Suggested drill:
+
+1. Restore the app key files and env file from the app backup archive.
+2. Restore PostgreSQL from a dump or volume snapshot.
+3. Start PostgreSQL and confirm it is reachable before starting the app.
+4. Start the app and verify `GET /api/health`.
+5. Treat Redis runtime state as rebuildable unless you have a separate persistence requirement for it.
+6. Re-run one end-to-end login and heartbeat test.
+
+Do not discover your PostgreSQL restore procedure for the first time during a real outage.
+
+## TLS and reverse proxy maintenance
+
+The app should normally sit behind HTTPS.
+
+Current repo examples:
+
+- Linux Caddy: [Caddyfile.example](/D:/code/OnlineVerification/deploy/linux/Caddyfile.example)
+- Linux Nginx TLS: [rocksolid.tls.conf.example](/D:/code/OnlineVerification/deploy/nginx/rocksolid.tls.conf.example)
+- Windows Caddy: [Caddyfile.example](/D:/code/OnlineVerification/deploy/windows/Caddyfile.example)
+
+Operational reminders:
+
+- Caddy usually renews certificates automatically, but still verify renewal is happening.
+- If you use Nginx, IIS, Certbot, or a cloud load balancer, put certificate expiry on a recurring calendar reminder.
+- After certificate renewal, verify the public admin URL and `/api/health` over HTTPS.
+- Keep `3000/tcp` private when a reverse proxy is present.
+- Only expose `4000/tcp` publicly if clients actually use TCP in production.
+
+## Token key maintenance
+
+Token signing keys are part of your recovery plan, not just a security feature.
+
+Before rotating keys:
+
+1. Confirm backups are recent.
+2. Record the current active `kid`.
+3. Confirm clients can fetch the full published key set.
+
+After rotating keys:
+
+1. Verify `GET /api/system/token-keys` publishes both the new active key and retired keys.
+2. Keep retired public keys published long enough for older tokens to expire naturally.
+3. If you suspect private-key compromise, treat it as a security incident and decide whether you also need forced session invalidation.
+
+Reference:
+
+- [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
+
+## First-response playbooks
+
+### Symptom: admin page or API is unreachable
+
+1. Run the local healthcheck script on the host.
+2. Check whether the app process or container is running.
+3. Check the service log for startup errors, missing env values, port binding failures, or disk-full conditions.
+4. If the app is healthy locally but not publicly reachable, inspect the reverse proxy, firewall, and DNS.
+
+### Symptom: login fails or heartbeat drops for many clients
+
+1. Verify the health endpoint first.
+2. Check whether a maintenance notice or forced-version rule is blocking traffic.
+3. Check whether a product-level feature toggle disabled register, login, recharge, or notices.
+4. If runtime state uses Redis, verify Redis is reachable.
+5. Check for server clock drift because timestamp-sensitive request validation depends on correct time.
+
+### Symptom: storage backend problems
+
+For SQLite:
+
+- verify file path, permissions, free disk space, and whether the database file still exists
+
+For PostgreSQL:
+
+- verify the connection URL, credentials, `pg_isready`, and data-volume health
+
+For Redis:
+
+- verify `redis-cli ping`, AOF persistence status if enabled, and free disk space
+
+### Symptom: suspected signing-key compromise
+
+1. Pause and preserve evidence first.
+2. Rotate signing keys.
+3. Review whether you need to revoke active sessions.
+4. Restore trust from known-good backups only after you understand the cause.
+5. Communicate to software authors if they need to refresh published public keys or packaged integration assets.
+
+## Recovery acceptance checklist
+
+After any restore or outage recovery, do not stop at "the process is up".
+
+Confirm all of the following:
+
+- admin login works
+- one project can be queried in the backoffice
+- one test client can log in
+- one heartbeat succeeds
+- `/api/health` reports `ok=true` and `data.status=ok`
+- the active token key set is readable
+- the newest backup job still runs after recovery

@@ -247,6 +247,14 @@ export function createApp(overrides = {}) {
       const productFeatureRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/admin/products/:productId/feature-config")
         : null;
+      if (req.method === "POST" && url.pathname === "/api/admin/products/feature-config/batch") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.updateProductFeatureConfigBatch(getBearerToken(req), body)
+        });
+        return;
+      }
       if (productFeatureRoute) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
@@ -1106,6 +1114,17 @@ export function createApp(overrides = {}) {
       const developerProductFeatureRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/developer/products/:productId/feature-config")
         : null;
+      if (req.method === "POST" && url.pathname === "/api/developer/products/feature-config/batch") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerUpdateProductFeatureConfigBatch(
+            getBearerToken(req),
+            body
+          )
+        });
+        return;
+      }
       if (developerProductFeatureRoute) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {

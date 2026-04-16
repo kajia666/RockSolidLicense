@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/projects</code></div>
-          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
+          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
           <div class="pill">Owner creates projects. Owner and admin members can edit product settings.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -43,10 +43,22 @@
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-filter-btn">Apply Filter</button><button id="clear-selection-btn">Clear Selection</button></div>
           <div class="three" style="margin-top:12px;">
             <label>Batch Status<select id="batch-status"><option value="active">active</option><option value="disabled">disabled</option><option value="archived">archived</option></select></label>
-            <div class="hint" id="batch-selection-meta">No projects selected for batch status changes.</div>
+            <div class="hint" id="batch-selection-meta">No projects selected for batch operations.</div>
             <div class="actions"><button class="secondary" id="select-visible-btn">Select Visible</button><button id="clear-batch-btn">Clear Batch</button><button class="danger" id="apply-batch-status-btn">Apply Batch Status</button></div>
           </div>
           <div class="hint" id="batch-status-note" style="margin-top:12px;">Choose a status target for the selected projects. Disabled or archived will revoke active sessions.</div>
+          <div class="hint" style="margin-top:12px;">Batch Feature Config</div>
+          <div class="toggle-grid" style="margin-top:12px;">
+            <label>Allow Register<select id="batch-allow-register"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Account Login<select id="batch-allow-account-login"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Card Login<select id="batch-allow-card-login"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Card Recharge<select id="batch-allow-card-recharge"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Version Check<select id="batch-allow-version-check"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Notices<select id="batch-allow-notices"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Allow Client Unbind<select id="batch-allow-client-unbind"><option value="true">true</option><option value="false">false</option></select></label>
+          </div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-batch-feature-btn">Apply Batch Feature Config</button></div>
+          <div class="hint" id="batch-feature-note" style="margin-top:12px;">The full feature toggle set below will be written to each selected project.</div>
           <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, status, feature toggles, and rotate SDK credentials inside assigned projects.</div>
         </article>
       </section>
@@ -222,10 +234,6 @@
         return (dashboard.projects || []).find((item) => item.code === code)?.metrics || {};
       }
 
-      function selectedBatchProducts() {
-        return products.filter((item) => batchProductIds.has(item.id));
-      }
-
       function syncStatusImpactHint(targetId, status, count) {
         const scopeCount = Number(count || 0);
         const scopeLabel = scopeCount === 1 ? "project" : "projects";
@@ -243,17 +251,26 @@
         el(targetId).textContent = messages[status] || messages.active;
       }
 
+      function syncBatchFeatureHint(count) {
+        const scopeCount = Number(count || 0);
+        el("batch-feature-note").textContent = scopeCount
+          ? `Apply the full feature toggle set below to ${scopeCount} selected project(s).`
+          : "Choose the feature toggle set below, then apply it to the selected projects.";
+      }
+
       function syncBatchSelectionUi() {
         const visible = filteredProducts();
         const visibleSelected = visible.filter((item) => batchProductIds.has(item.id)).length;
         const totalSelected = batchProductIds.size;
         el("batch-selection-meta").textContent = totalSelected
-          ? `${totalSelected} project(s) selected for batch status updates. ${visibleSelected} visible in the current filter.`
-          : "No projects selected for batch status changes.";
+          ? `${totalSelected} project(s) selected for batch operations. ${visibleSelected} visible in the current filter.`
+          : "No projects selected for batch operations.";
         el("apply-batch-status-btn").disabled = !canWriteProducts() || totalSelected === 0;
+        el("apply-batch-feature-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
         el("select-visible-btn").disabled = !products.length;
         syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
+        syncBatchFeatureHint(totalSelected);
       }
 
       function pruneBatchSelection(items = []) {
@@ -270,6 +287,7 @@
         for (const key of FEATURE_KEYS) {
           el(featureFieldId("create", key)).disabled = createDisabled;
           el(featureFieldId("edit", key)).disabled = editDisabled;
+          el(featureFieldId("batch", key)).disabled = editDisabled;
         }
         ["create-code", "create-name", "create-description"].forEach((id) => {
           el(id).disabled = createDisabled;
@@ -284,6 +302,7 @@
         el("rotate-sdk-app-id").disabled = editDisabled;
         el("batch-status").disabled = editDisabled;
         el("apply-batch-status-btn").disabled = editDisabled || batchProductIds.size === 0;
+        el("apply-batch-feature-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("permission-hint").textContent = !token
           ? "Sign in first."
           : `actor type=${actor?.type || "unknown"}${actor?.type === "member" ? ` | role=${actor?.role}` : " | owner can create and edit projects"}`;
@@ -488,6 +507,7 @@
         actor = null;
         products = [];
         dashboard = { summary: null, projects: [], generatedAt: null };
+        batchProductIds = new Set();
         renderProjects();
         setMeta();
         setSelection(null);
@@ -615,7 +635,7 @@
           batchProductIds.add(product.id);
         }
         renderProjects();
-        setStatus(`Selected ${batchProductIds.size} project(s) for batch status updates.`);
+        setStatus(`Selected ${batchProductIds.size} project(s) for batch operations.`);
       });
 
       el("clear-batch-btn").addEventListener("click", () => {
@@ -639,6 +659,28 @@
           });
           await refresh();
           setStatus(`Batch status updated for ${data.changed}/${data.total} project(s); revoked ${data.revokedSessions} session(s).`);
+          setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("apply-batch-feature-btn").addEventListener("click", async () => {
+        try {
+          const productIds = [...batchProductIds];
+          if (!productIds.length) {
+            throw new Error("Select at least one project before applying batch feature config.");
+          }
+          const data = await api("/api/developer/products/feature-config/batch", {
+            method: "POST",
+            body: {
+              productIds,
+              ...readFeatureConfig("batch")
+            }
+          });
+          await refresh();
+          setStatus(`Batch feature config updated for ${data.changed}/${data.total} project(s).`);
           setOutput(data);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
@@ -743,6 +785,7 @@
 
       writeFeatureConfig("create", {});
       writeFeatureConfig("edit", {});
+      writeFeatureConfig("batch", {});
       clearSession();
       renderProjects();
       renderStats();

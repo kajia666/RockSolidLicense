@@ -90,6 +90,16 @@ const DEVELOPER_MEMBER_ROLE_PERMISSIONS = Object.freeze({
   ]
 });
 
+const MANAGED_PRODUCT_FEATURE_KEYS = Object.freeze([
+  "allowRegister",
+  "allowAccountLogin",
+  "allowCardLogin",
+  "allowCardRecharge",
+  "allowVersionCheck",
+  "allowNotices",
+  "allowClientUnbind"
+]);
+
 function one(db, sql, ...params) {
   return db.prepare(sql).get(...params);
 }
@@ -1532,6 +1542,47 @@ function summarizeManagedProductStatusBatch(nextStatus, items) {
     changed,
     unchanged: total - changed,
     revokedSessions,
+    items
+  };
+}
+
+function snapshotManagedProductFeatureConfig(featureConfig = {}) {
+  return Object.fromEntries(
+    MANAGED_PRODUCT_FEATURE_KEYS.map((key) => [key, featureConfig?.[key] !== false])
+  );
+}
+
+function sameManagedProductFeatureConfig(left = {}, right = {}) {
+  return MANAGED_PRODUCT_FEATURE_KEYS.every((key) => {
+    const leftValue = left?.[key] !== false;
+    const rightValue = right?.[key] !== false;
+    return leftValue === rightValue;
+  });
+}
+
+async function applyManagedProductFeatureConfigChange(db, store, currentProduct, body, auditAction) {
+  const previousFeatureConfig = snapshotManagedProductFeatureConfig(resolveProductFeatureConfig(db, currentProduct));
+  const result = await Promise.resolve(store.products.updateProductFeatureConfig(currentProduct.id, body, nowIso()));
+  const nextFeatureConfig = snapshotManagedProductFeatureConfig(result.featureConfig);
+  const changed = !sameManagedProductFeatureConfig(previousFeatureConfig, nextFeatureConfig);
+
+  auditAction(result.product, result.featureConfig, previousFeatureConfig, changed);
+
+  return {
+    ...result.product,
+    featureConfig: result.featureConfig,
+    changed
+  };
+}
+
+function summarizeManagedProductFeatureConfigBatch(items) {
+  const total = items.length;
+  const changed = items.filter((item) => item.changed).length;
+
+  return {
+    total,
+    changed,
+    unchanged: total - changed,
     items
   };
 }
@@ -5053,18 +5104,64 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     async updateProductFeatureConfig(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const timestamp = nowIso();
-      const result = await Promise.resolve(store.products.updateProductFeatureConfig(productId, body, timestamp));
+      const currentProduct = await getStoreProductById(productId);
+      if (!currentProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
 
-      audit(db, "admin", admin.admin_id, "product.feature-config", "product", result.product.id, {
-        code: result.product.code,
-        featureConfig: result.featureConfig
+      return applyManagedProductFeatureConfigChange(db, store, currentProduct, body, (updatedProduct, featureConfig, previousFeatureConfig, changed) => {
+        audit(db, "admin", admin.admin_id, "product.feature-config", "product", updatedProduct.id, {
+          code: updatedProduct.code,
+          featureConfig,
+          previousFeatureConfig,
+          changed
+        });
       });
+    },
 
-      return {
-        ...result.product,
-        featureConfig: result.featureConfig
-      };
+    async updateProductFeatureConfigBatch(token, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const productIds = await resolveAdminProductIdsInput(db, store, body);
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        products.push(product);
+      }
+
+      const items = [];
+      for (const product of products) {
+        items.push(
+          await applyManagedProductFeatureConfigChange(
+            db,
+            store,
+            product,
+            body,
+            (updatedProduct, featureConfig, previousFeatureConfig, changed) => {
+              audit(db, "admin", admin.admin_id, "product.feature-config", "product", updatedProduct.id, {
+                code: updatedProduct.code,
+                featureConfig,
+                previousFeatureConfig,
+                changed,
+                batch: true
+              });
+            }
+          )
+        );
+      }
+
+      const summary = summarizeManagedProductFeatureConfigBatch(items);
+      audit(db, "admin", admin.admin_id, "product.feature-config.batch", "product", null, {
+        total: summary.total,
+        changed: summary.changed,
+        unchanged: summary.unchanged,
+        productIds,
+        productCodes: items.map((item) => item.code)
+      });
+      return summary;
     },
 
     async rotateProductSdkCredentials(token, productId, body = {}) {
@@ -5321,17 +5418,70 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_PRODUCT_FORBIDDEN",
         "You can only manage products owned by your developer account."
       );
-      const result = await Promise.resolve(store.products.updateProductFeatureConfig(ownedProduct.id, body, nowIso()));
-
-      auditDeveloperSession(db, session, "product.feature-config", "product", ownedProduct.id, {
-        code: result.product.code,
-        featureConfig: result.featureConfig
+      return applyManagedProductFeatureConfigChange(db, store, ownedProduct, body, (updatedProduct, featureConfig, previousFeatureConfig, changed) => {
+        auditDeveloperSession(db, session, "product.feature-config", "product", updatedProduct.id, {
+          code: updatedProduct.code,
+          featureConfig,
+          previousFeatureConfig,
+          changed
+        });
       });
+    },
 
-      return {
-        ...result.product,
-        featureConfig: result.featureConfig
-      };
+    async developerUpdateProductFeatureConfigBatch(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const productIds = await resolveDeveloperProductIdsInput(db, store, session, body);
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        ensureDeveloperCanAccessProduct(
+          db,
+          session,
+          {
+            id: product.id,
+            owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+          },
+          "products.write",
+          "DEVELOPER_PRODUCT_FORBIDDEN",
+          "You can only manage products owned by your developer account."
+        );
+        products.push(product);
+      }
+
+      const items = [];
+      for (const product of products) {
+        items.push(
+          await applyManagedProductFeatureConfigChange(
+            db,
+            store,
+            product,
+            body,
+            (updatedProduct, featureConfig, previousFeatureConfig, changed) => {
+              auditDeveloperSession(db, session, "product.feature-config", "product", updatedProduct.id, {
+                code: updatedProduct.code,
+                featureConfig,
+                previousFeatureConfig,
+                changed,
+                batch: true
+              });
+            }
+          )
+        );
+      }
+
+      const summary = summarizeManagedProductFeatureConfigBatch(items);
+      auditDeveloperSession(db, session, "product.feature-config.batch", "product", null, {
+        total: summary.total,
+        changed: summary.changed,
+        unchanged: summary.unchanged,
+        productIds,
+        productCodes: items.map((item) => item.code)
+      });
+      return summary;
     },
 
     async developerRotateProductSdkCredentials(token, productId, body = {}) {

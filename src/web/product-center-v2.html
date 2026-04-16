@@ -329,6 +329,7 @@
           <div class="pill">Batch Status API: <code>POST /api/admin/products/status/batch</code></div>
           <div class="pill">Profile API: <code>POST /api/admin/products/:productId/profile</code></div>
           <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
+          <div class="pill">Batch Feature API: <code>POST /api/admin/products/feature-config/batch</code></div>
           <div class="pill">Credential Rotate API: <code>POST /api/admin/products/:productId/sdk-credentials/rotate</code></div>
           <div class="pill">Owner API: <code>POST /api/admin/products/:productId/owner</code></div>
           <div class="pill">Developer Status API: <code>POST /api/admin/developers/:developerId/status</code></div>
@@ -538,7 +539,7 @@
                 <option value="archived">archived</option>
               </select>
             </label>
-            <div class="hint" id="batch-selection-meta">No projects selected for batch status changes.</div>
+            <div class="hint" id="batch-selection-meta">No projects selected for batch operations.</div>
           </div>
           <div class="actions" style="margin-bottom: 12px;">
             <button class="secondary" id="select-visible-btn">Select Visible</button>
@@ -546,6 +547,55 @@
             <button class="danger" id="apply-batch-status-btn">Apply Batch Status</button>
           </div>
           <div class="hint" id="batch-status-note" style="margin-bottom: 12px;">Choose a status target for the selected projects. Disabled or archived will revoke active sessions.</div>
+          <div class="hint" style="margin: 0 0 8px;">Batch Feature Config</div>
+          <div class="toggle-grid" style="margin-bottom: 12px;">
+            <label>Allow Register
+              <select id="batch-allow-register">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Allow Account Login
+              <select id="batch-allow-account-login">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Allow Card Login
+              <select id="batch-allow-card-login">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Allow Card Recharge
+              <select id="batch-allow-card-recharge">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Allow Version Check
+              <select id="batch-allow-version-check">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Allow Notices
+              <select id="batch-allow-notices">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Allow Client Unbind
+              <select id="batch-allow-client-unbind">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions" style="margin-bottom: 12px;">
+            <button class="secondary" id="apply-batch-feature-btn">Apply Batch Feature Config</button>
+          </div>
+          <div class="hint" id="batch-feature-note" style="margin-bottom: 12px;">The full feature toggle set below will be written to each selected project.</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -668,10 +718,6 @@
         return filterProducts(productsCache).find((item) => item.id === productId) || null;
       }
 
-      function selectedBatchProducts() {
-        return productsCache.filter((item) => batchProductIds.has(item.id));
-      }
-
       function syncStatusImpactHint(targetId, status, count) {
         const scopeCount = Number(count || 0);
         const scopeLabel = scopeCount === 1 ? "project" : "projects";
@@ -692,17 +738,30 @@
         }
       }
 
+      function syncBatchFeatureHint(count) {
+        const scopeCount = Number(count || 0);
+        const node = el("batch-feature-note");
+        if (!node) {
+          return;
+        }
+        node.textContent = scopeCount
+          ? `Apply the full feature toggle set below to ${scopeCount} selected project(s).`
+          : "Choose the feature toggle set below, then apply it to the selected projects.";
+      }
+
       function syncBatchSelectionUi() {
         const visibleProducts = filterProducts(productsCache);
         const visibleSelected = visibleProducts.filter((item) => batchProductIds.has(item.id)).length;
         const totalSelected = batchProductIds.size;
         el("batch-selection-meta").textContent = totalSelected
-          ? `${totalSelected} project(s) selected for batch status updates. ${visibleSelected} visible in the current filter.`
-          : "No projects selected for batch status changes.";
+          ? `${totalSelected} project(s) selected for batch operations. ${visibleSelected} visible in the current filter.`
+          : "No projects selected for batch operations.";
         el("select-visible-btn").disabled = !productsCache.length;
         el("apply-batch-status-btn").disabled = !adminToken || totalSelected === 0;
+        el("apply-batch-feature-btn").disabled = !adminToken || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
         syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
+        syncBatchFeatureHint(totalSelected);
       }
 
       function pruneBatchSelection(items = []) {
@@ -1202,7 +1261,7 @@
           batchProductIds.add(product.id);
         }
         renderProducts(productsCache);
-        setStatus(`Selected ${batchProductIds.size} project(s) for batch status updates.`);
+        setStatus(`Selected ${batchProductIds.size} project(s) for batch operations.`);
       });
 
       el("clear-batch-btn").addEventListener("click", () => {
@@ -1229,10 +1288,29 @@
         await refreshAll();
       }));
 
+      el("apply-batch-feature-btn").addEventListener("click", () => guarded(async () => {
+        const productIds = [...batchProductIds];
+        if (!productIds.length) {
+          throw new Error("Select at least one project before applying batch feature config.");
+        }
+
+        const data = await callApi("/api/admin/products/feature-config/batch", {
+          method: "POST",
+          body: {
+            productIds,
+            ...readFeatureConfig("batch")
+          }
+        });
+        setOutput(data);
+        setStatus(`Batch feature config updated for ${data.changed}/${data.total} project(s).`);
+        await refreshAll();
+      }));
+
       renderStats([]);
       renderProducts([]);
       renderDevelopers([]);
       renderDeveloperOptions();
+      writeFeatureConfig("batch", {});
       syncStatusImpactHint("single-status-note", "active", 1);
       syncBatchSelectionUi();
     </script>

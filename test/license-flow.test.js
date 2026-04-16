@@ -6616,6 +6616,174 @@ test("batch project status control can update multiple scoped projects", async (
   }
 });
 
+test("batch project feature config control can update multiple scoped projects", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "feature.owner",
+        password: "FeatureOwner123!",
+        displayName: "Feature Owner"
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "feature.owner",
+      password: "FeatureOwner123!"
+    });
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "FEAT_ALPHA",
+        name: "Feature Alpha",
+        featureConfig: {
+          allowCardRecharge: false
+        }
+      },
+      ownerSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "FEAT_BETA",
+        name: "Feature Beta",
+        featureConfig: {
+          allowRegister: false,
+          allowNotices: false
+        }
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "feature.admin",
+        password: "FeatureAdmin123!",
+        displayName: "Feature Admin",
+        role: "admin",
+        productCodes: ["FEAT_ALPHA", "FEAT_BETA"]
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "feature.operator",
+        password: "FeatureOperator123!",
+        displayName: "Feature Operator",
+        role: "operator",
+        productCodes: ["FEAT_ALPHA", "FEAT_BETA"]
+      },
+      ownerSession.token
+    );
+
+    const adminMemberSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "feature.admin",
+      password: "FeatureAdmin123!"
+    });
+
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "feature.operator",
+      password: "FeatureOperator123!"
+    });
+
+    const developerBatch = await postJson(
+      baseUrl,
+      "/api/developer/products/feature-config/batch",
+      {
+        productIds: [alphaProduct.id, betaProduct.id],
+        allowRegister: false,
+        allowAccountLogin: true,
+        allowCardLogin: false,
+        allowCardRecharge: false,
+        allowVersionCheck: true,
+        allowNotices: false,
+        allowClientUnbind: true
+      },
+      adminMemberSession.token
+    );
+    assert.equal(developerBatch.total, 2);
+    assert.equal(developerBatch.changed, 2);
+    assert.equal(developerBatch.unchanged, 0);
+    assert.equal(developerBatch.items.length, 2);
+    assert.deepEqual(developerBatch.items.map((item) => item.code).sort(), ["FEAT_ALPHA", "FEAT_BETA"]);
+    assert.ok(developerBatch.items.every((item) => item.featureConfig.allowRegister === false));
+    assert.ok(developerBatch.items.every((item) => item.featureConfig.allowCardLogin === false));
+    assert.ok(developerBatch.items.every((item) => item.featureConfig.allowCardRecharge === false));
+    assert.ok(developerBatch.items.every((item) => item.featureConfig.allowNotices === false));
+
+    const operatorForbidden = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/products/feature-config/batch",
+      {
+        productIds: [alphaProduct.id],
+        allowRegister: true
+      },
+      operatorSession.token
+    );
+    assert.equal(operatorForbidden.status, 403);
+    assert.equal(operatorForbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const adminBatch = await postJson(
+      baseUrl,
+      "/api/admin/products/feature-config/batch",
+      {
+        projectCodes: ["FEAT_ALPHA", "FEAT_BETA"],
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true,
+          allowVersionCheck: true,
+          allowNotices: true,
+          allowClientUnbind: true
+        }
+      },
+      adminSession.token
+    );
+    assert.equal(adminBatch.total, 2);
+    assert.equal(adminBatch.changed, 2);
+    assert.equal(adminBatch.unchanged, 0);
+    assert.ok(adminBatch.items.every((item) => item.featureConfig.allowRegister === true));
+    assert.ok(adminBatch.items.every((item) => item.featureConfig.allowCardLogin === true));
+    assert.ok(adminBatch.items.every((item) => item.featureConfig.allowCardRecharge === true));
+    assert.ok(adminBatch.items.every((item) => item.featureConfig.allowNotices === true));
+
+    const ownerProducts = await getJson(baseUrl, "/api/developer/products", ownerSession.token);
+    const updatedProducts = ownerProducts.filter((item) => ["FEAT_ALPHA", "FEAT_BETA"].includes(item.code));
+    assert.equal(updatedProducts.length, 2);
+    assert.ok(updatedProducts.every((item) => item.featureConfig.allowRegister === true));
+    assert.ok(updatedProducts.every((item) => item.featureConfig.allowCardLogin === true));
+    assert.ok(updatedProducts.every((item) => item.featureConfig.allowCardRecharge === true));
+    assert.ok(updatedProducts.every((item) => item.featureConfig.allowNotices === true));
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
+    const developerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", adminMemberSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.feature-config.batch"));
+    assert.ok(developerAuditLogs.items.some((entry) => entry.event_type === "product.feature-config.batch"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -6631,10 +6799,12 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /developers\/:developerId\/status/);
     assert.match(html, /products\/:productId\/status/);
     assert.match(html, /products\/status\/batch/);
+    assert.match(html, /products\/feature-config\/batch/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Save Project Status/);
     assert.match(html, /Apply Batch Status/);
+    assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
@@ -6770,12 +6940,14 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /feature-config/);
     assert.match(html, /products\/:productId\/status/);
     assert.match(html, /products\/status\/batch/);
+    assert.match(html, /products\/feature-config\/batch/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
     assert.match(html, /Save Project Status/);
     assert.match(html, /Apply Batch Status/);
+    assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);

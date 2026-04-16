@@ -433,6 +433,28 @@ function buildDeveloperIdentityPayload(session) {
   };
 }
 
+function buildOwnerDeveloperPayload(ownerDeveloper = null) {
+  if (!ownerDeveloper) {
+    return null;
+  }
+  return {
+    id: ownerDeveloper.id,
+    username: ownerDeveloper.username ?? null,
+    displayName: ownerDeveloper.displayName ?? "",
+    status: ownerDeveloper.status ?? null
+  };
+}
+
+function buildAdminActorPayload(adminSession = {}) {
+  return {
+    type: "admin",
+    id: adminSession.admin_id ?? null,
+    username: adminSession.username ?? "admin",
+    role: "admin",
+    permissions: ["*"]
+  };
+}
+
 function buildIntegrationTransportSnapshot(config) {
   return {
     http: {
@@ -579,12 +601,18 @@ function buildDeveloperIntegrationPackagePayload({
   transport,
   signing,
   tokenKeys,
-  examples
+  examples,
+  includeOwner = false,
+  generatedAt = nowIso()
 }) {
+  const ownerDeveloper = includeOwner
+    ? buildOwnerDeveloperPayload(product?.ownerDeveloper ?? null)
+    : undefined;
   const manifest = {
-    generatedAt: nowIso(),
-    developer,
-    actor,
+    generatedAt,
+    developer: developer ?? ownerDeveloper ?? null,
+    actor: actor ?? null,
+    ownerDeveloper,
     project: {
       id: product.id,
       code: product.code,
@@ -626,6 +654,15 @@ function buildDeveloperIntegrationPackagePayload({
   };
 
   return {
+    id: product.id,
+    code: product.code,
+    projectCode: product.projectCode ?? product.code,
+    softwareCode: product.softwareCode ?? product.code,
+    name: product.name,
+    description: product.description ?? "",
+    status: product.status,
+    updatedAt: product.updatedAt,
+    ownerDeveloper,
     fileName: `rocksolid-integration-${product.code}.json`,
     manifest,
     snippets: {
@@ -751,6 +788,14 @@ function buildProductSdkCredentialEnvBundleText(envFiles = []) {
   return envFiles.map((entry) => `### ${entry.fileName}\n${entry.content}`).join("\n\n");
 }
 
+function buildNamedFileBundleText(files = []) {
+  if (!files.length) {
+    return "";
+  }
+
+  return files.map((entry) => `### ${entry.fileName}\n${entry.content}`).join("\n\n");
+}
+
 function buildProductSdkCredentialExportBundle(products = [], options = {}) {
   const generatedAt = nowIso();
   const timestampTag = buildExportTimestampTag(generatedAt);
@@ -769,6 +814,57 @@ function buildProductSdkCredentialExportBundle(products = [], options = {}) {
     csvText,
     envFiles,
     envBundleText: buildProductSdkCredentialEnvBundleText(envFiles)
+  };
+}
+
+function buildIntegrationPackageManifestFiles(items = []) {
+  return items.map((item) => ({
+    fileName: item.fileName,
+    content: JSON.stringify(item.manifest, null, 2)
+  }));
+}
+
+function buildIntegrationPackageEnvFiles(items = []) {
+  return items.map((item) => ({
+    fileName: `${item.code}.env`,
+    content: item.snippets?.envTemplate || ""
+  }));
+}
+
+function buildIntegrationPackageCppFiles(items = []) {
+  return items.map((item) => ({
+    fileName: `${item.code}.cpp`,
+    content: item.snippets?.cppQuickstart || ""
+  }));
+}
+
+function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
+  const generatedAt = options.generatedAt ?? nowIso();
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const manifestFiles = buildIntegrationPackageManifestFiles(items);
+  const envFiles = buildIntegrationPackageEnvFiles(items);
+  const cppFiles = buildIntegrationPackageCppFiles(items);
+
+  return {
+    generatedAt,
+    total: items.length,
+    developer: options.developer,
+    actor: options.actor,
+    transport: options.transport,
+    signing: options.signing,
+    tokenKeys: options.tokenKeys,
+    examples: options.examples,
+    fileName: `rocksolid-integration-packages-${timestampTag}.json`,
+    manifestArchiveName: `rocksolid-integration-packages-${timestampTag}-manifests.txt`,
+    envArchiveName: `rocksolid-integration-packages-${timestampTag}-env.txt`,
+    cppArchiveName: `rocksolid-integration-packages-${timestampTag}-cpp.txt`,
+    items,
+    manifestFiles,
+    envFiles,
+    cppFiles,
+    manifestBundleText: buildNamedFileBundleText(manifestFiles),
+    envBundleText: buildNamedFileBundleText(envFiles),
+    cppBundleText: buildNamedFileBundleText(cppFiles)
   };
 }
 
@@ -5659,6 +5755,60 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return payload;
     },
 
+    async exportProductIntegrationPackages(token, body = {}, options = {}) {
+      const admin = requireAdminSession(db, token);
+      const productIds = await resolveAdminProductIdsInput(db, store, body);
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        products.push(product);
+      }
+
+      const generatedAt = nowIso();
+      const transport = buildIntegrationTransportSnapshot(config);
+      if (transport?.http && options.publicBaseUrl) {
+        transport.http.baseUrl = options.publicBaseUrl;
+      }
+      if (transport?.http && options.publicHost) {
+        transport.http.publicHost = options.publicHost;
+      }
+      if (transport?.http && options.publicPort) {
+        transport.http.publicPort = options.publicPort;
+      }
+      const signing = buildIntegrationSigningSnapshot(config);
+      const tokenKeys = this.tokenKeys();
+      const examples = buildIntegrationExamples();
+      const items = products.map((product) => buildDeveloperIntegrationPackagePayload({
+        actor: buildAdminActorPayload(admin),
+        product,
+        transport,
+        signing,
+        tokenKeys,
+        examples,
+        includeOwner: true,
+        generatedAt
+      }));
+      const payload = buildProductIntegrationPackageExportBundle(items, {
+        generatedAt,
+        actor: buildAdminActorPayload(admin),
+        transport,
+        signing,
+        tokenKeys,
+        examples
+      });
+      audit(db, "admin", admin.admin_id, "product.integration-packages.export.batch", "product", null, {
+        total: payload.total,
+        productIds,
+        productCodes: products.map((item) => item.code),
+        fileName: payload.fileName
+      });
+      return payload;
+    },
+
     async updateProductOwner(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
       const product = await getStoreProductById(productId);
@@ -6089,6 +6239,81 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         signing: buildIntegrationSigningSnapshot(config)
       });
       auditDeveloperSession(db, session, "product.sdk-credentials.export.batch", "product", null, {
+        total: payload.total,
+        productIds,
+        productCodes: products.map((item) => item.code),
+        fileName: payload.fileName
+      });
+      return payload;
+    },
+
+    async developerExportProductIntegrationPackages(token, body = {}, options = {}) {
+      const session = requireDeveloperSession(db, token);
+      const productIds = await resolveDeveloperProductIdsInput(
+        db,
+        store,
+        session,
+        body,
+        "products.read",
+        "You can only view projects assigned to your developer account."
+      );
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        ensureDeveloperCanAccessProduct(
+          db,
+          session,
+          {
+            id: product.id,
+            owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+          },
+          "products.read",
+          "DEVELOPER_PRODUCT_FORBIDDEN",
+          "You can only view projects assigned to your developer account."
+        );
+        products.push(product);
+      }
+
+      const generatedAt = nowIso();
+      const developer = buildDeveloperIdentityPayload(session);
+      const actor = buildDeveloperActor(session);
+      const transport = buildIntegrationTransportSnapshot(config);
+      if (transport?.http && options.publicBaseUrl) {
+        transport.http.baseUrl = options.publicBaseUrl;
+      }
+      if (transport?.http && options.publicHost) {
+        transport.http.publicHost = options.publicHost;
+      }
+      if (transport?.http && options.publicPort) {
+        transport.http.publicPort = options.publicPort;
+      }
+      const signing = buildIntegrationSigningSnapshot(config);
+      const tokenKeys = this.tokenKeys();
+      const examples = buildIntegrationExamples();
+      const items = products.map((product) => buildDeveloperIntegrationPackagePayload({
+        developer,
+        actor,
+        product,
+        transport,
+        signing,
+        tokenKeys,
+        examples,
+        generatedAt
+      }));
+      const payload = buildProductIntegrationPackageExportBundle(items, {
+        generatedAt,
+        developer,
+        actor,
+        transport,
+        signing,
+        tokenKeys,
+        examples
+      });
+      auditDeveloperSession(db, session, "product.integration-packages.export.batch", "product", null, {
         total: payload.total,
         productIds,
         productCodes: products.map((item) => item.code),

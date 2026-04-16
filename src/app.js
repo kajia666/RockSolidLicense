@@ -292,6 +292,18 @@ export function createApp(overrides = {}) {
         });
         return;
       }
+      if (req.method === "POST" && url.pathname === "/api/admin/products/integration-packages/export") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.exportProductIntegrationPackages(getBearerToken(req), body, {
+            publicBaseUrl: url.origin,
+            publicHost: url.hostname,
+            publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+          })
+        });
+        return;
+      }
       if (productSdkRotateRoute) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
@@ -1194,6 +1206,22 @@ export function createApp(overrides = {}) {
         sendJson(res, 200, {
           ok: true,
           data: await services.developerExportProductSdkCredentials(
+            getBearerToken(req),
+            body,
+            {
+              publicBaseUrl: url.origin,
+              publicHost: url.hostname,
+              publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+            }
+          )
+        });
+        return;
+      }
+      if (req.method === "POST" && url.pathname === "/api/developer/products/integration-packages/export") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerExportProductIntegrationPackages(
             getBearerToken(req),
             body,
             {

@@ -333,6 +333,7 @@
           <div class="pill">Credential Rotate API: <code>POST /api/admin/products/:productId/sdk-credentials/rotate</code></div>
           <div class="pill">Batch Credential Rotate API: <code>POST /api/admin/products/sdk-credentials/rotate/batch</code></div>
           <div class="pill">Credential Export API: <code>POST /api/admin/products/sdk-credentials/export</code></div>
+          <div class="pill">Integration Export API: <code>POST /api/admin/products/integration-packages/export</code></div>
           <div class="pill">Owner API: <code>POST /api/admin/products/:productId/owner</code></div>
           <div class="pill">Developer Status API: <code>POST /api/admin/developers/:developerId/status</code></div>
           <div class="pill">One developer can own multiple projects</div>
@@ -610,8 +611,10 @@
           <div class="actions" style="margin-bottom: 12px;">
             <button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button>
             <button class="secondary" id="export-batch-sdk-btn">Export Batch SDK Credentials</button>
+            <button class="secondary" id="export-batch-integration-btn">Export Batch Integration Packages</button>
           </div>
           <div class="hint" id="batch-export-note" style="margin-bottom: 12px;">Export the selected projects as JSON, CSV, and .env snippets so software authors can copy the current SDK credentials safely.</div>
+          <div class="hint" id="batch-package-note" style="margin-bottom: 12px;">Export full integration manifests, ready-to-copy `.env` files, and C/C++ quickstart snippets for the selected projects so your software authors can pick up the latest SDK settings in one handoff.</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -792,6 +795,17 @@
           : "Export the selected projects as JSON, CSV, and .env snippets so software authors can copy the current SDK credentials safely.";
       }
 
+      function syncBatchPackageHint(count) {
+        const scopeCount = Number(count || 0);
+        const node = el("batch-package-note");
+        if (!node) {
+          return;
+        }
+        node.textContent = scopeCount
+          ? `Export ${scopeCount} selected project(s) as full integration bundles with manifests, .env files, and C/C++ quickstart snippets.`
+          : "Export full integration manifests, ready-to-copy `.env` files, and C/C++ quickstart snippets for the selected projects so your software authors can pick up the latest SDK settings in one handoff.";
+      }
+
       function syncBatchSelectionUi() {
         const visibleProducts = filterProducts(productsCache);
         const visibleSelected = visibleProducts.filter((item) => batchProductIds.has(item.id)).length;
@@ -804,11 +818,13 @@
         el("apply-batch-feature-btn").disabled = !adminToken || totalSelected === 0;
         el("apply-batch-rotate-btn").disabled = !adminToken || totalSelected === 0;
         el("export-batch-sdk-btn").disabled = !adminToken || totalSelected === 0;
+        el("export-batch-integration-btn").disabled = !adminToken || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
         syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
         syncBatchFeatureHint(totalSelected);
         syncBatchRotateHint(totalSelected);
         syncBatchExportHint(totalSelected);
+        syncBatchPackageHint(totalSelected);
       }
 
       function pruneBatchSelection(items = []) {
@@ -1396,6 +1412,20 @@
         });
         setOutput(data);
         setStatus(`Batch SDK credential export generated for ${data.total} project(s).`);
+      }));
+
+      el("export-batch-integration-btn").addEventListener("click", () => guarded(async () => {
+        const productIds = [...batchProductIds];
+        if (!productIds.length) {
+          throw new Error("Select at least one project before exporting batch integration packages.");
+        }
+
+        const data = await callApi("/api/admin/products/integration-packages/export", {
+          method: "POST",
+          body: { productIds }
+        });
+        setOutput(data);
+        setStatus(`Batch integration package export generated for ${data.total} project(s).`);
       }));
 
       renderStats([]);

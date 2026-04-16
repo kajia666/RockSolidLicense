@@ -7130,6 +7130,144 @@ test("batch project sdk credential export can bundle selected projects with scop
   }
 });
 
+test("batch project integration package export can bundle selected projects with scoped access", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "integration.bundle.owner",
+        password: "IntegrationBundleOwner123!",
+        displayName: "Integration Bundle Owner"
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "integration.bundle.owner",
+      password: "IntegrationBundleOwner123!"
+    });
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "INTBUNDLE_ALPHA",
+        name: "Integration Bundle Alpha",
+        featureConfig: {
+          allowCardLogin: false
+        }
+      },
+      ownerSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "INTBUNDLE_BETA",
+        name: "Integration Bundle Beta"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "integration.bundle.viewer",
+        password: "IntegrationBundleViewer123!",
+        displayName: "Integration Bundle Viewer",
+        role: "viewer",
+        productCodes: ["INTBUNDLE_ALPHA"]
+      },
+      ownerSession.token
+    );
+
+    const viewerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "integration.bundle.viewer",
+      password: "IntegrationBundleViewer123!"
+    });
+
+    const developerExport = await postJson(
+      baseUrl,
+      "/api/developer/products/integration-packages/export",
+      {
+        productIds: [alphaProduct.id]
+      },
+      viewerSession.token
+    );
+    assert.equal(developerExport.total, 1);
+    assert.equal(developerExport.items.length, 1);
+    assert.equal(developerExport.items[0].code, "INTBUNDLE_ALPHA");
+    assert.equal(developerExport.items[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
+    assert.equal(developerExport.items[0].manifest.project.code, "INTBUNDLE_ALPHA");
+    assert.equal(developerExport.items[0].manifest.project.featureConfig.allowCardLogin, false);
+    assert.equal(developerExport.items[0].manifest.credentials.sdkAppId, alphaProduct.sdkAppId);
+    assert.equal(developerExport.items[0].manifest.credentials.sdkAppSecret, alphaProduct.sdkAppSecret);
+    assert.equal(developerExport.items[0].manifest.actor.type, "member");
+    assert.equal(developerExport.items[0].manifest.actor.role, "viewer");
+    assert.match(developerExport.items[0].snippets.cppQuickstart, /rocksolid::LicenseClientWin/);
+    assert.match(developerExport.items[0].snippets.cppQuickstart, /INTBUNDLE_ALPHA/);
+    assert.match(
+      developerExport.items[0].snippets.envTemplate,
+      new RegExp(`RS_HTTP_BASE_URL=${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
+    );
+    assert.equal(developerExport.manifestFiles.length, 1);
+    assert.equal(developerExport.manifestFiles[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
+    assert.match(developerExport.manifestFiles[0].content, /"code": "INTBUNDLE_ALPHA"/);
+    assert.equal(developerExport.envFiles[0].fileName, "INTBUNDLE_ALPHA.env");
+    assert.equal(developerExport.cppFiles[0].fileName, "INTBUNDLE_ALPHA.cpp");
+    assert.match(developerExport.manifestBundleText, /### rocksolid-integration-INTBUNDLE_ALPHA\.json/);
+    assert.match(developerExport.cppBundleText, /### INTBUNDLE_ALPHA\.cpp/);
+
+    const viewerForbidden = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/products/integration-packages/export",
+      {
+        productIds: [betaProduct.id]
+      },
+      viewerSession.token
+    );
+    assert.equal(viewerForbidden.status, 403);
+    assert.equal(viewerForbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const adminExport = await postJson(
+      baseUrl,
+      "/api/admin/products/integration-packages/export",
+      {
+        projectCodes: ["INTBUNDLE_ALPHA", "INTBUNDLE_BETA"]
+      },
+      adminSession.token
+    );
+    assert.equal(adminExport.total, 2);
+    assert.equal(adminExport.items.length, 2);
+    assert.equal(adminExport.actor.type, "admin");
+    assert.ok(adminExport.items.every((item) => item.ownerDeveloper?.id === owner.id));
+    assert.ok(adminExport.items.every((item) => item.manifest.ownerDeveloper?.username === "integration.bundle.owner"));
+    assert.ok(adminExport.items.every((item) => item.manifest.actor?.type === "admin"));
+    assert.equal(adminExport.manifestFiles.length, 2);
+    assert.equal(adminExport.cppFiles.length, 2);
+    assert.match(adminExport.manifestBundleText, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
+    assert.match(adminExport.manifestBundleText, /rocksolid-integration-INTBUNDLE_BETA\.json/);
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
+    const ownerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", ownerSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.integration-packages.export.batch"));
+    assert.ok(ownerAuditLogs.items.some((entry) => entry.event_type === "product.integration-packages.export.batch"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -7148,6 +7286,7 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /products\/feature-config\/batch/);
     assert.match(html, /sdk-credentials\/rotate\/batch/);
     assert.match(html, /sdk-credentials\/export/);
+    assert.match(html, /integration-packages\/export/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Save Project Status/);
@@ -7155,6 +7294,7 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Export Batch SDK Credentials/);
+    assert.match(html, /Export Batch Integration Packages/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
@@ -7397,6 +7537,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /products\/feature-config\/batch/);
     assert.match(html, /sdk-credentials\/rotate\/batch/);
     assert.match(html, /sdk-credentials\/export/);
+    assert.match(html, /integration-packages\/export/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
@@ -7406,6 +7547,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Export Batch SDK Credentials/);
+    assert.match(html, /Export Batch Integration Packages/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);

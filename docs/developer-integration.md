@@ -24,6 +24,8 @@ The page now also summarizes how many visible projects currently have each of th
 
 - `GET /api/developer/integration`
 - `GET /api/developer/integration/package`
+- `POST /api/developer/products/integration-packages/export`
+- `POST /api/admin/products/integration-packages/export`
 
 This route requires a normal developer bearer token and is scoped to projects visible to the current actor.
 
@@ -51,6 +53,17 @@ The package route returns:
 - `manifest`
 - `snippets.envTemplate`
 - `snippets.cppQuickstart`
+
+The batch package export routes return:
+
+- `fileName`
+- `items`
+- `manifestFiles`
+- `envFiles`
+- `cppFiles`
+- `manifestBundleText`
+- `envBundleText`
+- `cppBundleText`
 
 Typical shape:
 
@@ -95,6 +108,7 @@ The page and API are useful when the software author needs to:
 - adapt example register/login/card-login/heartbeat requests for their own client
 - confirm whether recharge and client-unbind are open for a scoped project before exposing those SDK flows
 - export a current project integration package after rotating `sdkAppSecret` or `sdkAppId`
+- export multiple project integration packages in one request from the project workspace when several software products need the same deployment refresh
 - hand the software author a ready-to-copy C++ quickstart snippet and environment template
 
 ## Request signing headers

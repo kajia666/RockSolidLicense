@@ -279,6 +279,7 @@ npm run db:postgres:check
 - `POST /api/admin/products/feature-config/batch`
 - `POST /api/admin/products/sdk-credentials/rotate/batch`
 - `POST /api/admin/products/sdk-credentials/export`
+- `POST /api/admin/products/integration-packages/export`
 - `POST /api/admin/products/:productId/profile`
 - `POST /api/admin/products/:productId/status`
 - `POST /api/admin/products/:productId/feature-config`
@@ -329,6 +330,7 @@ npm run db:postgres:check
 - `POST /api/developer/products/feature-config/batch`
 - `POST /api/developer/products/sdk-credentials/rotate/batch`
 - `POST /api/developer/products/sdk-credentials/export`
+- `POST /api/developer/products/integration-packages/export`
 - `POST /api/developer/products/:productId/profile`
 - `POST /api/developer/products/:productId/status`
 - `POST /api/developer/products/:productId/feature-config`
@@ -375,6 +377,7 @@ npm run db:postgres:check
 - 项目级功能开关关闭后，对应客户端接口会返回“disabled by product”，运行链路也不会继续套用该项目的相关规则
 - 项目 SDK 凭据支持只轮换 `sdkAppSecret`，也支持连同 `sdkAppId` 一起轮换；旧凭据会立即失效，因此更适合在软件作者完成 SDK 配置更新后统一切换
 - 项目中心里的 SDK 凭据批量导出会同时生成 JSON、CSV 和 `.env` 片段，方便软件作者在轮换后把新凭据快速同步给接入工程
+- 项目中心现在也支持批量导出集成包，单次导出会包含每个项目的接入清单 JSON、`.env` 模板和 C/C++ 快速接入片段，适合给多个软件项目同时下发最新 SDK 配置
 - 管理员产品中心、开发者总览、开发者项目中心和开发者接入中心都会直接汇总 `active / disabled / archived` 项目数量
 
 产品级功能开关当前支持：
@@ -403,11 +406,10 @@ npm run db:postgres:check
 
 ### 页面入口
 
-- `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换单个或批量项目状态、按关键字和状态筛选项目，并支持单个或批量调整项目级功能开关、批量轮换 SDK 凭据、批量导出凭据清单
+- `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换单个或批量项目状态、按关键字和状态筛选项目，并支持单个或批量调整项目级功能开关、批量轮换 SDK 凭据、批量导出凭据清单和批量集成包
 - `/developer`：开发者总览中心，展示项目数、在线会话、卡密、强更规则、阻断公告、网络规则和功能开关覆盖情况
-- `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息与示例请求
 - `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息、示例请求，并导出当前项目的接入包、环境模板和 C++ 快速接入片段
-- `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及单个或批量 SDK 凭据轮换、凭据导出
+- `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及单个或批量 SDK 凭据轮换、凭据导出和批量集成包导出
 - `/developer/licenses`：开发者授权中心，维护策略、卡密批次、卡密状态和卡密导出
 - `/developer/ops`：开发者授权运营台，处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁
 - `/developer/releases`：开发者发版中心，维护客户端版本、强更规则和启动公告

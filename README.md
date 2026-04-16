@@ -567,6 +567,7 @@ cl /EHsc /std:c++17 ^
 - [storage-deployment-guide.md](docs/storage-deployment-guide.md)
 - [postgres-main-store-preview.md](docs/postgres-main-store-preview.md)
 - [postgres-backup-restore.md](docs/postgres-backup-restore.md)
+- [incident-response-playbook.md](docs/incident-response-playbook.md)
 - [server-os-choice.md](docs/server-os-choice.md)
 - [production-launch-checklist.md](docs/production-launch-checklist.md)
 - [production-operations-runbook.md](docs/production-operations-runbook.md)

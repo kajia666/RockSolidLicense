@@ -233,3 +233,25 @@ test("postgres backup and restore assets cover linux, windows, and preview compo
   assert.match(unregisterPostgresTask, /RockSolidLicensePostgresBackup/);
   assert.match(unregisterPostgresTask, /Unregister-ScheduledTask/);
 });
+
+test("incident response playbook links recovery order across health, auth, storage, tls, and keys", () => {
+  const readme = readText("README.md");
+  const runbook = readText("docs/production-operations-runbook.md");
+  const playbook = readText("docs/incident-response-playbook.md");
+
+  assert.match(readme, /incident-response-playbook\.md/);
+  assert.match(runbook, /incident-response-playbook\.md/);
+
+  assert.match(playbook, /First 3 minutes/);
+  assert.match(playbook, /flowchart TD/);
+  assert.match(playbook, /GET \/api\/health/);
+  assert.match(playbook, /Admin or API unreachable/);
+  assert.match(playbook, /Login failing for many users/);
+  assert.match(playbook, /Heartbeat succeeds for some users but drops after login/);
+  assert.match(playbook, /PostgreSQL main-store trouble/);
+  assert.match(playbook, /Redis runtime-state trouble/);
+  assert.match(playbook, /TLS or reverse-proxy trouble/);
+  assert.match(playbook, /Signing-key or token verification incident/);
+  assert.match(playbook, /Safe recovery sequence/);
+  assert.match(playbook, /data\.storage\.mainStore\.driver/);
+});

@@ -11,6 +11,7 @@ It is meant for day-one and early-production operations, where the main goal is 
 - [windows-deployment-guide.md](/D:/code/OnlineVerification/docs/windows-deployment-guide.md)
 - [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
 - [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
+- [incident-response-playbook.md](/D:/code/OnlineVerification/docs/incident-response-playbook.md)
 - [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
 
 ## What healthy looks like
@@ -243,6 +244,10 @@ Reference:
 - [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
 
 ## First-response playbooks
+
+For a more detailed symptom-by-symptom recovery order, also see:
+
+- [incident-response-playbook.md](/D:/code/OnlineVerification/docs/incident-response-playbook.md)
 
 ### Symptom: admin page or API is unreachable
 

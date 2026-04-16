@@ -68,6 +68,24 @@ If you prefer automatic HTTPS with a lighter setup, you can also use:
 
 - [Caddyfile.example](/D:/code/OnlineVerification/deploy/linux/Caddyfile.example)
 
+## Additional compose profiles
+
+If you want a more production-oriented storage setup than plain SQLite, the repo now also includes:
+
+- [docker-compose.redis-runtime.yml](/D:/code/OnlineVerification/deploy/docker-compose.redis-runtime.yml)
+  Recommended for earlier production because main business data stays on SQLite while runtime state moves to Redis.
+- [docker-compose.pg-redis.preview.yml](/D:/code/OnlineVerification/deploy/docker-compose.pg-redis.preview.yml)
+  Recommended for preview / staging / gradual migration because PostgreSQL main-store support is still staged.
+
+Matching env templates:
+
+- [rocksolid.redis-runtime.env.example](/D:/code/OnlineVerification/deploy/rocksolid.redis-runtime.env.example)
+- [rocksolid.pg-redis.preview.env.example](/D:/code/OnlineVerification/deploy/rocksolid.pg-redis.preview.env.example)
+
+Recommended reading:
+
+- [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
+
 ## Option B: Direct systemd service
 
 1. Install `Node.js 24`.

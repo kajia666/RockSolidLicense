@@ -73,3 +73,37 @@ test("launch checklist and reverse proxy examples are present", () => {
   assert.match(nginxTls, /ssl_certificate/);
   assert.match(nginxTls, /proxy_pass http:\/\/127\.0\.0\.1:3000/);
 });
+
+test("storage deployment guide and compose examples cover redis runtime and postgres preview paths", () => {
+  const storageGuide = readText("docs/storage-deployment-guide.md");
+  const redisEnv = readText("deploy/rocksolid.redis-runtime.env.example");
+  const previewEnv = readText("deploy/rocksolid.pg-redis.preview.env.example");
+  const redisCompose = readText("deploy/docker-compose.redis-runtime.yml");
+  const previewCompose = readText("deploy/docker-compose.pg-redis.preview.yml");
+  const linuxGuide = readText("docs/linux-deployment.md");
+
+  assert.match(storageGuide, /SQLite \+ Redis/);
+  assert.match(storageGuide, /PostgreSQL Preview \+ Redis/);
+  assert.match(storageGuide, /docker-compose\.redis-runtime\.yml/);
+  assert.match(storageGuide, /docker-compose\.pg-redis\.preview\.yml/);
+
+  assert.match(redisEnv, /RSL_MAIN_STORE_DRIVER=sqlite/);
+  assert.match(redisEnv, /RSL_STATE_STORE_DRIVER=redis/);
+  assert.match(redisEnv, /RSL_REDIS_URL=redis:\/\/redis:6379/);
+
+  assert.match(previewEnv, /RSL_MAIN_STORE_DRIVER=postgres/);
+  assert.match(previewEnv, /RSL_STATE_STORE_DRIVER=redis/);
+  assert.match(previewEnv, /RSL_POSTGRES_URL=postgres:\/\/rocksolid:/);
+  assert.match(previewEnv, /POSTGRES_PASSWORD=ChangeThisPostgresPassword/);
+
+  assert.match(redisCompose, /image: redis:7\.2-alpine/);
+  assert.match(redisCompose, /rocksolid\.redis-runtime\.env/);
+  assert.match(redisCompose, /condition: service_healthy/);
+
+  assert.match(previewCompose, /image: postgres:17-alpine/);
+  assert.match(previewCompose, /rocksolid\.pg-redis\.preview\.env/);
+  assert.match(previewCompose, /init\.sql/);
+
+  assert.match(linuxGuide, /docker-compose\.redis-runtime\.yml/);
+  assert.match(linuxGuide, /docker-compose\.pg-redis\.preview\.yml/);
+});

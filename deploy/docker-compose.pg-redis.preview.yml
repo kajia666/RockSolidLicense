@@ -1,0 +1,80 @@
+services:
+  rocksolidlicense:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: rocksolidlicense:pg-redis-preview
+    container_name: rocksolidlicense
+    restart: unless-stopped
+    env_file:
+      - ./rocksolid.pg-redis.preview.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../data:/var/lib/rocksolid/data
+    ports:
+      - "3000:3000"
+      - "4000:4000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: rocksolidlicense-postgres
+    restart: unless-stopped
+    env_file:
+      - ./rocksolid.pg-redis.preview.env
+    volumes:
+      - rocksolid_postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: rocksolidlicense-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - rocksolid_preview_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: rocksolidlicense-nginx
+    depends_on:
+      rocksolidlicense:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./nginx/rocksolid.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+
+volumes:
+  rocksolid_postgres_data:
+  rocksolid_preview_redis_data:
+
+networks:
+  default:
+    name: rocksolidlicense-pg-redis-preview-net

@@ -293,6 +293,7 @@ npm run db:postgres:check
 - `GET /api/admin/developers`
 - `POST /api/admin/developers`
 - `POST /api/admin/developers/:developerId/status`
+- `GET /api/admin/audit-logs`
 - `GET /api/admin/ops/export`
 - `GET /api/admin/ops/export/download`
 
@@ -368,6 +369,8 @@ npm run db:postgres:check
 - `POST /api/developer/network-rules`
 - `POST /api/developer/network-rules/:ruleId/status`
 - `GET /api/developer/audit-logs`
+- `GET /api/developer/ops/export`
+- `GET /api/developer/ops/export/download`
 - `GET /api/developer/client-versions`
 - `POST /api/developer/client-versions`
 - `POST /api/developer/client-versions/:versionId/status`

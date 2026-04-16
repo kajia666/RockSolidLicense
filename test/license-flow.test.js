@@ -6542,6 +6542,210 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
   }
 });
 
+test("admin and developer audit logs support product, entity, username, and search filters", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "audit.filter.owner",
+        password: "AuditFilterOwner123!",
+        displayName: "Audit Filter Owner"
+      },
+      adminSession.token
+    );
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "AUDIT_FILTER_ALPHA",
+        name: "Audit Filter Alpha",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "AUDIT_FILTER_BETA",
+        name: "Audit Filter Beta",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "audit.filter.owner",
+      password: "AuditFilterOwner123!"
+    });
+
+    const alphaPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "AUDIT_FILTER_ALPHA",
+        name: "Audit Filter Alpha Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const betaPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "AUDIT_FILTER_BETA",
+        name: "Audit Filter Beta Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const alphaCards = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "AUDIT_FILTER_ALPHA",
+        policyId: alphaPolicy.id,
+        count: 1,
+        prefix: "AUFA"
+      },
+      ownerSession.token
+    );
+
+    const betaCards = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "AUDIT_FILTER_BETA",
+        policyId: betaPolicy.id,
+        count: 1,
+        prefix: "AUFB"
+      },
+      ownerSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "AUDIT_FILTER_ALPHA",
+      username: "auditalpha",
+      password: "AuditAlpha123!"
+    });
+    await signedClientPost(baseUrl, "/api/client/register", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "AUDIT_FILTER_BETA",
+      username: "auditbeta",
+      password: "AuditBeta123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "AUDIT_FILTER_ALPHA",
+      username: "auditalpha",
+      password: "AuditAlpha123!",
+      cardKey: alphaCards.keys[0]
+    });
+    await signedClientPost(baseUrl, "/api/client/recharge", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "AUDIT_FILTER_BETA",
+      username: "auditbeta",
+      password: "AuditBeta123!",
+      cardKey: betaCards.keys[0]
+    });
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "AUDIT_FILTER_ALPHA",
+        username: "auditalpha",
+        password: "AuditAlpha123!",
+        deviceFingerprint: "audit-filter-alpha-device-01",
+        deviceName: "Audit Filter Alpha Desktop"
+      }
+    );
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      betaProduct.sdkAppId,
+      betaProduct.sdkAppSecret,
+      {
+        productCode: "AUDIT_FILTER_BETA",
+        username: "auditbeta",
+        password: "AuditBeta123!",
+        deviceFingerprint: "audit-filter-beta-device-01",
+        deviceName: "Audit Filter Beta Desktop"
+      }
+    );
+
+    const alphaSessions = await getJson(
+      baseUrl,
+      "/api/developer/sessions?productCode=AUDIT_FILTER_ALPHA&status=active&username=auditalpha",
+      ownerSession.token
+    );
+    assert.equal(alphaSessions.total, 1);
+
+    await postJson(
+      baseUrl,
+      `/api/developer/sessions/${alphaSessions.items[0].id}/revoke`,
+      { reason: "audit_filter_marker" },
+      ownerSession.token
+    );
+
+    const adminAudit = await getJson(
+      baseUrl,
+      "/api/admin/audit-logs?productCode=AUDIT_FILTER_ALPHA&username=auditalpha&eventType=session.revoke&entityType=session&search=audit_filter_marker&limit=20",
+      adminSession.token
+    );
+    assert.equal(adminAudit.total, 1);
+    assert.ok(adminAudit.items.every((entry) => entry.event_type === "session.revoke"));
+    assert.ok(adminAudit.items.every((entry) => entry.entity_type === "session"));
+    assert.ok(adminAudit.items.every((entry) => entry.metadata?.productCode === "AUDIT_FILTER_ALPHA"));
+    assert.ok(adminAudit.items.every((entry) => entry.metadata?.username === "auditalpha"));
+    assert.ok(adminAudit.items.every((entry) => entry.metadata?.reason === "audit_filter_marker"));
+
+    const developerAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=AUDIT_FILTER_ALPHA&username=auditalpha&eventType=session.revoke&entityType=session&search=audit_filter_marker&limit=20",
+      ownerSession.token
+    );
+    assert.equal(developerAudit.total, 1);
+    assert.ok(developerAudit.items.every((entry) => entry.event_type === "session.revoke"));
+    assert.ok(developerAudit.items.every((entry) => entry.entity_type === "session"));
+    assert.ok(developerAudit.items.every((entry) => entry.metadata?.productCode === "AUDIT_FILTER_ALPHA"));
+    assert.ok(developerAudit.items.every((entry) => entry.metadata?.username === "auditalpha"));
+    assert.ok(developerAudit.items.every((entry) => entry.metadata?.reason === "audit_filter_marker"));
+
+    const betaAdminAudit = await getJson(
+      baseUrl,
+      "/api/admin/audit-logs?productCode=AUDIT_FILTER_BETA&search=audit_filter_marker&limit=20",
+      adminSession.token
+    );
+    assert.equal(betaAdminAudit.total, 0);
+
+    const betaDeveloperAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=AUDIT_FILTER_BETA&search=audit_filter_marker&limit=20",
+      ownerSession.token
+    );
+    assert.equal(betaDeveloperAudit.total, 0);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("admin and developers can rotate project sdk credentials with scoped permission checks", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -8512,6 +8716,7 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
+    assert.match(html, /ops-entity-type/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -8583,6 +8788,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/ops\/export/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Zip/);
+    assert.match(html, /filter-entity-type/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

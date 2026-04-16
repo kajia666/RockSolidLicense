@@ -82,8 +82,12 @@ This page is intended for day-to-day authorization operations:
 
 ### Audit logs
 
+- `productCode`
+- `username`
+- `search`
 - `eventType`
 - `actorType`
+- `entityType`
 - `limit`
 
 ### Ops snapshot export
@@ -93,6 +97,7 @@ This page is intended for day-to-day authorization operations:
 - `search`
 - `eventType`
 - `actorType`
+- `entityType`
 - `limit`
 
 The download route also accepts:

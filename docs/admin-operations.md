@@ -241,6 +241,7 @@ Supported query parameters:
 - `search`
 - `eventType`
 - `actorType`
+- `entityType`
 - `limit`
 - `format` for the `/download` route, one of `json`, `summary`, `checksums`, or `zip`
 
@@ -534,9 +535,13 @@ Effects:
 
 Supported query parameters:
 
+- `productCode`
+- `username`
+- `search`
 - `limit`
 - `eventType`
 - `actorType`
+- `entityType`
 
 ## Console workflow
 

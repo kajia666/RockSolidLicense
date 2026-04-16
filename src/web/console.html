@@ -496,6 +496,7 @@
               <option value="reseller">reseller</option>
             </select>
           </label>
+          <label>审计实体<input id="ops-entity-type" placeholder="例如 session" /></label>
           <label>日志条数<input id="audit-limit" type="number" min="1" max="200" value="30" /></label>
           <div class="actions">
             <button class="ghost" id="load-accounts-btn">加载账号</button>
@@ -1033,6 +1034,7 @@
           search: el("ops-search").value,
           eventType: el("ops-event-type").value,
           actorType: el("ops-actor-type").value,
+          entityType: el("ops-entity-type").value,
           limit: el("audit-limit").value
         };
       }
@@ -1096,8 +1098,12 @@
 
       async function loadAuditLogs() {
         const data = await callApi(`/api/admin/audit-logs${buildQuery({
+          productCode: el("ops-product-code").value,
+          username: el("ops-username").value,
+          search: el("ops-search").value,
           actorType: el("ops-actor-type").value,
           eventType: el("ops-event-type").value,
+          entityType: el("ops-entity-type").value,
           limit: el("audit-limit").value
         })}`);
         renderAuditLogs(data.items);

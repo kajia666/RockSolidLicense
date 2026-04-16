@@ -1760,6 +1760,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Search Filter: ${scope.search || "-"}`,
     `Audit Event Filter: ${scope.eventType || "-"}`,
     `Audit Actor Filter: ${scope.actorType || "-"}`,
+    `Audit Entity Filter: ${scope.entityType || "-"}`,
     `Audit Limit: ${scope.auditLimit ?? 0}`,
     "",
     `Projects: ${summary.projects ?? 0}`,
@@ -1820,6 +1821,7 @@ function buildDeveloperOpsSnapshotPayload({
       search: filters.search || null,
       eventType: filters.eventType || null,
       actorType: filters.actorType || null,
+      entityType: filters.entityType || null,
       auditLimit: Number(filters.limit ?? auditLogs.filters?.limit ?? 0)
     },
     summary: {
@@ -1984,6 +1986,7 @@ function buildAdminOpsSummaryText(payload = {}) {
     `Search Filter: ${scope.search || "-"}`,
     `Audit Event Filter: ${scope.eventType || "-"}`,
     `Audit Actor Filter: ${scope.actorType || "-"}`,
+    `Audit Entity Filter: ${scope.entityType || "-"}`,
     `Audit Limit: ${scope.auditLimit ?? 0}`,
     "",
     `Projects: ${summary.projects ?? 0}`,
@@ -2044,6 +2047,7 @@ function buildAdminOpsSnapshotPayload({
       search: filters.search || null,
       eventType: filters.eventType || null,
       actorType: filters.actorType || null,
+      entityType: filters.entityType || null,
       auditLimit: Number(filters.limit ?? auditLogs.filters?.limit ?? 0)
     },
     summary: {
@@ -4239,6 +4243,9 @@ function queryAuditLogRows(db, filters = {}) {
   const normalizedFilters = {
     eventType: filters.eventType ? String(filters.eventType).trim() : null,
     actorType: filters.actorType ? String(filters.actorType).trim() : null,
+    entityType: filters.entityType ? String(filters.entityType).trim() : null,
+    username: filters.username ? String(filters.username).trim() : null,
+    search: filters.search ? String(filters.search).trim() : null,
     limit
   };
 
@@ -4252,6 +4259,24 @@ function queryAuditLogRows(db, filters = {}) {
     params.push(normalizedFilters.actorType);
   }
 
+  if (normalizedFilters.entityType) {
+    conditions.push("entity_type = ?");
+    params.push(normalizedFilters.entityType);
+  }
+
+  if (normalizedFilters.username) {
+    conditions.push("metadata_json LIKE ?");
+    params.push(`%\"username\":\"${normalizedFilters.username.replaceAll("\"", "\\\"")}\"%`);
+  }
+
+  if (normalizedFilters.search) {
+    const pattern = likeFilter(normalizedFilters.search);
+    conditions.push(
+      "(COALESCE(actor_id, '') LIKE ? ESCAPE '\\' OR event_type LIKE ? ESCAPE '\\' OR entity_type LIKE ? ESCAPE '\\' OR COALESCE(entity_id, '') LIKE ? ESCAPE '\\' OR COALESCE(metadata_json, '') LIKE ? ESCAPE '\\')"
+    );
+    params.push(pattern, pattern, pattern, pattern, pattern);
+  }
+
   if (filters.developerId || (Array.isArray(filters.productCodes) && filters.productCodes.length)) {
     const scopedConditions = [];
     if (filters.developerId) {
@@ -4262,10 +4287,17 @@ function queryAuditLogRows(db, filters = {}) {
       ? Array.from(new Set(filters.productCodes.map((value) => String(value ?? "").trim().toUpperCase()).filter(Boolean)))
       : [];
     if (productCodes.length) {
-      const productPredicates = productCodes.map(() => "metadata_json LIKE ?").join(" OR ");
+      const productPredicates = productCodes.map(
+        () => "(metadata_json LIKE ? OR metadata_json LIKE ? OR metadata_json LIKE ? OR metadata_json LIKE ? OR metadata_json LIKE ? OR metadata_json LIKE ?)"
+      ).join(" OR ");
       scopedConditions.push(`(${productPredicates})`);
       for (const productCode of productCodes) {
         params.push(`%\"productCode\":\"${productCode}\"%`);
+        params.push(`%\"code\":\"${productCode}\"%`);
+        params.push(`%\"projectCode\":\"${productCode}\"%`);
+        params.push(`%\"softwareCode\":\"${productCode}\"%`);
+        params.push(`%\"productCodes\":%\"${productCode}\"%`);
+        params.push(`%\"projectCodes\":%\"${productCode}\"%`);
       }
     }
     if (scopedConditions.length) {
@@ -11799,7 +11831,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     listAuditLogs(token, filters = {}) {
       requireAdminSession(db, token);
-      return queryAuditLogRows(db, filters);
+      return queryAuditLogRows(db, {
+        ...filters,
+        productCodes: filters.productCode
+          ? [String(filters.productCode).trim().toUpperCase()]
+          : filters.productCodes
+      });
     },
 
     async exportAdminOpsSnapshot(token, filters = {}) {
@@ -11810,6 +11847,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         search: filters.search ? String(filters.search).trim() : null,
         eventType: filters.eventType ? String(filters.eventType).trim() : null,
         actorType: filters.actorType ? String(filters.actorType).trim() : null,
+        entityType: filters.entityType ? String(filters.entityType).trim() : null,
         limit: Math.min(Math.max(Number(filters.limit ?? 60), 1), 200)
       };
 
@@ -11877,6 +11915,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         Promise.resolve(queryAuditLogRows(db, {
           actorType: normalizedFilters.actorType,
           eventType: normalizedFilters.eventType,
+          entityType: normalizedFilters.entityType,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search,
           limit: normalizedFilters.limit,
           productCodes: normalizedFilters.productCode ? scopedProductCodes : null
         }))
@@ -11912,10 +11953,31 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_OPS_FORBIDDEN",
         "You can only view audit logs for your assigned projects."
       );
+      const normalizedFilters = {
+        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+        username: filters.username ? String(filters.username).trim() : null,
+        search: filters.search ? String(filters.search).trim() : null,
+        eventType: filters.eventType ? String(filters.eventType).trim() : null,
+        actorType: filters.actorType ? String(filters.actorType).trim() : null,
+        entityType: filters.entityType ? String(filters.entityType).trim() : null,
+        limit: Math.min(Math.max(Number(filters.limit ?? 50), 1), 200)
+      };
+      if (normalizedFilters.productCode) {
+        await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          normalizedFilters.productCode,
+          "ops.read"
+        );
+      }
+      const scopedProductCodes = normalizedFilters.productCode
+        ? [normalizedFilters.productCode]
+        : await listDeveloperAccessibleProductCodes(db, store, session);
       return queryAuditLogRows(db, {
-        ...filters,
-        developerId: session.developer_id,
-        productCodes: await listDeveloperAccessibleProductCodes(db, store, session)
+        ...normalizedFilters,
+        developerId: null,
+        productCodes: scopedProductCodes
       });
     },
 
@@ -11934,6 +11996,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         search: filters.search ? String(filters.search).trim() : null,
         eventType: filters.eventType ? String(filters.eventType).trim() : null,
         actorType: filters.actorType ? String(filters.actorType).trim() : null,
+        entityType: filters.entityType ? String(filters.entityType).trim() : null,
         limit: Math.min(Math.max(Number(filters.limit ?? 60), 1), 200)
       };
 
@@ -12011,8 +12074,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         Promise.resolve(queryAuditLogRows(db, {
           actorType: normalizedFilters.actorType,
           eventType: normalizedFilters.eventType,
+          entityType: normalizedFilters.entityType,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search,
           limit: normalizedFilters.limit,
-          developerId: normalizedFilters.productCode ? null : session.developer_id,
+          developerId: null,
           productCodes: scopedProductCodes
         }))
       ]);

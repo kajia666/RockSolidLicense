@@ -1025,8 +1025,12 @@ export function createApp(overrides = {}) {
         sendJson(res, 200, {
           ok: true,
           data: services.listAuditLogs(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            search: url.searchParams.get("search"),
             actorType: url.searchParams.get("actorType"),
             eventType: url.searchParams.get("eventType"),
+            entityType: url.searchParams.get("entityType"),
             limit: url.searchParams.get("limit")
           })
         });
@@ -1042,6 +1046,7 @@ export function createApp(overrides = {}) {
             search: url.searchParams.get("search"),
             eventType: url.searchParams.get("eventType"),
             actorType: url.searchParams.get("actorType"),
+            entityType: url.searchParams.get("entityType"),
             limit: url.searchParams.get("limit")
           })
         });
@@ -1055,6 +1060,7 @@ export function createApp(overrides = {}) {
           search: url.searchParams.get("search"),
           eventType: url.searchParams.get("eventType"),
           actorType: url.searchParams.get("actorType"),
+          entityType: url.searchParams.get("entityType"),
           limit: url.searchParams.get("limit")
         });
         sendAttachment(res, services.adminOpsExportDownloadAsset(data, url.searchParams.get("format")));
@@ -1610,6 +1616,7 @@ export function createApp(overrides = {}) {
             search: url.searchParams.get("search"),
             eventType: url.searchParams.get("eventType"),
             actorType: url.searchParams.get("actorType"),
+            entityType: url.searchParams.get("entityType"),
             limit: url.searchParams.get("limit")
           })
         });
@@ -1623,6 +1630,7 @@ export function createApp(overrides = {}) {
           search: url.searchParams.get("search"),
           eventType: url.searchParams.get("eventType"),
           actorType: url.searchParams.get("actorType"),
+          entityType: url.searchParams.get("entityType"),
           limit: url.searchParams.get("limit")
         });
         sendAttachment(res, services.developerOpsExportDownloadAsset(data, url.searchParams.get("format")));
@@ -1818,8 +1826,12 @@ export function createApp(overrides = {}) {
         sendJson(res, 200, {
           ok: true,
           data: await services.developerListAuditLogs(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            search: url.searchParams.get("search"),
             actorType: url.searchParams.get("actorType"),
             eventType: url.searchParams.get("eventType"),
+            entityType: url.searchParams.get("entityType"),
             limit: url.searchParams.get("limit")
           })
         });

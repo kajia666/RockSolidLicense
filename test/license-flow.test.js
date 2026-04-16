@@ -125,6 +125,39 @@ async function postText(baseUrl, path, body, token = null) {
   };
 }
 
+async function getBinary(baseUrl, path, token = null) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+  const body = Buffer.from(await response.arrayBuffer());
+  assert.equal(response.ok, true, body.toString("latin1"));
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    contentDisposition: response.headers.get("content-disposition"),
+    body
+  };
+}
+
+async function postBinary(baseUrl, path, body, token = null) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(body)
+  });
+  const data = Buffer.from(await response.arrayBuffer());
+  assert.equal(response.ok, true, data.toString("latin1"));
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    contentDisposition: response.headers.get("content-disposition"),
+    body: data
+  };
+}
+
 async function signedClientPost(baseUrl, path, appId, secret, payload, extraHeaders = {}) {
   const body = JSON.stringify(payload);
   const timestamp = new Date().toISOString();
@@ -5131,6 +5164,19 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseEnvDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.env"/);
     assert.match(releaseEnvDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
 
+    const releaseZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=zip",
+      viewerSession.token
+    );
+    assert.match(releaseZipDownload.contentType || "", /^application\/zip/);
+    assert.match(releaseZipDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*\.zip"/);
+    assert.equal(releaseZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const releaseZipText = releaseZipDownload.body.toString("latin1");
+    assert.match(releaseZipText, /RELPKG_ALPHA\.env/);
+    assert.match(releaseZipText, /RELPKG_ALPHA\.cpp/);
+    assert.match(releaseZipText, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/release-package?productCode=RELPKG_BETA&channel=stable",
@@ -7417,6 +7463,23 @@ test("batch project integration package export can bundle selected projects with
     assert.match(manifestDownload.body, /### rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(manifestDownload.body, /"code": "INTBUNDLE_ALPHA"/);
 
+    const developerZipDownload = await postBinary(
+      baseUrl,
+      "/api/developer/products/integration-packages/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "zip"
+      },
+      viewerSession.token
+    );
+    assert.match(developerZipDownload.contentType || "", /^application\/zip/);
+    assert.match(developerZipDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*\.zip"/);
+    assert.equal(developerZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const developerZipText = developerZipDownload.body.toString("latin1");
+    assert.match(developerZipText, /INTBUNDLE_ALPHA\.env/);
+    assert.match(developerZipText, /INTBUNDLE_ALPHA\.cpp/);
+    assert.match(developerZipText, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
+
     const viewerForbidden = await postJsonExpectError(
       baseUrl,
       "/api/developer/products/integration-packages/export",
@@ -7461,6 +7524,23 @@ test("batch project integration package export can bundle selected projects with
     assert.match(adminCppDownload.body, /### INTBUNDLE_ALPHA\.cpp/);
     assert.match(adminCppDownload.body, /### INTBUNDLE_BETA\.cpp/);
 
+    const adminZipDownload = await postBinary(
+      baseUrl,
+      "/api/admin/products/integration-packages/export/download",
+      {
+        projectCodes: ["INTBUNDLE_ALPHA", "INTBUNDLE_BETA"],
+        format: "zip"
+      },
+      adminSession.token
+    );
+    assert.match(adminZipDownload.contentType || "", /^application\/zip/);
+    assert.match(adminZipDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*\.zip"/);
+    assert.equal(adminZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const adminZipText = adminZipDownload.body.toString("latin1");
+    assert.match(adminZipText, /INTBUNDLE_ALPHA\.env/);
+    assert.match(adminZipText, /INTBUNDLE_BETA\.env/);
+    assert.match(adminZipText, /rocksolid-integration-INTBUNDLE_BETA\.json/);
+
     const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
     const ownerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", ownerSession.token);
     assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.integration-packages.export.batch"));
@@ -7490,6 +7570,7 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /sdk-credentials\/rotate\/batch/);
     assert.match(html, /sdk-credentials\/export/);
     assert.match(html, /integration-packages\/export/);
+    assert.match(html, /integration-packages\/export\/download/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Save Project Status/);
@@ -7498,6 +7579,7 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Export Batch SDK Credentials/);
     assert.match(html, /Export Batch Integration Packages/);
+    assert.match(html, /Download Batch Integration Zip/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
@@ -7741,6 +7823,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /sdk-credentials\/rotate\/batch/);
     assert.match(html, /sdk-credentials\/export/);
     assert.match(html, /integration-packages\/export/);
+    assert.match(html, /integration-packages\/export\/download/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
@@ -7751,6 +7834,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Export Batch SDK Credentials/);
     assert.match(html, /Export Batch Integration Packages/);
+    assert.match(html, /Download Batch Integration Zip/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
@@ -7861,6 +7945,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Release Delivery Package/);
     assert.match(html, /Generate Release Package/);
     assert.match(html, /Download Package JSON/);
+    assert.match(html, /Download Zip Archive/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

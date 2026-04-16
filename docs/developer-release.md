@@ -118,7 +118,7 @@ The package route accepts:
 
 The download route accepts the same selectors plus:
 
-- `format=json|summary|env|cpp`
+- `format=json|summary|env|cpp|zip`
 
 Typical uses:
 

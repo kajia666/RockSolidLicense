@@ -1,4 +1,5 @@
 import { AppError } from "./http.js";
+import { buildZipArchive } from "./archive.js";
 import { rotateLicenseKeyStore } from "./license-keys.js";
 import { NonceReplayError } from "./runtime-state.js";
 import {
@@ -980,15 +981,80 @@ function normalizeDownloadFormat(value, supported = [], fallback = "json", code 
   return normalized;
 }
 
+function buildArchiveRootName(fileName, fallback = "download") {
+  const normalized = String(fileName || fallback).trim() || fallback;
+  return normalized.replace(/\.[^.]+$/, "");
+}
+
+function buildReleasePackageZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "release-package");
+  return [
+    {
+      path: `${root}/${payload.fileName || "release-package.json"}`,
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: `${root}/${payload.summaryFileName || "release-package.txt"}`,
+      body: payload.summaryText || ""
+    },
+    {
+      path: `${root}/snippets/${payload.snippets?.envFileName || "project.env"}`,
+      body: payload.snippets?.envTemplate || ""
+    },
+    {
+      path: `${root}/snippets/${payload.snippets?.cppFileName || "project.cpp"}`,
+      body: payload.snippets?.cppQuickstart || ""
+    }
+  ];
+}
+
+function buildIntegrationPackageZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "integration-packages");
+  const entries = [
+    {
+      path: `${root}/${payload.fileName || "integration-packages.json"}`,
+      body: JSON.stringify(payload, null, 2)
+    }
+  ];
+
+  for (const file of payload.manifestFiles || []) {
+    entries.push({
+      path: `${root}/manifests/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
+  for (const file of payload.envFiles || []) {
+    entries.push({
+      path: `${root}/env/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
+  for (const file of payload.cppFiles || []) {
+    entries.push({
+      path: `${root}/cpp/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
+
+  return entries;
+}
+
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "cpp"],
+    ["json", "summary", "env", "cpp", "zip"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
   );
 
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "release-package")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildReleasePackageZipEntries(payload))
+    };
+  }
   if (normalizedFormat === "summary") {
     return {
       fileName: payload.summaryFileName || "release-package.txt",
@@ -1021,12 +1087,19 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "manifests", "env", "cpp"],
+    ["json", "manifests", "env", "cpp", "zip"],
     "json",
     "INVALID_INTEGRATION_EXPORT_FORMAT",
     "Integration export format"
   );
 
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "integration-packages")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildIntegrationPackageZipEntries(payload))
+    };
+  }
   if (normalizedFormat === "manifests") {
     return {
       fileName: payload.manifestArchiveName || "integration-manifests.txt",

@@ -333,7 +333,7 @@
           <div class="pill">Credential Rotate API: <code>POST /api/admin/products/:productId/sdk-credentials/rotate</code></div>
           <div class="pill">Batch Credential Rotate API: <code>POST /api/admin/products/sdk-credentials/rotate/batch</code></div>
           <div class="pill">Credential Export API: <code>POST /api/admin/products/sdk-credentials/export</code></div>
-          <div class="pill">Integration Export API: <code>POST /api/admin/products/integration-packages/export</code></div>
+          <div class="pill">Integration Export API: <code>POST /api/admin/products/integration-packages/export</code> / <code>POST /api/admin/products/integration-packages/export/download</code></div>
           <div class="pill">Owner API: <code>POST /api/admin/products/:productId/owner</code></div>
           <div class="pill">Developer Status API: <code>POST /api/admin/developers/:developerId/status</code></div>
           <div class="pill">One developer can own multiple projects</div>
@@ -612,6 +612,7 @@
             <button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button>
             <button class="secondary" id="export-batch-sdk-btn">Export Batch SDK Credentials</button>
             <button class="secondary" id="export-batch-integration-btn">Export Batch Integration Packages</button>
+            <button class="secondary" id="download-batch-integration-zip-btn">Download Batch Integration Zip</button>
           </div>
           <div class="hint" id="batch-export-note" style="margin-bottom: 12px;">Export the selected projects as JSON, CSV, and .env snippets so software authors can copy the current SDK credentials safely.</div>
           <div class="hint" id="batch-package-note" style="margin-bottom: 12px;">Export full integration manifests, ready-to-copy `.env` files, and C/C++ quickstart snippets for the selected projects so your software authors can pick up the latest SDK settings in one handoff.</div>
@@ -819,6 +820,7 @@
         el("apply-batch-rotate-btn").disabled = !adminToken || totalSelected === 0;
         el("export-batch-sdk-btn").disabled = !adminToken || totalSelected === 0;
         el("export-batch-integration-btn").disabled = !adminToken || totalSelected === 0;
+        el("download-batch-integration-zip-btn").disabled = !adminToken || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
         syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
         syncBatchFeatureHint(totalSelected);
@@ -1087,6 +1089,51 @@
           throw new Error(json.error?.message || `Request failed: ${response.status}`);
         }
         return json.data;
+      }
+
+      function downloadBlob(filename, blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadFileNameFromHeaders(headerValue, fallback) {
+        const raw = String(headerValue || "");
+        const utf8Match = raw.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const plainMatch = raw.match(/filename="([^"]+)"/i) || raw.match(/filename=([^;]+)/i);
+        return plainMatch ? plainMatch[1].trim() : fallback;
+      }
+
+      async function downloadApiFile(path, body, fallbackFileName) {
+        const headers = {
+          "Content-Type": "application/json",
+          ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
+        };
+        const response = await fetch(path, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body)
+        });
+        if (!response.ok) {
+          const json = await response.json().catch(() => ({}));
+          throw new Error(json.error?.message || `Request failed: ${response.status}`);
+        }
+        const blob = await response.blob();
+        const fileName = downloadFileNameFromHeaders(response.headers.get("content-disposition"), fallbackFileName);
+        downloadBlob(fileName, blob);
+        return { fileName };
       }
 
       async function refreshAll() {
@@ -1426,6 +1473,20 @@
         });
         setOutput(data);
         setStatus(`Batch integration package export generated for ${data.total} project(s).`);
+      }));
+
+      el("download-batch-integration-zip-btn").addEventListener("click", () => guarded(async () => {
+        const productIds = [...batchProductIds];
+        if (!productIds.length) {
+          throw new Error("Select at least one project before downloading a batch integration zip.");
+        }
+
+        const result = await downloadApiFile(
+          "/api/admin/products/integration-packages/export/download",
+          { productIds, format: "zip" },
+          "integration-packages.zip"
+        );
+        setStatus(`Batch integration zip downloaded: ${result.fileName}`);
       }));
 
       renderStats([]);

@@ -69,7 +69,7 @@ The batch package export routes return:
 
 The batch package download routes accept the same body selectors as the export routes plus:
 
-- `format=json|manifests|env|cpp`
+- `format=json|manifests|env|cpp|zip`
 
 Typical shape:
 

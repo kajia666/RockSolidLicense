@@ -544,6 +544,7 @@ cl /EHsc /std:c++17 ^
 - Linux 更适合作为长期生产主环境，仓库也已提供 Docker / Nginx / systemd 部署骨架
 - 当前已经把 nonce 防重放和在线会话抽成 runtime state store，并已支持 `redis` 运行时状态层、在线会话索引、单开 owner 索引和心跳期 runtime invalidation
 - 真正上线前建议继续补齐 PostgreSQL、Redis、TLS、RBAC、限流、监控和备份策略
+- 仓库现在也提供了更明确的上线检查清单，以及 Linux / Windows 的 TLS 反向代理示例
 
 ## 重点文档
 
@@ -563,9 +564,12 @@ cl /EHsc /std:c++17 ^
 - [storage-platform-guide.md](docs/storage-platform-guide.md)
 - [postgres-main-store-preview.md](docs/postgres-main-store-preview.md)
 - [server-os-choice.md](docs/server-os-choice.md)
+- [production-launch-checklist.md](docs/production-launch-checklist.md)
 - [vs2022-checklist.md](docs/vs2022-checklist.md)
 - [linux-deployment.md](docs/linux-deployment.md)
 - [windows-server-deployment.md](docs/windows-server-deployment.md)
+- [Caddyfile.example](deploy/linux/Caddyfile.example)
+- [rocksolid.tls.conf.example](deploy/nginx/rocksolid.tls.conf.example)
 - [run-rocksolid.sh](deploy/linux/run-rocksolid.sh)
 - [healthcheck-rocksolid.sh](deploy/linux/healthcheck-rocksolid.sh)
 - [backup-rocksolid.sh](deploy/linux/backup-rocksolid.sh)

@@ -17,9 +17,11 @@ Linux remains the best default fit for this project because:
 - [docker-compose.linux.yml](/D:/code/OnlineVerification/deploy/docker-compose.linux.yml)
 - [rocksolid.env.example](/D:/code/OnlineVerification/deploy/rocksolid.env.example)
 - [rocksolid.conf](/D:/code/OnlineVerification/deploy/nginx/rocksolid.conf)
+- [rocksolid.tls.conf.example](/D:/code/OnlineVerification/deploy/nginx/rocksolid.tls.conf.example)
 - [rocksolid.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid.service)
 - [rocksolid-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-backup.service)
 - [rocksolid-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-backup.timer)
+- [Caddyfile.example](/D:/code/OnlineVerification/deploy/linux/Caddyfile.example)
 - [run-rocksolid.sh](/D:/code/OnlineVerification/deploy/linux/run-rocksolid.sh)
 - [healthcheck-rocksolid.sh](/D:/code/OnlineVerification/deploy/linux/healthcheck-rocksolid.sh)
 - [backup-rocksolid.sh](/D:/code/OnlineVerification/deploy/linux/backup-rocksolid.sh)
@@ -61,6 +63,10 @@ Default exposed ports:
 - `80` for HTTP via Nginx
 - `3000` for the app directly
 - `4000` for the TCP gateway
+
+If you prefer automatic HTTPS with a lighter setup, you can also use:
+
+- [Caddyfile.example](/D:/code/OnlineVerification/deploy/linux/Caddyfile.example)
 
 ## Option B: Direct systemd service
 
@@ -164,6 +170,12 @@ The current timer runs every day at `03:15`.
 - Back up the database and token private key files together.
 - If you rotate token keys, keep retired public keys published until old tokens expire.
 - SQLite is still the default single-node storage choice in this repo.
+
+TLS-oriented reference files in the repo:
+
+- simple container HTTP proxy: [rocksolid.conf](/D:/code/OnlineVerification/deploy/nginx/rocksolid.conf)
+- host-level Nginx TLS example: [rocksolid.tls.conf.example](/D:/code/OnlineVerification/deploy/nginx/rocksolid.tls.conf.example)
+- host-level Caddy example: [Caddyfile.example](/D:/code/OnlineVerification/deploy/linux/Caddyfile.example)
 
 ## Suggested first production upgrade
 

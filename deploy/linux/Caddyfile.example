@@ -1,0 +1,22 @@
+license.example.com {
+  encode gzip zstd
+
+  reverse_proxy 127.0.0.1:3000
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  log {
+    output file /var/log/caddy/rocksolid-access.log
+    format console
+  }
+}
+
+# Notes:
+# - Replace license.example.com with your real public domain.
+# - This HTTPS layer only fronts the HTTP admin/API entrypoint on 3000.
+# - Keep the TCP gateway on 4000 behind a separate firewall rule or TCP load balancer if clients need it.

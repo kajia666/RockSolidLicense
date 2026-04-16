@@ -1,24 +1,17 @@
 [Unit]
-Description=RockSolidLicense License Service
+Description=RockSolidLicense Backup Job
 Wants=network-online.target
 After=network-online.target
 
 [Service]
-Type=simple
-WorkingDirectory=/opt/rocksolidlicense
+Type=oneshot
 EnvironmentFile=-/etc/rocksolidlicense/rocksolid.env
 Environment=PROJECT_ROOT=/opt/rocksolidlicense
 Environment=ENV_FILE=/etc/rocksolidlicense/rocksolid.env
-Environment=LOG_DIR=/var/log/rocksolid
-ExecStart=/opt/rocksolidlicense/deploy/linux/run-rocksolid.sh
-Restart=always
-RestartSec=3
+Environment=BACKUP_DIR=/var/lib/rocksolid/backups
+Environment=LABEL=scheduled
+ExecStart=/opt/rocksolidlicense/deploy/linux/backup-rocksolid.sh
 User=rocksolid
 Group=rocksolid
 NoNewPrivileges=true
 StateDirectory=rocksolid
-LogsDirectory=rocksolid
-LimitNOFILE=65535
-
-[Install]
-WantedBy=multi-user.target

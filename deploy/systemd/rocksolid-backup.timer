@@ -1,0 +1,10 @@
+[Unit]
+Description=Run RockSolidLicense backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+Unit=rocksolid-backup.service
+
+[Install]
+WantedBy=timers.target

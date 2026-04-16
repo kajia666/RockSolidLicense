@@ -635,6 +635,143 @@ function buildDeveloperIntegrationPackagePayload({
   };
 }
 
+function buildExportTimestampTag(value = nowIso()) {
+  return String(value)
+    .replaceAll("-", "")
+    .replaceAll(":", "")
+    .replaceAll(".", "")
+    .replace("T", "-")
+    .replace("Z", "");
+}
+
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  if (!/[",\r\n]/.test(text)) {
+    return text;
+  }
+  return `"${text.replaceAll("\"", "\"\"")}"`;
+}
+
+function buildProductSdkCredentialExportItem(product, includeOwner = false) {
+  const ownerDeveloper = includeOwner
+    ? (
+        product?.ownerDeveloper
+          ? {
+              id: product.ownerDeveloper.id,
+              username: product.ownerDeveloper.username ?? null,
+              displayName: product.ownerDeveloper.displayName ?? "",
+              status: product.ownerDeveloper.status ?? null
+            }
+          : null
+      )
+    : undefined;
+
+  return {
+    id: product.id,
+    code: product.code,
+    projectCode: product.projectCode ?? product.code,
+    softwareCode: product.softwareCode ?? product.code,
+    name: product.name,
+    description: product.description ?? "",
+    status: product.status,
+    sdkAppId: product.sdkAppId,
+    sdkAppSecret: product.sdkAppSecret,
+    updatedAt: product.updatedAt,
+    ownerDeveloper
+  };
+}
+
+function buildProductSdkCredentialCsv(items = [], includeOwner = false) {
+  const headers = [
+    "code",
+    "projectCode",
+    "softwareCode",
+    "name",
+    "status",
+    "sdkAppId",
+    "sdkAppSecret",
+    "updatedAt"
+  ];
+  if (includeOwner) {
+    headers.push("ownerUsername", "ownerDisplayName", "ownerStatus");
+  }
+
+  const rows = [headers.join(",")];
+  for (const item of items) {
+    const values = [
+      item.code,
+      item.projectCode,
+      item.softwareCode,
+      item.name,
+      item.status,
+      item.sdkAppId,
+      item.sdkAppSecret,
+      item.updatedAt
+    ];
+    if (includeOwner) {
+      values.push(
+        item.ownerDeveloper?.username ?? "",
+        item.ownerDeveloper?.displayName ?? "",
+        item.ownerDeveloper?.status ?? ""
+      );
+    }
+    rows.push(values.map(escapeCsvCell).join(","));
+  }
+
+  return rows.join("\n");
+}
+
+function buildProductSdkCredentialEnvFiles(products = [], transport = {}, signing = {}) {
+  return products.map((product) => {
+    const manifest = {
+      project: {
+        code: product.code,
+        name: product.name
+      },
+      credentials: {
+        sdkAppId: product.sdkAppId,
+        sdkAppSecret: product.sdkAppSecret,
+        deviceFingerprintSalt: product.code
+      },
+      transport,
+      signing
+    };
+    return {
+      fileName: `${product.code}.env`,
+      content: buildIntegrationEnvTemplate(manifest)
+    };
+  });
+}
+
+function buildProductSdkCredentialEnvBundleText(envFiles = []) {
+  if (!envFiles.length) {
+    return "";
+  }
+
+  return envFiles.map((entry) => `### ${entry.fileName}\n${entry.content}`).join("\n\n");
+}
+
+function buildProductSdkCredentialExportBundle(products = [], options = {}) {
+  const generatedAt = nowIso();
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const includeOwner = options.includeOwner === true;
+  const items = products.map((product) => buildProductSdkCredentialExportItem(product, includeOwner));
+  const csvText = buildProductSdkCredentialCsv(items, includeOwner);
+  const envFiles = buildProductSdkCredentialEnvFiles(products, options.transport || {}, options.signing || {});
+
+  return {
+    generatedAt,
+    total: items.length,
+    fileName: `rocksolid-sdk-credentials-${timestampTag}.json`,
+    csvFileName: `rocksolid-sdk-credentials-${timestampTag}.csv`,
+    envArchiveName: `rocksolid-sdk-credentials-${timestampTag}-env.txt`,
+    items,
+    csvText,
+    envFiles,
+    envBundleText: buildProductSdkCredentialEnvBundleText(envFiles)
+  };
+}
+
 function auditDeveloperSession(db, session, eventType, entityType, entityId, metadata = {}) {
   const actorType = session.actor_scope === "member" ? "developer_member" : "developer";
   audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
@@ -1704,7 +1841,14 @@ async function resolveAdminProductIdsInput(db, store, body = {}) {
   return [...resolved];
 }
 
-async function resolveDeveloperProductIdsInput(db, store, session, body = {}) {
+async function resolveDeveloperProductIdsInput(
+  db,
+  store,
+  session,
+  body = {},
+  permission = "products.write",
+  message = "You can only manage products owned by your developer account."
+) {
   const selector = normalizeBatchProductSelector(body);
   if (!selector.provided) {
     throw new AppError(
@@ -1728,9 +1872,9 @@ async function resolveDeveloperProductIdsInput(db, store, session, body = {}) {
         id: product.id,
         owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
       },
-      "products.write",
+      permission,
       "DEVELOPER_PRODUCT_FORBIDDEN",
-      "You can only manage products owned by your developer account."
+      message
     );
     resolved.add(product.id);
   }
@@ -5478,6 +5622,43 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return summary;
     },
 
+    async exportProductSdkCredentials(token, body = {}, options = {}) {
+      const admin = requireAdminSession(db, token);
+      const productIds = await resolveAdminProductIdsInput(db, store, body);
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        products.push(product);
+      }
+
+      const transport = buildIntegrationTransportSnapshot(config);
+      if (transport?.http && options.publicBaseUrl) {
+        transport.http.baseUrl = options.publicBaseUrl;
+      }
+      if (transport?.http && options.publicHost) {
+        transport.http.publicHost = options.publicHost;
+      }
+      if (transport?.http && options.publicPort) {
+        transport.http.publicPort = options.publicPort;
+      }
+      const payload = buildProductSdkCredentialExportBundle(products, {
+        includeOwner: true,
+        transport,
+        signing: buildIntegrationSigningSnapshot(config)
+      });
+      audit(db, "admin", admin.admin_id, "product.sdk-credentials.export.batch", "product", null, {
+        total: payload.total,
+        productIds,
+        productCodes: products.map((item) => item.code),
+        fileName: payload.fileName
+      });
+      return payload;
+    },
+
     async updateProductOwner(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
       const product = await getStoreProductById(productId);
@@ -5859,6 +6040,61 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         sdkAppIds: items.map((item) => item.sdkAppId)
       });
       return summary;
+    },
+
+    async developerExportProductSdkCredentials(token, body = {}, options = {}) {
+      const session = requireDeveloperSession(db, token);
+      const productIds = await resolveDeveloperProductIdsInput(
+        db,
+        store,
+        session,
+        body,
+        "products.read",
+        "You can only view projects assigned to your developer account."
+      );
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        ensureDeveloperCanAccessProduct(
+          db,
+          session,
+          {
+            id: product.id,
+            owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+          },
+          "products.read",
+          "DEVELOPER_PRODUCT_FORBIDDEN",
+          "You can only view projects assigned to your developer account."
+        );
+        products.push(product);
+      }
+
+      const transport = buildIntegrationTransportSnapshot(config);
+      if (transport?.http && options.publicBaseUrl) {
+        transport.http.baseUrl = options.publicBaseUrl;
+      }
+      if (transport?.http && options.publicHost) {
+        transport.http.publicHost = options.publicHost;
+      }
+      if (transport?.http && options.publicPort) {
+        transport.http.publicPort = options.publicPort;
+      }
+      const payload = buildProductSdkCredentialExportBundle(products, {
+        includeOwner: false,
+        transport,
+        signing: buildIntegrationSigningSnapshot(config)
+      });
+      auditDeveloperSession(db, session, "product.sdk-credentials.export.batch", "product", null, {
+        total: payload.total,
+        productIds,
+        productCodes: products.map((item) => item.code),
+        fileName: payload.fileName
+      });
+      return payload;
     },
 
     async listPolicies(token, productCode = null) {

@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/projects</code></div>
-          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code>, <code>/api/developer/products/sdk-credentials/rotate/batch</code></div>
+          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code>, <code>/api/developer/products/sdk-credentials/rotate/batch</code>, <code>/api/developer/products/sdk-credentials/export</code></div>
           <div class="pill">Owner creates projects. Owner and admin members can edit product settings.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -62,9 +62,10 @@
           <div class="three" style="margin-top:12px;">
             <label>Batch Rotate SDK App ID Too<select id="batch-rotate-sdk-app-id"><option value="false">false</option><option value="true">true</option></select></label>
             <div class="hint" id="batch-rotate-note">Rotate SDK secrets for the selected projects. New secrets only appear in the API output after rotation.</div>
-            <div class="actions"><button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button></div>
+            <div class="actions"><button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button><button class="secondary" id="export-batch-sdk-btn">Export Batch SDK Credentials</button></div>
           </div>
-          <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, status, feature toggles, and rotate SDK credentials inside assigned projects.</div>
+          <div class="hint" id="batch-export-note" style="margin-top:12px;">Export the selected projects as JSON, CSV, and .env snippets so software authors can distribute the latest SDK credentials without manual copying.</div>
+          <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, status, feature toggles, and rotate SDK credentials inside assigned projects. Viewer or operator roles can still export credentials for projects already visible to them.</div>
         </article>
       </section>
 
@@ -188,6 +189,11 @@
         return Boolean(token) && actor?.type !== "member";
       }
 
+      function canReadProducts() {
+        const permissions = actor?.permissions || [];
+        return Boolean(token) && (permissions.includes("*") || permissions.includes("products.read"));
+      }
+
       function canWriteProducts() {
         return Boolean(token) && (actor?.type !== "member" || actor?.role === "admin");
       }
@@ -273,6 +279,13 @@
             : `Rotate SDK secret only for ${scopeCount} selected project(s). Existing app IDs stay the same, but previous secrets stop working immediately.`;
       }
 
+      function syncBatchExportHint(count) {
+        const scopeCount = Number(count || 0);
+        el("batch-export-note").textContent = scopeCount
+          ? `Export ${scopeCount} selected project(s) as JSON, CSV, and .env snippets so software authors can distribute the latest SDK credentials quickly.`
+          : "Export the selected projects as JSON, CSV, and .env snippets so software authors can distribute the latest SDK credentials without manual copying.";
+      }
+
       function syncBatchSelectionUi() {
         const visible = filteredProducts();
         const visibleSelected = visible.filter((item) => batchProductIds.has(item.id)).length;
@@ -283,11 +296,13 @@
         el("apply-batch-status-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("apply-batch-feature-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("apply-batch-rotate-btn").disabled = !canWriteProducts() || totalSelected === 0;
+        el("export-batch-sdk-btn").disabled = !canReadProducts() || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
         el("select-visible-btn").disabled = !products.length;
         syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
         syncBatchFeatureHint(totalSelected);
         syncBatchRotateHint(totalSelected);
+        syncBatchExportHint(totalSelected);
       }
 
       function pruneBatchSelection(items = []) {
@@ -322,9 +337,10 @@
         el("apply-batch-status-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("apply-batch-feature-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("apply-batch-rotate-btn").disabled = editDisabled || batchProductIds.size === 0;
+        el("export-batch-sdk-btn").disabled = !canReadProducts() || batchProductIds.size === 0;
         el("permission-hint").textContent = !token
           ? "Sign in first."
-          : `actor type=${actor?.type || "unknown"}${actor?.type === "member" ? ` | role=${actor?.role}` : " | owner can create and edit projects"}`;
+          : `actor type=${actor?.type || "unknown"}${actor?.type === "member" ? ` | role=${actor?.role} | members can export visible project credentials` : " | owner can create, edit, rotate, and export project credentials"}`;
         syncBatchSelectionUi();
       }
 
@@ -718,19 +734,41 @@
             throw new Error("Select at least one project before applying batch SDK rotation.");
           }
           const rotateAppId = el("batch-rotate-sdk-app-id").value === "true";
-          const data = await api("/api/developer/products/sdk-credentials/rotate/batch", {
+          const rotation = await api("/api/developer/products/sdk-credentials/rotate/batch", {
             method: "POST",
             body: {
               productIds,
               rotateAppId
             }
           });
+          const credentialExport = await api("/api/developer/products/sdk-credentials/export", {
+            method: "POST",
+            body: { productIds }
+          });
           await refresh();
           setStatus(
             rotateAppId
-              ? `Batch SDK App IDs and secrets rotated for ${data.total} project(s).`
-              : `Batch SDK secrets rotated for ${data.total} project(s).`
+              ? `Batch SDK App IDs and secrets rotated and exported for ${rotation.total} project(s).`
+              : `Batch SDK secrets rotated and exported for ${rotation.total} project(s).`
           );
+          setOutput({ rotation, credentialExport });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("export-batch-sdk-btn").addEventListener("click", async () => {
+        try {
+          const productIds = [...batchProductIds];
+          if (!productIds.length) {
+            throw new Error("Select at least one project before exporting batch SDK credentials.");
+          }
+          const data = await api("/api/developer/products/sdk-credentials/export", {
+            method: "POST",
+            body: { productIds }
+          });
+          setStatus(`Batch SDK credential export generated for ${data.total} project(s).`);
           setOutput(data);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);

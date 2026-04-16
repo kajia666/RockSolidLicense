@@ -279,6 +279,19 @@ export function createApp(overrides = {}) {
         });
         return;
       }
+
+      if (req.method === "POST" && url.pathname === "/api/admin/products/sdk-credentials/export") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.exportProductSdkCredentials(getBearerToken(req), body, {
+            publicBaseUrl: url.origin,
+            publicHost: url.hostname,
+            publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+          })
+        });
+        return;
+      }
       if (productSdkRotateRoute) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
@@ -1171,6 +1184,23 @@ export function createApp(overrides = {}) {
           data: await services.developerRotateProductSdkCredentialsBatch(
             getBearerToken(req),
             body
+          )
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/products/sdk-credentials/export") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerExportProductSdkCredentials(
+            getBearerToken(req),
+            body,
+            {
+              publicBaseUrl: url.origin,
+              publicHost: url.hostname,
+              publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+            }
           )
         });
         return;

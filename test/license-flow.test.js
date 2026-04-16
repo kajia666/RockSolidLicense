@@ -7006,6 +7006,130 @@ test("batch project sdk credential rotation can rotate multiple scoped projects"
   }
 });
 
+test("batch project sdk credential export can bundle selected projects with scoped access", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "export.bundle.owner",
+        password: "ExportBundleOwner123!",
+        displayName: "Export Bundle Owner"
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "export.bundle.owner",
+      password: "ExportBundleOwner123!"
+    });
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "EXPBUNDLE_ALPHA",
+        name: "Export Bundle Alpha"
+      },
+      ownerSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "EXPBUNDLE_BETA",
+        name: "Export Bundle Beta"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "export.bundle.viewer",
+        password: "ExportBundleViewer123!",
+        displayName: "Export Bundle Viewer",
+        role: "viewer",
+        productCodes: ["EXPBUNDLE_ALPHA"]
+      },
+      ownerSession.token
+    );
+
+    const viewerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "export.bundle.viewer",
+      password: "ExportBundleViewer123!"
+    });
+
+    const developerExport = await postJson(
+      baseUrl,
+      "/api/developer/products/sdk-credentials/export",
+      {
+        productIds: [alphaProduct.id]
+      },
+      viewerSession.token
+    );
+    assert.equal(developerExport.total, 1);
+    assert.equal(developerExport.items.length, 1);
+    assert.equal(developerExport.items[0].code, "EXPBUNDLE_ALPHA");
+    assert.equal(developerExport.items[0].sdkAppId, alphaProduct.sdkAppId);
+    assert.equal(developerExport.items[0].sdkAppSecret, alphaProduct.sdkAppSecret);
+    assert.match(developerExport.csvText, /^code,projectCode,softwareCode,name,status,sdkAppId,sdkAppSecret,updatedAt/m);
+    assert.match(developerExport.csvText, /EXPBUNDLE_ALPHA/);
+    assert.equal(developerExport.envFiles.length, 1);
+    assert.equal(developerExport.envFiles[0].fileName, "EXPBUNDLE_ALPHA.env");
+    assert.match(developerExport.envFiles[0].content, /RS_PROJECT_CODE=EXPBUNDLE_ALPHA/);
+    assert.match(developerExport.envFiles[0].content, new RegExp(`RS_SDK_APP_ID=${alphaProduct.sdkAppId}`));
+    assert.match(developerExport.envFiles[0].content, new RegExp(`RS_SDK_APP_SECRET=${alphaProduct.sdkAppSecret}`));
+    assert.match(developerExport.envFiles[0].content, new RegExp(`RS_HTTP_BASE_URL=${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(developerExport.envBundleText, /### EXPBUNDLE_ALPHA\.env/);
+
+    const viewerForbidden = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/products/sdk-credentials/export",
+      {
+        productIds: [betaProduct.id]
+      },
+      viewerSession.token
+    );
+    assert.equal(viewerForbidden.status, 403);
+    assert.equal(viewerForbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const adminExport = await postJson(
+      baseUrl,
+      "/api/admin/products/sdk-credentials/export",
+      {
+        projectCodes: ["EXPBUNDLE_ALPHA", "EXPBUNDLE_BETA"]
+      },
+      adminSession.token
+    );
+    assert.equal(adminExport.total, 2);
+    assert.equal(adminExport.items.length, 2);
+    assert.ok(adminExport.items.every((item) => item.ownerDeveloper?.id === owner.id));
+    assert.ok(adminExport.items.every((item) => item.ownerDeveloper?.username === "export.bundle.owner"));
+    assert.match(adminExport.csvText, /ownerUsername,ownerDisplayName,ownerStatus/);
+    assert.match(adminExport.csvText, /EXPBUNDLE_ALPHA/);
+    assert.match(adminExport.csvText, /EXPBUNDLE_BETA/);
+    assert.equal(adminExport.envFiles.length, 2);
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
+    const ownerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", ownerSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.sdk-credentials.export.batch"));
+    assert.ok(ownerAuditLogs.items.some((entry) => entry.event_type === "product.sdk-credentials.export.batch"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -7023,12 +7147,14 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /products\/status\/batch/);
     assert.match(html, /products\/feature-config\/batch/);
     assert.match(html, /sdk-credentials\/rotate\/batch/);
+    assert.match(html, /sdk-credentials\/export/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Save Project Status/);
     assert.match(html, /Apply Batch Status/);
     assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Apply Batch SDK Rotation/);
+    assert.match(html, /Export Batch SDK Credentials/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
@@ -7270,6 +7396,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /products\/status\/batch/);
     assert.match(html, /products\/feature-config\/batch/);
     assert.match(html, /sdk-credentials\/rotate\/batch/);
+    assert.match(html, /sdk-credentials\/export/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
@@ -7278,6 +7405,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Apply Batch Status/);
     assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Apply Batch SDK Rotation/);
+    assert.match(html, /Export Batch SDK Credentials/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);

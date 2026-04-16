@@ -271,6 +271,14 @@ export function createApp(overrides = {}) {
       const productSdkRotateRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/admin/products/:productId/sdk-credentials/rotate")
         : null;
+      if (req.method === "POST" && url.pathname === "/api/admin/products/sdk-credentials/rotate/batch") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.rotateProductSdkCredentialsBatch(getBearerToken(req), body)
+        });
+        return;
+      }
       if (productSdkRotateRoute) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
@@ -1141,6 +1149,17 @@ export function createApp(overrides = {}) {
       const developerProductSdkRotateRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/developer/products/:productId/sdk-credentials/rotate")
         : null;
+      if (req.method === "POST" && url.pathname === "/api/developer/products/sdk-credentials/rotate/batch") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerRotateProductSdkCredentialsBatch(
+            getBearerToken(req),
+            body
+          )
+        });
+        return;
+      }
       if (developerProductSdkRotateRoute) {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {

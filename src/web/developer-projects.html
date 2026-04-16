@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/projects</code></div>
-          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
+          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code>, <code>/api/developer/products/sdk-credentials/rotate/batch</code></div>
           <div class="pill">Owner creates projects. Owner and admin members can edit product settings.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -59,6 +59,11 @@
           </div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-batch-feature-btn">Apply Batch Feature Config</button></div>
           <div class="hint" id="batch-feature-note" style="margin-top:12px;">The full feature toggle set below will be written to each selected project.</div>
+          <div class="three" style="margin-top:12px;">
+            <label>Batch Rotate SDK App ID Too<select id="batch-rotate-sdk-app-id"><option value="false">false</option><option value="true">true</option></select></label>
+            <div class="hint" id="batch-rotate-note">Rotate SDK secrets for the selected projects. New secrets only appear in the API output after rotation.</div>
+            <div class="actions"><button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button></div>
+          </div>
           <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, status, feature toggles, and rotate SDK credentials inside assigned projects.</div>
         </article>
       </section>
@@ -258,6 +263,16 @@
           : "Choose the feature toggle set below, then apply it to the selected projects.";
       }
 
+      function syncBatchRotateHint(count) {
+        const scopeCount = Number(count || 0);
+        const rotateAppId = el("batch-rotate-sdk-app-id").value === "true";
+        el("batch-rotate-note").textContent = !scopeCount
+          ? "Rotate SDK secrets for the selected projects. New secrets only appear in the API output after rotation."
+          : rotateAppId
+            ? `Rotate both SDK App ID and SDK secret for ${scopeCount} selected project(s). Existing client integrations must update both values immediately.`
+            : `Rotate SDK secret only for ${scopeCount} selected project(s). Existing app IDs stay the same, but previous secrets stop working immediately.`;
+      }
+
       function syncBatchSelectionUi() {
         const visible = filteredProducts();
         const visibleSelected = visible.filter((item) => batchProductIds.has(item.id)).length;
@@ -267,10 +282,12 @@
           : "No projects selected for batch operations.";
         el("apply-batch-status-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("apply-batch-feature-btn").disabled = !canWriteProducts() || totalSelected === 0;
+        el("apply-batch-rotate-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
         el("select-visible-btn").disabled = !products.length;
         syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
         syncBatchFeatureHint(totalSelected);
+        syncBatchRotateHint(totalSelected);
       }
 
       function pruneBatchSelection(items = []) {
@@ -301,8 +318,10 @@
         el("rotate-sdk-btn").disabled = editDisabled;
         el("rotate-sdk-app-id").disabled = editDisabled;
         el("batch-status").disabled = editDisabled;
+        el("batch-rotate-sdk-app-id").disabled = editDisabled;
         el("apply-batch-status-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("apply-batch-feature-btn").disabled = editDisabled || batchProductIds.size === 0;
+        el("apply-batch-rotate-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("permission-hint").textContent = !token
           ? "Sign in first."
           : `actor type=${actor?.type || "unknown"}${actor?.type === "member" ? ` | role=${actor?.role}` : " | owner can create and edit projects"}`;
@@ -630,6 +649,10 @@
         syncBatchSelectionUi();
       });
 
+      el("batch-rotate-sdk-app-id").addEventListener("change", () => {
+        syncBatchSelectionUi();
+      });
+
       el("select-visible-btn").addEventListener("click", () => {
         for (const product of filteredProducts()) {
           batchProductIds.add(product.id);
@@ -681,6 +704,33 @@
           });
           await refresh();
           setStatus(`Batch feature config updated for ${data.changed}/${data.total} project(s).`);
+          setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("apply-batch-rotate-btn").addEventListener("click", async () => {
+        try {
+          const productIds = [...batchProductIds];
+          if (!productIds.length) {
+            throw new Error("Select at least one project before applying batch SDK rotation.");
+          }
+          const rotateAppId = el("batch-rotate-sdk-app-id").value === "true";
+          const data = await api("/api/developer/products/sdk-credentials/rotate/batch", {
+            method: "POST",
+            body: {
+              productIds,
+              rotateAppId
+            }
+          });
+          await refresh();
+          setStatus(
+            rotateAppId
+              ? `Batch SDK App IDs and secrets rotated for ${data.total} project(s).`
+              : `Batch SDK secrets rotated for ${data.total} project(s).`
+          );
           setOutput(data);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);

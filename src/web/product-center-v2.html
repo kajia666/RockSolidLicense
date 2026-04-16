@@ -331,6 +331,7 @@
           <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
           <div class="pill">Batch Feature API: <code>POST /api/admin/products/feature-config/batch</code></div>
           <div class="pill">Credential Rotate API: <code>POST /api/admin/products/:productId/sdk-credentials/rotate</code></div>
+          <div class="pill">Batch Credential Rotate API: <code>POST /api/admin/products/sdk-credentials/rotate/batch</code></div>
           <div class="pill">Owner API: <code>POST /api/admin/products/:productId/owner</code></div>
           <div class="pill">Developer Status API: <code>POST /api/admin/developers/:developerId/status</code></div>
           <div class="pill">One developer can own multiple projects</div>
@@ -596,6 +597,18 @@
             <button class="secondary" id="apply-batch-feature-btn">Apply Batch Feature Config</button>
           </div>
           <div class="hint" id="batch-feature-note" style="margin-bottom: 12px;">The full feature toggle set below will be written to each selected project.</div>
+          <div class="two" style="margin-bottom: 12px;">
+            <label>Batch Rotate SDK App ID Too
+              <select id="batch-rotate-sdk-app-id">
+                <option value="false">false</option>
+                <option value="true">true</option>
+              </select>
+            </label>
+            <div class="hint" id="batch-rotate-note">Rotate SDK secrets for the selected projects. New secrets only appear in the API output after rotation.</div>
+          </div>
+          <div class="actions" style="margin-bottom: 12px;">
+            <button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -749,6 +762,22 @@
           : "Choose the feature toggle set below, then apply it to the selected projects.";
       }
 
+      function syncBatchRotateHint(count) {
+        const scopeCount = Number(count || 0);
+        const rotateAppId = el("batch-rotate-sdk-app-id")?.value === "true";
+        const node = el("batch-rotate-note");
+        if (!node) {
+          return;
+        }
+        if (!scopeCount) {
+          node.textContent = "Rotate SDK secrets for the selected projects. New secrets only appear in the API output after rotation.";
+          return;
+        }
+        node.textContent = rotateAppId
+          ? `Rotate both SDK App ID and SDK secret for ${scopeCount} selected project(s). Existing client integrations must update both values immediately.`
+          : `Rotate SDK secret only for ${scopeCount} selected project(s). Existing app IDs stay the same, but previous secrets stop working immediately.`;
+      }
+
       function syncBatchSelectionUi() {
         const visibleProducts = filterProducts(productsCache);
         const visibleSelected = visibleProducts.filter((item) => batchProductIds.has(item.id)).length;
@@ -759,9 +788,11 @@
         el("select-visible-btn").disabled = !productsCache.length;
         el("apply-batch-status-btn").disabled = !adminToken || totalSelected === 0;
         el("apply-batch-feature-btn").disabled = !adminToken || totalSelected === 0;
+        el("apply-batch-rotate-btn").disabled = !adminToken || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
         syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
         syncBatchFeatureHint(totalSelected);
+        syncBatchRotateHint(totalSelected);
       }
 
       function pruneBatchSelection(items = []) {
@@ -1235,6 +1266,10 @@
         syncBatchSelectionUi();
       });
 
+      el("batch-rotate-sdk-app-id").addEventListener("change", () => {
+        syncBatchSelectionUi();
+      });
+
       el("apply-filter-btn").addEventListener("click", () => {
         const visibleProducts = renderProducts(productsCache);
         const filter = readProductFilter();
@@ -1303,6 +1338,29 @@
         });
         setOutput(data);
         setStatus(`Batch feature config updated for ${data.changed}/${data.total} project(s).`);
+        await refreshAll();
+      }));
+
+      el("apply-batch-rotate-btn").addEventListener("click", () => guarded(async () => {
+        const productIds = [...batchProductIds];
+        if (!productIds.length) {
+          throw new Error("Select at least one project before applying batch SDK rotation.");
+        }
+
+        const rotateAppId = el("batch-rotate-sdk-app-id").value === "true";
+        const data = await callApi("/api/admin/products/sdk-credentials/rotate/batch", {
+          method: "POST",
+          body: {
+            productIds,
+            rotateAppId
+          }
+        });
+        setOutput(data);
+        setStatus(
+          rotateAppId
+            ? `Batch SDK App IDs and secrets rotated for ${data.total} project(s).`
+            : `Batch SDK secrets rotated for ${data.total} project(s).`
+        );
         await refreshAll();
       }));
 

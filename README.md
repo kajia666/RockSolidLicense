@@ -277,6 +277,7 @@ npm run db:postgres:check
 - `POST /api/admin/products`
 - `POST /api/admin/products/status/batch`
 - `POST /api/admin/products/feature-config/batch`
+- `POST /api/admin/products/sdk-credentials/rotate/batch`
 - `POST /api/admin/products/:productId/profile`
 - `POST /api/admin/products/:productId/status`
 - `POST /api/admin/products/:productId/feature-config`
@@ -324,6 +325,7 @@ npm run db:postgres:check
 - `POST /api/developer/products`
 - `POST /api/developer/products/status/batch`
 - `POST /api/developer/products/feature-config/batch`
+- `POST /api/developer/products/sdk-credentials/rotate/batch`
 - `POST /api/developer/products/:productId/profile`
 - `POST /api/developer/products/:productId/status`
 - `POST /api/developer/products/:productId/feature-config`
@@ -365,9 +367,10 @@ npm run db:postgres:check
 - `products.code` 是对外稳定的项目编码，接口里也兼容 `projectCode` / `softwareCode`
 - 项目维度目前支持 `active / disabled / archived` 三种状态
 - 项目停用或归档时，会同步回收该项目下的活跃会话，避免旧授权继续在线
-- 管理员和开发者工作台都支持批量状态切换，以及批量写入项目功能开关，便于一次性停用、归档、恢复或统一项目能力入口
+- 管理员和开发者工作台都支持批量状态切换、批量写入项目功能开关，以及批量轮换 SDK 凭据，便于一次性停用、归档、恢复、统一项目能力入口，或在泄漏后集中更换密钥
 - 软件作者可以按项目控制 `allowRegister / allowAccountLogin / allowCardLogin / allowCardRecharge / allowVersionCheck / allowNotices / allowClientUnbind`
 - 项目级功能开关关闭后，对应客户端接口会返回“disabled by product”，运行链路也不会继续套用该项目的相关规则
+- 项目 SDK 凭据支持只轮换 `sdkAppSecret`，也支持连同 `sdkAppId` 一起轮换；旧凭据会立即失效，因此更适合在软件作者完成 SDK 配置更新后统一切换
 - 管理员产品中心、开发者总览、开发者项目中心和开发者接入中心都会直接汇总 `active / disabled / archived` 项目数量
 
 产品级功能开关当前支持：
@@ -396,10 +399,10 @@ npm run db:postgres:check
 
 ### 页面入口
 
-- `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换单个或批量项目状态、按关键字和状态筛选项目，并支持单个或批量调整项目级功能开关
+- `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换单个或批量项目状态、按关键字和状态筛选项目，并支持单个或批量调整项目级功能开关、批量轮换 SDK 凭据
 - `/developer`：开发者总览中心，展示项目数、在线会话、卡密、强更规则、阻断公告、网络规则和功能开关覆盖情况
 - `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息与示例请求
-- `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及 SDK 凭据轮换
+- `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及单个或批量 SDK 凭据轮换
 - `/developer/licenses`：开发者授权中心，维护策略、卡密批次、卡密状态和卡密导出
 - `/developer/ops`：开发者授权运营台，处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁
 - `/developer/releases`：开发者发版中心，维护客户端版本、强更规则和启动公告

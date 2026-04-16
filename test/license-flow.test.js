@@ -6784,6 +6784,228 @@ test("batch project feature config control can update multiple scoped projects",
   }
 });
 
+test("batch project sdk credential rotation can rotate multiple scoped projects", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "batch.rotate.owner",
+        password: "BatchRotateOwner123!",
+        displayName: "Batch Rotate Owner"
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "batch.rotate.owner",
+      password: "BatchRotateOwner123!"
+    });
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "BROT_ALPHA",
+        name: "Batch Rotate Alpha"
+      },
+      ownerSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "BROT_BETA",
+        name: "Batch Rotate Beta"
+      },
+      ownerSession.token
+    );
+
+    const originalCredentials = new Map([
+      [alphaProduct.code, { sdkAppId: alphaProduct.sdkAppId, sdkAppSecret: alphaProduct.sdkAppSecret }],
+      [betaProduct.code, { sdkAppId: betaProduct.sdkAppId, sdkAppSecret: betaProduct.sdkAppSecret }]
+    ]);
+
+    await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "BROT_ALPHA",
+      username: "brot_alpha_before",
+      password: "BatchRotateUser123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/register", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "BROT_BETA",
+      username: "brot_beta_before",
+      password: "BatchRotateUser123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "batch.rotate.admin",
+        password: "BatchRotateAdmin123!",
+        displayName: "Batch Rotate Admin",
+        role: "admin",
+        productCodes: ["BROT_ALPHA", "BROT_BETA"]
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "batch.rotate.operator",
+        password: "BatchRotateOperator123!",
+        displayName: "Batch Rotate Operator",
+        role: "operator",
+        productCodes: ["BROT_ALPHA", "BROT_BETA"]
+      },
+      ownerSession.token
+    );
+
+    const adminMemberSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "batch.rotate.admin",
+      password: "BatchRotateAdmin123!"
+    });
+
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "batch.rotate.operator",
+      password: "BatchRotateOperator123!"
+    });
+
+    const developerBatch = await postJson(
+      baseUrl,
+      "/api/developer/products/sdk-credentials/rotate/batch",
+      {
+        productIds: [alphaProduct.id, betaProduct.id],
+        rotateAppId: false
+      },
+      adminMemberSession.token
+    );
+    assert.equal(developerBatch.rotateAppId, false);
+    assert.equal(developerBatch.total, 2);
+    assert.equal(developerBatch.items.length, 2);
+
+    const developerBatchByCode = new Map(developerBatch.items.map((item) => [item.code, item]));
+    for (const code of ["BROT_ALPHA", "BROT_BETA"]) {
+      const original = originalCredentials.get(code);
+      const rotated = developerBatchByCode.get(code);
+      assert.ok(rotated);
+      assert.equal(rotated.sdkAppId, original.sdkAppId);
+      assert.notEqual(rotated.sdkAppSecret, original.sdkAppSecret);
+      assert.equal(rotated.rotation.rotateAppId, false);
+      assert.equal(rotated.rotation.previousSdkAppId, original.sdkAppId);
+    }
+
+    const oldSecretFailure = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/register",
+      originalCredentials.get("BROT_ALPHA").sdkAppId,
+      originalCredentials.get("BROT_ALPHA").sdkAppSecret,
+      {
+        productCode: "BROT_ALPHA",
+        username: "brot_alpha_old_secret",
+        password: "BatchRotateUser123!"
+      }
+    );
+    assert.equal(oldSecretFailure.status, 401);
+    assert.equal(oldSecretFailure.error.code, "SDK_SIGNATURE_INVALID");
+
+    const alphaAfterDeveloperRotate = developerBatchByCode.get("BROT_ALPHA");
+    await signedClientPost(
+      baseUrl,
+      "/api/client/register",
+      alphaAfterDeveloperRotate.sdkAppId,
+      alphaAfterDeveloperRotate.sdkAppSecret,
+      {
+        productCode: "BROT_ALPHA",
+        username: "brot_alpha_after_member_rotate",
+        password: "BatchRotateUser123!"
+      }
+    );
+
+    const operatorForbidden = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/products/sdk-credentials/rotate/batch",
+      {
+        productIds: [alphaProduct.id],
+        rotateAppId: true
+      },
+      operatorSession.token
+    );
+    assert.equal(operatorForbidden.status, 403);
+    assert.equal(operatorForbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const adminBatch = await postJson(
+      baseUrl,
+      "/api/admin/products/sdk-credentials/rotate/batch",
+      {
+        projectCodes: ["BROT_ALPHA", "BROT_BETA"],
+        rotateAppId: true
+      },
+      adminSession.token
+    );
+    assert.equal(adminBatch.rotateAppId, true);
+    assert.equal(adminBatch.total, 2);
+    assert.equal(adminBatch.items.length, 2);
+
+    const adminBatchByCode = new Map(adminBatch.items.map((item) => [item.code, item]));
+    for (const code of ["BROT_ALPHA", "BROT_BETA"]) {
+      const previous = developerBatchByCode.get(code);
+      const rotated = adminBatchByCode.get(code);
+      assert.ok(rotated);
+      assert.notEqual(rotated.sdkAppId, previous.sdkAppId);
+      assert.notEqual(rotated.sdkAppSecret, previous.sdkAppSecret);
+      assert.equal(rotated.rotation.rotateAppId, true);
+      assert.equal(rotated.rotation.previousSdkAppId, previous.sdkAppId);
+    }
+
+    const oldAppIdFailure = await signedClientPostExpectError(
+      baseUrl,
+      "/api/client/register",
+      developerBatchByCode.get("BROT_BETA").sdkAppId,
+      developerBatchByCode.get("BROT_BETA").sdkAppSecret,
+      {
+        productCode: "BROT_BETA",
+        username: "brot_beta_old_appid",
+        password: "BatchRotateUser123!"
+      }
+    );
+    assert.equal(oldAppIdFailure.status, 401);
+    assert.equal(oldAppIdFailure.error.code, "SDK_APP_INVALID");
+
+    const betaAfterAdminRotate = adminBatchByCode.get("BROT_BETA");
+    await signedClientPost(
+      baseUrl,
+      "/api/client/register",
+      betaAfterAdminRotate.sdkAppId,
+      betaAfterAdminRotate.sdkAppSecret,
+      {
+        productCode: "BROT_BETA",
+        username: "brot_beta_after_admin_rotate",
+        password: "BatchRotateUser123!"
+      }
+    );
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
+    const developerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", adminMemberSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.sdk-credentials.rotate.batch"));
+    assert.ok(developerAuditLogs.items.some((entry) => entry.event_type === "product.sdk-credentials.rotate.batch"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -6800,11 +7022,13 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /products\/:productId\/status/);
     assert.match(html, /products\/status\/batch/);
     assert.match(html, /products\/feature-config\/batch/);
+    assert.match(html, /sdk-credentials\/rotate\/batch/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Save Project Status/);
     assert.match(html, /Apply Batch Status/);
     assert.match(html, /Apply Batch Feature Config/);
+    assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
@@ -6941,6 +7165,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /products\/:productId\/status/);
     assert.match(html, /products\/status\/batch/);
     assert.match(html, /products\/feature-config\/batch/);
+    assert.match(html, /sdk-credentials\/rotate\/batch/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
@@ -6948,6 +7173,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Save Project Status/);
     assert.match(html, /Apply Batch Status/);
     assert.match(html, /Apply Batch Feature Config/);
+    assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);

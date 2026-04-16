@@ -1587,6 +1587,24 @@ function summarizeManagedProductFeatureConfigBatch(items) {
   };
 }
 
+async function applyManagedProductSdkCredentialRotation(store, currentProduct, body, auditAction) {
+  const result = await Promise.resolve(store.products.rotateProductSdkCredentials(currentProduct.id, body, nowIso()));
+  auditAction(result.product, result.rotated);
+
+  return {
+    ...result.product,
+    rotation: result.rotated
+  };
+}
+
+function summarizeManagedProductSdkRotationBatch(rotateAppId, items) {
+  return {
+    rotateAppId: rotateAppId === true,
+    total: items.length,
+    items
+  };
+}
+
 function assertDeveloperUsernameAvailable(db, username, conflictCode = "DEVELOPER_EXISTS") {
   if (one(db, "SELECT id FROM developer_accounts WHERE username = ?", username)) {
     throw new AppError(409, conflictCode, "Developer username already exists.");
@@ -5166,19 +5184,59 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     async rotateProductSdkCredentials(token, productId, body = {}) {
       const admin = requireAdminSession(db, token);
-      const result = await Promise.resolve(store.products.rotateProductSdkCredentials(productId, body, nowIso()));
+      const currentProduct = await getStoreProductById(productId);
+      if (!currentProduct) {
+        throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+      }
 
-      audit(db, "admin", admin.admin_id, "product.sdk-credentials.rotate", "product", result.product.id, {
-        code: result.product.code,
-        rotateAppId: result.rotated.rotateAppId,
-        previousSdkAppId: result.rotated.previousSdkAppId,
-        sdkAppId: result.rotated.sdkAppId
+      return applyManagedProductSdkCredentialRotation(store, currentProduct, body, (updatedProduct, rotated) => {
+        audit(db, "admin", admin.admin_id, "product.sdk-credentials.rotate", "product", updatedProduct.id, {
+          code: updatedProduct.code,
+          rotateAppId: rotated.rotateAppId,
+          previousSdkAppId: rotated.previousSdkAppId,
+          sdkAppId: rotated.sdkAppId
+        });
       });
+    },
 
-      return {
-        ...result.product,
-        rotation: result.rotated
-      };
+    async rotateProductSdkCredentialsBatch(token, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const productIds = await resolveAdminProductIdsInput(db, store, body);
+      const rotateAppId = parseOptionalBoolean(body.rotateAppId, "rotateAppId") === true;
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        products.push(product);
+      }
+
+      const items = [];
+      for (const product of products) {
+        items.push(
+          await applyManagedProductSdkCredentialRotation(store, product, body, (updatedProduct, rotated) => {
+            audit(db, "admin", admin.admin_id, "product.sdk-credentials.rotate", "product", updatedProduct.id, {
+              code: updatedProduct.code,
+              rotateAppId: rotated.rotateAppId,
+              previousSdkAppId: rotated.previousSdkAppId,
+              sdkAppId: rotated.sdkAppId,
+              batch: true
+            });
+          })
+        );
+      }
+
+      const summary = summarizeManagedProductSdkRotationBatch(rotateAppId, items);
+      audit(db, "admin", admin.admin_id, "product.sdk-credentials.rotate.batch", "product", null, {
+        rotateAppId: summary.rotateAppId,
+        total: summary.total,
+        productIds,
+        productCodes: items.map((item) => item.code),
+        sdkAppIds: items.map((item) => item.sdkAppId)
+      });
+      return summary;
     },
 
     async updateProductOwner(token, productId, body = {}) {
@@ -5498,19 +5556,65 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "DEVELOPER_PRODUCT_FORBIDDEN",
         "You can only manage products owned by your developer account."
       );
-      const result = await Promise.resolve(store.products.rotateProductSdkCredentials(ownedProduct.id, body, nowIso()));
-
-      auditDeveloperSession(db, session, "product.sdk-credentials.rotate", "product", result.product.id, {
-        code: result.product.code,
-        rotateAppId: result.rotated.rotateAppId,
-        previousSdkAppId: result.rotated.previousSdkAppId,
-        sdkAppId: result.rotated.sdkAppId
+      return applyManagedProductSdkCredentialRotation(store, ownedProduct, body, (updatedProduct, rotated) => {
+        auditDeveloperSession(db, session, "product.sdk-credentials.rotate", "product", updatedProduct.id, {
+          code: updatedProduct.code,
+          rotateAppId: rotated.rotateAppId,
+          previousSdkAppId: rotated.previousSdkAppId,
+          sdkAppId: rotated.sdkAppId
+        });
       });
+    },
 
-      return {
-        ...result.product,
-        rotation: result.rotated
-      };
+    async developerRotateProductSdkCredentialsBatch(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const productIds = await resolveDeveloperProductIdsInput(db, store, session, body);
+      const rotateAppId = parseOptionalBoolean(body.rotateAppId, "rotateAppId") === true;
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        ensureDeveloperCanAccessProduct(
+          db,
+          session,
+          {
+            id: product.id,
+            owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+          },
+          "products.write",
+          "DEVELOPER_PRODUCT_FORBIDDEN",
+          "You can only manage products owned by your developer account."
+        );
+        products.push(product);
+      }
+
+      const items = [];
+      for (const product of products) {
+        items.push(
+          await applyManagedProductSdkCredentialRotation(store, product, body, (updatedProduct, rotated) => {
+            auditDeveloperSession(db, session, "product.sdk-credentials.rotate", "product", updatedProduct.id, {
+              code: updatedProduct.code,
+              rotateAppId: rotated.rotateAppId,
+              previousSdkAppId: rotated.previousSdkAppId,
+              sdkAppId: rotated.sdkAppId,
+              batch: true
+            });
+          })
+        );
+      }
+
+      const summary = summarizeManagedProductSdkRotationBatch(rotateAppId, items);
+      auditDeveloperSession(db, session, "product.sdk-credentials.rotate.batch", "product", null, {
+        rotateAppId: summary.rotateAppId,
+        total: summary.total,
+        productIds,
+        productCodes: items.map((item) => item.code),
+        sdkAppIds: items.map((item) => item.sdkAppId)
+      });
+      return summary;
     },
 
     async listPolicies(token, productCode = null) {

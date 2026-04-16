@@ -1099,6 +1099,20 @@ export function createApp(overrides = {}) {
         sendJson(res, 200, { ok: true, data });
         return;
       }
+      if (req.method === "GET" && url.pathname === "/api/developer/integration/package/download") {
+        const data = await services.developerIntegrationPackage(getBearerToken(req), {
+          productId: url.searchParams.get("productId"),
+          productCode: url.searchParams.get("productCode"),
+          projectCode: url.searchParams.get("projectCode"),
+          softwareCode: url.searchParams.get("softwareCode")
+        }, {
+          publicBaseUrl: url.origin,
+          publicHost: url.hostname,
+          publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+        });
+        sendAttachment(res, services.integrationPackageDownloadAsset(data, url.searchParams.get("format")));
+        return;
+      }
 
       if (req.method === "GET" && url.pathname === "/api/developer/release-package") {
         const data = await services.developerReleasePackage(getBearerToken(req), {

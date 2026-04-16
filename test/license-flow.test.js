@@ -7848,6 +7848,8 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(byProductId.snippets.envTemplate, /RS_PROJECT_CODE=EXPORT_ALPHA/);
     assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_ID=/);
     assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_SECRET=/);
+    assert.equal(byProductId.snippets.envFileName, "EXPORT_ALPHA.env");
+    assert.equal(byProductId.snippets.cppFileName, "EXPORT_ALPHA.cpp");
 
     const byProjectCode = await getJson(
       baseUrl,
@@ -7857,6 +7859,46 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.equal(byProjectCode.manifest.project.id, alphaProject.id);
     assert.equal(byProjectCode.manifest.project.code, "EXPORT_ALPHA");
 
+    const jsonDownload = await getText(
+      baseUrl,
+      `/api/developer/integration/package/download?productId=${encodeURIComponent(alphaProject.id)}&format=json`,
+      viewerSession.token
+    );
+    assert.equal(jsonDownload.contentType, "application/json; charset=utf-8");
+    assert.match(jsonDownload.contentDisposition || "", /rocksolid-integration-EXPORT_ALPHA\.json/);
+    assert.match(jsonDownload.body, /"code": "EXPORT_ALPHA"/);
+
+    const envDownload = await getText(
+      baseUrl,
+      "/api/developer/integration/package/download?projectCode=EXPORT_ALPHA&format=env",
+      viewerSession.token
+    );
+    assert.equal(envDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(envDownload.contentDisposition || "", /EXPORT_ALPHA\.env/);
+    assert.match(envDownload.body, /RS_PROJECT_CODE=EXPORT_ALPHA/);
+
+    const cppDownload = await getText(
+      baseUrl,
+      "/api/developer/integration/package/download?softwareCode=EXPORT_ALPHA&format=cpp",
+      viewerSession.token
+    );
+    assert.equal(cppDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(cppDownload.contentDisposition || "", /EXPORT_ALPHA\.cpp/);
+    assert.match(cppDownload.body, /startup_bootstrap_http/);
+
+    const zipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/integration/package/download?softwareCode=EXPORT_ALPHA&format=zip",
+      viewerSession.token
+    );
+    assert.equal(zipDownload.contentType, "application/zip");
+    assert.match(zipDownload.contentDisposition || "", /rocksolid-integration-EXPORT_ALPHA\.zip/);
+    assert.equal(zipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const zipText = zipDownload.body.toString("latin1");
+    assert.match(zipText, /rocksolid-integration-EXPORT_ALPHA\.json/);
+    assert.match(zipText, /EXPORT_ALPHA\.env/);
+    assert.match(zipText, /EXPORT_ALPHA\.cpp/);
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       `/api/developer/integration/package?productId=${encodeURIComponent(betaProject.id)}`,
@@ -7864,6 +7906,14 @@ test("developer integration package export is scoped and includes cpp quickstart
     );
     assert.equal(forbidden.status, 403);
     assert.equal(forbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const forbiddenDownload = await getJsonExpectError(
+      baseUrl,
+      `/api/developer/integration/package/download?productId=${encodeURIComponent(betaProject.id)}&format=json`,
+      viewerSession.token
+    );
+    assert.equal(forbiddenDownload.status, 403);
+    assert.equal(forbiddenDownload.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -7924,10 +7974,15 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Developer Integration Center/);
     assert.match(html, /api\/developer\/integration/);
     assert.match(html, /api\/developer\/integration\/package/);
+    assert.match(html, /api\/developer\/integration\/package\/download/);
     assert.match(html, /api\/client\/login/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Token Keys/);
     assert.match(html, /Refresh Integration Package/);
+    assert.match(html, /Download JSON/);
+    assert.match(html, /Download Env/);
+    assert.match(html, /Download C\+\+/);
+    assert.match(html, /Download Zip/);
     assert.match(html, /C\+\+ Quickstart/);
     assert.match(html, /Environment Template/);
     assert.match(html, /x-rs-app-id/);

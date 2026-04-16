@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/integration</code></div>
-          <div class="pill">APIs: <code>/api/developer/integration</code>, <code>/api/developer/integration/package</code></div>
+          <div class="pill">APIs: <code>/api/developer/integration</code>, <code>/api/developer/integration/package</code>, <code>/api/developer/integration/package/download</code></div>
           <div class="pill">Includes scoped projects, token keys, and transport bootstrap data.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -36,7 +36,7 @@
         <article class="card">
           <h2>Project Selector</h2>
           <label>Project Code<select id="project-select"></select></label>
-          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button></div>
+          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
         </article>
 
@@ -180,6 +180,40 @@
           throw error;
         }
         return payload.data;
+      }
+
+      function downloadBlob(filename, blob) {
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      }
+
+      function downloadFileNameFromHeaders(headerValue, fallback) {
+        const match = /filename="?([^";]+)"?/i.exec(headerValue || "");
+        return match?.[1] || fallback;
+      }
+
+      async function downloadApiFile(path, fallbackFileName) {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(path, { method: "GET", headers });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const error = new Error(payload?.error?.message || `Request failed: ${response.status}`);
+          error.code = payload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        const blob = await response.blob();
+        const fileName = downloadFileNameFromHeaders(
+          response.headers.get("content-disposition"),
+          fallbackFileName
+        );
+        downloadBlob(fileName, blob);
+        return { fileName };
       }
 
       function setMeta() {
@@ -380,6 +414,15 @@ ${JSON.stringify({
         el("env-snippet").textContent = packageSnapshot.snippets?.envTemplate || "";
       }
 
+      function syncPackageActions() {
+        const disabled = !token || !selectedProduct;
+        el("generate-package-btn").disabled = disabled;
+        el("download-package-json-btn").disabled = disabled;
+        el("download-package-env-btn").disabled = disabled;
+        el("download-package-cpp-btn").disabled = disabled;
+        el("download-package-zip-btn").disabled = disabled;
+      }
+
       function renderSelected() {
         const product = selectedProduct;
         if (!product) {
@@ -388,6 +431,7 @@ ${JSON.stringify({
           el("tcp-example").textContent = "Sign in to generate a TCP frame example.";
           packageSnapshot = null;
           renderPackage();
+          syncPackageActions();
           return;
         }
 
@@ -402,10 +446,15 @@ ${JSON.stringify({
         `;
         el("http-example").textContent = buildHttpExample(product);
         el("tcp-example").textContent = buildTcpExample(product);
+        syncPackageActions();
       }
 
       function buildPackagePath(product) {
         return `/api/developer/integration/package?productId=${encodeURIComponent(product.id)}`;
+      }
+
+      function buildPackageDownloadPath(product, format) {
+        return `/api/developer/integration/package/download?productId=${encodeURIComponent(product.id)}&format=${encodeURIComponent(format)}`;
       }
 
       function chooseSelected() {
@@ -443,6 +492,7 @@ ${JSON.stringify({
         renderProjects();
         renderTokenKeys();
         renderPackage();
+        syncPackageActions();
         setOutput("Waiting for actions...");
       }
 
@@ -527,12 +577,60 @@ ${JSON.stringify({
         }
       });
 
+      async function handlePackageDownload(format, fallbackFileName, label) {
+        if (!selectedProduct) {
+          throw new Error("Select a project before downloading an integration package.");
+        }
+        const result = await downloadApiFile(
+          buildPackageDownloadPath(selectedProduct, format),
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+      }
+
+      el("download-package-json-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("json", "integration-package.json", "Integration package JSON");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-package-env-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("env", "project.env", "Integration package env template");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-package-cpp-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("cpp", "project.cpp", "Integration package C++ quickstart");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-package-zip-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("zip", "integration-package.zip", "Integration package zip");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       clear();
       renderStats();
       renderTransport();
       renderProjects();
       renderTokenKeys();
       renderPackage();
+      syncPackageActions();
     </script>
   </body>
 </html>

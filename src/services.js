@@ -667,7 +667,9 @@ function buildDeveloperIntegrationPackagePayload({
     fileName: `rocksolid-integration-${product.code}.json`,
     manifest,
     snippets: {
+      envFileName: `${product.code}.env`,
       envTemplate: buildIntegrationEnvTemplate(manifest),
+      cppFileName: `${product.code}.cpp`,
       cppQuickstart: buildIntegrationCppQuickstart(manifest)
     }
   };
@@ -1039,6 +1041,24 @@ function buildIntegrationPackageZipEntries(payload) {
   return entries;
 }
 
+function buildSingleIntegrationPackageZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "integration-package");
+  return [
+    {
+      path: `${root}/${payload.fileName || "integration-package.json"}`,
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: `${root}/env/${payload.snippets?.envFileName || "project.env"}`,
+      body: payload.snippets?.envTemplate || ""
+    },
+    {
+      path: `${root}/cpp/${payload.snippets?.cppFileName || "project.cpp"}`,
+      body: payload.snippets?.cppQuickstart || ""
+    }
+  ];
+}
+
 function buildProductSdkCredentialZipEntries(payload) {
   const root = buildArchiveRootName(payload.fileName, "sdk-credentials");
   const entries = [
@@ -1185,6 +1205,44 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
 
   return {
     fileName: payload.fileName || "integration-packages.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
+function buildIntegrationPackageDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "env", "cpp", "zip"],
+    "json",
+    "INVALID_INTEGRATION_PACKAGE_FORMAT",
+    "Integration package format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "integration-package")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildSingleIntegrationPackageZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "env") {
+    return {
+      fileName: payload.snippets?.envFileName || "project.env",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.envTemplate || ""
+    };
+  }
+  if (normalizedFormat === "cpp") {
+    return {
+      fileName: payload.snippets?.cppFileName || "project.cpp",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.cppQuickstart || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "integration-package.json",
     contentType: "application/json; charset=utf-8",
     body: JSON.stringify(payload, null, 2)
   };
@@ -6325,6 +6383,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     integrationPackageExportDownloadAsset(payload, format = "json") {
       return buildIntegrationPackageExportDownloadAsset(payload, format);
+    },
+
+    integrationPackageDownloadAsset(payload, format = "json") {
+      return buildIntegrationPackageDownloadAsset(payload, format);
     },
 
     sdkCredentialExportDownloadAsset(payload, format = "json") {

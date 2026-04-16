@@ -570,7 +570,7 @@ cl /EHsc /std:c++17 ^
 - [production-operations-runbook.md](docs/production-operations-runbook.md)
 - [vs2022-checklist.md](docs/vs2022-checklist.md)
 - [linux-deployment.md](docs/linux-deployment.md)
-- [windows-server-deployment.md](docs/windows-server-deployment.md)
+- [windows-deployment-guide.md](docs/windows-deployment-guide.md)
 - [rocksolid.redis-runtime.env.example](deploy/rocksolid.redis-runtime.env.example)
 - [rocksolid.pg-redis.preview.env.example](deploy/rocksolid.pg-redis.preview.env.example)
 - [docker-compose.redis-runtime.yml](deploy/docker-compose.redis-runtime.yml)

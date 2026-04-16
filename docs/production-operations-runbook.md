@@ -8,7 +8,7 @@ It is meant for day-one and early-production operations, where the main goal is 
 
 - [production-launch-checklist.md](/D:/code/OnlineVerification/docs/production-launch-checklist.md)
 - [linux-deployment.md](/D:/code/OnlineVerification/docs/linux-deployment.md)
-- [windows-server-deployment.md](/D:/code/OnlineVerification/docs/windows-server-deployment.md)
+- [windows-deployment-guide.md](/D:/code/OnlineVerification/docs/windows-deployment-guide.md)
 - [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
 - [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
 

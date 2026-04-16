@@ -131,3 +131,29 @@ test("operations runbook and windows healthcheck document the real health respon
   assert.match(windowsHealthcheck, /\$healthData\.storage/);
   assert.match(windowsHealthcheck, /\$response\.ok/);
 });
+
+test("windows deployment guide documents scheduled task, healthcheck, backup, and caddy flow", () => {
+  const readme = readText("README.md");
+  const runbook = readText("docs/production-operations-runbook.md");
+  const guide = readText("docs/windows-deployment-guide.md");
+  const windowsCaddy = readText("deploy/windows/Caddyfile.example");
+  const taskScript = readText("deploy/windows/register-rocksolid-task.ps1");
+  const backupTaskScript = readText("deploy/windows/register-rocksolid-backup-task.ps1");
+
+  assert.match(readme, /windows-deployment-guide\.md/);
+  assert.match(runbook, /windows-deployment-guide\.md/);
+
+  assert.match(guide, /register-rocksolid-task\.ps1/);
+  assert.match(guide, /healthcheck-rocksolid\.ps1/);
+  assert.match(guide, /register-rocksolid-backup-task\.ps1/);
+  assert.match(guide, /Caddyfile\.example/);
+  assert.match(guide, /C:\\RockSolidLicense\\logs\\rocksolid-server\.log/);
+  assert.match(guide, /ok=true/);
+  assert.match(guide, /data\.status=ok/);
+  assert.match(guide, /sqlite \+ redis/i);
+  assert.match(guide, /PostgreSQL Preview \+ Redis/);
+
+  assert.match(windowsCaddy, /reverse_proxy 127\.0\.0\.1:3000/);
+  assert.match(taskScript, /New-ScheduledTaskTrigger -AtStartup/);
+  assert.match(backupTaskScript, /New-ScheduledTaskTrigger -Daily/);
+});

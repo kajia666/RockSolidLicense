@@ -6066,6 +6066,248 @@ test("developer operators can manage scoped authorization operations for assigne
   }
 });
 
+test("developer ops export bundles scoped data and downloadable assets", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "ops.export.owner",
+        password: "OpsExportOwner123!",
+        displayName: "Ops Export Owner"
+      },
+      adminSession.token
+    );
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "EXPORT_ALPHA",
+        name: "Export Alpha",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "EXPORT_BETA",
+        name: "Export Beta",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "ops.export.owner",
+      password: "OpsExportOwner123!"
+    });
+
+    const alphaPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "EXPORT_ALPHA",
+        name: "Export Alpha Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const betaPolicy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "EXPORT_BETA",
+        name: "Export Beta Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const alphaCards = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "EXPORT_ALPHA",
+        policyId: alphaPolicy.id,
+        count: 1,
+        prefix: "EXALPHA"
+      },
+      ownerSession.token
+    );
+
+    const betaCards = await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "EXPORT_BETA",
+        policyId: betaPolicy.id,
+        count: 1,
+        prefix: "EXBETA"
+      },
+      ownerSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "EXPORT_ALPHA",
+      username: "alphaexport",
+      password: "AlphaExport123!"
+    });
+    await signedClientPost(baseUrl, "/api/client/register", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "EXPORT_BETA",
+      username: "betaexport",
+      password: "BetaExport123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "EXPORT_ALPHA",
+      username: "alphaexport",
+      password: "AlphaExport123!",
+      cardKey: alphaCards.keys[0]
+    });
+    await signedClientPost(baseUrl, "/api/client/recharge", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "EXPORT_BETA",
+      username: "betaexport",
+      password: "BetaExport123!",
+      cardKey: betaCards.keys[0]
+    });
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      alphaProduct.sdkAppId,
+      alphaProduct.sdkAppSecret,
+      {
+        productCode: "EXPORT_ALPHA",
+        username: "alphaexport",
+        password: "AlphaExport123!",
+        deviceFingerprint: "export-alpha-device-01",
+        deviceName: "Export Alpha Desktop"
+      }
+    );
+
+    await signedClientPost(
+      baseUrl,
+      "/api/client/login",
+      betaProduct.sdkAppId,
+      betaProduct.sdkAppSecret,
+      {
+        productCode: "EXPORT_BETA",
+        username: "betaexport",
+        password: "BetaExport123!",
+        deviceFingerprint: "export-beta-device-01",
+        deviceName: "Export Beta Desktop"
+      }
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "ops.export.operator",
+        password: "OpsExportOperator123!",
+        displayName: "Ops Export Operator",
+        role: "operator",
+        productCodes: ["EXPORT_ALPHA"]
+      },
+      ownerSession.token
+    );
+
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "ops.export.operator",
+      password: "OpsExportOperator123!"
+    });
+
+    const scopedSessions = await getJson(baseUrl, "/api/developer/sessions?status=active", operatorSession.token);
+    assert.equal(scopedSessions.total, 1);
+    assert.equal(scopedSessions.items[0].product_code, "EXPORT_ALPHA");
+
+    const revokedSession = await postJson(
+      baseUrl,
+      `/api/developer/sessions/${scopedSessions.items[0].id}/revoke`,
+      { reason: "ops_export_snapshot" },
+      operatorSession.token
+    );
+    assert.equal(revokedSession.status, "expired");
+
+    const exportSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_ALPHA&eventType=session.revoke&limit=20",
+      operatorSession.token
+    );
+    assert.equal(exportSnapshot.scope.productCode, "EXPORT_ALPHA");
+    assert.equal(exportSnapshot.summary.projects, 1);
+    assert.equal(exportSnapshot.accounts.total, 1);
+    assert.equal(exportSnapshot.sessions.total, 1);
+    assert.equal(exportSnapshot.bindings.total, 1);
+    assert.equal(exportSnapshot.blocks.total, 0);
+    assert.ok(exportSnapshot.auditLogs.total >= 1);
+    assert.equal(exportSnapshot.accounts.items[0].productCode, "EXPORT_ALPHA");
+    assert.equal(exportSnapshot.sessions.items[0].productCode, "EXPORT_ALPHA");
+    assert.equal(exportSnapshot.bindings.items[0].productCode, "EXPORT_ALPHA");
+    assert.ok(exportSnapshot.auditLogs.items.every((item) => item.eventType === "session.revoke"));
+    assert.ok(exportSnapshot.auditLogs.items.every((item) => item.metadata?.productCode === "EXPORT_ALPHA"));
+    assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
+    assert.match(exportSnapshot.summaryText, /Project Filter: EXPORT_ALPHA/);
+
+    const forbiddenExport = await getJsonExpectError(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_BETA",
+      operatorSession.token
+    );
+    assert.equal(forbiddenExport.status, 403);
+    assert.equal(forbiddenExport.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const summaryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=summary",
+      operatorSession.token
+    );
+    assert.equal(summaryDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(summaryDownload.contentDisposition || "", /developer-ops/i);
+    assert.match(summaryDownload.body, /RockSolid Developer Ops Snapshot/);
+    assert.match(summaryDownload.body, /Project Filter: EXPORT_ALPHA/);
+
+    const checksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=checksums",
+      operatorSession.token
+    );
+    assert.equal(checksumsDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(checksumsDownload.body, /csv\/projects\.csv/);
+    assert.match(checksumsDownload.body, /csv\/audit-logs\.csv/);
+
+    const zipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=zip",
+      operatorSession.token
+    );
+    assert.equal(zipDownload.contentType, "application/zip");
+    assert.equal(zipDownload.body.subarray(0, 2).toString("utf8"), "PK");
+    const zipText = zipDownload.body.toString("latin1");
+    assert.match(zipText, /csv\/projects\.csv/);
+    assert.match(zipText, /csv\/accounts\.csv/);
+    assert.match(zipText, /csv\/audit-logs\.csv/);
+    assert.match(zipText, /SHA256SUMS\.txt/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("admin and developers can rotate project sdk credentials with scoped permission checks", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -8083,6 +8325,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/entitlements/);
     assert.match(html, /api\/developer\/device-bindings/);
     assert.match(html, /api\/developer\/audit-logs/);
+    assert.match(html, /api\/developer\/ops\/export/);
+    assert.match(html, /Download Summary/);
+    assert.match(html, /Download Zip/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

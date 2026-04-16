@@ -1332,6 +1332,633 @@ function buildIntegrationPackageDownloadAsset(payload, format = "json") {
   };
 }
 
+function sanitizeExportNameSegment(value, fallback = "scope") {
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || fallback;
+}
+
+function firstDefined(row, keys = [], fallback = null) {
+  for (const key of keys) {
+    if (row && row[key] !== undefined && row[key] !== null) {
+      return row[key];
+    }
+  }
+  return fallback;
+}
+
+function normalizeDeveloperOpsProjectItem(row = {}) {
+  return {
+    id: row.id,
+    code: row.code ?? null,
+    name: row.name ?? "",
+    description: row.description ?? "",
+    status: row.status ?? null,
+    updatedAt: row.updatedAt ?? row.updated_at ?? null,
+    featureConfig: row.featureConfig && typeof row.featureConfig === "object"
+      ? row.featureConfig
+      : {}
+  };
+}
+
+function normalizeDeveloperOpsAccountItem(row = {}) {
+  return {
+    id: row.id,
+    productId: firstDefined(row, ["productId", "product_id"]),
+    productCode: firstDefined(row, ["productCode", "product_code"]),
+    productName: firstDefined(row, ["productName", "product_name"], ""),
+    ownerDeveloperId: firstDefined(row, ["ownerDeveloperId", "owner_developer_id"]),
+    username: row.username ?? null,
+    status: row.status ?? null,
+    createdAt: firstDefined(row, ["createdAt", "created_at"]),
+    updatedAt: firstDefined(row, ["updatedAt", "updated_at"]),
+    lastLoginAt: firstDefined(row, ["lastLoginAt", "last_login_at"]),
+    activeEntitlementCount: Number(firstDefined(row, ["activeEntitlementCount", "active_entitlement_count"], 0)),
+    latestEntitlementEndsAt: firstDefined(row, ["latestEntitlementEndsAt", "latest_entitlement_ends_at"]),
+    activeSessionCount: Number(firstDefined(row, ["activeSessionCount", "active_session_count"], 0))
+  };
+}
+
+function normalizeDeveloperOpsEntitlementItem(row = {}) {
+  return {
+    id: row.id,
+    productId: firstDefined(row, ["productId", "product_id"]),
+    productCode: firstDefined(row, ["productCode", "product_code"]),
+    productName: firstDefined(row, ["productName", "product_name"], ""),
+    accountId: firstDefined(row, ["accountId", "account_id"]),
+    username: row.username ?? null,
+    policyId: firstDefined(row, ["policyId", "policy_id"]),
+    policyName: firstDefined(row, ["policyName", "policy_name"], ""),
+    sourceLicenseKeyId: firstDefined(row, ["sourceLicenseKeyId", "source_license_key_id"]),
+    sourceCardKey: firstDefined(row, ["sourceCardKey", "source_card_key", "cardKey", "card_key"]),
+    status: row.status ?? null,
+    lifecycleStatus: firstDefined(row, ["lifecycleStatus", "lifecycle_status"], row.status ?? null),
+    startsAt: firstDefined(row, ["startsAt", "starts_at"]),
+    endsAt: firstDefined(row, ["endsAt", "ends_at"]),
+    grantType: firstDefined(row, ["grantType", "grant_type"], "duration"),
+    grantPoints: Number(firstDefined(row, ["grantPoints", "grant_points"], 0)),
+    totalPoints: Number(firstDefined(row, ["totalPoints", "total_points"], 0)),
+    remainingPoints: Number(firstDefined(row, ["remainingPoints", "remaining_points"], 0)),
+    consumedPoints: Number(firstDefined(row, ["consumedPoints", "consumed_points"], 0)),
+    activeSessionCount: Number(firstDefined(row, ["activeSessionCount", "active_session_count"], 0)),
+    cardControlStatus: firstDefined(row, ["cardControlStatus", "card_control_status"]),
+    cardEffectiveStatus: firstDefined(row, ["cardEffectiveStatus", "card_effective_status"]),
+    cardExpiresAt: firstDefined(row, ["cardExpiresAt", "card_expires_at"]),
+    createdAt: firstDefined(row, ["createdAt", "created_at"]),
+    updatedAt: firstDefined(row, ["updatedAt", "updated_at"])
+  };
+}
+
+function normalizeDeveloperOpsSessionItem(row = {}) {
+  return {
+    id: row.id,
+    accountId: firstDefined(row, ["accountId", "account_id"]),
+    entitlementId: firstDefined(row, ["entitlementId", "entitlement_id"]),
+    deviceId: firstDefined(row, ["deviceId", "device_id"]),
+    status: row.status ?? null,
+    issuedAt: firstDefined(row, ["issuedAt", "issued_at"]),
+    expiresAt: firstDefined(row, ["expiresAt", "expires_at"]),
+    lastHeartbeatAt: firstDefined(row, ["lastHeartbeatAt", "last_heartbeat_at"]),
+    lastSeenIp: firstDefined(row, ["lastSeenIp", "last_seen_ip"]),
+    userAgent: firstDefined(row, ["userAgent", "user_agent"]),
+    revokedReason: firstDefined(row, ["revokedReason", "revoked_reason"]),
+    productId: firstDefined(row, ["productId", "product_id"]),
+    productCode: firstDefined(row, ["productCode", "product_code"]),
+    productName: firstDefined(row, ["productName", "product_name"], ""),
+    username: row.username ?? null,
+    fingerprint: row.fingerprint ?? null,
+    deviceName: firstDefined(row, ["deviceName", "device_name"]),
+    policyName: firstDefined(row, ["policyName", "policy_name"], "")
+  };
+}
+
+function normalizeDeveloperOpsBindingItem(row = {}) {
+  return {
+    id: row.id,
+    entitlementId: firstDefined(row, ["entitlementId", "entitlement_id"]),
+    deviceId: firstDefined(row, ["deviceId", "device_id"]),
+    status: row.status ?? null,
+    firstBoundAt: firstDefined(row, ["firstBoundAt", "first_bound_at"]),
+    lastBoundAt: firstDefined(row, ["lastBoundAt", "last_bound_at"]),
+    revokedAt: firstDefined(row, ["revokedAt", "revoked_at"]),
+    productId: firstDefined(row, ["productId", "product_id"]),
+    productCode: firstDefined(row, ["productCode", "product_code"]),
+    productName: firstDefined(row, ["productName", "product_name"], ""),
+    accountId: firstDefined(row, ["accountId", "account_id"]),
+    username: row.username ?? null,
+    policyName: firstDefined(row, ["policyName", "policy_name"], ""),
+    entitlementEndsAt: firstDefined(row, ["entitlementEndsAt", "entitlement_ends_at"]),
+    fingerprint: row.fingerprint ?? null,
+    deviceName: firstDefined(row, ["deviceName", "device_name"]),
+    lastSeenAt: firstDefined(row, ["lastSeenAt", "last_seen_at"]),
+    lastSeenIp: firstDefined(row, ["lastSeenIp", "last_seen_ip"]),
+    identityHash: firstDefined(row, ["identityHash", "identity_hash"]),
+    matchFields: firstDefined(row, ["matchFields", "match_fields", "match_fields_json"], {}),
+    identity: firstDefined(row, ["identity", "identity_json"], {}),
+    bindRequestIp: firstDefined(row, ["bindRequestIp", "bind_request_ip"]),
+    activeSessionCount: Number(firstDefined(row, ["activeSessionCount", "active_session_count"], 0))
+  };
+}
+
+function normalizeDeveloperOpsBlockItem(row = {}) {
+  return {
+    id: row.id,
+    productId: firstDefined(row, ["productId", "product_id"]),
+    productCode: firstDefined(row, ["productCode", "product_code"]),
+    productName: firstDefined(row, ["productName", "product_name"], ""),
+    fingerprint: row.fingerprint ?? null,
+    status: row.status ?? null,
+    reason: row.reason ?? null,
+    notes: row.notes ?? null,
+    createdAt: firstDefined(row, ["createdAt", "created_at"]),
+    updatedAt: firstDefined(row, ["updatedAt", "updated_at"]),
+    releasedAt: firstDefined(row, ["releasedAt", "released_at"]),
+    deviceId: firstDefined(row, ["deviceId", "device_id"]),
+    deviceName: firstDefined(row, ["deviceName", "device_name"]),
+    lastSeenAt: firstDefined(row, ["lastSeenAt", "last_seen_at"]),
+    lastSeenIp: firstDefined(row, ["lastSeenIp", "last_seen_ip"]),
+    activeSessionCount: Number(firstDefined(row, ["activeSessionCount", "active_session_count"], 0))
+  };
+}
+
+function normalizeDeveloperOpsAuditLogItem(row = {}) {
+  return {
+    id: row.id,
+    actorType: firstDefined(row, ["actorType", "actor_type"]),
+    actorId: firstDefined(row, ["actorId", "actor_id"]),
+    eventType: firstDefined(row, ["eventType", "event_type"]),
+    entityType: firstDefined(row, ["entityType", "entity_type"]),
+    entityId: firstDefined(row, ["entityId", "entity_id"]),
+    metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : null,
+    createdAt: firstDefined(row, ["createdAt", "created_at"])
+  };
+}
+
+function buildCsvDocument(headers = [], rows = []) {
+  const lines = [headers.map((value) => toCsvCell(value)).join(",")];
+  for (const row of rows) {
+    lines.push(row.map((value) => toCsvCell(value)).join(","));
+  }
+  return lines.join("\n");
+}
+
+function buildDeveloperOpsProjectsCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "projectId",
+      "projectCode",
+      "projectName",
+      "status",
+      "allowRegister",
+      "allowAccountLogin",
+      "allowCardLogin",
+      "allowCardRecharge",
+      "allowVersionCheck",
+      "allowNotices",
+      "allowClientUnbind",
+      "updatedAt"
+    ],
+    items.map((item) => [
+      item.id,
+      item.code,
+      item.name,
+      item.status,
+      item.featureConfig?.allowRegister !== false,
+      item.featureConfig?.allowAccountLogin !== false,
+      item.featureConfig?.allowCardLogin !== false,
+      item.featureConfig?.allowCardRecharge !== false,
+      item.featureConfig?.allowVersionCheck !== false,
+      item.featureConfig?.allowNotices !== false,
+      item.featureConfig?.allowClientUnbind !== false,
+      item.updatedAt
+    ])
+  );
+}
+
+function buildDeveloperOpsAccountsCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "accountId",
+      "projectCode",
+      "username",
+      "status",
+      "activeEntitlementCount",
+      "activeSessionCount",
+      "lastLoginAt",
+      "latestEntitlementEndsAt",
+      "createdAt",
+      "updatedAt"
+    ],
+    items.map((item) => [
+      item.id,
+      item.productCode,
+      item.username,
+      item.status,
+      item.activeEntitlementCount,
+      item.activeSessionCount,
+      item.lastLoginAt,
+      item.latestEntitlementEndsAt,
+      item.createdAt,
+      item.updatedAt
+    ])
+  );
+}
+
+function buildDeveloperOpsEntitlementsCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "entitlementId",
+      "projectCode",
+      "username",
+      "policyName",
+      "status",
+      "lifecycleStatus",
+      "grantType",
+      "totalPoints",
+      "remainingPoints",
+      "endsAt",
+      "cardControlStatus",
+      "activeSessionCount",
+      "createdAt",
+      "updatedAt"
+    ],
+    items.map((item) => [
+      item.id,
+      item.productCode,
+      item.username,
+      item.policyName,
+      item.status,
+      item.lifecycleStatus,
+      item.grantType,
+      item.totalPoints,
+      item.remainingPoints,
+      item.endsAt,
+      item.cardControlStatus,
+      item.activeSessionCount,
+      item.createdAt,
+      item.updatedAt
+    ])
+  );
+}
+
+function buildDeveloperOpsSessionsCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "sessionId",
+      "projectCode",
+      "username",
+      "status",
+      "fingerprint",
+      "deviceName",
+      "policyName",
+      "issuedAt",
+      "lastHeartbeatAt",
+      "expiresAt",
+      "lastSeenIp",
+      "revokedReason"
+    ],
+    items.map((item) => [
+      item.id,
+      item.productCode,
+      item.username,
+      item.status,
+      item.fingerprint,
+      item.deviceName,
+      item.policyName,
+      item.issuedAt,
+      item.lastHeartbeatAt,
+      item.expiresAt,
+      item.lastSeenIp,
+      item.revokedReason
+    ])
+  );
+}
+
+function buildDeveloperOpsBindingsCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "bindingId",
+      "projectCode",
+      "username",
+      "status",
+      "fingerprint",
+      "deviceName",
+      "policyName",
+      "identityHash",
+      "bindRequestIp",
+      "activeSessionCount",
+      "firstBoundAt",
+      "lastBoundAt",
+      "revokedAt"
+    ],
+    items.map((item) => [
+      item.id,
+      item.productCode,
+      item.username,
+      item.status,
+      item.fingerprint,
+      item.deviceName,
+      item.policyName,
+      item.identityHash,
+      item.bindRequestIp,
+      item.activeSessionCount,
+      item.firstBoundAt,
+      item.lastBoundAt,
+      item.revokedAt
+    ])
+  );
+}
+
+function buildDeveloperOpsBlocksCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "blockId",
+      "projectCode",
+      "status",
+      "fingerprint",
+      "deviceName",
+      "reason",
+      "notes",
+      "activeSessionCount",
+      "lastSeenIp",
+      "createdAt",
+      "updatedAt",
+      "releasedAt"
+    ],
+    items.map((item) => [
+      item.id,
+      item.productCode,
+      item.status,
+      item.fingerprint,
+      item.deviceName,
+      item.reason,
+      item.notes,
+      item.activeSessionCount,
+      item.lastSeenIp,
+      item.createdAt,
+      item.updatedAt,
+      item.releasedAt
+    ])
+  );
+}
+
+function buildDeveloperOpsAuditLogsCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "auditLogId",
+      "eventType",
+      "actorType",
+      "actorId",
+      "entityType",
+      "entityId",
+      "productCode",
+      "username",
+      "reason",
+      "createdAt",
+      "metadataJson"
+    ],
+    items.map((item) => [
+      item.id,
+      item.eventType,
+      item.actorType,
+      item.actorId,
+      item.entityType,
+      item.entityId,
+      item.metadata?.productCode ?? "",
+      item.metadata?.username ?? "",
+      item.metadata?.reason ?? "",
+      item.createdAt,
+      JSON.stringify(item.metadata ?? {})
+    ])
+  );
+}
+
+function buildDeveloperOpsSummaryText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const lines = [
+    "RockSolid Developer Ops Snapshot",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Developer: ${payload.developer?.username || "-"}`,
+    `Actor: ${payload.actor?.username || "-"}`,
+    `Actor Role: ${payload.actor?.role || "-"}`,
+    `Accessible Projects: ${scope.accessibleProjectCount ?? 0}`,
+    `Exported Projects: ${scope.exportedProjectCount ?? 0}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Username Filter: ${scope.username || "-"}`,
+    `Search Filter: ${scope.search || "-"}`,
+    `Audit Event Filter: ${scope.eventType || "-"}`,
+    `Audit Actor Filter: ${scope.actorType || "-"}`,
+    `Audit Limit: ${scope.auditLimit ?? 0}`,
+    "",
+    `Projects: ${summary.projects ?? 0}`,
+    `Accounts: ${summary.accounts ?? 0}`,
+    `Entitlements: ${summary.entitlements ?? 0}`,
+    `Sessions: ${summary.sessions ?? 0}`,
+    `Bindings: ${summary.bindings ?? 0}`,
+    `Blocks: ${summary.blocks ?? 0}`,
+    `Audit Logs: ${summary.auditLogs ?? 0}`
+  ];
+
+  if (Array.isArray(payload.projects) && payload.projects.length) {
+    lines.push("");
+    lines.push("Projects:");
+    for (const item of payload.projects) {
+      lines.push(`- ${item.code || "-"} (${item.name || ""}) [${item.status || "unknown"}]`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function buildDeveloperOpsSnapshotPayload({
+  generatedAt = nowIso(),
+  developer = null,
+  actor = null,
+  accessibleProjects = [],
+  projects = [],
+  filters = {},
+  accounts = {},
+  entitlements = {},
+  sessions = {},
+  bindings = {},
+  blocks = {},
+  auditLogs = {}
+} = {}) {
+  const normalizedProjects = projects.map((item) => normalizeDeveloperOpsProjectItem(item));
+  const normalizedAccounts = (accounts.items || []).map((item) => normalizeDeveloperOpsAccountItem(item));
+  const normalizedEntitlements = (entitlements.items || []).map((item) => normalizeDeveloperOpsEntitlementItem(item));
+  const normalizedSessions = (sessions.items || []).map((item) => normalizeDeveloperOpsSessionItem(item));
+  const normalizedBindings = (bindings.items || []).map((item) => normalizeDeveloperOpsBindingItem(item));
+  const normalizedBlocks = (blocks.items || []).map((item) => normalizeDeveloperOpsBlockItem(item));
+  const normalizedAuditLogs = (auditLogs.items || []).map((item) => normalizeDeveloperOpsAuditLogItem(item));
+  const scopeTag = sanitizeExportNameSegment(filters.productCode || "all-projects", "developer-ops");
+  const timestampTag = buildExportTimestampTag(generatedAt);
+
+  const payload = {
+    generatedAt,
+    fileName: `rocksolid-developer-ops-${scopeTag}-${timestampTag}.json`,
+    summaryFileName: `rocksolid-developer-ops-${scopeTag}-${timestampTag}-summary.txt`,
+    developer,
+    actor,
+    scope: {
+      accessibleProjectCount: accessibleProjects.length,
+      exportedProjectCount: normalizedProjects.length,
+      productCode: filters.productCode || null,
+      username: filters.username || null,
+      search: filters.search || null,
+      eventType: filters.eventType || null,
+      actorType: filters.actorType || null,
+      auditLimit: Number(filters.limit ?? auditLogs.filters?.limit ?? 0)
+    },
+    summary: {
+      projects: normalizedProjects.length,
+      accounts: normalizedAccounts.length,
+      entitlements: normalizedEntitlements.length,
+      sessions: normalizedSessions.length,
+      bindings: normalizedBindings.length,
+      blocks: normalizedBlocks.length,
+      auditLogs: normalizedAuditLogs.length
+    },
+    projects: normalizedProjects,
+    accounts: {
+      total: Number(accounts.total ?? normalizedAccounts.length),
+      filters: accounts.filters || {},
+      items: normalizedAccounts
+    },
+    entitlements: {
+      total: Number(entitlements.total ?? normalizedEntitlements.length),
+      filters: entitlements.filters || {},
+      items: normalizedEntitlements
+    },
+    sessions: {
+      total: Number(sessions.total ?? normalizedSessions.length),
+      filters: sessions.filters || {},
+      items: normalizedSessions
+    },
+    bindings: {
+      total: Number(bindings.total ?? normalizedBindings.length),
+      filters: bindings.filters || {},
+      items: normalizedBindings
+    },
+    blocks: {
+      total: Number(blocks.total ?? normalizedBlocks.length),
+      filters: blocks.filters || {},
+      items: normalizedBlocks
+    },
+    auditLogs: {
+      total: Number(auditLogs.total ?? normalizedAuditLogs.length),
+      filters: auditLogs.filters || {},
+      items: normalizedAuditLogs
+    },
+    csv: {
+      projects: buildDeveloperOpsProjectsCsv(normalizedProjects),
+      accounts: buildDeveloperOpsAccountsCsv(normalizedAccounts),
+      entitlements: buildDeveloperOpsEntitlementsCsv(normalizedEntitlements),
+      sessions: buildDeveloperOpsSessionsCsv(normalizedSessions),
+      bindings: buildDeveloperOpsBindingsCsv(normalizedBindings),
+      blocks: buildDeveloperOpsBlocksCsv(normalizedBlocks),
+      auditLogs: buildDeveloperOpsAuditLogsCsv(normalizedAuditLogs)
+    },
+    notes: [
+      "This export is scoped to the current developer actor and their assigned projects.",
+      "Use the zip archive when you need a support handoff bundle with JSON, summary, and CSV snapshots.",
+      "Audit logs are filtered separately from accounts, entitlements, sessions, bindings, and blocks."
+    ]
+  };
+
+  payload.summaryText = buildDeveloperOpsSummaryText(payload);
+  return payload;
+}
+
+function buildDeveloperOpsExportFiles(payload) {
+  return [
+    {
+      path: payload.fileName || "developer-ops.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: payload.summaryFileName || "developer-ops-summary.txt",
+      body: payload.summaryText || ""
+    },
+    {
+      path: "csv/projects.csv",
+      body: payload.csv?.projects || ""
+    },
+    {
+      path: "csv/accounts.csv",
+      body: payload.csv?.accounts || ""
+    },
+    {
+      path: "csv/entitlements.csv",
+      body: payload.csv?.entitlements || ""
+    },
+    {
+      path: "csv/sessions.csv",
+      body: payload.csv?.sessions || ""
+    },
+    {
+      path: "csv/device-bindings.csv",
+      body: payload.csv?.bindings || ""
+    },
+    {
+      path: "csv/device-blocks.csv",
+      body: payload.csv?.blocks || ""
+    },
+    {
+      path: "csv/audit-logs.csv",
+      body: payload.csv?.auditLogs || ""
+    }
+  ];
+}
+
+function buildDeveloperOpsExportZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "developer-ops");
+  return buildZipEntriesFromFiles(root, buildDeveloperOpsExportFiles(payload));
+}
+
+function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "zip", "checksums"],
+    "json",
+    "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
+    "Developer ops export format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "developer-ops")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildDeveloperOpsExportZipEntries(payload))
+    };
+  }
+
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "developer-ops"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildDeveloperOpsExportFiles(payload))
+    };
+  }
+
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "developer-ops-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "developer-ops.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
 function auditDeveloperSession(db, session, eventType, entityType, entityId, metadata = {}) {
   const actorType = session.actor_scope === "member" ? "developer_member" : "developer";
   audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
@@ -10955,6 +11582,126 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         developerId: session.developer_id,
         productCodes: await listDeveloperAccessibleProductCodes(db, store, session)
       });
+    },
+
+    async developerExportOpsSnapshot(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only export authorization operations for your assigned projects."
+      );
+
+      const normalizedFilters = {
+        productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+        username: filters.username ? String(filters.username).trim() : null,
+        search: filters.search ? String(filters.search).trim() : null,
+        eventType: filters.eventType ? String(filters.eventType).trim() : null,
+        actorType: filters.actorType ? String(filters.actorType).trim() : null,
+        limit: Math.min(Math.max(Number(filters.limit ?? 60), 1), 200)
+      };
+
+      if (normalizedFilters.productCode) {
+        await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          normalizedFilters.productCode,
+          "ops.read"
+        );
+      }
+
+      const accessibleProjects = await listDeveloperAccessibleProductRows(db, store, session);
+      const scopedProjects = normalizedFilters.productCode
+        ? accessibleProjects.filter((item) => item.code === normalizedFilters.productCode)
+        : accessibleProjects;
+
+      const emptyPayload = buildDeveloperOpsSnapshotPayload({
+        developer: buildDeveloperIdentityPayload(session),
+        actor: buildDeveloperActor(session),
+        accessibleProjects,
+        projects: scopedProjects,
+        filters: normalizedFilters,
+        accounts: { items: [], total: 0, filters: {} },
+        entitlements: { items: [], total: 0, filters: {} },
+        sessions: { items: [], total: 0, filters: {} },
+        bindings: { items: [], total: 0, filters: {} },
+        blocks: { items: [], total: 0, filters: {} },
+        auditLogs: { items: [], total: 0, filters: { limit: normalizedFilters.limit } }
+      });
+
+      if (!scopedProjects.length) {
+        return emptyPayload;
+      }
+
+      const scopedProductIds = scopedProjects.map((item) => item.id);
+      const scopedProductCodes = scopedProjects.map((item) => item.code).filter(Boolean);
+
+      await expireStaleSessions(db, store, stateStore);
+
+      const [accounts, entitlements, sessions, bindings, blocks, auditLogs] = await Promise.all([
+        Promise.resolve(store.accounts.queryAccountRows(
+          db,
+          {
+            productIds: scopedProductIds,
+            productCode: normalizedFilters.productCode,
+            search: normalizedFilters.search
+          },
+          stateStore
+        )),
+        Promise.resolve(store.entitlements.queryEntitlementRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(store.sessions.querySessionRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(store.devices.queryDeviceBindingRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          username: normalizedFilters.username,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(store.devices.queryDeviceBlockRows(db, {
+          productIds: scopedProductIds,
+          productCode: normalizedFilters.productCode,
+          search: normalizedFilters.search
+        })),
+        Promise.resolve(queryAuditLogRows(db, {
+          actorType: normalizedFilters.actorType,
+          eventType: normalizedFilters.eventType,
+          limit: normalizedFilters.limit,
+          developerId: normalizedFilters.productCode ? null : session.developer_id,
+          productCodes: scopedProductCodes
+        }))
+      ]);
+
+      return buildDeveloperOpsSnapshotPayload({
+        developer: buildDeveloperIdentityPayload(session),
+        actor: buildDeveloperActor(session),
+        accessibleProjects,
+        projects: scopedProjects,
+        filters: normalizedFilters,
+        accounts,
+        entitlements: {
+          ...entitlements,
+          total: entitlements.items?.length ?? 0
+        },
+        sessions,
+        bindings,
+        blocks,
+        auditLogs
+      });
+    },
+
+    developerOpsExportDownloadAsset(payload, format = "json") {
+      return buildDeveloperOpsExportDownloadAsset(payload, format);
     },
 
     rotateTokenKey(token) {

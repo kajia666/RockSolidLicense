@@ -47,11 +47,12 @@
     <main class="shell">
       <section class="hero">
         <h1>Developer Authorization Ops</h1>
-        <p class="sub">Manage end-user accounts, entitlements, sessions, device bindings, device blocks, and audit logs inside your assigned project scope.</p>
+        <p class="sub">Manage end-user accounts, entitlements, sessions, device bindings, device blocks, audit logs, and export a scoped troubleshooting snapshot inside your assigned project scope.</p>
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/admin/products">Admin Product Center</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/ops</code></div>
           <div class="pill">Scoped APIs: <code>/api/developer/accounts</code> to <code>/api/developer/audit-logs</code></div>
+          <div class="pill">Snapshot Export: <code>/api/developer/ops/export</code> and <code>/download</code></div>
         </div>
         <div class="stats" id="stats-box"></div>
       </section>
@@ -72,17 +73,31 @@
 
         <article class="card">
           <h2>Scoped Filters</h2>
-          <div class="two">
+          <div class="three">
             <label>Project Code<input id="filter-product-code" placeholder="ALPHA_APP" /></label>
             <label>Username<input id="filter-username" placeholder="customer.username" /></label>
             <label>Search<input id="filter-search" placeholder="fingerprint, session id, card key" /></label>
             <label>Audit Event<input id="filter-event-type" placeholder="session.revoke" /></label>
+            <label>Audit Actor<select id="filter-actor-type"><option value="">all</option><option value="developer">developer</option><option value="developer_member">developer_member</option><option value="admin">admin</option><option value="client">client</option></select></label>
+            <label>Audit Limit<input id="filter-limit" type="number" min="1" max="200" value="60" /></label>
           </div>
           <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="apply-filters-btn">Apply Filters</button>
             <button class="danger" id="clear-filters-btn">Clear Filters</button>
           </div>
           <div class="hint">Blank filters query everything inside the current developer scope.</div>
+        </article>
+
+        <article class="card">
+          <h2>Ops Snapshot Export</h2>
+          <div class="actions">
+            <button class="secondary" id="preview-export-btn">Preview Snapshot</button>
+            <button class="secondary" id="download-export-json-btn">Download JSON</button>
+            <button class="secondary" id="download-export-summary-btn">Download Summary</button>
+            <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
+            <button class="secondary" id="download-export-zip-btn">Download Zip</button>
+          </div>
+          <div class="hint">Generate a scoped ops handoff bundle with projects, accounts, entitlements, sessions, bindings, blocks, audit logs, and SHA-256 checksums.</div>
         </article>
 
         <article class="card">
@@ -152,32 +167,246 @@
     </main>
 
     <script>
-      let token = ""; let profile = null; let actor = null;
-      let snapshot = { accounts: [], entitlements: [], sessions: [], bindings: [], blocks: [], auditLogs: [] };
+      let token = "";
+      let profile = null;
+      let actor = null;
+      let snapshot = emptySnapshot();
+
+      function emptySnapshot() {
+        return {
+          summary: {
+            projects: 0,
+            accounts: 0,
+            entitlements: 0,
+            sessions: 0,
+            bindings: 0,
+            blocks: 0,
+            auditLogs: 0
+          },
+          projects: [],
+          accounts: [],
+          entitlements: [],
+          sessions: [],
+          bindings: [],
+          blocks: [],
+          auditLogs: [],
+          raw: null
+        };
+      }
+
       const el = (id) => document.getElementById(id);
-      const esc = (value) => String(value ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;");
+      const esc = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;");
       const setStatus = (message, warn = false) => { const box = el("status-box"); box.textContent = message; box.className = warn ? "status warn" : "status"; };
       const setOutput = (value) => { el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2); };
-      const setMeta = () => { el("session-meta").textContent = token && profile ? `${profile.username} | role=${actor?.role || "owner"} | scope=${actor?.scope || "owner"} | session=${profile.session?.id || "-"}` : "No developer session yet."; };
+      const setMeta = () => { el("session-meta").textContent = token && profile ? `${profile.username} | role=${actor?.role || "owner"} | scope=${actor?.type || "owner"} | session=${profile.session?.id || "-"}` : "No developer session yet."; };
       const q = (params) => { const s = new URLSearchParams(); Object.entries(params).forEach(([k, v]) => { if (v !== null && v !== undefined && String(v).trim() !== "") s.set(k, String(v).trim()); }); const r = s.toString(); return r ? `?${r}` : ""; };
+
+      function formatTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function renderTag(value) {
+        const text = String(value ?? "unknown");
+        const className = ["archived", "disabled", "frozen", "expired", "released", "revoked"].includes(text)
+          ? "tag danger"
+          : text === "active"
+            ? "tag ok"
+            : "tag";
+        return `<span class="${className}">${esc(text)}</span>`;
+      }
+
+      function downloadBlob(fileName, blob) {
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      }
+
+      function downloadFileNameFromHeaders(headerValue, fallback) {
+        const utf8Match = String(headerValue || "").match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const simpleMatch = String(headerValue || "").match(/filename="?([^";]+)"?/i);
+        return simpleMatch?.[1] || fallback;
+      }
+
+      async function downloadApiFile(path, fallbackFileName) {
+        const response = await fetch(path, {
+          headers: token ? { authorization: `Bearer ${token}` } : {}
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const error = new Error(payload?.error?.message || `Request failed: ${response.status}`);
+          error.code = payload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        const blob = await response.blob();
+        const fileName = downloadFileNameFromHeaders(response.headers.get("content-disposition"), fallbackFileName);
+        downloadBlob(fileName, blob);
+        return { fileName };
+      }
+
       async function api(path, options = {}) { const response = await fetch(path, { method: options.method || "GET", headers: { "content-type":"application/json", ...(token ? { authorization:`Bearer ${token}` } : {}) }, body: options.body ? JSON.stringify(options.body) : undefined }); const payload = await response.json().catch(() => ({})); if (!response.ok || payload.ok === false) { const error = new Error(payload?.error?.message || `Request failed: ${response.status}`); error.code = payload?.error?.code || "REQUEST_FAILED"; throw error; } return payload.data; }
-      function filters() { return { productCode: el("filter-product-code").value.trim(), username: el("filter-username").value.trim(), search: el("filter-search").value.trim(), eventType: el("filter-event-type").value.trim() }; }
-      function renderStats() { el("stats-box").innerHTML = [`Accounts`, `Entitlements`, `Sessions`, `Bindings`, `Blocks`, `Audit Logs`].map((label, index) => { const key = [`accounts`,`entitlements`,`sessions`,`bindings`,`blocks`,`auditLogs`][index]; return `<div class="stat"><strong>${snapshot[key].length}</strong><span>${label}</span></div>`; }).join(""); }
-      function bindRows(selector, datasetKey, handler) { for (const row of document.querySelectorAll(selector)) { row.addEventListener("click", () => handler(row.dataset)); } }
-      function renderAccounts() { const body = el("accounts-body"); if (!snapshot.accounts.length) { body.innerHTML = `<tr><td colspan="5">No scoped accounts found.</td></tr>`; return; } body.innerHTML = snapshot.accounts.map((item) => `<tr data-account-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.productCode)}</td><td><span class="tag ${item.status === "active" ? "ok" : "danger"}">${esc(item.status)}</span></td><td>${Number(item.activeEntitlementCount || 0)}</td><td>${Number(item.activeSessionCount || 0)}</td></tr>`).join(""); bindRows("#accounts-body tr[data-account-id]", "accountId", (data) => { el("account-id").value = data.accountId || ""; el("account-status").value = data.status || "active"; }); }
-      function renderEntitlements() { const body = el("entitlements-body"); if (!snapshot.entitlements.length) { body.innerHTML = `<tr><td colspan="5">No scoped entitlements found.</td></tr>`; return; } body.innerHTML = snapshot.entitlements.map((item) => { const grant = item.grantType === "points" ? `points ${Number(item.remainingPoints || 0)}/${Number(item.totalPoints || 0)}` : `until ${esc(item.endsAt || "-")}`; return `<tr data-entitlement-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.productCode)}</span></td><td>${esc(item.policyName)}</td><td><span class="tag ${item.status === "active" ? "ok" : "danger"}">${esc(item.status)}</span></td><td>${esc(grant)}</td><td>${esc(item.endsAt || "-")}</td></tr>`; }).join(""); bindRows("#entitlements-body tr[data-entitlement-id]", "entitlementId", (data) => { el("entitlement-id").value = data.entitlementId || ""; el("entitlement-status").value = data.status || "active"; }); }
-      function renderSessions() { const body = el("sessions-body"); if (!snapshot.sessions.length) { body.innerHTML = `<tr><td colspan="5">No scoped sessions found.</td></tr>`; return; } body.innerHTML = snapshot.sessions.map((item) => `<tr data-session-id="${esc(item.id)}"><td><span class="mono">${esc(item.id)}</span><br>${esc(item.fingerprint)}</td><td>${esc(item.username)}</td><td>${esc(item.productCode)}</td><td><span class="tag ${item.status === "active" ? "ok" : "danger"}">${esc(item.status)}</span></td><td>${esc(item.lastHeartbeatAt || "-")}</td></tr>`).join(""); bindRows("#sessions-body tr[data-session-id]", "sessionId", (data) => { el("session-id").value = data.sessionId || ""; }); }
-      function renderDevices() { const body = el("devices-body"); const items = [...snapshot.bindings.map((item) => ({ kind:"binding", id:item.id, identity:item.fingerprint, projectCode:item.productCode, status:item.status, updatedAt:item.lastBoundAt || item.revokedAt || "-", fingerprint:item.fingerprint })), ...snapshot.blocks.map((item) => ({ kind:"block", id:item.id, identity:item.fingerprint, projectCode:item.productCode, status:item.status, updatedAt:item.updatedAt || item.releasedAt || "-", fingerprint:item.fingerprint }))]; if (!items.length) { body.innerHTML = `<tr><td colspan="5">No scoped bindings or blocks found.</td></tr>`; return; } body.innerHTML = items.map((item) => `<tr data-kind="${esc(item.kind)}" data-id="${esc(item.id)}" data-project-code="${esc(item.projectCode)}" data-fingerprint="${esc(item.fingerprint)}"><td><span class="tag ${item.kind === "binding" ? "ok" : "danger"}">${esc(item.kind)}</span></td><td><strong>${esc(item.identity)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.projectCode)}</td><td>${esc(item.status)}</td><td>${esc(item.updatedAt)}</td></tr>`).join(""); bindRows("#devices-body tr[data-kind]", "id", (data) => { if (data.kind === "binding") { el("binding-id").value = data.id || ""; } if (data.kind === "block") { el("block-id").value = data.id || ""; } el("block-product-code").value = data.projectCode || ""; el("block-fingerprint").value = data.fingerprint || ""; }); }
-      function renderAuditLogs() { const body = el("audit-body"); if (!snapshot.auditLogs.length) { body.innerHTML = `<tr><td colspan="4">No scoped audit logs found.</td></tr>`; return; } body.innerHTML = snapshot.auditLogs.map((item) => `<tr><td><strong>${esc(item.eventType)}</strong></td><td>${esc(item.actorType)}<br><span class="mono">${esc(item.actorId)}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${esc(item.createdAt)}</td></tr>`).join(""); }
+      function filters() {
+        return {
+          productCode: el("filter-product-code").value.trim(),
+          username: el("filter-username").value.trim(),
+          search: el("filter-search").value.trim(),
+          eventType: el("filter-event-type").value.trim(),
+          actorType: el("filter-actor-type").value.trim(),
+          limit: Number(el("filter-limit").value || 60)
+        };
+      }
+
+      function normalizeSnapshot(data = null) {
+        if (!data || typeof data !== "object") {
+          return emptySnapshot();
+        }
+        return {
+          summary: data.summary || emptySnapshot().summary,
+          projects: Array.isArray(data.projects) ? data.projects : [],
+          accounts: Array.isArray(data.accounts?.items) ? data.accounts.items : [],
+          entitlements: Array.isArray(data.entitlements?.items) ? data.entitlements.items : [],
+          sessions: Array.isArray(data.sessions?.items) ? data.sessions.items : [],
+          bindings: Array.isArray(data.bindings?.items) ? data.bindings.items : [],
+          blocks: Array.isArray(data.blocks?.items) ? data.blocks.items : [],
+          auditLogs: Array.isArray(data.auditLogs?.items) ? data.auditLogs.items : [],
+          raw: data
+        };
+      }
+
+      function renderStats() {
+        const items = [
+          { label: "Projects", value: snapshot.summary.projects ?? snapshot.projects.length },
+          { label: "Accounts", value: snapshot.summary.accounts ?? snapshot.accounts.length },
+          { label: "Entitlements", value: snapshot.summary.entitlements ?? snapshot.entitlements.length },
+          { label: "Sessions", value: snapshot.summary.sessions ?? snapshot.sessions.length },
+          { label: "Bindings", value: snapshot.summary.bindings ?? snapshot.bindings.length },
+          { label: "Blocks", value: snapshot.summary.blocks ?? snapshot.blocks.length },
+          { label: "Audit Logs", value: snapshot.summary.auditLogs ?? snapshot.auditLogs.length }
+        ];
+        el("stats-box").innerHTML = items.map((item) => `<div class="stat"><strong>${Number(item.value || 0)}</strong><span>${item.label}</span></div>`).join("");
+      }
+
+      function bindRows(selector, handler) {
+        for (const row of document.querySelectorAll(selector)) {
+          row.addEventListener("click", () => handler(row.dataset));
+        }
+      }
+
+      function renderAccounts() {
+        const body = el("accounts-body");
+        if (!snapshot.accounts.length) {
+          body.innerHTML = `<tr><td colspan="5">No scoped accounts found.</td></tr>`;
+          return;
+        }
+        body.innerHTML = snapshot.accounts.map((item) => `<tr data-account-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${Number(item.activeEntitlementCount || 0)}</td><td>${Number(item.activeSessionCount || 0)}</td></tr>`).join("");
+        bindRows("#accounts-body tr[data-account-id]", (data) => { el("account-id").value = data.accountId || ""; el("account-status").value = data.status || "active"; });
+      }
+
+      function renderEntitlements() {
+        const body = el("entitlements-body");
+        if (!snapshot.entitlements.length) {
+          body.innerHTML = `<tr><td colspan="5">No scoped entitlements found.</td></tr>`;
+          return;
+        }
+        body.innerHTML = snapshot.entitlements.map((item) => { const grant = item.grantType === "points" ? `points ${Number(item.remainingPoints || 0)}/${Number(item.totalPoints || 0)}` : `until ${esc(item.endsAt || "-")}`; return `<tr data-entitlement-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.productCode)}</span></td><td>${esc(item.policyName)}</td><td>${renderTag(item.lifecycleStatus || item.status)}</td><td>${grant}</td><td>${esc(item.endsAt || "-")}</td></tr>`; }).join("");
+        bindRows("#entitlements-body tr[data-entitlement-id]", (data) => { el("entitlement-id").value = data.entitlementId || ""; el("entitlement-status").value = data.status || "active"; });
+      }
+
+      function renderSessions() {
+        const body = el("sessions-body");
+        if (!snapshot.sessions.length) {
+          body.innerHTML = `<tr><td colspan="5">No scoped sessions found.</td></tr>`;
+          return;
+        }
+        body.innerHTML = snapshot.sessions.map((item) => `<tr data-session-id="${esc(item.id)}"><td><span class="mono">${esc(item.id)}</span><br>${esc(item.fingerprint || "-")}</td><td>${esc(item.username)}</td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.lastHeartbeatAt))}</td></tr>`).join("");
+        bindRows("#sessions-body tr[data-session-id]", (data) => { el("session-id").value = data.sessionId || ""; });
+      }
+
+      function renderDevices() {
+        const body = el("devices-body");
+        const items = [...snapshot.bindings.map((item) => ({ kind:"binding", id:item.id, identity:item.fingerprint, projectCode:item.productCode, status:item.status, updatedAt:item.lastBoundAt || item.revokedAt || "-", fingerprint:item.fingerprint })), ...snapshot.blocks.map((item) => ({ kind:"block", id:item.id, identity:item.fingerprint, projectCode:item.productCode, status:item.status, updatedAt:item.updatedAt || item.releasedAt || "-", fingerprint:item.fingerprint }))];
+        if (!items.length) {
+          body.innerHTML = `<tr><td colspan="5">No scoped bindings or blocks found.</td></tr>`;
+          return;
+        }
+        body.innerHTML = items.map((item) => `<tr data-kind="${esc(item.kind)}" data-id="${esc(item.id)}" data-project-code="${esc(item.projectCode)}" data-fingerprint="${esc(item.fingerprint)}"><td><span class="tag ${item.kind === "binding" ? "ok" : "danger"}">${esc(item.kind)}</span></td><td><strong>${esc(item.identity)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.projectCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.updatedAt))}</td></tr>`).join("");
+        bindRows("#devices-body tr[data-kind]", (data) => { if (data.kind === "binding") { el("binding-id").value = data.id || ""; } if (data.kind === "block") { el("block-id").value = data.id || ""; } el("block-product-code").value = data.projectCode || ""; el("block-fingerprint").value = data.fingerprint || ""; });
+      }
+
+      function renderAuditLogs() {
+        const body = el("audit-body");
+        if (!snapshot.auditLogs.length) {
+          body.innerHTML = `<tr><td colspan="4">No scoped audit logs found.</td></tr>`;
+          return;
+        }
+        body.innerHTML = snapshot.auditLogs.map((item) => `<tr><td><strong>${esc(item.eventType)}</strong></td><td>${esc(item.actorType || "-")}<br><span class="mono">${esc(item.actorId || "-")}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${esc(formatTime(item.createdAt))}</td></tr>`).join("");
+      }
+
+      function renderAll() {
+        renderStats();
+        renderAccounts();
+        renderEntitlements();
+        renderSessions();
+        renderDevices();
+        renderAuditLogs();
+      }
+
       async function refreshProfile() { const data = await api("/api/developer/me"); profile = data.developer; actor = data.actor || null; setMeta(); }
-      async function refreshOps() { if (!token) { snapshot = { accounts: [], entitlements: [], sessions: [], bindings: [], blocks: [], auditLogs: [] }; renderStats(); renderAccounts(); renderEntitlements(); renderSessions(); renderDevices(); renderAuditLogs(); return; } const f = filters(); const [accounts, entitlements, sessions, bindings, blocks, auditLogs] = await Promise.all([api(`/api/developer/accounts${q({ productCode:f.productCode, search:f.search })}`), api(`/api/developer/entitlements${q({ productCode:f.productCode, username:f.username, search:f.search })}`), api(`/api/developer/sessions${q({ productCode:f.productCode, username:f.username, search:f.search })}`), api(`/api/developer/device-bindings${q({ productCode:f.productCode, username:f.username, search:f.search })}`), api(`/api/developer/device-blocks${q({ productCode:f.productCode, search:f.search })}`), api(`/api/developer/audit-logs${q({ eventType:f.eventType, limit:30 })}`)]); snapshot = { accounts: accounts.items || [], entitlements: entitlements.items || [], sessions: sessions.items || [], bindings: bindings.items || [], blocks: blocks.items || [], auditLogs: auditLogs.items || [] }; renderStats(); renderAccounts(); renderEntitlements(); renderSessions(); renderDevices(); renderAuditLogs(); setOutput({ accounts, entitlements, sessions, bindings, blocks, auditLogs }); }
-      function clearSession() { token = ""; profile = null; actor = null; setMeta(); snapshot = { accounts: [], entitlements: [], sessions: [], bindings: [], blocks: [], auditLogs: [] }; renderStats(); renderAccounts(); renderEntitlements(); renderSessions(); renderDevices(); renderAuditLogs(); }
-      async function act(path, body, okMessage) { const data = await api(path, { method:"POST", body }); await refreshOps(); setStatus(okMessage); setOutput(data); }
+
+      async function refreshOps(showOutput = true) {
+        if (!token) {
+          snapshot = emptySnapshot();
+          renderAll();
+          return snapshot;
+        }
+        const data = await api(`/api/developer/ops/export${q(filters())}`);
+        snapshot = normalizeSnapshot(data);
+        renderAll();
+        if (showOutput) {
+          setOutput(data);
+        }
+        return snapshot;
+      }
+
+      function clearSession() {
+        token = "";
+        profile = null;
+        actor = null;
+        snapshot = emptySnapshot();
+        setMeta();
+        renderAll();
+      }
+      async function act(path, body, okMessage) { const data = await api(path, { method:"POST", body }); await refreshOps(false); setStatus(okMessage); setOutput(data); }
+
+      async function handleExportDownload(format, fallbackFileName, label) {
+        const result = await downloadApiFile(`/api/developer/ops/export/download${q({ ...filters(), format })}`, fallbackFileName);
+        setStatus(`${label} downloaded: ${result.fileName}`);
+      }
+
       el("login-btn").addEventListener("click", async () => { try { const data = await api("/api/developer/login", { method:"POST", body:{ username:el("username").value.trim(), password:el("password").value } }); token = data.token; await refreshProfile(); await refreshOps(); setStatus("Developer operations loaded."); } catch (error) { clearSession(); setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("refresh-btn").addEventListener("click", async () => { try { await refreshProfile(); await refreshOps(); setStatus("Developer operations refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("logout-btn").addEventListener("click", async () => { try { if (token) await api("/api/developer/logout", { method:"POST" }); clearSession(); setStatus("Developer session closed."); setOutput("Logged out."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("apply-filters-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Filters applied."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
-      el("clear-filters-btn").addEventListener("click", async () => { ["filter-product-code","filter-username","filter-search","filter-event-type"].forEach((id) => { el(id).value = ""; }); try { await refreshOps(); setStatus("Filters cleared."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("clear-filters-btn").addEventListener("click", async () => { ["filter-product-code","filter-username","filter-search","filter-event-type","filter-actor-type"].forEach((id) => { el(id).value = ""; }); el("filter-limit").value = "60"; try { await refreshOps(); setStatus("Filters cleared."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("preview-export-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Scoped ops snapshot refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-json-btn").addEventListener("click", async () => { try { await handleExportDownload("json", "developer-ops.json", "Ops snapshot JSON"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("save-account-btn").addEventListener("click", async () => { try { await act(`/api/developer/accounts/${encodeURIComponent(el("account-id").value.trim())}/status`, { status: el("account-status").value }, "Account status updated."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("save-entitlement-status-btn").addEventListener("click", async () => { try { await act(`/api/developer/entitlements/${encodeURIComponent(el("entitlement-id").value.trim())}/status`, { status: el("entitlement-status").value }, "Entitlement status updated."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("extend-entitlement-btn").addEventListener("click", async () => { try { await act(`/api/developer/entitlements/${encodeURIComponent(el("entitlement-id").value.trim())}/extend`, { days: Number(el("extend-days").value || 0) }, "Entitlement extended."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

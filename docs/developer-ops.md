@@ -23,6 +23,7 @@ This page is intended for day-to-day authorization operations:
 - inspect device bindings and release them
 - block or unblock a device fingerprint
 - read scoped developer audit logs
+- export a scoped troubleshooting snapshot as JSON, summary text, checksums, or zip
 
 ## Developer APIs
 
@@ -40,6 +41,8 @@ This page is intended for day-to-day authorization operations:
 - `POST /api/developer/device-blocks`
 - `POST /api/developer/device-blocks/:blockId/unblock`
 - `GET /api/developer/audit-logs`
+- `GET /api/developer/ops/export`
+- `GET /api/developer/ops/export/download`
 
 ## Supported query parameters
 
@@ -83,6 +86,19 @@ This page is intended for day-to-day authorization operations:
 - `actorType`
 - `limit`
 
+### Ops snapshot export
+
+- `productCode`
+- `username`
+- `search`
+- `eventType`
+- `actorType`
+- `limit`
+
+The download route also accepts:
+
+- `format=json|summary|checksums|zip`
+
 ## Role behavior
 
 - `owner`
@@ -110,3 +126,4 @@ This page is intended for day-to-day authorization operations:
 - revoking a session causes the next heartbeat to fail
 - releasing a binding frees the device seat and expires any active session using that binding
 - blocking a device fingerprint kicks matching sessions offline and prevents the device from logging in again until unblocked
+- the ops snapshot zip bundles the current scoped project list, accounts, entitlements, sessions, bindings, blocks, and audit logs into one handoff package with SHA-256 checksums

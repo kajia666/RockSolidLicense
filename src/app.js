@@ -1573,6 +1573,34 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/ops/export") {
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerExportOpsSnapshot(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            username: url.searchParams.get("username"),
+            search: url.searchParams.get("search"),
+            eventType: url.searchParams.get("eventType"),
+            actorType: url.searchParams.get("actorType"),
+            limit: url.searchParams.get("limit")
+          })
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/developer/ops/export/download") {
+        const data = await services.developerExportOpsSnapshot(getBearerToken(req), {
+          productCode: url.searchParams.get("productCode"),
+          username: url.searchParams.get("username"),
+          search: url.searchParams.get("search"),
+          eventType: url.searchParams.get("eventType"),
+          actorType: url.searchParams.get("actorType"),
+          limit: url.searchParams.get("limit")
+        });
+        sendAttachment(res, services.developerOpsExportDownloadAsset(data, url.searchParams.get("format")));
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/accounts") {
         sendJson(res, 200, {
           ok: true,

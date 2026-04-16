@@ -65,6 +65,7 @@ C:\RockSolidLicense
 
 - [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
 - [production-operations-runbook.md](/D:/code/OnlineVerification/docs/production-operations-runbook.md)
+- [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 ## 手工启动一次
 
@@ -208,6 +209,12 @@ powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\windows\regi
 - `pg_dump`
 - 数据卷快照
 - 或托管 PostgreSQL 的备份策略
+
+仓库现在也已经提供了主机侧 PostgreSQL 备份/恢复脚本：
+
+- [backup-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.ps1)
+- [restore-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.ps1)
+- [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 ## 上线前最少要确认的事
 

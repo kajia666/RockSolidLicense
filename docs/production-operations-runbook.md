@@ -10,6 +10,7 @@ It is meant for day-one and early-production operations, where the main goal is 
 - [linux-deployment.md](/D:/code/OnlineVerification/docs/linux-deployment.md)
 - [windows-deployment-guide.md](/D:/code/OnlineVerification/docs/windows-deployment-guide.md)
 - [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
+- [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 - [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
 
 ## What healthy looks like
@@ -118,6 +119,14 @@ If `RSL_MAIN_STORE_DRIVER=postgres`, add one of these to your production backup 
 - volume snapshots for the PostgreSQL data volume
 - database-level backup automation provided by your managed PostgreSQL service
 
+Repository references:
+
+- [backup-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.sh)
+- [restore-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.sh)
+- [backup-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.ps1)
+- [restore-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.ps1)
+- [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
+
 For Redis in this topology, losing runtime state is usually survivable, but expect active sessions and heartbeat state to be rebuilt.
 
 ## Manual backup commands
@@ -179,6 +188,10 @@ Suggested drill:
 6. Re-run one end-to-end login and heartbeat test.
 
 Do not discover your PostgreSQL restore procedure for the first time during a real outage.
+
+Practical commands now live in:
+
+- [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 ## TLS and reverse proxy maintenance
 

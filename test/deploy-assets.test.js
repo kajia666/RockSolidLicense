@@ -157,3 +157,56 @@ test("windows deployment guide documents scheduled task, healthcheck, backup, an
   assert.match(taskScript, /New-ScheduledTaskTrigger -AtStartup/);
   assert.match(backupTaskScript, /New-ScheduledTaskTrigger -Daily/);
 });
+
+test("postgres backup and restore assets cover linux, windows, and preview compose access", () => {
+  const readme = readText("README.md");
+  const runbook = readText("docs/production-operations-runbook.md");
+  const linuxGuide = readText("docs/linux-deployment.md");
+  const windowsGuide = readText("docs/windows-deployment-guide.md");
+  const postgresGuide = readText("docs/postgres-backup-restore.md");
+  const previewEnv = readText("deploy/rocksolid.pg-redis.preview.env.example");
+  const linuxEnv = readText("deploy/rocksolid.env.example");
+  const windowsEnv = readText("deploy/windows/rocksolid.env.ps1.example");
+  const previewCompose = readText("deploy/docker-compose.pg-redis.preview.yml");
+  const backupShell = readText("deploy/postgres/backup-postgres.sh");
+  const restoreShell = readText("deploy/postgres/restore-postgres.sh");
+  const backupPs = readText("deploy/postgres/backup-postgres.ps1");
+  const restorePs = readText("deploy/postgres/restore-postgres.ps1");
+
+  assert.match(readme, /postgres-backup-restore\.md/);
+  assert.match(readme, /backup-postgres\.sh/);
+  assert.match(readme, /restore-postgres\.ps1/);
+
+  assert.match(runbook, /postgres-backup-restore\.md/);
+  assert.match(runbook, /backup-postgres\.sh/);
+  assert.match(runbook, /backup-postgres\.ps1/);
+
+  assert.match(linuxGuide, /postgres-backup-restore\.md/);
+  assert.match(linuxGuide, /backup-postgres\.sh/);
+  assert.match(windowsGuide, /postgres-backup-restore\.md/);
+  assert.match(windowsGuide, /backup-postgres\.ps1/);
+
+  assert.match(postgresGuide, /127\.0\.0\.1:5432:5432/);
+  assert.match(postgresGuide, /pg_dump/);
+  assert.match(postgresGuide, /pg_restore/);
+  assert.match(postgresGuide, /restore-postgres\.ps1/);
+
+  assert.match(previewEnv, /PGHOST=127\.0\.0\.1/);
+  assert.match(previewEnv, /PGDATABASE=rocksolid/);
+  assert.match(linuxEnv, /# PGHOST=127\.0\.0\.1/);
+  assert.match(windowsEnv, /\$env:PGHOST = "127\.0\.0\.1"/);
+
+  assert.match(previewCompose, /127\.0\.0\.1:5432:5432/);
+
+  assert.match(backupShell, /pg_dump/);
+  assert.match(backupShell, /--format=custom/);
+  assert.match(backupShell, /RSL_POSTGRES_URL/);
+  assert.match(restoreShell, /pg_restore/);
+  assert.match(restoreShell, /--no-clean/);
+  assert.match(restoreShell, /\.sql\.gz/);
+
+  assert.match(backupPs, /pg_dump\.exe/);
+  assert.match(backupPs, /RSL_POSTGRES_URL/);
+  assert.match(restorePs, /pg_restore\.exe/);
+  assert.match(restorePs, /SkipClean/);
+});

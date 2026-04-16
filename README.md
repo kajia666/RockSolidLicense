@@ -546,6 +546,7 @@ cl /EHsc /std:c++17 ^
 - 真正上线前建议继续补齐 PostgreSQL、Redis、TLS、RBAC、限流、监控和备份策略
 - 仓库现在也提供了更明确的上线检查清单，以及 Linux / Windows 的 TLS 反向代理示例
 - 存储层当前更推荐按 `SQLite + Redis -> PostgreSQL Preview + Redis` 的顺序渐进升级
+- `PostgreSQL Preview + Redis` 路径现在也补了 Linux / Windows 的主机侧 `pg_dump / restore` 脚本骨架
 
 ## 重点文档
 
@@ -565,6 +566,7 @@ cl /EHsc /std:c++17 ^
 - [storage-platform-guide.md](docs/storage-platform-guide.md)
 - [storage-deployment-guide.md](docs/storage-deployment-guide.md)
 - [postgres-main-store-preview.md](docs/postgres-main-store-preview.md)
+- [postgres-backup-restore.md](docs/postgres-backup-restore.md)
 - [server-os-choice.md](docs/server-os-choice.md)
 - [production-launch-checklist.md](docs/production-launch-checklist.md)
 - [production-operations-runbook.md](docs/production-operations-runbook.md)
@@ -575,6 +577,10 @@ cl /EHsc /std:c++17 ^
 - [rocksolid.pg-redis.preview.env.example](deploy/rocksolid.pg-redis.preview.env.example)
 - [docker-compose.redis-runtime.yml](deploy/docker-compose.redis-runtime.yml)
 - [docker-compose.pg-redis.preview.yml](deploy/docker-compose.pg-redis.preview.yml)
+- [backup-postgres.sh](deploy/postgres/backup-postgres.sh)
+- [restore-postgres.sh](deploy/postgres/restore-postgres.sh)
+- [backup-postgres.ps1](deploy/postgres/backup-postgres.ps1)
+- [restore-postgres.ps1](deploy/postgres/restore-postgres.ps1)
 - [Caddyfile.example](deploy/linux/Caddyfile.example)
 - [rocksolid.tls.conf.example](deploy/nginx/rocksolid.tls.conf.example)
 - [run-rocksolid.sh](deploy/linux/run-rocksolid.sh)

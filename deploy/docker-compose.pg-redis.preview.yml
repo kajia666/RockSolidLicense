@@ -37,6 +37,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./rocksolid.pg-redis.preview.env
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - rocksolid_postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro

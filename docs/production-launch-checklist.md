@@ -82,6 +82,8 @@ Recommended smoke tests:
   - environment file copy
 - Turn on the scheduled backup job or timer.
 - Perform one restore drill on a non-production directory or machine.
+- If `RSL_MAIN_STORE_DRIVER=postgres`, also verify your PostgreSQL dump and restore path:
+  - [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 ## Phase 6: Launch-day checks
 

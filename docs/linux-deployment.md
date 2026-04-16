@@ -85,6 +85,7 @@ Matching env templates:
 Recommended reading:
 
 - [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
+- [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 ## Option B: Direct systemd service
 
@@ -167,6 +168,12 @@ The default output directory is:
 - `/var/lib/rocksolid/backups`
 
 Old archives older than `14` days are removed automatically by default.
+
+If your main store is PostgreSQL instead of SQLite, also add host-level PostgreSQL dump and restore operations:
+
+- [backup-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.sh)
+- [restore-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.sh)
+- [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 ## Scheduled backups with systemd timer
 

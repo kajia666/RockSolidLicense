@@ -12,6 +12,8 @@ It is intended for software authors who need a dedicated place to manage project
 - `POST /api/developer/products/:productId/status`
 - `POST /api/developer/products/:productId/feature-config`
 - `POST /api/developer/products/:productId/sdk-credentials/rotate`
+- `POST /api/developer/products/sdk-credentials/export`
+- `POST /api/developer/products/sdk-credentials/export/download`
 - `GET /api/developer/dashboard`
 
 ## Role behavior
@@ -121,3 +123,40 @@ Effects:
 - a new `sdkAppSecret` is always generated
 - `sdkAppId` changes only when `rotateAppId=true`
 - old credentials stop working immediately after rotation succeeds
+
+## Batch SDK credential export
+
+`POST /api/developer/products/sdk-credentials/export`
+
+Typical body:
+
+```json
+{
+  "productIds": [
+    1,
+    2
+  ]
+}
+```
+
+Returned data includes:
+
+- batch JSON snapshot
+- CSV text for quick spreadsheet import
+- per-project `.env` snippets
+- combined `.env` bundle text
+
+`POST /api/developer/products/sdk-credentials/export/download` accepts the same selectors plus:
+
+- `format=json|csv|env|zip`
+
+The `zip` format bundles:
+
+- the full JSON export
+- the generated CSV file
+- one `.env` file per selected project
+
+Access notes:
+
+- owner, admin member, operator member, and viewer member can export SDK credentials for projects already visible to them
+- visibility is still scoped by assigned project membership, so members cannot download credentials for unassigned projects

@@ -1039,6 +1039,67 @@ function buildIntegrationPackageZipEntries(payload) {
   return entries;
 }
 
+function buildProductSdkCredentialZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "sdk-credentials");
+  const entries = [
+    {
+      path: `${root}/${payload.fileName || "sdk-credentials.json"}`,
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: `${root}/${payload.csvFileName || "sdk-credentials.csv"}`,
+      body: payload.csvText || ""
+    }
+  ];
+
+  for (const file of payload.envFiles || []) {
+    entries.push({
+      path: `${root}/env/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
+
+  return entries;
+}
+
+function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "csv", "env", "zip"],
+    "json",
+    "INVALID_SDK_CREDENTIAL_EXPORT_FORMAT",
+    "SDK credential export format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "sdk-credentials")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildProductSdkCredentialZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "csv") {
+    return {
+      fileName: payload.csvFileName || "sdk-credentials.csv",
+      contentType: "text/csv; charset=utf-8",
+      body: payload.csvText || ""
+    };
+  }
+  if (normalizedFormat === "env") {
+    return {
+      fileName: payload.envArchiveName || "sdk-credentials-env.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.envBundleText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "sdk-credentials.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
@@ -6264,6 +6325,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     integrationPackageExportDownloadAsset(payload, format = "json") {
       return buildIntegrationPackageExportDownloadAsset(payload, format);
+    },
+
+    sdkCredentialExportDownloadAsset(payload, format = "json") {
+      return buildProductSdkCredentialDownloadAsset(payload, format);
     },
 
     async developerCreateProduct(token, body = {}) {

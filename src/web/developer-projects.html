@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/projects</code></div>
-          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code>, <code>/api/developer/products/sdk-credentials/rotate/batch</code>, <code>/api/developer/products/sdk-credentials/export</code>, <code>/api/developer/products/integration-packages/export</code>, <code>/api/developer/products/integration-packages/export/download</code></div>
+          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code>, <code>/api/developer/products/sdk-credentials/rotate/batch</code>, <code>/api/developer/products/sdk-credentials/export</code>, <code>/api/developer/products/sdk-credentials/export/download</code>, <code>/api/developer/products/integration-packages/export</code>, <code>/api/developer/products/integration-packages/export/download</code></div>
           <div class="pill">Owner creates projects. Owner and admin members can edit product settings.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -62,9 +62,9 @@
           <div class="three" style="margin-top:12px;">
             <label>Batch Rotate SDK App ID Too<select id="batch-rotate-sdk-app-id"><option value="false">false</option><option value="true">true</option></select></label>
             <div class="hint" id="batch-rotate-note">Rotate SDK secrets for the selected projects. New secrets only appear in the API output after rotation.</div>
-            <div class="actions"><button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button><button class="secondary" id="export-batch-sdk-btn">Export Batch SDK Credentials</button><button class="secondary" id="export-batch-integration-btn">Export Batch Integration Packages</button><button class="secondary" id="download-batch-integration-zip-btn">Download Batch Integration Zip</button></div>
+            <div class="actions"><button class="danger" id="apply-batch-rotate-btn">Apply Batch SDK Rotation</button><button class="secondary" id="export-batch-sdk-btn">Export Batch SDK Credentials</button><button class="secondary" id="download-batch-sdk-zip-btn">Download Batch SDK Zip</button><button class="secondary" id="export-batch-integration-btn">Export Batch Integration Packages</button><button class="secondary" id="download-batch-integration-zip-btn">Download Batch Integration Zip</button></div>
           </div>
-          <div class="hint" id="batch-export-note" style="margin-top:12px;">Export the selected projects as JSON, CSV, and .env snippets so software authors can distribute the latest SDK credentials without manual copying.</div>
+          <div class="hint" id="batch-export-note" style="margin-top:12px;">Export the selected projects as JSON, CSV, and .env snippets, or download them as one zip bundle so software authors can distribute the latest SDK credentials without manual copying.</div>
           <div class="hint" id="batch-package-note" style="margin-top:12px;">Export full integration manifests, ready-to-copy `.env` files, and C/C++ quickstart snippets for the selected projects so software authors can wire the SDK into multiple products faster.</div>
           <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, status, feature toggles, and rotate SDK credentials inside assigned projects. Viewer or operator roles can still export credentials and integration packages for projects already visible to them.</div>
         </article>
@@ -305,6 +305,7 @@
         el("apply-batch-feature-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("apply-batch-rotate-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("export-batch-sdk-btn").disabled = !canReadProducts() || totalSelected === 0;
+        el("download-batch-sdk-zip-btn").disabled = !canReadProducts() || totalSelected === 0;
         el("export-batch-integration-btn").disabled = !canReadProducts() || totalSelected === 0;
         el("download-batch-integration-zip-btn").disabled = !canReadProducts() || totalSelected === 0;
         el("clear-batch-btn").disabled = totalSelected === 0;
@@ -349,11 +350,12 @@
         el("apply-batch-feature-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("apply-batch-rotate-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("export-batch-sdk-btn").disabled = !canReadProducts() || batchProductIds.size === 0;
+        el("download-batch-sdk-zip-btn").disabled = !canReadProducts() || batchProductIds.size === 0;
         el("export-batch-integration-btn").disabled = !canReadProducts() || batchProductIds.size === 0;
         el("download-batch-integration-zip-btn").disabled = !canReadProducts() || batchProductIds.size === 0;
         el("permission-hint").textContent = !token
           ? "Sign in first."
-          : `actor type=${actor?.type || "unknown"}${actor?.type === "member" ? ` | role=${actor?.role} | members can export visible project credentials and integration bundles` : " | owner can create, edit, rotate, and export project credentials and integration bundles"}`;
+          : `actor type=${actor?.type || "unknown"}${actor?.type === "member" ? ` | role=${actor?.role} | members can export visible project credentials, sdk zip bundles, and integration bundles` : " | owner can create, edit, rotate, and export project credentials, sdk zip bundles, and integration bundles"}`;
         syncBatchSelectionUi();
       }
 
@@ -835,6 +837,24 @@
           });
           setStatus(`Batch SDK credential export generated for ${data.total} project(s).`);
           setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-batch-sdk-zip-btn").addEventListener("click", async () => {
+        try {
+          const productIds = [...batchProductIds];
+          if (!productIds.length) {
+            throw new Error("Select at least one project before downloading a batch SDK zip.");
+          }
+          const result = await downloadApiFile(
+            "/api/developer/products/sdk-credentials/export/download",
+            { productIds, format: "zip" },
+            "sdk-credentials.zip"
+          );
+          setStatus(`Batch SDK credential zip downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

@@ -7313,6 +7313,37 @@ test("batch project sdk credential export can bundle selected projects with scop
     assert.match(developerExport.envFiles[0].content, new RegExp(`RS_HTTP_BASE_URL=${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
     assert.match(developerExport.envBundleText, /### EXPBUNDLE_ALPHA\.env/);
 
+    const developerEnvDownload = await postText(
+      baseUrl,
+      "/api/developer/products/sdk-credentials/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "env"
+      },
+      viewerSession.token
+    );
+    assert.equal(developerEnvDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(developerEnvDownload.contentDisposition || "", /rocksolid-sdk-credentials-.*-env\.txt/);
+    assert.match(developerEnvDownload.body, /### EXPBUNDLE_ALPHA\.env/);
+    assert.match(developerEnvDownload.body, /RS_PROJECT_CODE=EXPBUNDLE_ALPHA/);
+
+    const developerZipDownload = await postBinary(
+      baseUrl,
+      "/api/developer/products/sdk-credentials/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "zip"
+      },
+      viewerSession.token
+    );
+    assert.equal(developerZipDownload.contentType, "application/zip");
+    assert.match(developerZipDownload.contentDisposition || "", /rocksolid-sdk-credentials-.*\.zip/);
+    assert.equal(developerZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const developerZipText = developerZipDownload.body.toString("latin1");
+    assert.match(developerZipText, /EXPBUNDLE_ALPHA\.env/);
+    assert.match(developerZipText, /rocksolid-sdk-credentials-.*\.csv/);
+    assert.match(developerZipText, /code,projectCode,softwareCode,name,status,sdkAppId,sdkAppSecret,updatedAt/);
+
     const viewerForbidden = await postJsonExpectError(
       baseUrl,
       "/api/developer/products/sdk-credentials/export",
@@ -7340,6 +7371,37 @@ test("batch project sdk credential export can bundle selected projects with scop
     assert.match(adminExport.csvText, /EXPBUNDLE_ALPHA/);
     assert.match(adminExport.csvText, /EXPBUNDLE_BETA/);
     assert.equal(adminExport.envFiles.length, 2);
+
+    const adminCsvDownload = await postText(
+      baseUrl,
+      "/api/admin/products/sdk-credentials/export/download",
+      {
+        projectCodes: ["EXPBUNDLE_ALPHA", "EXPBUNDLE_BETA"],
+        format: "csv"
+      },
+      adminSession.token
+    );
+    assert.equal(adminCsvDownload.contentType, "text/csv; charset=utf-8");
+    assert.match(adminCsvDownload.contentDisposition || "", /rocksolid-sdk-credentials-.*\.csv/);
+    assert.match(adminCsvDownload.body, /ownerUsername,ownerDisplayName,ownerStatus/);
+    assert.match(adminCsvDownload.body, /EXPBUNDLE_BETA/);
+
+    const adminZipDownload = await postBinary(
+      baseUrl,
+      "/api/admin/products/sdk-credentials/export/download",
+      {
+        projectCodes: ["EXPBUNDLE_ALPHA", "EXPBUNDLE_BETA"],
+        format: "zip"
+      },
+      adminSession.token
+    );
+    assert.equal(adminZipDownload.contentType, "application/zip");
+    assert.match(adminZipDownload.contentDisposition || "", /rocksolid-sdk-credentials-.*\.zip/);
+    assert.equal(adminZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const adminZipText = adminZipDownload.body.toString("latin1");
+    assert.match(adminZipText, /EXPBUNDLE_ALPHA\.env/);
+    assert.match(adminZipText, /EXPBUNDLE_BETA\.env/);
+    assert.match(adminZipText, /ownerUsername,ownerDisplayName,ownerStatus/);
 
     const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
     const ownerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", ownerSession.token);
@@ -7578,8 +7640,10 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Export Batch SDK Credentials/);
+    assert.match(html, /Download Batch SDK Zip/);
     assert.match(html, /Export Batch Integration Packages/);
     assert.match(html, /Download Batch Integration Zip/);
+    assert.match(html, /sdk-credentials\/export\/download/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
@@ -7833,8 +7897,10 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Apply Batch Feature Config/);
     assert.match(html, /Apply Batch SDK Rotation/);
     assert.match(html, /Export Batch SDK Credentials/);
+    assert.match(html, /Download Batch SDK Zip/);
     assert.match(html, /Export Batch Integration Packages/);
     assert.match(html, /Download Batch Integration Zip/);
+    assert.match(html, /sdk-credentials\/export\/download/);
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);

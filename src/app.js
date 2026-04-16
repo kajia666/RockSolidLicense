@@ -305,6 +305,16 @@ export function createApp(overrides = {}) {
         });
         return;
       }
+      if (req.method === "POST" && url.pathname === "/api/admin/products/sdk-credentials/export/download") {
+        const { body } = await readJsonBody(req);
+        const data = await services.exportProductSdkCredentials(getBearerToken(req), body, {
+          publicBaseUrl: url.origin,
+          publicHost: url.hostname,
+          publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+        });
+        sendAttachment(res, services.sdkCredentialExportDownloadAsset(data, body.format));
+        return;
+      }
       if (req.method === "POST" && url.pathname === "/api/admin/products/integration-packages/export") {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {
@@ -1269,6 +1279,20 @@ export function createApp(overrides = {}) {
             }
           )
         });
+        return;
+      }
+      if (req.method === "POST" && url.pathname === "/api/developer/products/sdk-credentials/export/download") {
+        const { body } = await readJsonBody(req);
+        const data = await services.developerExportProductSdkCredentials(
+          getBearerToken(req),
+          body,
+          {
+            publicBaseUrl: url.origin,
+            publicHost: url.hostname,
+            publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+          }
+        );
+        sendAttachment(res, services.sdkCredentialExportDownloadAsset(data, body.format));
         return;
       }
       if (req.method === "POST" && url.pathname === "/api/developer/products/integration-packages/export") {

@@ -5164,6 +5164,17 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseEnvDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.env"/);
     assert.match(releaseEnvDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
 
+    const releaseChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=checksums",
+      viewerSession.token
+    );
+    assert.match(releaseChecksumsDownload.contentType || "", /^text\/plain/);
+    assert.match(releaseChecksumsDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*-sha256\.txt"/);
+    assert.match(releaseChecksumsDownload.body, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+    assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA\.env/);
+    assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA\.cpp/);
+
     const releaseZipDownload = await getBinary(
       baseUrl,
       "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=zip",
@@ -5176,6 +5187,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseZipText, /RELPKG_ALPHA\.env/);
     assert.match(releaseZipText, /RELPKG_ALPHA\.cpp/);
     assert.match(releaseZipText, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+    assert.match(releaseZipText, /SHA256SUMS\.txt/);
 
     const forbidden = await getJsonExpectError(
       baseUrl,
@@ -7343,6 +7355,22 @@ test("batch project sdk credential export can bundle selected projects with scop
     assert.match(developerZipText, /EXPBUNDLE_ALPHA\.env/);
     assert.match(developerZipText, /rocksolid-sdk-credentials-.*\.csv/);
     assert.match(developerZipText, /code,projectCode,softwareCode,name,status,sdkAppId,sdkAppSecret,updatedAt/);
+    assert.match(developerZipText, /SHA256SUMS\.txt/);
+
+    const developerChecksumsDownload = await postText(
+      baseUrl,
+      "/api/developer/products/sdk-credentials/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "checksums"
+      },
+      viewerSession.token
+    );
+    assert.equal(developerChecksumsDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(developerChecksumsDownload.contentDisposition || "", /rocksolid-sdk-credentials-.*-sha256\.txt/);
+    assert.match(developerChecksumsDownload.body, /rocksolid-sdk-credentials-.*\.json/);
+    assert.match(developerChecksumsDownload.body, /rocksolid-sdk-credentials-.*\.csv/);
+    assert.match(developerChecksumsDownload.body, /env\/EXPBUNDLE_ALPHA\.env/);
 
     const viewerForbidden = await postJsonExpectError(
       baseUrl,
@@ -7402,6 +7430,7 @@ test("batch project sdk credential export can bundle selected projects with scop
     assert.match(adminZipText, /EXPBUNDLE_ALPHA\.env/);
     assert.match(adminZipText, /EXPBUNDLE_BETA\.env/);
     assert.match(adminZipText, /ownerUsername,ownerDisplayName,ownerStatus/);
+    assert.match(adminZipText, /SHA256SUMS\.txt/);
 
     const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
     const ownerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", ownerSession.token);
@@ -7541,6 +7570,22 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerZipText, /INTBUNDLE_ALPHA\.env/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA\.cpp/);
     assert.match(developerZipText, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
+    assert.match(developerZipText, /SHA256SUMS\.txt/);
+
+    const developerChecksumsDownload = await postText(
+      baseUrl,
+      "/api/developer/products/integration-packages/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "checksums"
+      },
+      viewerSession.token
+    );
+    assert.equal(developerChecksumsDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(developerChecksumsDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*-sha256\.txt"/);
+    assert.match(developerChecksumsDownload.body, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
+    assert.match(developerChecksumsDownload.body, /env\/INTBUNDLE_ALPHA\.env/);
+    assert.match(developerChecksumsDownload.body, /cpp\/INTBUNDLE_ALPHA\.cpp/);
 
     const viewerForbidden = await postJsonExpectError(
       baseUrl,
@@ -7602,6 +7647,7 @@ test("batch project integration package export can bundle selected projects with
     assert.match(adminZipText, /INTBUNDLE_ALPHA\.env/);
     assert.match(adminZipText, /INTBUNDLE_BETA\.env/);
     assert.match(adminZipText, /rocksolid-integration-INTBUNDLE_BETA\.json/);
+    assert.match(adminZipText, /SHA256SUMS\.txt/);
 
     const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
     const ownerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", ownerSession.token);
@@ -7886,6 +7932,17 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(cppDownload.contentDisposition || "", /EXPORT_ALPHA\.cpp/);
     assert.match(cppDownload.body, /startup_bootstrap_http/);
 
+    const checksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/integration/package/download?softwareCode=EXPORT_ALPHA&format=checksums",
+      viewerSession.token
+    );
+    assert.equal(checksumsDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(checksumsDownload.contentDisposition || "", /rocksolid-integration-EXPORT_ALPHA-sha256\.txt/);
+    assert.match(checksumsDownload.body, /rocksolid-integration-EXPORT_ALPHA\.json/);
+    assert.match(checksumsDownload.body, /env\/EXPORT_ALPHA\.env/);
+    assert.match(checksumsDownload.body, /cpp\/EXPORT_ALPHA\.cpp/);
+
     const zipDownload = await getBinary(
       baseUrl,
       "/api/developer/integration/package/download?softwareCode=EXPORT_ALPHA&format=zip",
@@ -7898,6 +7955,7 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(zipText, /rocksolid-integration-EXPORT_ALPHA\.json/);
     assert.match(zipText, /EXPORT_ALPHA\.env/);
     assert.match(zipText, /EXPORT_ALPHA\.cpp/);
+    assert.match(zipText, /SHA256SUMS\.txt/);
 
     const forbidden = await getJsonExpectError(
       baseUrl,
@@ -7982,6 +8040,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Download JSON/);
     assert.match(html, /Download Env/);
     assert.match(html, /Download C\+\+/);
+    assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
     assert.match(html, /C\+\+ Quickstart/);
     assert.match(html, /Environment Template/);
@@ -8066,6 +8125,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Release Delivery Package/);
     assert.match(html, /Generate Release Package/);
     assert.match(html, /Download Package JSON/);
+    assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip Archive/);
   } finally {
     await app.close();

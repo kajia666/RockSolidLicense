@@ -118,11 +118,12 @@ The package route accepts:
 
 The download route accepts the same selectors plus:
 
-- `format=json|summary|env|cpp|zip`
+- `format=json|summary|env|cpp|checksums|zip`
 
 Typical uses:
 
 - hand the release manager a single deployment snapshot for one software project
 - verify that the download URL, force-update floor, and maintenance notices match the latest SDK credentials
 - export release coordination material for viewer members without giving them write access
+- hand over a matching SHA-256 checksum list so operators can verify downloaded files before distribution
 - let the browser download server-generated attachments instead of building files locally in the page

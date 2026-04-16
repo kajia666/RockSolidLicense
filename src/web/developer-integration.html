@@ -36,7 +36,7 @@
         <article class="card">
           <h2>Project Selector</h2>
           <label>Project Code<select id="project-select"></select></label>
-          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
+          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
         </article>
 
@@ -420,6 +420,7 @@ ${JSON.stringify({
         el("download-package-json-btn").disabled = disabled;
         el("download-package-env-btn").disabled = disabled;
         el("download-package-cpp-btn").disabled = disabled;
+        el("download-package-checksums-btn").disabled = disabled;
         el("download-package-zip-btn").disabled = disabled;
       }
 
@@ -609,6 +610,15 @@ ${JSON.stringify({
       el("download-package-cpp-btn").addEventListener("click", async () => {
         try {
           await handlePackageDownload("cpp", "project.cpp", "Integration package C++ quickstart");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-package-checksums-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("checksums", "integration-package-sha256.txt", "Integration package checksums");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

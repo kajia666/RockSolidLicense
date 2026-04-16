@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { AppError } from "./http.js";
 import { buildZipArchive } from "./archive.js";
 import { rotateLicenseKeyStore } from "./license-keys.js";
@@ -988,104 +989,159 @@ function buildArchiveRootName(fileName, fallback = "download") {
   return normalized.replace(/\.[^.]+$/, "");
 }
 
-function buildReleasePackageZipEntries(payload) {
-  const root = buildArchiveRootName(payload.fileName, "release-package");
+function normalizeChecksumBody(body) {
+  if (Buffer.isBuffer(body)) {
+    return body;
+  }
+  if (body instanceof Uint8Array) {
+    return Buffer.from(body);
+  }
+  return Buffer.from(String(body ?? ""), "utf8");
+}
+
+function sha256ChecksumHex(body) {
+  return createHash("sha256").update(normalizeChecksumBody(body)).digest("hex");
+}
+
+function buildChecksumManifestText(files = []) {
+  const lines = ["# SHA-256 checksums"];
+  for (const file of files) {
+    const filePath = String(file.path || file.fileName || "file").replace(/\\/g, "/");
+    lines.push(`${sha256ChecksumHex(file.body)} *${filePath}`);
+  }
+  return lines.join("\n");
+}
+
+function buildChecksumFileName(fileName, fallback = "download") {
+  return `${buildArchiveRootName(fileName, fallback)}-sha256.txt`;
+}
+
+function buildZipEntriesFromFiles(root, files = []) {
+  const entries = files.map((file) => ({
+    path: `${root}/${file.path}`,
+    body: file.body
+  }));
+  entries.push({
+    path: `${root}/SHA256SUMS.txt`,
+    body: buildChecksumManifestText(files)
+  });
+  return entries;
+}
+
+function buildReleasePackageFiles(payload) {
   return [
     {
-      path: `${root}/${payload.fileName || "release-package.json"}`,
+      path: payload.fileName || "release-package.json",
       body: JSON.stringify(payload, null, 2)
     },
     {
-      path: `${root}/${payload.summaryFileName || "release-package.txt"}`,
+      path: payload.summaryFileName || "release-package.txt",
       body: payload.summaryText || ""
     },
     {
-      path: `${root}/snippets/${payload.snippets?.envFileName || "project.env"}`,
+      path: `snippets/${payload.snippets?.envFileName || "project.env"}`,
       body: payload.snippets?.envTemplate || ""
     },
     {
-      path: `${root}/snippets/${payload.snippets?.cppFileName || "project.cpp"}`,
+      path: `snippets/${payload.snippets?.cppFileName || "project.cpp"}`,
       body: payload.snippets?.cppQuickstart || ""
     }
   ];
 }
 
-function buildIntegrationPackageZipEntries(payload) {
-  const root = buildArchiveRootName(payload.fileName, "integration-packages");
-  const entries = [
+function buildReleasePackageZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "release-package");
+  return buildZipEntriesFromFiles(root, buildReleasePackageFiles(payload));
+}
+
+function buildIntegrationPackageExportFiles(payload) {
+  const files = [
     {
-      path: `${root}/${payload.fileName || "integration-packages.json"}`,
+      path: payload.fileName || "integration-packages.json",
       body: JSON.stringify(payload, null, 2)
     }
   ];
 
   for (const file of payload.manifestFiles || []) {
-    entries.push({
-      path: `${root}/manifests/${file.fileName}`,
+    files.push({
+      path: `manifests/${file.fileName}`,
       body: file.content || ""
     });
   }
   for (const file of payload.envFiles || []) {
-    entries.push({
-      path: `${root}/env/${file.fileName}`,
+    files.push({
+      path: `env/${file.fileName}`,
       body: file.content || ""
     });
   }
   for (const file of payload.cppFiles || []) {
-    entries.push({
-      path: `${root}/cpp/${file.fileName}`,
+    files.push({
+      path: `cpp/${file.fileName}`,
       body: file.content || ""
     });
   }
 
-  return entries;
+  return files;
 }
 
-function buildSingleIntegrationPackageZipEntries(payload) {
-  const root = buildArchiveRootName(payload.fileName, "integration-package");
+function buildIntegrationPackageZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "integration-packages");
+  return buildZipEntriesFromFiles(root, buildIntegrationPackageExportFiles(payload));
+}
+
+function buildSingleIntegrationPackageFiles(payload) {
   return [
     {
-      path: `${root}/${payload.fileName || "integration-package.json"}`,
+      path: payload.fileName || "integration-package.json",
       body: JSON.stringify(payload, null, 2)
     },
     {
-      path: `${root}/env/${payload.snippets?.envFileName || "project.env"}`,
+      path: `env/${payload.snippets?.envFileName || "project.env"}`,
       body: payload.snippets?.envTemplate || ""
     },
     {
-      path: `${root}/cpp/${payload.snippets?.cppFileName || "project.cpp"}`,
+      path: `cpp/${payload.snippets?.cppFileName || "project.cpp"}`,
       body: payload.snippets?.cppQuickstart || ""
     }
   ];
 }
 
-function buildProductSdkCredentialZipEntries(payload) {
-  const root = buildArchiveRootName(payload.fileName, "sdk-credentials");
-  const entries = [
+function buildSingleIntegrationPackageZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "integration-package");
+  return buildZipEntriesFromFiles(root, buildSingleIntegrationPackageFiles(payload));
+}
+
+function buildProductSdkCredentialFiles(payload) {
+  const files = [
     {
-      path: `${root}/${payload.fileName || "sdk-credentials.json"}`,
+      path: payload.fileName || "sdk-credentials.json",
       body: JSON.stringify(payload, null, 2)
     },
     {
-      path: `${root}/${payload.csvFileName || "sdk-credentials.csv"}`,
+      path: payload.csvFileName || "sdk-credentials.csv",
       body: payload.csvText || ""
     }
   ];
 
   for (const file of payload.envFiles || []) {
-    entries.push({
-      path: `${root}/env/${file.fileName}`,
+    files.push({
+      path: `env/${file.fileName}`,
       body: file.content || ""
     });
   }
 
-  return entries;
+  return files;
+}
+
+function buildProductSdkCredentialZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "sdk-credentials");
+  return buildZipEntriesFromFiles(root, buildProductSdkCredentialFiles(payload));
 }
 
 function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "csv", "env", "zip"],
+    ["json", "csv", "env", "zip", "checksums"],
     "json",
     "INVALID_SDK_CREDENTIAL_EXPORT_FORMAT",
     "SDK credential export format"
@@ -1096,6 +1152,13 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
       fileName: `${buildArchiveRootName(payload.fileName, "sdk-credentials")}.zip`,
       contentType: "application/zip",
       body: buildZipArchive(buildProductSdkCredentialZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "sdk-credentials"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildProductSdkCredentialFiles(payload))
     };
   }
   if (normalizedFormat === "csv") {
@@ -1123,7 +1186,7 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "cpp", "zip"],
+    ["json", "summary", "env", "cpp", "zip", "checksums"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
@@ -1134,6 +1197,13 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
       fileName: `${buildArchiveRootName(payload.fileName, "release-package")}.zip`,
       contentType: "application/zip",
       body: buildZipArchive(buildReleasePackageZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "release-package"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildReleasePackageFiles(payload))
     };
   }
   if (normalizedFormat === "summary") {
@@ -1168,7 +1238,7 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "manifests", "env", "cpp", "zip"],
+    ["json", "manifests", "env", "cpp", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_EXPORT_FORMAT",
     "Integration export format"
@@ -1179,6 +1249,13 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
       fileName: `${buildArchiveRootName(payload.fileName, "integration-packages")}.zip`,
       contentType: "application/zip",
       body: buildZipArchive(buildIntegrationPackageZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "integration-packages"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildIntegrationPackageExportFiles(payload))
     };
   }
   if (normalizedFormat === "manifests") {
@@ -1213,7 +1290,7 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "env", "cpp", "zip"],
+    ["json", "env", "cpp", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_PACKAGE_FORMAT",
     "Integration package format"
@@ -1224,6 +1301,13 @@ function buildIntegrationPackageDownloadAsset(payload, format = "json") {
       fileName: `${buildArchiveRootName(payload.fileName, "integration-package")}.zip`,
       contentType: "application/zip",
       body: buildZipArchive(buildSingleIntegrationPackageZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "integration-package"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildSingleIntegrationPackageFiles(payload))
     };
   }
   if (normalizedFormat === "env") {

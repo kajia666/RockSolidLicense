@@ -148,13 +148,15 @@ Returned data includes:
 
 `POST /api/developer/products/sdk-credentials/export/download` accepts the same selectors plus:
 
-- `format=json|csv|env|zip`
+- `format=json|csv|env|checksums|zip`
 
 The `zip` format bundles:
 
 - the full JSON export
 - the generated CSV file
 - one `.env` file per selected project
+
+The `checksums` format returns a SHA-256 manifest for the generated JSON / CSV / per-project `.env` files so software authors can verify a handoff package after download.
 
 Access notes:
 

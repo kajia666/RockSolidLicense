@@ -205,6 +205,7 @@
             <button class="secondary" id="download-release-package-summary-btn">Download Summary</button>
             <button class="secondary" id="download-release-package-env-btn">Download Env Template</button>
             <button class="secondary" id="download-release-package-cpp-btn">Download C++ Quickstart</button>
+            <button class="secondary" id="download-release-package-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-release-package-zip-btn">Download Zip Archive</button>
           </div>
           <div class="hint" id="release-package-hint">Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.</div>
@@ -490,7 +491,7 @@
           }
         });
         const hasPackage = Boolean(releasePackage);
-        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-cpp-btn", "download-release-package-zip-btn"].forEach((id) => {
+        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-cpp-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
           const node = el(id);
           if (node) {
             node.disabled = readDisabled || !hasPackage;
@@ -898,6 +899,24 @@
             releasePackage.snippets?.cppFileName || "project.cpp"
           );
           setStatus(`Release package C++ quickstart downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-release-package-checksums-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "checksums" })}`,
+            (releasePackage.fileName || "release-package.json").replace(/\.json$/i, "-sha256.txt")
+          );
+          setStatus(`Release package checksums downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

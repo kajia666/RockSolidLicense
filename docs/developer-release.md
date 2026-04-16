@@ -19,6 +19,7 @@ Route:
 - `GET /api/developer/notices`
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
+- `GET /api/developer/release-package`
 
 Common filters:
 
@@ -96,3 +97,26 @@ Typical uses:
 - show release announcements at client startup
 - publish maintenance windows
 - temporarily block login with a maintenance notice
+
+## Release delivery package
+
+The release workspace can now generate a project-scoped release delivery package that combines:
+
+- the current integration package
+- the selected channel's version manifest
+- active runtime notices that affect startup or login
+- ready-to-download `.env` and C/C++ quickstart snippets
+
+The package route accepts:
+
+- `productId`
+- `productCode`
+- `projectCode`
+- `softwareCode`
+- `channel`
+
+Typical uses:
+
+- hand the release manager a single deployment snapshot for one software project
+- verify that the download URL, force-update floor, and maintenance notices match the latest SDK credentials
+- export release coordination material for viewer members without giving them write access

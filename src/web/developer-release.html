@@ -146,7 +146,7 @@
         </div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/releases</code></div>
-          <div class="pill">APIs: <code>/api/developer/client-versions</code> and <code>/api/developer/notices</code></div>
+          <div class="pill">APIs: <code>/api/developer/client-versions</code>, <code>/api/developer/notices</code>, and <code>/api/developer/release-package</code></div>
           <div class="pill">Scoped to assigned projects. Viewer members stay read-only.</div>
         </div>
         <div class="project-list" id="project-list"></div>
@@ -190,6 +190,23 @@
             <button id="clear-filters-btn">Clear Filters</button>
           </div>
           <div class="hint">Filters stay inside the current developer scope. Leave a field blank to query everything you can access.</div>
+        </article>
+
+        <article class="card">
+          <h2>Release Delivery Package</h2>
+          <label>Project Code<input id="package-product-code" placeholder="ALPHA_APP" /></label>
+          <label>Channel<input id="package-channel" value="stable" placeholder="stable" /></label>
+          <div class="actions">
+            <button class="secondary" id="use-filter-project-btn">Use Filter Project</button>
+            <button id="generate-release-package-btn">Generate Release Package</button>
+          </div>
+          <div class="actions">
+            <button class="secondary" id="download-release-package-json-btn">Download Package JSON</button>
+            <button class="secondary" id="download-release-package-summary-btn">Download Summary</button>
+            <button class="secondary" id="download-release-package-env-btn">Download Env Template</button>
+            <button class="secondary" id="download-release-package-cpp-btn">Download C++ Quickstart</button>
+          </div>
+          <div class="hint" id="release-package-hint">Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.</div>
         </article>
 
         <article class="card">
@@ -327,7 +344,7 @@
                   <th>Starts</th>
                 </tr>
               </thead>
-              <tbody id="notice-body"></tbody>
+              <tbody id="notice-table-body"></tbody>
             </table>
           </div>
         </article>
@@ -344,6 +361,7 @@
       let actor = null;
       let projects = [];
       let snapshot = { versions: [], notices: [] };
+      let releasePackage = null;
 
       function el(id) { return document.getElementById(id); }
 
@@ -387,11 +405,108 @@
         return value === true || value === 1 || value === "true";
       }
 
+      function hasPermission(permission) {
+        if (!token || !actor) {
+          return false;
+        }
+        if (actor.type === "owner") {
+          return true;
+        }
+        const permissions = Array.isArray(actor.permissions) ? actor.permissions : [];
+        return permissions.includes("*") || permissions.includes(permission);
+      }
+
+      function canReadReleaseWorkspace() {
+        return hasPermission("products.read") && hasPermission("versions.read") && hasPermission("notices.read");
+      }
+
+      function canWriteReleaseWorkspace() {
+        return hasPermission("versions.write") && hasPermission("notices.write");
+      }
+
       function formatTime(value) {
         if (!value) return "-";
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return String(value);
         return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function syncReleasePackageHint() {
+        const productCode = el("package-product-code").value.trim();
+        const channel = el("package-channel").value.trim() || "stable";
+        el("release-package-hint").textContent = productCode
+          ? `Generate the ${productCode} release handoff package for channel ${channel}, including integration config, version manifest, and active notices.`
+          : "Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.";
+      }
+
+      function syncPermissions() {
+        const readDisabled = !canReadReleaseWorkspace();
+        const writeDisabled = !canWriteReleaseWorkspace();
+        [
+          "version-product-code",
+          "version-value",
+          "version-channel",
+          "version-status",
+          "version-force-update",
+          "version-download-url",
+          "version-notice-title",
+          "version-notice-body",
+          "version-release-notes",
+          "version-released-at",
+          "version-id",
+          "version-update-status",
+          "version-update-force",
+          "notice-product-code",
+          "notice-channel",
+          "notice-kind",
+          "notice-severity",
+          "notice-title",
+          "notice-body",
+          "notice-action-url",
+          "notice-starts-at",
+          "notice-ends-at",
+          "notice-status",
+          "notice-block-login",
+          "notice-id",
+          "notice-update-status",
+          "notice-update-block-login"
+        ].forEach((id) => {
+          const node = el(id);
+          if (node) {
+            node.disabled = writeDisabled;
+          }
+        });
+        ["create-version-btn", "update-version-btn", "create-notice-btn", "update-notice-btn"].forEach((id) => {
+          const node = el(id);
+          if (node) {
+            node.disabled = writeDisabled;
+          }
+        });
+        ["package-product-code", "package-channel", "use-filter-project-btn", "generate-release-package-btn"].forEach((id) => {
+          const node = el(id);
+          if (node) {
+            node.disabled = readDisabled;
+          }
+        });
+        const hasPackage = Boolean(releasePackage);
+        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-cpp-btn"].forEach((id) => {
+          const node = el(id);
+          if (node) {
+            node.disabled = readDisabled || !hasPackage;
+          }
+        });
+      }
+
+      function downloadBlob(filename, content, contentType) {
+        const blob = new Blob([content], { type: contentType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
       }
 
       function renderTag(value, truthy = false) {
@@ -430,11 +545,21 @@
           return;
         }
         host.innerHTML = projects.map((item) => `
-          <div class="project-pill">
+          <div class="project-pill" data-project-code="${escapeHtml(item.code || item.productCode || "-")}" style="cursor:pointer;">
             <strong>${escapeHtml(item.code || item.productCode || "-")}</strong>
             <span>${escapeHtml(item.name || "Unnamed Project")}</span>
           </div>
         `).join("");
+        for (const pill of host.querySelectorAll("[data-project-code]")) {
+          pill.addEventListener("click", () => {
+            const productCode = pill.dataset.projectCode || "";
+            el("filter-product-code").value = productCode;
+            el("package-product-code").value = productCode;
+            el("version-product-code").value = productCode;
+            el("notice-product-code").value = productCode;
+            syncReleasePackageHint();
+          });
+        }
       }
 
       function versionProductCode(item) {
@@ -449,7 +574,7 @@
         }
 
         body.innerHTML = snapshot.versions.map((item) => `
-          <tr data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status)}" data-force="${escapeHtml(String(Boolean(item.forceUpdate || item.force_update)))}">
+          <tr data-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(versionProductCode(item))}" data-status="${escapeHtml(item.status)}" data-force="${escapeHtml(String(Boolean(item.forceUpdate || item.force_update)))}">
             <td><strong>${escapeHtml(item.version)}</strong><div>${escapeHtml(item.notice_title || item.noticeTitle || "")}</div></td>
             <td>${escapeHtml(versionProductCode(item))}</td>
             <td>${escapeHtml(item.channel)}</td>
@@ -464,19 +589,21 @@
             el("version-id").value = row.dataset.id || "";
             el("version-update-status").value = row.dataset.status || "active";
             el("version-update-force").value = row.dataset.force === "true" ? "true" : "false";
+            el("package-product-code").value = row.dataset.productCode || "";
+            syncReleasePackageHint();
           });
         }
       }
 
       function renderNotices() {
-        const body = el("notice-body");
+        const body = el("notice-table-body");
         if (!snapshot.notices.length) {
           body.innerHTML = `<tr><td colspan="6">No notices found inside the current scope.</td></tr>`;
           return;
         }
 
         body.innerHTML = snapshot.notices.map((item) => `
-          <tr data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status)}" data-block-login="${escapeHtml(String(Boolean(item.blockLogin)))}">
+          <tr data-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.productCode || "-")}" data-status="${escapeHtml(item.status)}" data-block-login="${escapeHtml(String(Boolean(item.blockLogin)))}">
             <td><strong>${escapeHtml(item.title)}</strong><div>${escapeHtml(item.body || "")}</div></td>
             <td>${escapeHtml(item.productCode || "-")}</td>
             <td>${escapeHtml(item.kind)}</td>
@@ -491,6 +618,8 @@
             el("notice-id").value = row.dataset.id || "";
             el("notice-update-status").value = row.dataset.status || "active";
             el("notice-update-block-login").value = row.dataset.blockLogin === "true" ? "true" : "false";
+            el("package-product-code").value = row.dataset.productCode || "";
+            syncReleasePackageHint();
           });
         }
       }
@@ -499,10 +628,12 @@
         actor = null;
         projects = [];
         snapshot = { versions: [], notices: [] };
+        releasePackage = null;
         setMeta();
         renderProjects();
         renderVersions();
         renderNotices();
+        syncPermissions();
       }
 
       async function refreshProfile() {
@@ -553,6 +684,7 @@
         renderProjects();
         renderVersions();
         renderNotices();
+        syncPermissions();
         setOutput({ products: productRows, versions, notices });
       }
 
@@ -561,6 +693,18 @@
         await refreshWorkspace();
         setStatus(successMessage);
         setOutput(data);
+      }
+
+      async function generateReleasePackage() {
+        const productCode = el("package-product-code").value.trim();
+        const channel = el("package-channel").value.trim() || "stable";
+        if (!productCode) {
+          throw new Error("Enter a project code before generating a release package.");
+        }
+        const data = await api(`/api/developer/release-package${q({ productCode, channel })}`);
+        releasePackage = data;
+        syncPermissions();
+        return data;
       }
 
       el("login-btn").addEventListener("click", async () => {
@@ -633,6 +777,56 @@
         }
       });
 
+      el("use-filter-project-btn").addEventListener("click", () => {
+        el("package-product-code").value = el("filter-product-code").value.trim();
+        el("package-channel").value = el("filter-channel").value.trim() || "stable";
+        syncReleasePackageHint();
+        setStatus("Package selector synced from the current filters.");
+      });
+
+      el("generate-release-package-btn").addEventListener("click", async () => {
+        try {
+          const data = await generateReleasePackage();
+          setStatus(`Release package generated for ${data.manifest.project.code}.`);
+          setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-release-package-json-btn").addEventListener("click", () => {
+        if (!releasePackage) {
+          return;
+        }
+        downloadBlob(releasePackage.fileName || "release-package.json", JSON.stringify(releasePackage.manifest, null, 2), "application/json;charset=utf-8");
+        setStatus("Release package JSON downloaded.");
+      });
+
+      el("download-release-package-summary-btn").addEventListener("click", () => {
+        if (!releasePackage) {
+          return;
+        }
+        downloadBlob(releasePackage.summaryFileName || "release-package.txt", releasePackage.summaryText || "", "text/plain;charset=utf-8");
+        setStatus("Release package summary downloaded.");
+      });
+
+      el("download-release-package-env-btn").addEventListener("click", () => {
+        if (!releasePackage) {
+          return;
+        }
+        downloadBlob(releasePackage.snippets?.envFileName || "project.env", releasePackage.snippets?.envTemplate || "", "text/plain;charset=utf-8");
+        setStatus("Release package env template downloaded.");
+      });
+
+      el("download-release-package-cpp-btn").addEventListener("click", () => {
+        if (!releasePackage) {
+          return;
+        }
+        downloadBlob(releasePackage.snippets?.cppFileName || "project.cpp", releasePackage.snippets?.cppQuickstart || "", "text/plain;charset=utf-8");
+        setStatus("Release package C++ quickstart downloaded.");
+      });
+
       el("create-version-btn").addEventListener("click", async () => {
         try {
           await mutate("/api/developer/client-versions", {
@@ -699,6 +893,8 @@
       });
 
       clearWorkspace();
+      syncReleasePackageHint();
+      syncPermissions();
       setStatus("Sign in to manage versions and notices.");
       setOutput("Waiting for actions...");
     </script>

@@ -366,6 +366,7 @@ npm run db:postgres:check
 - `GET /api/developer/notices`
 - `POST /api/developer/notices`
 - `POST /api/developer/notices/:noticeId/status`
+- `GET /api/developer/release-package`
 
 ## 项目级功能和状态
 
@@ -412,7 +413,7 @@ npm run db:postgres:check
 - `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及单个或批量 SDK 凭据轮换、凭据导出和批量集成包导出
 - `/developer/licenses`：开发者授权中心，维护策略、卡密批次、卡密状态和卡密导出
 - `/developer/ops`：开发者授权运营台，处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁
-- `/developer/releases`：开发者发版中心，维护客户端版本、强更规则和启动公告
+- `/developer/releases`：开发者发版中心，维护客户端版本、强更规则和启动公告，并可导出项目级发布交付包，把当前集成配置、版本规则和有效公告一次性打包给软件作者或发布同事
 - `/developer/security`：开发者安全中心，维护项目级 IP / CIDR 网络规则
 
 ## Windows C/C++ SDK

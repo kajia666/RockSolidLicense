@@ -4972,6 +4972,143 @@ test("developer release workspace keeps viewers read-only while owners manage sc
   }
 });
 
+test("developer release package export bundles integration, versions, and notices inside scope", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "release.package.owner",
+        password: "ReleasePackageOwner123!",
+        displayName: "Release Package Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "RELPKG_ALPHA",
+        name: "Release Package Alpha",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowCardLogin: false
+        }
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "RELPKG_BETA",
+        name: "Release Package Beta",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "release.package.owner",
+      password: "ReleasePackageOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "release.package.viewer",
+        password: "ReleasePackageViewer123!",
+        displayName: "Release Package Viewer",
+        role: "viewer",
+        productCodes: ["RELPKG_ALPHA"]
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/client-versions",
+      {
+        productCode: "RELPKG_ALPHA",
+        version: "5.4.0",
+        channel: "stable",
+        forceUpdate: true,
+        downloadUrl: "https://example.invalid/relpkg-alpha/5.4.0",
+        noticeTitle: "Critical release",
+        noticeBody: "All users should move to 5.4.0."
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/notices",
+      {
+        productCode: "RELPKG_ALPHA",
+        title: "Scheduled maintenance",
+        body: "Brief maintenance window for release rollout.",
+        kind: "maintenance",
+        channel: "stable",
+        blockLogin: true
+      },
+      ownerSession.token
+    );
+
+    const viewerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "release.package.viewer",
+      password: "ReleasePackageViewer123!"
+    });
+
+    const releasePackage = await getJson(
+      baseUrl,
+      "/api/developer/release-package?productCode=RELPKG_ALPHA&channel=stable",
+      viewerSession.token
+    );
+    assert.match(releasePackage.fileName, /^rocksolid-release-package-RELPKG_ALPHA-stable-/);
+    assert.equal(releasePackage.manifest.project.code, "RELPKG_ALPHA");
+    assert.equal(releasePackage.manifest.release.channel, "stable");
+    assert.equal(releasePackage.manifest.release.versionManifest.latestVersion, "5.4.0");
+    assert.equal(releasePackage.manifest.release.versionManifest.minimumAllowedVersion, "5.4.0");
+    assert.equal(releasePackage.manifest.release.versionManifest.latestDownloadUrl, "https://example.invalid/relpkg-alpha/5.4.0");
+    assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
+    assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
+    assert.equal(releasePackage.manifest.integration.project.code, "RELPKG_ALPHA");
+    assert.equal(releasePackage.manifest.integration.project.featureConfig.allowCardLogin, false);
+    assert.equal(releasePackage.manifest.actor.type, "member");
+    assert.equal(releasePackage.manifest.actor.role, "viewer");
+    assert.equal(releasePackage.snippets.envFileName, "RELPKG_ALPHA.env");
+    assert.equal(releasePackage.snippets.cppFileName, "RELPKG_ALPHA.cpp");
+    assert.match(releasePackage.snippets.envTemplate, /RS_PROJECT_CODE=RELPKG_ALPHA/);
+    assert.match(releasePackage.snippets.cppQuickstart, /RELPKG_ALPHA/);
+    assert.match(releasePackage.summaryText, /Latest Version: 5.4.0/);
+    assert.match(releasePackage.summaryText, /Blocking Notices: 1/);
+
+    const forbidden = await getJsonExpectError(
+      baseUrl,
+      "/api/developer/release-package?productCode=RELPKG_BETA&channel=stable",
+      viewerSession.token
+    );
+    assert.equal(forbidden.status, 403);
+    assert.equal(forbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const viewerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=120", viewerSession.token);
+    assert.ok(viewerAuditLogs.items.some((entry) => entry.event_type === "product.release-package.export"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -7652,7 +7789,11 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Developer Release Center/);
     assert.match(html, /api\/developer\/client-versions/);
     assert.match(html, /api\/developer\/notices/);
+    assert.match(html, /api\/developer\/release-package/);
     assert.match(html, /Scoped to assigned projects/);
+    assert.match(html, /Release Delivery Package/);
+    assert.match(html, /Generate Release Package/);
+    assert.match(html, /Download Package JSON/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

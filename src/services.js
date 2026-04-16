@@ -868,6 +868,110 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
   };
 }
 
+function buildReleasePackageSummaryText(manifest = {}) {
+  const project = manifest.project || {};
+  const release = manifest.release || {};
+  const versionManifest = release.versionManifest || {};
+  const activeNotices = release.activeNotices || {};
+  const noticeItems = Array.isArray(activeNotices.items) ? activeNotices.items : [];
+  const lines = [
+    "RockSolid Release Delivery Package",
+    `Generated At: ${manifest.generatedAt || ""}`,
+    `Project Code: ${project.code || ""}`,
+    `Project Name: ${project.name || ""}`,
+    `Channel: ${release.channel || "stable"}`,
+    `Latest Version: ${versionManifest.latestVersion || "-"}`,
+    `Minimum Allowed Version: ${versionManifest.minimumAllowedVersion || "-"}`,
+    `Latest Download URL: ${versionManifest.latestDownloadUrl || "-"}`,
+    `Active Notices: ${activeNotices.total ?? 0}`,
+    `Blocking Notices: ${activeNotices.blockingTotal ?? 0}`,
+    ""
+  ];
+
+  if (noticeItems.length) {
+    lines.push("Active Notice Titles:");
+    for (const item of noticeItems) {
+      lines.push(`- ${item.title || "(untitled)"} [${item.channel || "all"}]`);
+    }
+  } else {
+    lines.push("Active Notice Titles:");
+    lines.push("- none");
+  }
+
+  return lines.join("\n");
+}
+
+function buildReleasePackagePayload({
+  generatedAt = nowIso(),
+  developer,
+  actor,
+  product,
+  channel = "stable",
+  versionManifest,
+  activeNoticeRows = [],
+  integrationPackage
+}) {
+  const normalizedChannel = normalizeChannel(channel);
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const activeNotices = activeNoticeRows.map((row) => (
+    row && typeof row === "object" && Object.hasOwn(row, "blockLogin")
+      ? row
+      : formatNotice(row)
+  ));
+  const blockingNotices = activeNotices.filter((item) => item.blockLogin);
+  const envFileName = `${product.code}.env`;
+  const cppFileName = `${product.code}.cpp`;
+  const manifest = {
+    generatedAt,
+    developer: developer ?? null,
+    actor: actor ?? null,
+    project: {
+      id: product.id,
+      code: product.code,
+      projectCode: product.projectCode ?? product.code,
+      softwareCode: product.softwareCode ?? product.code,
+      name: product.name,
+      description: product.description ?? "",
+      status: product.status,
+      updatedAt: product.updatedAt,
+      featureConfig: product.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {}
+    },
+    release: {
+      channel: normalizedChannel,
+      versionManifest,
+      activeNotices: {
+        total: activeNotices.length,
+        blockingTotal: blockingNotices.length,
+        items: activeNotices
+      }
+    },
+    integration: integrationPackage?.manifest ?? null,
+    snippets: {
+      envFileName,
+      cppFileName
+    },
+    notes: [
+      "Use this package as the handoff snapshot for software release coordination, client upgrade notices, and SDK configuration updates.",
+      "Regenerate the package after rotating SDK credentials or changing active version and notice rules."
+    ]
+  };
+
+  return {
+    fileName: `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.json`,
+    summaryFileName: `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.txt`,
+    manifest,
+    snippets: {
+      envFileName,
+      envTemplate: integrationPackage?.snippets?.envTemplate || "",
+      cppFileName,
+      cppQuickstart: integrationPackage?.snippets?.cppQuickstart || ""
+    },
+    summaryText: buildReleasePackageSummaryText(manifest)
+  };
+}
+
 function auditDeveloperSession(db, session, eventType, entityType, entityId, metadata = {}) {
   const actorType = session.actor_scope === "member" ? "developer_member" : "developer";
   audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
@@ -5919,6 +6023,82 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         tokenKeys,
         examples: buildIntegrationExamples()
       });
+    },
+
+    async developerReleasePackage(token, selector = {}, options = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+      requireDeveloperPermission(
+        session,
+        "versions.read",
+        "DEVELOPER_CLIENT_VERSION_FORBIDDEN",
+        "You can only view client versions under your assigned projects."
+      );
+      requireDeveloperPermission(
+        session,
+        "notices.read",
+        "DEVELOPER_NOTICE_FORBIDDEN",
+        "You can only view notices under your assigned projects."
+      );
+      const product = await resolveDeveloperAccessibleProductInput(
+        db,
+        store,
+        session,
+        selector,
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+      const channel = normalizeChannel(selector.channel, "stable");
+      const generatedAt = nowIso();
+      const developer = buildDeveloperIdentityPayload(session);
+      const actor = buildDeveloperActor(session);
+      const transport = buildIntegrationTransportSnapshot(config);
+      if (transport?.http && options.publicBaseUrl) {
+        transport.http.baseUrl = options.publicBaseUrl;
+      }
+      if (transport?.http && options.publicHost) {
+        transport.http.publicHost = options.publicHost;
+      }
+      if (transport?.http && options.publicPort) {
+        transport.http.publicPort = options.publicPort;
+      }
+      const signing = buildIntegrationSigningSnapshot(config);
+      const tokenKeys = this.tokenKeys();
+      const examples = buildIntegrationExamples();
+      const integrationPackage = buildDeveloperIntegrationPackagePayload({
+        developer,
+        actor,
+        product,
+        transport,
+        signing,
+        tokenKeys,
+        examples,
+        generatedAt
+      });
+      const versionManifest = await buildVersionManifest(db, store, product, null, channel);
+      const activeNoticeRows = await activeNoticesForProduct(db, store, product.id, channel);
+      const payload = buildReleasePackagePayload({
+        generatedAt,
+        developer,
+        actor,
+        product,
+        channel,
+        versionManifest,
+        activeNoticeRows,
+        integrationPackage
+      });
+      auditDeveloperSession(db, session, "product.release-package.export", "product", product.id, {
+        code: product.code,
+        channel,
+        fileName: payload.fileName
+      });
+      return payload;
     },
 
     async developerCreateProduct(token, body = {}) {

@@ -1067,6 +1067,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/release-package") {
+        const data = await services.developerReleasePackage(getBearerToken(req), {
+          productId: url.searchParams.get("productId"),
+          productCode: url.searchParams.get("productCode"),
+          projectCode: url.searchParams.get("projectCode"),
+          softwareCode: url.searchParams.get("softwareCode"),
+          channel: url.searchParams.get("channel")
+        }, {
+          publicBaseUrl: url.origin,
+          publicHost: url.hostname,
+          publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+        });
+        sendJson(res, 200, { ok: true, data });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/developer/logout") {
         sendJson(res, 200, { ok: true, data: services.developerLogout(getBearerToken(req)) });
         return;

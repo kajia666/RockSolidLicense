@@ -305,3 +305,16 @@ test("launch timeline playbook connects prelaunch, launch day, and first-week op
   assert.match(timeline, /incident-response-playbook\.md/);
   assert.match(timeline, /Do not expand rollout if any of these are still true/);
 });
+
+test("legacy deployment and storage docs point to the maintained guides", () => {
+  const legacyWindows = readText("docs/windows-server-deployment.md");
+  const legacyStorage = readText("docs/production-storage.md");
+
+  assert.match(legacyWindows, /legacy compatibility entry/i);
+  assert.match(legacyWindows, /windows-deployment-guide\.md/);
+  assert.match(legacyWindows, /production-operations-runbook\.md/);
+
+  assert.match(legacyStorage, /legacy compatibility entry/i);
+  assert.match(legacyStorage, /storage-deployment-guide\.md/);
+  assert.match(legacyStorage, /postgres-backup-restore\.md/);
+});

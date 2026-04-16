@@ -7,6 +7,7 @@ It is meant for day-one and early-production operations, where the main goal is 
 ## Read this together with
 
 - [production-launch-checklist.md](/D:/code/OnlineVerification/docs/production-launch-checklist.md)
+- [launch-timeline-playbook.md](/D:/code/OnlineVerification/docs/launch-timeline-playbook.md)
 - [linux-deployment.md](/D:/code/OnlineVerification/docs/linux-deployment.md)
 - [windows-deployment-guide.md](/D:/code/OnlineVerification/docs/windows-deployment-guide.md)
 - [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)

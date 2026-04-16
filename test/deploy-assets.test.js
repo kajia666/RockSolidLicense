@@ -283,3 +283,25 @@ test("daily checklist and observability guide cover routine checks, backups, log
   assert.match(observability, /certificate expiry/i);
   assert.match(observability, /backup freshness/i);
 });
+
+test("launch timeline playbook connects prelaunch, launch day, and first-week operations", () => {
+  const readme = readText("README.md");
+  const launchChecklist = readText("docs/production-launch-checklist.md");
+  const runbook = readText("docs/production-operations-runbook.md");
+  const timeline = readText("docs/launch-timeline-playbook.md");
+
+  assert.match(readme, /launch-timeline-playbook\.md/);
+  assert.match(launchChecklist, /launch-timeline-playbook\.md/);
+  assert.match(runbook, /launch-timeline-playbook\.md/);
+
+  assert.match(timeline, /T minus 1 day/);
+  assert.match(timeline, /Launch morning/);
+  assert.match(timeline, /First 30 minutes after opening traffic/);
+  assert.match(timeline, /First 4 hours/);
+  assert.match(timeline, /End of launch day/);
+  assert.match(timeline, /Day 2 to Day 7/);
+  assert.match(timeline, /GET \/api\/health/);
+  assert.match(timeline, /daily-operations-checklist\.md/);
+  assert.match(timeline, /incident-response-playbook\.md/);
+  assert.match(timeline, /Do not expand rollout if any of these are still true/);
+});

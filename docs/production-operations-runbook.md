@@ -12,6 +12,8 @@ It is meant for day-one and early-production operations, where the main goal is 
 - [storage-deployment-guide.md](/D:/code/OnlineVerification/docs/storage-deployment-guide.md)
 - [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 - [incident-response-playbook.md](/D:/code/OnlineVerification/docs/incident-response-playbook.md)
+- [daily-operations-checklist.md](/D:/code/OnlineVerification/docs/daily-operations-checklist.md)
+- [observability-guide.md](/D:/code/OnlineVerification/docs/observability-guide.md)
 - [token-key-rotation.md](/D:/code/OnlineVerification/docs/token-key-rotation.md)
 
 ## What healthy looks like
@@ -33,6 +35,10 @@ The storage section should also match the deployment you intended to run:
 If the service says `sqlite + sqlite` while you expected `sqlite + redis`, stop and verify your env file before taking more traffic.
 
 ## Daily 5-minute checks
+
+For a shorter shift-style version of this section, also see:
+
+- [daily-operations-checklist.md](/D:/code/OnlineVerification/docs/daily-operations-checklist.md)
 
 1. Run the local healthcheck script.
 2. Confirm the newest backup file exists and is recent enough.
@@ -62,6 +68,10 @@ Look for repeated patterns such as:
 - heartbeat failures after login succeeds
 - signature or timestamp validation failures
 - repeated device-block or network-rule denials that were not expected
+
+For logging, dashboard, and alert suggestions, also see:
+
+- [observability-guide.md](/D:/code/OnlineVerification/docs/observability-guide.md)
 
 ## Weekly checks
 

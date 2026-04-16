@@ -255,3 +255,31 @@ test("incident response playbook links recovery order across health, auth, stora
   assert.match(playbook, /Safe recovery sequence/);
   assert.match(playbook, /data\.storage\.mainStore\.driver/);
 });
+
+test("daily checklist and observability guide cover routine checks, backups, logs, and alerts", () => {
+  const readme = readText("README.md");
+  const runbook = readText("docs/production-operations-runbook.md");
+  const checklist = readText("docs/daily-operations-checklist.md");
+  const observability = readText("docs/observability-guide.md");
+
+  assert.match(readme, /daily-operations-checklist\.md/);
+  assert.match(readme, /observability-guide\.md/);
+
+  assert.match(runbook, /daily-operations-checklist\.md/);
+  assert.match(runbook, /observability-guide\.md/);
+
+  assert.match(checklist, /Start of day/);
+  assert.match(checklist, /GET \/api\/health/);
+  assert.match(checklist, /Backup freshness/);
+  assert.match(checklist, /Log scan/);
+  assert.match(checklist, /Auth path spot check/);
+  assert.match(checklist, /Weekly minimum/);
+
+  assert.match(observability, /What to observe first/);
+  assert.match(observability, /Logging guidance/);
+  assert.match(observability, /Suggested key indicators/);
+  assert.match(observability, /Suggested alert rules/);
+  assert.match(observability, /Dashboard suggestions/);
+  assert.match(observability, /certificate expiry/i);
+  assert.match(observability, /backup freshness/i);
+});

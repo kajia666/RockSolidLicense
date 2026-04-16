@@ -7151,6 +7151,110 @@ test("developer integration snapshot is scoped to visible projects", async () =>
   }
 });
 
+test("developer integration package export is scoped and includes cpp quickstart snippets", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "export.owner",
+        password: "ExportOwner123!",
+        displayName: "Export Owner"
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "export.owner",
+      password: "ExportOwner123!"
+    });
+
+    const alphaProject = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "EXPORT_ALPHA",
+        name: "Export Alpha",
+        featureConfig: {
+          allowCardLogin: false
+        }
+      },
+      ownerSession.token
+    );
+
+    const betaProject = await postJson(
+      baseUrl,
+      "/api/developer/products",
+      {
+        code: "EXPORT_BETA",
+        name: "Export Beta"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "export.viewer",
+        password: "ExportViewer123!",
+        displayName: "Export Viewer",
+        role: "viewer",
+        productCodes: ["EXPORT_ALPHA"]
+      },
+      ownerSession.token
+    );
+
+    const viewerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "export.viewer",
+      password: "ExportViewer123!"
+    });
+
+    const byProductId = await getJson(
+      baseUrl,
+      `/api/developer/integration/package?productId=${encodeURIComponent(alphaProject.id)}`,
+      viewerSession.token
+    );
+    assert.equal(byProductId.fileName, "rocksolid-integration-EXPORT_ALPHA.json");
+    assert.equal(byProductId.manifest.project.code, "EXPORT_ALPHA");
+    assert.equal(byProductId.manifest.project.featureConfig.allowCardLogin, false);
+    assert.equal(byProductId.manifest.credentials.sdkAppId, alphaProject.sdkAppId);
+    assert.equal(byProductId.manifest.credentials.sdkAppSecret, alphaProject.sdkAppSecret);
+    assert.match(byProductId.snippets.cppQuickstart, /rocksolid::ClientIdentity/);
+    assert.match(byProductId.snippets.cppQuickstart, /startup_bootstrap_http/);
+    assert.match(byProductId.snippets.cppQuickstart, /EXPORT_ALPHA/);
+    assert.match(byProductId.snippets.envTemplate, /RS_PROJECT_CODE=EXPORT_ALPHA/);
+    assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_ID=/);
+    assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_SECRET=/);
+
+    const byProjectCode = await getJson(
+      baseUrl,
+      "/api/developer/integration/package?projectCode=EXPORT_ALPHA",
+      viewerSession.token
+    );
+    assert.equal(byProjectCode.manifest.project.id, alphaProject.id);
+    assert.equal(byProjectCode.manifest.project.code, "EXPORT_ALPHA");
+
+    const forbidden = await getJsonExpectError(
+      baseUrl,
+      `/api/developer/integration/package?productId=${encodeURIComponent(betaProject.id)}`,
+      viewerSession.token
+    );
+    assert.equal(forbidden.status, 403);
+    assert.equal(forbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer projects page is served from the dedicated route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -7196,9 +7300,13 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(response.headers.get("content-type") || "", /^text\/html/);
     assert.match(html, /Developer Integration Center/);
     assert.match(html, /api\/developer\/integration/);
+    assert.match(html, /api\/developer\/integration\/package/);
     assert.match(html, /api\/client\/login/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Token Keys/);
+    assert.match(html, /Refresh Integration Package/);
+    assert.match(html, /C\+\+ Quickstart/);
+    assert.match(html, /Environment Template/);
     assert.match(html, /x-rs-app-id/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);

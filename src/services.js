@@ -424,6 +424,217 @@ function buildDeveloperActor(session) {
   };
 }
 
+function buildDeveloperIdentityPayload(session) {
+  return {
+    id: session.developer_id,
+    username: session.developer_username ?? session.username,
+    displayName: session.developer_display_name ?? session.display_name ?? "",
+    status: session.developer_status
+  };
+}
+
+function buildIntegrationTransportSnapshot(config) {
+  return {
+    http: {
+      protocol: "http",
+      host: config.host,
+      port: config.port,
+      baseUrl: `http://127.0.0.1:${config.port}`
+    },
+    tcp: {
+      enabled: Boolean(config.tcpEnabled),
+      host: config.tcpHost,
+      port: config.tcpPort
+    }
+  };
+}
+
+function buildIntegrationSigningSnapshot(config) {
+  return {
+    requestAlgorithm: "HMAC-SHA256",
+    requestSkewSeconds: config.requestSkewSeconds,
+    tokenAlgorithm: config.licenseKeys.algorithm,
+    tokenIssuer: config.tokenIssuer,
+    activeKeyId: config.licenseKeys.keyId
+  };
+}
+
+function buildIntegrationExamples() {
+  return {
+    http: [
+      { action: "register", path: "/api/client/register" },
+      { action: "login", path: "/api/client/login" },
+      { action: "card-login", path: "/api/client/card-login" },
+      { action: "version-check", path: "/api/client/version-check" },
+      { action: "notices", path: "/api/client/notices" },
+      { action: "heartbeat", path: "/api/client/heartbeat" }
+    ],
+    tcp: [
+      { action: "client.register" },
+      { action: "client.login" },
+      { action: "client.card-login" },
+      { action: "client.heartbeat" }
+    ]
+  };
+}
+
+function escapeCppStringLiteral(value) {
+  return String(value ?? "")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("\"", "\\\"");
+}
+
+function resolveIntegrationHttpEndpoint(transport = {}) {
+  try {
+    const parsed = new URL(transport.baseUrl);
+    return {
+      host: parsed.hostname || "127.0.0.1",
+      port: Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80)),
+      secure: parsed.protocol === "https:"
+    };
+  } catch {
+    return {
+      host: "127.0.0.1",
+      port: Number(transport.port || 3000),
+      secure: false
+    };
+  }
+}
+
+function buildIntegrationEnvTemplate(manifest) {
+  const http = manifest.transport?.http || {};
+  const tcp = manifest.transport?.tcp || {};
+  const signing = manifest.signing || {};
+  const project = manifest.project || {};
+  const credentials = manifest.credentials || {};
+
+  return [
+    `RS_PROJECT_CODE=${project.code || ""}`,
+    `RS_PROJECT_NAME=${project.name || ""}`,
+    `RS_SDK_APP_ID=${credentials.sdkAppId || ""}`,
+    `RS_SDK_APP_SECRET=${credentials.sdkAppSecret || ""}`,
+    `RS_APP_SALT=${credentials.deviceFingerprintSalt || project.code || ""}`,
+    `RS_HTTP_BASE_URL=${http.baseUrl || ""}`,
+    `RS_HTTP_HOST=${http.host || ""}`,
+    `RS_HTTP_PORT=${http.port ?? ""}`,
+    `RS_TCP_ENABLED=${tcp.enabled === true ? "true" : "false"}`,
+    `RS_TCP_HOST=${tcp.host || ""}`,
+    `RS_TCP_PORT=${tcp.port ?? ""}`,
+    `RS_REQUEST_SKEW_SECONDS=${signing.requestSkewSeconds ?? ""}`,
+    `RS_TOKEN_ISSUER=${signing.tokenIssuer || ""}`,
+    `RS_ACTIVE_KEY_ID=${signing.activeKeyId || ""}`
+  ].join("\n");
+}
+
+function buildIntegrationCppQuickstart(manifest) {
+  const project = manifest.project || {};
+  const credentials = manifest.credentials || {};
+  const transport = manifest.transport || {};
+  const http = resolveIntegrationHttpEndpoint(transport.http || {});
+  const tcp = transport.tcp || {};
+
+  return `#include "rocksolid_transport_win.hpp"
+
+rocksolid::ClientIdentity identity{
+  "${escapeCppStringLiteral(credentials.sdkAppId || "")}",
+  "${escapeCppStringLiteral(credentials.sdkAppSecret || "")}",
+  "${escapeCppStringLiteral(credentials.deviceFingerprintSalt || project.code || "")}"
+};
+
+rocksolid::HttpEndpoint http_endpoint;
+http_endpoint.host = L"${escapeCppStringLiteral(http.host)}";
+http_endpoint.port = ${Number(http.port || 0)};
+http_endpoint.secure = ${http.secure ? "true" : "false"};
+
+rocksolid::TcpEndpoint tcp_endpoint;
+tcp_endpoint.host = "${escapeCppStringLiteral(tcp.host || "127.0.0.1")}";
+tcp_endpoint.port = ${Number(tcp.port || 0)};  // tcp enabled=${tcp.enabled === true ? "true" : "false"}
+
+rocksolid::LicenseClientWin client(identity, http_endpoint, tcp_endpoint);
+
+const std::string product_code = "${escapeCppStringLiteral(project.code || "")}";
+const std::string client_version = "1.0.0";
+const std::string channel = "stable";
+
+const rocksolid::ClientStartupBootstrapResponse startup =
+  client.startup_bootstrap_http({ product_code, client_version, channel, true });
+
+rocksolid::LoginRequest login_request{
+  product_code,
+  "demo_user",
+  "demo_password",
+  client.generate_device_fingerprint(),
+  "Demo Workstation",
+  client_version,
+  channel
+};
+
+const rocksolid::LoginResponse login_result = client.login_http_parsed(login_request);`;
+}
+
+function buildDeveloperIntegrationPackagePayload({
+  developer,
+  actor,
+  product,
+  transport,
+  signing,
+  tokenKeys,
+  examples
+}) {
+  const manifest = {
+    generatedAt: nowIso(),
+    developer,
+    actor,
+    project: {
+      id: product.id,
+      code: product.code,
+      projectCode: product.projectCode ?? product.code,
+      softwareCode: product.softwareCode ?? product.code,
+      name: product.name,
+      description: product.description ?? "",
+      status: product.status,
+      updatedAt: product.updatedAt,
+      featureConfig: product.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {}
+    },
+    credentials: {
+      sdkAppId: product.sdkAppId,
+      sdkAppSecret: product.sdkAppSecret,
+      deviceFingerprintSalt: product.code
+    },
+    transport,
+    signing,
+    tokenKeys,
+    startupDefaults: {
+      productCode: product.code,
+      clientVersion: "1.0.0",
+      channel: "stable",
+      includeTokenKeys: true
+    },
+    examples,
+    sdkDistribution: {
+      languages: ["c", "cpp"],
+      preferredPackage: "rocksolid-sdk-cpp",
+      preferredLinkage: "static_lib",
+      requiredDefine: "RS_SDK_STATIC"
+    },
+    notes: [
+      "Replace the demo host values with your public service domain when you deploy behind a reverse proxy or TLS.",
+      "Refresh this package immediately after rotating sdkAppId or sdkAppSecret, then redeploy the client configuration."
+    ]
+  };
+
+  return {
+    fileName: `rocksolid-integration-${product.code}.json`,
+    manifest,
+    snippets: {
+      envTemplate: buildIntegrationEnvTemplate(manifest),
+      cppQuickstart: buildIntegrationCppQuickstart(manifest)
+    }
+  };
+}
+
 function auditDeveloperSession(db, session, eventType, entityType, entityId, metadata = {}) {
   const actorType = session.actor_scope === "member" ? "developer_member" : "developer";
   audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
@@ -829,6 +1040,34 @@ async function resolveDeveloperAccessibleProductByCode(db, store, session, produ
     throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist or is inactive.");
   }
   return ensureDeveloperCanAccessProduct(db, session, product, permission, code, message);
+}
+
+async function resolveDeveloperAccessibleProductInput(db, store, session, selector = {}, permission, code, message) {
+  const productId = String(selector.productId ?? "").trim();
+  if (productId) {
+    const rows = await Promise.resolve(store.products.queryProductRows(db, { productId }));
+    const product = rows[0] ?? null;
+    if (!product) {
+      throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+    }
+    return ensureDeveloperCanAccessProduct(db, session, product, permission, code, message);
+  }
+
+  const productCode = readProductCodeInput(selector, false);
+  if (productCode) {
+    const rows = await Promise.resolve(store.products.queryProductRows(db, { productCode }));
+    const product = rows[0] ?? null;
+    if (!product) {
+      throw new AppError(404, "PRODUCT_NOT_FOUND", "Product does not exist.");
+    }
+    return ensureDeveloperCanAccessProduct(db, session, product, permission, code, message);
+  }
+
+  throw new AppError(
+    400,
+    "VALIDATION_ERROR",
+    "productId is required. productCode, projectCode, or softwareCode are also accepted."
+  );
 }
 
 async function queryDeveloperMemberRows(db, store, developerId) {
@@ -5297,53 +5536,58 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "You can only view projects assigned to your developer account."
       );
       const products = await listDeveloperAccessibleProductRows(db, store, session);
+      const transport = buildIntegrationTransportSnapshot(config);
+      const signing = buildIntegrationSigningSnapshot(config);
+      const examples = buildIntegrationExamples();
       return {
-        developer: {
-          id: session.developer_id,
-          username: session.developer_username ?? session.username,
-          displayName: session.developer_display_name ?? session.display_name ?? "",
-          status: session.developer_status
-        },
+        developer: buildDeveloperIdentityPayload(session),
         actor: buildDeveloperActor(session),
-        transport: {
-          http: {
-            protocol: "http",
-            host: config.host,
-            port: config.port,
-            baseUrl: `http://127.0.0.1:${config.port}`
-          },
-          tcp: {
-            enabled: Boolean(config.tcpEnabled),
-            host: config.tcpHost,
-            port: config.tcpPort
-          }
-        },
-        signing: {
-          requestAlgorithm: "HMAC-SHA256",
-          requestSkewSeconds: config.requestSkewSeconds,
-          tokenAlgorithm: config.licenseKeys.algorithm,
-          tokenIssuer: config.tokenIssuer,
-          activeKeyId: config.licenseKeys.keyId
-        },
+        transport,
+        signing,
         tokenKeys: this.tokenKeys(),
         products,
-        examples: {
-          http: [
-            { action: "register", path: "/api/client/register" },
-            { action: "login", path: "/api/client/login" },
-            { action: "card-login", path: "/api/client/card-login" },
-            { action: "version-check", path: "/api/client/version-check" },
-            { action: "notices", path: "/api/client/notices" },
-            { action: "heartbeat", path: "/api/client/heartbeat" }
-          ],
-          tcp: [
-            { action: "client.register" },
-            { action: "client.login" },
-            { action: "client.card-login" },
-            { action: "client.heartbeat" }
-          ]
-        }
+        examples
       };
+    },
+
+    async developerIntegrationPackage(token, selector = {}, options = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+      const product = await resolveDeveloperAccessibleProductInput(
+        db,
+        store,
+        session,
+        selector,
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+      const transport = buildIntegrationTransportSnapshot(config);
+      if (transport?.http && options.publicBaseUrl) {
+        transport.http.baseUrl = options.publicBaseUrl;
+      }
+      if (transport?.http && options.publicHost) {
+        transport.http.publicHost = options.publicHost;
+      }
+      if (transport?.http && options.publicPort) {
+        transport.http.publicPort = options.publicPort;
+      }
+      const signing = buildIntegrationSigningSnapshot(config);
+      const tokenKeys = this.tokenKeys();
+      return buildDeveloperIntegrationPackagePayload({
+        developer: buildDeveloperIdentityPayload(session),
+        actor: buildDeveloperActor(session),
+        product,
+        transport,
+        signing,
+        tokenKeys,
+        examples: buildIntegrationExamples()
+      });
     },
 
     async developerCreateProduct(token, body = {}) {

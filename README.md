@@ -315,6 +315,7 @@ npm run db:postgres:check
 - `GET /api/developer/me`
 - `GET /api/developer/dashboard`
 - `GET /api/developer/integration`
+- `GET /api/developer/integration/package`
 - `POST /api/developer/logout`
 - `POST /api/developer/profile`
 - `POST /api/developer/change-password`
@@ -402,6 +403,7 @@ npm run db:postgres:check
 - `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换单个或批量项目状态、按关键字和状态筛选项目，并支持单个或批量调整项目级功能开关、批量轮换 SDK 凭据
 - `/developer`：开发者总览中心，展示项目数、在线会话、卡密、强更规则、阻断公告、网络规则和功能开关覆盖情况
 - `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息与示例请求
+- `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息、示例请求，并导出当前项目的接入包、环境模板和 C++ 快速接入片段
 - `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及单个或批量 SDK 凭据轮换
 - `/developer/licenses`：开发者授权中心，维护策略、卡密批次、卡密状态和卡密导出
 - `/developer/ops`：开发者授权运营台，处理账号冻结、授权续期、点数调账、强制下线、设备解绑和设备封禁

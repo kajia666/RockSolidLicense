@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/integration</code></div>
-          <div class="pill">API: <code>/api/developer/integration</code></div>
+          <div class="pill">APIs: <code>/api/developer/integration</code>, <code>/api/developer/integration/package</code></div>
           <div class="pill">Includes scoped projects, token keys, and transport bootstrap data.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -36,8 +36,8 @@
         <article class="card">
           <h2>Project Selector</h2>
           <label>Project Code<select id="project-select"></select></label>
-          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button></div>
-          <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples and inspect the matching SDK credentials.</div>
+          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button></div>
+          <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
         </article>
 
         <article class="card">
@@ -74,8 +74,34 @@
           <pre id="tcp-example">Sign in to generate a TCP frame example.</pre>
         </article>
         <article class="card">
+          <h2>Integration Package</h2>
+          <pre id="package-json">Select a project to generate an integration package.</pre>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>C++ Quickstart</h2>
+          <pre id="cpp-snippet">Select a project to generate a C++ quickstart snippet.</pre>
+        </article>
+        <article class="card">
+          <h2>Environment Template</h2>
+          <pre id="env-snippet">Select a project to generate an environment template.</pre>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
           <h2>Raw Snapshot</h2>
           <pre id="output">Waiting for actions...</pre>
+        </article>
+        <article class="card">
+          <h2>Export Notes</h2>
+          <div class="hint">
+            <p>The integration package is generated from the currently selected scoped project and always reflects the latest SDK credentials visible to the current developer actor.</p>
+            <p>After rotating `sdkAppSecret` or `sdkAppId`, refresh the package here and redeploy the client-side configuration before shipping a new build.</p>
+            <p>The generated HTTP host and base URL come from the current request origin. Replace them with your public domain or TLS endpoint when deploying behind a reverse proxy.</p>
+          </div>
         </article>
       </section>
     </main>
@@ -86,6 +112,7 @@
       let token = "";
       let snapshot = null;
       let selectedProduct = null;
+      let packageSnapshot = null;
 
       function el(id) {
         return document.getElementById(id);
@@ -254,10 +281,15 @@
           .join("");
 
         for (const row of body.querySelectorAll("tr[data-id]")) {
-          row.addEventListener("click", () => {
+          row.addEventListener("click", async () => {
             select.value = row.dataset.id;
-            chooseSelected();
-            setStatus(`Loaded integration data for ${(selectedProduct || {}).code || "project"}.`);
+            try {
+              await chooseSelectedAndRefreshPackage();
+              setStatus(`Loaded integration data for ${(selectedProduct || {}).code || "project"}.`);
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
           });
         }
 
@@ -335,12 +367,27 @@ ${JSON.stringify({
         }, null, 2);
       }
 
+      function renderPackage() {
+        if (!packageSnapshot) {
+          el("package-json").textContent = "Select a project to generate an integration package.";
+          el("cpp-snippet").textContent = "Select a project to generate a C++ quickstart snippet.";
+          el("env-snippet").textContent = "Select a project to generate an environment template.";
+          return;
+        }
+
+        el("package-json").textContent = JSON.stringify(packageSnapshot, null, 2);
+        el("cpp-snippet").textContent = packageSnapshot.snippets?.cppQuickstart || "";
+        el("env-snippet").textContent = packageSnapshot.snippets?.envTemplate || "";
+      }
+
       function renderSelected() {
         const product = selectedProduct;
         if (!product) {
           el("project-detail").innerHTML = '<div class="hint">Select a project to inspect credentials and feature toggles.</div>';
           el("http-example").textContent = "Sign in to generate an example request.";
           el("tcp-example").textContent = "Sign in to generate a TCP frame example.";
+          packageSnapshot = null;
+          renderPackage();
           return;
         }
 
@@ -357,6 +404,10 @@ ${JSON.stringify({
         el("tcp-example").textContent = buildTcpExample(product);
       }
 
+      function buildPackagePath(product) {
+        return `/api/developer/integration/package?productId=${encodeURIComponent(product.id)}`;
+      }
+
       function chooseSelected() {
         const id = el("project-select").value;
         selectedProduct = (snapshot?.products || []).find((item) => item.id === id) || null;
@@ -364,15 +415,34 @@ ${JSON.stringify({
         setOutput(snapshot);
       }
 
+      async function refreshPackage() {
+        if (!token || !selectedProduct) {
+          packageSnapshot = null;
+          renderPackage();
+          return;
+        }
+
+        packageSnapshot = await api(buildPackagePath(selectedProduct));
+        renderPackage();
+        setOutput(packageSnapshot);
+      }
+
+      async function chooseSelectedAndRefreshPackage() {
+        chooseSelected();
+        await refreshPackage();
+      }
+
       function clear() {
         token = "";
         snapshot = null;
         selectedProduct = null;
+        packageSnapshot = null;
         setMeta();
         renderStats();
         renderTransport();
         renderProjects();
         renderTokenKeys();
+        renderPackage();
         setOutput("Waiting for actions...");
       }
 
@@ -389,6 +459,7 @@ ${JSON.stringify({
         renderTransport();
         renderProjects();
         renderTokenKeys();
+        await refreshPackage();
         setOutput(snapshot);
       }
 
@@ -436,8 +507,24 @@ ${JSON.stringify({
       });
 
       el("use-selected-btn").addEventListener("click", () => {
-        chooseSelected();
-        setStatus(`Using ${(selectedProduct || {}).code || "selected project"} for examples.`);
+        chooseSelectedAndRefreshPackage()
+          .then(() => {
+            setStatus(`Using ${(selectedProduct || {}).code || "selected project"} for examples and export data.`);
+          })
+          .catch((error) => {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          });
+      });
+
+      el("generate-package-btn").addEventListener("click", async () => {
+        try {
+          await chooseSelectedAndRefreshPackage();
+          setStatus(`Integration package refreshed for ${(selectedProduct || {}).code || "selected project"}.`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
       });
 
       clear();
@@ -445,6 +532,7 @@ ${JSON.stringify({
       renderTransport();
       renderProjects();
       renderTokenKeys();
+      renderPackage();
     </script>
   </body>
 </html>

@@ -23,8 +23,16 @@ The page now also summarizes how many visible projects currently have each of th
 ## API
 
 - `GET /api/developer/integration`
+- `GET /api/developer/integration/package`
 
 This route requires a normal developer bearer token and is scoped to projects visible to the current actor.
+
+The package route accepts:
+
+- `productId`
+- `productCode`
+- `projectCode`
+- `softwareCode`
 
 ## Returned data
 
@@ -36,6 +44,13 @@ This route requires a normal developer bearer token and is scoped to projects vi
 - `tokenKeys`
 - `products`
 - `examples`
+
+The package route returns:
+
+- `fileName`
+- `manifest`
+- `snippets.envTemplate`
+- `snippets.cppQuickstart`
 
 Typical shape:
 
@@ -79,6 +94,8 @@ The page and API are useful when the software author needs to:
 - fetch the current public key set used for `licenseToken` verification
 - adapt example register/login/card-login/heartbeat requests for their own client
 - confirm whether recharge and client-unbind are open for a scoped project before exposing those SDK flows
+- export a current project integration package after rotating `sdkAppSecret` or `sdkAppId`
+- hand the software author a ready-to-copy C++ quickstart snippet and environment template
 
 ## Request signing headers
 

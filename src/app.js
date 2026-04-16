@@ -203,6 +203,15 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/admin/products/status/batch") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.updateProductStatusBatch(getBearerToken(req), body)
+        });
+        return;
+      }
+
       const productStatusRoute = req.method === "POST"
         ? matchPath(url.pathname, "/api/admin/products/:productId/status")
         : null;
@@ -1050,6 +1059,15 @@ export function createApp(overrides = {}) {
       if (req.method === "POST" && url.pathname === "/api/developer/products") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, { ok: true, data: await services.developerCreateProduct(getBearerToken(req), body) });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/developer/products/status/batch") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerUpdateProductStatusBatch(getBearerToken(req), body)
+        });
         return;
       }
 

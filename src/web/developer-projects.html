@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/projects</code></div>
-          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
+          <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code></div>
           <div class="pill">Owner creates projects. Owner and admin members can edit product settings.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -41,6 +41,12 @@
             <label>Rotate SDK App ID Too<select id="rotate-sdk-app-id"><option value="false">false</option><option value="true">true</option></select></label>
           </div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-filter-btn">Apply Filter</button><button id="clear-selection-btn">Clear Selection</button></div>
+          <div class="three" style="margin-top:12px;">
+            <label>Batch Status<select id="batch-status"><option value="active">active</option><option value="disabled">disabled</option><option value="archived">archived</option></select></label>
+            <div class="hint" id="batch-selection-meta">No projects selected for batch status changes.</div>
+            <div class="actions"><button class="secondary" id="select-visible-btn">Select Visible</button><button id="clear-batch-btn">Clear Batch</button><button class="danger" id="apply-batch-status-btn">Apply Batch Status</button></div>
+          </div>
+          <div class="hint" id="batch-status-note" style="margin-top:12px;">Choose a status target for the selected projects. Disabled or archived will revoke active sessions.</div>
           <div class="hint" id="permission-hint">Owners can create projects. Admin members can edit project profile, status, feature toggles, and rotate SDK credentials inside assigned projects.</div>
         </article>
       </section>
@@ -75,6 +81,7 @@
             <label>SDK App ID<input id="edit-sdk-app-id" placeholder="Filled from selection" /></label>
             <label>Project Status<select id="edit-product-status"><option value="active">active</option><option value="disabled">disabled</option><option value="archived">archived</option></select></label>
           </div>
+          <div class="hint" id="single-status-note" style="margin-top:12px;">Active keeps the selected project available. Disabled or archived will revoke active sessions for that project.</div>
           <label style="margin-top:12px;">Description<textarea id="edit-product-description" placeholder="Optional project description"></textarea></label>
           <div class="hint" style="margin:12px 0 8px;">FeatureConfig</div>
           <div class="toggle-grid">
@@ -95,7 +102,7 @@
           <h2>Projects</h2>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Project</th><th>SDK</th><th>Client Features</th><th>Updated</th></tr></thead>
+              <thead><tr><th>Select</th><th>Project</th><th>SDK</th><th>Client Features</th><th>Updated</th></tr></thead>
               <tbody id="projects-body"></tbody>
             </table>
           </div>
@@ -121,6 +128,7 @@
       let actor = null;
       let products = [];
       let dashboard = { summary: null, projects: [], generatedAt: null };
+      let batchProductIds = new Set();
 
       function el(id) {
         return document.getElementById(id);
@@ -214,6 +222,46 @@
         return (dashboard.projects || []).find((item) => item.code === code)?.metrics || {};
       }
 
+      function selectedBatchProducts() {
+        return products.filter((item) => batchProductIds.has(item.id));
+      }
+
+      function syncStatusImpactHint(targetId, status, count) {
+        const scopeCount = Number(count || 0);
+        const scopeLabel = scopeCount === 1 ? "project" : "projects";
+        const messages = {
+          active: scopeCount
+            ? `Set ${scopeCount} ${scopeLabel} to active. Existing expired sessions stay expired, but new validations can run again.`
+            : "Set selected projects to active so new validations can run again.",
+          disabled: scopeCount
+            ? `Disable ${scopeCount} ${scopeLabel} immediately and revoke their active sessions.`
+            : "Disabled projects reject new validations and revoke active sessions immediately.",
+          archived: scopeCount
+            ? `Archive ${scopeCount} ${scopeLabel} and revoke their active sessions.`
+            : "Archived projects revoke active sessions and stay out of normal runtime use until re-enabled."
+        };
+        el(targetId).textContent = messages[status] || messages.active;
+      }
+
+      function syncBatchSelectionUi() {
+        const visible = filteredProducts();
+        const visibleSelected = visible.filter((item) => batchProductIds.has(item.id)).length;
+        const totalSelected = batchProductIds.size;
+        el("batch-selection-meta").textContent = totalSelected
+          ? `${totalSelected} project(s) selected for batch status updates. ${visibleSelected} visible in the current filter.`
+          : "No projects selected for batch status changes.";
+        el("apply-batch-status-btn").disabled = !canWriteProducts() || totalSelected === 0;
+        el("clear-batch-btn").disabled = totalSelected === 0;
+        el("select-visible-btn").disabled = !products.length;
+        syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
+      }
+
+      function pruneBatchSelection(items = []) {
+        const availableIds = new Set(items.map((item) => item.id));
+        batchProductIds = new Set([...batchProductIds].filter((productId) => availableIds.has(productId)));
+        syncBatchSelectionUi();
+      }
+
       function syncPermissions() {
         const createDisabled = !canCreateProjects();
         const editDisabled = !canWriteProducts();
@@ -234,9 +282,12 @@
         el("save-feature-btn").disabled = editDisabled;
         el("rotate-sdk-btn").disabled = editDisabled;
         el("rotate-sdk-app-id").disabled = editDisabled;
+        el("batch-status").disabled = editDisabled;
+        el("apply-batch-status-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("permission-hint").textContent = !token
           ? "Sign in first."
           : `actor type=${actor?.type || "unknown"}${actor?.type === "member" ? ` | role=${actor?.role}` : " | owner can create and edit projects"}`;
+        syncBatchSelectionUi();
       }
 
       function setMeta() {
@@ -361,6 +412,7 @@
           el("edit-product-status").value = "active";
           writeFeatureConfig("edit", {});
           renderDetail(null);
+          syncStatusImpactHint("single-status-note", "active", 1);
           return;
         }
 
@@ -372,15 +424,17 @@
         el("edit-product-status").value = product.status || "active";
         writeFeatureConfig("edit", product.featureConfig || {});
         renderDetail(product);
+        syncStatusImpactHint("single-status-note", product.status || "active", 1);
       }
 
       function renderProjects() {
         const body = el("projects-body");
         const items = filteredProducts();
         if (!items.length) {
-          body.innerHTML = `<tr><td colspan="4">${products.length ? "No scoped projects match current filter." : "No scoped projects found."}</td></tr>`;
+          body.innerHTML = `<tr><td colspan="5">${products.length ? "No scoped projects match current filter." : "No scoped projects found."}</td></tr>`;
           renderStats();
           setSelection(null);
+          syncBatchSelectionUi();
           return items;
         }
 
@@ -388,6 +442,7 @@
           const features = item.featureConfig || {};
           return `
             <tr data-id="${esc(item.id)}">
+              <td><input type="checkbox" data-batch-id="${esc(item.id)}" ${batchProductIds.has(item.id) ? "checked" : ""} /></td>
               <td><strong>${esc(item.code)}</strong><div>${esc(item.name)}</div><div class="hint">${esc(item.description || "No description")}</div></td>
               <td><div class="mono">${esc(item.sdkAppId)}</div><div class="hint">${esc(item.status)}</div></td>
               <td>${renderFeatureTags(features)}</td>
@@ -405,11 +460,25 @@
             }
           });
         }
+        for (const toggle of body.querySelectorAll("[data-batch-id]")) {
+          toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+          });
+          toggle.addEventListener("change", () => {
+            if (toggle.checked) {
+              batchProductIds.add(toggle.dataset.batchId);
+            } else {
+              batchProductIds.delete(toggle.dataset.batchId);
+            }
+            syncBatchSelectionUi();
+          });
+        }
         const selectedProductId = el("edit-product-id").value.trim();
         if (selectedProductId && !items.some((item) => item.id === selectedProductId)) {
           setSelection(null);
         }
         renderStats();
+        syncBatchSelectionUi();
         return items;
       }
 
@@ -439,6 +508,7 @@
         ]);
         products = Array.isArray(productItems) ? productItems : [];
         dashboard = dashboardData || { summary: null, projects: [], generatedAt: null };
+        pruneBatchSelection(products);
         renderProjects();
         if (selectedProductId) {
           setSelection(findVisibleProductById(selectedProductId));
@@ -530,6 +600,50 @@
         renderProjects();
         setSelection(null);
         setStatus("Project filters and selection cleared.");
+      });
+
+      el("edit-product-status").addEventListener("change", () => {
+        syncStatusImpactHint("single-status-note", el("edit-product-status").value, 1);
+      });
+
+      el("batch-status").addEventListener("change", () => {
+        syncBatchSelectionUi();
+      });
+
+      el("select-visible-btn").addEventListener("click", () => {
+        for (const product of filteredProducts()) {
+          batchProductIds.add(product.id);
+        }
+        renderProjects();
+        setStatus(`Selected ${batchProductIds.size} project(s) for batch status updates.`);
+      });
+
+      el("clear-batch-btn").addEventListener("click", () => {
+        batchProductIds.clear();
+        renderProjects();
+        setStatus("Batch selection cleared.");
+      });
+
+      el("apply-batch-status-btn").addEventListener("click", async () => {
+        try {
+          const productIds = [...batchProductIds];
+          if (!productIds.length) {
+            throw new Error("Select at least one project before applying batch status.");
+          }
+          const data = await api("/api/developer/products/status/batch", {
+            method: "POST",
+            body: {
+              productIds,
+              status: el("batch-status").value
+            }
+          });
+          await refresh();
+          setStatus(`Batch status updated for ${data.changed}/${data.total} project(s); revoked ${data.revokedSessions} session(s).`);
+          setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
       });
 
       el("create-project-btn").addEventListener("click", async () => {
@@ -632,6 +746,8 @@
       clearSession();
       renderProjects();
       renderStats();
+      syncStatusImpactHint("single-status-note", "active", 1);
+      syncBatchSelectionUi();
       setOutput("Waiting for actions...");
     </script>
   </body>

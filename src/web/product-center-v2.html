@@ -326,6 +326,7 @@
           <div class="pill">Route: <code>/admin/products</code></div>
           <div class="pill">Product code = projectCode = softwareCode</div>
           <div class="pill">Status API: <code>POST /api/admin/products/:productId/status</code></div>
+          <div class="pill">Batch Status API: <code>POST /api/admin/products/status/batch</code></div>
           <div class="pill">Profile API: <code>POST /api/admin/products/:productId/profile</code></div>
           <div class="pill">Feature API: <code>POST /api/admin/products/:productId/feature-config</code></div>
           <div class="pill">Credential Rotate API: <code>POST /api/admin/products/:productId/sdk-credentials/rotate</code></div>
@@ -420,6 +421,7 @@
               <option value="archived">archived</option>
             </select>
           </label>
+          <div class="hint" id="single-status-note">Active keeps the selected project available. Disabled or archived will revoke active sessions for that project.</div>
           <label>Owner Developer
             <select id="edit-owner-developer-id">
               <option value="">Unassigned</option>
@@ -528,10 +530,27 @@
             <button id="clear-filter-btn">Clear Filter</button>
           </div>
           <div class="hint" style="margin-bottom: 12px;">Filter products by project code, display name, description, and lifecycle status.</div>
+          <div class="two" style="margin-bottom: 12px;">
+            <label>Batch Status
+              <select id="batch-status">
+                <option value="active">active</option>
+                <option value="disabled">disabled</option>
+                <option value="archived">archived</option>
+              </select>
+            </label>
+            <div class="hint" id="batch-selection-meta">No projects selected for batch status changes.</div>
+          </div>
+          <div class="actions" style="margin-bottom: 12px;">
+            <button class="secondary" id="select-visible-btn">Select Visible</button>
+            <button id="clear-batch-btn">Clear Batch</button>
+            <button class="danger" id="apply-batch-status-btn">Apply Batch Status</button>
+          </div>
+          <div class="hint" id="batch-status-note" style="margin-bottom: 12px;">Choose a status target for the selected projects. Disabled or archived will revoke active sessions.</div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th>Select</th>
                   <th>Product</th>
                   <th>Owner</th>
                   <th>SDK App</th>
@@ -565,6 +584,7 @@
       let adminToken = "";
       let productsCache = [];
       let developersCache = [];
+      let batchProductIds = new Set();
 
       function el(id) {
         return document.getElementById(id);
@@ -646,6 +666,49 @@
 
       function findVisibleProductById(productId) {
         return filterProducts(productsCache).find((item) => item.id === productId) || null;
+      }
+
+      function selectedBatchProducts() {
+        return productsCache.filter((item) => batchProductIds.has(item.id));
+      }
+
+      function syncStatusImpactHint(targetId, status, count) {
+        const scopeCount = Number(count || 0);
+        const scopeLabel = scopeCount === 1 ? "project" : "projects";
+        const messages = {
+          active: scopeCount
+            ? `Set ${scopeCount} ${scopeLabel} to active. Existing expired sessions stay expired, but new validations can run again.`
+            : "Set selected projects to active so new validations can run again.",
+          disabled: scopeCount
+            ? `Disable ${scopeCount} ${scopeLabel} immediately and revoke their active sessions.`
+            : "Disabled projects reject new validations and revoke active sessions immediately.",
+          archived: scopeCount
+            ? `Archive ${scopeCount} ${scopeLabel} and revoke their active sessions.`
+            : "Archived projects revoke active sessions and stay out of normal runtime use until re-enabled."
+        };
+        const node = el(targetId);
+        if (node) {
+          node.textContent = messages[status] || messages.active;
+        }
+      }
+
+      function syncBatchSelectionUi() {
+        const visibleProducts = filterProducts(productsCache);
+        const visibleSelected = visibleProducts.filter((item) => batchProductIds.has(item.id)).length;
+        const totalSelected = batchProductIds.size;
+        el("batch-selection-meta").textContent = totalSelected
+          ? `${totalSelected} project(s) selected for batch status updates. ${visibleSelected} visible in the current filter.`
+          : "No projects selected for batch status changes.";
+        el("select-visible-btn").disabled = !productsCache.length;
+        el("apply-batch-status-btn").disabled = !adminToken || totalSelected === 0;
+        el("clear-batch-btn").disabled = totalSelected === 0;
+        syncStatusImpactHint("batch-status-note", el("batch-status").value, totalSelected);
+      }
+
+      function pruneBatchSelection(items = []) {
+        const availableIds = new Set(items.map((item) => item.id));
+        batchProductIds = new Set([...batchProductIds].filter((productId) => availableIds.has(productId)));
+        syncBatchSelectionUi();
       }
 
       function renderFeatureSummary(stats) {
@@ -766,6 +829,7 @@
           el("rotate-sdk-app-id").value = "false";
           writeFeatureConfig("edit", {});
           el("details-box").innerHTML = '<div class="hint">Select a product row to inspect SDK credentials, project owner, and toggle summary.</div>';
+          syncStatusImpactHint("single-status-note", "active", 1);
           return;
         }
 
@@ -777,6 +841,7 @@
         el("edit-owner-developer-id").value = product.ownerDeveloperId || "";
         writeFeatureConfig("edit", product.featureConfig || {});
         renderDetails(product);
+        syncStatusImpactHint("single-status-note", product.status || "active", 1);
       }
 
       function renderDetails(product) {
@@ -801,9 +866,10 @@
         const body = el("products-body");
         const visibleItems = filterProducts(items);
         if (!visibleItems.length) {
-          body.innerHTML = `<tr><td colspan="7">${items.length ? "No products match current filter." : "No products yet."}</td></tr>`;
+          body.innerHTML = `<tr><td colspan="8">${items.length ? "No products match current filter." : "No products yet."}</td></tr>`;
           renderStats([]);
           setSelection(null);
+          syncBatchSelectionUi();
           return visibleItems;
         }
 
@@ -812,6 +878,7 @@
           const owner = ownerSummary(item);
           return `
             <tr data-id="${escapeHtml(item.id)}">
+              <td><input type="checkbox" data-batch-id="${escapeHtml(item.id)}" ${batchProductIds.has(item.id) ? "checked" : ""} /></td>
               <td>
                 <strong>${escapeHtml(item.code)}</strong>
                 <div>${escapeHtml(item.name)}</div>
@@ -858,7 +925,22 @@
           });
         }
 
+        for (const toggle of body.querySelectorAll("[data-batch-id]")) {
+          toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+          });
+          toggle.addEventListener("change", () => {
+            if (toggle.checked) {
+              batchProductIds.add(toggle.dataset.batchId);
+            } else {
+              batchProductIds.delete(toggle.dataset.batchId);
+            }
+            syncBatchSelectionUi();
+          });
+        }
+
         renderStats(visibleItems);
+        syncBatchSelectionUi();
         return visibleItems;
       }
 
@@ -894,6 +976,7 @@
 
         productsCache = Array.isArray(productData) ? productData : [];
         developersCache = Array.isArray(developerData?.items) ? developerData.items : [];
+        pruneBatchSelection(productsCache);
         renderDeveloperOptions();
         renderDevelopers(developersCache);
         const visibleProducts = renderProducts(productsCache);
@@ -1085,6 +1168,14 @@
         setStatus("Selection cleared.");
       });
 
+      el("edit-product-status").addEventListener("change", () => {
+        syncStatusImpactHint("single-status-note", el("edit-product-status").value, 1);
+      });
+
+      el("batch-status").addEventListener("change", () => {
+        syncBatchSelectionUi();
+      });
+
       el("apply-filter-btn").addEventListener("click", () => {
         const visibleProducts = renderProducts(productsCache);
         const filter = readProductFilter();
@@ -1106,10 +1197,44 @@
         });
       });
 
+      el("select-visible-btn").addEventListener("click", () => {
+        for (const product of filterProducts(productsCache)) {
+          batchProductIds.add(product.id);
+        }
+        renderProducts(productsCache);
+        setStatus(`Selected ${batchProductIds.size} project(s) for batch status updates.`);
+      });
+
+      el("clear-batch-btn").addEventListener("click", () => {
+        batchProductIds.clear();
+        renderProducts(productsCache);
+        setStatus("Batch selection cleared.");
+      });
+
+      el("apply-batch-status-btn").addEventListener("click", () => guarded(async () => {
+        const productIds = [...batchProductIds];
+        if (!productIds.length) {
+          throw new Error("Select at least one project before applying batch status.");
+        }
+
+        const data = await callApi("/api/admin/products/status/batch", {
+          method: "POST",
+          body: {
+            productIds,
+            status: el("batch-status").value
+          }
+        });
+        setOutput(data);
+        setStatus(`Batch status updated for ${data.changed}/${data.total} project(s); revoked ${data.revokedSessions} session(s).`);
+        await refreshAll();
+      }));
+
       renderStats([]);
       renderProducts([]);
       renderDevelopers([]);
       renderDeveloperOptions();
+      syncStatusImpactHint("single-status-note", "active", 1);
+      syncBatchSelectionUi();
     </script>
   </body>
 </html>

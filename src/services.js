@@ -1388,6 +1388,154 @@ async function resolveDeveloperOwnedProductIdsInput(db, store, developerId, body
   return [...resolved];
 }
 
+function normalizeBatchProductSelector(body = {}) {
+  const productIds = Array.isArray(body.productIds) ? body.productIds : [];
+  const productCodes = Array.isArray(body.productCodes)
+    ? body.productCodes
+    : Array.isArray(body.projectCodes)
+      ? body.projectCodes
+      : Array.isArray(body.softwareCodes)
+        ? body.softwareCodes
+        : [];
+
+  const provided = (
+    body.productIds !== undefined
+    || body.productCodes !== undefined
+    || body.projectCodes !== undefined
+    || body.softwareCodes !== undefined
+  );
+
+  const ids = Array.from(
+    new Set(
+      productIds
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  const codes = Array.from(
+    new Set(
+      productCodes
+        .map((value) => String(value ?? "").trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  return {
+    provided,
+    ids,
+    codes
+  };
+}
+
+async function resolveAdminProductIdsInput(db, store, body = {}) {
+  const selector = normalizeBatchProductSelector(body);
+  if (!selector.provided) {
+    throw new AppError(
+      400,
+      "VALIDATION_ERROR",
+      "productIds, productCodes, projectCodes, or softwareCodes is required."
+    );
+  }
+
+  const resolved = new Set(selector.ids);
+  for (const productCode of selector.codes) {
+    const rows = await Promise.resolve(store.products.queryProductRows(db, { productCode }));
+    const product = rows[0] ?? null;
+    if (!product) {
+      throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productCode} does not exist.`);
+    }
+    resolved.add(product.id);
+  }
+
+  if (!resolved.size) {
+    throw new AppError(400, "VALIDATION_ERROR", "At least one product must be selected.");
+  }
+
+  return [...resolved];
+}
+
+async function resolveDeveloperProductIdsInput(db, store, session, body = {}) {
+  const selector = normalizeBatchProductSelector(body);
+  if (!selector.provided) {
+    throw new AppError(
+      400,
+      "VALIDATION_ERROR",
+      "productIds, productCodes, projectCodes, or softwareCodes is required."
+    );
+  }
+
+  const resolved = new Set(selector.ids);
+  for (const productCode of selector.codes) {
+    const rows = await Promise.resolve(store.products.queryProductRows(db, { productCode }));
+    const product = rows[0] ?? null;
+    if (!product) {
+      throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productCode} does not exist.`);
+    }
+    ensureDeveloperCanAccessProduct(
+      db,
+      session,
+      {
+        id: product.id,
+        owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+      },
+      "products.write",
+      "DEVELOPER_PRODUCT_FORBIDDEN",
+      "You can only manage products owned by your developer account."
+    );
+    resolved.add(product.id);
+  }
+
+  if (!resolved.size) {
+    throw new AppError(400, "VALIDATION_ERROR", "At least one product must be selected.");
+  }
+
+  return [...resolved];
+}
+
+async function applyManagedProductStatusChange(db, store, stateStore, currentProduct, nextStatus, auditAction) {
+  if (currentProduct.status === nextStatus) {
+    return {
+      ...currentProduct,
+      status: nextStatus,
+      changed: false,
+      revokedSessions: 0
+    };
+  }
+
+  return withTransaction(db, async () => {
+    const updatedProduct = await Promise.resolve(
+      store.products.updateProductStatus(currentProduct.id, nextStatus, nowIso())
+    );
+    const revokedSessions = nextStatus === "active"
+      ? 0
+      : await expireActiveSessions(db, store, stateStore, { productId: currentProduct.id }, `product_${nextStatus}`);
+
+    auditAction(updatedProduct, revokedSessions);
+
+    return {
+      ...updatedProduct,
+      changed: true,
+      revokedSessions
+    };
+  });
+}
+
+function summarizeManagedProductStatusBatch(nextStatus, items) {
+  const total = items.length;
+  const changed = items.filter((item) => item.changed).length;
+  const revokedSessions = items.reduce((sum, item) => sum + Number(item.revokedSessions || 0), 0);
+
+  return {
+    status: nextStatus,
+    total,
+    changed,
+    unchanged: total - changed,
+    revokedSessions,
+    items
+  };
+}
+
 function assertDeveloperUsernameAvailable(db, username, conflictCode = "DEVELOPER_EXISTS") {
   if (one(db, "SELECT id FROM developer_accounts WHERE username = ?", username)) {
     throw new AppError(409, conflictCode, "Developer username already exists.");
@@ -4851,36 +4999,56 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const nextStatus = normalizeProductStatus(body.status);
-      if (currentProduct.status === nextStatus) {
-        return {
-          ...currentProduct,
-          status: nextStatus,
-          changed: false,
-          revokedSessions: 0
-        };
-      }
-
-      return withTransaction(db, async () => {
-        const updatedProduct = await Promise.resolve(
-          store.products.updateProductStatus(productId, nextStatus, nowIso())
-        );
-        const revokedSessions = nextStatus === "active"
-          ? 0
-          : await expireActiveSessions(db, store, stateStore, { productId: currentProduct.id }, `product_${nextStatus}`);
-
+      return applyManagedProductStatusChange(db, store, stateStore, currentProduct, nextStatus, (updatedProduct, revokedSessions) => {
         audit(db, "admin", admin.admin_id, "product.status", "product", productId, {
           previousStatus: currentProduct.status,
           status: nextStatus,
           code: updatedProduct.code,
           revokedSessions
         });
-
-        return {
-          ...updatedProduct,
-          changed: true,
-          revokedSessions
-        };
       });
+    },
+
+    async updateProductStatusBatch(token, body = {}) {
+      const admin = requireAdminSession(db, token);
+      const productIds = await resolveAdminProductIdsInput(db, store, body);
+      const nextStatus = normalizeProductStatus(body.status);
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        products.push(product);
+      }
+
+      const items = [];
+      for (const product of products) {
+        items.push(
+          await applyManagedProductStatusChange(db, store, stateStore, product, nextStatus, (updatedProduct, revokedSessions) => {
+            audit(db, "admin", admin.admin_id, "product.status", "product", product.id, {
+              previousStatus: product.status,
+              status: nextStatus,
+              code: updatedProduct.code,
+              revokedSessions,
+              batch: true
+            });
+          })
+        );
+      }
+
+      const summary = summarizeManagedProductStatusBatch(nextStatus, items);
+      audit(db, "admin", admin.admin_id, "product.status.batch", "product", null, {
+        status: nextStatus,
+        total: summary.total,
+        changed: summary.changed,
+        unchanged: summary.unchanged,
+        revokedSessions: summary.revokedSessions,
+        productIds,
+        productCodes: items.map((item) => item.code)
+      });
+      return summary;
     },
 
     async updateProductFeatureConfig(token, productId, body = {}) {
@@ -5076,36 +5244,67 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       );
 
       const nextStatus = normalizeProductStatus(body.status);
-      if (ownedProduct.status === nextStatus) {
-        return {
-          ...ownedProduct,
-          status: nextStatus,
-          changed: false,
-          revokedSessions: 0
-        };
-      }
-
-      return withTransaction(db, async () => {
-        const updatedProduct = await Promise.resolve(
-          store.products.updateProductStatus(ownedProduct.id, nextStatus, nowIso())
-        );
-        const revokedSessions = nextStatus === "active"
-          ? 0
-          : await expireActiveSessions(db, store, stateStore, { productId: ownedProduct.id }, `product_${nextStatus}`);
-
+      return applyManagedProductStatusChange(db, store, stateStore, ownedProduct, nextStatus, (updatedProduct, revokedSessions) => {
         auditDeveloperSession(db, session, "product.status", "product", ownedProduct.id, {
           previousStatus: ownedProduct.status,
           status: nextStatus,
           code: updatedProduct.code,
           revokedSessions
         });
-
-        return {
-          ...updatedProduct,
-          changed: true,
-          revokedSessions
-        };
       });
+    },
+
+    async developerUpdateProductStatusBatch(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      const productIds = await resolveDeveloperProductIdsInput(db, store, session, body);
+      const nextStatus = normalizeProductStatus(body.status);
+      const products = [];
+
+      for (const productId of productIds) {
+        const product = await getStoreProductById(productId);
+        if (!product) {
+          throw new AppError(404, "PRODUCT_NOT_FOUND", `Product ${productId} does not exist.`);
+        }
+        ensureDeveloperCanAccessProduct(
+          db,
+          session,
+          {
+            id: product.id,
+            owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+          },
+          "products.write",
+          "DEVELOPER_PRODUCT_FORBIDDEN",
+          "You can only manage products owned by your developer account."
+        );
+        products.push(product);
+      }
+
+      const items = [];
+      for (const product of products) {
+        items.push(
+          await applyManagedProductStatusChange(db, store, stateStore, product, nextStatus, (updatedProduct, revokedSessions) => {
+            auditDeveloperSession(db, session, "product.status", "product", product.id, {
+              previousStatus: product.status,
+              status: nextStatus,
+              code: updatedProduct.code,
+              revokedSessions,
+              batch: true
+            });
+          })
+        );
+      }
+
+      const summary = summarizeManagedProductStatusBatch(nextStatus, items);
+      auditDeveloperSession(db, session, "product.status.batch", "product", null, {
+        status: nextStatus,
+        total: summary.total,
+        changed: summary.changed,
+        unchanged: summary.unchanged,
+        revokedSessions: summary.revokedSessions,
+        productIds,
+        productCodes: items.map((item) => item.code)
+      });
+      return summary;
     },
 
     async developerUpdateProductFeatureConfig(token, productId, body = {}) {

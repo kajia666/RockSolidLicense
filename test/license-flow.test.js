@@ -6359,6 +6359,263 @@ test("project status control can disable runtime and revoke scoped sessions", as
   }
 });
 
+test("batch project status control can update multiple scoped projects", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "batch.owner",
+        password: "BatchOwner123!",
+        displayName: "Batch Owner"
+      },
+      adminSession.token
+    );
+
+    const alphaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "BATCH_ALPHA",
+        name: "Batch Alpha",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const betaProduct = await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "BATCH_BETA",
+        name: "Batch Beta",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const alphaPolicy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "BATCH_ALPHA",
+        name: "Batch Alpha Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const betaPolicy = await postJson(
+      baseUrl,
+      "/api/admin/policies",
+      {
+        productCode: "BATCH_BETA",
+        name: "Batch Beta Policy",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      adminSession.token
+    );
+
+    const alphaBatch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "BATCH_ALPHA",
+        policyId: alphaPolicy.id,
+        count: 1,
+        prefix: "BALPHA"
+      },
+      adminSession.token
+    );
+
+    const betaBatch = await postJson(
+      baseUrl,
+      "/api/admin/cards/batch",
+      {
+        productCode: "BATCH_BETA",
+        policyId: betaPolicy.id,
+        count: 1,
+        prefix: "BBETA"
+      },
+      adminSession.token
+    );
+
+    await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "BATCH_ALPHA",
+      username: "batch_alpha_user",
+      password: "BatchAlphaUser123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "BATCH_ALPHA",
+      username: "batch_alpha_user",
+      password: "BatchAlphaUser123!",
+      cardKey: alphaBatch.keys[0]
+    });
+
+    const alphaLogin = await signedClientPost(baseUrl, "/api/client/login", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "BATCH_ALPHA",
+      username: "batch_alpha_user",
+      password: "BatchAlphaUser123!",
+      deviceFingerprint: "batch-alpha-device",
+      deviceName: "Batch Alpha Desktop"
+    });
+    assert.ok(alphaLogin.sessionToken);
+
+    await signedClientPost(baseUrl, "/api/client/register", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "BATCH_BETA",
+      username: "batch_beta_user",
+      password: "BatchBetaUser123!"
+    });
+
+    await signedClientPost(baseUrl, "/api/client/recharge", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "BATCH_BETA",
+      username: "batch_beta_user",
+      password: "BatchBetaUser123!",
+      cardKey: betaBatch.keys[0]
+    });
+
+    const betaLogin = await signedClientPost(baseUrl, "/api/client/login", betaProduct.sdkAppId, betaProduct.sdkAppSecret, {
+      productCode: "BATCH_BETA",
+      username: "batch_beta_user",
+      password: "BatchBetaUser123!",
+      deviceFingerprint: "batch-beta-device",
+      deviceName: "Batch Beta Desktop"
+    });
+    assert.ok(betaLogin.sessionToken);
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "batch.owner",
+      password: "BatchOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "batch.admin",
+        password: "BatchAdmin123!",
+        displayName: "Batch Admin",
+        role: "admin",
+        productCodes: ["BATCH_ALPHA", "BATCH_BETA"]
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "batch.operator",
+        password: "BatchOperator123!",
+        displayName: "Batch Operator",
+        role: "operator",
+        productCodes: ["BATCH_ALPHA", "BATCH_BETA"]
+      },
+      ownerSession.token
+    );
+
+    const adminMemberSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "batch.admin",
+      password: "BatchAdmin123!"
+    });
+
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "batch.operator",
+      password: "BatchOperator123!"
+    });
+
+    const disableBatch = await postJson(
+      baseUrl,
+      "/api/developer/products/status/batch",
+      {
+        productIds: [alphaProduct.id, betaProduct.id],
+        status: "disabled"
+      },
+      adminMemberSession.token
+    );
+    assert.equal(disableBatch.status, "disabled");
+    assert.equal(disableBatch.total, 2);
+    assert.equal(disableBatch.changed, 2);
+    assert.equal(disableBatch.unchanged, 0);
+    assert.ok(disableBatch.revokedSessions >= 2);
+    assert.equal(disableBatch.items.length, 2);
+    assert.deepEqual(disableBatch.items.map((item) => item.status).sort(), ["disabled", "disabled"]);
+
+    const alphaSessionsAfterDisable = await getJson(
+      baseUrl,
+      "/api/admin/sessions?productCode=BATCH_ALPHA&status=active",
+      adminSession.token
+    );
+    assert.equal(alphaSessionsAfterDisable.total, 0);
+
+    const betaSessionsAfterDisable = await getJson(
+      baseUrl,
+      "/api/admin/sessions?productCode=BATCH_BETA&status=active",
+      adminSession.token
+    );
+    assert.equal(betaSessionsAfterDisable.total, 0);
+
+    const ownerProductsAfterDisable = await getJson(baseUrl, "/api/developer/products", ownerSession.token);
+    const disabledCodes = ownerProductsAfterDisable
+      .filter((item) => ["BATCH_ALPHA", "BATCH_BETA"].includes(item.code))
+      .map((item) => item.status)
+      .sort();
+    assert.deepEqual(disabledCodes, ["disabled", "disabled"]);
+
+    const operatorForbidden = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/products/status/batch",
+      {
+        productIds: [alphaProduct.id],
+        status: "active"
+      },
+      operatorSession.token
+    );
+    assert.equal(operatorForbidden.status, 403);
+    assert.equal(operatorForbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const reenableBatch = await postJson(
+      baseUrl,
+      "/api/admin/products/status/batch",
+      {
+        projectCodes: ["BATCH_ALPHA", "BATCH_BETA"],
+        status: "active"
+      },
+      adminSession.token
+    );
+    assert.equal(reenableBatch.status, "active");
+    assert.equal(reenableBatch.total, 2);
+    assert.equal(reenableBatch.changed, 2);
+    assert.equal(reenableBatch.unchanged, 0);
+    assert.equal(reenableBatch.revokedSessions, 0);
+
+    const registerAfterEnable = await signedClientPost(baseUrl, "/api/client/register", alphaProduct.sdkAppId, alphaProduct.sdkAppSecret, {
+      productCode: "BATCH_ALPHA",
+      username: "batch_alpha_return",
+      password: "BatchAlphaReturn123!"
+    });
+    assert.equal(registerAfterEnable.username, "batch_alpha_return");
+
+    const adminAuditLogs = await getJson(baseUrl, "/api/admin/audit-logs?limit=200", adminSession.token);
+    const developerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=200", adminMemberSession.token);
+    assert.ok(adminAuditLogs.items.some((entry) => entry.event_type === "product.status.batch"));
+    assert.ok(developerAuditLogs.items.some((entry) => entry.event_type === "product.status.batch"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("product center page is served from the dedicated admin route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -6373,9 +6630,12 @@ test("product center page is served from the dedicated admin route", async () =>
     assert.match(html, /api\/admin\/developers/);
     assert.match(html, /developers\/:developerId\/status/);
     assert.match(html, /products\/:productId\/status/);
+    assert.match(html, /products\/status\/batch/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Save Project Status/);
+    assert.match(html, /Apply Batch Status/);
+    assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
     assert.match(html, /Save Project Profile/);
@@ -6509,11 +6769,14 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/products/);
     assert.match(html, /feature-config/);
     assert.match(html, /products\/:productId\/status/);
+    assert.match(html, /products\/status\/batch/);
     assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
     assert.match(html, /Save Project Status/);
+    assert.match(html, /Apply Batch Status/);
+    assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
     assert.match(html, /Save Project Profile/);

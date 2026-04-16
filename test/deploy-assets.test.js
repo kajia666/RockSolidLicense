@@ -172,24 +172,38 @@ test("postgres backup and restore assets cover linux, windows, and preview compo
   const restoreShell = readText("deploy/postgres/restore-postgres.sh");
   const backupPs = readText("deploy/postgres/backup-postgres.ps1");
   const restorePs = readText("deploy/postgres/restore-postgres.ps1");
+  const postgresBackupService = readText("deploy/systemd/rocksolid-postgres-backup.service");
+  const postgresBackupTimer = readText("deploy/systemd/rocksolid-postgres-backup.timer");
+  const registerPostgresTask = readText("deploy/windows/register-rocksolid-postgres-backup-task.ps1");
+  const unregisterPostgresTask = readText("deploy/windows/unregister-rocksolid-postgres-backup-task.ps1");
 
   assert.match(readme, /postgres-backup-restore\.md/);
   assert.match(readme, /backup-postgres\.sh/);
   assert.match(readme, /restore-postgres\.ps1/);
+  assert.match(readme, /rocksolid-postgres-backup\.timer/);
+  assert.match(readme, /register-rocksolid-postgres-backup-task\.ps1/);
 
   assert.match(runbook, /postgres-backup-restore\.md/);
   assert.match(runbook, /backup-postgres\.sh/);
   assert.match(runbook, /backup-postgres\.ps1/);
+  assert.match(runbook, /rocksolid-postgres-backup\.timer/);
 
   assert.match(linuxGuide, /postgres-backup-restore\.md/);
   assert.match(linuxGuide, /backup-postgres\.sh/);
+  assert.match(linuxGuide, /rocksolid-postgres-backup\.service/);
+  assert.match(linuxGuide, /03:35/);
   assert.match(windowsGuide, /postgres-backup-restore\.md/);
   assert.match(windowsGuide, /backup-postgres\.ps1/);
+  assert.match(windowsGuide, /register-rocksolid-postgres-backup-task\.ps1/);
+  assert.match(windowsGuide, /RockSolidLicensePostgresBackup/);
 
   assert.match(postgresGuide, /127\.0\.0\.1:5432:5432/);
   assert.match(postgresGuide, /pg_dump/);
   assert.match(postgresGuide, /pg_restore/);
   assert.match(postgresGuide, /restore-postgres\.ps1/);
+  assert.match(postgresGuide, /rocksolid-postgres-backup\.timer/);
+  assert.match(postgresGuide, /03:35/);
+  assert.match(postgresGuide, /register-rocksolid-postgres-backup-task\.ps1/);
 
   assert.match(previewEnv, /PGHOST=127\.0\.0\.1/);
   assert.match(previewEnv, /PGDATABASE=rocksolid/);
@@ -209,4 +223,13 @@ test("postgres backup and restore assets cover linux, windows, and preview compo
   assert.match(backupPs, /RSL_POSTGRES_URL/);
   assert.match(restorePs, /pg_restore\.exe/);
   assert.match(restorePs, /SkipClean/);
+
+  assert.match(postgresBackupService, /deploy\/postgres\/backup-postgres\.sh/);
+  assert.match(postgresBackupService, /BACKUP_DIR=\/var\/lib\/rocksolid\/postgres-backups/);
+  assert.match(postgresBackupTimer, /OnCalendar=\*-\*-\* 03:35:00/);
+  assert.match(registerPostgresTask, /RockSolidLicensePostgresBackup/);
+  assert.match(registerPostgresTask, /backup-postgres\.ps1/);
+  assert.match(registerPostgresTask, /Minute = 35/);
+  assert.match(unregisterPostgresTask, /RockSolidLicensePostgresBackup/);
+  assert.match(unregisterPostgresTask, /Unregister-ScheduledTask/);
 });

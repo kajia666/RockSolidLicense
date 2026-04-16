@@ -24,6 +24,8 @@ Windows 上当前最稳的首发方式是：
 - [configure-firewall.ps1](/D:/code/OnlineVerification/deploy/windows/configure-firewall.ps1)
 - [backup-rocksolid.ps1](/D:/code/OnlineVerification/deploy/windows/backup-rocksolid.ps1)
 - [register-rocksolid-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/register-rocksolid-backup-task.ps1)
+- [register-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/register-rocksolid-postgres-backup-task.ps1)
+- [unregister-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/unregister-rocksolid-postgres-backup-task.ps1)
 - [healthcheck-rocksolid.ps1](/D:/code/OnlineVerification/deploy/windows/healthcheck-rocksolid.ps1)
 - [Caddyfile.example](/D:/code/OnlineVerification/deploy/windows/Caddyfile.example)
 
@@ -214,7 +216,17 @@ powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\windows\regi
 
 - [backup-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.ps1)
 - [restore-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.ps1)
+- [register-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/register-rocksolid-postgres-backup-task.ps1)
+- [unregister-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/unregister-rocksolid-postgres-backup-task.ps1)
 - [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
+
+如果你准备把 PostgreSQL 备份也变成每日自动任务，可以执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\windows\register-rocksolid-postgres-backup-task.ps1
+```
+
+默认任务名是 `RockSolidLicensePostgresBackup`，默认每天 `03:35` 运行，故意比文件型 app 备份晚一些，避免两个任务同时起跑。
 
 ## 上线前最少要确认的事
 

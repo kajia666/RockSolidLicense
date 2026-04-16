@@ -21,6 +21,8 @@ Linux remains the best default fit for this project because:
 - [rocksolid.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid.service)
 - [rocksolid-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-backup.service)
 - [rocksolid-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-backup.timer)
+- [rocksolid-postgres-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.service)
+- [rocksolid-postgres-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.timer)
 - [Caddyfile.example](/D:/code/OnlineVerification/deploy/linux/Caddyfile.example)
 - [run-rocksolid.sh](/D:/code/OnlineVerification/deploy/linux/run-rocksolid.sh)
 - [healthcheck-rocksolid.sh](/D:/code/OnlineVerification/deploy/linux/healthcheck-rocksolid.sh)
@@ -173,6 +175,8 @@ If your main store is PostgreSQL instead of SQLite, also add host-level PostgreS
 
 - [backup-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.sh)
 - [restore-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.sh)
+- [rocksolid-postgres-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.service)
+- [rocksolid-postgres-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.timer)
 - [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 ## Scheduled backups with systemd timer
@@ -187,6 +191,19 @@ sudo systemctl enable --now rocksolid-backup.timer
 ```
 
 The current timer runs every day at `03:15`.
+
+If you also enable the PostgreSQL preview main store path, you can add a second daily timer for `pg_dump`:
+
+1. Copy [rocksolid-postgres-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.service) to `/etc/systemd/system/rocksolid-postgres-backup.service`.
+2. Copy [rocksolid-postgres-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.timer) to `/etc/systemd/system/rocksolid-postgres-backup.timer`.
+3. Enable the timer:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now rocksolid-postgres-backup.timer
+```
+
+The current PostgreSQL timer runs every day at `03:35`.
 
 ## Production notes
 

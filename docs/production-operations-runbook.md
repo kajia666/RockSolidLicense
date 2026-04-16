@@ -76,6 +76,14 @@ Recommended weekly endpoints:
 - `GET /api/system/token-key`
 - `GET /api/system/token-keys`
 
+Suggested weekly order:
+
+1. Check the newest app backup artifact.
+2. If PostgreSQL is enabled, check the newest PostgreSQL dump artifact too.
+3. Verify both backup schedules are still enabled.
+4. Run one small restore drill on a non-production target.
+5. Confirm the health endpoint and one real client login still work after the drill.
+
 ## Backup expectations by storage topology
 
 ### SQLite + SQLite
@@ -125,6 +133,9 @@ Repository references:
 - [restore-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.sh)
 - [backup-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.ps1)
 - [restore-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.ps1)
+- [rocksolid-postgres-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.service)
+- [rocksolid-postgres-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.timer)
+- [register-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/register-rocksolid-postgres-backup-task.ps1)
 - [postgres-backup-restore.md](/D:/code/OnlineVerification/docs/postgres-backup-restore.md)
 
 For Redis in this topology, losing runtime state is usually survivable, but expect active sessions and heartbeat state to be rebuilt.
@@ -257,6 +268,7 @@ For SQLite:
 For PostgreSQL:
 
 - verify the connection URL, credentials, `pg_isready`, and data-volume health
+- verify the latest scheduled `pg_dump` job actually produced a fresh dump file
 
 For Redis:
 

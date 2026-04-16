@@ -17,6 +17,10 @@ The repository now includes host-side PostgreSQL client scripts for both Linux a
 - [restore-postgres.sh](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.sh)
 - [backup-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/backup-postgres.ps1)
 - [restore-postgres.ps1](/D:/code/OnlineVerification/deploy/postgres/restore-postgres.ps1)
+- [rocksolid-postgres-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.service)
+- [rocksolid-postgres-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.timer)
+- [register-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/register-rocksolid-postgres-backup-task.ps1)
+- [unregister-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/unregister-rocksolid-postgres-backup-task.ps1)
 
 These scripts are meant for environments where:
 
@@ -88,6 +92,28 @@ RETENTION_DAYS=30
 PG_DUMP_BIN=/usr/lib/postgresql/17/bin/pg_dump
 ```
 
+## Linux scheduled backup with systemd
+
+The repository now also includes:
+
+- [rocksolid-postgres-backup.service](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.service)
+- [rocksolid-postgres-backup.timer](/D:/code/OnlineVerification/deploy/systemd/rocksolid-postgres-backup.timer)
+
+Suggested installation:
+
+```bash
+sudo cp /opt/rocksolidlicense/deploy/systemd/rocksolid-postgres-backup.service /etc/systemd/system/
+sudo cp /opt/rocksolidlicense/deploy/systemd/rocksolid-postgres-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now rocksolid-postgres-backup.timer
+```
+
+Current default schedule:
+
+- every day at `03:35`
+
+That intentionally runs after the file-based app backup timer so the two jobs do not start at the exact same moment.
+
 ## Linux restore
 
 Typical command:
@@ -149,6 +175,31 @@ If you need to keep existing objects and avoid the cleanup pass:
 powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\postgres\restore-postgres.ps1 `
   -BackupPath C:\RockSolidLicense\postgres-backups\rocksolid-postgres-backup-20260417-030000-manual.dump `
   -SkipClean
+```
+
+## Windows scheduled backup with Scheduled Task
+
+The repository now also includes:
+
+- [register-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/register-rocksolid-postgres-backup-task.ps1)
+- [unregister-rocksolid-postgres-backup-task.ps1](/D:/code/OnlineVerification/deploy/windows/unregister-rocksolid-postgres-backup-task.ps1)
+
+Register the daily PostgreSQL backup task:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\windows\register-rocksolid-postgres-backup-task.ps1
+```
+
+Default task settings:
+
+- task name: `RockSolidLicensePostgresBackup`
+- run account: `SYSTEM`
+- schedule: every day at `03:35`
+
+Remove the task later if needed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\RockSolidLicense\deploy\windows\unregister-rocksolid-postgres-backup-task.ps1
 ```
 
 ## Recommended restore drill

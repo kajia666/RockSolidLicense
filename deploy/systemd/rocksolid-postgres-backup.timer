@@ -1,0 +1,10 @@
+[Unit]
+Description=Run RockSolidLicense PostgreSQL backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:35:00
+Persistent=true
+Unit=rocksolid-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

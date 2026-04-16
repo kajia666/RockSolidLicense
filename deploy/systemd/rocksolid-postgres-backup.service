@@ -1,0 +1,16 @@
+[Unit]
+Description=RockSolidLicense PostgreSQL Backup Job
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/rocksolidlicense/rocksolid.env
+Environment=ENV_FILE=/etc/rocksolidlicense/rocksolid.env
+Environment=BACKUP_DIR=/var/lib/rocksolid/postgres-backups
+Environment=LABEL=scheduled
+ExecStart=/opt/rocksolidlicense/deploy/postgres/backup-postgres.sh
+User=rocksolid
+Group=rocksolid
+NoNewPrivileges=true
+StateDirectory=rocksolid

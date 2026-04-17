@@ -11,6 +11,13 @@ The selected project detail card now also exposes direct handoff links into:
 
 `/developer/projects` also accepts `productId` or `productCode` in the query string so the page can reopen with the same project preselected.
 
+The detail card now also shows a lightweight "Delivery quick signals" summary. It is not the same as the full release readiness package, but it helps software authors spot obvious blockers such as:
+
+- inactive project status
+- no active client version rule
+- active blocking notices
+- startup version-check or notice toggles being turned off
+
 ## Scoped APIs
 
 - `GET /api/developer/products`

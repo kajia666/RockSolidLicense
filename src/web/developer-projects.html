@@ -526,6 +526,86 @@
         renderFeatureSummary();
       }
 
+      function buildDeliveryQuickSignals(product, metrics = {}, features = {}) {
+        const activeVersions = Number(metrics.activeClientVersions ?? 0);
+        const forceUpdates = Number(metrics.forceUpdateVersions ?? 0);
+        const blockingNotices = Number(metrics.blockingNotices ?? 0);
+        const activeRules = Number(metrics.activeNetworkRules ?? 0);
+        const projectActive = (product.status || "active") === "active";
+        const versionChecksEnabled = features.allowVersionCheck !== false;
+        const noticesEnabled = features.allowNotices !== false;
+
+        let status = "ready";
+        let title = "Ready to review";
+        const tags = [];
+        const concerns = [];
+
+        if (!projectActive) {
+          status = "hold";
+          title = "Hold before release";
+          concerns.push("project is not active");
+        }
+        if (blockingNotices > 0) {
+          status = "hold";
+          title = "Hold before release";
+          concerns.push(`${blockingNotices} blocking notice(s) are active`);
+        }
+        if (activeVersions <= 0 && status !== "hold") {
+          status = "attention";
+          title = "Needs attention";
+          concerns.push("no active client version rule is available");
+        }
+        if (!versionChecksEnabled && status === "ready") {
+          status = "attention";
+          title = "Needs attention";
+          concerns.push("startup version check is disabled");
+        }
+        if (!noticesEnabled && status === "ready") {
+          status = "attention";
+          title = "Needs attention";
+          concerns.push("startup notices are disabled");
+        }
+
+        tags.push({
+          label: title,
+          style: status === "ready" ? "ok" : status === "hold" ? "danger" : ""
+        });
+        tags.push({
+          label: activeVersions > 0 ? `${activeVersions} active version` : "no active version",
+          style: activeVersions > 0 ? "ok" : "danger"
+        });
+        tags.push({
+          label: blockingNotices > 0 ? `${blockingNotices} blocking notice` : "no blocking notices",
+          style: blockingNotices > 0 ? "danger" : "ok"
+        });
+        tags.push({
+          label: versionChecksEnabled ? "version check on" : "version check off",
+          style: versionChecksEnabled ? "ok" : ""
+        });
+        tags.push({
+          label: noticesEnabled ? "notices on" : "notices off",
+          style: noticesEnabled ? "ok" : ""
+        });
+        if (forceUpdates > 0) {
+          tags.push({ label: `${forceUpdates} force update`, style: "" });
+        }
+        if (activeRules > 0) {
+          tags.push({ label: `${activeRules} network rule`, style: "" });
+        }
+
+        let message = "Current project signals look stable enough for a dedicated release readiness check.";
+        let nextAction = "Open Release Check to generate the full readiness, delivery summary, and checklist for this project.";
+        if (status === "hold") {
+          message = `Release traffic should stay on hold because ${concerns.join(" and ")}.`;
+          nextAction = "Resolve the project status or blocking notices first, then regenerate the release package.";
+        } else if (status === "attention") {
+          message = `Release setup still needs review because ${concerns.join(" and ")}.`;
+          nextAction = "Review version rules and startup toggles, then open Release Check for a full handoff package.";
+        }
+
+        return { status, title, tags, message, nextAction };
+      }
+
       function renderDetail(product = null) {
         if (!product) {
           el("detail-box").innerHTML = '<div class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>';
@@ -535,6 +615,7 @@
 
         const metrics = findProjectMetrics(product.code);
         const features = product.featureConfig || {};
+        const delivery = buildDeliveryQuickSignals(product, metrics, features);
         el("detail-box").innerHTML = `
           <div class="split-line"><span>Project</span><span><strong>${esc(product.code)}</strong> | ${esc(product.name)}</span></div>
           <div class="split-line"><span>Description</span><span>${esc(product.description || "No description")}</span></div>
@@ -549,6 +630,10 @@
           <div class="split-line"><span>Runtime</span><span>${esc(metrics.activeEntitlements ?? 0)} entitlements | ${esc(metrics.activeSessions ?? 0)} sessions</span></div>
           <div class="split-line"><span>Release</span><span>${esc(metrics.activeClientVersions ?? 0)} active | ${esc(metrics.forceUpdateVersions ?? 0)} force update</span></div>
           <div class="split-line"><span>Notices & Rules</span><span>${esc(metrics.blockingNotices ?? 0)} blocking | ${esc(metrics.activeNetworkRules ?? 0)} rules</span></div>
+          <div class="hint" style="margin-top:14px;">Delivery quick signals</div>
+          <div style="margin-top:8px;">${delivery.tags.map((item) => tag(item.label, item.style)).join("")}</div>
+          <div class="hint" style="margin-top:10px;">${esc(delivery.message)}</div>
+          <div class="hint" style="margin-top:10px;">Next: ${esc(delivery.nextAction)}</div>
           <div class="hint" style="margin-top:14px;">Current featureConfig</div>
           <div style="margin-top:8px;">${renderFeatureDetails(features)}</div>
         `;

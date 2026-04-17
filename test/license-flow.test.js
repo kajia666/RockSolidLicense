@@ -8881,6 +8881,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Open Integration Package/);
     assert.match(html, /Open Release Check/);
     assert.match(html, /window\.location\.search/);
+    assert.match(html, /Delivery quick signals/);
+    assert.match(html, /buildDeliveryQuickSignals/);
     assert.match(html, /Save Project Profile/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);

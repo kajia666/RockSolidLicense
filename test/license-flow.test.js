@@ -8792,6 +8792,7 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /Last Action Result/);
     assert.match(html, /buildAdminMutationRecap/);
     assert.match(html, /compareAdminMutationSignals/);
+    assert.match(html, /isEscalateFirstSummary/);
     assert.match(html, /Prepared Control/);
     assert.match(html, /rememberAdminPreparedFocus/);
     assert.match(html, /runAdminPreparedAction/);
@@ -8808,6 +8809,8 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /Open Control/);
     assert.match(html, /Load Full Context/);
     assert.match(html, /ESCALATE/);
+    assert.match(html, /Escalate First Cleared/);
+    assert.match(html, /escalate:/);
     assert.match(html, /Follow-up:/);
     assert.match(html, /follow-up:/);
     assert.match(html, /Impact:/);

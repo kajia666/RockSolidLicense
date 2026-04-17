@@ -1152,6 +1152,18 @@
         return ranks[normalized] || 0;
       }
 
+      function isEscalateFirstSummary(summary = {}) {
+        const queuePosition = Number(summary?.queuePosition);
+        if (!Number.isFinite(queuePosition) || queuePosition <= 0) {
+          return false;
+        }
+        const severityRank = adminSeverityRank(summary?.queueSeverity || summary?.maxSeverity || "");
+        if (severityRank >= 3) {
+          return true;
+        }
+        return queuePosition === 1 && severityRank === 2;
+      }
+
       function summarizeAdminSnapshotHits(hits = []) {
         const summary = {
           hitCount: Array.isArray(hits) ? hits.length : 0,
@@ -1159,6 +1171,7 @@
           maxSeverityRank: 0,
           queuePosition: null,
           queueSeverity: "",
+          escalateFirst: false,
           sources: []
         };
         if (!Array.isArray(hits)) {
@@ -1183,6 +1196,7 @@
             }
           }
         }
+        summary.escalateFirst = isEscalateFirstSummary(summary);
         return summary;
       }
 
@@ -1230,6 +1244,18 @@
               : after.maxSeverityRank > 0
               ? "warning"
               : "ok";
+        let escalationLabel = "";
+        let escalationTone = "";
+        if (before.escalateFirst && !after.escalateFirst) {
+          escalationLabel = "Escalate First Cleared";
+          escalationTone = "ok";
+        } else if (!before.escalateFirst && after.escalateFirst) {
+          escalationLabel = "Escalate First Added";
+          escalationTone = "danger";
+        } else if (before.escalateFirst && after.escalateFirst && before.queuePosition !== null && after.queuePosition !== null && before.queuePosition !== after.queuePosition) {
+          escalationLabel = after.queuePosition < before.queuePosition ? "Escalate First Higher" : "Escalate First Lower";
+          escalationTone = after.queuePosition < before.queuePosition ? "danger" : "warning";
+        }
         let headline = "Still visible in the current snapshot focus.";
         if (trend === "cleared") {
           headline = "The refreshed snapshot no longer flags this object.";
@@ -1265,6 +1291,11 @@
           const afterQueue = after.queuePosition !== null ? `#${after.queuePosition}` : "out";
           detailParts.push(`queue=${beforeQueue}->${afterQueue}`);
         }
+        if (before.escalateFirst || after.escalateFirst) {
+          const beforeEscalate = before.escalateFirst && before.queuePosition !== null ? `#${before.queuePosition}` : "out";
+          const afterEscalate = after.escalateFirst && after.queuePosition !== null ? `#${after.queuePosition}` : "out";
+          detailParts.push(`escalate=${beforeEscalate}->${afterEscalate}`);
+        }
         detailParts.push(`signals=${before.hitCount}->${after.hitCount}`);
 
         return {
@@ -1273,6 +1304,8 @@
           trend,
           trendLabel: trendLabelMap[trend] || "No Change",
           trendTone,
+          escalationLabel,
+          escalationTone,
           headline,
           detail: detailParts.join(" | ")
         };
@@ -1534,6 +1567,8 @@
           trend: comparison.trend,
           trendLabel: comparison.trendLabel,
           trendTone: comparison.trendTone,
+          escalationLabel: comparison.escalationLabel,
+          escalationTone: comparison.escalationTone,
           before: comparison.before,
           after: comparison.after,
           followUp,
@@ -1557,9 +1592,11 @@
         const afterQueue = adminLastMutation.after?.queuePosition;
         const progressTags = [
           adminLastMutation.trendLabel ? `<span class="tag ${escapeHtml(adminLastMutation.trendTone || "")}">${escapeHtml(adminLastMutation.trendLabel)}</span>` : "",
+          adminLastMutation.escalationLabel ? `<span class="tag ${escapeHtml(adminLastMutation.escalationTone || "")}">${escapeHtml(adminLastMutation.escalationLabel)}</span>` : "",
           adminLastMutation.before?.maxSeverity ? `<span class="tag ${escapeHtml(beforeSeverityClass || "")}">before:${escapeHtml(adminLastMutation.before.maxSeverity.toUpperCase())}</span>` : "",
           adminLastMutation.after?.maxSeverity ? `<span class="tag ${escapeHtml(afterSeverityClass || "")}">now:${escapeHtml(adminLastMutation.after.maxSeverity.toUpperCase())}</span>` : (adminLastMutation.before?.maxSeverity || beforeQueue !== null ? `<span class="tag ok">now:clear</span>` : ""),
           (Number.isFinite(beforeQueue) || Number.isFinite(afterQueue)) ? `<span class="tag">queue:${escapeHtml(beforeQueue !== null ? `#${beforeQueue}` : "out")}->${escapeHtml(afterQueue !== null ? `#${afterQueue}` : "out")}</span>` : "",
+          (adminLastMutation.before?.escalateFirst || adminLastMutation.after?.escalateFirst) ? `<span class="tag">escalate:${escapeHtml(adminLastMutation.before?.escalateFirst && beforeQueue !== null ? `#${beforeQueue}` : "out")}->${escapeHtml(adminLastMutation.after?.escalateFirst && afterQueue !== null ? `#${afterQueue}` : "out")}</span>` : "",
           `<span class="tag">signals:${escapeHtml(adminLastMutation.before?.hitCount ?? 0)}->${escapeHtml(adminLastMutation.after?.hitCount ?? 0)}</span>`
         ].filter(Boolean).join("");
         const followUpTags = [

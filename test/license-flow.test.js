@@ -6274,6 +6274,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(Array.isArray(exportSnapshot.overview.recommendedQueue));
     assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "session" && item.severity));
     assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.recommendedControl?.label));
+    assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "account" && typeof item.issueCount === "number"));
+    assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "device" && typeof item.relatedSessionCount === "number"));
     assert.equal(exportSnapshot.overview.queueSummary.total, exportSnapshot.overview.recommendedQueue.length);
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: EXPORT_ALPHA/);
@@ -6532,6 +6534,8 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
     assert.ok(Array.isArray(exportSnapshot.overview.recommendedQueue));
     assert.equal(exportSnapshot.overview.recommendedQueue[0].severity, "critical");
     assert.equal(exportSnapshot.overview.recommendedQueue[0].recommendedControl?.type, "unblock_device");
+    assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "account" && typeof item.activeSessionCount === "number"));
+    assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "device" && typeof item.relatedSessionCount === "number"));
     assert.equal(exportSnapshot.overview.queueSummary.critical >= 1, true);
     assert.ok(exportSnapshot.overview.focusFingerprints.some((item) => item.fingerprint === "admin-export-alpha-device-01"));
     assert.match(exportSnapshot.summaryText, /RockSolid Admin Ops Snapshot/);

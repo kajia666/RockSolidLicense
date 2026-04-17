@@ -282,6 +282,11 @@
         background: rgba(15, 124, 104, 0.06);
       }
 
+      tbody tr.row-focus {
+        background: rgba(15, 124, 104, 0.16);
+        box-shadow: inset 0 0 0 2px rgba(15, 124, 104, 0.22);
+      }
+
       .empty {
         color: var(--muted);
       }
@@ -910,6 +915,7 @@
       let adminOpsPreview = null;
       let adminOpsLastDownload = null;
       let adminOpsFocusMap = new Map();
+      let adminFocusedRows = [];
       const AUDIT_PRESET_BUTTONS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
       function el(id) {
@@ -1301,6 +1307,9 @@
           if (item.accountId) {
             el("account-id").value = item.accountId;
           }
+          if (item.entitlementId) {
+            el("entitlement-id").value = item.entitlementId;
+          }
           if (item.sessionId) {
             el("session-id").value = item.sessionId;
           }
@@ -1321,6 +1330,9 @@
           }
           if (item.username) {
             el("ops-username").value = item.username;
+          }
+          if (item.entitlementId) {
+            el("entitlement-id").value = item.entitlementId;
           }
           if (item.sessionId) {
             el("session-id").value = item.sessionId;
@@ -1361,9 +1373,20 @@
           }
         }
         const preparedControl = applyAdminRecommendedControl(item.recommendedControl);
+        let loadedPanels = [];
+        let matchedPanels = [];
         if (adminToken) {
           await previewOpsExport();
         }
+        loadedPanels = await drillIntoFocusTables(kind, item);
+        matchedPanels = focusMatchingRowsForFocus(kind, item);
+        setOutput({
+          focusKind: kind,
+          preparedControl,
+          loadedPanels,
+          matchedPanels,
+          item
+        });
         setStatus(`已带入重点对象：${kind}。`);
       }
 
@@ -1600,6 +1623,81 @@
         el(targetId).innerHTML = `<tr><td class="empty" colspan="${columnCount}">${escapeHtml(message)}</td></tr>`;
       }
 
+      function clearFocusedAdminRows() {
+        for (const row of adminFocusedRows) {
+          row.classList.remove("row-focus");
+        }
+        adminFocusedRows = [];
+      }
+
+      function focusAdminTableRow(selector, matcher) {
+        const target = Array.from(document.querySelectorAll(selector)).find((row) => matcher(row.dataset, row));
+        if (!target) {
+          return null;
+        }
+        target.classList.add("row-focus");
+        adminFocusedRows.push(target);
+        return target;
+      }
+
+      function focusMatchingRowsForFocus(kind, item = {}) {
+        clearFocusedAdminRows();
+        const entitlementId = item.entitlementId || item.recommendedControl?.entitlementId || "";
+        const sessionId = item.sessionId || item.recommendedControl?.sessionId || "";
+        const bindingId = item.bindingId || "";
+        const blockId = item.blockId || item.recommendedControl?.blockId || "";
+        const accountId = item.accountId || item.recommendedControl?.accountId || "";
+        const productCode = item.productCode || item.recommendedControl?.productCode || "";
+        const username = item.username || "";
+        const fingerprint = item.fingerprint || item.recommendedControl?.fingerprint || "";
+        const matches = [];
+        const firstRow = (() => {
+          if (accountId) {
+            const row = focusAdminTableRow("#accounts-body tr[data-account-id]", (data) => data.accountId === accountId);
+            if (row) {
+              matches.push("accounts");
+              return row;
+            }
+          }
+          if (username && productCode) {
+            const row = focusAdminTableRow("#accounts-body tr[data-account-id]", (data) => data.username === username && data.productCode === productCode);
+            if (row) {
+              matches.push("accounts");
+              return row;
+            }
+          }
+          return null;
+        })();
+
+        if (entitlementId && focusAdminTableRow("#entitlements-body tr[data-entitlement-id]", (data) => data.entitlementId === entitlementId)) {
+          matches.push("entitlements");
+        } else if ((kind === "account" || kind === "session") && username && productCode && focusAdminTableRow("#entitlements-body tr[data-entitlement-id]", (data) => data.username === username && data.productCode === productCode)) {
+          matches.push("entitlements");
+        }
+
+        if (sessionId && focusAdminTableRow("#sessions-body tr[data-session-id]", (data) => data.sessionId === sessionId)) {
+          matches.push("sessions");
+        }
+
+        if (bindingId && focusAdminTableRow("#bindings-body tr[data-binding-id]", (data) => data.bindingId === bindingId)) {
+          matches.push("bindings");
+        } else if (fingerprint && productCode && focusAdminTableRow("#bindings-body tr[data-binding-id]", (data) => data.fingerprint === fingerprint && data.productCode === productCode)) {
+          matches.push("bindings");
+        }
+
+        if (blockId && focusAdminTableRow("#blocks-body tr[data-block-id]", (data) => data.blockId === blockId)) {
+          matches.push("blocks");
+        } else if (fingerprint && productCode && focusAdminTableRow("#blocks-body tr[data-block-id]", (data) => data.fingerprint === fingerprint && data.productCode === productCode)) {
+          matches.push("blocks");
+        }
+
+        const scrollTarget = firstRow || adminFocusedRows[0] || null;
+        if (scrollTarget) {
+          scrollTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return matches;
+      }
+
       function renderAccounts(items) {
         if (!items.length) {
           renderEmptyRow("accounts-body", 6, "没有匹配的账号。");
@@ -1607,7 +1705,7 @@
         }
 
         el("accounts-body").innerHTML = items.map((item) => `
-          <tr data-account-id="${escapeHtml(item.id)}">
+          <tr data-account-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-username="${escapeHtml(item.username)}">
             <td><strong>${escapeHtml(item.username)}</strong><div class="mono">${escapeHtml(shortText(item.id, 20))}</div></td>
             <td>${escapeHtml(item.product_code)}</td>
             <td>${renderTag(item.status)}</td>
@@ -1671,7 +1769,7 @@
         }
 
         el("bindings-body").innerHTML = items.map((item) => `
-          <tr data-binding-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-fingerprint="${escapeHtml(item.fingerprint)}">
+          <tr data-binding-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-fingerprint="${escapeHtml(item.fingerprint)}" data-username="${escapeHtml(item.username)}">
             <td><strong>${escapeHtml(item.username)}</strong><div>${escapeHtml(item.product_code)}</div></td>
             <td class="mono">${escapeHtml(shortText(item.fingerprint, 24))}</td>
             <td>${escapeHtml(item.device_name || "未命名设备")}</td>
@@ -1755,7 +1853,7 @@
         }
 
         el("sessions-body").innerHTML = items.map((item) => `
-          <tr data-session-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-fingerprint="${escapeHtml(item.fingerprint)}">
+          <tr data-session-id="${escapeHtml(item.id)}" data-product-code="${escapeHtml(item.product_code)}" data-fingerprint="${escapeHtml(item.fingerprint)}" data-username="${escapeHtml(item.username)}">
             <td class="mono">${escapeHtml(shortText(item.id, 20))}</td>
             <td><strong>${escapeHtml(item.username)}</strong><div>${escapeHtml(item.policy_name)}</div></td>
             <td>${escapeHtml(item.product_code)}</td>
@@ -1850,6 +1948,30 @@
         setStatus(`Entitlements refreshed: ${data.total}`);
       }
 
+      async function loadAccountsForFocus(item = {}) {
+        const data = await callApi(`/api/admin/accounts${buildQuery({
+          productCode: item.productCode || el("ops-product-code").value,
+          status: el("ops-account-status").value,
+          search: item.username || item.accountId || el("ops-search").value
+        })}`);
+        renderAccounts(data.items);
+        setOutput(data);
+        setStatus(`Accounts drill-down refreshed: ${data.total}`);
+        return data;
+      }
+
+      async function loadEntitlementsForFocus(item = {}) {
+        const data = await callApi(`/api/admin/entitlements${buildQuery({
+          productCode: item.productCode || el("ops-product-code").value,
+          username: item.username || el("ops-username").value,
+          search: item.entitlementId || item.username || ""
+        })}`);
+        renderEntitlements(data.items);
+        setOutput(data);
+        setStatus(`Entitlements drill-down refreshed: ${data.total}`);
+        return data;
+      }
+
       async function loadBindings() {
         const filters = readOpsFilters();
         filters.status = el("ops-binding-status").value;
@@ -1904,6 +2026,62 @@
         renderAuditLogs(data.items);
         setOutput(data);
         setStatus(`审计日志已刷新，共 ${data.total} 条。`);
+      }
+
+      async function drillIntoFocusTables(kind, item = {}) {
+        const tasks = [];
+        const addTask = (label, task) => {
+          if (!tasks.some((entry) => entry.label === label)) {
+            tasks.push({ label, task });
+          }
+        };
+
+        if (kind === "account") {
+          addTask("accounts", () => loadAccountsForFocus(item));
+          if (item.entitlementId || item.activeEntitlementCount || item.username) {
+            addTask("entitlements", () => loadEntitlementsForFocus(item));
+          }
+          if (item.sessionId || item.activeSessionCount) {
+            addTask("sessions", loadSessions);
+          }
+        }
+
+        if (kind === "session") {
+          addTask("sessions", loadSessions);
+          if (item.username || item.accountId) {
+            addTask("accounts", () => loadAccountsForFocus(item));
+          }
+          if (item.entitlementId || item.username) {
+            addTask("entitlements", () => loadEntitlementsForFocus(item));
+          }
+          if (item.fingerprint) {
+            addTask("bindings", loadBindings);
+            addTask("blocks", loadBlocks);
+          }
+        }
+
+        if (kind === "device") {
+          if (item.bindingId || item.fingerprint) {
+            addTask("bindings", loadBindings);
+          }
+          if (item.blockId || item.fingerprint) {
+            addTask("blocks", loadBlocks);
+          }
+          if (item.sessionId) {
+            addTask("sessions", loadSessions);
+          }
+          if (item.username) {
+            addTask("accounts", () => loadAccountsForFocus(item));
+          }
+          if (item.entitlementId) {
+            addTask("entitlements", () => loadEntitlementsForFocus(item));
+          }
+        }
+
+        for (const entry of tasks) {
+          await entry.task();
+        }
+        return tasks.map((entry) => entry.label);
       }
 
       async function previewOpsExport() {

@@ -8775,6 +8775,8 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /adjust-points-btn/);
     assert.match(html, /Entitlements Review/);
     assert.match(html, /entitlements-body/);
+    assert.match(html, /row-focus/);
+    assert.match(html, /drillIntoFocusTables/);
     assert.match(html, /高频原因/);
     assert.match(html, /建议优先处理/);
     assert.match(html, /重点账号明细/);

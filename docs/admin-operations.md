@@ -35,6 +35,7 @@ Terminology:
 - use the ops snapshot overview to surface focus accounts, sessions, and devices with severity, next-action hints, and a recommended action queue, then click back into matching filters and quick controls directly
 - use audit preset buttons and row-click backfill inside `/admin` to narrow down common session, device, and entitlement events faster
 - review entitlements from a dedicated admin table, then click a row to prefill entitlement quick controls before freezing, extending, or adjusting points
+- click a focus item from the ops snapshot overview to auto-refresh the most relevant account, entitlement, session, binding, or block table and highlight the matching rows
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints
@@ -141,6 +142,7 @@ Effects:
 - `POST /api/client/bindings` still works when self-unbind is disabled, but the returned `unbindPolicy` will reflect that the product-level switch is off
 - `/admin` ops snapshot preview now surfaces common reasons plus focus account/session/device detail lists, each with severity and next-action hints, and also builds a recommended action queue that can prefill account, entitlement, session, or device controls before drilling down further
 - `/admin` now also includes an `Entitlements Review` table so administrators can inspect matching entitlements directly and copy the selected entitlement into the quick-control form without leaving the console
+- clicking a focus object now refreshes the most relevant data tables for that object and highlights the matching rows, so operators can move from snapshot triage to the concrete record with less manual filtering
 
 ### Developer project management
 

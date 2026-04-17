@@ -1933,6 +1933,99 @@ function buildSnapshotFocusDeviceActionHint(item = {}) {
   return "Inspect this device history before restoring access.";
 }
 
+function buildSnapshotActionQueueItem(sourceType, item = {}) {
+  const normalizedSourceType = String(sourceType ?? "").trim().toLowerCase();
+  const severity = String(item.severity ?? "low").trim().toLowerCase() || "low";
+  const latestAt = item.latestAt || item.lastHeartbeatAt || item.expiresAt || null;
+  let title = "";
+  let summary = "";
+
+  if (normalizedSourceType === "account") {
+    title = `${item.username || "-"} @ ${item.productCode || "-"}`;
+    summary = `issues=${item.issueCount ?? 0} | signals=${(item.signals || []).slice(0, 3).join(", ") || "-"} | reasons=${(item.reasons || []).slice(0, 2).join(", ") || "-"}`;
+  } else if (normalizedSourceType === "session") {
+    title = `${item.sessionId || "-"} | ${item.username || "-"}`;
+    summary = `${item.productCode || "-"} | ${item.status || "-"} | reason=${item.reason || "-"} | device=${item.deviceName || item.fingerprint || "-"}`;
+  } else {
+    title = `${item.fingerprint || "-"} @ ${item.productCode || "-"}`;
+    summary = `${item.kind || "-"} | ${item.status || "-"} | reason=${item.reason || "-"} | user=${item.username || "-"} | device=${item.deviceName || "-"}`;
+  }
+
+  return {
+    sourceType: normalizedSourceType,
+    severity,
+    severityRank: snapshotSeverityRank(severity),
+    title,
+    summary,
+    nextAction: item.actionHint || null,
+    actionHint: item.actionHint || null,
+    productCode: item.productCode || null,
+    username: item.username || null,
+    accountId: item.accountId || null,
+    entitlementId: item.entitlementId || null,
+    sessionId: item.sessionId || null,
+    bindingId: item.bindingId || null,
+    blockId: item.blockId || null,
+    fingerprint: item.fingerprint || null,
+    reason: item.reason || (Array.isArray(item.reasons) ? item.reasons[0] || null : null),
+    latestAt,
+    latestMs: snapshotDateMs(latestAt),
+    item
+  };
+}
+
+function buildSnapshotActionQueue(focusAccounts = [], focusSessions = [], focusDevices = [], limit = 8) {
+  const items = [
+    ...focusAccounts.map((item) => buildSnapshotActionQueueItem("account", item)),
+    ...focusSessions.map((item) => buildSnapshotActionQueueItem("session", item)),
+    ...focusDevices.map((item) => buildSnapshotActionQueueItem("device", item))
+  ];
+
+  const sourceRanks = {
+    device: 3,
+    account: 2,
+    session: 1
+  };
+
+  return items
+    .sort((left, right) => {
+      if (right.severityRank !== left.severityRank) {
+        return right.severityRank - left.severityRank;
+      }
+      if (right.latestMs !== left.latestMs) {
+        return right.latestMs - left.latestMs;
+      }
+      if ((sourceRanks[right.sourceType] || 0) !== (sourceRanks[left.sourceType] || 0)) {
+        return (sourceRanks[right.sourceType] || 0) - (sourceRanks[left.sourceType] || 0);
+      }
+      return left.title.localeCompare(right.title);
+    })
+    .slice(0, limit)
+    .map(({ severityRank, latestMs, item, ...rest }) => ({
+      ...rest
+    }));
+}
+
+function buildSnapshotQueueSummary(items = []) {
+  const summary = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    total: Array.isArray(items) ? items.length : 0
+  };
+  if (!Array.isArray(items)) {
+    return summary;
+  }
+  for (const item of items) {
+    const severity = String(item?.severity ?? "").trim().toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(summary, severity)) {
+      summary[severity] += 1;
+    }
+  }
+  return summary;
+}
+
 function buildSnapshotFocusAccounts(accounts = [], entitlements = [], sessions = [], limit = 5) {
   const items = new Map();
 
@@ -2363,6 +2456,8 @@ function buildSnapshotOverview({
   const focusAccounts = buildSnapshotFocusAccounts(accounts, entitlements, sessions, 5);
   const focusSessions = buildSnapshotFocusSessions(sessions, 5);
   const focusDevices = buildSnapshotFocusDevices(bindings, blocks, sessions, 5);
+  const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
+  const queueSummary = buildSnapshotQueueSummary(recommendedQueue);
 
   const totalScopeItems = projects.length + accounts.length + entitlements.length + sessions.length + bindings.length + blocks.length + auditLogs.length;
   const attentionCount = metrics.inactiveProjects
@@ -2415,6 +2510,13 @@ function buildSnapshotOverview({
   if (focusUsernames.length) {
     highlights.push(`Focus usernames: ${focusUsernames.slice(0, 3).map((item) => `${item.username} x${item.count}`).join(", ")}.`);
   }
+  if (recommendedQueue.length) {
+    const queuePreview = recommendedQueue
+      .slice(0, 3)
+      .map((item) => `[${String(item.severity || "-").toUpperCase()}] ${item.title}`)
+      .join(", ");
+    highlights.push(`Recommended queue: ${queuePreview}.`);
+  }
   if (!highlights.length) {
     highlights.push("No obvious authorization anomalies were detected in the exported scope.");
   }
@@ -2432,10 +2534,24 @@ function buildSnapshotOverview({
     topReasons,
     focusUsernames,
     focusFingerprints,
+    queueSummary,
+    recommendedQueue,
     focusAccounts,
     focusSessions,
     focusDevices
   };
+}
+
+function appendSnapshotQueueSummaryLines(lines = [], overview = {}) {
+  if (overview && typeof overview === "object" && overview.queueSummary && typeof overview.queueSummary === "object") {
+    lines.push(`Recommended Queue Counts: critical=${overview.queueSummary.critical ?? 0} | high=${overview.queueSummary.high ?? 0} | medium=${overview.queueSummary.medium ?? 0} | low=${overview.queueSummary.low ?? 0} | total=${overview.queueSummary.total ?? 0}`);
+  }
+  if (Array.isArray(overview.recommendedQueue) && overview.recommendedQueue.length) {
+    lines.push("Recommended Queue:");
+    for (const item of overview.recommendedQueue) {
+      lines.push(`- [${String(item.severity || "-").toUpperCase()}][${item.sourceType || "-"}] ${item.title || "-"} | ${item.summary || "-"} | next=${item.nextAction || "-"}`);
+    }
+  }
 }
 
 function buildDeveloperOpsSummaryText(payload = {}) {
@@ -2520,6 +2636,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
+    appendSnapshotQueueSummaryLines(lines, overview);
   }
 
   if (Array.isArray(payload.projects) && payload.projects.length) {
@@ -2812,6 +2929,7 @@ function buildAdminOpsSummaryText(payload = {}) {
         lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
+    appendSnapshotQueueSummaryLines(lines, overview);
   }
 
   if (Array.isArray(payload.projects) && payload.projects.length) {

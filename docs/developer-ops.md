@@ -24,7 +24,7 @@ This page is intended for day-to-day authorization operations:
 - block or unblock a device fingerprint
 - read scoped developer audit logs
 - use common audit presets and click an audit row to backfill matching filters and quick-control ids
-- review focus account, session, and device detail lists directly from the snapshot overview, including severity and next-action hints, and click them back into the active filters
+- review focus account, session, and device detail lists directly from the snapshot overview, including severity, next-action hints, and a recommended action queue, and click them back into the active filters
 - export a scoped troubleshooting snapshot as JSON, summary text, checksums, or zip
 
 ## Developer APIs
@@ -134,5 +134,5 @@ The download route also accepts:
 - releasing a binding frees the device seat and expires any active session using that binding
 - blocking a device fingerprint kicks matching sessions offline and prevents the device from logging in again until unblocked
 - the ops snapshot zip bundles the current scoped project list, accounts, entitlements, sessions, bindings, blocks, and audit logs into one handoff package with SHA-256 checksums
-- the ops snapshot preview and JSON payload now include an `overview` block with a headline, attention counters, highlight bullets, top audit-event counts, common reasons, and focus account/session/device detail lists with severity and next-action hints for faster scoped troubleshooting
+- the ops snapshot preview and JSON payload now include an `overview` block with a headline, attention counters, highlight bullets, top audit-event counts, common reasons, a recommended action queue, and focus account/session/device detail lists with severity and next-action hints for faster scoped troubleshooting
 - focus items in the `/developer/ops` overview can backfill username, reason, fingerprint, and quick-control ids so the next action starts from the right scoped target

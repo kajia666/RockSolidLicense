@@ -286,6 +286,15 @@
         return `<span class="tag ${normalized}">${esc(normalized.toUpperCase())}</span>`;
       }
 
+      function renderQueueSummaryTags(queueSummary = {}) {
+        const severities = ["critical", "high", "medium", "low"];
+        const parts = severities
+          .filter((severity) => Number(queueSummary?.[severity] || 0) > 0)
+          .map((severity) => `<span class="tag ${severity}">${esc(severity.toUpperCase())} x${esc(queueSummary[severity])}</span>`);
+        parts.push(`<span class="tag">total x${esc(queueSummary?.total ?? 0)}</span>`);
+        return parts.join("");
+      }
+
       async function applyOverviewAction(kind, value) {
         const normalizedValue = String(value ?? "").trim();
         if (!normalizedValue) {
@@ -323,6 +332,17 @@
           const focusKey = `${kind}:${index}`;
           overviewFocusMap.set(focusKey, { kind, item });
           return `<button type="button" class="snapshot-focus-item" data-focus-key="${esc(focusKey)}"><div class="snapshot-focus-head"><strong>${renderTitle(item)}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${renderMeta(item)}</div>${item?.actionHint ? `<div class="snapshot-focus-action">next=${esc(item.actionHint)}</div>` : ""}</button>`;
+        }).join("")}</div>`;
+      }
+
+      function renderOverviewActionQueue(items = []) {
+        if (!Array.isArray(items) || !items.length) {
+          return `<div class="hint">No recommended actions yet.</div>`;
+        }
+        return `<div class="snapshot-focus-list">${items.map((item, index) => {
+          const focusKey = `queue:${index}`;
+          overviewFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
+          return `<button type="button" class="snapshot-focus-item" data-focus-key="${esc(focusKey)}"><div class="snapshot-focus-head"><strong>${esc(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${esc(item.sourceType || "-")} | ${esc(item.summary || "-")}</div>${item?.nextAction ? `<div class="snapshot-focus-action">next=${esc(item.nextAction)}</div>` : ""}</button>`;
         }).join("")}</div>`;
       }
 
@@ -420,6 +440,8 @@
         const topReasons = Array.isArray(overview.topReasons) ? overview.topReasons : [];
         const focusUsernames = Array.isArray(overview.focusUsernames) ? overview.focusUsernames : [];
         const focusFingerprints = Array.isArray(overview.focusFingerprints) ? overview.focusFingerprints : [];
+        const queueSummary = overview.queueSummary || {};
+        const recommendedQueue = Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : [];
         const focusAccounts = Array.isArray(overview.focusAccounts) ? overview.focusAccounts : [];
         const focusSessions = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
         const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
@@ -456,6 +478,11 @@
           <div>
             <div class="hint">Top reasons</div>
             <div class="audit-meta">${renderOverviewTags(topReasons, "reason", "reason")}</div>
+          </div>
+          <div>
+            <div class="hint">Recommended next actions</div>
+            <div class="audit-meta">${renderQueueSummaryTags(queueSummary)}</div>
+            ${renderOverviewActionQueue(recommendedQueue)}
           </div>
           <div>
             <div class="hint">Focus accounts</div>

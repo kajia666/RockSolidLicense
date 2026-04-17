@@ -71,6 +71,11 @@
         gap: 14px;
       }
 
+      .card.panel-focus {
+        border-color: rgba(15, 124, 104, 0.38);
+        box-shadow: 0 0 0 2px rgba(15, 124, 104, 0.18), var(--shadow);
+      }
+
       .grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -916,6 +921,7 @@
       let adminOpsLastDownload = null;
       let adminOpsFocusMap = new Map();
       let adminFocusedRows = [];
+      let adminFocusedPanels = [];
       const AUDIT_PRESET_BUTTONS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
       function el(id) {
@@ -1380,13 +1386,21 @@
         }
         loadedPanels = await drillIntoFocusTables(kind, item);
         matchedPanels = focusMatchingRowsForFocus(kind, item);
+        const focusedPanel = focusAdminControlPanel(kind, item, item.recommendedControl);
         setOutput({
           focusKind: kind,
           preparedControl,
           loadedPanels,
           matchedPanels,
+          focusedPanel,
           item
         });
+        const panelBits = loadedPanels.length ? ` | panels=${loadedPanels.join(",")}` : "";
+        const matchBits = matchedPanels.length ? ` | matched=${matchedPanels.join(",")}` : "";
+        const controlBits = preparedControl ? ` | ${preparedControl}` : "";
+        const focusBits = focusedPanel ? ` | control=${focusedPanel}` : "";
+        const finalStatusMessage = `Focus object applied: ${kind}${controlBits}${panelBits}${matchBits}${focusBits}.`;
+        queueMicrotask(() => setStatus(finalStatusMessage));
         setStatus(`已带入重点对象：${kind}。`);
       }
 
@@ -1621,6 +1635,80 @@
 
       function renderEmptyRow(targetId, columnCount, message) {
         el(targetId).innerHTML = `<tr><td class="empty" colspan="${columnCount}">${escapeHtml(message)}</td></tr>`;
+      }
+
+      function ensureAdminControlPanels() {
+        const mappings = [
+          ["account", "account-id"],
+          ["entitlement", "entitlement-id"],
+          ["session", "session-id"],
+          ["binding", "binding-id"],
+          ["device-block", "block-product-code"]
+        ];
+        for (const [panelName, inputId] of mappings) {
+          const card = el(inputId)?.closest(".card");
+          if (card) {
+            card.dataset.controlPanel = panelName;
+          }
+        }
+      }
+
+      function clearFocusedAdminPanels() {
+        for (const panel of adminFocusedPanels) {
+          panel.classList.remove("panel-focus");
+        }
+        adminFocusedPanels = [];
+      }
+
+      function inferAdminControlPanel(kind, item = {}, control = {}) {
+        const type = String(control?.type || "").trim();
+        if (type === "account_status") {
+          return "account";
+        }
+        if (["entitlement_status", "extend_entitlement", "adjust_points"].includes(type)) {
+          return "entitlement";
+        }
+        if (type === "revoke_session") {
+          return "session";
+        }
+        if (type === "block_device" || type === "unblock_device") {
+          return "device-block";
+        }
+        if (kind === "account") {
+          return item.entitlementId ? "entitlement" : "account";
+        }
+        if (kind === "session") {
+          return "session";
+        }
+        if (kind === "device") {
+          if (item.blockId || item.recommendedControl?.blockId || item.recommendedControl?.type === "block_device" || item.recommendedControl?.type === "unblock_device") {
+            return "device-block";
+          }
+          if (item.bindingId) {
+            return "binding";
+          }
+        }
+        if (item.entitlementId) {
+          return "entitlement";
+        }
+        return "";
+      }
+
+      function focusAdminControlPanel(kind, item = {}, control = {}) {
+        ensureAdminControlPanels();
+        clearFocusedAdminPanels();
+        const panelName = inferAdminControlPanel(kind, item, control);
+        if (!panelName) {
+          return "";
+        }
+        const target = document.querySelector(`.card[data-control-panel="${panelName}"]`);
+        if (!target) {
+          return "";
+        }
+        target.classList.add("panel-focus");
+        adminFocusedPanels.push(target);
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        return panelName;
       }
 
       function clearFocusedAdminRows() {

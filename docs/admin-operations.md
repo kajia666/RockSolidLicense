@@ -36,6 +36,7 @@ Terminology:
 - use audit preset buttons and row-click backfill inside `/admin` to narrow down common session, device, and entitlement events faster
 - review entitlements from a dedicated admin table, then click a row to prefill entitlement quick controls before freezing, extending, or adjusting points
 - click a focus item from the ops snapshot overview to auto-refresh the most relevant account, entitlement, session, binding, or block table and highlight the matching rows
+- when a focus item carries a recommended control, the matching admin control card is also highlighted so operators can move from triage to action with less scrolling
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints
@@ -143,6 +144,7 @@ Effects:
 - `/admin` ops snapshot preview now surfaces common reasons plus focus account/session/device detail lists, each with severity and next-action hints, and also builds a recommended action queue that can prefill account, entitlement, session, or device controls before drilling down further
 - `/admin` now also includes an `Entitlements Review` table so administrators can inspect matching entitlements directly and copy the selected entitlement into the quick-control form without leaving the console
 - clicking a focus object now refreshes the most relevant data tables for that object and highlights the matching rows, so operators can move from snapshot triage to the concrete record with less manual filtering
+- the same focus interaction now also highlights the most relevant control card, such as account status, entitlement actions, session revoke, binding release, or device block/unblock
 
 ### Developer project management
 

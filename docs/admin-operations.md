@@ -37,6 +37,7 @@ Terminology:
 - review entitlements from a dedicated admin table, then click a row to prefill entitlement quick controls before freezing, extending, or adjusting points
 - click a focus item from the ops snapshot overview to auto-refresh the most relevant account, entitlement, session, binding, or block table and highlight the matching rows
 - when a focus item carries a recommended control, the matching admin control card is also highlighted so operators can move from triage to action with less scrolling
+- after an admin action succeeds, the console now refreshes the visible snapshot/list context around the same focused object and re-highlights the matching rows and control card
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints

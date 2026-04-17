@@ -55,6 +55,10 @@
       .snapshot-stat span { color:var(--muted); font-size:12px; }
       .snapshot-list { margin:0; padding-left:18px; color:var(--muted); line-height:1.6; }
       .snapshot-list strong { color:var(--ink); }
+      .snapshot-recap { padding:14px; border-radius:16px; border:1px solid rgba(24,31,27,.08); background:rgba(255,255,255,.84); display:grid; gap:8px; }
+      .snapshot-recap-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+      .snapshot-recap-actions { display:flex; flex-wrap:wrap; gap:8px; }
+      .snapshot-inline-button { border:1px solid rgba(24,31,27,.08); background:rgba(255,255,255,.92); color:var(--ink); border-radius:999px; padding:6px 10px; cursor:pointer; font:inherit; }
       .snapshot-focus-list { display:grid; gap:8px; }
       .snapshot-focus-entry { display:grid; gap:8px; }
       .snapshot-focus-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 4px; }
@@ -211,6 +215,7 @@
       let actor = null;
       let snapshot = emptySnapshot();
       let lastExportDownload = null;
+      let preparedFocus = null;
       let overviewFocusMap = new Map();
       const AUDIT_PRESETS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
@@ -242,6 +247,7 @@
       const setOutput = (value) => { el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2); };
       const setMeta = () => { el("session-meta").textContent = token && profile ? `${profile.username} | role=${actor?.role || "owner"} | scope=${actor?.type || "owner"} | session=${profile.session?.id || "-"}` : "No developer session yet."; };
       const q = (params) => { const s = new URLSearchParams(); Object.entries(params).forEach(([k, v]) => { if (v !== null && v !== undefined && String(v).trim() !== "") s.set(k, String(v).trim()); }); const r = s.toString(); return r ? `?${r}` : ""; };
+      const cloneValue = (value) => value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : null;
 
       function formatTime(value) {
         if (!value) return "-";
@@ -520,6 +526,86 @@
         return control.label || "";
       }
 
+      function buildPreparedFocusTitle(kind, item = {}) {
+        if (kind === "account") {
+          return `${item.username || "-"} @ ${item.productCode || "-"}`;
+        }
+        if (kind === "session") {
+          return `${item.sessionId || "-"} | ${item.username || "-"}`;
+        }
+        if (kind === "device") {
+          return `${item.fingerprint || "-"} @ ${item.productCode || "-"}`;
+        }
+        if (kind === "entitlement") {
+          return `${item.entitlementId || "-"} | ${item.username || "-"}`;
+        }
+        return item.productCode || item.username || item.sessionId || item.fingerprint || kind || "focus-item";
+      }
+
+      function buildPreparedFocusSummary(kind, item = {}) {
+        if (kind === "account") {
+          return [`account=${item.accountId || "-"}`, `severity=${item.severity || "-"}`, `issues=${item.issueCount ?? 0}`].join(" | ");
+        }
+        if (kind === "session") {
+          return [`${item.productCode || "-"} | ${item.status || "-"}`, `severity=${item.severity || "-"}`, `reason=${item.reason || "-"}`].join(" | ");
+        }
+        if (kind === "device") {
+          return [`${item.kind || "-"} | ${item.status || "-"}`, `severity=${item.severity || "-"}`, `reason=${item.reason || "-"}`].join(" | ");
+        }
+        if (kind === "entitlement") {
+          return [`${item.productCode || "-"} | ${item.status || "-"}`, `entitlement=${item.entitlementId || "-"}`, `points=${item.remainingPoints ?? "-"}`].join(" | ");
+        }
+        return item.reason || item.summary || "-";
+      }
+
+      function rememberPreparedFocus(kind, item = {}, preparedControl = "") {
+        if (!kind) {
+          preparedFocus = null;
+          return null;
+        }
+        const clonedItem = cloneValue(item) || {};
+        preparedFocus = {
+          timestamp: new Date().toISOString(),
+          kind,
+          item: clonedItem,
+          title: buildPreparedFocusTitle(kind, clonedItem),
+          summary: buildPreparedFocusSummary(kind, clonedItem),
+          preparedControl: preparedControl || clonedItem?.recommendedControl?.label || "",
+          severity: focusSeverityClass(clonedItem?.severity),
+          actionHint: clonedItem?.actionHint || clonedItem?.nextAction || "",
+          recommendedControl: cloneValue(clonedItem?.recommendedControl) || null
+        };
+        return preparedFocus;
+      }
+
+      function renderPreparedFocus() {
+        if (!preparedFocus) {
+          return "";
+        }
+        const detailTags = [
+          `<span class="tag">${esc(preparedFocus.kind)}</span>`,
+          preparedFocus.severity ? `<span class="tag ${esc(preparedFocus.severity)}">${esc(preparedFocus.severity.toUpperCase())}</span>` : "",
+          preparedFocus.preparedControl ? `<span class="tag ok">${esc(preparedFocus.preparedControl)}</span>` : "",
+          preparedFocus.actionHint ? `<span class="tag warning">next:${esc(preparedFocus.actionHint)}</span>` : ""
+        ].filter(Boolean).join("");
+        const buttons = [
+          `<button type="button" class="snapshot-inline-button" data-prepared-action="reapply">Reapply Focus</button>`,
+          preparedFocus.recommendedControl ? `<button type="button" class="snapshot-inline-button" data-prepared-action="control">Jump To Controls</button>` : ""
+        ].filter(Boolean).join("");
+        return `
+          <div class="snapshot-recap">
+            <div class="snapshot-recap-head">
+              <strong>Prepared Control</strong>
+              <span class="tag">${esc(formatTime(preparedFocus.timestamp))}</span>
+            </div>
+            <div><strong>${esc(preparedFocus.title)}</strong></div>
+            <div class="hint">${esc(preparedFocus.summary)}</div>
+            <div class="audit-meta">${detailTags}</div>
+            ${buttons ? `<div class="snapshot-recap-actions">${buttons}</div>` : ""}
+          </div>
+        `;
+      }
+
       function focusQuickControlsCard() {
         const card = el("quick-controls-card");
         if (!card) {
@@ -602,6 +688,8 @@
           await refreshOps();
         }
         const preparedControl = applyRecommendedControl(item.recommendedControl);
+        rememberPreparedFocus(kind, item, preparedControl);
+        renderSnapshotOverview();
         setStatus(`Focus object applied: ${kind}${preparedControl ? ` | ${preparedControl}.` : "."}`);
       }
 
@@ -620,10 +708,35 @@
           if (!preparedControl) {
             throw { code: "MISSING_CONTROL", message: "No direct escalation control is available." };
           }
+          rememberPreparedFocus(focus.kind, focus.item, preparedControl);
+          renderSnapshotOverview();
           setStatus(`Escalation shortcut prepared: ${preparedControl}.`);
           setOutput({
             focusKind: focus.kind,
             focusItem: focus.item,
+            preparedControl
+          });
+        }
+      }
+
+      async function runDeveloperPreparedAction(action) {
+        if (!preparedFocus) {
+          return;
+        }
+        if (action === "reapply") {
+          await applyOverviewFocusItem(preparedFocus.kind, preparedFocus.item);
+          return;
+        }
+        if (action === "control") {
+          const preparedControl = applyRecommendedControl(preparedFocus.recommendedControl || preparedFocus.item?.recommendedControl || {});
+          focusQuickControlsCard();
+          if (!preparedControl) {
+            throw { code: "MISSING_CONTROL", message: "No prepared control is available." };
+          }
+          setStatus(`Prepared control refocused: ${preparedControl}.`);
+          setOutput({
+            focusKind: preparedFocus.kind,
+            focusItem: preparedFocus.item,
             preparedControl
           });
         }
@@ -676,6 +789,7 @@
           <div class="hint">Generated ${esc(formatTime(payload.generatedAt))}${payload.fileName ? ` | ${esc(payload.fileName)}` : ""}${lastExportDownload?.fileName ? ` | last download ${esc(lastExportDownload.fileName)}` : ""}</div>
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
+          ${renderPreparedFocus()}
           <div>
             <div class="hint">Top audit events</div>
             <div class="audit-meta">${renderOverviewTags(topAuditEvents, "eventType", "event")}</div>
@@ -776,6 +890,14 @@
         bindRows("#snapshot-overview [data-escalation-action]", async (data) => {
           try {
             await runDeveloperEscalationAction(data.escalationFocusKey, data.escalationAction);
+          } catch (error) {
+            setStatus(`${error.code}: ${error.message}`, true);
+            setOutput({ code:error.code, message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-prepared-action]", async (data) => {
+          try {
+            await runDeveloperPreparedAction(data.preparedAction);
           } catch (error) {
             setStatus(`${error.code}: ${error.message}`, true);
             setOutput({ code:error.code, message:error.message });
@@ -1099,6 +1221,7 @@
         actor = null;
         snapshot = emptySnapshot();
         lastExportDownload = null;
+        preparedFocus = null;
         setMeta();
         renderAll();
       }

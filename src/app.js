@@ -1470,6 +1470,22 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/cards/export/download") {
+        const payload = await services.developerExportCards(getBearerToken(req), {
+          productCode: url.searchParams.get("productCode"),
+          policyId: url.searchParams.get("policyId"),
+          batchCode: url.searchParams.get("batchCode"),
+          usageStatus: url.searchParams.get("usageStatus"),
+          status: url.searchParams.get("status"),
+          search: url.searchParams.get("search")
+        });
+        sendAttachment(
+          res,
+          services.developerCardExportDownloadAsset(payload, url.searchParams.get("format") || "json")
+        );
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/developer/cards/batch") {
         const { body } = await readJsonBody(req);
         sendJson(res, 201, { ok: true, data: await services.developerCreateCardBatch(getBearerToken(req), body) });

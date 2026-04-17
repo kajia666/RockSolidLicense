@@ -44,6 +44,7 @@ Typical creation body:
 
 - `GET /api/developer/cards`
 - `GET /api/developer/cards/export`
+- `GET /api/developer/cards/export/download`
 - `POST /api/developer/cards/batch`
 - `POST /api/developer/cards/:cardId/status`
 
@@ -78,7 +79,7 @@ Supported card control statuses:
 
 ## Filter support
 
-Both the list and CSV export endpoints accept:
+The list endpoint, the legacy CSV export endpoint, and the download endpoint all accept:
 
 - `productCode`
 - `policyId`
@@ -88,3 +89,11 @@ Both the list and CSV export endpoints accept:
 - `search`
 
 That keeps the page and exported inventory inside the current developer scope while still letting the author narrow results to a single policy or batch.
+
+## Export delivery
+
+- `GET /api/developer/cards/export` keeps returning CSV for backward compatibility.
+- `GET /api/developer/cards/export/download` accepts `format=json|csv|summary|checksums|zip`.
+- `summary` gives a human-readable project and batch recap for support handoff.
+- `checksums` emits SHA-256 digests for the generated JSON, summary, and CSV files.
+- `zip` bundles JSON, summary, CSV, and `SHA256SUMS.txt` into one delivery archive.

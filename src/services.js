@@ -5159,6 +5159,227 @@ function buildCardsCsv(items = []) {
   return `\uFEFF${lines.join("\n")}`;
 }
 
+function buildDeveloperCardExportProjectItem(row = {}) {
+  return {
+    id: row.id,
+    code: row.code ?? row.productCode ?? null,
+    name: row.name ?? row.productName ?? "",
+    status: row.status ?? null
+  };
+}
+
+function buildDeveloperCardBatchSummary(items = []) {
+  const buckets = new Map();
+  for (const item of items) {
+    const key = String(item.batchCode || "").trim() || "(unbatched)";
+    const entry = buckets.get(key) || {
+      batchCode: key === "(unbatched)" ? null : key,
+      label: key,
+      total: 0,
+      unused: 0,
+      used: 0,
+      frozen: 0,
+      revoked: 0,
+      expired: 0
+    };
+    entry.total += 1;
+    if (entry[item.displayStatus] !== undefined) {
+      entry[item.displayStatus] += 1;
+    }
+    buckets.set(key, entry);
+  }
+
+  return Array.from(buckets.values()).sort((left, right) =>
+    right.total - left.total || String(left.label).localeCompare(String(right.label))
+  );
+}
+
+function buildDeveloperCardExportSummaryText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const lines = [
+    "RockSolid Developer Card Export",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Developer: ${payload.developer?.username || "-"}`,
+    `Actor: ${payload.actor?.username || "-"}`,
+    `Actor Role: ${payload.actor?.role || "-"}`,
+    `Accessible Projects: ${scope.accessibleProjectCount ?? 0}`,
+    `Scope Projects: ${scope.exportedProjectCount ?? 0}`,
+    `Visible Projects: ${scope.visibleProjectCount ?? 0}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Policy Filter: ${scope.policyId || "-"}`,
+    `Batch Filter: ${scope.batchCode || "-"}`,
+    `Usage Filter: ${scope.usageStatus || "-"}`,
+    `Status Filter: ${scope.status || "-"}`,
+    `Search Filter: ${scope.search || "-"}`,
+    "",
+    `Cards Total: ${summary.total ?? 0}`,
+    `Unused: ${summary.unused ?? 0}`,
+    `Used: ${summary.used ?? 0}`,
+    `Frozen: ${summary.frozen ?? 0}`,
+    `Revoked: ${summary.revoked ?? 0}`,
+    `Expired: ${summary.expired ?? 0}`,
+    `Policies: ${summary.policies ?? 0}`,
+    `Batches: ${summary.batches ?? 0}`
+  ];
+
+  if (Array.isArray(payload.projects) && payload.projects.length) {
+    lines.push("");
+    lines.push("Projects:");
+    for (const item of payload.projects) {
+      lines.push(`- ${item.code || "-"} (${item.name || ""}) [${item.status || "unknown"}]`);
+    }
+  }
+
+  if (Array.isArray(payload.batches) && payload.batches.length) {
+    const visibleBatches = payload.batches.slice(0, 12);
+    lines.push("");
+    lines.push("Batch Summary:");
+    for (const item of visibleBatches) {
+      lines.push(`- ${item.label || "-"} | total=${item.total ?? 0} | unused=${item.unused ?? 0} | used=${item.used ?? 0} | frozen=${item.frozen ?? 0} | revoked=${item.revoked ?? 0} | expired=${item.expired ?? 0}`);
+    }
+    if (payload.batches.length > visibleBatches.length) {
+      lines.push(`- +${payload.batches.length - visibleBatches.length} more batches`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function buildDeveloperCardExportPayload({
+  generatedAt = nowIso(),
+  developer = null,
+  actor = null,
+  accessibleProjects = [],
+  projects = [],
+  filters = {},
+  cards = {}
+} = {}) {
+  const normalizedProjects = projects.map((item) => buildDeveloperCardExportProjectItem(item));
+  const items = Array.isArray(cards.items) ? cards.items.map((item) => ({ ...item })) : [];
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const scopeTag = sanitizeExportNameSegment(
+    filters.productCode || filters.batchCode || filters.policyId || "all-projects",
+    "developer-cards"
+  );
+  const summary = {
+    total: Number(cards.summary?.total ?? items.length),
+    unused: Number(cards.summary?.unused ?? 0),
+    used: Number(cards.summary?.used ?? 0),
+    frozen: Number(cards.summary?.frozen ?? 0),
+    revoked: Number(cards.summary?.revoked ?? 0),
+    expired: Number(cards.summary?.expired ?? 0),
+    policies: new Set(items.map((item) => item.policyId).filter(Boolean)).size,
+    batches: new Set(items.map((item) => item.batchCode).filter(Boolean)).size
+  };
+  const productCodes = Array.from(new Set(items.map((item) => item.productCode).filter(Boolean))).sort();
+  const payload = {
+    generatedAt,
+    fileName: `rocksolid-developer-cards-${scopeTag}-${timestampTag}.json`,
+    summaryFileName: `rocksolid-developer-cards-${scopeTag}-${timestampTag}-summary.txt`,
+    csvFileName: `rocksolid-developer-cards-${scopeTag}-${timestampTag}.csv`,
+    developer,
+    actor,
+    scope: {
+      accessibleProjectCount: accessibleProjects.length,
+      exportedProjectCount: normalizedProjects.length,
+      visibleProjectCount: productCodes.length,
+      productCode: filters.productCode || null,
+      policyId: filters.policyId || null,
+      batchCode: filters.batchCode || null,
+      usageStatus: filters.usageStatus || null,
+      status: filters.status || null,
+      search: filters.search || null
+    },
+    summary,
+    productCodes,
+    projects: normalizedProjects,
+    batches: buildDeveloperCardBatchSummary(items),
+    items,
+    csvText: buildCardsCsv(items),
+    notes: [
+      "This export is scoped to the current developer actor and their assigned projects.",
+      "Use the zip archive when you need a handoff bundle with JSON, summary, CSV, and checksum manifest.",
+      "The legacy /api/developer/cards/export route still returns CSV for backward compatibility."
+    ]
+  };
+
+  payload.summaryText = buildDeveloperCardExportSummaryText(payload);
+  return payload;
+}
+
+function buildDeveloperCardExportFiles(payload = {}) {
+  return [
+    {
+      path: payload.fileName || "developer-cards.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: payload.summaryFileName || "developer-cards-summary.txt",
+      body: payload.summaryText || ""
+    },
+    {
+      path: payload.csvFileName || "developer-cards.csv",
+      body: payload.csvText || ""
+    }
+  ];
+}
+
+function buildDeveloperCardExportZipEntries(payload = {}) {
+  return buildZipEntriesFromFiles(
+    buildArchiveRootName(payload.fileName, "developer-cards"),
+    buildDeveloperCardExportFiles(payload)
+  );
+}
+
+function buildDeveloperCardExportDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "csv", "summary", "checksums", "zip"],
+    "json",
+    "INVALID_DEVELOPER_CARD_EXPORT_FORMAT",
+    "Developer card export format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "developer-cards")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildDeveloperCardExportZipEntries(payload))
+    };
+  }
+
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "developer-cards"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildDeveloperCardExportFiles(payload))
+    };
+  }
+
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "developer-cards-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+
+  if (normalizedFormat === "csv") {
+    return {
+      fileName: payload.csvFileName || "developer-cards.csv",
+      contentType: "text/csv; charset=utf-8",
+      body: payload.csvText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "developer-cards.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
 function ensureCardControlAvailable(controlState) {
   if (controlState.available) {
     return;
@@ -9135,6 +9356,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
     },
 
     async developerExportCardsCsv(token, filters = {}) {
+      const payload = await this.developerExportCards(token, filters);
+      return payload.csvText;
+    },
+
+    async developerExportCards(token, filters = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -9151,12 +9377,43 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           "cards.read"
         );
       }
-      const { items } = await Promise.resolve(store.cards.queryCardRows(
+
+      const accessibleProjects = await listDeveloperAccessibleProductRows(db, store, session);
+      const scopedProjects = filters.productCode
+        ? accessibleProjects.filter((item) => item.code === String(filters.productCode).trim().toUpperCase())
+        : accessibleProjects;
+      const cards = await Promise.resolve(store.cards.queryCardRows(
         db,
-        { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
+        { ...filters, productIds: scopedProjects.map((item) => item.id) },
         { limit: 5000 }
       ));
-      return buildCardsCsv(items);
+      const payload = buildDeveloperCardExportPayload({
+        developer: buildDeveloperIdentityPayload(session),
+        actor: buildDeveloperActor(session),
+        accessibleProjects,
+        projects: scopedProjects,
+        filters: cards.filters || {},
+        cards
+      });
+
+      auditDeveloperSession(db, session, "card.export", "license_key", null, {
+        productCode: payload.scope.productCode,
+        policyId: payload.scope.policyId,
+        batchCode: payload.scope.batchCode,
+        usageStatus: payload.scope.usageStatus,
+        status: payload.scope.status,
+        search: payload.scope.search,
+        total: payload.summary.total,
+        productCodes: payload.productCodes,
+        fileName: payload.fileName,
+        csvFileName: payload.csvFileName
+      });
+
+      return payload;
+    },
+
+    developerCardExportDownloadAsset(payload, format = "json") {
+      return buildDeveloperCardExportDownloadAsset(payload, format);
     },
 
     async updateCardStatus(token, cardId, body = {}) {

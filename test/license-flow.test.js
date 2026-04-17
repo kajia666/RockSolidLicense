@@ -4471,6 +4471,54 @@ test("developer-owned projects can manage policies, cards, versions, and notices
     assert.match(csvText, /ALICE_OPS_APP/);
     assert.doesNotMatch(csvText, /BOB_OPS_APP/);
 
+    const jsonDownloadResponse = await fetch(
+      `${baseUrl}/api/developer/cards/export/download?productCode=ALICE_OPS_APP&format=json`,
+      {
+        headers: { Authorization: `Bearer ${aliceSession.token}` }
+      }
+    );
+    const jsonDownloadText = await jsonDownloadResponse.text();
+    assert.equal(jsonDownloadResponse.ok, true);
+    assert.match(jsonDownloadResponse.headers.get("content-type") || "", /^application\/json/);
+    assert.match(jsonDownloadText, /ALICE_OPS_APP/);
+    assert.doesNotMatch(jsonDownloadText, /BOB_OPS_APP/);
+
+    const summaryDownloadResponse = await fetch(
+      `${baseUrl}/api/developer/cards/export/download?productCode=ALICE_OPS_APP&format=summary`,
+      {
+        headers: { Authorization: `Bearer ${aliceSession.token}` }
+      }
+    );
+    const summaryDownloadText = await summaryDownloadResponse.text();
+    assert.equal(summaryDownloadResponse.ok, true);
+    assert.match(summaryDownloadText, /RockSolid Developer Card Export/);
+    assert.match(summaryDownloadText, /ALICE_OPS_APP/);
+    assert.doesNotMatch(summaryDownloadText, /BOB_OPS_APP/);
+
+    const checksumDownloadResponse = await fetch(
+      `${baseUrl}/api/developer/cards/export/download?productCode=ALICE_OPS_APP&format=checksums`,
+      {
+        headers: { Authorization: `Bearer ${aliceSession.token}` }
+      }
+    );
+    const checksumDownloadText = await checksumDownloadResponse.text();
+    assert.equal(checksumDownloadResponse.ok, true);
+    assert.match(checksumDownloadText, /# SHA-256 checksums/);
+    assert.match(checksumDownloadText, /rocksolid-developer-cards-/);
+    assert.match(checksumDownloadText, /\.csv/);
+    assert.match(checksumDownloadText, /summary\.txt/);
+
+    const zipDownloadResponse = await fetch(
+      `${baseUrl}/api/developer/cards/export/download?productCode=ALICE_OPS_APP&format=zip`,
+      {
+        headers: { Authorization: `Bearer ${aliceSession.token}` }
+      }
+    );
+    const zipDownloadBuffer = Buffer.from(await zipDownloadResponse.arrayBuffer());
+    assert.equal(zipDownloadResponse.ok, true);
+    assert.match(zipDownloadResponse.headers.get("content-type") || "", /^application\/zip/);
+    assert.ok(zipDownloadBuffer.length > 0);
+
     const aliceVersion = await postJson(
       baseUrl,
       "/api/developer/client-versions",
@@ -8954,7 +9002,11 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/policies/);
     assert.match(html, /api\/developer\/cards/);
     assert.match(html, /api\/developer\/cards\/export/);
+    assert.match(html, /api\/developer\/cards\/export\/download/);
     assert.match(html, /Issue Card Batch/);
+    assert.match(html, /Download Summary/);
+    assert.match(html, /Download Checksums/);
+    assert.match(html, /Download Zip/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

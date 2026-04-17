@@ -351,6 +351,7 @@ npm run db:postgres:check
 - `POST /api/developer/policies/:policyId/unbind-config`
 - `GET /api/developer/cards`
 - `GET /api/developer/cards/export`
+- `GET /api/developer/cards/export/download`
 - `POST /api/developer/cards/batch`
 - `POST /api/developer/cards/:cardId/status`
 - `GET /api/developer/accounts`

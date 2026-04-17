@@ -145,6 +145,22 @@ rocksolid::LoginRequest request{
 const auto result = client.login_tcp(request);
 ```
 
+## Project-level hardening profiles
+
+The server can now expose a project-scoped client hardening profile through the integration package and startup bootstrap preview.
+
+- `strict`: startup bootstrap, local `licenseToken` validation, and heartbeat-driven feature gating are all expected in the host app
+- `balanced`: most client-side hardening stays enabled, but one gate is intentionally relaxed for that project
+- `relaxed`: the project leans more on server-side authorization and keeps fewer client-side anti-crack gates enabled
+
+Recommended interpretation:
+
+- `requireStartupBootstrap=true`: call `startup_bootstrap_http(...)` before showing login or recharge UI, then enforce `evaluate_startup_decision(...)`
+- `requireLocalTokenValidation=true`: cache token keys or bootstrap payloads and validate `licenseToken` locally after login
+- `requireHeartbeatGate=true`: keep protected features behind a healthy heartbeat and react quickly to revoked or expired sessions
+
+These project-level toggles do not disable core protocol security. Request signing, replay protection, and server-side authorization checks remain mandatory.
+
 Parsed high-level usage:
 
 ```cpp
@@ -253,6 +269,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `ClientNoticesResponse` returns the currently active notice list with `block_login` and timing metadata.
 - `validate_license_token_with_key_set(...)` lets you validate `licenseToken` locally against keys fetched during startup, without an extra round trip.
 - `validate_license_token_with_bootstrap(...)` reuses the cached bootstrap payload directly, so the caller does not need to manage key selection.
+- The integration package now includes a project-specific hardening guide so software authors can align startup, token validation, and heartbeat gating with the current project profile.
 - `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
 - `rs_sdk_version_string()` and `rocksolid::sdk_version_string()` let your host application report the exact SDK build it is using.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.

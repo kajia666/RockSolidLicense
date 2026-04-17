@@ -563,6 +563,59 @@ function buildClientHardeningProfile(featureConfig = {}) {
   };
 }
 
+function buildClientHardeningGuideText({
+  projectCode = "",
+  channel = "stable",
+  clientHardening = {}
+} = {}) {
+  const resolved = clientHardening && typeof clientHardening === "object" && clientHardening.profile
+    ? clientHardening
+    : buildClientHardeningProfile(clientHardening);
+  const lines = [
+    "RockSolid Client Hardening Guide",
+    `Project Code: ${projectCode || "-"}`,
+    `Channel: ${channel || "stable"}`,
+    `Profile: ${String(resolved.profile || "unknown").toUpperCase()}`,
+    `Summary: ${resolved.summary || "-"}`,
+    ""
+  ];
+
+  const coreProtocolNotes = Array.isArray(resolved.coreProtocolNotes) ? resolved.coreProtocolNotes : [];
+  if (coreProtocolNotes.length) {
+    lines.push("Core Protocol Security (always on):");
+    for (const item of coreProtocolNotes) {
+      lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
+
+  const controls = Array.isArray(resolved.controls) ? resolved.controls : [];
+  if (controls.length) {
+    lines.push("Project-level Controls:");
+    for (const item of controls) {
+      lines.push(`- [${item.required ? "REQUIRED" : "OPTIONAL"}] ${item.label}: ${item.summary}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("Recommended Integration Order:");
+  lines.push("1. Create one LicenseClientWin instance at app startup and cache a stable device fingerprint.");
+  lines.push(resolved.startupBootstrapRequired
+    ? "2. Call startup_bootstrap_http(...) before showing login or recharge UI, then enforce evaluate_startup_decision(...)."
+    : "2. Call startup_bootstrap_http(...) during app launch as a recommended pre-login check, even though this project does not hard-require it.");
+  lines.push(resolved.localTokenValidationRequired
+    ? "3. Persist the bootstrap payload or returned key set so the host app can verify licenseToken locally after login."
+    : "3. Local licenseToken validation is optional here, but keeping the returned key set still raises the reverse-engineering cost.");
+  lines.push("4. Run parsed login helpers and keep the returned binding, quota, and session metadata available to the host application.");
+  lines.push(resolved.heartbeatGateRequired
+    ? "5. Keep protected features behind a healthy heartbeat and react immediately when the session is revoked, expired, or no longer renewed."
+    : "5. Heartbeat is still recommended for online state, but this project uses a softer local feature gate after heartbeat loss.");
+  lines.push("");
+  lines.push(`Shipping Note: ${resolved.nextAction || "-"}`);
+
+  return lines.join("\n");
+}
+
 function buildIntegrationExamples() {
   return {
     http: [
@@ -968,6 +1021,12 @@ function buildDeveloperIntegrationPackagePayload({
         ? product.featureConfig
         : {}
     );
+  const hardeningFileName = `${product.code}-hardening-guide.txt`;
+  const hardeningGuide = buildClientHardeningGuideText({
+    projectCode: product.code,
+    channel: startupDefaults.channel || "stable",
+    clientHardening
+  });
   const manifest = {
     generatedAt,
     developer: developer ?? ownerDeveloper ?? null,
@@ -1027,7 +1086,9 @@ function buildDeveloperIntegrationPackagePayload({
       envFileName: `${product.code}.env`,
       envTemplate: buildIntegrationEnvTemplate(manifest),
       cppFileName: `${product.code}.cpp`,
-      cppQuickstart: buildIntegrationCppQuickstart(manifest)
+      cppQuickstart: buildIntegrationCppQuickstart(manifest),
+      hardeningFileName,
+      hardeningGuide
     }
   };
 }
@@ -1198,12 +1259,20 @@ function buildIntegrationPackageCppFiles(items = []) {
   }));
 }
 
+function buildIntegrationPackageHardeningFiles(items = []) {
+  return items.map((item) => ({
+    fileName: item.snippets?.hardeningFileName || `${item.code}-hardening-guide.txt`,
+    content: item.snippets?.hardeningGuide || ""
+  }));
+}
+
 function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
   const generatedAt = options.generatedAt ?? nowIso();
   const timestampTag = buildExportTimestampTag(generatedAt);
   const manifestFiles = buildIntegrationPackageManifestFiles(items);
   const envFiles = buildIntegrationPackageEnvFiles(items);
   const cppFiles = buildIntegrationPackageCppFiles(items);
+  const hardeningFiles = buildIntegrationPackageHardeningFiles(items);
 
   return {
     generatedAt,
@@ -1218,13 +1287,16 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     manifestArchiveName: `rocksolid-integration-packages-${timestampTag}-manifests.txt`,
     envArchiveName: `rocksolid-integration-packages-${timestampTag}-env.txt`,
     cppArchiveName: `rocksolid-integration-packages-${timestampTag}-cpp.txt`,
+    hardeningArchiveName: `rocksolid-integration-packages-${timestampTag}-hardening.txt`,
     items,
     manifestFiles,
     envFiles,
     cppFiles,
+    hardeningFiles,
     manifestBundleText: buildNamedFileBundleText(manifestFiles),
     envBundleText: buildNamedFileBundleText(envFiles),
-    cppBundleText: buildNamedFileBundleText(cppFiles)
+    cppBundleText: buildNamedFileBundleText(cppFiles),
+    hardeningBundleText: buildNamedFileBundleText(hardeningFiles)
   };
 }
 
@@ -1725,6 +1797,7 @@ function buildReleasePackagePayload({
   });
   const envFileName = `${product.code}.env`;
   const cppFileName = `${product.code}.cpp`;
+  const hardeningFileName = `${product.code}-hardening-guide.txt`;
   const fileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.txt`;
   const deliverySummary = buildReleaseDeliverySummaryPayload({
@@ -1800,7 +1873,13 @@ function buildReleasePackagePayload({
       envFileName,
       envTemplate: integrationPackage?.snippets?.envTemplate || "",
       cppFileName,
-      cppQuickstart: integrationPackage?.snippets?.cppQuickstart || ""
+      cppQuickstart: integrationPackage?.snippets?.cppQuickstart || "",
+      hardeningFileName,
+      hardeningGuide: buildClientHardeningGuideText({
+        projectCode: product.code,
+        channel: normalizedChannel,
+        clientHardening: releaseStartupPreview?.clientHardening || integrationPackage?.manifest?.clientHardening || {}
+      })
     },
     summaryText: buildReleasePackageSummaryText(manifest)
   };
@@ -1875,6 +1954,10 @@ function buildReleasePackageFiles(payload) {
     {
       path: `snippets/${payload.snippets?.cppFileName || "project.cpp"}`,
       body: payload.snippets?.cppQuickstart || ""
+    },
+    {
+      path: `snippets/${payload.snippets?.hardeningFileName || "project-hardening-guide.txt"}`,
+      body: payload.snippets?.hardeningGuide || ""
     }
   ];
 }
@@ -1910,6 +1993,12 @@ function buildIntegrationPackageExportFiles(payload) {
       body: file.content || ""
     });
   }
+  for (const file of payload.hardeningFiles || []) {
+    files.push({
+      path: `hardening/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
 
   return files;
 }
@@ -1932,6 +2021,10 @@ function buildSingleIntegrationPackageFiles(payload) {
     {
       path: `cpp/${payload.snippets?.cppFileName || "project.cpp"}`,
       body: payload.snippets?.cppQuickstart || ""
+    },
+    {
+      path: `hardening/${payload.snippets?.hardeningFileName || "project-hardening-guide.txt"}`,
+      body: payload.snippets?.hardeningGuide || ""
     }
   ];
 }

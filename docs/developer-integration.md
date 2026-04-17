@@ -72,6 +72,8 @@ The package route returns:
 - `snippets.envTemplate`
 - `snippets.cppFileName`
 - `snippets.cppQuickstart`
+- `snippets.hardeningFileName`
+- `snippets.hardeningGuide`
 
 The batch package export routes return:
 

@@ -5275,8 +5275,11 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releasePackage.manifest.actor.role, "viewer");
     assert.equal(releasePackage.snippets.envFileName, "RELPKG_ALPHA.env");
     assert.equal(releasePackage.snippets.cppFileName, "RELPKG_ALPHA.cpp");
+    assert.equal(releasePackage.snippets.hardeningFileName, "RELPKG_ALPHA-hardening-guide.txt");
     assert.match(releasePackage.snippets.envTemplate, /RS_PROJECT_CODE=RELPKG_ALPHA/);
     assert.match(releasePackage.snippets.cppQuickstart, /RELPKG_ALPHA/);
+    assert.match(releasePackage.snippets.hardeningGuide, /Profile: BALANCED/);
+    assert.match(releasePackage.snippets.hardeningGuide, /Shipping Note:/);
     assert.match(releasePackage.summaryText, /Latest Version: 5.4.0/);
     assert.match(releasePackage.summaryText, /Blocking Notices: 1/);
     assert.match(releasePackage.summaryText, /Client Hardening: BALANCED/);
@@ -5313,6 +5316,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseChecksumsDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*-sha256\.txt"/);
     assert.match(releaseChecksumsDownload.body, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA\.env/);
+    assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA-hardening-guide\.txt/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA\.cpp/);
 
     const releaseZipDownload = await getBinary(
@@ -5326,6 +5330,7 @@ test("developer release package export bundles integration, versions, and notice
     const releaseZipText = releaseZipDownload.body.toString("latin1");
     assert.match(releaseZipText, /RELPKG_ALPHA\.env/);
     assert.match(releaseZipText, /RELPKG_ALPHA\.cpp/);
+    assert.match(releaseZipText, /RELPKG_ALPHA-hardening-guide\.txt/);
     assert.match(releaseZipText, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(releaseZipText, /SHA256SUMS\.txt/);
 
@@ -8412,6 +8417,9 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerExport.items[0].snippets.cppQuickstart, /rocksolid::LicenseClientWin/);
     assert.match(developerExport.items[0].snippets.cppQuickstart, /INTBUNDLE_ALPHA/);
     assert.match(developerExport.items[0].snippets.cppQuickstart, /Startup bootstrap is still recommended/);
+    assert.equal(developerExport.items[0].snippets.hardeningFileName, "INTBUNDLE_ALPHA-hardening-guide.txt");
+    assert.match(developerExport.items[0].snippets.hardeningGuide, /Profile: RELAXED/);
+    assert.match(developerExport.items[0].snippets.hardeningGuide, /Project-level Controls:/);
     assert.match(
       developerExport.items[0].snippets.envTemplate,
       new RegExp(`RS_HTTP_BASE_URL=${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
@@ -8455,6 +8463,7 @@ test("batch project integration package export can bundle selected projects with
     const developerZipText = developerZipDownload.body.toString("latin1");
     assert.match(developerZipText, /INTBUNDLE_ALPHA\.env/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA\.cpp/);
+    assert.match(developerZipText, /INTBUNDLE_ALPHA-hardening-guide\.txt/);
     assert.match(developerZipText, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(developerZipText, /SHA256SUMS\.txt/);
 
@@ -8472,6 +8481,7 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerChecksumsDownload.body, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(developerChecksumsDownload.body, /env\/INTBUNDLE_ALPHA\.env/);
     assert.match(developerChecksumsDownload.body, /cpp\/INTBUNDLE_ALPHA\.cpp/);
+    assert.match(developerChecksumsDownload.body, /hardening\/INTBUNDLE_ALPHA-hardening-guide\.txt/);
 
     const viewerForbidden = await postJsonExpectError(
       baseUrl,
@@ -8789,6 +8799,9 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(byProductId.snippets.cppQuickstart, /evaluate_startup_decision/);
     assert.match(byProductId.snippets.cppQuickstart, /EXPORT_ALPHA/);
     assert.match(byProductId.snippets.cppQuickstart, /Local licenseToken validation is optional/);
+    assert.equal(byProductId.snippets.hardeningFileName, "EXPORT_ALPHA-hardening-guide.txt");
+    assert.match(byProductId.snippets.hardeningGuide, /Profile: RELAXED/);
+    assert.match(byProductId.snippets.hardeningGuide, /Recommended Integration Order:/);
     assert.match(byProductId.snippets.envTemplate, /RS_PROJECT_CODE=EXPORT_ALPHA/);
     assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_ID=/);
     assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_SECRET=/);
@@ -9034,6 +9047,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /api\/client\/startup-bootstrap/);
     assert.match(html, /C\+\+ Quickstart/);
     assert.match(html, /Environment Template/);
+    assert.match(html, /Hardening Guide/);
     assert.match(html, /x-rs-app-id/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
@@ -9159,6 +9173,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Delivery Summary/);
     assert.match(html, /Delivery Checklist/);
     assert.match(html, /Package Summary/);
+    assert.match(html, /Hardening Guide/);
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip Archive/);

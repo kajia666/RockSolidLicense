@@ -103,6 +103,11 @@
         </article>
       </section>
 
+      <section class="card">
+        <h2>Hardening Guide</h2>
+        <pre id="hardening-guide">Select a project to generate a project-specific client hardening guide.</pre>
+      </section>
+
       <section class="wide">
         <article class="card">
           <h2>Raw Snapshot</h2>
@@ -473,6 +478,7 @@ ${JSON.stringify(request, null, 2)}`;
           el("package-json").textContent = "Select a project to generate an integration package.";
           el("cpp-snippet").textContent = "Select a project to generate a C++ quickstart snippet.";
           el("env-snippet").textContent = "Select a project to generate an environment template.";
+          el("hardening-guide").textContent = "Select a project to generate a project-specific client hardening guide.";
           el("startup-preview").textContent = selectedProduct
             ? "Refresh the integration package to inspect the current startup bootstrap decision."
             : "Select a project to inspect the default startup bootstrap decision.";
@@ -485,6 +491,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("package-json").textContent = JSON.stringify(packageSnapshot, null, 2);
         el("cpp-snippet").textContent = packageSnapshot.snippets?.cppQuickstart || "";
         el("env-snippet").textContent = packageSnapshot.snippets?.envTemplate || "";
+        el("hardening-guide").textContent = packageSnapshot.snippets?.hardeningGuide || "";
         renderStartupPreview();
       }
 

@@ -178,3 +178,13 @@ This runs packaging plus the smoke test in one command.
 8. Persist `sessionToken` for heartbeats, and for point-based policies also cache the latest `LoginResponse.quota` snapshot for your UI.
 9. Catch `rocksolid::ApiException` around parsed helper calls if your host application needs stable `error.code` branching.
 10. Persist `ClientStartupBootstrapCache` if you want offline startup decisions or local token verification during short network outages.
+
+## Matching the project hardening profile
+
+When you hand this SDK to a software author, match the host app behavior to the project's exported hardening profile:
+
+1. `strict`: keep startup bootstrap, local token validation, and heartbeat feature gating all enabled.
+2. `balanced`: keep most of the flow above, but follow the exported hardening guide for the one relaxed gate.
+3. `relaxed`: the host app can lean more on server-side authorization, but startup bootstrap and local token validation are still recommended where practical.
+
+The generated integration package and release package now include a project-specific hardening guide text file. Use that file as the final source of truth for the current project's startup, token-validation, and heartbeat expectations.

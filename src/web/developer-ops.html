@@ -946,52 +946,171 @@
         };
       }
 
-      function buildDeveloperFollowUp(comparison = {}, focus = null) {
+      function buildDeveloperFollowUpImpactBits(focus = null) {
+        const item = focus?.item || {};
+        const kind = String(focus?.kind || "").trim().toLowerCase();
+        const bits = [];
+        if (kind === "account") {
+          if (item.issueCount !== null && item.issueCount !== undefined) {
+            bits.push(`issues=${Number(item.issueCount || 0)}`);
+          }
+          if (Number(item.activeSessionCount || 0) > 0) {
+            bits.push(`sessions=${Number(item.activeSessionCount)}`);
+          }
+          if (Number(item.activeEntitlementCount || 0) > 0) {
+            bits.push(`entitlements=${Number(item.activeEntitlementCount)}`);
+          }
+          return bits;
+        }
+        if (kind === "session") {
+          if (item.status) {
+            bits.push(`status=${item.status}`);
+          }
+          if (item.deviceName || item.fingerprint) {
+            bits.push(`device=${item.deviceName || shortText(item.fingerprint, 18)}`);
+          }
+          return bits;
+        }
+        if (kind === "device") {
+          if (item.kind) {
+            bits.push(`kind=${item.kind}`);
+          }
+          if (item.status) {
+            bits.push(`status=${item.status}`);
+          }
+          if (Number(item.relatedSessionCount || 0) > 0) {
+            bits.push(`sessions=${Number(item.relatedSessionCount)}`);
+          }
+          return bits;
+        }
+        if (kind === "entitlement") {
+          if (item.status) {
+            bits.push(`status=${item.status}`);
+          }
+          if (item.remainingPoints !== null && item.remainingPoints !== undefined) {
+            bits.push(`points=${item.remainingPoints}`);
+          }
+        }
+        return bits;
+      }
+
+      function tuneDeveloperFollowUpPlan(plan = {}, comparison = {}, hasDirectControl = false) {
         const outcomeLabel = String(comparison?.outcomeLabel || "").trim();
-        const recommendedLabel = focus?.item?.recommendedControl?.label || "";
-        const actionHint = focus?.item?.actionHint || focus?.item?.nextAction || "";
-        if (outcomeLabel === "Mitigated" || outcomeLabel === "Queue Cleared") {
+        if (!outcomeLabel) {
+          return plan;
+        }
+        if (outcomeLabel === "Mitigated") {
           return {
-            label: "Close Out",
-            tone: "ok",
-            primaryAction: "refresh_snapshot",
-            primaryLabel: "Confirm Snapshot",
-            secondaryAction: "reapply_focus",
-            secondaryLabel: "Review Last Focus",
-            hint: "The current scoped snapshot looks stable enough to confirm and close."
+            ...plan,
+            primaryLabel: "Confirm Mitigation",
+            secondaryAction: plan.secondaryAction || "reapply_focus",
+            secondaryLabel: plan.secondaryLabel || "Review Last Focus"
+          };
+        }
+        if (outcomeLabel === "Queue Cleared") {
+          return {
+            ...plan,
+            primaryLabel: plan.primaryAction === "refresh_snapshot" ? "Confirm Queue Exit" : (plan.primaryLabel || "Continue"),
+            secondaryAction: plan.secondaryAction || "reapply_focus",
+            secondaryLabel: plan.secondaryLabel || "Review Residual Risk"
           };
         }
         if (outcomeLabel === "Still Urgent") {
           return {
+            ...plan,
+            primaryAction: hasDirectControl ? "jump_controls" : "reapply_focus",
+            primaryLabel: hasDirectControl ? "Return To Controls" : "Reload Focus",
+            secondaryAction: "reapply_focus",
+            secondaryLabel: hasDirectControl ? "Reload Focus" : (plan.secondaryLabel || "")
+          };
+        }
+        if (outcomeLabel === "Risk Lowered") {
+          return {
+            ...plan,
+            primaryLabel: plan.primaryAction === "reapply_focus" ? "Review Lower Risk" : (plan.primaryLabel || "Continue"),
+            secondaryLabel: plan.secondaryAction === "refresh_snapshot" ? "Confirm Lower Risk" : (plan.secondaryLabel || "")
+          };
+        }
+        if (outcomeLabel === "Needs Watch") {
+          return {
+            ...plan,
+            primaryLabel: plan.primaryAction === "reapply_focus" ? "Review Remaining Risk" : (plan.primaryLabel || "Continue"),
+            secondaryLabel: plan.secondaryAction === "refresh_snapshot" ? "Recheck Snapshot" : (plan.secondaryLabel || "")
+          };
+        }
+        return plan;
+      }
+
+      function buildDeveloperFollowUp(comparison = {}, focus = null) {
+        const after = comparison?.after || {};
+        const severityRank = Number(after.maxSeverityRank || 0);
+        const queuePosition = Number.isFinite(after.queuePosition) ? after.queuePosition : null;
+        const recommendedControl = focus?.recommendedControl || focus?.item?.recommendedControl || {};
+        const recommendedLabel = recommendedControl.label || "";
+        const hasDirectControl = Boolean(recommendedControl.kind || recommendedLabel);
+        const actionHint = focus?.item?.actionHint || focus?.item?.nextAction || "";
+        const actionTarget = recommendedLabel || actionHint || (hasDirectControl ? "return to the quick controls" : "review the current scoped focus");
+        const impactBits = buildDeveloperFollowUpImpactBits(focus);
+        const impactSummary = impactBits.length ? `Impact: ${impactBits.join(", ")}.` : "";
+        if (severityRank === 0 && queuePosition === null) {
+          return tuneDeveloperFollowUpPlan({
+            priority: "clear",
+            label: "Close Out",
+            tone: "ok",
+            impactBits,
+            hint: `No active scoped signal remains for this object. ${impactSummary ? `${impactSummary} ` : ""}You can confirm the snapshot and close the loop now.`,
+            primaryAction: "refresh_snapshot",
+            primaryLabel: "Refresh Snapshot",
+            secondaryAction: focus?.kind ? "reapply_focus" : "",
+            secondaryLabel: focus?.kind ? "Review Last Focus" : ""
+          }, comparison, hasDirectControl);
+        }
+        if (
+          severityRank >= 3
+          || comparison?.trend === "escalated"
+          || comparison?.trend === "prioritized"
+          || (queuePosition !== null && queuePosition <= 2)
+        ) {
+          return tuneDeveloperFollowUpPlan({
+            priority: "urgent",
             label: "Escalate",
             tone: "danger",
-            primaryAction: "jump_controls",
-            primaryLabel: "Return To Controls",
-            secondaryAction: "reapply_focus",
-            secondaryLabel: "Reload Focus",
-            hint: `This object still needs immediate handling.${recommendedLabel || actionHint ? ` Next: ${recommendedLabel || actionHint}.` : ""}`
-          };
+            impactBits,
+            hint: `The object is still in a high-priority state. ${impactSummary ? `${impactSummary} ` : ""}${actionTarget ? `Next: ${actionTarget}.` : "A stronger scoped follow-up is recommended now."}`,
+            primaryAction: hasDirectControl ? "jump_controls" : "reapply_focus",
+            primaryLabel: hasDirectControl ? "Open Escalation Control" : "Reload Focus",
+            secondaryAction: hasDirectControl ? "reapply_focus" : "refresh_snapshot",
+            secondaryLabel: hasDirectControl ? "Reload Focus" : "Refresh Snapshot"
+          }, comparison, hasDirectControl);
         }
-        if (outcomeLabel === "Risk Lowered" || outcomeLabel === "Needs Watch") {
-          return {
+        if (
+          severityRank >= 2
+          || comparison?.trend === "queue-added"
+          || comparison?.trend === "new-signal"
+        ) {
+          return tuneDeveloperFollowUpPlan({
+            priority: "follow-up",
             label: "Follow Up",
             tone: "warning",
+            impactBits,
+            hint: `The object still needs scoped follow-up. ${impactSummary ? `${impactSummary} ` : ""}${actionTarget ? `Next: ${actionTarget}.` : "Review the refreshed focus details before closing the incident."}`,
             primaryAction: "reapply_focus",
-            primaryLabel: outcomeLabel === "Risk Lowered" ? "Review Lower Risk" : "Review Remaining Risk",
-            secondaryAction: "refresh_snapshot",
-            secondaryLabel: "Recheck Snapshot",
-            hint: "The risk looks better, but another scoped review pass is still recommended."
-          };
+            primaryLabel: "Continue Follow-up",
+            secondaryAction: hasDirectControl ? "jump_controls" : "refresh_snapshot",
+            secondaryLabel: hasDirectControl ? "Open Control" : "Refresh Snapshot"
+          }, comparison, hasDirectControl);
         }
-        return {
+        return tuneDeveloperFollowUpPlan({
+          priority: "monitor",
           label: "Monitor",
           tone: "warning",
-          primaryAction: "refresh_snapshot",
-          primaryLabel: "Refresh Snapshot",
-          secondaryAction: "reapply_focus",
-          secondaryLabel: "Reload Focus",
-          hint: "Keep the object under scoped monitoring."
-        };
+          impactBits,
+          hint: `The risk looks lower, but the object still appears in the scoped snapshot. ${impactSummary ? `${impactSummary} ` : ""}${actionTarget ? `Keep ${actionTarget} ready while monitoring.` : "Keep the object under scoped monitoring."}`,
+          primaryAction: "reapply_focus",
+          primaryLabel: "Keep Focus Loaded",
+          secondaryAction: "refresh_snapshot",
+          secondaryLabel: "Refresh Snapshot"
+        }, comparison, hasDirectControl);
       }
 
       function buildDeveloperMutationRecap(successMessage, focus = null, previousHits = []) {
@@ -1033,7 +1152,8 @@
           `<span class="tag">signals:${esc(lastMutation.before?.hitCount ?? 0)}->${esc(lastMutation.after?.hitCount ?? 0)}</span>`
         ].filter(Boolean).join("");
         const followUpTags = [
-          lastMutation.followUp?.label ? `<span class="tag ${esc(lastMutation.followUp.tone || "")}">${esc(lastMutation.followUp.label)}</span>` : ""
+          lastMutation.followUp?.label ? `<span class="tag ${esc(lastMutation.followUp.tone || "")}">${esc(lastMutation.followUp.label)}</span>` : "",
+          ...(Array.isArray(lastMutation.followUp?.impactBits) ? lastMutation.followUp.impactBits.map((bit) => `<span class="tag">${esc(bit)}</span>`) : [])
         ].filter(Boolean).join("");
         const followUpButtons = [
           lastMutation.followUp?.primaryAction ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${esc(lastMutation.followUp.primaryAction)}">${esc(lastMutation.followUp.primaryLabel || "Continue")}</button>` : "",

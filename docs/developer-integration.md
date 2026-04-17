@@ -49,7 +49,7 @@ The package route accepts:
 
 The package download route accepts the same selectors plus:
 
-- `format=json|env|cpp|checksums|zip`
+- `format=json|env|cpp|host-skeleton|checksums|zip`
 
 ## Returned data
 
@@ -92,7 +92,7 @@ The batch package export routes return:
 
 The batch package download routes accept the same body selectors as the export routes plus:
 
-- `format=json|manifests|env|cpp|checksums|zip`
+- `format=json|manifests|env|cpp|host-skeleton|checksums|zip`
 
 Typical shape:
 
@@ -139,7 +139,7 @@ The page and API are useful when the software author needs to:
 - adapt a dedicated `startup-bootstrap` request before showing the local login UI
 - confirm whether recharge and client-unbind are open for a scoped project before exposing those SDK flows
 - export a current project integration package after rotating `sdkAppSecret` or `sdkAppId`
-- download the current single-project integration package directly as JSON, `.env`, C++ quickstart, or one zip handoff bundle
+- download the current single-project integration package directly as JSON, `.env`, C++ quickstart, host skeleton, or one zip handoff bundle
 - download a matching SHA-256 checksum list for the generated handoff files
 - export multiple project integration packages in one request from the project workspace when several software products need the same deployment refresh
 - hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, and environment template

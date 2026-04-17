@@ -52,7 +52,7 @@
 - 产品级功能开关
 - 项目 SDK 凭据轮换
 - 批量 SDK 凭据 / 集成包 / 发版包导出与 zip 下载
-- 开发者接入中心单项目集成包直接下载
+- 开发者接入中心单项目集成包直接下载，并支持单独下载项目级 C++ host skeleton
 - 项目中心 / 接入中心 / 发版中心跨页预填联动
 - 项目页发版快速信号摘要
 - 开发者多项目归属
@@ -437,7 +437,7 @@ npm run db:postgres:check
 - `/admin`：管理员控制台，可处理账号、授权、会话、绑定、设备封禁和审计日志，支持审计快捷筛选、日志行回填、可点击的快照概览卡、直接可点的授权审查列表，以及从快照重点对象自动联动相关列表并高亮匹配记录、自动聚焦对应控制卡片，并在动作成功后围绕同一对象自动刷新上下文，还会在快照区显示最近一次动作是否仍处于重点关注中、风险级别是改善还是升高、是否移出了推荐处置队列、是否已经脱离 `Escalate First` 级别，以及更直接的 `Mitigated / Escalation Lowered / Still Escalate` 这类缓解结论；这些结果还会进一步驱动更贴合语境的 follow-up 按钮文案，帮助管理员更自然地继续 `Close Out / Monitor / Follow Up / Escalate`，同时保留 `issues / sessions / entitlements / points` 这类影响范围提示；快照顶部会额外突出 `Escalate First` 高优先级对象，并把产品、用户、原因、建议动作以及影响范围指标压缩成更短摘要，还支持直接 `Open Control` 或 `Load Full Context`，这些重点摘要也会同步进导出的 `summary` 文本
 - `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换单个或批量项目状态、按关键字和状态筛选项目，并支持单个或批量调整项目级功能开关、批量轮换 SDK 凭据、批量导出凭据清单和批量集成包
 - `/developer`：开发者总览中心，展示项目数、在线会话、卡密、强更规则、阻断公告、网络规则和功能开关覆盖情况
-- `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息、启动引导 `startup-bootstrap` 预览、示例请求，并导出当前项目的接入包、环境模板和 C++ 快速接入片段
+- `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息、启动引导 `startup-bootstrap` 预览、示例请求，并导出当前项目的接入包、环境模板、C++ 快速接入片段和项目级 host skeleton
 - `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及单个或批量 SDK 凭据轮换、凭据导出和批量集成包导出
 - `/developer/licenses`：开发者授权中心，维护策略、卡密批次、卡密状态和卡密导出
 - `/developer/ops`：开发者授权运营台，处理账号冻结、授权续期、点数调账、强制下线、设备解绑、设备封禁，并支持审计快捷筛选、日志行回填、可点击的快照概览卡、重点账号/会话/设备明细、`Escalate First` 高优先级对象摘要、`Prepared Control` 回显卡，以及动作完成后的 `Last Action Result / Mitigation / Follow-up` 回显；这些回显现在不仅能跟随快照焦点，也能尽量跟随表格选中对象或快速控制表单中的当前目标，并会结合结果状态、影响范围、`Escalate First` 变化、当前对象摘要和命中的快照信号给出更贴合的下一步入口，同时保留直接 `Open Control / Load Full Context` 的 scoped 处置入口与 ops 快照包导出

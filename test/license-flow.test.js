@@ -5311,6 +5311,16 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseEnvDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.env"/);
     assert.match(releaseEnvDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
 
+    const releaseHostSkeletonDownload = await getText(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=host-skeleton",
+      viewerSession.token
+    );
+    assert.match(releaseHostSkeletonDownload.contentType || "", /^text\/plain/);
+    assert.match(releaseHostSkeletonDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA-host-skeleton\.cpp"/);
+    assert.match(releaseHostSkeletonDownload.body, /FeatureGate/);
+    assert.match(releaseHostSkeletonDownload.body, /validate_license_token_with_bootstrap/);
+
     const releaseChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=checksums",
@@ -8459,6 +8469,20 @@ test("batch project integration package export can bundle selected projects with
     assert.match(manifestDownload.body, /### rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(manifestDownload.body, /"code": "INTBUNDLE_ALPHA"/);
 
+    const hostSkeletonBundleDownload = await postText(
+      baseUrl,
+      "/api/developer/products/integration-packages/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "host-skeleton"
+      },
+      viewerSession.token
+    );
+    assert.match(hostSkeletonBundleDownload.contentType || "", /^text\/plain/);
+    assert.match(hostSkeletonBundleDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*-host-skeleton\.txt"/);
+    assert.match(hostSkeletonBundleDownload.body, /### INTBUNDLE_ALPHA-host-skeleton\.cpp/);
+    assert.match(hostSkeletonBundleDownload.body, /FeatureGate/);
+
     const developerZipDownload = await postBinary(
       baseUrl,
       "/api/developer/products/integration-packages/export/download",
@@ -8863,6 +8887,16 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(cppDownload.contentDisposition || "", /EXPORT_ALPHA\.cpp/);
     assert.match(cppDownload.body, /startup_bootstrap_http/);
 
+    const hostSkeletonDownload = await getText(
+      baseUrl,
+      "/api/developer/integration/package/download?softwareCode=EXPORT_ALPHA&format=host-skeleton",
+      viewerSession.token
+    );
+    assert.equal(hostSkeletonDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(hostSkeletonDownload.contentDisposition || "", /EXPORT_ALPHA-host-skeleton\.cpp/);
+    assert.match(hostSkeletonDownload.body, /FeatureGate/);
+    assert.match(hostSkeletonDownload.body, /startup_bootstrap_http/);
+
     const checksumsDownload = await getText(
       baseUrl,
       "/api/developer/integration/package/download?softwareCode=EXPORT_ALPHA&format=checksums",
@@ -9056,6 +9090,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Download JSON/);
     assert.match(html, /Download Env/);
     assert.match(html, /Download C\+\+/);
+    assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
     assert.match(html, /Open Project Workspace/);
@@ -9195,6 +9230,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Package Summary/);
     assert.match(html, /Host Skeleton/);
     assert.match(html, /Hardening Guide/);
+    assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip Archive/);

@@ -209,6 +209,7 @@
             <button class="secondary" id="download-release-package-summary-btn">Download Summary</button>
             <button class="secondary" id="download-release-package-env-btn">Download Env Template</button>
             <button class="secondary" id="download-release-package-cpp-btn">Download C++ Quickstart</button>
+            <button class="secondary" id="download-release-package-host-skeleton-btn">Download Host Skeleton</button>
             <button class="secondary" id="download-release-package-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-release-package-zip-btn">Download Zip Archive</button>
           </div>
@@ -520,7 +521,7 @@
         const productCode = el("package-product-code").value.trim();
         const channel = el("package-channel").value.trim() || "stable";
         el("release-package-hint").textContent = productCode
-          ? `Generate the ${productCode} release handoff package for channel ${channel}, then download server-generated attachments for JSON, summary, env, or C++ quickstart.`
+          ? `Generate the ${productCode} release handoff package for channel ${channel}, then download server-generated attachments for JSON, summary, env, C++ quickstart, or the host skeleton.`
           : "Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.";
         syncReleaseWorkspaceLinks();
       }
@@ -575,7 +576,7 @@
           }
         });
         const hasPackage = Boolean(releasePackage);
-        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-cpp-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
+        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-cpp-btn", "download-release-package-host-skeleton-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
           const node = el(id);
           if (node) {
             node.disabled = readDisabled || !hasPackage;
@@ -1092,6 +1093,24 @@
             releasePackage.snippets?.cppFileName || "project.cpp"
           );
           setStatus(`Release package C++ quickstart downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-release-package-host-skeleton-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "host-skeleton" })}`,
+            releasePackage.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"
+          );
+          setStatus(`Release package host skeleton downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

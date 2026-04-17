@@ -127,7 +127,7 @@ The package route accepts:
 
 The download route accepts the same selectors plus:
 
-- `format=json|summary|env|cpp|checksums|zip`
+- `format=json|summary|env|cpp|host-skeleton|checksums|zip`
 
 Typical uses:
 

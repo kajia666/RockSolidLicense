@@ -2342,7 +2342,7 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "cpp", "zip", "checksums"],
+    ["json", "summary", "env", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
@@ -2383,6 +2383,13 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
       body: payload.snippets?.cppQuickstart || ""
     };
   }
+  if (normalizedFormat === "host-skeleton") {
+    return {
+      fileName: payload.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.hostSkeletonCpp || ""
+    };
+  }
 
   return {
     fileName: payload.fileName || "release-package.json",
@@ -2394,7 +2401,7 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "manifests", "env", "cpp", "zip", "checksums"],
+    ["json", "manifests", "env", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_EXPORT_FORMAT",
     "Integration export format"
@@ -2435,6 +2442,13 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
       body: payload.cppBundleText || ""
     };
   }
+  if (normalizedFormat === "host-skeleton") {
+    return {
+      fileName: payload.hostSkeletonArchiveName || "integration-host-skeleton.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.hostSkeletonBundleText || ""
+    };
+  }
 
   return {
     fileName: payload.fileName || "integration-packages.json",
@@ -2446,7 +2460,7 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "env", "cpp", "zip", "checksums"],
+    ["json", "env", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_PACKAGE_FORMAT",
     "Integration package format"
@@ -2478,6 +2492,13 @@ function buildIntegrationPackageDownloadAsset(payload, format = "json") {
       fileName: payload.snippets?.cppFileName || "project.cpp",
       contentType: "text/plain; charset=utf-8",
       body: payload.snippets?.cppQuickstart || ""
+    };
+  }
+  if (normalizedFormat === "host-skeleton") {
+    return {
+      fileName: payload.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.hostSkeletonCpp || ""
     };
   }
 

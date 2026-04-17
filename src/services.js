@@ -1117,6 +1117,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
   const release = manifest.release || {};
   const versionManifest = release.versionManifest || {};
   const activeNotices = release.activeNotices || {};
+  const readiness = release.readiness || {};
   const noticeItems = Array.isArray(activeNotices.items) ? activeNotices.items : [];
   const lines = [
     "RockSolid Release Delivery Package",
@@ -1129,8 +1130,30 @@ function buildReleasePackageSummaryText(manifest = {}) {
     `Latest Download URL: ${versionManifest.latestDownloadUrl || "-"}`,
     `Active Notices: ${activeNotices.total ?? 0}`,
     `Blocking Notices: ${activeNotices.blockingTotal ?? 0}`,
+    `Release Readiness: ${String(readiness.status || "unknown").toUpperCase()}`,
+    `Release Message: ${readiness.message || "-"}`,
     ""
   ];
+
+  const readinessChecks = Array.isArray(readiness.checks) ? readiness.checks : [];
+  if (readinessChecks.length) {
+    lines.push("Release Checks:");
+    for (const item of readinessChecks) {
+      lines.push(
+        `- [${String(item.level || "info").toUpperCase()}] ${item.label || item.key || "check"}: ${item.summary || "-"}`
+      );
+    }
+    lines.push("");
+  }
+
+  const nextActions = Array.isArray(readiness.nextActions) ? readiness.nextActions : [];
+  if (nextActions.length) {
+    lines.push("Recommended Next Actions:");
+    for (const item of nextActions) {
+      lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
 
   if (noticeItems.length) {
     lines.push("Active Notice Titles:");
@@ -1145,6 +1168,165 @@ function buildReleasePackageSummaryText(manifest = {}) {
   return lines.join("\n");
 }
 
+function buildReleaseReadinessPayload({
+  product,
+  versionManifest,
+  activeNotices = [],
+  releaseStartupPreview = null
+}) {
+  const featureConfig = snapshotManagedProductFeatureConfig(
+    product?.featureConfig && typeof product.featureConfig === "object"
+      ? product.featureConfig
+      : {}
+  );
+  const latestVersion = versionManifest?.latestVersion || null;
+  const latestDownloadUrl = versionManifest?.latestDownloadUrl || null;
+  const blockingNotices = activeNotices.filter((item) => item.blockLogin);
+  const startupDecision = releaseStartupPreview?.decision || {};
+  const tokenKeySummary = releaseStartupPreview?.tokenKeySummary || {};
+  const checks = [];
+
+  checks.push({
+    key: "project_status",
+    label: "Project status",
+    level: (product?.status ?? "active") === "active" ? "ok" : "blocking",
+    blocking: (product?.status ?? "active") !== "active",
+    summary: (product?.status ?? "active") === "active"
+      ? "Project is active and can serve runtime traffic."
+      : `Project is ${product?.status || "inactive"} and will reject runtime validation requests.`,
+    nextAction: (product?.status ?? "active") === "active"
+      ? null
+      : "Switch the project back to active before shipping this release."
+  });
+
+  checks.push({
+    key: "version_rule",
+    label: "Version rule",
+    level: latestVersion ? "ok" : "attention",
+    blocking: false,
+    summary: latestVersion
+      ? `Latest published client version is ${latestVersion}.`
+      : "No active version rule is published for the selected channel.",
+    nextAction: latestVersion
+      ? null
+      : "Publish or activate a client version rule so the release package names an expected build."
+  });
+
+  checks.push({
+    key: "download_url",
+    label: "Download URL",
+    level: !latestVersion || latestDownloadUrl ? "ok" : "attention",
+    blocking: false,
+    summary: !latestVersion
+      ? "No download URL requirement because no active version rule is published yet."
+      : latestDownloadUrl
+        ? `Latest build points to ${latestDownloadUrl}.`
+        : "The latest active version does not expose a download URL.",
+    nextAction: !latestVersion || latestDownloadUrl
+      ? null
+      : "Attach a download URL to the active client version so upgrade prompts can route users correctly."
+  });
+
+  checks.push({
+    key: "startup_gate",
+    label: "Startup gate",
+    level: startupDecision.ready === false ? "blocking" : "ok",
+    blocking: startupDecision.ready === false,
+    summary: startupDecision.message
+      || (
+        startupDecision.ready === false
+          ? "The release candidate would still be blocked during startup."
+          : "The release candidate can complete startup checks."
+      ),
+    nextAction: startupDecision.ready === false
+      ? (startupDecision.recommendedAction || "Resolve the blocking startup condition before release handoff.")
+      : null
+  });
+
+  checks.push({
+    key: "notices",
+    label: "Runtime notices",
+    level: blockingNotices.length ? "blocking" : activeNotices.length ? "attention" : "ok",
+    blocking: blockingNotices.length > 0,
+    summary: blockingNotices.length
+      ? `${blockingNotices.length} active blocking notice(s) would stop login for the selected channel.`
+      : activeNotices.length
+        ? `${activeNotices.length} active notice(s) will be shown at startup for the selected channel.`
+        : "No active startup notices are configured for the selected channel.",
+    nextAction: blockingNotices.length
+      ? "Archive or downgrade the blocking maintenance notice before opening the release to users."
+      : activeNotices.length
+        ? "Double-check the notice copy and timing so the startup message matches the rollout plan."
+        : null
+  });
+
+  checks.push({
+    key: "runtime_coverage",
+    label: "Runtime safeguards",
+    level: featureConfig.allowVersionCheck === false || featureConfig.allowNotices === false
+      ? "attention"
+      : "ok",
+    blocking: false,
+    summary: featureConfig.allowVersionCheck === false && featureConfig.allowNotices === false
+      ? "Version checks and startup notices are both disabled for this project."
+      : featureConfig.allowVersionCheck === false
+        ? "Version checks are disabled for this project."
+        : featureConfig.allowNotices === false
+          ? "Startup notices are disabled for this project."
+          : "Version checks and startup notices are both enabled for this project.",
+    nextAction: featureConfig.allowVersionCheck === false || featureConfig.allowNotices === false
+      ? "Review project feature toggles if this release should enforce upgrade guidance or show startup notices."
+      : null
+  });
+
+  checks.push({
+    key: "token_keys",
+    label: "Token verification keys",
+    level: (tokenKeySummary.totalKeys ?? 0) > 0 ? "ok" : "attention",
+    blocking: false,
+    summary: (tokenKeySummary.totalKeys ?? 0) > 0
+      ? `${tokenKeySummary.totalKeys} public token key(s) are available for local licenseToken verification.`
+      : "No public token keys were included in the startup preview.",
+    nextAction: (tokenKeySummary.totalKeys ?? 0) > 0
+      ? null
+      : "Make sure the client requests token keys during startup if it also verifies license tokens locally."
+  });
+
+  const blockingChecks = checks.filter((item) => item.blocking);
+  const attentionChecks = checks.filter((item) => item.level === "attention");
+  let status = "ready";
+  let ready = true;
+  let title = "Ready to ship";
+  let message = "The selected project looks ready for release handoff and runtime rollout.";
+
+  if (blockingChecks.length) {
+    status = "hold";
+    ready = false;
+    title = "Hold release";
+    message = `${blockingChecks.length} blocking check(s) should be resolved before this release goes live.`;
+  } else if (attentionChecks.length) {
+    status = "attention";
+    title = "Ship with attention";
+    message = `${attentionChecks.length} non-blocking check(s) still deserve review before final handoff.`;
+  }
+
+  const nextActions = checks
+    .map((item) => item.nextAction)
+    .filter((item, index, list) => item && list.indexOf(item) === index);
+
+  return {
+    ready,
+    status,
+    title,
+    message,
+    blockingChecks: blockingChecks.length,
+    attentionChecks: attentionChecks.length,
+    candidateVersion: releaseStartupPreview?.request?.clientVersion || latestVersion || null,
+    checks,
+    nextActions
+  };
+}
+
 function buildReleasePackagePayload({
   generatedAt = nowIso(),
   developer,
@@ -1153,7 +1335,8 @@ function buildReleasePackagePayload({
   channel = "stable",
   versionManifest,
   activeNoticeRows = [],
-  integrationPackage
+  integrationPackage,
+  releaseStartupPreview = null
 }) {
   const normalizedChannel = normalizeChannel(channel);
   const timestampTag = buildExportTimestampTag(generatedAt);
@@ -1163,6 +1346,12 @@ function buildReleasePackagePayload({
       : formatNotice(row)
   ));
   const blockingNotices = activeNotices.filter((item) => item.blockLogin);
+  const readiness = buildReleaseReadinessPayload({
+    product,
+    versionManifest,
+    activeNotices,
+    releaseStartupPreview
+  });
   const envFileName = `${product.code}.env`;
   const cppFileName = `${product.code}.cpp`;
   const manifest = {
@@ -1185,6 +1374,8 @@ function buildReleasePackagePayload({
     release: {
       channel: normalizedChannel,
       versionManifest,
+      startupPreview: releaseStartupPreview,
+      readiness,
       activeNotices: {
         total: activeNotices.length,
         blockingTotal: blockingNotices.length,
@@ -8947,6 +9138,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       });
       const versionManifest = await buildVersionManifest(db, store, product, null, channel);
       const activeNoticeRows = await activeNoticesForProduct(db, store, product.id, channel);
+      const releaseStartupPreview = await buildIntegrationStartupPreviewPayload(
+        db,
+        store,
+        product,
+        tokenKeys,
+        {
+          clientVersion: versionManifest.latestVersion || integrationPackage?.manifest?.startupDefaults?.clientVersion || "1.0.0",
+          channel,
+          includeTokenKeys: true
+        }
+      );
       const payload = buildReleasePackagePayload({
         generatedAt,
         developer,
@@ -8955,7 +9157,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         channel,
         versionManifest,
         activeNoticeRows,
-        integrationPackage
+        integrationPackage,
+        releaseStartupPreview
       });
       auditDeveloperSession(db, session, "product.release-package.export", "product", product.id, {
         code: product.code,

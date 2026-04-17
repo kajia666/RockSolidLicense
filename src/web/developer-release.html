@@ -314,6 +314,17 @@
 
       <section class="table-grid">
         <article class="card">
+          <h2>Release Readiness</h2>
+          <div id="release-readiness" class="hint">Generate a release package to evaluate whether the selected channel looks ready for rollout.</div>
+        </article>
+        <article class="card">
+          <h2>Package Summary</h2>
+          <pre id="release-summary">Generate a release package to preview its summary text here.</pre>
+        </article>
+      </section>
+
+      <section class="table-grid">
+        <article class="card">
           <h2>Version Rules</h2>
           <div class="table-wrap">
             <table>
@@ -530,6 +541,38 @@
         return `<span class="${className}">${escapeHtml(text)}</span>`;
       }
 
+      function renderReleaseReadiness() {
+        if (!releasePackage) {
+          el("release-readiness").textContent = "Generate a release package to evaluate whether the selected channel looks ready for rollout.";
+          el("release-summary").textContent = "Generate a release package to preview its summary text here.";
+          return;
+        }
+
+        const readiness = releasePackage.manifest?.release?.readiness || {};
+        const startupPreview = releasePackage.manifest?.release?.startupPreview || {};
+        const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
+        const nextActions = Array.isArray(readiness.nextActions) ? readiness.nextActions : [];
+        const request = startupPreview.request || {};
+        const noticeSummary = startupPreview.noticeSummary || {};
+
+        el("release-readiness").innerHTML = `
+          <div style="margin-bottom:10px;">
+            ${renderTag(readiness.title || readiness.status || "unknown", readiness.ready === true)}
+            ${renderTag(String(readiness.status || "unknown").toUpperCase(), readiness.ready === true)}
+            ${startupPreview.runtimeChecks?.projectActive ? renderTag("PROJECT ACTIVE", true) : renderTag("PROJECT INACTIVE", false)}
+          </div>
+          <div class="split-line"><span>Candidate Version</span><span>${escapeHtml(readiness.candidateVersion || "-")}</span></div>
+          <div class="split-line"><span>Startup Channel</span><span>${escapeHtml(request.channel || "-")}</span></div>
+          <div class="split-line"><span>Blocking Checks</span><span>${escapeHtml(readiness.blockingChecks ?? 0)}</span></div>
+          <div class="split-line"><span>Attention Checks</span><span>${escapeHtml(readiness.attentionChecks ?? 0)}</span></div>
+          <div class="split-line"><span>Active Notices</span><span>${escapeHtml(noticeSummary.total ?? 0)} active | ${escapeHtml(noticeSummary.blockingTotal ?? 0)} blocking</span></div>
+          <div class="hint" style="margin-top:12px;">${escapeHtml(readiness.message || "No release readiness summary available.")}</div>
+          ${checks.length ? `<div class="hint" style="margin-top:12px;">${checks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
+          ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
+        `;
+        el("release-summary").textContent = releasePackage.summaryText || "";
+      }
+
       async function api(path, options = {}) {
         const headers = { ...(options.headers || {}) };
         if (options.body) {
@@ -671,6 +714,7 @@
         renderProjects();
         renderVersions();
         renderNotices();
+        renderReleaseReadiness();
         syncPermissions();
       }
 
@@ -729,6 +773,8 @@
       async function mutate(path, body, successMessage) {
         const data = await api(path, { method: "POST", body });
         await refreshWorkspace();
+        releasePackage = null;
+        renderReleaseReadiness();
         setStatus(successMessage);
         setOutput(data);
       }
@@ -741,6 +787,7 @@
         }
         const data = await api(`/api/developer/release-package${q({ productCode, channel })}`);
         releasePackage = data;
+        renderReleaseReadiness();
         syncPermissions();
         return data;
       }

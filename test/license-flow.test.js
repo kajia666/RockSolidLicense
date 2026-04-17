@@ -5235,6 +5235,11 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releasePackage.manifest.release.versionManifest.latestVersion, "5.4.0");
     assert.equal(releasePackage.manifest.release.versionManifest.minimumAllowedVersion, "5.4.0");
     assert.equal(releasePackage.manifest.release.versionManifest.latestDownloadUrl, "https://example.invalid/relpkg-alpha/5.4.0");
+    assert.equal(releasePackage.manifest.release.startupPreview.request.clientVersion, "5.4.0");
+    assert.equal(releasePackage.manifest.release.readiness.status, "hold");
+    assert.equal(releasePackage.manifest.release.readiness.ready, false);
+    assert.equal(releasePackage.manifest.release.readiness.candidateVersion, "5.4.0");
+    assert.ok(releasePackage.manifest.release.readiness.blockingChecks >= 1);
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
     assert.equal(releasePackage.manifest.integration.project.code, "RELPKG_ALPHA");
@@ -5247,6 +5252,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.snippets.cppQuickstart, /RELPKG_ALPHA/);
     assert.match(releasePackage.summaryText, /Latest Version: 5.4.0/);
     assert.match(releasePackage.summaryText, /Blocking Notices: 1/);
+    assert.match(releasePackage.summaryText, /Release Readiness: HOLD/);
+    assert.match(releasePackage.summaryText, /Release Checks:/);
 
     const releaseSummaryDownload = await getText(
       baseUrl,
@@ -5257,6 +5264,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*\.txt"/);
     assert.match(releaseSummaryDownload.body, /Latest Version: 5.4.0/);
     assert.match(releaseSummaryDownload.body, /Blocking Notices: 1/);
+    assert.match(releaseSummaryDownload.body, /Release Readiness: HOLD/);
 
     const releaseEnvDownload = await getText(
       baseUrl,
@@ -9092,6 +9100,8 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Scoped to assigned projects/);
     assert.match(html, /Release Delivery Package/);
     assert.match(html, /Generate Release Package/);
+    assert.match(html, /Release Readiness/);
+    assert.match(html, /Package Summary/);
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip Archive/);

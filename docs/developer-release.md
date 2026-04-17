@@ -105,6 +105,8 @@ The release workspace can now generate a project-scoped release delivery package
 
 - the current integration package
 - the selected channel's version manifest
+- a release-specific startup bootstrap preview
+- a release readiness summary with blocking and attention checks
 - active runtime notices that affect startup or login
 - ready-to-download `.env` and C/C++ quickstart snippets
 
@@ -124,6 +126,7 @@ Typical uses:
 
 - hand the release manager a single deployment snapshot for one software project
 - verify that the download URL, force-update floor, and maintenance notices match the latest SDK credentials
+- decide whether the selected release should be held, shipped with attention, or treated as ready before rollout
 - export release coordination material for viewer members without giving them write access
 - hand over a matching SHA-256 checksum list so operators can verify downloaded files before distribution
 - let the browser download server-generated attachments instead of building files locally in the page

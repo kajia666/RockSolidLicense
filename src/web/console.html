@@ -1200,6 +1200,49 @@
         return summary;
       }
 
+      function buildAdminEscalationOutcome(before = {}, after = {}, trend = "unchanged") {
+        if (before.escalateFirst && !after.escalateFirst && after.maxSeverityRank === 0) {
+          return {
+            label: "Mitigated",
+            tone: "ok",
+            hint: "The object has left Escalate First and no active snapshot signal remains."
+          };
+        }
+        if (before.escalateFirst && !after.escalateFirst) {
+          return {
+            label: "Escalation Lowered",
+            tone: "ok",
+            hint: "The object has left Escalate First, but lower-priority follow-up is still visible."
+          };
+        }
+        if (after.escalateFirst && (trend === "escalated" || trend === "prioritized" || trend === "queue-added" || !before.escalateFirst)) {
+          return {
+            label: "Still Escalate",
+            tone: "danger",
+            hint: "The object is still in Escalate First and should stay in immediate handling."
+          };
+        }
+        if (after.escalateFirst) {
+          return {
+            label: "Escalation Active",
+            tone: "warning",
+            hint: "The object remains in Escalate First even after the last action."
+          };
+        }
+        if (after.maxSeverityRank > 0 || after.queuePosition !== null) {
+          return {
+            label: "Needs Watch",
+            tone: "warning",
+            hint: "The object left the top escalation tier, but it still needs observation or follow-up."
+          };
+        }
+        return {
+          label: "Routine Monitor",
+          tone: "ok",
+          hint: "No active Escalate First condition remains for this object."
+        };
+      }
+
       function compareAdminMutationSignals(previousHits = [], currentHits = []) {
         const before = summarizeAdminSnapshotHits(previousHits);
         const after = summarizeAdminSnapshotHits(currentHits);
@@ -1297,6 +1340,7 @@
           detailParts.push(`escalate=${beforeEscalate}->${afterEscalate}`);
         }
         detailParts.push(`signals=${before.hitCount}->${after.hitCount}`);
+        const escalationOutcome = buildAdminEscalationOutcome(before, after, trend);
 
         return {
           before,
@@ -1306,6 +1350,9 @@
           trendTone,
           escalationLabel,
           escalationTone,
+          escalationOutcomeLabel: escalationOutcome.label,
+          escalationOutcomeTone: escalationOutcome.tone,
+          escalationOutcomeHint: escalationOutcome.hint,
           headline,
           detail: detailParts.join(" | ")
         };
@@ -1569,6 +1616,9 @@
           trendTone: comparison.trendTone,
           escalationLabel: comparison.escalationLabel,
           escalationTone: comparison.escalationTone,
+          escalationOutcomeLabel: comparison.escalationOutcomeLabel,
+          escalationOutcomeTone: comparison.escalationOutcomeTone,
+          escalationOutcomeHint: comparison.escalationOutcomeHint,
           before: comparison.before,
           after: comparison.after,
           followUp,
@@ -1593,6 +1643,7 @@
         const progressTags = [
           adminLastMutation.trendLabel ? `<span class="tag ${escapeHtml(adminLastMutation.trendTone || "")}">${escapeHtml(adminLastMutation.trendLabel)}</span>` : "",
           adminLastMutation.escalationLabel ? `<span class="tag ${escapeHtml(adminLastMutation.escalationTone || "")}">${escapeHtml(adminLastMutation.escalationLabel)}</span>` : "",
+          adminLastMutation.escalationOutcomeLabel ? `<span class="tag ${escapeHtml(adminLastMutation.escalationOutcomeTone || "")}">${escapeHtml(adminLastMutation.escalationOutcomeLabel)}</span>` : "",
           adminLastMutation.before?.maxSeverity ? `<span class="tag ${escapeHtml(beforeSeverityClass || "")}">before:${escapeHtml(adminLastMutation.before.maxSeverity.toUpperCase())}</span>` : "",
           adminLastMutation.after?.maxSeverity ? `<span class="tag ${escapeHtml(afterSeverityClass || "")}">now:${escapeHtml(adminLastMutation.after.maxSeverity.toUpperCase())}</span>` : (adminLastMutation.before?.maxSeverity || beforeQueue !== null ? `<span class="tag ok">now:clear</span>` : ""),
           (Number.isFinite(beforeQueue) || Number.isFinite(afterQueue)) ? `<span class="tag">queue:${escapeHtml(beforeQueue !== null ? `#${beforeQueue}` : "out")}->${escapeHtml(afterQueue !== null ? `#${afterQueue}` : "out")}</span>` : "",
@@ -1628,6 +1679,7 @@
             <div>${escapeHtml(adminLastMutation.successMessage)}</div>
             <div class="hint">${escapeHtml(adminLastMutation.headline)} ${escapeHtml(adminLastMutation.detail)}</div>
             <div class="audit-meta">${progressTags}</div>
+            ${adminLastMutation.escalationOutcomeHint ? `<div class="hint"><strong>Mitigation:</strong> ${escapeHtml(adminLastMutation.escalationOutcomeHint)}</div>` : ""}
             <div class="audit-meta">${followUpTags}</div>
             ${adminLastMutation.followUp?.hint ? `<div class="hint"><strong>Follow-up:</strong> ${escapeHtml(adminLastMutation.followUp.hint)}</div>` : ""}
             ${followUpButtons ? `<div class="snapshot-recap-actions">${followUpButtons}</div>` : ""}

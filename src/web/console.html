@@ -1406,6 +1406,43 @@
         return bits;
       }
 
+      function tuneAdminFollowUpPlan(plan = {}, comparison = {}, focusedPanel = "") {
+        const outcomeLabel = String(comparison?.escalationOutcomeLabel || "").trim();
+        if (!outcomeLabel) {
+          return plan;
+        }
+        if (outcomeLabel === "Mitigated") {
+          return {
+            ...plan,
+            primaryLabel: "Confirm Mitigation",
+            secondaryAction: plan.secondaryAction || "reapply_focus",
+            secondaryLabel: plan.secondaryLabel || "Review Last Focus"
+          };
+        }
+        if (outcomeLabel === "Escalation Lowered") {
+          return {
+            ...plan,
+            primaryLabel: plan.primaryAction === "reapply_focus" ? "Review Lower Risk" : (plan.primaryLabel || "Continue"),
+            secondaryLabel: plan.secondaryAction === "refresh_snapshot" ? "Confirm Lower Risk" : (plan.secondaryLabel || "")
+          };
+        }
+        if (outcomeLabel === "Still Escalate" || outcomeLabel === "Escalation Active") {
+          return {
+            ...plan,
+            primaryLabel: focusedPanel ? "Return To Escalation Control" : "Reload Escalation Focus",
+            secondaryLabel: plan.secondaryAction === "reapply_focus" ? "Review Escalation Focus" : (plan.secondaryLabel || "")
+          };
+        }
+        if (outcomeLabel === "Needs Watch") {
+          return {
+            ...plan,
+            primaryLabel: plan.primaryAction === "reapply_focus" ? "Review Remaining Risk" : (plan.primaryLabel || "Continue"),
+            secondaryLabel: plan.secondaryAction === "refresh_snapshot" ? "Recheck Snapshot" : (plan.secondaryLabel || "")
+          };
+        }
+        return plan;
+      }
+
       function buildAdminMutationFollowUp(comparison = {}, focus = null, focusedPanel = "", snapshotHits = []) {
         const after = comparison?.after || {};
         const severityRank = Number(after.maxSeverityRank || 0);
@@ -1416,7 +1453,7 @@
         const impactBits = buildAdminFollowUpImpactBits(focus);
         const impactSummary = impactBits.length ? `Impact: ${impactBits.join(", ")}.` : "";
         if (severityRank === 0 && queuePosition === null) {
-          return {
+          return tuneAdminFollowUpPlan({
             priority: "clear",
             label: "Close Out",
             tone: "ok",
@@ -1424,7 +1461,7 @@
             hint: `No active focus signal remains for this object. ${impactSummary ? `${impactSummary} ` : ""}You can close the loop now or keep it in routine monitoring.`,
             primaryAction: "refresh_snapshot",
             primaryLabel: "Refresh Snapshot"
-          };
+          }, comparison, focusedPanel);
         }
         if (
           severityRank >= 4
@@ -1432,7 +1469,7 @@
           || comparison?.trend === "prioritized"
           || (queuePosition !== null && queuePosition <= 2)
         ) {
-          return {
+          return tuneAdminFollowUpPlan({
             priority: "urgent",
             label: "Escalate",
             tone: "danger",
@@ -1442,14 +1479,14 @@
             primaryLabel: focusedPanel ? "Open Escalation Control" : "Reopen Focus",
             secondaryAction: "reapply_focus",
             secondaryLabel: focusedPanel ? "Reload Focus" : ""
-          };
+          }, comparison, focusedPanel);
         }
         if (
           severityRank >= 3
           || comparison?.trend === "queue-added"
           || comparison?.trend === "new-signal"
         ) {
-          return {
+          return tuneAdminFollowUpPlan({
             priority: "follow-up",
             label: "Follow Up",
             tone: "warning",
@@ -1459,9 +1496,9 @@
             primaryLabel: "Continue Follow-up",
             secondaryAction: focusedPanel ? "jump_control" : "refresh_snapshot",
             secondaryLabel: focusedPanel ? "Open Control" : "Refresh Snapshot"
-          };
+          }, comparison, focusedPanel);
         }
-        return {
+        return tuneAdminFollowUpPlan({
           priority: "monitor",
           label: "Monitor",
           tone: "warning",
@@ -1471,7 +1508,7 @@
           primaryLabel: "Keep Focus Loaded",
           secondaryAction: "refresh_snapshot",
           secondaryLabel: "Refresh Snapshot"
-        };
+        }, comparison, focusedPanel);
       }
 
       function buildAdminFocusTitle(kind, item = {}) {

@@ -1825,6 +1825,45 @@ function snapshotArrayIncludes(values = [], expected) {
   return Array.isArray(values) && values.includes(expected);
 }
 
+function snapshotFirstText(values = []) {
+  for (const value of values) {
+    const text = String(value ?? "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function buildSnapshotControl(type, label, extras = {}) {
+  if (!type || !label) {
+    return null;
+  }
+  return {
+    type,
+    label,
+    ...extras
+  };
+}
+
+function snapshotReasonSuggestsBlock(value) {
+  const reason = String(value ?? "").trim().toLowerCase();
+  return reason.includes("tamper")
+    || reason.includes("replay")
+    || reason.includes("fraud")
+    || reason.includes("risk")
+    || reason.includes("multi")
+    || reason.includes("forbid")
+    || reason.includes("ban");
+}
+
+function snapshotReasonSuggestsUnblock(value) {
+  const reason = String(value ?? "").trim().toLowerCase();
+  return reason.includes("block")
+    || reason.includes("ban")
+    || reason.includes("forbid");
+}
+
 function buildSnapshotFocusAccountSeverity(item = {}) {
   const signals = Array.isArray(item.signals) ? item.signals : [];
   if (snapshotArrayIncludes(signals, "account_disabled") && Number(item.activeSessionCount || 0) > 0) {
@@ -1872,6 +1911,43 @@ function buildSnapshotFocusAccountActionHint(item = {}) {
   return "Inspect recent account, entitlement, and session changes before taking action on this customer.";
 }
 
+function buildSnapshotFocusAccountRecommendedControl(item = {}) {
+  const signals = Array.isArray(item.signals) ? item.signals : [];
+  const firstReason = snapshotFirstText(item.reasons || []);
+  if (snapshotArrayIncludes(signals, "account_disabled") && item.accountId) {
+    return buildSnapshotControl("account_status", "Prepare account re-enable", {
+      accountId: item.accountId,
+      targetStatus: "active"
+    });
+  }
+  if (snapshotArrayIncludes(signals, "entitlement_frozen") && item.entitlementId) {
+    return buildSnapshotControl("entitlement_status", "Prepare entitlement resume", {
+      entitlementId: item.entitlementId,
+      targetStatus: "active"
+    });
+  }
+  if (snapshotArrayIncludes(signals, "entitlement_expired") && item.entitlementId) {
+    return buildSnapshotControl("extend_entitlement", "Prepare 7-day extension", {
+      entitlementId: item.entitlementId,
+      days: 7
+    });
+  }
+  if (snapshotArrayIncludes(signals, "points_exhausted") && item.entitlementId) {
+    return buildSnapshotControl("adjust_points", "Prepare point top-up", {
+      entitlementId: item.entitlementId,
+      mode: "add",
+      points: 1
+    });
+  }
+  if (item.sessionId) {
+    return buildSnapshotControl("revoke_session", "Prepare session review", {
+      sessionId: item.sessionId,
+      reason: firstReason || "snapshot_review"
+    });
+  }
+  return null;
+}
+
 function buildSnapshotFocusSessionSeverity(item = {}) {
   const reason = String(item.reason ?? "").trim().toLowerCase();
   if (reason.includes("block") || reason.includes("ban") || reason.includes("forbid")) {
@@ -1898,6 +1974,25 @@ function buildSnapshotFocusSessionActionHint(item = {}) {
     return "Check heartbeat timing and client connectivity before asking the customer to retry.";
   }
   return "Inspect this session before restoring access.";
+}
+
+function buildSnapshotFocusSessionRecommendedControl(item = {}) {
+  if (snapshotReasonSuggestsUnblock(item.reason) && (item.blockId || item.fingerprint)) {
+    return buildSnapshotControl("unblock_device", "Prepare device unblock review", {
+      blockId: item.blockId || null,
+      productCode: item.productCode || null,
+      fingerprint: item.fingerprint || null,
+      reason: "snapshot_unblocked"
+    });
+  }
+  if (snapshotReasonSuggestsBlock(item.reason) && item.fingerprint) {
+    return buildSnapshotControl("block_device", "Prepare device block", {
+      productCode: item.productCode || null,
+      fingerprint: item.fingerprint || null,
+      reason: item.reason || "snapshot_block_review"
+    });
+  }
+  return null;
 }
 
 function buildSnapshotFocusDeviceSeverity(item = {}) {
@@ -1933,6 +2028,27 @@ function buildSnapshotFocusDeviceActionHint(item = {}) {
   return "Inspect this device history before restoring access.";
 }
 
+function buildSnapshotFocusDeviceRecommendedControl(item = {}) {
+  const kind = normalizeSnapshotStatus(item.kind);
+  const status = normalizeSnapshotStatus(item.status);
+  if (kind === "block" && status === "active") {
+    return buildSnapshotControl("unblock_device", "Prepare device unblock review", {
+      blockId: item.blockId || null,
+      productCode: item.productCode || null,
+      fingerprint: item.fingerprint || null,
+      reason: "snapshot_unblocked"
+    });
+  }
+  if (kind === "session" && item.fingerprint && snapshotReasonSuggestsBlock(item.reason)) {
+    return buildSnapshotControl("block_device", "Prepare device block", {
+      productCode: item.productCode || null,
+      fingerprint: item.fingerprint || null,
+      reason: item.reason || "snapshot_block_review"
+    });
+  }
+  return null;
+}
+
 function buildSnapshotActionQueueItem(sourceType, item = {}) {
   const normalizedSourceType = String(sourceType ?? "").trim().toLowerCase();
   const severity = String(item.severity ?? "low").trim().toLowerCase() || "low";
@@ -1959,6 +2075,7 @@ function buildSnapshotActionQueueItem(sourceType, item = {}) {
     summary,
     nextAction: item.actionHint || null,
     actionHint: item.actionHint || null,
+    recommendedControl: item.recommendedControl || null,
     productCode: item.productCode || null,
     username: item.username || null,
     accountId: item.accountId || null,
@@ -2156,7 +2273,8 @@ function buildSnapshotFocusAccounts(accounts = [], entitlements = [], sessions =
       return {
         ...normalized,
         severity: buildSnapshotFocusAccountSeverity(normalized),
-        actionHint: buildSnapshotFocusAccountActionHint(normalized)
+        actionHint: buildSnapshotFocusAccountActionHint(normalized),
+        recommendedControl: buildSnapshotFocusAccountRecommendedControl(normalized)
       };
     });
 }
@@ -2191,7 +2309,8 @@ function buildSnapshotFocusSessions(sessions = [], limit = 5) {
       return {
         ...normalized,
         severity: buildSnapshotFocusSessionSeverity(normalized),
-        actionHint: buildSnapshotFocusSessionActionHint(normalized)
+        actionHint: buildSnapshotFocusSessionActionHint(normalized),
+        recommendedControl: buildSnapshotFocusSessionRecommendedControl(normalized)
       };
     });
 }
@@ -2329,7 +2448,8 @@ function buildSnapshotFocusDevices(bindings = [], blocks = [], sessions = [], li
       return {
         ...normalized,
         severity: buildSnapshotFocusDeviceSeverity(normalized),
-        actionHint: buildSnapshotFocusDeviceActionHint(normalized)
+        actionHint: buildSnapshotFocusDeviceActionHint(normalized),
+        recommendedControl: buildSnapshotFocusDeviceRecommendedControl(normalized)
       };
     });
 }
@@ -2549,7 +2669,7 @@ function appendSnapshotQueueSummaryLines(lines = [], overview = {}) {
   if (Array.isArray(overview.recommendedQueue) && overview.recommendedQueue.length) {
     lines.push("Recommended Queue:");
     for (const item of overview.recommendedQueue) {
-      lines.push(`- [${String(item.severity || "-").toUpperCase()}][${item.sourceType || "-"}] ${item.title || "-"} | ${item.summary || "-"} | next=${item.nextAction || "-"}`);
+      lines.push(`- [${String(item.severity || "-").toUpperCase()}][${item.sourceType || "-"}] ${item.title || "-"} | ${item.summary || "-"} | control=${item.recommendedControl?.label || "-"} | next=${item.nextAction || "-"}`);
     }
   }
 }
@@ -2621,19 +2741,19 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.focusAccounts) && overview.focusAccounts.length) {
       lines.push("Focus Account Details:");
       for (const item of overview.focusAccounts) {
-        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | severity=${item.severity || "-"} | account=${item.accountId || "-"} | next=${item.actionHint || "-"}`);
+        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | severity=${item.severity || "-"} | account=${item.accountId || "-"} | control=${item.recommendedControl?.label || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusSessions) && overview.focusSessions.length) {
       lines.push("Focus Sessions:");
       for (const item of overview.focusSessions) {
-        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
+        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | control=${item.recommendedControl?.label || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusDevices) && overview.focusDevices.length) {
       lines.push("Focus Devices:");
       for (const item of overview.focusDevices) {
-        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
+        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | control=${item.recommendedControl?.label || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     appendSnapshotQueueSummaryLines(lines, overview);
@@ -2914,19 +3034,19 @@ function buildAdminOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.focusAccounts) && overview.focusAccounts.length) {
       lines.push("Focus Account Details:");
       for (const item of overview.focusAccounts) {
-        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | severity=${item.severity || "-"} | account=${item.accountId || "-"} | next=${item.actionHint || "-"}`);
+        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | severity=${item.severity || "-"} | account=${item.accountId || "-"} | control=${item.recommendedControl?.label || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusSessions) && overview.focusSessions.length) {
       lines.push("Focus Sessions:");
       for (const item of overview.focusSessions) {
-        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
+        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | control=${item.recommendedControl?.label || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusDevices) && overview.focusDevices.length) {
       lines.push("Focus Devices:");
       for (const item of overview.focusDevices) {
-        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
+        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | control=${item.recommendedControl?.label || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     appendSnapshotQueueSummaryLines(lines, overview);

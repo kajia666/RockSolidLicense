@@ -565,6 +565,34 @@
           <label>发布说明<textarea id="version-release-notes" placeholder="例如：Improve verification stability."></textarea></label>
           <button class="secondary" id="create-version-btn">创建版本规则</button>
         </article>
+
+        <article class="card">
+          <h2>Entitlement Control</h2>
+          <label>Entitlement ID<input id="entitlement-id" placeholder="fill from queue, logs, or entitlement review" /></label>
+          <label>
+            Entitlement Status
+            <select id="entitlement-status">
+              <option value="active">active</option>
+              <option value="frozen">frozen</option>
+            </select>
+          </label>
+          <label>Extend Days<input id="extend-days" type="number" min="1" value="7" /></label>
+          <label>
+            Point Mode
+            <select id="point-mode">
+              <option value="add">add</option>
+              <option value="subtract">subtract</option>
+              <option value="set">set</option>
+            </select>
+          </label>
+          <label>Points<input id="points" type="number" min="0" value="1" /></label>
+          <div class="actions">
+            <button class="ghost" id="set-entitlement-status-btn">Save Entitlement</button>
+            <button class="ghost" id="extend-entitlement-btn">Extend</button>
+            <button class="ghost" id="adjust-points-btn">Adjust Points</button>
+          </div>
+          <div class="hint">Resume or freeze an entitlement, extend duration licenses, or top up point-based access without leaving the admin console.</div>
+        </article>
       </section>
 
       <section class="wide-grid">
@@ -1075,6 +1103,19 @@
         return `<span class="tag ${normalized}">${escapeHtml(normalized.toUpperCase())}</span>`;
       }
 
+      function renderFocusActionLine(item = {}) {
+        const parts = [];
+        if (item?.recommendedControl?.label) {
+          parts.push(`prepare=${escapeHtml(item.recommendedControl.label)}`);
+        }
+        if (item?.actionHint) {
+          parts.push(`next=${escapeHtml(item.actionHint)}`);
+        } else if (item?.nextAction) {
+          parts.push(`next=${escapeHtml(item.nextAction)}`);
+        }
+        return parts.length ? `<div class="snapshot-focus-action">${parts.join(" | ")}</div>` : "";
+      }
+
       function renderQueueSummaryTags(queueSummary = {}) {
         const severities = ["critical", "high", "medium", "low"];
         const parts = severities
@@ -1091,7 +1132,7 @@
         return `<div class="snapshot-focus-list">${items.map((item, index) => {
           const focusKey = `${kind}:${index}`;
           adminOpsFocusMap.set(focusKey, { kind, item });
-          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${renderTitle(item)}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${renderMeta(item)}</div>${item?.actionHint ? `<div class="snapshot-focus-action">next=${escapeHtml(item.actionHint)}</div>` : ""}</button>`;
+          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${renderTitle(item)}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${renderMeta(item)}</div>${renderFocusActionLine(item)}</button>`;
         }).join("")}</div>`;
       }
 
@@ -1102,8 +1143,91 @@
         return `<div class="snapshot-focus-list">${items.map((item, index) => {
           const focusKey = `queue:${index}`;
           adminOpsFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
-          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${item?.nextAction ? `<div class="snapshot-focus-action">next=${escapeHtml(item.nextAction)}</div>` : ""}</button>`;
+          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${renderFocusActionLine(item)}</button>`;
         }).join("")}</div>`;
+      }
+
+      function applyAdminRecommendedControl(control = {}) {
+        const type = String(control?.type || "").trim();
+        if (!type) {
+          return "";
+        }
+        if (type === "account_status") {
+          if (control.accountId) {
+            el("account-id").value = control.accountId;
+          }
+          if (control.targetStatus) {
+            el("account-status").value = control.targetStatus;
+          }
+          return control.label || "Account control prepared";
+        }
+        if (type === "entitlement_status") {
+          if (el("entitlement-id") && control.entitlementId) {
+            el("entitlement-id").value = control.entitlementId;
+          }
+          if (el("entitlement-status") && control.targetStatus) {
+            el("entitlement-status").value = control.targetStatus;
+          }
+          return control.label || "Entitlement control prepared";
+        }
+        if (type === "extend_entitlement") {
+          if (el("entitlement-id") && control.entitlementId) {
+            el("entitlement-id").value = control.entitlementId;
+          }
+          if (el("extend-days") && control.days) {
+            el("extend-days").value = Number(control.days);
+          }
+          return control.label || "Entitlement extension prepared";
+        }
+        if (type === "adjust_points") {
+          if (el("entitlement-id") && control.entitlementId) {
+            el("entitlement-id").value = control.entitlementId;
+          }
+          if (el("point-mode") && control.mode) {
+            el("point-mode").value = control.mode;
+          }
+          if (el("points") && control.points !== null && control.points !== undefined) {
+            el("points").value = Number(control.points);
+          }
+          return control.label || "Point adjustment prepared";
+        }
+        if (type === "revoke_session") {
+          if (control.sessionId) {
+            el("session-id").value = control.sessionId;
+          }
+          if (control.reason) {
+            el("session-reason").value = control.reason;
+          }
+          return control.label || "Session control prepared";
+        }
+        if (type === "block_device") {
+          if (control.productCode) {
+            el("block-product-code").value = control.productCode;
+          }
+          if (control.fingerprint) {
+            el("block-fingerprint").value = control.fingerprint;
+          }
+          if (control.reason) {
+            el("block-reason").value = control.reason;
+          }
+          return control.label || "Device block prepared";
+        }
+        if (type === "unblock_device") {
+          if (control.blockId) {
+            el("block-id").value = control.blockId;
+          }
+          if (control.productCode) {
+            el("block-product-code").value = control.productCode;
+          }
+          if (control.fingerprint) {
+            el("block-fingerprint").value = control.fingerprint;
+          }
+          if (control.reason) {
+            el("unblock-reason").value = control.reason;
+          }
+          return control.label || "Device unblock prepared";
+        }
+        return control.label || "";
       }
 
       async function applyOpsOverviewAction(kind, value) {
@@ -1215,6 +1339,7 @@
             el("unblock-reason").value = item.reason;
           }
         }
+        const preparedControl = applyAdminRecommendedControl(item.recommendedControl);
         if (adminToken) {
           await previewOpsExport();
         }
@@ -1935,6 +2060,64 @@
         await refreshDashboard();
         await loadAuditLogs();
       }));
+
+      if (el("set-entitlement-status-btn")) {
+        el("set-entitlement-status-btn").addEventListener("click", () => guarded(async () => {
+          const entitlementId = el("entitlement-id").value.trim();
+          if (!entitlementId) {
+            throw new Error("Please enter an entitlement ID.");
+          }
+          const data = await callApi(`/api/admin/entitlements/${encodeURIComponent(entitlementId)}/status`, {
+            method: "POST",
+            body: JSON.stringify({
+              status: el("entitlement-status").value
+            })
+          });
+          setOutput(data);
+          setStatus(`Entitlement status updated: ${data.status}`);
+          await refreshDashboard();
+          await loadAuditLogs();
+        }));
+      }
+
+      if (el("extend-entitlement-btn")) {
+        el("extend-entitlement-btn").addEventListener("click", () => guarded(async () => {
+          const entitlementId = el("entitlement-id").value.trim();
+          if (!entitlementId) {
+            throw new Error("Please enter an entitlement ID.");
+          }
+          const data = await callApi(`/api/admin/entitlements/${encodeURIComponent(entitlementId)}/extend`, {
+            method: "POST",
+            body: JSON.stringify({
+              days: Number(el("extend-days").value || 0)
+            })
+          });
+          setOutput(data);
+          setStatus(`Entitlement extended by ${data.addedDays ?? el("extend-days").value} days.`);
+          await refreshDashboard();
+          await loadAuditLogs();
+        }));
+      }
+
+      if (el("adjust-points-btn")) {
+        el("adjust-points-btn").addEventListener("click", () => guarded(async () => {
+          const entitlementId = el("entitlement-id").value.trim();
+          if (!entitlementId) {
+            throw new Error("Please enter an entitlement ID.");
+          }
+          const data = await callApi(`/api/admin/entitlements/${encodeURIComponent(entitlementId)}/points`, {
+            method: "POST",
+            body: JSON.stringify({
+              mode: el("point-mode").value,
+              points: Number(el("points").value || 0)
+            })
+          });
+          setOutput(data);
+          setStatus(`Entitlement points updated: ${data.mode || el("point-mode").value}.`);
+          await refreshDashboard();
+          await loadAuditLogs();
+        }));
+      }
 
       el("revoke-session-btn").addEventListener("click", () => guarded(async () => {
         const sessionId = el("session-id").value.trim();

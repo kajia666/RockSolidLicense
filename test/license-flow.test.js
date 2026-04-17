@@ -6273,6 +6273,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(exportSnapshot.overview.focusDevices.some((item) => item.severity && item.actionHint));
     assert.ok(Array.isArray(exportSnapshot.overview.recommendedQueue));
     assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "session" && item.severity));
+    assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.recommendedControl?.label));
     assert.equal(exportSnapshot.overview.queueSummary.total, exportSnapshot.overview.recommendedQueue.length);
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: EXPORT_ALPHA/);
@@ -6283,6 +6284,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /Focus Devices:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue Counts:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue:/);
+    assert.match(exportSnapshot.summaryText, /control=/);
     assert.match(exportSnapshot.summaryText, /severity=/);
     assert.match(exportSnapshot.summaryText, /next=/);
 
@@ -6529,6 +6531,7 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
     assert.ok(exportSnapshot.overview.focusDevices.some((item) => item.severity === "critical" && item.actionHint));
     assert.ok(Array.isArray(exportSnapshot.overview.recommendedQueue));
     assert.equal(exportSnapshot.overview.recommendedQueue[0].severity, "critical");
+    assert.equal(exportSnapshot.overview.recommendedQueue[0].recommendedControl?.type, "unblock_device");
     assert.equal(exportSnapshot.overview.queueSummary.critical >= 1, true);
     assert.ok(exportSnapshot.overview.focusFingerprints.some((item) => item.fingerprint === "admin-export-alpha-device-01"));
     assert.match(exportSnapshot.summaryText, /RockSolid Admin Ops Snapshot/);
@@ -6540,6 +6543,7 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
     assert.match(exportSnapshot.summaryText, /Focus Fingerprints:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue Counts:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue:/);
+    assert.match(exportSnapshot.summaryText, /control=/);
     assert.match(exportSnapshot.summaryText, /severity=/);
     assert.match(exportSnapshot.summaryText, /next=/);
 
@@ -8765,11 +8769,15 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /ops-entity-type/);
     assert.match(html, /clear-audit-filters-btn/);
     assert.match(html, /ops-preview-summary/);
+    assert.match(html, /set-entitlement-status-btn/);
+    assert.match(html, /extend-entitlement-btn/);
+    assert.match(html, /adjust-points-btn/);
     assert.match(html, /高频原因/);
     assert.match(html, /建议优先处理/);
     assert.match(html, /重点账号明细/);
     assert.match(html, /重点会话/);
     assert.match(html, /重点设备明细/);
+    assert.match(html, /prepare=/);
     assert.match(html, /severity=/);
     assert.match(html, /next=/);
     assert.match(html, /session\.login/);
@@ -8851,6 +8859,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Focus account details/);
     assert.match(html, /Focus sessions/);
     assert.match(html, /Focus devices/);
+    assert.match(html, /prepare=/);
     assert.match(html, /severity=/);
     assert.match(html, /next=/);
     assert.match(html, /Session Login/);

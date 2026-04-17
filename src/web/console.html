@@ -1272,7 +1272,9 @@
             priority: "clear",
             label: "Close Out",
             tone: "ok",
-            hint: "No active focus signal remains for this object. You can close the loop now or keep it in routine monitoring."
+            hint: "No active focus signal remains for this object. You can close the loop now or keep it in routine monitoring.",
+            primaryAction: "refresh_snapshot",
+            primaryLabel: "Refresh Snapshot"
           };
         }
         if (
@@ -1285,7 +1287,11 @@
             priority: "urgent",
             label: "Escalate",
             tone: "danger",
-            hint: `The object is still in a high-priority state. ${actionTarget ? `Next: ${actionTarget}.` : "A stronger operator action is recommended now."}`
+            hint: `The object is still in a high-priority state. ${actionTarget ? `Next: ${actionTarget}.` : "A stronger operator action is recommended now."}`,
+            primaryAction: focusedPanel ? "jump_control" : "reapply_focus",
+            primaryLabel: focusedPanel ? "Open Escalation Control" : "Reopen Focus",
+            secondaryAction: "reapply_focus",
+            secondaryLabel: focusedPanel ? "Reload Focus" : ""
           };
         }
         if (
@@ -1297,14 +1303,22 @@
             priority: "follow-up",
             label: "Follow Up",
             tone: "warning",
-            hint: `The object still needs operator follow-up. ${actionTarget ? `Next: ${actionTarget}.` : "Review the refreshed focus details before closing the incident."}`
+            hint: `The object still needs operator follow-up. ${actionTarget ? `Next: ${actionTarget}.` : "Review the refreshed focus details before closing the incident."}`,
+            primaryAction: "reapply_focus",
+            primaryLabel: "Continue Follow-up",
+            secondaryAction: focusedPanel ? "jump_control" : "refresh_snapshot",
+            secondaryLabel: focusedPanel ? "Open Control" : "Refresh Snapshot"
           };
         }
         return {
           priority: "monitor",
           label: "Monitor",
           tone: "warning",
-          hint: `The risk looks lower, but the object still appears in the snapshot. ${actionTarget ? `Keep ${actionTarget} ready while monitoring.` : "Keep the object under observation."}`
+          hint: `The risk looks lower, but the object still appears in the snapshot. ${actionTarget ? `Keep ${actionTarget} ready while monitoring.` : "Keep the object under observation."}`,
+          primaryAction: "reapply_focus",
+          primaryLabel: "Keep Focus Loaded",
+          secondaryAction: "refresh_snapshot",
+          secondaryLabel: "Refresh Snapshot"
         };
       }
 
@@ -1429,6 +1443,8 @@
           before: comparison.before,
           after: comparison.after,
           followUp,
+          focusItem: cloneAdminFocusValue(focus?.item) || null,
+          recommendedControl: cloneAdminFocusValue(focus?.item?.recommendedControl) || null,
           loadedPanels,
           matchedPanels,
           focusedPanel,
@@ -1456,6 +1472,14 @@
           adminLastMutation.followUp?.label ? `<span class="tag ${escapeHtml(adminLastMutation.followUp.tone || "")}">${escapeHtml(adminLastMutation.followUp.label)}</span>` : "",
           adminLastMutation.followUp?.priority ? `<span class="tag">follow-up:${escapeHtml(adminLastMutation.followUp.priority)}</span>` : ""
         ].filter(Boolean).join("");
+        const followUpButtons = [
+          adminLastMutation.followUp?.primaryAction
+            ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${escapeHtml(adminLastMutation.followUp.primaryAction)}">${escapeHtml(adminLastMutation.followUp.primaryLabel || "Continue")}</button>`
+            : "",
+          adminLastMutation.followUp?.secondaryAction && adminLastMutation.followUp?.secondaryLabel
+            ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${escapeHtml(adminLastMutation.followUp.secondaryAction)}">${escapeHtml(adminLastMutation.followUp.secondaryLabel)}</button>`
+            : ""
+        ].filter(Boolean).join("");
         const contextTags = [
           adminLastMutation.focusKind ? `<span class="tag">${escapeHtml(adminLastMutation.focusKind)}</span>` : "",
           adminLastMutation.focusedPanel ? `<span class="tag ok">control:${escapeHtml(adminLastMutation.focusedPanel)}</span>` : "",
@@ -1474,6 +1498,7 @@
             <div class="audit-meta">${progressTags}</div>
             <div class="audit-meta">${followUpTags}</div>
             ${adminLastMutation.followUp?.hint ? `<div class="hint"><strong>Follow-up:</strong> ${escapeHtml(adminLastMutation.followUp.hint)}</div>` : ""}
+            ${followUpButtons ? `<div class="snapshot-recap-actions">${followUpButtons}</div>` : ""}
             <div class="audit-meta">${contextTags || `<span class="tag">no-context</span>`}</div>
             ${hitTags ? `<div><div class="hint">Snapshot hits</div><div class="audit-meta">${hitTags}</div></div>` : ""}
           </div>
@@ -2078,8 +2103,54 @@
             return applyOpsFocusDetail(focus.kind, focus.item);
           }));
         }
+        for (const action of box.querySelectorAll("[data-mutation-action]")) {
+          action.addEventListener("click", () => guarded(() => runAdminMutationAction(action.dataset.mutationAction)));
+        }
         for (const action of box.querySelectorAll("[data-prepared-action]")) {
           action.addEventListener("click", () => guarded(() => runAdminPreparedAction(action.dataset.preparedAction)));
+        }
+      }
+
+      async function runAdminMutationAction(action) {
+        if (!adminLastMutation) {
+          return;
+        }
+        if (action === "refresh_snapshot") {
+          if (!adminToken) {
+            throw new Error("Admin login is required before refreshing the snapshot.");
+          }
+          await previewOpsExport();
+          setStatus("Snapshot refreshed for follow-up review.");
+          return;
+        }
+        const focusSource = adminPreparedFocus && adminPreparedFocus.kind === adminLastMutation.focusKind
+          ? {
+              kind: adminPreparedFocus.kind,
+              item: adminPreparedFocus.item,
+              recommendedControl: adminPreparedFocus.recommendedControl || adminPreparedFocus.item?.recommendedControl || {}
+            }
+          : {
+              kind: adminLastMutation.focusKind,
+              item: adminLastMutation.focusItem || {},
+              recommendedControl: adminLastMutation.recommendedControl || adminLastMutation.focusItem?.recommendedControl || {}
+            };
+        if (!focusSource.kind) {
+          throw new Error("No follow-up focus context is available.");
+        }
+        if (action === "reapply_focus") {
+          await applyOpsFocusDetail(focusSource.kind, focusSource.item);
+          return;
+        }
+        if (action === "jump_control") {
+          const focusedPanel = focusAdminControlPanel(
+            focusSource.kind,
+            focusSource.item,
+            focusSource.recommendedControl
+          );
+          if (!focusedPanel) {
+            throw new Error("No follow-up control panel is available.");
+          }
+          setStatus(`Follow-up control focused: ${focusedPanel}.`);
         }
       }
 

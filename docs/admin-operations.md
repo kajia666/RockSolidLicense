@@ -32,6 +32,7 @@ Terminology:
 - trace whether reseller-allocated cards remain fresh or have been redeemed
 - create IP / CIDR access rules for login, register, recharge, or heartbeat
 - read recent audit logs
+- use audit preset buttons and row-click backfill inside `/admin` to narrow down common session, device, and entitlement events faster
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints

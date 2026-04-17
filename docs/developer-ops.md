@@ -23,6 +23,7 @@ This page is intended for day-to-day authorization operations:
 - inspect device bindings and release them
 - block or unblock a device fingerprint
 - read scoped developer audit logs
+- use common audit presets and click an audit row to backfill matching filters and quick-control ids
 - export a scoped troubleshooting snapshot as JSON, summary text, checksums, or zip
 
 ## Developer APIs

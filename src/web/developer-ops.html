@@ -38,6 +38,10 @@
       tbody tr { cursor:pointer; } tbody tr:hover { background:rgba(15,124,104,.06); }
       .tag { display:inline-block; padding:4px 8px; border-radius:999px; background:rgba(24,31,27,.08); color:var(--muted); margin:0 6px 6px 0; }
       .tag.ok { background:rgba(15,124,104,.12); color:var(--accent); } .tag.danger { background:rgba(160,66,44,.12); color:var(--danger); }
+      .quick-filters { align-items:center; }
+      .quick-filters button { padding:8px 12px; font-size:13px; }
+      .audit-summary { display:grid; gap:6px; }
+      .audit-meta { display:flex; flex-wrap:wrap; gap:6px; }
       pre { margin:0; min-height:220px; padding:16px; border-radius:18px; background:#101715; color:#eef7f2; overflow:auto; white-space:pre-wrap; word-break:break-word; }
       @media (max-width:1180px) { .wide { grid-template-columns:1fr; } }
       @media (max-width:760px) { .two,.three { grid-template-columns:1fr; } }
@@ -78,7 +82,7 @@
             <label>Username<input id="filter-username" placeholder="customer.username" /></label>
             <label>Search<input id="filter-search" placeholder="fingerprint, session id, card key" /></label>
             <label>Audit Event<input id="filter-event-type" placeholder="session.revoke" /></label>
-            <label>Audit Actor<select id="filter-actor-type"><option value="">all</option><option value="developer">developer</option><option value="developer_member">developer_member</option><option value="admin">admin</option><option value="client">client</option></select></label>
+            <label>Audit Actor<select id="filter-actor-type"><option value="">all</option><option value="developer">developer</option><option value="developer_member">developer_member</option><option value="admin">admin</option><option value="account">account</option><option value="license_key">license_key</option><option value="client">client</option></select></label>
             <label>Audit Entity<input id="filter-entity-type" placeholder="session" /></label>
             <label>Audit Limit<input id="filter-limit" type="number" min="1" max="200" value="60" /></label>
           </div>
@@ -86,7 +90,16 @@
             <button class="secondary" id="apply-filters-btn">Apply Filters</button>
             <button class="danger" id="clear-filters-btn">Clear Filters</button>
           </div>
-          <div class="hint">Blank filters query everything inside the current developer scope.</div>
+          <div class="hint">Common audit presets</div>
+          <div class="pill-row quick-filters" id="audit-preset-bar">
+            <button type="button" class="secondary" data-audit-event="session.login" data-audit-entity="session" data-audit-actor="account">Session Login</button>
+            <button type="button" class="secondary" data-audit-event="session.revoke" data-audit-entity="session">Session Revoke</button>
+            <button type="button" class="secondary" data-audit-event="device-binding.release" data-audit-entity="device_binding">Binding Release</button>
+            <button type="button" class="secondary" data-audit-event="device-block.activate" data-audit-entity="device_block">Block Activate</button>
+            <button type="button" class="secondary" data-audit-event="device-block.release" data-audit-entity="device_block">Block Release</button>
+            <button type="button" class="secondary" data-audit-event="entitlement.extend" data-audit-entity="entitlement">Entitlement Extend</button>
+          </div>
+          <div class="hint">Blank filters query everything inside the current developer scope. Clicking an audit row also backfills matching filters and quick-control ids.</div>
         </article>
 
         <article class="card">
@@ -158,6 +171,7 @@
       <section class="wide">
         <article class="card">
           <h2>Audit Logs</h2>
+          <div class="hint">Click a row to copy the matching event, actor, entity, product, username, and related operation ids into the quick controls.</div>
           <div class="table-wrap"><table><thead><tr><th>Event</th><th>Actor</th><th>Entity</th><th>Scope</th><th>When</th></tr></thead><tbody id="audit-body"></tbody></table></div>
         </article>
         <article class="card">
@@ -172,6 +186,7 @@
       let profile = null;
       let actor = null;
       let snapshot = emptySnapshot();
+      const AUDIT_PRESETS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
       function emptySnapshot() {
         return {
@@ -217,6 +232,137 @@
             ? "tag ok"
             : "tag";
         return `<span class="${className}">${esc(text)}</span>`;
+      }
+
+      function firstValue(values = []) {
+        for (const value of values) {
+          if (Array.isArray(value)) {
+            const flattened = value
+              .map((item) => String(item ?? "").trim())
+              .filter(Boolean);
+            if (flattened.length) {
+              return flattened.join(", ");
+            }
+            continue;
+          }
+          if (value !== null && value !== undefined) {
+            const text = String(value).trim();
+            if (text) {
+              return text;
+            }
+          }
+        }
+        return "";
+      }
+
+      function metadataValue(metadata = {}, keys = []) {
+        return firstValue(keys.map((key) => metadata?.[key]));
+      }
+
+      function metadataSingleValue(metadata = {}, keys = []) {
+        for (const key of keys) {
+          const value = metadata?.[key];
+          if (Array.isArray(value)) {
+            const single = value
+              .map((item) => String(item ?? "").trim())
+              .find(Boolean);
+            if (single) {
+              return single;
+            }
+            continue;
+          }
+          if (value !== null && value !== undefined) {
+            const text = String(value).trim();
+            if (text) {
+              return text;
+            }
+          }
+        }
+        return "";
+      }
+
+      function statusTransition(metadata = {}) {
+        const previous = metadataValue(metadata, ["previousStatus"]);
+        const next = metadataValue(metadata, ["status"]);
+        if (previous && next) {
+          return `${previous} -> ${next}`;
+        }
+        return next || previous || "";
+      }
+
+      function auditScopeBits(item = {}) {
+        const metadata = item.metadata || {};
+        return [
+          metadataValue(metadata, ["productCode", "code", "projectCode", "softwareCode", "productCodes", "projectCodes"]),
+          metadataValue(metadata, ["username", "tokenSubject", "redeemedUsername"]),
+          metadataValue(metadata, ["resellerCode"])
+        ].filter(Boolean);
+      }
+
+      function auditDetailBits(item = {}) {
+        const metadata = item.metadata || {};
+        return [
+          metadataValue(metadata, ["reason", "revokedReason", "releaseReason"]) ? `reason: ${metadataValue(metadata, ["reason", "revokedReason", "releaseReason"])}` : "",
+          statusTransition(metadata) ? `status: ${statusTransition(metadata)}` : "",
+          metadataValue(metadata, ["deviceFingerprint", "fingerprint"]) ? `device: ${metadataValue(metadata, ["deviceFingerprint", "fingerprint"])}` : "",
+          metadataValue(metadata, ["cardKeyMasked"]) ? `card: ${metadataValue(metadata, ["cardKeyMasked"])}` : "",
+          metadataValue(metadata, ["batchCode"]) ? `batch: ${metadataValue(metadata, ["batchCode"])}` : "",
+          metadataValue(metadata, ["channel"]) ? `channel: ${metadataValue(metadata, ["channel"])}` : "",
+          metadataValue(metadata, ["version"]) ? `version: ${metadataValue(metadata, ["version"])}` : ""
+        ].filter(Boolean);
+      }
+
+      function fillFiltersFromAudit(item = {}) {
+        const metadata = item.metadata || {};
+        const productCode = metadataSingleValue(metadata, ["productCode", "code", "projectCode", "softwareCode", "productCodes", "projectCodes"]);
+        const username = metadataSingleValue(metadata, ["username", "tokenSubject", "redeemedUsername"]);
+        if (productCode) {
+          el("filter-product-code").value = productCode;
+          el("block-product-code").value = productCode;
+        }
+        if (username) {
+          el("filter-username").value = username;
+        }
+        if (item.eventType) {
+          el("filter-event-type").value = item.eventType;
+        }
+        if (item.actorType) {
+          el("filter-actor-type").value = item.actorType;
+        }
+        if (item.entityType) {
+          el("filter-entity-type").value = item.entityType;
+        }
+      }
+
+      function fillQuickControlsFromAudit(item = {}) {
+        const metadata = item.metadata || {};
+        const reason = metadataSingleValue(metadata, ["reason", "revokedReason", "releaseReason"]);
+        const fingerprint = metadataSingleValue(metadata, ["deviceFingerprint", "fingerprint"]);
+        if (reason) {
+          el("reason").value = reason;
+        }
+        if (fingerprint) {
+          el("block-fingerprint").value = fingerprint;
+        }
+        switch (item.entityType) {
+          case "account":
+            el("account-id").value = item.entityId || "";
+            break;
+          case "entitlement":
+            el("entitlement-id").value = item.entityId || "";
+            break;
+          case "session":
+            el("session-id").value = item.entityId || "";
+            break;
+          case "device_binding":
+            el("binding-id").value = item.entityId || "";
+            break;
+          case "device_block":
+            el("block-id").value = item.entityId || "";
+            break;
+          default:
+            break;
+        }
       }
 
       function downloadBlob(fileName, blob) {
@@ -356,13 +502,19 @@
           return;
         }
         body.innerHTML = snapshot.auditLogs.map((item) => {
-          const scopeBits = [
-            item.metadata?.productCode || "",
-            item.metadata?.username || "",
-            item.metadata?.reason || ""
-          ].filter(Boolean);
-          return `<tr><td><strong>${esc(item.eventType)}</strong></td><td>${esc(item.actorType || "-")}<br><span class="mono">${esc(item.actorId || "-")}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${scopeBits.length ? scopeBits.map((value) => esc(value)).join("<br>") : "-"}</td><td>${esc(formatTime(item.createdAt))}</td></tr>`;
+          const scopeBits = auditScopeBits(item);
+          const detailBits = auditDetailBits(item);
+          return `<tr data-audit-id="${esc(item.id)}"><td><div class="audit-summary"><strong>${esc(item.eventType)}</strong>${detailBits.length ? `<div class="hint">${esc(detailBits.join(" | "))}</div>` : `<div class="hint">No extra metadata summary.</div>`}</div></td><td>${esc(item.actorType || "-")}<br><span class="mono">${esc(item.actorId || "-")}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${scopeBits.length ? `<div class="audit-meta">${scopeBits.map((value) => `<span class="tag">${esc(value)}</span>`).join("")}</div>` : "-"}${item.metadata?.reason ? `<div class="hint">reason=${esc(item.metadata.reason)}</div>` : ""}</td><td>${esc(formatTime(item.createdAt))}</td></tr>`;
         }).join("");
+        bindRows("#audit-body tr[data-audit-id]", (data) => {
+          const item = snapshot.auditLogs.find((entry) => entry.id === data.auditId);
+          if (!item) {
+            return;
+          }
+          fillFiltersFromAudit(item);
+          fillQuickControlsFromAudit(item);
+          setStatus("Audit row copied into filters and quick controls.");
+        });
       }
 
       function renderAll() {
@@ -411,6 +563,22 @@
       el("logout-btn").addEventListener("click", async () => { try { if (token) await api("/api/developer/logout", { method:"POST" }); clearSession(); setStatus("Developer session closed."); setOutput("Logged out."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("apply-filters-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Filters applied."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("clear-filters-btn").addEventListener("click", async () => { ["filter-product-code","filter-username","filter-search","filter-event-type","filter-actor-type","filter-entity-type"].forEach((id) => { el(id).value = ""; }); el("filter-limit").value = "60"; try { await refreshOps(); setStatus("Filters cleared."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      AUDIT_PRESETS.forEach((button) => {
+        button.addEventListener("click", async () => {
+          el("filter-event-type").value = button.dataset.auditEvent || "";
+          el("filter-entity-type").value = button.dataset.auditEntity || "";
+          el("filter-actor-type").value = button.dataset.auditActor || "";
+          try {
+            if (token) {
+              await refreshOps();
+            }
+            setStatus(`Audit preset applied: ${button.textContent.trim()}.`);
+          } catch (error) {
+            setStatus(`${error.code}: ${error.message}`, true);
+            setOutput({ code:error.code, message:error.message });
+          }
+        });
+      });
       el("preview-export-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Scoped ops snapshot refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-json-btn").addEventListener("click", async () => { try { await handleExportDownload("json", "developer-ops.json", "Ops snapshot JSON"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

@@ -196,6 +196,15 @@
         gap: 10px;
       }
 
+      .quick-filters {
+        align-items: center;
+      }
+
+      .quick-filters button {
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+
       .stats {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -292,6 +301,17 @@
       .tag.danger {
         background: var(--danger-soft);
         color: var(--danger);
+      }
+
+      .audit-summary {
+        display: grid;
+        gap: 6px;
+      }
+
+      .audit-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
       pre {
@@ -509,6 +529,17 @@
             <button class="ghost" id="download-ops-checksums-btn">Download Checksums</button>
             <button class="ghost" id="download-ops-zip-btn">Download Zip</button>
           </div>
+          <div class="hint">审计快捷筛选</div>
+          <div class="actions quick-filters" id="audit-preset-bar">
+            <button class="ghost" type="button" data-audit-event="session.login" data-audit-entity="session" data-audit-actor="account">会话登录</button>
+            <button class="ghost" type="button" data-audit-event="session.revoke" data-audit-entity="session">会话下线</button>
+            <button class="ghost" type="button" data-audit-event="device-binding.release" data-audit-entity="device_binding">解绑设备</button>
+            <button class="ghost" type="button" data-audit-event="device-block.activate" data-audit-entity="device_block">设备封禁</button>
+            <button class="ghost" type="button" data-audit-event="device-block.release" data-audit-entity="device_block">解除封禁</button>
+            <button class="ghost" type="button" data-audit-event="entitlement.extend" data-audit-entity="entitlement">授权续期</button>
+            <button class="ghost" type="button" id="clear-audit-filters-btn">清空审计筛选</button>
+          </div>
+          <div class="hint">点击下方审计日志行，会自动回填事件筛选、产品代号、用户名以及相关操作 ID。</div>
           <div class="hint">支持通过 <code>/api/admin/ops/export</code> 和 <code>/api/admin/ops/export/download</code> 预览或下载管理员授权运营快照包。</div>
         </article>
       </section>
@@ -688,6 +719,7 @@
 
         <article class="card">
           <h2>审计日志</h2>
+          <div class="hint">点击日志行可快速带出筛选条件和对应的账号 / 会话 / 绑定 / 封禁对象，便于继续处理。</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -713,6 +745,7 @@
 
     <script>
       let adminToken = "";
+      const AUDIT_PRESET_BUTTONS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
       function el(id) {
         return document.getElementById(id);
@@ -760,6 +793,141 @@
         const text = String(value ?? "unknown");
         const className = text === "active" ? "tag ok" : text === "disabled" || text === "revoked" || text === "expired" ? "tag danger" : "tag";
         return `<span class="${className}">${escapeHtml(text)}</span>`;
+      }
+
+      function firstAuditValue(values = []) {
+        for (const value of values) {
+          if (Array.isArray(value)) {
+            const flattened = value
+              .map((item) => String(item ?? "").trim())
+              .filter(Boolean);
+            if (flattened.length) {
+              return flattened.join(", ");
+            }
+            continue;
+          }
+          if (value !== null && value !== undefined) {
+            const text = String(value).trim();
+            if (text) {
+              return text;
+            }
+          }
+        }
+        return "";
+      }
+
+      function auditMetadataValue(metadata = {}, keys = []) {
+        return firstAuditValue(keys.map((key) => metadata?.[key]));
+      }
+
+      function auditSingleMetadataValue(metadata = {}, keys = []) {
+        for (const key of keys) {
+          const value = metadata?.[key];
+          if (Array.isArray(value)) {
+            const single = value
+              .map((item) => String(item ?? "").trim())
+              .find(Boolean);
+            if (single) {
+              return single;
+            }
+            continue;
+          }
+          if (value !== null && value !== undefined) {
+            const text = String(value).trim();
+            if (text) {
+              return text;
+            }
+          }
+        }
+        return "";
+      }
+
+      function auditStatusSummary(metadata = {}) {
+        const previous = auditMetadataValue(metadata, ["previousStatus"]);
+        const next = auditMetadataValue(metadata, ["status"]);
+        if (previous && next) {
+          return `${previous} -> ${next}`;
+        }
+        return next || previous || "";
+      }
+
+      function auditProductCode(metadata = {}) {
+        return auditMetadataValue(metadata, ["productCode", "code", "projectCode", "softwareCode", "productCodes", "projectCodes"]);
+      }
+
+      function auditUsername(metadata = {}) {
+        return auditMetadataValue(metadata, ["username", "tokenSubject", "redeemedUsername"]);
+      }
+
+      function buildAuditScopeBits(metadata = {}) {
+        return [
+          auditProductCode(metadata),
+          auditUsername(metadata),
+          auditMetadataValue(metadata, ["resellerCode"])
+        ].filter(Boolean);
+      }
+
+      function buildAuditDetailBits(metadata = {}) {
+        return [
+          auditMetadataValue(metadata, ["reason", "revokedReason", "releaseReason"]) ? `reason: ${auditMetadataValue(metadata, ["reason", "revokedReason", "releaseReason"])}` : "",
+          auditStatusSummary(metadata) ? `status: ${auditStatusSummary(metadata)}` : "",
+          auditMetadataValue(metadata, ["deviceFingerprint", "fingerprint"]) ? `device: ${auditMetadataValue(metadata, ["deviceFingerprint", "fingerprint"])}` : "",
+          auditMetadataValue(metadata, ["cardKeyMasked"]) ? `card: ${auditMetadataValue(metadata, ["cardKeyMasked"])}` : "",
+          auditMetadataValue(metadata, ["batchCode"]) ? `batch: ${auditMetadataValue(metadata, ["batchCode"])}` : "",
+          auditMetadataValue(metadata, ["channel"]) ? `channel: ${auditMetadataValue(metadata, ["channel"])}` : "",
+          auditMetadataValue(metadata, ["version"]) ? `version: ${auditMetadataValue(metadata, ["version"])}` : ""
+        ].filter(Boolean);
+      }
+
+      function fillAuditSelection(item = {}) {
+        const metadata = item.metadata || {};
+        const productCode = auditSingleMetadataValue(metadata, ["productCode", "code", "projectCode", "softwareCode", "productCodes", "projectCodes"]);
+        const username = auditSingleMetadataValue(metadata, ["username", "tokenSubject", "redeemedUsername"]);
+        const reason = auditSingleMetadataValue(metadata, ["reason", "revokedReason", "releaseReason"]);
+        const fingerprint = auditSingleMetadataValue(metadata, ["deviceFingerprint", "fingerprint"]);
+
+        if (productCode) {
+          el("ops-product-code").value = productCode;
+          el("block-product-code").value = productCode;
+          if (el("version-product-code")) {
+            el("version-product-code").value = productCode;
+          }
+        }
+        if (username) {
+          el("ops-username").value = username;
+        }
+        if (item.event_type) {
+          el("ops-event-type").value = item.event_type;
+        }
+        if (item.actor_type) {
+          el("ops-actor-type").value = item.actor_type;
+        }
+        if (item.entity_type) {
+          el("ops-entity-type").value = item.entity_type;
+        }
+        if (reason) {
+          el("session-reason").value = reason;
+          el("binding-reason").value = reason;
+          el("block-reason").value = reason;
+          el("unblock-reason").value = reason;
+        }
+        if (fingerprint) {
+          el("block-fingerprint").value = fingerprint;
+        }
+
+        if (item.entity_type === "account") {
+          el("account-id").value = item.entity_id || "";
+        }
+        if (item.entity_type === "session") {
+          el("session-id").value = item.entity_id || "";
+        }
+        if (item.entity_type === "device_binding") {
+          el("binding-id").value = item.entity_id || "";
+        }
+        if (item.entity_type === "device_block") {
+          el("block-id").value = item.entity_id || "";
+        }
+        setStatus("已回填审计筛选和相关操作对象，可继续读取日志或直接处理对应记录。");
       }
 
       async function callApi(path, options = {}) {
@@ -1009,14 +1177,29 @@
         }
 
         el("audit-body").innerHTML = items.map((item) => `
-          <tr>
+          <tr data-audit-id="${escapeHtml(item.id)}">
             <td>${escapeHtml(formatTime(item.created_at))}</td>
-            <td><span class="tag">${escapeHtml(item.event_type)}</span></td>
+            <td>
+              <div class="audit-summary">
+                <span class="tag">${escapeHtml(item.event_type)}</span>
+                <div class="hint">${escapeHtml(buildAuditDetailBits(item.metadata || {}).join(" | ") || "无额外摘要")}</div>
+              </div>
+            </td>
             <td>${escapeHtml(item.actor_type)}<div class="mono">${escapeHtml(shortText(item.actor_id || "-", 20))}</div></td>
             <td>${escapeHtml(item.entity_type)}<div class="mono">${escapeHtml(shortText(item.entity_id || "-", 20))}</div></td>
-            <td>${escapeHtml(JSON.stringify(item.metadata || {}))}</td>
+            <td>${buildAuditScopeBits(item.metadata || {}).length ? `<div class="audit-meta">${buildAuditScopeBits(item.metadata || {}).map((value) => `<span class="tag">${escapeHtml(value)}</span>`).join("")}</div>` : ""}<div class="hint">${escapeHtml(JSON.stringify(item.metadata || {}))}</div></td>
           </tr>
         `).join("");
+
+        for (const row of el("audit-body").querySelectorAll("tr[data-audit-id]")) {
+          row.addEventListener("click", () => {
+            const item = items.find((entry) => entry.id === row.dataset.auditId);
+            if (!item) {
+              return;
+            }
+            fillAuditSelection(item);
+          });
+        }
       }
 
       function readOpsFilters() {
@@ -1178,6 +1361,25 @@
       el("download-ops-summary-btn").addEventListener("click", () => guarded(() => downloadOpsExport("summary", "admin-ops-summary.txt")));
       el("download-ops-checksums-btn").addEventListener("click", () => guarded(() => downloadOpsExport("checksums", "admin-ops-sha256sums.txt")));
       el("download-ops-zip-btn").addEventListener("click", () => guarded(() => downloadOpsExport("zip", "admin-ops.zip")));
+      for (const button of AUDIT_PRESET_BUTTONS) {
+        button.addEventListener("click", () => guarded(async () => {
+          el("ops-event-type").value = button.dataset.auditEvent || "";
+          el("ops-entity-type").value = button.dataset.auditEntity || "";
+          el("ops-actor-type").value = button.dataset.auditActor || "";
+          if (adminToken) {
+            await loadAuditLogs();
+          }
+          setStatus(`已应用审计快捷筛选：${button.textContent.trim()}。`);
+        }));
+      }
+      if (el("clear-audit-filters-btn")) {
+        el("clear-audit-filters-btn").addEventListener("click", () => {
+          el("ops-event-type").value = "";
+          el("ops-actor-type").value = "";
+          el("ops-entity-type").value = "";
+          setStatus("已清空审计筛选，可重新读取日志。");
+        });
+      }
       if (el("load-versions-btn")) {
         el("load-versions-btn").addEventListener("click", () => guarded(loadVersions));
       }

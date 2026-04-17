@@ -8717,6 +8717,8 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
     assert.match(html, /ops-entity-type/);
+    assert.match(html, /clear-audit-filters-btn/);
+    assert.match(html, /session\.login/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -8789,6 +8791,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Zip/);
     assert.match(html, /filter-entity-type/);
+    assert.match(html, /Session Login/);
+    assert.match(html, /license_key/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

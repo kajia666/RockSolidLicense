@@ -122,6 +122,8 @@ Actual package names include the SDK version from `sdk/VERSION`, for example:
 
 The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, and C++ demo source.
 
+When software authors pull a project-scoped integration or release package from the backoffice, they now also receive a generated C++ host skeleton alongside the quickstart snippet so the host app can wire startup bootstrap, local token validation, and heartbeat gating in the order recommended by the current project profile.
+
 The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, import library, docs, and a C demo source.
 
 Each release output directory now also includes:

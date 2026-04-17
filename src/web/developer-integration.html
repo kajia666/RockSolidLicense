@@ -98,14 +98,20 @@
           <pre id="cpp-snippet">Select a project to generate a C++ quickstart snippet.</pre>
         </article>
         <article class="card">
-          <h2>Environment Template</h2>
-          <pre id="env-snippet">Select a project to generate an environment template.</pre>
+          <h2>Host Skeleton</h2>
+          <pre id="host-skeleton-snippet">Select a project to generate a project-aware C++ host skeleton.</pre>
         </article>
       </section>
 
-      <section class="card">
-        <h2>Hardening Guide</h2>
-        <pre id="hardening-guide">Select a project to generate a project-specific client hardening guide.</pre>
+      <section class="wide">
+        <article class="card">
+          <h2>Environment Template</h2>
+          <pre id="env-snippet">Select a project to generate an environment template.</pre>
+        </article>
+        <article class="card">
+          <h2>Hardening Guide</h2>
+          <pre id="hardening-guide">Select a project to generate a project-specific client hardening guide.</pre>
+        </article>
       </section>
 
       <section class="wide">
@@ -477,6 +483,7 @@ ${JSON.stringify(request, null, 2)}`;
         if (!packageSnapshot) {
           el("package-json").textContent = "Select a project to generate an integration package.";
           el("cpp-snippet").textContent = "Select a project to generate a C++ quickstart snippet.";
+          el("host-skeleton-snippet").textContent = "Select a project to generate a project-aware C++ host skeleton.";
           el("env-snippet").textContent = "Select a project to generate an environment template.";
           el("hardening-guide").textContent = "Select a project to generate a project-specific client hardening guide.";
           el("startup-preview").textContent = selectedProduct
@@ -490,6 +497,7 @@ ${JSON.stringify(request, null, 2)}`;
 
         el("package-json").textContent = JSON.stringify(packageSnapshot, null, 2);
         el("cpp-snippet").textContent = packageSnapshot.snippets?.cppQuickstart || "";
+        el("host-skeleton-snippet").textContent = packageSnapshot.snippets?.hostSkeletonCpp || "";
         el("env-snippet").textContent = packageSnapshot.snippets?.envTemplate || "";
         el("hardening-guide").textContent = packageSnapshot.snippets?.hardeningGuide || "";
         renderStartupPreview();

@@ -114,6 +114,7 @@ The release workspace can now generate a project-scoped release delivery package
 - a delivery checklist that turns the handoff into concrete pass/review/block items
 - active runtime notices that affect startup or login
 - ready-to-download `.env` and C/C++ quickstart snippets
+- a project-aware C++ host skeleton that maps startup, local token validation, and heartbeat gating into host-app flow
 - a project-specific hardening guide text snippet for SDK integrators
 
 The package route accepts:

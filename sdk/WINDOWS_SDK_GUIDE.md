@@ -269,7 +269,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `ClientNoticesResponse` returns the currently active notice list with `block_login` and timing metadata.
 - `validate_license_token_with_key_set(...)` lets you validate `licenseToken` locally against keys fetched during startup, without an extra round trip.
 - `validate_license_token_with_bootstrap(...)` reuses the cached bootstrap payload directly, so the caller does not need to manage key selection.
-- The integration package now includes a project-specific hardening guide so software authors can align startup, token validation, and heartbeat gating with the current project profile.
+- The integration package now includes both a project-specific hardening guide and a project-aware C++ host skeleton so software authors can align startup, token validation, and heartbeat gating with the current project profile.
 - `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
 - `rs_sdk_version_string()` and `rocksolid::sdk_version_string()` let your host application report the exact SDK build it is using.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.

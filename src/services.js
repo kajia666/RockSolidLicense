@@ -753,6 +753,205 @@ if (!startup_decision.allow_login) {
 }`;
 }
 
+function buildIntegrationCppHostSkeleton(manifest) {
+  const project = manifest.project || {};
+  const credentials = manifest.credentials || {};
+  const transport = manifest.transport || {};
+  const http = resolveIntegrationHttpEndpoint(transport.http || {});
+  const tcp = transport.tcp || {};
+  const startupDefaults = manifest.startupDefaults || {};
+  const clientHardening = manifest.clientHardening || buildClientHardeningProfile(project.featureConfig || {});
+  const productCode = project.code || "";
+  const clientVersion = String(startupDefaults.clientVersion ?? "1.0.0").trim() || "1.0.0";
+  const channel = String(startupDefaults.channel ?? "stable").trim() || "stable";
+  const includeTokenKeys = startupDefaults.includeTokenKeys !== false;
+  const loginMethod = tcp.enabled === true ? "login_tcp_parsed" : "login_http_parsed";
+  const heartbeatMethod = tcp.enabled === true ? "heartbeat_tcp_parsed" : "heartbeat_http_parsed";
+  const startupLine = clientHardening.startupBootstrapRequired
+    ? "// This project requires startup bootstrap before login or recharge UI is shown."
+    : "// Startup bootstrap is still recommended here, even though the project does not hard-block the local UI.";
+  const tokenValidationBlock = clientHardening.localTokenValidationRequired
+    ? `  const rocksolid::TokenValidationResult validation =
+    rocksolid::LicenseClientWin::validate_license_token_with_bootstrap(
+      login.license_token,
+      runtime.startup_cache.bootstrap
+    );
+  if (!validation.valid) {
+    host_app::set_feature_gate(gate, false, "local_token_validation_failed");
+    throw std::runtime_error("licenseToken failed local signature validation.");
+  }
+  std::cout << "[token] local validation passed with key " << validation.key_id << std::endl;`
+    : `  if (include_token_keys) {
+    const rocksolid::TokenValidationResult validation =
+      rocksolid::LicenseClientWin::validate_license_token_with_bootstrap(
+        login.license_token,
+        runtime.startup_cache.bootstrap
+      );
+    std::cout << "[token] optional local validation="
+              << (validation.valid ? "true" : "false")
+              << " key=" << validation.key_id << std::endl;
+  }`;
+  const heartbeatBlock = clientHardening.heartbeatGateRequired
+    ? `  host_app::set_feature_gate(gate, true, "session_active");
+
+  // Move this heartbeat loop into a background worker in the real host app.
+  while (runtime.logged_in) {
+    const rocksolid::HeartbeatResponse heartbeat =
+      client.${heartbeatMethod}({
+        product_code,
+        runtime.login.session_token,
+        device_fingerprint,
+        client_version,
+        channel_name
+      });
+
+    if (heartbeat.status != "active") {
+      host_app::set_feature_gate(gate, false, "heartbeat_not_active");
+      runtime.logged_in = false;
+      std::cout << "[heartbeat] session is no longer active." << std::endl;
+      break;
+    }
+
+    std::cout << "[heartbeat] next in "
+              << heartbeat.next_heartbeat_in_seconds
+              << "s" << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(
+      heartbeat.next_heartbeat_in_seconds > 0 ? heartbeat.next_heartbeat_in_seconds : 15
+    ));
+  }`
+    : `  host_app::set_feature_gate(gate, true, "login_succeeded");
+
+  const rocksolid::HeartbeatResponse heartbeat =
+    client.${heartbeatMethod}({
+      product_code,
+      runtime.login.session_token,
+      device_fingerprint,
+      client_version,
+      channel_name
+    });
+  std::cout << "[heartbeat] optional status=" << heartbeat.status
+            << " next=" << heartbeat.next_heartbeat_in_seconds << "s" << std::endl;
+  // This project keeps a softer local gate after heartbeat loss, but the host app
+  // should still retry, log, and degrade online-only features when heartbeat stops.`;
+
+  return `#include "rocksolid_transport_win.hpp"
+
+#include <chrono>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <thread>
+
+namespace host_app {
+
+struct FeatureGate {
+  bool protected_features_enabled = false;
+  std::string reason = "startup_pending";
+};
+
+struct RuntimeSession {
+  rocksolid::ClientStartupBootstrapCache startup_cache;
+  rocksolid::LoginResponse login;
+  bool logged_in = false;
+};
+
+void set_feature_gate(FeatureGate& gate, bool enabled, const std::string& reason) {
+  gate.protected_features_enabled = enabled;
+  gate.reason = reason;
+  std::cout << "[gate] protected="
+            << (enabled ? "true" : "false")
+            << " reason=" << reason << std::endl;
+}
+
+}  // namespace host_app
+
+int main() {
+  try {
+    rocksolid::ClientIdentity identity{
+      "${escapeCppStringLiteral(credentials.sdkAppId || "")}",
+      "${escapeCppStringLiteral(credentials.sdkAppSecret || "")}",
+      "${escapeCppStringLiteral(credentials.deviceFingerprintSalt || project.code || "")}"
+    };
+
+    rocksolid::HttpEndpoint http_endpoint;
+    http_endpoint.host = L"${escapeCppStringLiteral(http.host)}";
+    http_endpoint.port = ${Number(http.port || 0)};
+    http_endpoint.secure = ${http.secure ? "true" : "false"};
+
+    rocksolid::TcpEndpoint tcp_endpoint;
+    tcp_endpoint.host = "${escapeCppStringLiteral(tcp.host || "127.0.0.1")}";
+    tcp_endpoint.port = ${Number(tcp.port || 0)};
+
+    rocksolid::LicenseClientWin client(identity, http_endpoint, tcp_endpoint);
+
+    const std::string product_code = "${escapeCppStringLiteral(productCode)}";
+    const std::string client_version = "${escapeCppStringLiteral(clientVersion)}";
+    const std::string channel_name = "${escapeCppStringLiteral(channel)}";
+    const bool include_token_keys = ${includeTokenKeys ? "true" : "false"};
+    const std::string device_fingerprint = client.generate_device_fingerprint();
+
+    host_app::FeatureGate gate;
+    host_app::RuntimeSession runtime;
+    host_app::set_feature_gate(gate, false, "startup_bootstrap_pending");
+
+${startupLine}
+    const rocksolid::ClientStartupBootstrapResponse startup =
+      client.startup_bootstrap_http({
+        product_code,
+        client_version,
+        channel_name,
+        include_token_keys
+      });
+    const rocksolid::ClientStartupDecision startup_decision =
+      rocksolid::LicenseClientWin::evaluate_startup_decision(startup);
+
+    if (!startup_decision.allow_login) {
+      std::cout << "[startup] blocked code=" << startup_decision.primary_code
+                << " message=" << startup_decision.primary_message << std::endl;
+      return 0;
+    }
+
+    runtime.startup_cache = {
+      1,
+      rocksolid::iso8601_now_utc(),
+      startup
+    };
+    rocksolid::LicenseClientWin::write_startup_bootstrap_cache_file(
+      "rocksolid-startup-cache.json",
+      runtime.startup_cache
+    );
+
+    rocksolid::LoginRequest login_request{
+      product_code,
+      "demo_user",
+      "demo_password",
+      device_fingerprint,
+      "Demo Workstation",
+      client_version,
+      channel_name
+    };
+
+    const rocksolid::LoginResponse login = client.${loginMethod}(login_request);
+    runtime.login = login;
+    runtime.logged_in = true;
+
+${tokenValidationBlock}
+
+${heartbeatBlock}
+    return 0;
+  } catch (const rocksolid::ApiException& error) {
+    std::cerr << "RockSolid API failed: code=" << error.code()
+              << " status=" << error.status()
+              << " transportStatus=" << error.transport_status()
+              << " message=" << error.what() << std::endl;
+    return 1;
+  } catch (const std::exception& error) {
+    std::cerr << "Host skeleton failed: " << error.what() << std::endl;
+    return 1;
+  }
+}`;
+}
+
 function buildIntegrationStartupWorkflow({
   projectActive,
   featureConfig,
@@ -1087,6 +1286,8 @@ function buildDeveloperIntegrationPackagePayload({
       envTemplate: buildIntegrationEnvTemplate(manifest),
       cppFileName: `${product.code}.cpp`,
       cppQuickstart: buildIntegrationCppQuickstart(manifest),
+      hostSkeletonFileName: `${product.code}-host-skeleton.cpp`,
+      hostSkeletonCpp: buildIntegrationCppHostSkeleton(manifest),
       hardeningFileName,
       hardeningGuide
     }
@@ -1259,6 +1460,13 @@ function buildIntegrationPackageCppFiles(items = []) {
   }));
 }
 
+function buildIntegrationPackageHostSkeletonFiles(items = []) {
+  return items.map((item) => ({
+    fileName: item.snippets?.hostSkeletonFileName || `${item.code}-host-skeleton.cpp`,
+    content: item.snippets?.hostSkeletonCpp || ""
+  }));
+}
+
 function buildIntegrationPackageHardeningFiles(items = []) {
   return items.map((item) => ({
     fileName: item.snippets?.hardeningFileName || `${item.code}-hardening-guide.txt`,
@@ -1272,6 +1480,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
   const manifestFiles = buildIntegrationPackageManifestFiles(items);
   const envFiles = buildIntegrationPackageEnvFiles(items);
   const cppFiles = buildIntegrationPackageCppFiles(items);
+  const hostSkeletonFiles = buildIntegrationPackageHostSkeletonFiles(items);
   const hardeningFiles = buildIntegrationPackageHardeningFiles(items);
 
   return {
@@ -1287,15 +1496,18 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     manifestArchiveName: `rocksolid-integration-packages-${timestampTag}-manifests.txt`,
     envArchiveName: `rocksolid-integration-packages-${timestampTag}-env.txt`,
     cppArchiveName: `rocksolid-integration-packages-${timestampTag}-cpp.txt`,
+    hostSkeletonArchiveName: `rocksolid-integration-packages-${timestampTag}-host-skeleton.txt`,
     hardeningArchiveName: `rocksolid-integration-packages-${timestampTag}-hardening.txt`,
     items,
     manifestFiles,
     envFiles,
     cppFiles,
+    hostSkeletonFiles,
     hardeningFiles,
     manifestBundleText: buildNamedFileBundleText(manifestFiles),
     envBundleText: buildNamedFileBundleText(envFiles),
     cppBundleText: buildNamedFileBundleText(cppFiles),
+    hostSkeletonBundleText: buildNamedFileBundleText(hostSkeletonFiles),
     hardeningBundleText: buildNamedFileBundleText(hardeningFiles)
   };
 }
@@ -1339,7 +1551,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push(`- Hardening Summary: ${deliverySummary.clientHardeningSummary}`);
   }
   if (deliverySummary.artifacts) {
-    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"}`);
+    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
   }
   lines.push("");
 
@@ -1505,9 +1717,9 @@ function buildReleaseDeliveryChecklistPayload({
     key: "handoff_artifacts",
     label: "Handoff artifacts",
     status: "pass",
-    summary: "JSON package, summary text, env template, and C++ quickstart are bundled for handoff.",
-    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"}`,
-    nextAction: "Send the matching JSON, summary, env, and C++ snippets together so integration stays aligned."
+    summary: "JSON package, summary text, env template, C++ quickstart, and host skeleton are bundled for handoff.",
+    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
+    nextAction: "Send the matching JSON, summary, env, quickstart, and host skeleton snippets together so integration stays aligned."
   });
 
   const blockItems = items.filter((item) => item.status === "block").length;
@@ -1535,7 +1747,8 @@ function buildReleaseDeliverySummaryPayload({
   fileName,
   summaryFileName,
   envFileName,
-  cppFileName
+  cppFileName,
+  hostSkeletonFileName
 }) {
   const latestVersion = versionManifest?.latestVersion || null;
   const candidateVersion = readiness?.candidateVersion || latestVersion || null;
@@ -1587,7 +1800,8 @@ function buildReleaseDeliverySummaryPayload({
       packageJson: fileName || "release-package.json",
       packageSummary: summaryFileName || "release-package.txt",
       envTemplate: `snippets/${envFileName || "project.env"}`,
-      cppQuickstart: `snippets/${cppFileName || "project.cpp"}`
+      cppQuickstart: `snippets/${cppFileName || "project.cpp"}`,
+      hostSkeleton: `snippets/${hostSkeletonFileName || "project-host-skeleton.cpp"}`
     },
     handoffChecks: Array.isArray(readiness?.checks)
       ? readiness.checks.map((item) => ({
@@ -1797,6 +2011,7 @@ function buildReleasePackagePayload({
   });
   const envFileName = `${product.code}.env`;
   const cppFileName = `${product.code}.cpp`;
+  const hostSkeletonFileName = `${product.code}-host-skeleton.cpp`;
   const hardeningFileName = `${product.code}-hardening-guide.txt`;
   const fileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.txt`;
@@ -1811,7 +2026,8 @@ function buildReleasePackagePayload({
     fileName,
     summaryFileName,
     envFileName,
-    cppFileName
+    cppFileName,
+    hostSkeletonFileName
   });
   const deliveryChecklist = buildReleaseDeliveryChecklistPayload({
     product,
@@ -1855,7 +2071,8 @@ function buildReleasePackagePayload({
     integration: integrationPackage?.manifest ?? null,
     snippets: {
       envFileName,
-      cppFileName
+      cppFileName,
+      hostSkeletonFileName
     },
     notes: [
       "Use this package as the handoff snapshot for software release coordination, client upgrade notices, and SDK configuration updates.",
@@ -1874,6 +2091,8 @@ function buildReleasePackagePayload({
       envTemplate: integrationPackage?.snippets?.envTemplate || "",
       cppFileName,
       cppQuickstart: integrationPackage?.snippets?.cppQuickstart || "",
+      hostSkeletonFileName,
+      hostSkeletonCpp: integrationPackage?.snippets?.hostSkeletonCpp || "",
       hardeningFileName,
       hardeningGuide: buildClientHardeningGuideText({
         projectCode: product.code,
@@ -1956,6 +2175,10 @@ function buildReleasePackageFiles(payload) {
       body: payload.snippets?.cppQuickstart || ""
     },
     {
+      path: `snippets/${payload.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"}`,
+      body: payload.snippets?.hostSkeletonCpp || ""
+    },
+    {
       path: `snippets/${payload.snippets?.hardeningFileName || "project-hardening-guide.txt"}`,
       body: payload.snippets?.hardeningGuide || ""
     }
@@ -1993,6 +2216,12 @@ function buildIntegrationPackageExportFiles(payload) {
       body: file.content || ""
     });
   }
+  for (const file of payload.hostSkeletonFiles || []) {
+    files.push({
+      path: `host-skeleton/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
   for (const file of payload.hardeningFiles || []) {
     files.push({
       path: `hardening/${file.fileName}`,
@@ -2021,6 +2250,10 @@ function buildSingleIntegrationPackageFiles(payload) {
     {
       path: `cpp/${payload.snippets?.cppFileName || "project.cpp"}`,
       body: payload.snippets?.cppQuickstart || ""
+    },
+    {
+      path: `host-skeleton/${payload.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"}`,
+      body: payload.snippets?.hostSkeletonCpp || ""
     },
     {
       path: `hardening/${payload.snippets?.hardeningFileName || "project-hardening-guide.txt"}`,

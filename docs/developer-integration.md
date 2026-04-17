@@ -26,7 +26,7 @@ The page now also summarizes how many visible projects currently have each of th
 - `requireLocalTokenValidation`
 - `requireHeartbeatGate`
 
-The last 3 switches act as project-level client hardening controls. They affect the integration package, startup bootstrap preview, env template, and C++ quickstart guidance so software authors can choose a stricter or more relaxed client-side hardening profile per project.
+The last 3 switches act as project-level client hardening controls. They affect the integration package, startup bootstrap preview, env template, C++ quickstart guidance, and generated C++ host skeleton so software authors can choose a stricter or more relaxed client-side hardening profile per project.
 
 ## API
 
@@ -72,6 +72,8 @@ The package route returns:
 - `snippets.envTemplate`
 - `snippets.cppFileName`
 - `snippets.cppQuickstart`
+- `snippets.hostSkeletonFileName`
+- `snippets.hostSkeletonCpp`
 - `snippets.hardeningFileName`
 - `snippets.hardeningGuide`
 
@@ -82,9 +84,11 @@ The batch package export routes return:
 - `manifestFiles`
 - `envFiles`
 - `cppFiles`
+- `hostSkeletonFiles`
 - `manifestBundleText`
 - `envBundleText`
 - `cppBundleText`
+- `hostSkeletonBundleText`
 
 The batch package download routes accept the same body selectors as the export routes plus:
 
@@ -138,7 +142,7 @@ The page and API are useful when the software author needs to:
 - download the current single-project integration package directly as JSON, `.env`, C++ quickstart, or one zip handoff bundle
 - download a matching SHA-256 checksum list for the generated handoff files
 - export multiple project integration packages in one request from the project workspace when several software products need the same deployment refresh
-- hand the software author a ready-to-copy C++ quickstart snippet and environment template
+- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, and environment template
 
 ## Request signing headers
 

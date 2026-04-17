@@ -338,9 +338,15 @@
         <pre id="release-summary">Generate a release package to preview its summary text here.</pre>
       </section>
 
-      <section class="card">
-        <h2>Hardening Guide</h2>
-        <pre id="release-hardening-guide">Generate a release package to preview the current client hardening guide here.</pre>
+      <section class="table-grid">
+        <article class="card">
+          <h2>Host Skeleton</h2>
+          <pre id="release-host-skeleton">Generate a release package to preview the current C++ host skeleton here.</pre>
+        </article>
+        <article class="card">
+          <h2>Hardening Guide</h2>
+          <pre id="release-hardening-guide">Generate a release package to preview the current client hardening guide here.</pre>
+        </article>
       </section>
 
       <section class="table-grid">
@@ -614,6 +620,7 @@
           el("delivery-summary").textContent = "Generate a release package to see the handoff summary for software authors and release operators.";
           el("delivery-checklist").textContent = "Generate a release package to see the step-by-step handoff checklist.";
           el("release-summary").textContent = "Generate a release package to preview its summary text here.";
+          el("release-host-skeleton").textContent = "Generate a release package to preview the current C++ host skeleton here.";
           el("release-hardening-guide").textContent = "Generate a release package to preview the current client hardening guide here.";
           return;
         }
@@ -677,6 +684,7 @@
           `
           : "No delivery checklist is available yet.";
         el("release-summary").textContent = releasePackage.summaryText || "";
+        el("release-host-skeleton").textContent = releasePackage.snippets?.hostSkeletonCpp || "";
         el("release-hardening-guide").textContent = releasePackage.snippets?.hardeningGuide || "";
       }
 

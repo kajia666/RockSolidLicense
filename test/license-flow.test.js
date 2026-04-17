@@ -8904,8 +8904,13 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Download Zip/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
+    assert.match(html, /Escalate First/);
     assert.match(html, /Focus accounts/);
     assert.match(html, /Recommended next actions/);
+    assert.match(html, /runDeveloperEscalationAction/);
+    assert.match(html, /data-escalation-action/);
+    assert.match(html, /Open Control/);
+    assert.match(html, /Load Full Context/);
     assert.match(html, /Focus account details/);
     assert.match(html, /Focus sessions/);
     assert.match(html, /Focus devices/);

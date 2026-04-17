@@ -56,7 +56,10 @@
       .snapshot-list { margin:0; padding-left:18px; color:var(--muted); line-height:1.6; }
       .snapshot-list strong { color:var(--ink); }
       .snapshot-focus-list { display:grid; gap:8px; }
+      .snapshot-focus-entry { display:grid; gap:8px; }
+      .snapshot-focus-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 4px; }
       .snapshot-focus-item { padding:12px; border-radius:14px; border:1px solid rgba(24,31,27,.08); background:rgba(255,255,255,.82); color:var(--ink); text-align:left; cursor:pointer; }
+      .snapshot-focus-item.urgent { border-color:rgba(160,66,44,.22); background:rgba(255,246,243,.94); box-shadow:0 10px 24px rgba(160,66,44,.08); }
       .snapshot-focus-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
       .snapshot-focus-item strong { display:block; }
       .snapshot-focus-meta { color:var(--muted); font-size:12px; line-height:1.6; }
@@ -135,7 +138,7 @@
           <div class="snapshot-box" id="snapshot-overview"></div>
         </article>
 
-        <article class="card">
+        <article class="card" id="quick-controls-card">
           <h2>Quick Controls</h2>
           <div class="three">
             <label>Account ID<input id="account-id" placeholder="select from table" /></label>
@@ -308,6 +311,11 @@
         return parts.join("");
       }
 
+      function isUrgentQueueItem(item = {}, index = 0) {
+        const severity = focusSeverityClass(item?.severity);
+        return severity === "critical" || severity === "high" || (index === 0 && severity === "medium");
+      }
+
       async function applyOverviewAction(kind, value) {
         const normalizedValue = String(value ?? "").trim();
         if (!normalizedValue) {
@@ -345,6 +353,76 @@
           const focusKey = `${kind}:${index}`;
           overviewFocusMap.set(focusKey, { kind, item });
           return `<button type="button" class="snapshot-focus-item" data-focus-key="${esc(focusKey)}"><div class="snapshot-focus-head"><strong>${renderTitle(item)}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${renderMeta(item)}</div>${renderFocusActionLine(item)}</button>`;
+        }).join("")}</div>`;
+      }
+
+      function renderEscalationSummaryTags(item = {}, index = 0) {
+        const impactTags = [];
+        if (item.sourceType === "account") {
+          impactTags.push(`<span class="tag">issues:${esc(item.issueCount ?? 0)}</span>`);
+          if (Number(item.activeSessionCount || 0) > 0) {
+            impactTags.push(`<span class="tag warning">sessions:${esc(item.activeSessionCount)}</span>`);
+          }
+          if (Number(item.activeEntitlementCount || 0) > 0) {
+            impactTags.push(`<span class="tag">entitlements:${esc(item.activeEntitlementCount)}</span>`);
+          }
+        }
+        if (item.sourceType === "session") {
+          if (item.status) {
+            impactTags.push(`<span class="tag">status:${esc(item.status)}</span>`);
+          }
+          if (item.deviceName || item.fingerprint) {
+            impactTags.push(`<span class="tag">device:${esc(String(item.deviceName || item.fingerprint).slice(0, 18))}</span>`);
+          }
+        }
+        if (item.sourceType === "device") {
+          if (item.kind) {
+            impactTags.push(`<span class="tag">kind:${esc(item.kind)}</span>`);
+          }
+          if (item.status) {
+            impactTags.push(`<span class="tag">status:${esc(item.status)}</span>`);
+          }
+          if (Number(item.relatedSessionCount || 0) > 0) {
+            impactTags.push(`<span class="tag warning">sessions:${esc(item.relatedSessionCount)}</span>`);
+          }
+        }
+        const tags = [
+          `<span class="tag danger">ESCALATE</span>`,
+          `<span class="tag">#${esc(index + 1)}</span>`,
+          item.productCode ? `<span class="tag">project:${esc(item.productCode)}</span>` : "",
+          item.username ? `<span class="tag">user:${esc(String(item.username).slice(0, 18))}</span>` : "",
+          item.reason ? `<span class="tag warning">reason:${esc(String(item.reason).slice(0, 24))}</span>` : "",
+          ...impactTags,
+          item.recommendedControl?.label ? `<span class="tag ok">control:${esc(String(item.recommendedControl.label).slice(0, 28))}</span>` : "",
+          (item.actionHint || item.nextAction) ? `<span class="tag">next:${esc(String(item.actionHint || item.nextAction).slice(0, 28))}</span>` : ""
+        ].filter(Boolean).join("");
+        return tags ? `<div class="audit-meta">${tags}</div>` : "";
+      }
+
+      function renderEscalationActionButtons(focusKey, item = {}) {
+        const actions = [];
+        if (item?.recommendedControl?.type || item?.recommendedControl?.label) {
+          actions.push(`<button type="button" class="secondary" data-escalation-focus-key="${esc(focusKey)}" data-escalation-action="prepare_control">Open Control</button>`);
+        }
+        actions.push(`<button type="button" class="secondary" data-escalation-focus-key="${esc(focusKey)}" data-escalation-action="load_context">Load Full Context</button>`);
+        return actions.length ? `<div class="snapshot-focus-actions">${actions.join("")}</div>` : "";
+      }
+
+      function renderEscalationQueue(items = []) {
+        if (!Array.isArray(items) || !items.length) {
+          return "";
+        }
+        const urgentEntries = items
+          .map((item, index) => ({ item, index }))
+          .filter(({ item, index }) => isUrgentQueueItem(item, index))
+          .slice(0, 3);
+        if (!urgentEntries.length) {
+          return "";
+        }
+        return `<div class="snapshot-focus-list">${urgentEntries.map(({ item, index }) => {
+          const focusKey = `priority-queue:${index}`;
+          overviewFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
+          return `<div class="snapshot-focus-entry"><button type="button" class="snapshot-focus-item urgent" data-focus-key="${esc(focusKey)}"><div class="snapshot-focus-head"><strong>${esc(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${esc(item.sourceType || "-")} | ${esc(item.summary || "-")}</div>${renderEscalationSummaryTags(item, index)}${renderFocusActionLine(item)}</button>${renderEscalationActionButtons(focusKey, item)}</div>`;
         }).join("")}</div>`;
       }
 
@@ -442,6 +520,15 @@
         return control.label || "";
       }
 
+      function focusQuickControlsCard() {
+        const card = el("quick-controls-card");
+        if (!card) {
+          return false;
+        }
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        return true;
+      }
+
       async function applyOverviewFocusItem(kind, item = {}) {
         if (kind === "account") {
           if (item.productCode) {
@@ -518,6 +605,30 @@
         setStatus(`Focus object applied: ${kind}${preparedControl ? ` | ${preparedControl}.` : "."}`);
       }
 
+      async function runDeveloperEscalationAction(focusKey, action) {
+        const focus = overviewFocusMap.get(focusKey);
+        if (!focus) {
+          throw { code: "MISSING_FOCUS", message: "No escalation focus context is available." };
+        }
+        if (action === "load_context") {
+          await applyOverviewFocusItem(focus.kind, focus.item);
+          return;
+        }
+        if (action === "prepare_control") {
+          const preparedControl = applyRecommendedControl(focus.item?.recommendedControl || {});
+          focusQuickControlsCard();
+          if (!preparedControl) {
+            throw { code: "MISSING_CONTROL", message: "No direct escalation control is available." };
+          }
+          setStatus(`Escalation shortcut prepared: ${preparedControl}.`);
+          setOutput({
+            focusKind: focus.kind,
+            focusItem: focus.item,
+            preparedControl
+          });
+        }
+      }
+
       function renderSnapshotOverview() {
         const statusBox = el("snapshot-overview-status");
         const box = el("snapshot-overview");
@@ -539,6 +650,7 @@
         const focusFingerprints = Array.isArray(overview.focusFingerprints) ? overview.focusFingerprints : [];
         const queueSummary = overview.queueSummary || {};
         const recommendedQueue = Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : [];
+        const escalationQueueMarkup = renderEscalationQueue(recommendedQueue);
         const focusAccounts = Array.isArray(overview.focusAccounts) ? overview.focusAccounts : [];
         const focusSessions = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
         const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
@@ -575,6 +687,13 @@
           <div>
             <div class="hint">Top reasons</div>
             <div class="audit-meta">${renderOverviewTags(topReasons, "reason", "reason")}</div>
+          </div>
+          <div>
+            ${escalationQueueMarkup ? `
+            <div class="hint">Escalate First</div>
+            <div class="audit-meta"><span class="tag danger">priority</span><span class="tag">top queue targets</span></div>
+            ${escalationQueueMarkup}
+            ` : ""}
           </div>
           <div>
             <div class="hint">Recommended next actions</div>
@@ -649,6 +768,14 @@
           }
           try {
             await applyOverviewFocusItem(focus.kind, focus.item);
+          } catch (error) {
+            setStatus(`${error.code}: ${error.message}`, true);
+            setOutput({ code:error.code, message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-escalation-action]", async (data) => {
+          try {
+            await runDeveloperEscalationAction(data.escalationFocusKey, data.escalationAction);
           } catch (error) {
             setStatus(`${error.code}: ${error.message}`, true);
             setOutput({ code:error.code, message:error.message });

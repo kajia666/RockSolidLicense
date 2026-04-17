@@ -25,6 +25,7 @@ This page is intended for day-to-day authorization operations:
 - read scoped developer audit logs
 - use common audit presets and click an audit row to backfill matching filters and quick-control ids
 - review focus account, session, and device detail lists directly from the snapshot overview, including severity, next-action hints, and a recommended action queue, and click them back into the active filters or quick controls
+- use the `Escalate First` slice inside the scoped snapshot overview to jump straight into `Open Control` or `Load Full Context` for the highest-priority queue items
 - export a scoped troubleshooting snapshot as JSON, summary text, checksums, or zip
 
 ## Developer APIs
@@ -135,4 +136,5 @@ The download route also accepts:
 - blocking a device fingerprint kicks matching sessions offline and prevents the device from logging in again until unblocked
 - the ops snapshot zip bundles the current scoped project list, accounts, entitlements, sessions, bindings, blocks, and audit logs into one handoff package with SHA-256 checksums
 - the ops snapshot preview and JSON payload now include an `overview` block with a headline, attention counters, highlight bullets, top audit-event counts, common reasons, a recommended action queue, and focus account/session/device detail lists with severity, next-action hints, and recommended-control metadata for faster scoped troubleshooting
+- `/developer/ops` now also surfaces an `Escalate First` view for the most urgent queue items, including compressed impact tags and direct shortcuts into the quick-control form or full context loading flow
 - focus items in the `/developer/ops` overview can backfill username, reason, fingerprint, and quick-control ids so the next action starts from the right scoped target

@@ -1239,12 +1239,20 @@
       function buildDeveloperMutationRecap(successMessage, focus = null, previousHits = []) {
         const snapshotHits = collectDeveloperSnapshotHits(focus);
         const comparison = compareDeveloperMutationSignals(previousHits, snapshotHits);
+        const stillFlagged = snapshotHits.length > 0;
+        const clonedItem = cloneValue(focus?.item) || null;
         return {
           timestamp: new Date().toISOString(),
           successMessage,
           focusKind: focus?.kind || "",
-          focusItem: cloneValue(focus?.item) || null,
+          status: stillFlagged ? "attention" : "ok",
+          title: focus?.kind ? buildPreparedFocusTitle(focus.kind, clonedItem || {}) : "",
+          summary: focus?.kind ? buildPreparedFocusSummary(focus.kind, clonedItem || {}) : "",
+          focusItem: clonedItem,
           recommendedControl: cloneValue(focus?.recommendedControl || focus?.item?.recommendedControl) || null,
+          preparedControl: focus?.recommendedControl?.label || focus?.item?.recommendedControl?.label || "",
+          severity: focusSeverityClass(focus?.item?.severity),
+          actionHint: focus?.item?.actionHint || focus?.item?.nextAction || "",
           trendLabel: comparison.trendLabel,
           trendTone: comparison.trendTone,
           escalationLabel: comparison.escalationLabel,
@@ -1259,7 +1267,8 @@
           detail: comparison.detail,
           before: comparison.before,
           after: comparison.after,
-          followUp: buildDeveloperFollowUp(comparison, focus)
+          followUp: buildDeveloperFollowUp(comparison, focus),
+          snapshotHits
         };
       }
 
@@ -1267,6 +1276,9 @@
         if (!lastMutation) {
           return "";
         }
+        const hitTags = Array.isArray(lastMutation.snapshotHits)
+          ? lastMutation.snapshotHits.map((item) => `<span class="tag ${esc(item.severity || "")}">${esc(item.source)}${item.severity ? `:${esc(item.severity)}` : ""}</span>`).join("")
+          : "";
         const beforeQueue = lastMutation.before?.queuePosition;
         const afterQueue = lastMutation.after?.queuePosition;
         const beforeSeverityClass = focusSeverityClass(lastMutation.before?.maxSeverity);
@@ -1289,21 +1301,32 @@
         ].filter(Boolean).join("");
         const followUpButtons = [
           lastMutation.followUp?.primaryAction ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${esc(lastMutation.followUp.primaryAction)}">${esc(lastMutation.followUp.primaryLabel || "Continue")}</button>` : "",
-          lastMutation.followUp?.secondaryAction ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${esc(lastMutation.followUp.secondaryAction)}">${esc(lastMutation.followUp.secondaryLabel || "Review")}</button>` : ""
+          lastMutation.followUp?.secondaryAction && lastMutation.followUp?.secondaryLabel ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${esc(lastMutation.followUp.secondaryAction)}">${esc(lastMutation.followUp.secondaryLabel)}</button>` : ""
+        ].filter(Boolean).join("");
+        const contextTags = [
+          lastMutation.focusKind ? `<span class="tag">${esc(lastMutation.focusKind)}</span>` : "",
+          lastMutation.severity ? `<span class="tag ${esc(lastMutation.severity)}">${esc(lastMutation.severity.toUpperCase())}</span>` : "",
+          lastMutation.preparedControl ? `<span class="tag ok">${esc(lastMutation.preparedControl)}</span>` : "",
+          lastMutation.actionHint ? `<span class="tag warning">next:${esc(lastMutation.actionHint)}</span>` : ""
         ].filter(Boolean).join("");
         return `
-          <div class="snapshot-recap">
+          <div class="snapshot-recap ${esc(lastMutation.status || "")}">
             <div class="snapshot-recap-head">
               <strong>Last Action Result</strong>
+              <span class="tag ${(lastMutation.status || "") === "attention" ? "danger" : "ok"}">${esc(String(lastMutation.status || "ok").toUpperCase())}</span>
               <span class="tag">${esc(formatTime(lastMutation.timestamp))}</span>
             </div>
             <div>${esc(lastMutation.successMessage)}</div>
+            ${lastMutation.title ? `<div><strong>${esc(lastMutation.title)}</strong></div>` : ""}
+            ${lastMutation.summary ? `<div class="hint">${esc(lastMutation.summary)}</div>` : ""}
             <div class="hint">${esc(lastMutation.headline)} ${esc(lastMutation.detail)}</div>
             <div class="audit-meta">${progressTags}</div>
             ${(lastMutation.escalationOutcomeHint || lastMutation.outcomeHint) ? `<div class="hint"><strong>Mitigation:</strong> ${esc(lastMutation.escalationOutcomeHint || lastMutation.outcomeHint)}</div>` : ""}
             <div class="audit-meta">${followUpTags}</div>
             ${lastMutation.followUp?.hint ? `<div class="hint"><strong>Follow-up:</strong> ${esc(lastMutation.followUp.hint)}</div>` : ""}
             ${followUpButtons ? `<div class="snapshot-recap-actions">${followUpButtons}</div>` : ""}
+            <div class="audit-meta">${contextTags || `<span class="tag">no-context</span>`}</div>
+            ${hitTags ? `<div><div class="hint">Snapshot hits</div><div class="audit-meta">${hitTags}</div></div>` : ""}
           </div>
         `;
       }

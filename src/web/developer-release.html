@@ -324,6 +324,11 @@
       </section>
 
       <section class="card">
+        <h2>Delivery Checklist</h2>
+        <div id="delivery-checklist" class="hint">Generate a release package to see the step-by-step handoff checklist.</div>
+      </section>
+
+      <section class="card">
         <h2>Package Summary</h2>
         <pre id="release-summary">Generate a release package to preview its summary text here.</pre>
       </section>
@@ -550,12 +555,14 @@
         if (!releasePackage) {
           el("release-readiness").textContent = "Generate a release package to evaluate whether the selected channel looks ready for rollout.";
           el("delivery-summary").textContent = "Generate a release package to see the handoff summary for software authors and release operators.";
+          el("delivery-checklist").textContent = "Generate a release package to see the step-by-step handoff checklist.";
           el("release-summary").textContent = "Generate a release package to preview its summary text here.";
           return;
         }
 
         const readiness = releasePackage.manifest?.release?.readiness || {};
         const deliverySummary = releasePackage.deliverySummary || releasePackage.manifest?.release?.deliverySummary || {};
+        const deliveryChecklist = releasePackage.deliveryChecklist || releasePackage.manifest?.release?.deliveryChecklist || {};
         const startupPreview = releasePackage.manifest?.release?.startupPreview || {};
         const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
         const nextActions = Array.isArray(readiness.nextActions) ? readiness.nextActions : [];
@@ -594,6 +601,18 @@
           ${handoffChecks.length ? `<div class="hint" style="margin-top:12px;">${handoffChecks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
           ${deliveryActions.length ? `<div class="hint" style="margin-top:12px;">Handoff actions:<br>${deliveryActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
+        const checklistItems = Array.isArray(deliveryChecklist.items) ? deliveryChecklist.items : [];
+        el("delivery-checklist").innerHTML = checklistItems.length
+          ? `
+            <div style="margin-bottom:10px;">
+              ${renderTag(String(deliveryChecklist.status || "unknown").toUpperCase(), deliveryChecklist.status === "ready")}
+              ${renderTag(`pass:${deliveryChecklist.passItems ?? 0}`, true)}
+              ${renderTag(`review:${deliveryChecklist.reviewItems ?? 0}`, false)}
+              ${renderTag(`block:${deliveryChecklist.blockItems ?? 0}`, false)}
+            </div>
+            <div class="hint">${checklistItems.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "unknown").toUpperCase())}] ${escapeHtml(item.label || item.key || "item")} | ${escapeHtml(item.summary || "-")}${item.artifact ? ` | artifact=${escapeHtml(item.artifact)}` : ""}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}`).join("<br>")}</div>
+          `
+          : "No delivery checklist is available yet.";
         el("release-summary").textContent = releasePackage.summaryText || "";
       }
 

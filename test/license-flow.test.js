@@ -5246,6 +5246,10 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releasePackage.deliverySummary.startupStatus, "blocking_notice");
     assert.equal(releasePackage.deliverySummary.blockingNotices, 1);
     assert.match(releasePackage.deliverySummary.headline, /hold/i);
+    assert.equal(releasePackage.deliveryChecklist.status, "hold");
+    assert.ok(releasePackage.deliveryChecklist.blockItems >= 1);
+    assert.ok(Array.isArray(releasePackage.deliveryChecklist.items));
+    assert.ok(releasePackage.deliveryChecklist.items.some((item) => item.key === "handoff_artifacts"));
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
     assert.equal(releasePackage.manifest.integration.project.code, "RELPKG_ALPHA");
@@ -5260,6 +5264,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Blocking Notices: 1/);
     assert.match(releasePackage.summaryText, /Release Readiness: HOLD/);
     assert.match(releasePackage.summaryText, /Delivery Summary:/);
+    assert.match(releasePackage.summaryText, /Delivery Checklist:/);
     assert.match(releasePackage.summaryText, /Release Checks:/);
 
     const releaseSummaryDownload = await getText(
@@ -9109,6 +9114,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Generate Release Package/);
     assert.match(html, /Release Readiness/);
     assert.match(html, /Delivery Summary/);
+    assert.match(html, /Delivery Checklist/);
     assert.match(html, /Package Summary/);
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);

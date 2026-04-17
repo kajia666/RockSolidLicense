@@ -1116,6 +1116,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
   const project = manifest.project || {};
   const release = manifest.release || {};
   const deliverySummary = release.deliverySummary || {};
+  const deliveryChecklist = release.deliveryChecklist || {};
   const versionManifest = release.versionManifest || {};
   const activeNotices = release.activeNotices || {};
   const readiness = release.readiness || {};
@@ -1148,6 +1149,16 @@ function buildReleasePackageSummaryText(manifest = {}) {
   }
   lines.push("");
 
+  const checklistItems = Array.isArray(deliveryChecklist.items) ? deliveryChecklist.items : [];
+  if (checklistItems.length) {
+    lines.push("Delivery Checklist:");
+    lines.push(`- Status: ${String(deliveryChecklist.status || "unknown").toUpperCase()} | pass=${deliveryChecklist.passItems ?? 0} | review=${deliveryChecklist.reviewItems ?? 0} | block=${deliveryChecklist.blockItems ?? 0}`);
+    for (const item of checklistItems) {
+      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}`);
+    }
+    lines.push("");
+  }
+
   const readinessChecks = Array.isArray(readiness.checks) ? readiness.checks : [];
   if (readinessChecks.length) {
     lines.push("Release Checks:");
@@ -1179,6 +1190,129 @@ function buildReleasePackageSummaryText(manifest = {}) {
   }
 
   return lines.join("\n");
+}
+
+function buildReleaseDeliveryChecklistPayload({
+  product,
+  channel = "stable",
+  versionManifest,
+  activeNotices = [],
+  readiness = {},
+  deliverySummary = {},
+  releaseStartupPreview = null
+}) {
+  const activeKeyId = deliverySummary.activeKeyId || null;
+  const activeItems = Array.isArray(activeNotices) ? activeNotices : [];
+  const blockingNotices = activeItems.filter((item) => item.blockLogin);
+  const startupDecision = releaseStartupPreview?.decision || {};
+  const tokenKeySummary = releaseStartupPreview?.tokenKeySummary || {};
+  const items = [];
+
+  items.push({
+    key: "project_status",
+    label: "Project active",
+    status: (product?.status ?? "active") === "active" ? "pass" : "block",
+    summary: (product?.status ?? "active") === "active"
+      ? "Project runtime status is active."
+      : `Project is ${product?.status || "inactive"} and runtime traffic would be rejected.`,
+    artifact: null,
+    nextAction: (product?.status ?? "active") === "active"
+      ? null
+      : "Switch the project back to active before handing this build to users."
+  });
+
+  items.push({
+    key: "startup_bootstrap",
+    label: "Startup bootstrap",
+    status: startupDecision.ready === false
+      ? "block"
+      : startupDecision.status === "upgrade_recommended"
+        ? "review"
+        : "pass",
+    summary: startupDecision.message || "Startup bootstrap preview is available for the current channel.",
+    artifact: "POST /api/client/startup-bootstrap",
+    nextAction: startupDecision.recommendedAction || null
+  });
+
+  items.push({
+    key: "version_manifest",
+    label: "Version manifest",
+    status: versionManifest?.latestVersion ? "pass" : "review",
+    summary: versionManifest?.latestVersion
+      ? `Latest published version is ${versionManifest.latestVersion}.`
+      : "No active version rule is published for this release channel.",
+    artifact: "manifest.release.versionManifest",
+    nextAction: versionManifest?.latestVersion
+      ? null
+      : "Publish or activate a version rule so this release names a concrete client build."
+  });
+
+  items.push({
+    key: "download_url",
+    label: "Download URL",
+    status: !versionManifest?.latestVersion || versionManifest?.latestDownloadUrl ? "pass" : "review",
+    summary: !versionManifest?.latestVersion
+      ? "No active version rule means no download URL is required yet."
+      : versionManifest?.latestDownloadUrl
+        ? `Latest version points to ${versionManifest.latestDownloadUrl}.`
+        : "Latest active version has no download URL.",
+    artifact: "manifest.release.versionManifest.latestDownloadUrl",
+    nextAction: !versionManifest?.latestVersion || versionManifest?.latestDownloadUrl
+      ? null
+      : "Attach a download URL to the active client version before rollout."
+  });
+
+  items.push({
+    key: "notices",
+    label: "Runtime notices",
+    status: blockingNotices.length ? "block" : activeItems.length ? "review" : "pass",
+    summary: blockingNotices.length
+      ? `${blockingNotices.length} blocking notice(s) would stop login during rollout.`
+      : activeItems.length
+        ? `${activeItems.length} active notice(s) will be shown at startup.`
+        : "No active startup notices are configured for this channel.",
+    artifact: "manifest.release.activeNotices",
+    nextAction: blockingNotices.length
+      ? "Archive or downgrade the blocking maintenance notice before release."
+      : activeItems.length
+        ? "Confirm the active announcement text and schedule before handoff."
+        : null
+  });
+
+  items.push({
+    key: "token_keys",
+    label: "Token verification keys",
+    status: (tokenKeySummary.totalKeys ?? 0) > 0 && activeKeyId ? "pass" : "review",
+    summary: (tokenKeySummary.totalKeys ?? 0) > 0 && activeKeyId
+      ? `${tokenKeySummary.totalKeys} public key(s) are available and active key ${activeKeyId} is selected.`
+      : "Startup preview did not resolve a usable active public key.",
+    artifact: activeKeyId || "manifest.integration.tokenKeys",
+    nextAction: (tokenKeySummary.totalKeys ?? 0) > 0 && activeKeyId
+      ? null
+      : "Make sure the client requests token keys during startup if it validates license tokens locally."
+  });
+
+  items.push({
+    key: "handoff_artifacts",
+    label: "Handoff artifacts",
+    status: "pass",
+    summary: "JSON package, summary text, env template, and C++ quickstart are bundled for handoff.",
+    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"}`,
+    nextAction: "Send the matching JSON, summary, env, and C++ snippets together so integration stays aligned."
+  });
+
+  const blockItems = items.filter((item) => item.status === "block").length;
+  const reviewItems = items.filter((item) => item.status === "review").length;
+  const passItems = items.filter((item) => item.status === "pass").length;
+
+  return {
+    status: blockItems ? "hold" : reviewItems ? "attention" : "ready",
+    passItems,
+    reviewItems,
+    blockItems,
+    total: items.length,
+    items
+  };
 }
 
 function buildReleaseDeliverySummaryPayload({
@@ -1450,6 +1584,15 @@ function buildReleasePackagePayload({
     envFileName,
     cppFileName
   });
+  const deliveryChecklist = buildReleaseDeliveryChecklistPayload({
+    product,
+    channel: normalizedChannel,
+    versionManifest,
+    activeNotices,
+    readiness,
+    deliverySummary,
+    releaseStartupPreview
+  });
   const manifest = {
     generatedAt,
     developer: developer ?? null,
@@ -1473,6 +1616,7 @@ function buildReleasePackagePayload({
       startupPreview: releaseStartupPreview,
       readiness,
       deliverySummary,
+      deliveryChecklist,
       activeNotices: {
         total: activeNotices.length,
         blockingTotal: blockingNotices.length,
@@ -1495,6 +1639,7 @@ function buildReleasePackagePayload({
     summaryFileName,
     manifest,
     deliverySummary,
+    deliveryChecklist,
     snippets: {
       envFileName,
       envTemplate: integrationPackage?.snippets?.envTemplate || "",

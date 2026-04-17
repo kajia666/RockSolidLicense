@@ -28,6 +28,7 @@ This page is intended for day-to-day authorization operations:
 - use the `Escalate First` slice inside the scoped snapshot overview to jump straight into `Open Control` or `Load Full Context` for the highest-priority queue items
 - the scoped snapshot now also keeps a `Prepared Control` recap after focus or escalation actions, so developers can reapply the same focus or jump back to the prepared quick-control target without rebuilding context by hand
 - after a scoped quick-control action succeeds, the overview now also renders a `Last Action Result` recap with mitigation and follow-up guidance, so the developer can tell whether the current focus is resolved or still needs attention
+- that recap no longer depends only on snapshot-origin focus clicks; it now also attempts to infer the active scoped target from the quick-control form itself, so table-driven operations can still produce a useful result recap
 - export a scoped troubleshooting snapshot as JSON, summary text, checksums, or zip
 
 ## Developer APIs
@@ -141,4 +142,5 @@ The download route also accepts:
 - `/developer/ops` now also surfaces an `Escalate First` view for the most urgent queue items, including compressed impact tags and direct shortcuts into the quick-control form or full context loading flow
 - the same scoped overview now renders a `Prepared Control` card once a focus item or escalation shortcut has primed a quick control, which makes repeated scoped handling less error-prone
 - the scoped overview now also compares the focused object before and after a quick-control mutation, then renders a short mitigation/follow-up recap instead of forcing the developer to infer the result only from refreshed tables
+- quick-control actions now try to infer the active target from the current account / entitlement / session / binding / block inputs as well, so a recap can still be generated even when the developer starts from a table row instead of the snapshot overview
 - focus items in the `/developer/ops` overview can backfill username, reason, fingerprint, and quick-control ids so the next action starts from the right scoped target

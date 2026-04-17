@@ -615,6 +615,82 @@
         };
       }
 
+      function buildDeveloperDeviceFocusItem(item = {}, shape = "binding") {
+        return {
+          ...item,
+          kind: item.kind || shape,
+          productCode: item.productCode || item.projectCode || "",
+          fingerprint: item.fingerprint || item.deviceFingerprint || "",
+          bindingId: item.bindingId || (shape === "binding" ? item.id || "" : ""),
+          blockId: item.blockId || (shape === "block" ? item.id || "" : "")
+        };
+      }
+
+      function inferDeveloperActionFocus() {
+        if (preparedFocus?.kind) {
+          return buildFocusPayload(preparedFocus.kind, preparedFocus.item);
+        }
+        const accountId = el("account-id")?.value.trim();
+        if (accountId) {
+          const account = snapshot.accounts.find((item) => item.id === accountId);
+          if (account) {
+            return buildFocusPayload("account", {
+              ...account,
+              accountId: account.id,
+              accountStatus: account.status
+            });
+          }
+          return buildFocusPayload("account", { accountId });
+        }
+        const entitlementId = el("entitlement-id")?.value.trim();
+        if (entitlementId) {
+          const entitlement = snapshot.entitlements.find((item) => item.id === entitlementId);
+          if (entitlement) {
+            return buildFocusPayload("entitlement", {
+              ...entitlement,
+              entitlementId: entitlement.id
+            });
+          }
+          return buildFocusPayload("entitlement", { entitlementId });
+        }
+        const sessionId = el("session-id")?.value.trim();
+        if (sessionId) {
+          const session = snapshot.sessions.find((item) => item.id === sessionId);
+          if (session) {
+            return buildFocusPayload("session", {
+              ...session,
+              sessionId: session.id
+            });
+          }
+          return buildFocusPayload("session", { sessionId });
+        }
+        const bindingId = el("binding-id")?.value.trim();
+        if (bindingId) {
+          const binding = snapshot.bindings.find((item) => item.id === bindingId);
+          if (binding) {
+            return buildFocusPayload("device", buildDeveloperDeviceFocusItem(binding, "binding"));
+          }
+          return buildFocusPayload("device", { bindingId });
+        }
+        const blockId = el("block-id")?.value.trim();
+        if (blockId) {
+          const block = snapshot.blocks.find((item) => item.id === blockId);
+          if (block) {
+            return buildFocusPayload("device", buildDeveloperDeviceFocusItem(block, "block"));
+          }
+          return buildFocusPayload("device", { blockId });
+        }
+        const fingerprint = el("block-fingerprint")?.value.trim();
+        const productCode = el("block-product-code")?.value.trim();
+        if (fingerprint || productCode) {
+          return buildFocusPayload("device", {
+            fingerprint,
+            productCode
+          });
+        }
+        return null;
+      }
+
       function developerFocusMatchesRecord(focus = null, item = {}) {
         if (!focus || !item) {
           return false;
@@ -1648,7 +1724,7 @@
         renderAll();
       }
       async function act(path, body, okMessage) {
-        const focus = preparedFocus ? buildFocusPayload(preparedFocus.kind, preparedFocus.item) : null;
+        const focus = inferDeveloperActionFocus();
         const previousHits = focus ? collectDeveloperSnapshotHits(focus) : [];
         const data = await api(path, { method:"POST", body });
         await refreshOps(false);

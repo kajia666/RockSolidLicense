@@ -1260,6 +1260,54 @@
         };
       }
 
+      function buildAdminMutationFollowUp(comparison = {}, focus = null, focusedPanel = "", snapshotHits = []) {
+        const after = comparison?.after || {};
+        const severityRank = Number(after.maxSeverityRank || 0);
+        const queuePosition = Number.isFinite(after.queuePosition) ? after.queuePosition : null;
+        const recommendedLabel = focus?.item?.recommendedControl?.label || "";
+        const actionHint = focus?.item?.actionHint || focus?.item?.nextAction || "";
+        const actionTarget = recommendedLabel || actionHint || (focusedPanel ? `return to ${focusedPanel}` : "review the current focus context");
+        if (severityRank === 0 && queuePosition === null) {
+          return {
+            priority: "clear",
+            label: "Close Out",
+            tone: "ok",
+            hint: "No active focus signal remains for this object. You can close the loop now or keep it in routine monitoring."
+          };
+        }
+        if (
+          severityRank >= 4
+          || comparison?.trend === "escalated"
+          || comparison?.trend === "prioritized"
+          || (queuePosition !== null && queuePosition <= 2)
+        ) {
+          return {
+            priority: "urgent",
+            label: "Escalate",
+            tone: "danger",
+            hint: `The object is still in a high-priority state. ${actionTarget ? `Next: ${actionTarget}.` : "A stronger operator action is recommended now."}`
+          };
+        }
+        if (
+          severityRank >= 3
+          || comparison?.trend === "queue-added"
+          || comparison?.trend === "new-signal"
+        ) {
+          return {
+            priority: "follow-up",
+            label: "Follow Up",
+            tone: "warning",
+            hint: `The object still needs operator follow-up. ${actionTarget ? `Next: ${actionTarget}.` : "Review the refreshed focus details before closing the incident."}`
+          };
+        }
+        return {
+          priority: "monitor",
+          label: "Monitor",
+          tone: "warning",
+          hint: `The risk looks lower, but the object still appears in the snapshot. ${actionTarget ? `Keep ${actionTarget} ready while monitoring.` : "Keep the object under observation."}`
+        };
+      }
+
       function buildAdminFocusTitle(kind, item = {}) {
         if (kind === "account") {
           return `${item.username || "-"} @ ${item.productCode || "-"}`;
@@ -1365,6 +1413,7 @@
       function buildAdminMutationRecap(successMessage, focus = null, loadedPanels = [], matchedPanels = [], focusedPanel = "", previousSnapshotHits = []) {
         const snapshotHits = collectAdminSnapshotHits(focus);
         const comparison = compareAdminMutationSignals(previousSnapshotHits, snapshotHits);
+        const followUp = buildAdminMutationFollowUp(comparison, focus, focusedPanel, snapshotHits);
         const stillFlagged = snapshotHits.length > 0;
         const status = stillFlagged ? "attention" : "ok";
         return {
@@ -1379,6 +1428,7 @@
           trendTone: comparison.trendTone,
           before: comparison.before,
           after: comparison.after,
+          followUp,
           loadedPanels,
           matchedPanels,
           focusedPanel,
@@ -1402,6 +1452,10 @@
           (Number.isFinite(beforeQueue) || Number.isFinite(afterQueue)) ? `<span class="tag">queue:${escapeHtml(beforeQueue !== null ? `#${beforeQueue}` : "out")}->${escapeHtml(afterQueue !== null ? `#${afterQueue}` : "out")}</span>` : "",
           `<span class="tag">signals:${escapeHtml(adminLastMutation.before?.hitCount ?? 0)}->${escapeHtml(adminLastMutation.after?.hitCount ?? 0)}</span>`
         ].filter(Boolean).join("");
+        const followUpTags = [
+          adminLastMutation.followUp?.label ? `<span class="tag ${escapeHtml(adminLastMutation.followUp.tone || "")}">${escapeHtml(adminLastMutation.followUp.label)}</span>` : "",
+          adminLastMutation.followUp?.priority ? `<span class="tag">follow-up:${escapeHtml(adminLastMutation.followUp.priority)}</span>` : ""
+        ].filter(Boolean).join("");
         const contextTags = [
           adminLastMutation.focusKind ? `<span class="tag">${escapeHtml(adminLastMutation.focusKind)}</span>` : "",
           adminLastMutation.focusedPanel ? `<span class="tag ok">control:${escapeHtml(adminLastMutation.focusedPanel)}</span>` : "",
@@ -1418,6 +1472,8 @@
             <div>${escapeHtml(adminLastMutation.successMessage)}</div>
             <div class="hint">${escapeHtml(adminLastMutation.headline)} ${escapeHtml(adminLastMutation.detail)}</div>
             <div class="audit-meta">${progressTags}</div>
+            <div class="audit-meta">${followUpTags}</div>
+            ${adminLastMutation.followUp?.hint ? `<div class="hint"><strong>Follow-up:</strong> ${escapeHtml(adminLastMutation.followUp.hint)}</div>` : ""}
             <div class="audit-meta">${contextTags || `<span class="tag">no-context</span>`}</div>
             ${hitTags ? `<div><div class="hint">Snapshot hits</div><div class="audit-meta">${hitTags}</div></div>` : ""}
           </div>
@@ -2800,6 +2856,9 @@
         }
         if (adminLastMutation?.trend) {
           suffixParts.push(`recap=${adminLastMutation.trend}`);
+        }
+        if (adminLastMutation?.followUp?.priority) {
+          suffixParts.push(`followup=${adminLastMutation.followUp.priority}`);
         }
         renderOpsPreviewSummary();
         setStatus(`${successMessage}${suffixParts.length ? ` | ${suffixParts.join(" | ")}` : ""}.`);

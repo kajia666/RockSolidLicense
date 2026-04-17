@@ -40,6 +40,7 @@ Terminology:
 - the snapshot panel now keeps a `Prepared Control` card after drilling into a focus item, so operators can reapply the same focus or jump back to the prepared control card without rebuilding filters by hand
 - after an admin action succeeds, the console now refreshes the visible snapshot/list context around the same focused object and re-highlights the matching rows and control card
 - the snapshot panel also keeps a `Last Action Result` recap so operators can see whether the handled object still appears in the current focus set, whether the severity improved or worsened, and whether the object moved in or out of the recommended queue
+- the same recap now adds an explicit follow-up conclusion, so operators can quickly tell whether the next step is `Close Out`, `Monitor`, `Follow Up`, or `Escalate`
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints

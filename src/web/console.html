@@ -15,6 +15,8 @@
         --muted: #5f6a62;
         --accent: #0f7c68;
         --accent-soft: rgba(15, 124, 104, 0.12);
+        --warning: #9a6118;
+        --warning-soft: rgba(154, 97, 24, 0.14);
         --danger: #a0422c;
         --danger-soft: rgba(160, 66, 44, 0.12);
         --shadow: 0 28px 70px rgba(54, 49, 42, 0.14);
@@ -298,9 +300,34 @@
         color: var(--accent);
       }
 
+      .tag.warning {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
       .tag.danger {
         background: var(--danger-soft);
         color: var(--danger);
+      }
+
+      .tag.critical {
+        background: rgba(160, 66, 44, 0.16);
+        color: var(--danger);
+      }
+
+      .tag.high {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
+      .tag.medium {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tag.low {
+        background: rgba(23, 32, 27, 0.08);
+        color: var(--muted);
       }
 
       .tag-button {
@@ -374,6 +401,13 @@
         cursor: pointer;
       }
 
+      .snapshot-focus-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
       .snapshot-focus-item strong {
         display: block;
       }
@@ -382,6 +416,13 @@
         color: var(--muted);
         font-size: 12px;
         line-height: 1.6;
+      }
+
+      .snapshot-focus-action {
+        color: var(--ink);
+        font-size: 12px;
+        line-height: 1.6;
+        margin-top: 6px;
       }
 
       pre {
@@ -1018,6 +1059,22 @@
         }).join("") || `<span class="tag">none</span>`;
       }
 
+      function focusSeverityClass(severity) {
+        const normalized = String(severity ?? "").trim().toLowerCase();
+        if (["critical", "high", "medium", "low"].includes(normalized)) {
+          return normalized;
+        }
+        return "";
+      }
+
+      function renderFocusSeverityBadge(item = {}) {
+        const normalized = focusSeverityClass(item.severity);
+        if (!normalized) {
+          return "";
+        }
+        return `<span class="tag ${normalized}">${escapeHtml(normalized.toUpperCase())}</span>`;
+      }
+
       function renderOverviewDetailList(items = [], kind, renderTitle, renderMeta) {
         if (!Array.isArray(items) || !items.length) {
           return `<div class="hint">暂无重点对象。</div>`;
@@ -1025,7 +1082,7 @@
         return `<div class="snapshot-focus-list">${items.map((item, index) => {
           const focusKey = `${kind}:${index}`;
           adminOpsFocusMap.set(focusKey, { kind, item });
-          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><strong>${renderTitle(item)}</strong><div class="snapshot-focus-meta">${renderMeta(item)}</div></button>`;
+          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${renderTitle(item)}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${renderMeta(item)}</div>${item?.actionHint ? `<div class="snapshot-focus-action">next=${escapeHtml(item.actionHint)}</div>` : ""}</button>`;
         }).join("")}</div>`;
       }
 
@@ -1215,6 +1272,7 @@
               (item) => `${escapeHtml(item.username || "-")} @ ${escapeHtml(item.productCode || "-")}`,
               (item) => [
                 `issues=${escapeHtml(item.issueCount ?? 0)}`,
+                `severity=${escapeHtml(item.severity || "-")}`,
                 `account=${escapeHtml(item.accountId || "-")}`,
                 `signals=${escapeHtml((item.signals || []).slice(0, 3).join(", ") || "-")}`,
                 `reasons=${escapeHtml((item.reasons || []).slice(0, 2).join(", ") || "-")}`
@@ -1229,6 +1287,7 @@
               (item) => `${escapeHtml(item.sessionId || "-")} | ${escapeHtml(item.username || "-")}`,
               (item) => [
                 `${escapeHtml(item.productCode || "-")} | ${escapeHtml(item.status || "-")}`,
+                `severity=${escapeHtml(item.severity || "-")}`,
                 `reason=${escapeHtml(item.reason || "-")}`,
                 `device=${escapeHtml(item.deviceName || item.fingerprint || "-")}`
               ].join(" | ")
@@ -1242,6 +1301,7 @@
               (item) => `${escapeHtml(item.fingerprint || "-")} @ ${escapeHtml(item.productCode || "-")}`,
               (item) => [
                 `${escapeHtml(item.kind || "-")} | ${escapeHtml(item.status || "-")}`,
+                `severity=${escapeHtml(item.severity || "-")}`,
                 `reason=${escapeHtml(item.reason || "-")}`,
                 `binding=${escapeHtml(item.bindingId || "-")}`,
                 `block=${escapeHtml(item.blockId || "-")}`

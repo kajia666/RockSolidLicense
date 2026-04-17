@@ -1809,6 +1809,130 @@ function mapSnapshotTopCounts(items = [], selector, keyName, limit = 5) {
     .map(([value, count]) => ({ [keyName]: value, count }));
 }
 
+const SNAPSHOT_SEVERITY_RANKS = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1
+};
+
+function snapshotSeverityRank(value) {
+  const key = String(value ?? "").trim().toLowerCase();
+  return SNAPSHOT_SEVERITY_RANKS[key] || 0;
+}
+
+function snapshotArrayIncludes(values = [], expected) {
+  return Array.isArray(values) && values.includes(expected);
+}
+
+function buildSnapshotFocusAccountSeverity(item = {}) {
+  const signals = Array.isArray(item.signals) ? item.signals : [];
+  if (snapshotArrayIncludes(signals, "account_disabled") && Number(item.activeSessionCount || 0) > 0) {
+    return "critical";
+  }
+  if (
+    snapshotArrayIncludes(signals, "entitlement_frozen")
+    || (snapshotArrayIncludes(signals, "account_disabled") && Number(item.activeEntitlementCount || 0) > 0)
+  ) {
+    return "high";
+  }
+  if (
+    snapshotArrayIncludes(signals, "points_exhausted")
+    || snapshotArrayIncludes(signals, "entitlement_expired")
+    || snapshotArrayIncludes(signals, "session_expired")
+    || snapshotArrayIncludes(signals, "session_revoked")
+    || snapshotArrayIncludes(signals, "account_disabled")
+  ) {
+    return "medium";
+  }
+  return "low";
+}
+
+function buildSnapshotFocusAccountActionHint(item = {}) {
+  const signals = Array.isArray(item.signals) ? item.signals : [];
+  const firstReason = Array.isArray(item.reasons) ? item.reasons.find((entry) => String(entry ?? "").trim()) : "";
+  if (snapshotArrayIncludes(signals, "account_disabled") && Number(item.activeSessionCount || 0) > 0) {
+    return "Review this disabled account first and confirm all lingering sessions are revoked before telling the customer to retry.";
+  }
+  if (snapshotArrayIncludes(signals, "entitlement_frozen")) {
+    return "Check why the entitlement was frozen and resume or extend it only after support confirms access should return.";
+  }
+  if (snapshotArrayIncludes(signals, "points_exhausted")) {
+    return "Recharge or adjust remaining points if this customer should keep logging in.";
+  }
+  if (snapshotArrayIncludes(signals, "entitlement_expired")) {
+    return "Extend or renew the entitlement if this customer should regain access.";
+  }
+  if (snapshotArrayIncludes(signals, "account_disabled")) {
+    return "Decide whether to re-enable this account or keep it blocked before the next login attempt.";
+  }
+  if (firstReason) {
+    return `Inspect recent session revocations for this account, starting with "${firstReason}".`;
+  }
+  return "Inspect recent account, entitlement, and session changes before taking action on this customer.";
+}
+
+function buildSnapshotFocusSessionSeverity(item = {}) {
+  const reason = String(item.reason ?? "").trim().toLowerCase();
+  if (reason.includes("block") || reason.includes("ban") || reason.includes("forbid")) {
+    return "critical";
+  }
+  if (reason) {
+    return "high";
+  }
+  if (normalizeSnapshotStatus(item.status) === "expired") {
+    return "medium";
+  }
+  return "low";
+}
+
+function buildSnapshotFocusSessionActionHint(item = {}) {
+  const reason = String(item.reason ?? "").trim().toLowerCase();
+  if (reason.includes("block") || reason.includes("ban") || reason.includes("forbid")) {
+    return "Check whether this session was forced offline by a block rule before allowing another login.";
+  }
+  if (String(item.reason ?? "").trim()) {
+    return "Review why this session was revoked and decide whether a fresh login or manual unblock is appropriate.";
+  }
+  if (normalizeSnapshotStatus(item.status) === "expired") {
+    return "Check heartbeat timing and client connectivity before asking the customer to retry.";
+  }
+  return "Inspect this session before restoring access.";
+}
+
+function buildSnapshotFocusDeviceSeverity(item = {}) {
+  const kind = normalizeSnapshotStatus(item.kind);
+  const status = normalizeSnapshotStatus(item.status);
+  if (kind === "block" && status === "active") {
+    return "critical";
+  }
+  if (kind === "binding" && ["revoked", "released"].includes(status)) {
+    return "high";
+  }
+  if (kind === "session" || Number(item.relatedSessionCount || 0) > 0) {
+    return "medium";
+  }
+  return "low";
+}
+
+function buildSnapshotFocusDeviceActionHint(item = {}) {
+  const kind = normalizeSnapshotStatus(item.kind);
+  const status = normalizeSnapshotStatus(item.status);
+  if (kind === "block" && status === "active") {
+    return "Keep this fingerprint blocked until device review is complete, or unblock only after confirming it is safe.";
+  }
+  if (kind === "binding" && ["revoked", "released"].includes(status)) {
+    return "Confirm whether this hardware change is legitimate before releasing another seat or rebinding.";
+  }
+  if (kind === "session") {
+    return "Inspect recent login or heartbeat failures on this device before asking the customer to retry.";
+  }
+  if (kind === "block") {
+    return "Verify whether this device can safely log in again before clearing related notes or filters.";
+  }
+  return "Inspect this device history before restoring access.";
+}
+
 function buildSnapshotFocusAccounts(accounts = [], entitlements = [], sessions = [], limit = 5) {
   const items = new Map();
 
@@ -1921,20 +2045,27 @@ function buildSnapshotFocusAccounts(accounts = [], entitlements = [], sessions =
       return left.username.localeCompare(right.username);
     })
     .slice(0, limit)
-    .map((item) => ({
-      username: item.username,
-      productCode: item.productCode,
-      accountId: item.accountId,
-      entitlementId: item.entitlementId,
-      sessionId: item.sessionId,
-      accountStatus: item.accountStatus,
-      issueCount: item.issueCount,
-      signals: Array.from(item.signals),
-      reasons: Array.from(item.reasons),
-      activeSessionCount: item.activeSessionCount,
-      activeEntitlementCount: item.activeEntitlementCount,
-      latestAt: item.latestAt
-    }));
+    .map((item) => {
+      const normalized = {
+        username: item.username,
+        productCode: item.productCode,
+        accountId: item.accountId,
+        entitlementId: item.entitlementId,
+        sessionId: item.sessionId,
+        accountStatus: item.accountStatus,
+        issueCount: item.issueCount,
+        signals: Array.from(item.signals),
+        reasons: Array.from(item.reasons),
+        activeSessionCount: item.activeSessionCount,
+        activeEntitlementCount: item.activeEntitlementCount,
+        latestAt: item.latestAt
+      };
+      return {
+        ...normalized,
+        severity: buildSnapshotFocusAccountSeverity(normalized),
+        actionHint: buildSnapshotFocusAccountActionHint(normalized)
+      };
+    });
 }
 
 function buildSnapshotFocusSessions(sessions = [], limit = 5) {
@@ -1949,19 +2080,27 @@ function buildSnapshotFocusSessions(sessions = [], limit = 5) {
       return String(left?.id ?? "").localeCompare(String(right?.id ?? ""));
     })
     .slice(0, limit)
-    .map((item) => ({
-      sessionId: item?.id || null,
-      accountId: item?.accountId || null,
-      entitlementId: item?.entitlementId || null,
-      username: item?.username || null,
-      productCode: item?.productCode || null,
-      status: item?.status || null,
-      reason: item?.revokedReason || null,
-      fingerprint: item?.fingerprint || null,
-      deviceName: item?.deviceName || null,
-      lastHeartbeatAt: item?.lastHeartbeatAt || null,
-      expiresAt: item?.expiresAt || null
-    }));
+    .map((item) => {
+      const normalized = {
+        sessionId: item?.id || null,
+        accountId: item?.accountId || null,
+        entitlementId: item?.entitlementId || null,
+        username: item?.username || null,
+        productCode: item?.productCode || null,
+        status: item?.status || null,
+        reason: item?.revokedReason || null,
+        fingerprint: item?.fingerprint || null,
+        deviceName: item?.deviceName || null,
+        lastHeartbeatAt: item?.lastHeartbeatAt || null,
+        expiresAt: item?.expiresAt || null,
+        latestAt: item?.lastHeartbeatAt || item?.expiresAt || item?.issuedAt || null
+      };
+      return {
+        ...normalized,
+        severity: buildSnapshotFocusSessionSeverity(normalized),
+        actionHint: buildSnapshotFocusSessionActionHint(normalized)
+      };
+    });
 }
 
 function buildSnapshotFocusDevices(bindings = [], blocks = [], sessions = [], limit = 5) {
@@ -2079,20 +2218,27 @@ function buildSnapshotFocusDevices(bindings = [], blocks = [], sessions = [], li
       return left.fingerprint.localeCompare(right.fingerprint);
     })
     .slice(0, limit)
-    .map((item) => ({
-      kind: item.kind,
-      productCode: item.productCode,
-      fingerprint: item.fingerprint,
-      status: item.status,
-      reason: item.reason,
-      username: item.username,
-      deviceName: item.deviceName,
-      bindingId: item.bindingId,
-      blockId: item.blockId,
-      sessionId: item.sessionId,
-      latestAt: item.latestAt,
-      relatedSessionCount: item.relatedSessionCount
-    }));
+    .map((item) => {
+      const normalized = {
+        kind: item.kind,
+        productCode: item.productCode,
+        fingerprint: item.fingerprint,
+        status: item.status,
+        reason: item.reason,
+        username: item.username,
+        deviceName: item.deviceName,
+        bindingId: item.bindingId,
+        blockId: item.blockId,
+        sessionId: item.sessionId,
+        latestAt: item.latestAt,
+        relatedSessionCount: item.relatedSessionCount
+      };
+      return {
+        ...normalized,
+        severity: buildSnapshotFocusDeviceSeverity(normalized),
+        actionHint: buildSnapshotFocusDeviceActionHint(normalized)
+      };
+    });
 }
 
 function buildSnapshotOverview({
@@ -2359,19 +2505,19 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.focusAccounts) && overview.focusAccounts.length) {
       lines.push("Focus Account Details:");
       for (const item of overview.focusAccounts) {
-        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | account=${item.accountId || "-"}`);
+        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | severity=${item.severity || "-"} | account=${item.accountId || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusSessions) && overview.focusSessions.length) {
       lines.push("Focus Sessions:");
       for (const item of overview.focusSessions) {
-        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
+        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusDevices) && overview.focusDevices.length) {
       lines.push("Focus Devices:");
       for (const item of overview.focusDevices) {
-        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
+        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
   }
@@ -2651,19 +2797,19 @@ function buildAdminOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.focusAccounts) && overview.focusAccounts.length) {
       lines.push("Focus Account Details:");
       for (const item of overview.focusAccounts) {
-        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | account=${item.accountId || "-"}`);
+        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | severity=${item.severity || "-"} | account=${item.accountId || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusSessions) && overview.focusSessions.length) {
       lines.push("Focus Sessions:");
       for (const item of overview.focusSessions) {
-        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
+        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
     if (Array.isArray(overview.focusDevices) && overview.focusDevices.length) {
       lines.push("Focus Devices:");
       for (const item of overview.focusDevices) {
-        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
+        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
   }

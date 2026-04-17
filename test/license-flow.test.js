@@ -6268,6 +6268,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(exportSnapshot.overview.focusAccounts.some((item) => item.username === "alphaexport"));
     assert.ok(exportSnapshot.overview.focusSessions.some((item) => item.username === "alphaexport"));
     assert.ok(exportSnapshot.overview.focusDevices.some((item) => item.fingerprint === "export-alpha-device-01"));
+    assert.ok(exportSnapshot.overview.focusAccounts.some((item) => item.severity && item.actionHint));
+    assert.ok(exportSnapshot.overview.focusSessions.some((item) => item.severity && item.actionHint));
+    assert.ok(exportSnapshot.overview.focusDevices.some((item) => item.severity && item.actionHint));
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: EXPORT_ALPHA/);
     assert.match(exportSnapshot.summaryText, /Overview Status: ok/);
@@ -6275,6 +6278,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);
     assert.match(exportSnapshot.summaryText, /Focus Devices:/);
+    assert.match(exportSnapshot.summaryText, /severity=/);
+    assert.match(exportSnapshot.summaryText, /next=/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
@@ -6514,6 +6519,9 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
     assert.ok(exportSnapshot.overview.focusAccounts.some((item) => item.username === "adminalpha"));
     assert.ok(exportSnapshot.overview.focusSessions.some((item) => item.username === "adminalpha"));
     assert.ok(exportSnapshot.overview.focusDevices.some((item) => item.fingerprint === "admin-export-alpha-device-01"));
+    assert.ok(exportSnapshot.overview.focusAccounts.some((item) => item.severity && item.actionHint));
+    assert.ok(exportSnapshot.overview.focusSessions.some((item) => item.severity && item.actionHint));
+    assert.ok(exportSnapshot.overview.focusDevices.some((item) => item.severity === "critical" && item.actionHint));
     assert.ok(exportSnapshot.overview.focusFingerprints.some((item) => item.fingerprint === "admin-export-alpha-device-01"));
     assert.match(exportSnapshot.summaryText, /RockSolid Admin Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: ADMIN_EXPORT_ALPHA/);
@@ -6522,6 +6530,8 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);
     assert.match(exportSnapshot.summaryText, /Focus Devices:/);
     assert.match(exportSnapshot.summaryText, /Focus Fingerprints:/);
+    assert.match(exportSnapshot.summaryText, /severity=/);
+    assert.match(exportSnapshot.summaryText, /next=/);
 
     const fullSnapshot = await getJson(
       baseUrl,
@@ -8749,6 +8759,8 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /重点账号明细/);
     assert.match(html, /重点会话/);
     assert.match(html, /重点设备明细/);
+    assert.match(html, /severity=/);
+    assert.match(html, /next=/);
     assert.match(html, /session\.login/);
   } finally {
     await app.close();
@@ -8827,6 +8839,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Focus account details/);
     assert.match(html, /Focus sessions/);
     assert.match(html, /Focus devices/);
+    assert.match(html, /severity=/);
+    assert.match(html, /next=/);
     assert.match(html, /Session Login/);
     assert.match(html, /license_key/);
   } finally {

@@ -32,7 +32,7 @@ Terminology:
 - trace whether reseller-allocated cards remain fresh or have been redeemed
 - create IP / CIDR access rules for login, register, recharge, or heartbeat
 - read recent audit logs
-- use the ops snapshot overview to surface focus accounts, sessions, and devices, then click back into matching filters directly
+- use the ops snapshot overview to surface focus accounts, sessions, and devices with severity and next-action hints, then click back into matching filters directly
 - use audit preset buttons and row-click backfill inside `/admin` to narrow down common session, device, and entitlement events faster
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
@@ -138,7 +138,7 @@ Effects:
 - when `allowVersionCheck` or `allowNotices` is off, login no longer applies version rejection or maintenance blocking for that product
 - disabling `allowRegister`, `allowAccountLogin`, `allowCardLogin`, `allowCardRecharge`, or `allowClientUnbind` blocks the corresponding signed client endpoint
 - `POST /api/client/bindings` still works when self-unbind is disabled, but the returned `unbindPolicy` will reflect that the product-level switch is off
-- `/admin` ops snapshot preview now surfaces common reasons plus focus account/session/device detail lists, and each item can backfill the matching product, username, reason, or fingerprint filters for the next drilldown
+- `/admin` ops snapshot preview now surfaces common reasons plus focus account/session/device detail lists, each with severity and next-action hints, and every item can backfill the matching product, username, reason, or fingerprint filters for the next drilldown
 
 ### Developer project management
 

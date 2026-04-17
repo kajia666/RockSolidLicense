@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RockSolidLicense Developer Ops</title>
     <style>
-      :root { --bg:#f6efe5; --surface:rgba(255,252,246,.94); --line:rgba(24,31,27,.1); --ink:#18201b; --muted:#647067; --accent:#0f7c68; --danger:#a0422c; --shadow:0 24px 60px rgba(58,52,45,.14); }
+      :root { --bg:#f6efe5; --surface:rgba(255,252,246,.94); --line:rgba(24,31,27,.1); --ink:#18201b; --muted:#647067; --accent:#0f7c68; --warning:#9a6118; --danger:#a0422c; --shadow:0 24px 60px rgba(58,52,45,.14); }
       * { box-sizing:border-box; }
       body { margin:0; min-height:100vh; color:var(--ink); font-family:"Bahnschrift","Segoe UI",sans-serif; background:linear-gradient(135deg,#f4ede2 0%,#f9f4eb 52%,#efe5d5 100%); }
       code, pre { font-family:"Cascadia Code","Consolas",monospace; }
@@ -38,6 +38,11 @@
       tbody tr { cursor:pointer; } tbody tr:hover { background:rgba(15,124,104,.06); }
       .tag { display:inline-block; padding:4px 8px; border-radius:999px; background:rgba(24,31,27,.08); color:var(--muted); margin:0 6px 6px 0; }
       .tag.ok { background:rgba(15,124,104,.12); color:var(--accent); } .tag.danger { background:rgba(160,66,44,.12); color:var(--danger); }
+      .tag.warning { background:rgba(154,97,24,.14); color:var(--warning); }
+      .tag.critical { background:rgba(160,66,44,.16); color:var(--danger); }
+      .tag.high { background:rgba(154,97,24,.14); color:var(--warning); }
+      .tag.medium { background:rgba(15,124,104,.12); color:var(--accent); }
+      .tag.low { background:rgba(24,31,27,.08); color:var(--muted); }
       .tag-button { border:1px solid rgba(24,31,27,.08); cursor:pointer; font:inherit; }
       .quick-filters { align-items:center; }
       .quick-filters button { padding:8px 12px; font-size:13px; }
@@ -52,8 +57,10 @@
       .snapshot-list strong { color:var(--ink); }
       .snapshot-focus-list { display:grid; gap:8px; }
       .snapshot-focus-item { padding:12px; border-radius:14px; border:1px solid rgba(24,31,27,.08); background:rgba(255,255,255,.82); color:var(--ink); text-align:left; cursor:pointer; }
+      .snapshot-focus-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
       .snapshot-focus-item strong { display:block; }
       .snapshot-focus-meta { color:var(--muted); font-size:12px; line-height:1.6; }
+      .snapshot-focus-action { color:var(--ink); font-size:12px; line-height:1.6; margin-top:6px; }
       pre { margin:0; min-height:220px; padding:16px; border-radius:18px; background:#101715; color:#eef7f2; overflow:auto; white-space:pre-wrap; word-break:break-word; }
       @media (max-width:1180px) { .wide { grid-template-columns:1fr; } }
       @media (max-width:760px) { .two,.three { grid-template-columns:1fr; } }
@@ -263,6 +270,22 @@
         }).join("") || `<span class="tag">none</span>`;
       }
 
+      function focusSeverityClass(severity) {
+        const normalized = String(severity ?? "").trim().toLowerCase();
+        if (["critical", "high", "medium", "low"].includes(normalized)) {
+          return normalized;
+        }
+        return "";
+      }
+
+      function renderFocusSeverityBadge(item = {}) {
+        const normalized = focusSeverityClass(item.severity);
+        if (!normalized) {
+          return "";
+        }
+        return `<span class="tag ${normalized}">${esc(normalized.toUpperCase())}</span>`;
+      }
+
       async function applyOverviewAction(kind, value) {
         const normalizedValue = String(value ?? "").trim();
         if (!normalizedValue) {
@@ -299,7 +322,7 @@
         return `<div class="snapshot-focus-list">${items.map((item, index) => {
           const focusKey = `${kind}:${index}`;
           overviewFocusMap.set(focusKey, { kind, item });
-          return `<button type="button" class="snapshot-focus-item" data-focus-key="${esc(focusKey)}"><strong>${renderTitle(item)}</strong><div class="snapshot-focus-meta">${renderMeta(item)}</div></button>`;
+          return `<button type="button" class="snapshot-focus-item" data-focus-key="${esc(focusKey)}"><div class="snapshot-focus-head"><strong>${renderTitle(item)}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${renderMeta(item)}</div>${item?.actionHint ? `<div class="snapshot-focus-action">next=${esc(item.actionHint)}</div>` : ""}</button>`;
         }).join("")}</div>`;
       }
 
@@ -450,6 +473,7 @@
               (item) => `${esc(item.username || "-")} @ ${esc(item.productCode || "-")}`,
               (item) => [
                 `issues=${esc(item.issueCount ?? 0)}`,
+                `severity=${esc(item.severity || "-")}`,
                 `account=${esc(item.accountId || "-")}`,
                 `signals=${esc((item.signals || []).slice(0, 3).join(", ") || "-")}`,
                 `reasons=${esc((item.reasons || []).slice(0, 2).join(", ") || "-")}`
@@ -464,6 +488,7 @@
               (item) => `${esc(item.sessionId || "-")} | ${esc(item.username || "-")}`,
               (item) => [
                 `${esc(item.productCode || "-")} | ${esc(item.status || "-")}`,
+                `severity=${esc(item.severity || "-")}`,
                 `reason=${esc(item.reason || "-")}`,
                 `device=${esc(item.deviceName || item.fingerprint || "-")}`
               ].join(" | ")
@@ -477,6 +502,7 @@
               (item) => `${esc(item.fingerprint || "-")} @ ${esc(item.productCode || "-")}`,
               (item) => [
                 `${esc(item.kind || "-")} | ${esc(item.status || "-")}`,
+                `severity=${esc(item.severity || "-")}`,
                 `reason=${esc(item.reason || "-")}`,
                 `binding=${esc(item.bindingId || "-")}`,
                 `block=${esc(item.blockId || "-")}`

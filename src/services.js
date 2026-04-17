@@ -495,6 +495,7 @@ function buildIntegrationSigningSnapshot(config) {
 function buildIntegrationExamples() {
   return {
     http: [
+      { action: "startup-bootstrap", path: "/api/client/startup-bootstrap" },
       { action: "register", path: "/api/client/register" },
       { action: "login", path: "/api/client/login" },
       { action: "card-login", path: "/api/client/card-login" },
@@ -4841,6 +4842,30 @@ function buildDisabledNoticeManifest(product, channel = "stable") {
     status: "disabled_by_product",
     message: "Client notices are disabled for this product.",
     notices: []
+  };
+}
+
+function buildClientStartupBootstrapPayload({
+  product,
+  clientVersion = null,
+  channel = "stable",
+  versionManifest,
+  notices,
+  activeTokenKey,
+  tokenKeys = null,
+  hasTokenKeys = false,
+  generatedAt = nowIso()
+} = {}) {
+  return {
+    generatedAt,
+    productCode: product.code,
+    clientVersion,
+    channel: normalizeChannel(channel),
+    versionManifest,
+    notices,
+    activeTokenKey,
+    ...(hasTokenKeys && tokenKeys ? { tokenKeys } : {}),
+    hasTokenKeys
   };
 }
 
@@ -13529,6 +13554,47 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         String(body.clientVersion).trim(),
         body.channel
       );
+    },
+
+    async clientStartupBootstrap(reqLike, body, rawBody) {
+      const product = await requireSignedProduct(db, store, config, stateStore, reqLike, rawBody);
+      requireField(body, "clientVersion");
+      requireSignedProductCodeMatch(product, body);
+
+      const featureConfig = resolveProductFeatureConfig(db, product);
+      const clientVersion = String(body.clientVersion).trim();
+      const channel = body.channel ? String(body.channel).trim() : "stable";
+      const includeTokenKeys = body.includeTokenKeys !== false;
+      const versionManifest = featureConfig.allowVersionCheck
+        ? await buildVersionManifest(db, store, product, clientVersion, channel)
+        : buildDisabledVersionManifest(product, clientVersion, channel);
+      const notices = featureConfig.allowNotices
+        ? {
+            productCode: product.code,
+            channel: normalizeNoticeChannel(channel, "stable"),
+            enabled: true,
+            status: "enabled",
+            message: "Active notices loaded.",
+            notices: await activeNoticesForProduct(db, store, product.id, channel)
+          }
+        : buildDisabledNoticeManifest(product, channel);
+      const tokenKeys = includeTokenKeys ? this.tokenKeys() : null;
+      const activeTokenKey = includeTokenKeys
+        ? (
+            tokenKeys.keys.find((entry) => entry.keyId === tokenKeys.activeKeyId) || this.tokenKey()
+          )
+        : this.tokenKey();
+
+      return buildClientStartupBootstrapPayload({
+        product,
+        clientVersion,
+        channel,
+        versionManifest,
+        notices,
+        activeTokenKey,
+        tokenKeys,
+        hasTokenKeys: includeTokenKeys
+      });
     },
 
     async clientBindings(reqLike, body, rawBody, meta = {}) {

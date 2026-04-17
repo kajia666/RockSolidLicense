@@ -246,7 +246,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - `LoginResponse.quota` exposes point-based quota consumption after each successful login.
 - `RechargeResponse.grant_type` and `RechargeResponse.remaining_points` help distinguish duration cards from point cards.
 - `ClientVersionCheckRequest` and `ClientNoticesRequest` let the SDK drive the same startup flow documented on the server side.
-- `ClientStartupBootstrapRequest` and `startup_bootstrap_http(...)` bundle version-check, active notices, and token-key fetch into one startup helper.
+- `ClientStartupBootstrapRequest` and `startup_bootstrap_http(...)` now prefer the dedicated `POST /api/client/startup-bootstrap` route, while still falling back to separate version-check, notice, and token-key calls against older servers.
 - `ClientStartupDecision` and `evaluate_startup_decision(...)` turn startup payloads into a simple allow/block/update decision for your login UI.
 - `ClientStartupBootstrapCache` plus `serialize_* / parse_* / read_* / write_*` helpers let you persist startup payloads locally for offline startup and short outage recovery.
 - `ClientVersionManifestResponse` exposes `allowed/status/latest_version/minimum_allowed_version/latest_download_url`.

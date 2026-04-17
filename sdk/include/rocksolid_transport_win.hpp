@@ -534,6 +534,7 @@ class LicenseClientWin {
   static std::string to_json(const UnbindRequest& request);
   static std::string to_json(const ClientVersionCheckRequest& request);
   static std::string to_json(const ClientNoticesRequest& request);
+  static std::string to_json(const ClientStartupBootstrapRequest& request);
   static std::string to_json(const CardLoginRequest& request);
   static std::string to_json(const LoginRequest& request);
   static std::string to_json(const HeartbeatRequest& request);
@@ -560,6 +561,7 @@ class LicenseClientWin {
   static UnbindResponse parse_unbind_response(const ApiEnvelope& envelope);
   static ClientVersionManifestResponse parse_version_check_response(const ApiEnvelope& envelope);
   static ClientNoticesResponse parse_notices_response(const ApiEnvelope& envelope);
+  static ClientStartupBootstrapResponse parse_startup_bootstrap_response(const ApiEnvelope& envelope);
   static LoginResponse parse_login_response(const ApiEnvelope& envelope);
   static HeartbeatResponse parse_heartbeat_response(const ApiEnvelope& envelope);
   static LogoutResponse parse_logout_response(const ApiEnvelope& envelope);

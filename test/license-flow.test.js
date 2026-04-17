@@ -2155,6 +2155,25 @@ test("client version rules can recommend upgrades and reject outdated clients", 
     assert.equal(manifestFor110.minimumAllowedVersion, "1.2.0");
     assert.equal(manifestFor110.notice.title, "关键升级");
 
+    const startupBootstrap = await signedClientPost(
+      baseUrl,
+      "/api/client/startup-bootstrap",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "VERSION_APP",
+        clientVersion: "1.1.0",
+        channel: "stable",
+        includeTokenKeys: true
+      }
+    );
+    assert.equal(startupBootstrap.versionManifest.status, "force_update_required");
+    assert.equal(startupBootstrap.versionManifest.minimumAllowedVersion, "1.2.0");
+    assert.equal(startupBootstrap.notices.notices.length, 0);
+    assert.equal(startupBootstrap.hasTokenKeys, true);
+    assert.equal(startupBootstrap.activeTokenKey.keyId, startupBootstrap.tokenKeys.activeKeyId);
+    assert.ok(startupBootstrap.tokenKeys.keys.length > 0);
+
     const manifestFor100 = await signedClientPost(
       baseUrl,
       "/api/client/version-check",
@@ -2325,6 +2344,24 @@ test("client notices can broadcast announcements and temporarily block login", a
     assert.equal(notices.notices.length, 2);
     assert.equal(notices.notices[0].blockLogin, true);
     assert.equal(notices.notices[1].title, "新版本说明");
+
+    const startupBootstrap = await signedClientPost(
+      baseUrl,
+      "/api/client/startup-bootstrap",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "NOTICE_APP",
+        clientVersion: "1.0.0",
+        channel: "stable",
+        includeTokenKeys: true
+      }
+    );
+    assert.equal(startupBootstrap.versionManifest.status, "no_version_rules");
+    assert.equal(startupBootstrap.notices.notices.length, 2);
+    assert.equal(startupBootstrap.notices.notices[0].blockLogin, true);
+    assert.equal(startupBootstrap.hasTokenKeys, true);
+    assert.equal(startupBootstrap.activeTokenKey.keyId, startupBootstrap.tokenKeys.activeKeyId);
 
     await signedClientPost(baseUrl, "/api/client/register", product.sdkAppId, product.sdkAppSecret, {
       productCode: "NOTICE_APP",
@@ -3888,6 +3925,23 @@ test("product feature config can selectively disable client-facing capabilities"
     assert.equal(notices.enabled, false);
     assert.equal(notices.status, "disabled_by_product");
     assert.equal(notices.notices.length, 0);
+
+    const startupBootstrap = await signedClientPost(
+      baseUrl,
+      "/api/client/startup-bootstrap",
+      product.sdkAppId,
+      product.sdkAppSecret,
+      {
+        productCode: "FEATURE_APP",
+        clientVersion: "1.0.0",
+        channel: "stable",
+        includeTokenKeys: false
+      }
+    );
+    assert.equal(startupBootstrap.versionManifest.enabled, false);
+    assert.equal(startupBootstrap.notices.enabled, false);
+    assert.equal(startupBootstrap.hasTokenKeys, false);
+    assert.ok(startupBootstrap.activeTokenKey.keyId);
 
     const loginWhileChecksDisabled = await signedClientPost(
       baseUrl,

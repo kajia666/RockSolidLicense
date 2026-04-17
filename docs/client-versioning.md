@@ -120,10 +120,11 @@ Current rejection status uses:
 ## Recommended client flow
 
 1. client starts
-2. client calls `POST /api/client/version-check`
-3. if response says force update is required, block local login UI
-4. if response says upgrade recommended, show the notice and download URL
-5. include `clientVersion` on login and heartbeat requests
+2. client preferably calls `POST /api/client/startup-bootstrap`
+3. if only upgrade state is needed, client can still call `POST /api/client/version-check`
+4. if response says force update is required, block local login UI
+5. if response says upgrade recommended, show the notice and download URL
+6. include `clientVersion` on login and heartbeat requests
 
 ## Notes
 

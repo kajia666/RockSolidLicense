@@ -1117,6 +1117,32 @@ ClientNoticesResponse LicenseClientWin::parse_notices_response(const ApiEnvelope
   return parse_client_notices_object(envelope.data);
 }
 
+ClientStartupBootstrapResponse LicenseClientWin::parse_startup_bootstrap_response(
+  const ApiEnvelope& envelope
+) {
+  if (!envelope.ok) {
+    throw_api_exception(envelope, "Client startup bootstrap failed.");
+  }
+
+  const JsonValue& object = envelope.data;
+  ClientStartupBootstrapResponse bootstrap;
+  bootstrap.version_manifest = parse_client_version_manifest_object(
+    require_object_field(object, "versionManifest", JsonType::object)
+  );
+  bootstrap.notices = parse_client_notices_object(
+    require_object_field(object, "notices", JsonType::object)
+  );
+  bootstrap.active_token_key = parse_token_key_info_payload(
+    require_object_field(object, "activeTokenKey", JsonType::object),
+    ""
+  );
+  if (const JsonValue* token_keys = optional_object_value(object, "tokenKeys")) {
+    bootstrap.token_keys = parse_token_key_set_object(*token_keys);
+  }
+  bootstrap.has_token_keys = optional_object_bool(object, "hasTokenKeys", false);
+  return bootstrap;
+}
+
 LoginResponse LicenseClientWin::parse_login_response(const ApiEnvelope& envelope) {
   if (!envelope.ok) {
     throw_api_exception(envelope, "Login request failed.");
@@ -1298,6 +1324,16 @@ ClientNoticesResponse LicenseClientWin::notices_http_parsed(const ClientNoticesR
 ClientStartupBootstrapResponse LicenseClientWin::startup_bootstrap_http(
   const ClientStartupBootstrapRequest& request
 ) const {
+  try {
+    return parse_startup_bootstrap_response(parse_api_envelope(
+      http_.post_json(make_signed_http_request("/api/client/startup-bootstrap", to_json(request)))
+    ));
+  } catch (const ApiException& error) {
+    if (error.status() != 404 && error.code() != "NOT_FOUND") {
+      throw;
+    }
+  }
+
   ClientStartupBootstrapResponse response;
   response.version_manifest = version_check_http_parsed(ClientVersionCheckRequest{
     request.product_code,
@@ -1705,6 +1741,20 @@ std::string LicenseClientWin::to_json(const ClientNoticesRequest& request) {
   if (!request.channel.empty()) {
     stream << "," << build_json_pair("channel", request.channel);
   }
+  stream << "}";
+  return stream.str();
+}
+
+std::string LicenseClientWin::to_json(const ClientStartupBootstrapRequest& request) {
+  std::ostringstream stream;
+  stream
+    << "{"
+    << build_json_pair("productCode", require_not_empty("productCode", request.product_code)) << ","
+    << build_json_pair("clientVersion", require_not_empty("clientVersion", request.client_version));
+  if (!request.channel.empty()) {
+    stream << "," << build_json_pair("channel", request.channel);
+  }
+  stream << ",\"includeTokenKeys\":" << json_bool_literal(request.include_token_keys);
   stream << "}";
   return stream.str();
 }

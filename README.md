@@ -271,6 +271,7 @@ npm run db:postgres:check
 - `POST /api/client/login`
 - `POST /api/client/bindings`
 - `POST /api/client/unbind`
+- `POST /api/client/startup-bootstrap`
 - `POST /api/client/version-check`
 - `POST /api/client/notices`
 - `POST /api/client/heartbeat`

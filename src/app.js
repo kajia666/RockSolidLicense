@@ -1949,6 +1949,19 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/client/startup-bootstrap") {
+        const { body, raw } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.clientStartupBootstrap(
+            { headers: req.headers, method: req.method, path: url.pathname },
+            body,
+            raw
+          )
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/client/bindings") {
         const { body, raw } = await readJsonBody(req);
         sendJson(res, 200, {

@@ -38,6 +38,8 @@
           <label>Project Code<select id="project-select"></select></label>
           <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
+          <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace or release handoff check with the same project prefilled.</div>
         </article>
 
         <article class="card">
@@ -120,6 +122,10 @@
     <script src="/assets/product-features.js"></script>
     <script>
       const FEATURE_ENTRIES = window.RSProductFeatures.entries;
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
       let token = "";
       let snapshot = null;
       let selectedProduct = null;
@@ -207,6 +213,28 @@
       function downloadFileNameFromHeaders(headerValue, fallback) {
         const match = /filename="?([^";]+)"?/i.exec(headerValue || "");
         return match?.[1] || fallback;
+      }
+
+      function buildRouteQuery(params = {}) {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && String(value).trim() !== "") {
+            query.set(key, String(value).trim());
+          }
+        });
+        const text = query.toString();
+        return text ? `?${text}` : "";
+      }
+
+      function buildWorkspaceUrl(path, params = {}) {
+        return `${path}${buildRouteQuery(params)}`;
+      }
+
+      function findRequestedProduct(items = []) {
+        const requestedCode = requestedProductCode.toUpperCase();
+        return items.find((item) => item.id === requestedProductId)
+          || items.find((item) => String(item.code || "").toUpperCase() === requestedCode)
+          || null;
       }
 
       async function downloadApiFile(path, fallbackFileName) {
@@ -338,7 +366,10 @@
           });
         }
 
-        if (!selectedProduct || !items.find((item) => item.id === selectedProduct.id)) {
+        const requestedProduct = findRequestedProduct(items);
+        if (requestedProduct) {
+          selectedProduct = requestedProduct;
+        } else if (!selectedProduct || !items.find((item) => item.id === selectedProduct.id)) {
           selectedProduct = items[0];
         }
         select.value = selectedProduct.id;
@@ -388,7 +419,7 @@ ${JSON.stringify({
     requestIp: "<client-ip>"
   },
   clientVersion: "1.0.0",
-  channel: "stable"
+  channel: requestedChannel
 }, null, 2)}`;
       }
 
@@ -403,7 +434,7 @@ ${JSON.stringify({
           || {
             productCode: product.code,
             clientVersion: "1.0.0",
-            channel: "stable",
+            channel: requestedChannel,
             includeTokenKeys: true
           };
 
@@ -432,7 +463,7 @@ ${JSON.stringify(request, null, 2)}`;
             deviceFingerprint: "machine-guid-hash",
             deviceProfile: { machineGuid: "machine-guid" },
             clientVersion: "1.0.0",
-            channel: "stable"
+            channel: requestedChannel
           }
         }, null, 2);
       }
@@ -507,6 +538,15 @@ ${JSON.stringify(request, null, 2)}`;
         el("download-package-zip-btn").disabled = disabled;
       }
 
+      function syncWorkspaceLinks(product = null) {
+        const hasProduct = Boolean(product);
+        el("open-project-workspace-btn").disabled = !hasProduct;
+        el("open-release-check-btn").disabled = !hasProduct;
+        el("workspace-link-hint").textContent = hasProduct
+          ? `Open ${product.code} in Developer Projects or Developer Releases with channel ${requestedChannel} already filled in.`
+          : "Select a project to jump into its settings workspace or release handoff check with the same project prefilled.";
+      }
+
       function renderSelected() {
         const product = selectedProduct;
         if (!product) {
@@ -518,6 +558,7 @@ ${JSON.stringify(request, null, 2)}`;
           packageSnapshot = null;
           renderPackage();
           syncPackageActions();
+          syncWorkspaceLinks(null);
           return;
         }
 
@@ -534,6 +575,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("http-example").textContent = buildHttpExample(product);
         el("tcp-example").textContent = buildTcpExample(product);
         syncPackageActions();
+        syncWorkspaceLinks(product);
       }
 
       function buildPackagePath(product) {
@@ -720,6 +762,30 @@ ${JSON.stringify(request, null, 2)}`;
         }
       });
 
+      el("open-project-workspace-btn").addEventListener("click", () => {
+        if (!selectedProduct) {
+          setStatus("Select a project before opening Developer Projects.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/projects", {
+          productId: selectedProduct.id,
+          productCode: selectedProduct.code
+        });
+      });
+
+      el("open-release-check-btn").addEventListener("click", () => {
+        if (!selectedProduct) {
+          setStatus("Select a project before opening Developer Releases.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/releases", {
+          productId: selectedProduct.id,
+          productCode: selectedProduct.code,
+          channel: requestedChannel,
+          autofocus: "package"
+        });
+      });
+
       clear();
       renderStats();
       renderTransport();
@@ -727,6 +793,7 @@ ${JSON.stringify(request, null, 2)}`;
       renderTokenKeys();
       renderPackage();
       syncPackageActions();
+      syncWorkspaceLinks(null);
     </script>
   </body>
 </html>

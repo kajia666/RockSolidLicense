@@ -11,6 +11,8 @@ It is designed to help software authors connect the SDK to their own software by
 - public token keys
 - example request payloads
 
+The page also accepts `productId`, `productCode`, and `channel` in the query string. That allows the project workspace or release workspace to open `/developer/integration` with the matching project already selected, and lets the integration page jump back to project settings or release readiness without losing the current project context.
+
 The page now also summarizes how many visible projects currently have each of the 7 product-level switches enabled:
 
 - `allowRegister`

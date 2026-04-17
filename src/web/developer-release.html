@@ -201,6 +201,10 @@
             <button id="generate-release-package-btn">Generate Release Package</button>
           </div>
           <div class="actions">
+            <button class="secondary" id="open-release-project-btn">Open Project Workspace</button>
+            <button class="secondary" id="open-release-integration-btn">Open Integration Package</button>
+          </div>
+          <div class="actions">
             <button class="secondary" id="download-release-package-json-btn">Download Package JSON</button>
             <button class="secondary" id="download-release-package-summary-btn">Download Summary</button>
             <button class="secondary" id="download-release-package-env-btn">Download Env Template</button>
@@ -209,6 +213,7 @@
             <button class="secondary" id="download-release-package-zip-btn">Download Zip Archive</button>
           </div>
           <div class="hint" id="release-package-hint">Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.</div>
+          <div class="hint" id="release-route-hint" style="margin-top:12px;">Open this page from the project or integration workspaces to prefill the selected project and channel.</div>
         </article>
 
         <article class="card">
@@ -380,6 +385,10 @@
     </main>
 
     <script>
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
       let token = "";
       let actor = null;
       let projects = [];
@@ -424,6 +433,10 @@
         return query ? `?${query}` : "";
       }
 
+      function buildWorkspaceUrl(path, params = {}) {
+        return `${path}${q(params)}`;
+      }
+
       function toBoolean(value) {
         return value === true || value === 1 || value === "true";
       }
@@ -454,12 +467,51 @@
         return date.toLocaleString("zh-CN", { hour12: false });
       }
 
+      function currentReleaseTarget() {
+        return {
+          productCode: el("package-product-code").value.trim() || el("filter-product-code").value.trim(),
+          channel: el("package-channel").value.trim() || el("filter-channel").value.trim() || requestedChannel
+        };
+      }
+
+      function currentReleaseProductId(productCode) {
+        const normalized = String(productCode || "").trim().toUpperCase();
+        if (!normalized) {
+          return "";
+        }
+        return projects.find((item) => item.id === requestedProductId && String(item.code || "").toUpperCase() === normalized)?.id
+          || projects.find((item) => String(item.code || "").toUpperCase() === normalized)?.id
+          || (requestedProductId && requestedProductCode.toUpperCase() === normalized ? requestedProductId : "");
+      }
+
+      function applyRoutePrefill() {
+        if (requestedProductCode) {
+          ["filter-product-code", "package-product-code", "version-product-code", "notice-product-code"].forEach((id) => {
+            el(id).value = requestedProductCode;
+          });
+        }
+        ["filter-channel", "package-channel", "version-channel", "notice-channel"].forEach((id) => {
+          el(id).value = requestedChannel;
+        });
+      }
+
+      function syncReleaseWorkspaceLinks() {
+        const target = currentReleaseTarget();
+        const hasProduct = Boolean(target.productCode);
+        el("open-release-project-btn").disabled = !hasProduct;
+        el("open-release-integration-btn").disabled = !hasProduct;
+        el("release-route-hint").textContent = hasProduct
+          ? `Release checks are prefilled for ${target.productCode} on ${target.channel}. Open Developer Projects or Developer Integration with the same project preserved.`
+          : "Open this page from the project or integration workspaces to prefill the selected project and channel.";
+      }
+
       function syncReleasePackageHint() {
         const productCode = el("package-product-code").value.trim();
         const channel = el("package-channel").value.trim() || "stable";
         el("release-package-hint").textContent = productCode
           ? `Generate the ${productCode} release handoff package for channel ${channel}, then download server-generated attachments for JSON, summary, env, or C++ quickstart.`
           : "Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.";
+        syncReleaseWorkspaceLinks();
       }
 
       function syncPermissions() {
@@ -912,6 +964,12 @@
         setStatus("Package selector synced from the current filters.");
       });
 
+      ["filter-product-code", "filter-channel", "package-product-code", "package-channel"].forEach((id) => {
+        el(id).addEventListener("input", () => {
+          syncReleasePackageHint();
+        });
+      });
+
       el("generate-release-package-btn").addEventListener("click", async () => {
         try {
           const data = await generateReleasePackage();
@@ -921,6 +979,31 @@
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
+      });
+
+      el("open-release-project-btn").addEventListener("click", () => {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          setStatus("Enter a project code before opening Developer Projects.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/projects", {
+          productId: currentReleaseProductId(target.productCode),
+          productCode: target.productCode
+        });
+      });
+
+      el("open-release-integration-btn").addEventListener("click", () => {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          setStatus("Enter a project code before opening Developer Integration.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/integration", {
+          productId: currentReleaseProductId(target.productCode),
+          productCode: target.productCode,
+          channel: target.channel
+        });
       });
 
       el("download-release-package-json-btn").addEventListener("click", async () => {
@@ -1096,6 +1179,7 @@
         }
       });
 
+      applyRoutePrefill();
       clearWorkspace();
       syncReleasePackageHint();
       syncPermissions();

@@ -4,6 +4,13 @@ The developer project workspace is available at `/developer/projects`.
 
 It is intended for software authors who need a dedicated place to manage project creation, project profile editing, project status changes, product-level feature toggles, and SDK signing credentials.
 
+The selected project detail card now also exposes direct handoff links into:
+
+- `/developer/integration?productId=...&productCode=...`
+- `/developer/releases?productId=...&productCode=...&channel=stable`
+
+`/developer/projects` also accepts `productId` or `productCode` in the query string so the page can reopen with the same project preselected.
+
 ## Scoped APIs
 
 - `GET /api/developer/products`

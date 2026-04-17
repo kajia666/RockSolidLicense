@@ -129,6 +129,11 @@
         <article class="card">
           <h2>Project Detail</h2>
           <div id="detail-box" class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>
+          <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
+            <button class="secondary" id="open-project-release-btn">Open Release Check</button>
+          </div>
+          <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces.</div>
         </article>
       </section>
 
@@ -141,6 +146,9 @@
     <script src="/assets/product-features.js"></script>
     <script>
       const FEATURE_KEYS = window.RSProductFeatures.keys;
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
 
       let token = "";
       let profile = null;
@@ -180,6 +188,28 @@
         return Number.isNaN(date.getTime())
           ? String(value)
           : date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function buildRouteQuery(params = {}) {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && String(value).trim() !== "") {
+            query.set(key, String(value).trim());
+          }
+        });
+        const text = query.toString();
+        return text ? `?${text}` : "";
+      }
+
+      function buildWorkspaceUrl(path, params = {}) {
+        return `${path}${buildRouteQuery(params)}`;
+      }
+
+      function findRequestedProduct(items = []) {
+        const requestedCode = requestedProductCode.toUpperCase();
+        return items.find((item) => item.id === requestedProductId)
+          || items.find((item) => String(item.code || "").toUpperCase() === requestedCode)
+          || null;
       }
 
       function tag(value, style = "") {
@@ -499,6 +529,7 @@
       function renderDetail(product = null) {
         if (!product) {
           el("detail-box").innerHTML = '<div class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>';
+          syncWorkspaceLinks(null);
           return;
         }
 
@@ -521,6 +552,16 @@
           <div class="hint" style="margin-top:14px;">Current featureConfig</div>
           <div style="margin-top:8px;">${renderFeatureDetails(features)}</div>
         `;
+        syncWorkspaceLinks(product);
+      }
+
+      function syncWorkspaceLinks(product = null) {
+        const hasProduct = Boolean(product);
+        el("open-project-integration-btn").disabled = !hasProduct;
+        el("open-project-release-btn").disabled = !hasProduct;
+        el("detail-navigation-hint").textContent = hasProduct
+          ? `Open ${product.code} in Developer Integration or Developer Releases with the same project already selected.`
+          : "Select a project to open its integration package or release handoff check in the dedicated workspaces.";
       }
 
       function setSelection(product = null) {
@@ -632,7 +673,10 @@
         dashboard = dashboardData || { summary: null, projects: [], generatedAt: null };
         pruneBatchSelection(products);
         renderProjects();
-        if (selectedProductId) {
+        const requestedProduct = findRequestedProduct(products);
+        if (requestedProduct) {
+          setSelection(requestedProduct);
+        } else if (selectedProductId) {
           setSelection(findVisibleProductById(selectedProductId));
         }
         setOutput({ products, dashboard });
@@ -992,12 +1036,41 @@
         }
       });
 
+      el("open-project-integration-btn").addEventListener("click", () => {
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          setStatus("Select a project before opening Developer Integration.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/integration", {
+          productId,
+          productCode
+        });
+      });
+
+      el("open-project-release-btn").addEventListener("click", () => {
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          setStatus("Select a project before opening Developer Releases.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/releases", {
+          productId,
+          productCode,
+          channel: "stable",
+          autofocus: "package"
+        });
+      });
+
       writeFeatureConfig("create", {});
       writeFeatureConfig("edit", {});
       writeFeatureConfig("batch", {});
       clearSession();
       renderProjects();
       renderStats();
+      syncWorkspaceLinks(null);
       syncStatusImpactHint("single-status-note", "active", 1);
       syncBatchSelectionUi();
       setOutput("Waiting for actions...");

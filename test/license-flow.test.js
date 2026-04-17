@@ -8878,6 +8878,9 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Select Visible/);
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
+    assert.match(html, /Open Integration Package/);
+    assert.match(html, /Open Release Check/);
+    assert.match(html, /window\.location\.search/);
     assert.match(html, /Save Project Profile/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
@@ -8986,6 +8989,9 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Download C\+\+/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
+    assert.match(html, /Open Project Workspace/);
+    assert.match(html, /Open Release Check/);
+    assert.match(html, /window\.location\.search/);
     assert.match(html, /Startup Bootstrap Preview/);
     assert.match(html, /Startup Bootstrap Example/);
     assert.match(html, /api\/client\/startup-bootstrap/);
@@ -9119,6 +9125,10 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip Archive/);
+    assert.match(html, /Open Project Workspace/);
+    assert.match(html, /Open Integration Package/);
+    assert.match(html, /release-route-hint/);
+    assert.match(html, /applyRoutePrefill/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

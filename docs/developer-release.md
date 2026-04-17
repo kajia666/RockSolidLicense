@@ -11,6 +11,8 @@ Route:
 
 - `/developer/releases`
 
+The page accepts `productId`, `productCode`, and `channel` in the query string so project or integration workflows can open `/developer/releases` with the current project already prefilled. The release package card also links back to the project workspace and integration workspace with the same project context preserved.
+
 ## Scoped APIs
 
 - `GET /api/developer/client-versions`

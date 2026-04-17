@@ -43,6 +43,8 @@ copy /Y sdk\examples\windows_client_demo.cpp "%CPP_ROOT%\examples\" >nul
 copy /Y sdk\examples\windows_host_skeleton_template.cpp "%CPP_ROOT%\examples\" >nul
 if exist "%CPP_ROOT%\examples\cmake_cpp_consumer" rmdir /s /q "%CPP_ROOT%\examples\cmake_cpp_consumer"
 xcopy /E /I /Y sdk\examples\cmake_cpp_consumer "%CPP_ROOT%\examples\cmake_cpp_consumer\" >nul
+if exist "%CPP_ROOT%\examples\cmake_cpp_host_consumer" rmdir /s /q "%CPP_ROOT%\examples\cmake_cpp_host_consumer"
+xcopy /E /I /Y sdk\examples\cmake_cpp_host_consumer "%CPP_ROOT%\examples\cmake_cpp_host_consumer\" >nul
 copy /Y sdk\WINDOWS_SDK_GUIDE.md "%CPP_ROOT%\docs\" >nul
 copy /Y sdk\BUILD_WINDOWS.md "%CPP_ROOT%\docs\" >nul
 copy /Y sdk\CHANGELOG.md "%CPP_ROOT%\docs\" >nul

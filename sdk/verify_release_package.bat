@@ -42,6 +42,11 @@ if not exist "%CPP_ROOT%\examples\cmake_cpp_consumer\CMakeLists.txt" (
   goto :fail
 )
 
+if not exist "%CPP_ROOT%\examples\cmake_cpp_host_consumer\CMakeLists.txt" (
+  echo Missing packaged CMake C++ host consumer example at %CPP_ROOT%\examples\cmake_cpp_host_consumer
+  goto :fail
+)
+
 if not exist "%CAPI_ROOT%\examples\cmake_capi_consumer\CMakeLists.txt" (
   echo Missing packaged CMake C API consumer example at %CAPI_ROOT%\examples\cmake_capi_consumer
   goto :fail
@@ -137,6 +142,12 @@ mkdir "%VERIFY_ROOT%\cmake-capi-validate" 2>nul
 >>"%VERIFY_ROOT%\cmake-cpp-validate\CMakeLists.txt" echo endif()
 
 "%CMAKE_EXE%" -S "%VERIFY_ROOT%\cmake-cpp-validate" -B "%VERIFY_ROOT%\cmake-cpp-validate-build" -G "NMake Makefiles"
+if errorlevel 1 goto :fail
+
+"%CMAKE_EXE%" -S "%CPP_ROOT%\examples\cmake_cpp_host_consumer" -B "%VERIFY_ROOT%\cmake-cpp-host-consumer-build" -G "NMake Makefiles"
+if errorlevel 1 goto :fail
+
+"%CMAKE_EXE%" --build "%VERIFY_ROOT%\cmake-cpp-host-consumer-build"
 if errorlevel 1 goto :fail
 
 > "%VERIFY_ROOT%\cmake-capi-validate\CMakeLists.txt" echo cmake_minimum_required(VERSION 3.20)

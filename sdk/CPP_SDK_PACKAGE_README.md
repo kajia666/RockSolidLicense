@@ -8,6 +8,7 @@ This package is for software authors who want the full Windows C++ SDK.
 - `lib/rocksolid_sdk_static.lib`: full C++ static library
 - `examples/windows_client_demo.cpp`: high-level client example
 - `examples/windows_host_skeleton_template.cpp`: host-app startup/login/heartbeat skeleton
+- `examples/cmake_cpp_host_consumer/`: ready-to-adapt CMake host-app project skeleton
 - `docs/WINDOWS_SDK_GUIDE.md`: SDK guide
 - `docs/BUILD_WINDOWS.md`: build instructions
 - `docs/CHANGELOG.md`: SDK release notes
@@ -43,4 +44,5 @@ cl /nologo /EHsc /std:c++17 /DRS_SDK_STATIC ^
 - Use the high-level HTTP and TCP flows for login, heartbeat, notices, version checks, bindings, and self-unbind.
 - Validate `licenseToken` locally and optionally persist startup cache data for short outage recovery.
 - Start from `examples/windows_host_skeleton_template.cpp` when you want a host-app-oriented baseline instead of a demo-only sample.
+- Start from `examples/cmake_cpp_host_consumer/` when you want a minimal `find_package(...)` project that already wires the host skeleton flow into a standalone executable.
 - If you use CMake, point `find_package(RockSolidSDK CONFIG REQUIRED)` at the packaged `cmake/` directory and link `RockSolidSDK::cpp_static`.

@@ -1266,6 +1266,54 @@
         };
       }
 
+      function buildAdminFollowUpImpactBits(focus = null) {
+        const item = focus?.item || {};
+        const kind = String(focus?.kind || "").trim().toLowerCase();
+        const bits = [];
+        if (kind === "account") {
+          if (item.issueCount !== null && item.issueCount !== undefined) {
+            bits.push(`issues=${Number(item.issueCount || 0)}`);
+          }
+          if (Number(item.activeSessionCount || 0) > 0) {
+            bits.push(`sessions=${Number(item.activeSessionCount)}`);
+          }
+          if (Number(item.activeEntitlementCount || 0) > 0) {
+            bits.push(`entitlements=${Number(item.activeEntitlementCount)}`);
+          }
+          return bits;
+        }
+        if (kind === "session") {
+          if (item.status) {
+            bits.push(`status=${item.status}`);
+          }
+          if (item.deviceName || item.fingerprint) {
+            bits.push(`device=${item.deviceName || shortText(item.fingerprint, 18)}`);
+          }
+          return bits;
+        }
+        if (kind === "device") {
+          if (item.kind) {
+            bits.push(`kind=${item.kind}`);
+          }
+          if (item.status) {
+            bits.push(`status=${item.status}`);
+          }
+          if (Number(item.relatedSessionCount || 0) > 0) {
+            bits.push(`sessions=${Number(item.relatedSessionCount)}`);
+          }
+          return bits;
+        }
+        if (kind === "entitlement") {
+          if (item.status) {
+            bits.push(`status=${item.status}`);
+          }
+          if (item.remainingPoints !== null && item.remainingPoints !== undefined) {
+            bits.push(`points=${item.remainingPoints}`);
+          }
+        }
+        return bits;
+      }
+
       function buildAdminMutationFollowUp(comparison = {}, focus = null, focusedPanel = "", snapshotHits = []) {
         const after = comparison?.after || {};
         const severityRank = Number(after.maxSeverityRank || 0);
@@ -1273,12 +1321,15 @@
         const recommendedLabel = focus?.item?.recommendedControl?.label || "";
         const actionHint = focus?.item?.actionHint || focus?.item?.nextAction || "";
         const actionTarget = recommendedLabel || actionHint || (focusedPanel ? `return to ${focusedPanel}` : "review the current focus context");
+        const impactBits = buildAdminFollowUpImpactBits(focus);
+        const impactSummary = impactBits.length ? `Impact: ${impactBits.join(", ")}.` : "";
         if (severityRank === 0 && queuePosition === null) {
           return {
             priority: "clear",
             label: "Close Out",
             tone: "ok",
-            hint: "No active focus signal remains for this object. You can close the loop now or keep it in routine monitoring.",
+            impactBits,
+            hint: `No active focus signal remains for this object. ${impactSummary ? `${impactSummary} ` : ""}You can close the loop now or keep it in routine monitoring.`,
             primaryAction: "refresh_snapshot",
             primaryLabel: "Refresh Snapshot"
           };
@@ -1293,7 +1344,8 @@
             priority: "urgent",
             label: "Escalate",
             tone: "danger",
-            hint: `The object is still in a high-priority state. ${actionTarget ? `Next: ${actionTarget}.` : "A stronger operator action is recommended now."}`,
+            impactBits,
+            hint: `The object is still in a high-priority state. ${impactSummary ? `${impactSummary} ` : ""}${actionTarget ? `Next: ${actionTarget}.` : "A stronger operator action is recommended now."}`,
             primaryAction: focusedPanel ? "jump_control" : "reapply_focus",
             primaryLabel: focusedPanel ? "Open Escalation Control" : "Reopen Focus",
             secondaryAction: "reapply_focus",
@@ -1309,7 +1361,8 @@
             priority: "follow-up",
             label: "Follow Up",
             tone: "warning",
-            hint: `The object still needs operator follow-up. ${actionTarget ? `Next: ${actionTarget}.` : "Review the refreshed focus details before closing the incident."}`,
+            impactBits,
+            hint: `The object still needs operator follow-up. ${impactSummary ? `${impactSummary} ` : ""}${actionTarget ? `Next: ${actionTarget}.` : "Review the refreshed focus details before closing the incident."}`,
             primaryAction: "reapply_focus",
             primaryLabel: "Continue Follow-up",
             secondaryAction: focusedPanel ? "jump_control" : "refresh_snapshot",
@@ -1320,7 +1373,8 @@
           priority: "monitor",
           label: "Monitor",
           tone: "warning",
-          hint: `The risk looks lower, but the object still appears in the snapshot. ${actionTarget ? `Keep ${actionTarget} ready while monitoring.` : "Keep the object under observation."}`,
+          impactBits,
+          hint: `The risk looks lower, but the object still appears in the snapshot. ${impactSummary ? `${impactSummary} ` : ""}${actionTarget ? `Keep ${actionTarget} ready while monitoring.` : "Keep the object under observation."}`,
           primaryAction: "reapply_focus",
           primaryLabel: "Keep Focus Loaded",
           secondaryAction: "refresh_snapshot",
@@ -1476,7 +1530,8 @@
         ].filter(Boolean).join("");
         const followUpTags = [
           adminLastMutation.followUp?.label ? `<span class="tag ${escapeHtml(adminLastMutation.followUp.tone || "")}">${escapeHtml(adminLastMutation.followUp.label)}</span>` : "",
-          adminLastMutation.followUp?.priority ? `<span class="tag">follow-up:${escapeHtml(adminLastMutation.followUp.priority)}</span>` : ""
+          adminLastMutation.followUp?.priority ? `<span class="tag">follow-up:${escapeHtml(adminLastMutation.followUp.priority)}</span>` : "",
+          ...(Array.isArray(adminLastMutation.followUp?.impactBits) ? adminLastMutation.followUp.impactBits.map((item) => `<span class="tag">${escapeHtml(item)}</span>`) : [])
         ].filter(Boolean).join("");
         const followUpButtons = [
           adminLastMutation.followUp?.primaryAction

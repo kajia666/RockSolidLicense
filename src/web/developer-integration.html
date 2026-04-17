@@ -12,12 +12,12 @@
     <main class="shell">
       <section class="hero">
         <h1>Developer Integration Center</h1>
-        <p class="sub">Centralize project credentials, public token keys, HTTP/TCP endpoint information, and ready-to-adapt request examples for software authors integrating the SDK.</p>
+        <p class="sub">Centralize project credentials, public token keys, startup bootstrap behavior, HTTP/TCP endpoint information, and ready-to-adapt request examples for software authors integrating the SDK.</p>
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/integration</code></div>
           <div class="pill">APIs: <code>/api/developer/integration</code>, <code>/api/developer/integration/package</code>, <code>/api/developer/integration/package/download</code></div>
-          <div class="pill">Includes scoped projects, token keys, and transport bootstrap data.</div>
+          <div class="pill">Includes scoped projects, token keys, transport data, and a default startup bootstrap preview.</div>
         </div>
         <div class="stats" id="stats-box"></div>
         <div class="pill-row" id="feature-summary-box"></div>
@@ -59,11 +59,22 @@
 
       <section class="wide">
         <article class="card">
+          <h2>Startup Bootstrap Preview</h2>
+          <div id="startup-preview" class="hint">Select a project to inspect the default startup bootstrap decision.</div>
+        </article>
+        <article class="card">
+          <h2>Startup Bootstrap Example</h2>
+          <pre id="startup-example">Select a project to generate a startup bootstrap request.</pre>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
           <h2>Token Keys</h2>
           <div class="table-wrap"><table><thead><tr><th>Key</th><th>Status</th><th>Fingerprint</th><th>Created</th></tr></thead><tbody id="token-keys-body"></tbody></table></div>
         </article>
         <article class="card">
-          <h2>HTTP Example</h2>
+          <h2>Login Example</h2>
           <pre id="http-example">Sign in to generate an example request.</pre>
         </article>
       </section>
@@ -381,6 +392,31 @@ ${JSON.stringify({
 }, null, 2)}`;
       }
 
+      function buildStartupExample(product) {
+        if (!product || !snapshot) {
+          return "Select a project to generate a startup bootstrap request.";
+        }
+
+        const base = snapshot.transport?.http?.baseUrl || "http://127.0.0.1:3000";
+        const request = packageSnapshot?.manifest?.startupPreview?.request
+          || packageSnapshot?.manifest?.startupDefaults
+          || {
+            productCode: product.code,
+            clientVersion: "1.0.0",
+            channel: "stable",
+            includeTokenKeys: true
+          };
+
+        return `POST ${base}/api/client/startup-bootstrap
+Headers:
+  x-rs-app-id: ${product.sdkAppId}
+  x-rs-timestamp: 1713024000
+  x-rs-nonce: random-16-bytes
+  x-rs-signature: <HMAC-SHA256 of raw body>
+Body:
+${JSON.stringify(request, null, 2)}`;
+      }
+
       function buildTcpExample(product) {
         if (!product || !snapshot) {
           return "Sign in to generate a TCP frame example.";
@@ -406,12 +442,59 @@ ${JSON.stringify({
           el("package-json").textContent = "Select a project to generate an integration package.";
           el("cpp-snippet").textContent = "Select a project to generate a C++ quickstart snippet.";
           el("env-snippet").textContent = "Select a project to generate an environment template.";
+          el("startup-preview").textContent = selectedProduct
+            ? "Refresh the integration package to inspect the current startup bootstrap decision."
+            : "Select a project to inspect the default startup bootstrap decision.";
+          el("startup-example").textContent = selectedProduct
+            ? buildStartupExample(selectedProduct)
+            : "Select a project to generate a startup bootstrap request.";
           return;
         }
 
         el("package-json").textContent = JSON.stringify(packageSnapshot, null, 2);
         el("cpp-snippet").textContent = packageSnapshot.snippets?.cppQuickstart || "";
         el("env-snippet").textContent = packageSnapshot.snippets?.envTemplate || "";
+        renderStartupPreview();
+      }
+
+      function renderStartupPreview() {
+        const preview = packageSnapshot?.manifest?.startupPreview || null;
+        if (!preview) {
+          el("startup-preview").textContent = selectedProduct
+            ? "Refresh the integration package to inspect the current startup bootstrap decision."
+            : "Select a project to inspect the default startup bootstrap decision.";
+          el("startup-example").textContent = selectedProduct
+            ? buildStartupExample(selectedProduct)
+            : "Select a project to generate a startup bootstrap request.";
+          return;
+        }
+
+        const request = preview.request || {};
+        const runtimeChecks = preview.runtimeChecks || {};
+        const decision = preview.decision || {};
+        const noticeSummary = preview.noticeSummary || {};
+        const tokenKeySummary = preview.tokenKeySummary || {};
+        const versionManifest = preview.expectedResponse?.versionManifest || {};
+        const expectedError = preview.expectedError || null;
+        const workflow = Array.isArray(preview.workflow) ? preview.workflow : [];
+
+        el("startup-preview").innerHTML = `
+          <div style="margin-bottom:10px;">
+            ${tag(decision.ready ? "ready" : "needs attention", decision.ready)}
+            ${tag(decision.status || "unknown", decision.ready)}
+            ${runtimeChecks.projectActive ? tag("project active", true) : tag(`project ${runtimeChecks.projectStatus || "inactive"}`, false)}
+          </div>
+          <div class="split-line"><span>Default Request</span><span>${esc(request.clientVersion || "-")} | ${esc(request.channel || "-")} | keys=${esc(String(request.includeTokenKeys !== false))}</span></div>
+          <div class="split-line"><span>Version Rule</span><span>${esc(versionManifest.status || "n/a")} | latest ${esc(versionManifest.latestVersion || "-")}</span></div>
+          <div class="split-line"><span>Notices</span><span>${esc(noticeSummary.total ?? 0)} active | ${esc(noticeSummary.blockingTotal ?? 0)} blocking</span></div>
+          <div class="split-line"><span>Token Keys</span><span>${esc(String(tokenKeySummary.hasTokenKeys ?? false))} | ${esc(tokenKeySummary.totalKeys ?? 0)} public</span></div>
+          <div class="hint" style="margin-top:12px;">${esc(decision.message || "No startup decision summary available yet.")}</div>
+          <div class="hint" style="margin-top:10px;">Recommended action: ${esc(decision.recommendedAction || "Review the package JSON for the full startup payload.")}</div>
+          ${expectedError ? `<div class="hint" style="margin-top:10px;">Current runtime call result: ${esc(expectedError.code)} (${esc(expectedError.status)})</div>` : ""}
+          ${versionManifest.latestDownloadUrl ? `<div class="hint" style="margin-top:10px;">Latest download URL: <span class="mono">${esc(versionManifest.latestDownloadUrl)}</span></div>` : ""}
+          ${workflow.length ? `<div class="hint" style="margin-top:12px;">${workflow.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
+        `;
+        el("startup-example").textContent = buildStartupExample(selectedProduct);
       }
 
       function syncPackageActions() {
@@ -428,6 +511,8 @@ ${JSON.stringify({
         const product = selectedProduct;
         if (!product) {
           el("project-detail").innerHTML = '<div class="hint">Select a project to inspect credentials and feature toggles.</div>';
+          el("startup-preview").textContent = "Select a project to inspect the default startup bootstrap decision.";
+          el("startup-example").textContent = "Select a project to generate a startup bootstrap request.";
           el("http-example").textContent = "Sign in to generate an example request.";
           el("tcp-example").textContent = "Sign in to generate a TCP frame example.";
           packageSnapshot = null;
@@ -445,6 +530,7 @@ ${JSON.stringify({
           <div class="hint" style="margin-top:14px;">Feature toggles</div>
           <div style="margin-top:8px;">${renderFeatureTags(features)}</div>
         `;
+        el("startup-example").textContent = buildStartupExample(product);
         el("http-example").textContent = buildHttpExample(product);
         el("tcp-example").textContent = buildTcpExample(product);
         syncPackageActions();

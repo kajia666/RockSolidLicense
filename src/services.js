@@ -592,18 +592,245 @@ const std::string channel = "stable";
 
 const rocksolid::ClientStartupBootstrapResponse startup =
   client.startup_bootstrap_http({ product_code, client_version, channel, true });
+const rocksolid::ClientStartupDecision startup_decision =
+  rocksolid::LicenseClientWin::evaluate_startup_decision(startup);
 
-rocksolid::LoginRequest login_request{
-  product_code,
-  "demo_user",
-  "demo_password",
-  client.generate_device_fingerprint(),
-  "Demo Workstation",
-  client_version,
-  channel
-};
+if (!startup_decision.allow_login) {
+  // Show startup_decision.primary_title / primary_message and skip login here.
+} else {
+  rocksolid::LoginRequest login_request{
+    product_code,
+    "demo_user",
+    "demo_password",
+    client.generate_device_fingerprint(),
+    "Demo Workstation",
+    client_version,
+    channel
+  };
 
-const rocksolid::LoginResponse login_result = client.login_http_parsed(login_request);`;
+  const rocksolid::LoginResponse login_result = client.login_http_parsed(login_request);
+}`;
+}
+
+function buildIntegrationStartupWorkflow({
+  projectActive,
+  featureConfig,
+  versionManifest,
+  activeNoticeRows = [],
+  blockingNoticeRows = [],
+  includeTokenKeys = true
+}) {
+  const workflow = [
+    "Call POST /api/client/startup-bootstrap before showing login or recharge UI."
+  ];
+
+  if (!projectActive) {
+    workflow.push("Re-enable the project first, because inactive projects reject startup requests.");
+  } else if (featureConfig.allowVersionCheck !== false) {
+    if (versionManifest?.allowed === false) {
+      workflow.push("Block local login when versionManifest.allowed is false or a force update is required.");
+    } else if (versionManifest?.status === "upgrade_recommended") {
+      workflow.push("Show a non-blocking upgrade prompt when startup reports upgrade_recommended.");
+    } else {
+      workflow.push("Continue to login when versionManifest.allowed stays true.");
+    }
+  } else {
+    workflow.push("Version gating is currently disabled for this project, so startup will not block by version.");
+  }
+
+  if (featureConfig.allowNotices !== false) {
+    if (blockingNoticeRows.length) {
+      workflow.push("Display the blocking maintenance notice immediately and keep login disabled until it is cleared.");
+    } else if (activeNoticeRows.length) {
+      workflow.push("Render the returned startup notices before login so users see current announcements.");
+    } else {
+      workflow.push("No active startup notices are configured for the default channel right now.");
+    }
+  } else {
+    workflow.push("Startup notices are currently disabled for this project.");
+  }
+
+  if (includeTokenKeys) {
+    workflow.push("Cache the returned public token keys so the client can verify licenseToken signatures locally.");
+  } else {
+    workflow.push("Request token keys during startup if the client also needs local licenseToken verification.");
+  }
+
+  return workflow;
+}
+
+async function buildIntegrationStartupPreviewPayload(
+  db,
+  store,
+  product,
+  tokenKeys,
+  startupRequest = {}
+) {
+  const request = {
+    productCode: product.code,
+    clientVersion: String(startupRequest.clientVersion ?? "1.0.0").trim() || "1.0.0",
+    channel: normalizeChannel(startupRequest.channel, "stable"),
+    includeTokenKeys: startupRequest.includeTokenKeys !== false
+  };
+  const featureConfig = snapshotManagedProductFeatureConfig(resolveProductFeatureConfig(db, product));
+  const projectActive = (product.status ?? "active") === "active";
+  const versionManifest = featureConfig.allowVersionCheck !== false
+    ? await buildVersionManifest(db, store, product, request.clientVersion, request.channel)
+    : buildDisabledVersionManifest(product, request.clientVersion, request.channel);
+  const activeNoticeRows = featureConfig.allowNotices !== false
+    ? await activeNoticesForProduct(db, store, product.id, request.channel)
+    : [];
+  const notices = featureConfig.allowNotices !== false
+    ? {
+        productCode: product.code,
+        channel: normalizeNoticeChannel(request.channel, "stable"),
+        enabled: true,
+        status: "enabled",
+        message: activeNoticeRows.length
+          ? "Active notices loaded."
+          : "No active notices for the default startup channel.",
+        notices: activeNoticeRows
+      }
+    : buildDisabledNoticeManifest(product, request.channel);
+  const blockingNoticeRows = activeNoticeRows.filter((item) => item.blockLogin);
+  const totalPublicKeys = Array.isArray(tokenKeys?.keys) ? tokenKeys.keys.length : 0;
+  const hasTokenKeys = request.includeTokenKeys && totalPublicKeys > 0;
+  const activeTokenKey = Array.isArray(tokenKeys?.keys)
+    ? (
+        tokenKeys.keys.find((entry) => entry.keyId === tokenKeys.activeKeyId)
+        || tokenKeys.keys.find((entry) => entry.status === "active")
+        || tokenKeys.keys[0]
+        || null
+      )
+    : null;
+
+  let status = "ready";
+  let ready = true;
+  let message = "Startup bootstrap is ready to continue into login for the default request.";
+  let recommendedAction = "Call startup-bootstrap during app launch and enforce the returned result before local login.";
+
+  if (!projectActive) {
+    status = "project_inactive";
+    ready = false;
+    message = "This project is not active, so startup-bootstrap requests are rejected until the project is re-enabled.";
+    recommendedAction = "Switch the project back to active before shipping or testing the client startup flow.";
+  } else if (featureConfig.allowVersionCheck !== false && versionManifest?.allowed === false) {
+    status = versionManifest.status || "version_blocked";
+    ready = false;
+    message = versionManifest.message || "The default startup version would be rejected by the current version policy.";
+    recommendedAction = versionManifest.latestDownloadUrl
+      ? `Ship a compatible client build and direct users to ${versionManifest.latestDownloadUrl}.`
+      : "Ship a compatible client build or relax the force-update floor before opening login.";
+  } else if (featureConfig.allowNotices !== false && blockingNoticeRows.length) {
+    status = "blocking_notice";
+    ready = false;
+    message = `${blockingNoticeRows.length} blocking notice(s) are active for the default startup channel.`;
+    recommendedAction = "Archive or downgrade the blocking maintenance notice before letting users log in again.";
+  } else if (versionManifest?.status === "upgrade_recommended") {
+    status = "upgrade_recommended";
+    message = `Startup allows login, but the current preview version should recommend upgrading to ${versionManifest.latestVersion || "the latest build"}.`;
+    recommendedAction = "Show a non-blocking upgrade prompt and keep the latest download URL visible in the client shell.";
+  } else if (featureConfig.allowVersionCheck === false && featureConfig.allowNotices === false) {
+    status = "checks_disabled";
+    message = "Version rules and startup notices are both disabled for this project, so startup bootstrap will return informational disabled manifests only.";
+    recommendedAction = "Enable version rules or notices when you are ready to enforce upgrade guidance or maintenance messaging.";
+  } else if (featureConfig.allowVersionCheck === false) {
+    status = "version_check_disabled";
+    message = "Version rules are disabled for this project, so startup bootstrap will not block outdated clients right now.";
+    recommendedAction = "Enable version rules before rollout if this project should enforce minimum client versions.";
+  } else if (featureConfig.allowNotices === false) {
+    status = "notices_disabled";
+    message = "Startup notices are disabled for this project, so users will not receive announcements or maintenance windows during launch.";
+    recommendedAction = "Enable notices before rollout if this project needs startup announcements or maintenance blocking.";
+  } else if (activeNoticeRows.length) {
+    status = "ready_with_notices";
+    message = `${activeNoticeRows.length} active notice(s) will be returned during startup for the default channel.`;
+    recommendedAction = "Render the returned notices before login so users see the latest release notes or maintenance guidance.";
+  }
+
+  const expectedResponse = projectActive
+    ? buildClientStartupBootstrapPayload({
+        product,
+        clientVersion: request.clientVersion,
+        channel: request.channel,
+        versionManifest,
+        notices,
+        activeTokenKey,
+        tokenKeys: hasTokenKeys ? tokenKeys : null,
+        hasTokenKeys
+      })
+    : null;
+
+  return {
+    request,
+    featureConfig,
+    runtimeChecks: {
+      projectStatus: product.status,
+      projectActive,
+      versionCheckEnabled: featureConfig.allowVersionCheck !== false,
+      noticesEnabled: featureConfig.allowNotices !== false,
+      includeTokenKeys: request.includeTokenKeys
+    },
+    noticeSummary: {
+      total: activeNoticeRows.length,
+      blockingTotal: blockingNoticeRows.length
+    },
+    tokenKeySummary: {
+      hasTokenKeys,
+      activeKeyId: activeTokenKey?.keyId ?? tokenKeys?.activeKeyId ?? null,
+      totalKeys: totalPublicKeys
+    },
+    decision: {
+      ready,
+      status,
+      message,
+      recommendedAction
+    },
+    workflow: buildIntegrationStartupWorkflow({
+      projectActive,
+      featureConfig,
+      versionManifest,
+      activeNoticeRows,
+      blockingNoticeRows,
+      includeTokenKeys: request.includeTokenKeys
+    }),
+    expectedResponse,
+    expectedError: projectActive
+      ? null
+      : {
+          status: 404,
+          code: "PRODUCT_NOT_FOUND",
+          message: "Product does not exist or is inactive."
+        }
+  };
+}
+
+async function buildDeveloperIntegrationPackagePayloadAsync({
+  db,
+  store,
+  developer,
+  actor,
+  product,
+  transport,
+  signing,
+  tokenKeys,
+  examples,
+  includeOwner = false,
+  generatedAt = nowIso()
+}) {
+  const startupPreview = await buildIntegrationStartupPreviewPayload(db, store, product, tokenKeys);
+  return buildDeveloperIntegrationPackagePayload({
+    developer,
+    actor,
+    product,
+    transport,
+    signing,
+    tokenKeys,
+    examples,
+    includeOwner,
+    generatedAt,
+    startupPreview
+  });
 }
 
 function buildDeveloperIntegrationPackagePayload({
@@ -615,11 +842,18 @@ function buildDeveloperIntegrationPackagePayload({
   tokenKeys,
   examples,
   includeOwner = false,
-  generatedAt = nowIso()
+  generatedAt = nowIso(),
+  startupPreview = null
 }) {
   const ownerDeveloper = includeOwner
     ? buildOwnerDeveloperPayload(product?.ownerDeveloper ?? null)
     : undefined;
+  const startupDefaults = startupPreview?.request || {
+    productCode: product.code,
+    clientVersion: "1.0.0",
+    channel: "stable",
+    includeTokenKeys: true
+  };
   const manifest = {
     generatedAt,
     developer: developer ?? ownerDeveloper ?? null,
@@ -646,12 +880,8 @@ function buildDeveloperIntegrationPackagePayload({
     transport,
     signing,
     tokenKeys,
-    startupDefaults: {
-      productCode: product.code,
-      clientVersion: "1.0.0",
-      channel: "stable",
-      includeTokenKeys: true
-    },
+    startupDefaults,
+    startupPreview,
     examples,
     sdkDistribution: {
       languages: ["c", "cpp"],
@@ -8514,7 +8744,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const signing = buildIntegrationSigningSnapshot(config);
       const tokenKeys = this.tokenKeys();
       const examples = buildIntegrationExamples();
-      const items = products.map((product) => buildDeveloperIntegrationPackagePayload({
+      const items = await Promise.all(products.map((product) => buildDeveloperIntegrationPackagePayloadAsync({
+        db,
+        store,
         actor: buildAdminActorPayload(admin),
         product,
         transport,
@@ -8523,7 +8755,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         examples,
         includeOwner: true,
         generatedAt
-      }));
+      })));
       const payload = buildProductIntegrationPackageExportBundle(items, {
         generatedAt,
         actor: buildAdminActorPayload(admin),
@@ -8642,7 +8874,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
       const signing = buildIntegrationSigningSnapshot(config);
       const tokenKeys = this.tokenKeys();
-      return buildDeveloperIntegrationPackagePayload({
+      return await buildDeveloperIntegrationPackagePayloadAsync({
+        db,
+        store,
         developer: buildDeveloperIdentityPayload(session),
         actor: buildDeveloperActor(session),
         product,
@@ -8699,7 +8933,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const signing = buildIntegrationSigningSnapshot(config);
       const tokenKeys = this.tokenKeys();
       const examples = buildIntegrationExamples();
-      const integrationPackage = buildDeveloperIntegrationPackagePayload({
+      const integrationPackage = await buildDeveloperIntegrationPackagePayloadAsync({
+        db,
+        store,
         developer,
         actor,
         product,
@@ -9118,7 +9354,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const signing = buildIntegrationSigningSnapshot(config);
       const tokenKeys = this.tokenKeys();
       const examples = buildIntegrationExamples();
-      const items = products.map((product) => buildDeveloperIntegrationPackagePayload({
+      const items = await Promise.all(products.map((product) => buildDeveloperIntegrationPackagePayloadAsync({
+        db,
+        store,
         developer,
         actor,
         product,
@@ -9127,7 +9365,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         tokenKeys,
         examples,
         generatedAt
-      }));
+      })));
       const payload = buildProductIntegrationPackageExportBundle(items, {
         generatedAt,
         developer,

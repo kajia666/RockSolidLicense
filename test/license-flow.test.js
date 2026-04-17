@@ -8728,8 +8728,14 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.equal(byProductId.manifest.project.featureConfig.allowCardLogin, false);
     assert.equal(byProductId.manifest.credentials.sdkAppId, alphaProject.sdkAppId);
     assert.equal(byProductId.manifest.credentials.sdkAppSecret, alphaProject.sdkAppSecret);
+    assert.equal(byProductId.manifest.startupPreview.request.productCode, "EXPORT_ALPHA");
+    assert.equal(byProductId.manifest.startupPreview.expectedResponse.versionManifest.status, "no_version_rules");
+    assert.equal(byProductId.manifest.startupPreview.noticeSummary.blockingTotal, 0);
+    assert.equal(byProductId.manifest.startupPreview.tokenKeySummary.hasTokenKeys, true);
+    assert.equal(byProductId.manifest.startupPreview.decision.ready, true);
     assert.match(byProductId.snippets.cppQuickstart, /rocksolid::ClientIdentity/);
     assert.match(byProductId.snippets.cppQuickstart, /startup_bootstrap_http/);
+    assert.match(byProductId.snippets.cppQuickstart, /evaluate_startup_decision/);
     assert.match(byProductId.snippets.cppQuickstart, /EXPORT_ALPHA/);
     assert.match(byProductId.snippets.envTemplate, /RS_PROJECT_CODE=EXPORT_ALPHA/);
     assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_ID=/);
@@ -8960,6 +8966,9 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Download C\+\+/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
+    assert.match(html, /Startup Bootstrap Preview/);
+    assert.match(html, /Startup Bootstrap Example/);
+    assert.match(html, /api\/client\/startup-bootstrap/);
     assert.match(html, /C\+\+ Quickstart/);
     assert.match(html, /Environment Template/);
     assert.match(html, /x-rs-app-id/);

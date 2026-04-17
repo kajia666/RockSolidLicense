@@ -6,6 +6,7 @@ It is designed to help software authors connect the SDK to their own software by
 
 - scoped project credentials
 - product feature toggles
+- default startup bootstrap preview
 - HTTP and TCP listener information
 - public token keys
 - example request payloads
@@ -58,6 +59,7 @@ The package route returns:
 
 - `fileName`
 - `manifest`
+- `manifest.startupPreview`
 - `snippets.envFileName`
 - `snippets.envTemplate`
 - `snippets.cppFileName`
@@ -117,8 +119,10 @@ The page and API are useful when the software author needs to:
 
 - copy the correct `sdkAppId` and `sdkAppSecret`
 - confirm whether HTTP or TCP endpoints are enabled
+- inspect how the default `startup-bootstrap` call will behave before shipping a client build
 - fetch the current public key set used for `licenseToken` verification
 - adapt example register/login/card-login/heartbeat requests for their own client
+- adapt a dedicated `startup-bootstrap` request before showing the local login UI
 - confirm whether recharge and client-unbind are open for a scoped project before exposing those SDK flows
 - export a current project integration package after rotating `sdkAppSecret` or `sdkAppId`
 - download the current single-project integration package directly as JSON, `.env`, C++ quickstart, or one zip handoff bundle

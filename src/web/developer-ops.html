@@ -38,6 +38,7 @@
       tbody tr { cursor:pointer; } tbody tr:hover { background:rgba(15,124,104,.06); }
       .tag { display:inline-block; padding:4px 8px; border-radius:999px; background:rgba(24,31,27,.08); color:var(--muted); margin:0 6px 6px 0; }
       .tag.ok { background:rgba(15,124,104,.12); color:var(--accent); } .tag.danger { background:rgba(160,66,44,.12); color:var(--danger); }
+      .tag-button { border:1px solid rgba(24,31,27,.08); cursor:pointer; font:inherit; }
       .quick-filters { align-items:center; }
       .quick-filters button { padding:8px 12px; font-size:13px; }
       .audit-summary { display:grid; gap:6px; }
@@ -244,6 +245,48 @@
         return `<span class="${className}">${esc(text)}</span>`;
       }
 
+      function renderOverviewTags(items = [], keyName, kind) {
+        if (!Array.isArray(items) || !items.length) {
+          return `<span class="tag">none</span>`;
+        }
+        return items.map((item) => {
+          const value = String(item?.[keyName] ?? "").trim();
+          if (!value) {
+            return "";
+          }
+          return `<button type="button" class="tag tag-button" data-overview-kind="${esc(kind)}" data-overview-value="${esc(value)}">${esc(value)} x${esc(item.count ?? 0)}</button>`;
+        }).join("") || `<span class="tag">none</span>`;
+      }
+
+      async function applyOverviewAction(kind, value) {
+        const normalizedValue = String(value ?? "").trim();
+        if (!normalizedValue) {
+          return;
+        }
+        if (kind === "product") {
+          el("filter-product-code").value = normalizedValue;
+          el("block-product-code").value = normalizedValue;
+        }
+        if (kind === "event") {
+          el("filter-event-type").value = normalizedValue;
+        }
+        if (kind === "username") {
+          el("filter-username").value = normalizedValue;
+        }
+        if (kind === "reason") {
+          el("filter-search").value = normalizedValue;
+          el("reason").value = normalizedValue;
+        }
+        if (kind === "fingerprint") {
+          el("filter-search").value = normalizedValue;
+          el("block-fingerprint").value = normalizedValue;
+        }
+        if (token) {
+          await refreshOps();
+        }
+        setStatus(`Overview filter applied: ${normalizedValue}.`);
+      }
+
       function renderSnapshotOverview() {
         const statusBox = el("snapshot-overview-status");
         const box = el("snapshot-overview");
@@ -260,6 +303,9 @@
         const highlights = Array.isArray(overview.highlights) ? overview.highlights : [];
         const topAuditEvents = Array.isArray(overview.topAuditEvents) ? overview.topAuditEvents : [];
         const topProducts = Array.isArray(overview.topProducts) ? overview.topProducts : [];
+        const topReasons = Array.isArray(overview.topReasons) ? overview.topReasons : [];
+        const focusUsernames = Array.isArray(overview.focusUsernames) ? overview.focusUsernames : [];
+        const focusFingerprints = Array.isArray(overview.focusFingerprints) ? overview.focusFingerprints : [];
         const statusText = overview.status === "attention"
           ? "Needs attention"
           : overview.status === "empty"
@@ -283,13 +329,33 @@
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           <div>
             <div class="hint">Top audit events</div>
-            <div class="audit-meta">${topAuditEvents.length ? topAuditEvents.map((item) => `<span class="tag">${esc(item.eventType)} x${esc(item.count)}</span>`).join("") : `<span class="tag">none</span>`}</div>
+            <div class="audit-meta">${renderOverviewTags(topAuditEvents, "eventType", "event")}</div>
           </div>
           <div>
             <div class="hint">Top products</div>
-            <div class="audit-meta">${topProducts.length ? topProducts.map((item) => `<span class="tag">${esc(item.productCode)} x${esc(item.count)}</span>`).join("") : `<span class="tag">none</span>`}</div>
+            <div class="audit-meta">${renderOverviewTags(topProducts, "productCode", "product")}</div>
+          </div>
+          <div>
+            <div class="hint">Top reasons</div>
+            <div class="audit-meta">${renderOverviewTags(topReasons, "reason", "reason")}</div>
+          </div>
+          <div>
+            <div class="hint">Focus accounts</div>
+            <div class="audit-meta">${renderOverviewTags(focusUsernames, "username", "username")}</div>
+          </div>
+          <div>
+            <div class="hint">Focus devices</div>
+            <div class="audit-meta">${renderOverviewTags(focusFingerprints, "fingerprint", "fingerprint")}</div>
           </div>
         `;
+        bindRows("#snapshot-overview [data-overview-kind]", async (data) => {
+          try {
+            await applyOverviewAction(data.overviewKind, data.overviewValue);
+          } catch (error) {
+            setStatus(`${error.code}: ${error.message}`, true);
+            setOutput({ code:error.code, message:error.message });
+          }
+        });
       }
 
       function firstValue(values = []) {

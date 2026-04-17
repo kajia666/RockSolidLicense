@@ -1802,6 +1802,11 @@ function buildSnapshotTopCounts(items = [], selector, limit = 5) {
     .slice(0, limit);
 }
 
+function mapSnapshotTopCounts(items = [], selector, keyName, limit = 5) {
+  return buildSnapshotTopCounts(items, selector, limit)
+    .map(([value, count]) => ({ [keyName]: value, count }));
+}
+
 function buildSnapshotOverview({
   generatedAt = nowIso(),
   projects = [],
@@ -1839,7 +1844,7 @@ function buildSnapshotOverview({
 
   const topAuditEvents = buildSnapshotTopCounts(auditLogs, (item) => item?.eventType, 5)
     .map(([eventType, count]) => ({ eventType, count }));
-  const topProducts = buildSnapshotTopCounts(
+  const topProducts = mapSnapshotTopCounts(
     [
       ...projects.map((item) => ({ productCode: item?.code })),
       ...accounts,
@@ -1852,8 +1857,75 @@ function buildSnapshotOverview({
       }))
     ],
     (item) => item?.productCode,
+    "productCode",
     5
-  ).map(([productCode, count]) => ({ productCode, count }));
+  );
+  const topReasons = mapSnapshotTopCounts(
+    [
+      ...blocks.map((item) => ({ reason: item?.reason })),
+      ...sessions.map((item) => ({ reason: item?.revokedReason })),
+      ...auditLogs.map((item) => ({
+        reason: [
+          item?.metadata?.reason,
+          item?.metadata?.revokedReason,
+          item?.metadata?.releaseReason
+        ]
+      }))
+    ],
+    (item) => item?.reason,
+    "reason",
+    5
+  );
+  const focusUsernames = mapSnapshotTopCounts(
+    [
+      ...accounts
+        .filter((item) => normalizeSnapshotStatus(item?.status) === "disabled")
+        .map((item) => ({ username: item?.username })),
+      ...entitlements
+        .filter((item) => {
+          const lifecycleStatus = normalizeSnapshotStatus(item?.lifecycleStatus || item?.status);
+          return lifecycleStatus === "frozen"
+            || lifecycleStatus === "expired"
+            || (normalizeSnapshotStatus(item?.grantType || "duration") === "points" && Number(item?.remainingPoints || 0) <= 0);
+        })
+        .map((item) => ({ username: item?.username })),
+      ...sessions
+        .filter((item) => normalizeSnapshotStatus(item?.status) !== "active")
+        .map((item) => ({ username: item?.username })),
+      ...auditLogs.map((item) => ({
+        username: [
+          item?.metadata?.username,
+          item?.metadata?.tokenSubject,
+          item?.metadata?.redeemedUsername
+        ]
+      }))
+    ],
+    (item) => item?.username,
+    "username",
+    5
+  );
+  const focusFingerprints = mapSnapshotTopCounts(
+    [
+      ...blocks
+        .filter((item) => normalizeSnapshotStatus(item?.status) === "active")
+        .map((item) => ({ fingerprint: item?.fingerprint })),
+      ...bindings
+        .filter((item) => normalizeSnapshotStatus(item?.status) !== "active")
+        .map((item) => ({ fingerprint: item?.fingerprint })),
+      ...sessions
+        .filter((item) => normalizeSnapshotStatus(item?.status) !== "active")
+        .map((item) => ({ fingerprint: item?.fingerprint })),
+      ...auditLogs.map((item) => ({
+        fingerprint: [
+          item?.metadata?.deviceFingerprint,
+          item?.metadata?.fingerprint
+        ]
+      }))
+    ],
+    (item) => item?.fingerprint,
+    "fingerprint",
+    5
+  );
 
   const totalScopeItems = projects.length + accounts.length + entitlements.length + sessions.length + bindings.length + blocks.length + auditLogs.length;
   const attentionCount = metrics.inactiveProjects
@@ -1900,6 +1972,12 @@ function buildSnapshotOverview({
   if (topAuditEvents.length) {
     highlights.push(`Top audit events: ${topAuditEvents.slice(0, 3).map((item) => `${item.eventType} x${item.count}`).join(", ")}.`);
   }
+  if (topReasons.length) {
+    highlights.push(`Common reasons: ${topReasons.slice(0, 3).map((item) => `${item.reason} x${item.count}`).join(", ")}.`);
+  }
+  if (focusUsernames.length) {
+    highlights.push(`Focus usernames: ${focusUsernames.slice(0, 3).map((item) => `${item.username} x${item.count}`).join(", ")}.`);
+  }
   if (!highlights.length) {
     highlights.push("No obvious authorization anomalies were detected in the exported scope.");
   }
@@ -1913,7 +1991,10 @@ function buildSnapshotOverview({
     metrics,
     highlights,
     topAuditEvents,
-    topProducts
+    topProducts,
+    topReasons,
+    focusUsernames,
+    focusFingerprints
   };
 }
 
@@ -1961,6 +2042,24 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Top Audit Events:");
       for (const item of overview.topAuditEvents) {
         lines.push(`- ${item.eventType || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.topReasons) && overview.topReasons.length) {
+      lines.push("Top Reasons:");
+      for (const item of overview.topReasons) {
+        lines.push(`- ${item.reason || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.focusUsernames) && overview.focusUsernames.length) {
+      lines.push("Focus Usernames:");
+      for (const item of overview.focusUsernames) {
+        lines.push(`- ${item.username || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.focusFingerprints) && overview.focusFingerprints.length) {
+      lines.push("Focus Fingerprints:");
+      for (const item of overview.focusFingerprints) {
+        lines.push(`- ${item.fingerprint || "-"} x${item.count ?? 0}`);
       }
     }
   }
@@ -2217,6 +2316,24 @@ function buildAdminOpsSummaryText(payload = {}) {
       lines.push("Top Audit Events:");
       for (const item of overview.topAuditEvents) {
         lines.push(`- ${item.eventType || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.topReasons) && overview.topReasons.length) {
+      lines.push("Top Reasons:");
+      for (const item of overview.topReasons) {
+        lines.push(`- ${item.reason || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.focusUsernames) && overview.focusUsernames.length) {
+      lines.push("Focus Usernames:");
+      for (const item of overview.focusUsernames) {
+        lines.push(`- ${item.username || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.focusFingerprints) && overview.focusFingerprints.length) {
+      lines.push("Focus Fingerprints:");
+      for (const item of overview.focusFingerprints) {
+        lines.push(`- ${item.fingerprint || "-"} x${item.count ?? 0}`);
       }
     }
   }

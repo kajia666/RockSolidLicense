@@ -303,6 +303,12 @@
         color: var(--danger);
       }
 
+      .tag-button {
+        border: 1px solid rgba(23, 32, 27, 0.08);
+        cursor: pointer;
+        font: inherit;
+      }
+
       .audit-summary {
         display: grid;
         gap: 6px;
@@ -973,6 +979,54 @@
         setStatus("已回填审计筛选和相关操作对象，可继续读取日志或直接处理对应记录。");
       }
 
+      function renderOverviewTags(items = [], keyName, kind) {
+        if (!Array.isArray(items) || !items.length) {
+          return `<span class="tag">none</span>`;
+        }
+        return items.map((item) => {
+          const value = String(item?.[keyName] ?? "").trim();
+          if (!value) {
+            return "";
+          }
+          return `<button type="button" class="tag tag-button" data-overview-kind="${escapeHtml(kind)}" data-overview-value="${escapeHtml(value)}">${escapeHtml(value)} x${escapeHtml(item.count ?? 0)}</button>`;
+        }).join("") || `<span class="tag">none</span>`;
+      }
+
+      async function applyOpsOverviewAction(kind, value) {
+        const normalizedValue = String(value ?? "").trim();
+        if (!normalizedValue) {
+          return;
+        }
+        if (kind === "product") {
+          el("ops-product-code").value = normalizedValue;
+          el("block-product-code").value = normalizedValue;
+          if (el("version-product-code")) {
+            el("version-product-code").value = normalizedValue;
+          }
+        }
+        if (kind === "event") {
+          el("ops-event-type").value = normalizedValue;
+        }
+        if (kind === "username") {
+          el("ops-username").value = normalizedValue;
+        }
+        if (kind === "reason") {
+          el("ops-search").value = normalizedValue;
+          el("session-reason").value = normalizedValue;
+          el("binding-reason").value = normalizedValue;
+          el("block-reason").value = normalizedValue;
+          el("unblock-reason").value = normalizedValue;
+        }
+        if (kind === "fingerprint") {
+          el("ops-search").value = normalizedValue;
+          el("block-fingerprint").value = normalizedValue;
+        }
+        if (adminToken) {
+          await previewOpsExport();
+        }
+        setStatus(`已应用快照概览筛选：${normalizedValue}。`);
+      }
+
       function renderOpsPreviewSummary() {
         const statusBox = el("ops-preview-status");
         const box = el("ops-preview-summary");
@@ -988,6 +1042,9 @@
         const highlights = Array.isArray(overview.highlights) ? overview.highlights : [];
         const topAuditEvents = Array.isArray(overview.topAuditEvents) ? overview.topAuditEvents : [];
         const topProducts = Array.isArray(overview.topProducts) ? overview.topProducts : [];
+        const topReasons = Array.isArray(overview.topReasons) ? overview.topReasons : [];
+        const focusUsernames = Array.isArray(overview.focusUsernames) ? overview.focusUsernames : [];
+        const focusFingerprints = Array.isArray(overview.focusFingerprints) ? overview.focusFingerprints : [];
         const statusText = overview.status === "attention"
           ? "需要重点排查"
           : overview.status === "empty"
@@ -1011,13 +1068,28 @@
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : `<div class="hint">暂无额外概览提示。</div>`}</div>
           <div>
             <div class="hint">高频审计事件</div>
-            <div class="audit-meta">${topAuditEvents.length ? topAuditEvents.map((item) => `<span class="tag">${escapeHtml(item.eventType)} x${escapeHtml(item.count)}</span>`).join("") : `<span class="tag">none</span>`}</div>
+            <div class="audit-meta">${renderOverviewTags(topAuditEvents, "eventType", "event")}</div>
           </div>
           <div>
             <div class="hint">高频项目</div>
-            <div class="audit-meta">${topProducts.length ? topProducts.map((item) => `<span class="tag">${escapeHtml(item.productCode)} x${escapeHtml(item.count)}</span>`).join("") : `<span class="tag">none</span>`}</div>
+            <div class="audit-meta">${renderOverviewTags(topProducts, "productCode", "product")}</div>
+          </div>
+          <div>
+            <div class="hint">高频原因</div>
+            <div class="audit-meta">${renderOverviewTags(topReasons, "reason", "reason")}</div>
+          </div>
+          <div>
+            <div class="hint">重点账号</div>
+            <div class="audit-meta">${renderOverviewTags(focusUsernames, "username", "username")}</div>
+          </div>
+          <div>
+            <div class="hint">重点设备</div>
+            <div class="audit-meta">${renderOverviewTags(focusFingerprints, "fingerprint", "fingerprint")}</div>
           </div>
         `;
+        for (const action of box.querySelectorAll("[data-overview-kind]")) {
+          action.addEventListener("click", () => guarded(() => applyOpsOverviewAction(action.dataset.overviewKind, action.dataset.overviewValue)));
+        }
       }
 
       async function callApi(path, options = {}) {

@@ -249,10 +249,10 @@ Supported query parameters:
 Effects:
 
 - returns one admin-scoped snapshot that combines products, accounts, entitlements, sessions, bindings, blocks, and recent audit logs
-- the preview payload now also includes an `overview` block with headline, attention metrics, highlight bullets, and top audit-event counts for quicker incident triage
+- the preview payload now also includes an `overview` block with headline, attention metrics, highlight bullets, top audit-event counts, common reasons, and focus accounts/devices for quicker incident triage
 - when `productCode` is set, both the exported project list and the audit log view stay scoped to that one project
 - when `productCode` is omitted, the audit log view stays platform-wide so operators can capture cross-project incidents
-- `/admin` now exposes preview and download buttons for the same snapshot bundle, plus an overview card that surfaces the latest snapshot health before you hand it off
+- `/admin` now exposes preview and download buttons for the same snapshot bundle, plus an overview card whose tags can feed product, username, reason, or fingerprint filters back into the next preview
 
 ### Device bindings
 

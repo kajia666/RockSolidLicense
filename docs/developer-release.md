@@ -107,6 +107,7 @@ The release workspace can now generate a project-scoped release delivery package
 - the selected channel's version manifest
 - a release-specific startup bootstrap preview
 - a release readiness summary with blocking and attention checks
+- a delivery summary that condenses the main handoff points for software authors and release operators
 - active runtime notices that affect startup or login
 - ready-to-download `.env` and C/C++ quickstart snippets
 

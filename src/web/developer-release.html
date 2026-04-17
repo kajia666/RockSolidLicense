@@ -318,9 +318,14 @@
           <div id="release-readiness" class="hint">Generate a release package to evaluate whether the selected channel looks ready for rollout.</div>
         </article>
         <article class="card">
-          <h2>Package Summary</h2>
-          <pre id="release-summary">Generate a release package to preview its summary text here.</pre>
+          <h2>Delivery Summary</h2>
+          <div id="delivery-summary" class="hint">Generate a release package to see the handoff summary for software authors and release operators.</div>
         </article>
+      </section>
+
+      <section class="card">
+        <h2>Package Summary</h2>
+        <pre id="release-summary">Generate a release package to preview its summary text here.</pre>
       </section>
 
       <section class="table-grid">
@@ -544,11 +549,13 @@
       function renderReleaseReadiness() {
         if (!releasePackage) {
           el("release-readiness").textContent = "Generate a release package to evaluate whether the selected channel looks ready for rollout.";
+          el("delivery-summary").textContent = "Generate a release package to see the handoff summary for software authors and release operators.";
           el("release-summary").textContent = "Generate a release package to preview its summary text here.";
           return;
         }
 
         const readiness = releasePackage.manifest?.release?.readiness || {};
+        const deliverySummary = releasePackage.deliverySummary || releasePackage.manifest?.release?.deliverySummary || {};
         const startupPreview = releasePackage.manifest?.release?.startupPreview || {};
         const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
         const nextActions = Array.isArray(readiness.nextActions) ? readiness.nextActions : [];
@@ -569,6 +576,23 @@
           <div class="hint" style="margin-top:12px;">${escapeHtml(readiness.message || "No release readiness summary available.")}</div>
           ${checks.length ? `<div class="hint" style="margin-top:12px;">${checks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
+        `;
+        const handoffChecks = Array.isArray(deliverySummary.handoffChecks) ? deliverySummary.handoffChecks : [];
+        const deliveryActions = Array.isArray(deliverySummary.nextActions) ? deliverySummary.nextActions : [];
+        const artifacts = deliverySummary.artifacts || {};
+        el("delivery-summary").innerHTML = `
+          <div style="margin-bottom:10px;">
+            ${renderTag(deliverySummary.headline || deliverySummary.status || "summary", deliverySummary.status === "ready")}
+            ${renderTag(String(deliverySummary.status || "unknown").toUpperCase(), deliverySummary.status === "ready")}
+          </div>
+          <div class="split-line"><span>Candidate Version</span><span>${escapeHtml(deliverySummary.candidateVersion || "-")}</span></div>
+          <div class="split-line"><span>Startup Status</span><span>${escapeHtml(deliverySummary.startupStatus || "-")}</span></div>
+          <div class="split-line"><span>Active Key ID</span><span class="mono">${escapeHtml(deliverySummary.activeKeyId || "-")}</span></div>
+          <div class="split-line"><span>Artifacts</span><span>${escapeHtml(artifacts.packageJson || "-")} | ${escapeHtml(artifacts.packageSummary || "-")}</span></div>
+          <div class="hint" style="margin-top:12px;">${escapeHtml(deliverySummary.summary || "No delivery summary is available yet.")}</div>
+          ${deliverySummary.startupMessage ? `<div class="hint" style="margin-top:10px;">Startup: ${escapeHtml(deliverySummary.startupMessage)}</div>` : ""}
+          ${handoffChecks.length ? `<div class="hint" style="margin-top:12px;">${handoffChecks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
+          ${deliveryActions.length ? `<div class="hint" style="margin-top:12px;">Handoff actions:<br>${deliveryActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
         el("release-summary").textContent = releasePackage.summaryText || "";
       }

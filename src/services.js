@@ -1115,6 +1115,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
 function buildReleasePackageSummaryText(manifest = {}) {
   const project = manifest.project || {};
   const release = manifest.release || {};
+  const deliverySummary = release.deliverySummary || {};
   const versionManifest = release.versionManifest || {};
   const activeNotices = release.activeNotices || {};
   const readiness = release.readiness || {};
@@ -1134,6 +1135,18 @@ function buildReleasePackageSummaryText(manifest = {}) {
     `Release Message: ${readiness.message || "-"}`,
     ""
   ];
+
+  lines.push("Delivery Summary:");
+  lines.push(`- Headline: ${deliverySummary.headline || "-"}`);
+  lines.push(`- Candidate Version: ${deliverySummary.candidateVersion || "-"}`);
+  lines.push(`- Startup Status: ${deliverySummary.startupStatus || "-"}`);
+  lines.push(`- Active Key ID: ${deliverySummary.activeKeyId || "-"}`);
+  lines.push(`- Blocking Notices: ${deliverySummary.blockingNotices ?? 0}`);
+  lines.push(`- Summary: ${deliverySummary.summary || "-"}`);
+  if (deliverySummary.artifacts) {
+    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"}`);
+  }
+  lines.push("");
 
   const readinessChecks = Array.isArray(readiness.checks) ? readiness.checks : [];
   if (readinessChecks.length) {
@@ -1166,6 +1179,74 @@ function buildReleasePackageSummaryText(manifest = {}) {
   }
 
   return lines.join("\n");
+}
+
+function buildReleaseDeliverySummaryPayload({
+  product,
+  channel = "stable",
+  versionManifest,
+  activeNotices = [],
+  readiness = {},
+  integrationPackage = null,
+  releaseStartupPreview = null,
+  fileName,
+  summaryFileName,
+  envFileName,
+  cppFileName
+}) {
+  const latestVersion = versionManifest?.latestVersion || null;
+  const candidateVersion = readiness?.candidateVersion || latestVersion || null;
+  const activeKeyId = integrationPackage?.manifest?.signing?.activeKeyId
+    || releaseStartupPreview?.tokenKeySummary?.activeKeyId
+    || null;
+  const blockingNotices = activeNotices.filter((item) => item.blockLogin);
+  const startupStatus = releaseStartupPreview?.decision?.status || "unknown";
+  const startupMessage = releaseStartupPreview?.decision?.message || null;
+  let headline = `${product.code} ${channel} release summary`;
+  let summary = `Candidate version ${candidateVersion || "-"} is packaged for the ${channel} channel.`;
+
+  if (readiness?.status === "hold") {
+    headline = `${product.code} ${channel} should stay on hold`;
+    summary = `${blockingNotices.length || readiness.blockingChecks || 0} blocking item(s) should be resolved before rollout.`;
+  } else if (readiness?.status === "attention") {
+    headline = `${product.code} ${channel} can ship with attention`;
+    summary = `${readiness.attentionChecks || 0} non-blocking item(s) still deserve review before handoff.`;
+  } else if (readiness?.status === "ready") {
+    headline = `${product.code} ${channel} looks ready to ship`;
+    summary = `The release package looks ready for handoff with candidate version ${candidateVersion || "-"}.`;
+  }
+
+  return {
+    headline,
+    status: readiness?.status || "unknown",
+    summary,
+    projectCode: product.code,
+    channel,
+    candidateVersion,
+    latestVersion,
+    minimumAllowedVersion: versionManifest?.minimumAllowedVersion || null,
+    latestDownloadUrl: versionManifest?.latestDownloadUrl || null,
+    startupStatus,
+    startupMessage,
+    activeKeyId,
+    activeNotices: activeNotices.length,
+    blockingNotices: blockingNotices.length,
+    artifacts: {
+      packageJson: fileName || "release-package.json",
+      packageSummary: summaryFileName || "release-package.txt",
+      envTemplate: `snippets/${envFileName || "project.env"}`,
+      cppQuickstart: `snippets/${cppFileName || "project.cpp"}`
+    },
+    handoffChecks: Array.isArray(readiness?.checks)
+      ? readiness.checks.map((item) => ({
+          key: item.key,
+          label: item.label,
+          level: item.level,
+          summary: item.summary
+        }))
+      : [],
+    nextActions: Array.isArray(readiness?.nextActions) ? readiness.nextActions : []
+  };
 }
 
 function buildReleaseReadinessPayload({
@@ -1354,6 +1435,21 @@ function buildReleasePackagePayload({
   });
   const envFileName = `${product.code}.env`;
   const cppFileName = `${product.code}.cpp`;
+  const fileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.json`;
+  const summaryFileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.txt`;
+  const deliverySummary = buildReleaseDeliverySummaryPayload({
+    product,
+    channel: normalizedChannel,
+    versionManifest,
+    activeNotices,
+    readiness,
+    integrationPackage,
+    releaseStartupPreview,
+    fileName,
+    summaryFileName,
+    envFileName,
+    cppFileName
+  });
   const manifest = {
     generatedAt,
     developer: developer ?? null,
@@ -1376,6 +1472,7 @@ function buildReleasePackagePayload({
       versionManifest,
       startupPreview: releaseStartupPreview,
       readiness,
+      deliverySummary,
       activeNotices: {
         total: activeNotices.length,
         blockingTotal: blockingNotices.length,
@@ -1394,9 +1491,10 @@ function buildReleasePackagePayload({
   };
 
   return {
-    fileName: `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.json`,
-    summaryFileName: `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.txt`,
+    fileName,
+    summaryFileName,
     manifest,
+    deliverySummary,
     snippets: {
       envFileName,
       envTemplate: integrationPackage?.snippets?.envTemplate || "",

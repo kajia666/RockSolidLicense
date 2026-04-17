@@ -117,6 +117,8 @@ The release workspace can now generate a project-scoped release delivery package
 - a project-aware C++ host skeleton that maps startup, local token validation, and heartbeat gating into host-app flow
 - a project-specific hardening guide text snippet for SDK integrators
 
+The release package `.env` template now also carries the extra demo/runtime keys used by the packaged CMake host consumer example, so release handoff can stay closer to a real executable skeleton instead of stopping at raw SDK credentials.
+
 The package route accepts:
 
 - `productId`

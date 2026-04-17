@@ -665,6 +665,7 @@ function buildIntegrationEnvTemplate(manifest) {
   const signing = manifest.signing || {};
   const project = manifest.project || {};
   const credentials = manifest.credentials || {};
+  const startupDefaults = manifest.startupDefaults || {};
   const clientHardening = manifest.clientHardening || buildClientHardeningProfile(project.featureConfig || {});
 
   return [
@@ -676,15 +677,23 @@ function buildIntegrationEnvTemplate(manifest) {
     `RS_HTTP_BASE_URL=${http.baseUrl || ""}`,
     `RS_HTTP_HOST=${http.host || ""}`,
     `RS_HTTP_PORT=${http.port ?? ""}`,
+    `RS_HTTP_SECURE=${http.secure === true ? "true" : "false"}`,
     `RS_TCP_ENABLED=${tcp.enabled === true ? "true" : "false"}`,
     `RS_TCP_HOST=${tcp.host || ""}`,
     `RS_TCP_PORT=${tcp.port ?? ""}`,
     `RS_REQUEST_SKEW_SECONDS=${signing.requestSkewSeconds ?? ""}`,
     `RS_TOKEN_ISSUER=${signing.tokenIssuer || ""}`,
     `RS_ACTIVE_KEY_ID=${signing.activeKeyId || ""}`,
+    `RS_CLIENT_VERSION=${String(startupDefaults.clientVersion ?? "1.0.0").trim() || "1.0.0"}`,
+    `RS_CHANNEL=${String(startupDefaults.channel ?? "stable").trim() || "stable"}`,
+    `RS_INCLUDE_TOKEN_KEYS=${startupDefaults.includeTokenKeys !== false ? "true" : "false"}`,
     `RS_REQUIRE_STARTUP_BOOTSTRAP=${clientHardening.startupBootstrapRequired ? "true" : "false"}`,
     `RS_REQUIRE_LOCAL_TOKEN_VALIDATION=${clientHardening.localTokenValidationRequired ? "true" : "false"}`,
-    `RS_REQUIRE_HEARTBEAT_GATE=${clientHardening.heartbeatGateRequired ? "true" : "false"}`
+    `RS_REQUIRE_HEARTBEAT_GATE=${clientHardening.heartbeatGateRequired ? "true" : "false"}`,
+    `RS_RUN_NETWORK_DEMO=false`,
+    `RS_DEMO_USERNAME=demo_user`,
+    `RS_DEMO_PASSWORD=demo_password`,
+    `RS_DEMO_DEVICE_NAME=Demo Workstation`
   ].join("\n");
 }
 

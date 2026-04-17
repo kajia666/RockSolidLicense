@@ -28,6 +28,8 @@ The page now also summarizes how many visible projects currently have each of th
 
 The last 3 switches act as project-level client hardening controls. They affect the integration package, startup bootstrap preview, env template, C++ quickstart guidance, and generated C++ host skeleton so software authors can choose a stricter or more relaxed client-side hardening profile per project.
 
+The generated `.env` template is now also shaped to work with the packaged CMake host consumer example. In practice that means a software author can usually start from the project integration `.env`, add the demo login credentials, flip `RS_RUN_NETWORK_DEMO=true`, and then use the same values inside the host consumer skeleton.
+
 ## API
 
 - `GET /api/developer/integration`
@@ -142,7 +144,7 @@ The page and API are useful when the software author needs to:
 - download the current single-project integration package directly as JSON, `.env`, C++ quickstart, host skeleton, or one zip handoff bundle
 - download a matching SHA-256 checksum list for the generated handoff files
 - export multiple project integration packages in one request from the project workspace when several software products need the same deployment refresh
-- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, and environment template
+- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, and environment template that already lines up with the packaged CMake host consumer example
 
 ## Request signing headers
 

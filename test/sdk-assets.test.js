@@ -15,6 +15,7 @@ test("sdk cpp package assets include the host skeleton template and packaging ho
   const template = readText("sdk/examples/windows_host_skeleton_template.cpp");
   const cmakeHostConsumerMain = readText("sdk/examples/cmake_cpp_host_consumer/main.cpp");
   const cmakeHostConsumerCmake = readText("sdk/examples/cmake_cpp_host_consumer/CMakeLists.txt");
+  const cmakeHostConsumerEnv = readText("sdk/examples/cmake_cpp_host_consumer/rocksolid_host_config.env.example");
   const packageScript = readText("sdk/package_release.bat");
   const verifyScript = readText("sdk/verify_release_package.bat");
   const packageReadme = readText("sdk/CPP_SDK_PACKAGE_README.md");
@@ -26,11 +27,17 @@ test("sdk cpp package assets include the host skeleton template and packaging ho
   assert.match(template, /validate_license_token_with_bootstrap/);
   assert.match(template, /heartbeat_http_parsed/);
 
-  assert.match(cmakeHostConsumerMain, /run_network_demo = false/);
+  assert.match(cmakeHostConsumerMain, /rocksolid_host_config\.env/);
+  assert.match(cmakeHostConsumerMain, /RS_REQUIRE_LOCAL_TOKEN_VALIDATION/);
+  assert.match(cmakeHostConsumerMain, /RS_REQUIRE_HEARTBEAT_GATE/);
+  assert.match(cmakeHostConsumerMain, /RS_RUN_NETWORK_DEMO/);
   assert.match(cmakeHostConsumerMain, /startup_bootstrap_http/);
   assert.match(cmakeHostConsumerMain, /validate_license_token_with_bootstrap/);
   assert.match(cmakeHostConsumerCmake, /find_package\(RockSolidSDK CONFIG REQUIRED/);
   assert.match(cmakeHostConsumerCmake, /RockSolidSDK::cpp_static/);
+  assert.match(cmakeHostConsumerEnv, /RS_PROJECT_CODE=MY_SOFTWARE/);
+  assert.match(cmakeHostConsumerEnv, /RS_INCLUDE_TOKEN_KEYS=true/);
+  assert.match(cmakeHostConsumerEnv, /RS_RUN_NETWORK_DEMO=false/);
 
   assert.match(packageScript, /windows_host_skeleton_template\.cpp/);
   assert.match(packageScript, /cmake_cpp_host_consumer/);
@@ -41,10 +48,12 @@ test("sdk cpp package assets include the host skeleton template and packaging ho
 
   assert.match(packageReadme, /windows_host_skeleton_template\.cpp/);
   assert.match(packageReadme, /cmake_cpp_host_consumer/);
+  assert.match(packageReadme, /rocksolid_host_config\.env/);
   assert.match(packageReadme, /host-app startup\/login\/heartbeat skeleton/);
 
   assert.match(guide, /windows_host_skeleton_template\.cpp/);
   assert.match(guide, /cmake_cpp_host_consumer/);
+  assert.match(guide, /rocksolid_host_config\.env/);
   assert.match(buildGuide, /host-app-oriented C\+\+ skeleton template/);
   assert.match(buildGuide, /CMake consumer skeleton/);
 });

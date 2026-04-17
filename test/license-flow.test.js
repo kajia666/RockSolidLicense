@@ -8445,6 +8445,9 @@ test("batch project integration package export can bundle selected projects with
     );
     assert.match(developerExport.items[0].snippets.envTemplate, /RS_REQUIRE_STARTUP_BOOTSTRAP=false/);
     assert.match(developerExport.items[0].snippets.envTemplate, /RS_REQUIRE_LOCAL_TOKEN_VALIDATION=false/);
+    assert.match(developerExport.items[0].snippets.envTemplate, /RS_INCLUDE_TOKEN_KEYS=false/);
+    assert.match(developerExport.items[0].snippets.envTemplate, /RS_RUN_NETWORK_DEMO=false/);
+    assert.match(developerExport.items[0].snippets.envTemplate, /RS_DEMO_USERNAME=demo_user/);
     assert.equal(developerExport.manifestFiles.length, 1);
     assert.equal(developerExport.manifestFiles[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
     assert.match(developerExport.manifestFiles[0].content, /"code": "INTBUNDLE_ALPHA"/);
@@ -8849,6 +8852,9 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(byProductId.snippets.envTemplate, /RS_REQUIRE_STARTUP_BOOTSTRAP=false/);
     assert.match(byProductId.snippets.envTemplate, /RS_REQUIRE_LOCAL_TOKEN_VALIDATION=false/);
     assert.match(byProductId.snippets.envTemplate, /RS_REQUIRE_HEARTBEAT_GATE=true/);
+    assert.match(byProductId.snippets.envTemplate, /RS_CLIENT_VERSION=1.0.0/);
+    assert.match(byProductId.snippets.envTemplate, /RS_CHANNEL=stable/);
+    assert.match(byProductId.snippets.envTemplate, /RS_RUN_NETWORK_DEMO=false/);
     assert.equal(byProductId.snippets.envFileName, "EXPORT_ALPHA.env");
     assert.equal(byProductId.snippets.cppFileName, "EXPORT_ALPHA.cpp");
 

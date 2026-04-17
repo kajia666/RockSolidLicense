@@ -47,6 +47,11 @@ if not exist "%CPP_ROOT%\examples\cmake_cpp_host_consumer\CMakeLists.txt" (
   goto :fail
 )
 
+if not exist "%CPP_ROOT%\examples\cmake_cpp_host_consumer\rocksolid_host_config.env.example" (
+  echo Missing packaged host consumer env template at %CPP_ROOT%\examples\cmake_cpp_host_consumer\rocksolid_host_config.env.example
+  goto :fail
+)
+
 if not exist "%CAPI_ROOT%\examples\cmake_capi_consumer\CMakeLists.txt" (
   echo Missing packaged CMake C API consumer example at %CAPI_ROOT%\examples\cmake_capi_consumer
   goto :fail

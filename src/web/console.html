@@ -359,6 +359,31 @@
         line-height: 1.6;
       }
 
+      .snapshot-focus-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .snapshot-focus-item {
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(23, 32, 27, 0.08);
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .snapshot-focus-item strong {
+        display: block;
+      }
+
+      .snapshot-focus-meta {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
       pre {
         margin: 0;
         min-height: 220px;
@@ -794,6 +819,7 @@
       let adminToken = "";
       let adminOpsPreview = null;
       let adminOpsLastDownload = null;
+      let adminOpsFocusMap = new Map();
       const AUDIT_PRESET_BUTTONS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
       function el(id) {
@@ -992,6 +1018,17 @@
         }).join("") || `<span class="tag">none</span>`;
       }
 
+      function renderOverviewDetailList(items = [], kind, renderTitle, renderMeta) {
+        if (!Array.isArray(items) || !items.length) {
+          return `<div class="hint">暂无重点对象。</div>`;
+        }
+        return `<div class="snapshot-focus-list">${items.map((item, index) => {
+          const focusKey = `${kind}:${index}`;
+          adminOpsFocusMap.set(focusKey, { kind, item });
+          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><strong>${renderTitle(item)}</strong><div class="snapshot-focus-meta">${renderMeta(item)}</div></button>`;
+        }).join("")}</div>`;
+      }
+
       async function applyOpsOverviewAction(kind, value) {
         const normalizedValue = String(value ?? "").trim();
         if (!normalizedValue) {
@@ -1027,6 +1064,86 @@
         setStatus(`已应用快照概览筛选：${normalizedValue}。`);
       }
 
+      async function applyOpsFocusDetail(kind, item = {}) {
+        if (kind === "account") {
+          if (item.productCode) {
+            el("ops-product-code").value = item.productCode;
+            el("block-product-code").value = item.productCode;
+            if (el("version-product-code")) {
+              el("version-product-code").value = item.productCode;
+            }
+          }
+          if (item.username) {
+            el("ops-username").value = item.username;
+          }
+          if (item.accountId) {
+            el("account-id").value = item.accountId;
+          }
+          if (item.sessionId) {
+            el("session-id").value = item.sessionId;
+          }
+          if (item.accountStatus) {
+            el("account-status").value = item.accountStatus;
+          }
+          if (Array.isArray(item.reasons) && item.reasons[0]) {
+            el("session-reason").value = item.reasons[0];
+            el("binding-reason").value = item.reasons[0];
+            el("block-reason").value = item.reasons[0];
+            el("unblock-reason").value = item.reasons[0];
+          }
+        }
+        if (kind === "session") {
+          if (item.productCode) {
+            el("ops-product-code").value = item.productCode;
+            el("block-product-code").value = item.productCode;
+          }
+          if (item.username) {
+            el("ops-username").value = item.username;
+          }
+          if (item.sessionId) {
+            el("session-id").value = item.sessionId;
+            el("ops-search").value = item.sessionId;
+          }
+          if (item.reason) {
+            el("session-reason").value = item.reason;
+          }
+          if (item.fingerprint) {
+            el("block-fingerprint").value = item.fingerprint;
+          }
+        }
+        if (kind === "device") {
+          if (item.productCode) {
+            el("ops-product-code").value = item.productCode;
+            el("block-product-code").value = item.productCode;
+          }
+          if (item.username) {
+            el("ops-username").value = item.username;
+          }
+          if (item.fingerprint) {
+            el("ops-search").value = item.fingerprint;
+            el("block-fingerprint").value = item.fingerprint;
+          }
+          if (item.bindingId) {
+            el("binding-id").value = item.bindingId;
+          }
+          if (item.blockId) {
+            el("block-id").value = item.blockId;
+          }
+          if (item.sessionId) {
+            el("session-id").value = item.sessionId;
+          }
+          if (item.reason) {
+            el("binding-reason").value = item.reason;
+            el("block-reason").value = item.reason;
+            el("unblock-reason").value = item.reason;
+          }
+        }
+        if (adminToken) {
+          await previewOpsExport();
+        }
+        setStatus(`已带入重点对象：${kind}。`);
+      }
+
       function renderOpsPreviewSummary() {
         const statusBox = el("ops-preview-status");
         const box = el("ops-preview-summary");
@@ -1045,6 +1162,10 @@
         const topReasons = Array.isArray(overview.topReasons) ? overview.topReasons : [];
         const focusUsernames = Array.isArray(overview.focusUsernames) ? overview.focusUsernames : [];
         const focusFingerprints = Array.isArray(overview.focusFingerprints) ? overview.focusFingerprints : [];
+        const focusAccounts = Array.isArray(overview.focusAccounts) ? overview.focusAccounts : [];
+        const focusSessions = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
+        const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
+        adminOpsFocusMap = new Map();
         const statusText = overview.status === "attention"
           ? "需要重点排查"
           : overview.status === "empty"
@@ -1086,9 +1207,59 @@
             <div class="hint">重点设备</div>
             <div class="audit-meta">${renderOverviewTags(focusFingerprints, "fingerprint", "fingerprint")}</div>
           </div>
+          <div>
+            <div class="hint">重点账号明细</div>
+            ${renderOverviewDetailList(
+              focusAccounts,
+              "account",
+              (item) => `${escapeHtml(item.username || "-")} @ ${escapeHtml(item.productCode || "-")}`,
+              (item) => [
+                `issues=${escapeHtml(item.issueCount ?? 0)}`,
+                `account=${escapeHtml(item.accountId || "-")}`,
+                `signals=${escapeHtml((item.signals || []).slice(0, 3).join(", ") || "-")}`,
+                `reasons=${escapeHtml((item.reasons || []).slice(0, 2).join(", ") || "-")}`
+              ].join(" | ")
+            )}
+          </div>
+          <div>
+            <div class="hint">重点会话</div>
+            ${renderOverviewDetailList(
+              focusSessions,
+              "session",
+              (item) => `${escapeHtml(item.sessionId || "-")} | ${escapeHtml(item.username || "-")}`,
+              (item) => [
+                `${escapeHtml(item.productCode || "-")} | ${escapeHtml(item.status || "-")}`,
+                `reason=${escapeHtml(item.reason || "-")}`,
+                `device=${escapeHtml(item.deviceName || item.fingerprint || "-")}`
+              ].join(" | ")
+            )}
+          </div>
+          <div>
+            <div class="hint">重点设备明细</div>
+            ${renderOverviewDetailList(
+              focusDevices,
+              "device",
+              (item) => `${escapeHtml(item.fingerprint || "-")} @ ${escapeHtml(item.productCode || "-")}`,
+              (item) => [
+                `${escapeHtml(item.kind || "-")} | ${escapeHtml(item.status || "-")}`,
+                `reason=${escapeHtml(item.reason || "-")}`,
+                `binding=${escapeHtml(item.bindingId || "-")}`,
+                `block=${escapeHtml(item.blockId || "-")}`
+              ].join(" | ")
+            )}
+          </div>
         `;
         for (const action of box.querySelectorAll("[data-overview-kind]")) {
           action.addEventListener("click", () => guarded(() => applyOpsOverviewAction(action.dataset.overviewKind, action.dataset.overviewValue)));
+        }
+        for (const action of box.querySelectorAll("[data-focus-key]")) {
+          action.addEventListener("click", () => guarded(() => {
+            const focus = adminOpsFocusMap.get(action.dataset.focusKey);
+            if (!focus) {
+              return Promise.resolve();
+            }
+            return applyOpsFocusDetail(focus.kind, focus.item);
+          }));
         }
       }
 

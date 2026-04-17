@@ -1748,6 +1748,11 @@ function normalizeSnapshotStatus(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function snapshotDateMs(value) {
+  const ms = new Date(value || "").getTime();
+  return Number.isNaN(ms) ? -1 : ms;
+}
+
 function countSnapshotItems(items = [], statuses = []) {
   const normalizedStatuses = new Set(statuses.map((value) => normalizeSnapshotStatus(value)));
   return items.reduce((count, item) => {
@@ -1759,11 +1764,8 @@ function latestSnapshotTimestamp(values = []) {
   let latest = null;
   let latestMs = -1;
   for (const value of values) {
-    if (!value) {
-      continue;
-    }
-    const ms = new Date(value).getTime();
-    if (Number.isNaN(ms) || ms <= latestMs) {
+    const ms = snapshotDateMs(value);
+    if (ms <= latestMs) {
       continue;
     }
     latest = value;
@@ -1805,6 +1807,292 @@ function buildSnapshotTopCounts(items = [], selector, limit = 5) {
 function mapSnapshotTopCounts(items = [], selector, keyName, limit = 5) {
   return buildSnapshotTopCounts(items, selector, limit)
     .map(([value, count]) => ({ [keyName]: value, count }));
+}
+
+function buildSnapshotFocusAccounts(accounts = [], entitlements = [], sessions = [], limit = 5) {
+  const items = new Map();
+
+  function ensureItem(username, productCode) {
+    const normalizedUsername = String(username ?? "").trim();
+    const normalizedProductCode = String(productCode ?? "").trim();
+    if (!normalizedUsername || !normalizedProductCode) {
+      return null;
+    }
+    const key = `${normalizedProductCode}::${normalizedUsername}`;
+    if (!items.has(key)) {
+      items.set(key, {
+        username: normalizedUsername,
+        productCode: normalizedProductCode,
+        accountId: null,
+        entitlementId: null,
+        sessionId: null,
+        accountStatus: null,
+        issueCount: 0,
+        signals: new Set(),
+        reasons: new Set(),
+        activeSessionCount: 0,
+        activeEntitlementCount: 0,
+        latestAt: null,
+        latestMs: -1
+      });
+    }
+    return items.get(key);
+  }
+
+  function touchItem(target, timestamp) {
+    const ms = snapshotDateMs(timestamp);
+    if (ms > target.latestMs) {
+      target.latestMs = ms;
+      target.latestAt = timestamp || null;
+    }
+  }
+
+  for (const item of accounts) {
+    if (normalizeSnapshotStatus(item?.status) !== "disabled") {
+      continue;
+    }
+    const target = ensureItem(item?.username, item?.productCode);
+    if (!target) {
+      continue;
+    }
+    target.accountId = target.accountId || item?.id || null;
+    target.accountStatus = item?.status || target.accountStatus;
+    target.activeSessionCount = Math.max(target.activeSessionCount, Number(item?.activeSessionCount || 0));
+    target.activeEntitlementCount = Math.max(target.activeEntitlementCount, Number(item?.activeEntitlementCount || 0));
+    target.issueCount += 1;
+    target.signals.add("account_disabled");
+    touchItem(target, item?.updatedAt || item?.lastLoginAt || item?.createdAt);
+  }
+
+  for (const item of entitlements) {
+    const lifecycleStatus = normalizeSnapshotStatus(item?.lifecycleStatus || item?.status);
+    const pointExhausted = normalizeSnapshotStatus(item?.grantType || "duration") === "points"
+      && Number(item?.remainingPoints || 0) <= 0;
+    if (!["frozen", "expired"].includes(lifecycleStatus) && !pointExhausted) {
+      continue;
+    }
+    const target = ensureItem(item?.username, item?.productCode);
+    if (!target) {
+      continue;
+    }
+    target.entitlementId = target.entitlementId || item?.id || null;
+    target.issueCount += 1;
+    if (lifecycleStatus === "frozen") {
+      target.signals.add("entitlement_frozen");
+    }
+    if (lifecycleStatus === "expired") {
+      target.signals.add("entitlement_expired");
+    }
+    if (pointExhausted) {
+      target.signals.add("points_exhausted");
+    }
+    touchItem(target, item?.updatedAt || item?.endsAt || item?.createdAt);
+  }
+
+  for (const item of sessions) {
+    const status = normalizeSnapshotStatus(item?.status);
+    if (status === "active" && !item?.revokedReason) {
+      continue;
+    }
+    const target = ensureItem(item?.username, item?.productCode);
+    if (!target) {
+      continue;
+    }
+    target.sessionId = target.sessionId || item?.id || null;
+    target.issueCount += 1;
+    target.signals.add(`session_${status || "issue"}`);
+    if (item?.revokedReason) {
+      target.reasons.add(String(item.revokedReason).trim());
+    }
+    touchItem(target, item?.lastHeartbeatAt || item?.expiresAt || item?.issuedAt);
+  }
+
+  return Array.from(items.values())
+    .sort((left, right) => {
+      if (right.issueCount !== left.issueCount) {
+        return right.issueCount - left.issueCount;
+      }
+      if (right.latestMs !== left.latestMs) {
+        return right.latestMs - left.latestMs;
+      }
+      if (left.productCode !== right.productCode) {
+        return left.productCode.localeCompare(right.productCode);
+      }
+      return left.username.localeCompare(right.username);
+    })
+    .slice(0, limit)
+    .map((item) => ({
+      username: item.username,
+      productCode: item.productCode,
+      accountId: item.accountId,
+      entitlementId: item.entitlementId,
+      sessionId: item.sessionId,
+      accountStatus: item.accountStatus,
+      issueCount: item.issueCount,
+      signals: Array.from(item.signals),
+      reasons: Array.from(item.reasons),
+      activeSessionCount: item.activeSessionCount,
+      activeEntitlementCount: item.activeEntitlementCount,
+      latestAt: item.latestAt
+    }));
+}
+
+function buildSnapshotFocusSessions(sessions = [], limit = 5) {
+  return sessions
+    .filter((item) => normalizeSnapshotStatus(item?.status) !== "active" || item?.revokedReason)
+    .sort((left, right) => {
+      const leftMs = Math.max(snapshotDateMs(left?.lastHeartbeatAt), snapshotDateMs(left?.expiresAt), snapshotDateMs(left?.issuedAt));
+      const rightMs = Math.max(snapshotDateMs(right?.lastHeartbeatAt), snapshotDateMs(right?.expiresAt), snapshotDateMs(right?.issuedAt));
+      if (rightMs !== leftMs) {
+        return rightMs - leftMs;
+      }
+      return String(left?.id ?? "").localeCompare(String(right?.id ?? ""));
+    })
+    .slice(0, limit)
+    .map((item) => ({
+      sessionId: item?.id || null,
+      accountId: item?.accountId || null,
+      entitlementId: item?.entitlementId || null,
+      username: item?.username || null,
+      productCode: item?.productCode || null,
+      status: item?.status || null,
+      reason: item?.revokedReason || null,
+      fingerprint: item?.fingerprint || null,
+      deviceName: item?.deviceName || null,
+      lastHeartbeatAt: item?.lastHeartbeatAt || null,
+      expiresAt: item?.expiresAt || null
+    }));
+}
+
+function buildSnapshotFocusDevices(bindings = [], blocks = [], sessions = [], limit = 5) {
+  const items = new Map();
+
+  function upsertDevice(entry) {
+    const productCode = String(entry?.productCode ?? "").trim();
+    const fingerprint = String(entry?.fingerprint ?? "").trim();
+    if (!productCode || !fingerprint) {
+      return;
+    }
+    const key = `${productCode}::${fingerprint}`;
+    const latestMs = snapshotDateMs(entry?.latestAt);
+    if (!items.has(key)) {
+      items.set(key, {
+        productCode,
+        fingerprint,
+        kind: entry?.kind || "device",
+        status: entry?.status || null,
+        reason: entry?.reason || null,
+        username: entry?.username || null,
+        deviceName: entry?.deviceName || null,
+        bindingId: entry?.bindingId || null,
+        blockId: entry?.blockId || null,
+        sessionId: entry?.sessionId || null,
+        latestAt: entry?.latestAt || null,
+        latestMs,
+        priority: Number(entry?.priority || 0),
+        relatedSessionCount: Number(entry?.relatedSessionCount || 0)
+      });
+      return;
+    }
+
+    const current = items.get(key);
+    if (Number(entry?.priority || 0) > current.priority) {
+      current.kind = entry?.kind || current.kind;
+      current.status = entry?.status || current.status;
+      current.reason = entry?.reason || current.reason;
+      current.priority = Number(entry?.priority || current.priority);
+    }
+    current.username = current.username || entry?.username || null;
+    current.deviceName = current.deviceName || entry?.deviceName || null;
+    current.bindingId = current.bindingId || entry?.bindingId || null;
+    current.blockId = current.blockId || entry?.blockId || null;
+    current.sessionId = current.sessionId || entry?.sessionId || null;
+    current.relatedSessionCount = Math.max(current.relatedSessionCount, Number(entry?.relatedSessionCount || 0));
+    if (latestMs > current.latestMs) {
+      current.latestMs = latestMs;
+      current.latestAt = entry?.latestAt || current.latestAt;
+    }
+  }
+
+  for (const item of blocks) {
+    upsertDevice({
+      kind: "block",
+      productCode: item?.productCode,
+      fingerprint: item?.fingerprint,
+      status: item?.status,
+      reason: item?.reason,
+      deviceName: item?.deviceName,
+      blockId: item?.id,
+      latestAt: item?.updatedAt || item?.releasedAt || item?.createdAt,
+      priority: normalizeSnapshotStatus(item?.status) === "active" ? 3 : 1,
+      relatedSessionCount: item?.activeSessionCount
+    });
+  }
+
+  for (const item of bindings) {
+    if (normalizeSnapshotStatus(item?.status) === "active") {
+      continue;
+    }
+    upsertDevice({
+      kind: "binding",
+      productCode: item?.productCode,
+      fingerprint: item?.fingerprint,
+      status: item?.status,
+      username: item?.username,
+      deviceName: item?.deviceName,
+      bindingId: item?.id,
+      latestAt: item?.revokedAt || item?.lastBoundAt || item?.firstBoundAt,
+      priority: 2,
+      relatedSessionCount: item?.activeSessionCount
+    });
+  }
+
+  for (const item of sessions) {
+    if (normalizeSnapshotStatus(item?.status) === "active") {
+      continue;
+    }
+    upsertDevice({
+      kind: "session",
+      productCode: item?.productCode,
+      fingerprint: item?.fingerprint,
+      status: item?.status,
+      reason: item?.revokedReason,
+      username: item?.username,
+      deviceName: item?.deviceName,
+      sessionId: item?.id,
+      latestAt: item?.lastHeartbeatAt || item?.expiresAt || item?.issuedAt,
+      priority: 2
+    });
+  }
+
+  return Array.from(items.values())
+    .sort((left, right) => {
+      if (right.priority !== left.priority) {
+        return right.priority - left.priority;
+      }
+      if (right.latestMs !== left.latestMs) {
+        return right.latestMs - left.latestMs;
+      }
+      if (left.productCode !== right.productCode) {
+        return left.productCode.localeCompare(right.productCode);
+      }
+      return left.fingerprint.localeCompare(right.fingerprint);
+    })
+    .slice(0, limit)
+    .map((item) => ({
+      kind: item.kind,
+      productCode: item.productCode,
+      fingerprint: item.fingerprint,
+      status: item.status,
+      reason: item.reason,
+      username: item.username,
+      deviceName: item.deviceName,
+      bindingId: item.bindingId,
+      blockId: item.blockId,
+      sessionId: item.sessionId,
+      latestAt: item.latestAt,
+      relatedSessionCount: item.relatedSessionCount
+    }));
 }
 
 function buildSnapshotOverview({
@@ -1926,6 +2214,9 @@ function buildSnapshotOverview({
     "fingerprint",
     5
   );
+  const focusAccounts = buildSnapshotFocusAccounts(accounts, entitlements, sessions, 5);
+  const focusSessions = buildSnapshotFocusSessions(sessions, 5);
+  const focusDevices = buildSnapshotFocusDevices(bindings, blocks, sessions, 5);
 
   const totalScopeItems = projects.length + accounts.length + entitlements.length + sessions.length + bindings.length + blocks.length + auditLogs.length;
   const attentionCount = metrics.inactiveProjects
@@ -1994,7 +2285,10 @@ function buildSnapshotOverview({
     topProducts,
     topReasons,
     focusUsernames,
-    focusFingerprints
+    focusFingerprints,
+    focusAccounts,
+    focusSessions,
+    focusDevices
   };
 }
 
@@ -2060,6 +2354,24 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Focus Fingerprints:");
       for (const item of overview.focusFingerprints) {
         lines.push(`- ${item.fingerprint || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.focusAccounts) && overview.focusAccounts.length) {
+      lines.push("Focus Account Details:");
+      for (const item of overview.focusAccounts) {
+        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | account=${item.accountId || "-"}`);
+      }
+    }
+    if (Array.isArray(overview.focusSessions) && overview.focusSessions.length) {
+      lines.push("Focus Sessions:");
+      for (const item of overview.focusSessions) {
+        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
+      }
+    }
+    if (Array.isArray(overview.focusDevices) && overview.focusDevices.length) {
+      lines.push("Focus Devices:");
+      for (const item of overview.focusDevices) {
+        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
       }
     }
   }
@@ -2334,6 +2646,24 @@ function buildAdminOpsSummaryText(payload = {}) {
       lines.push("Focus Fingerprints:");
       for (const item of overview.focusFingerprints) {
         lines.push(`- ${item.fingerprint || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.focusAccounts) && overview.focusAccounts.length) {
+      lines.push("Focus Account Details:");
+      for (const item of overview.focusAccounts) {
+        lines.push(`- ${item.username || "-"} @ ${item.productCode || "-"} | issues=${item.issueCount ?? 0} | account=${item.accountId || "-"}`);
+      }
+    }
+    if (Array.isArray(overview.focusSessions) && overview.focusSessions.length) {
+      lines.push("Focus Sessions:");
+      for (const item of overview.focusSessions) {
+        lines.push(`- ${item.sessionId || "-"} | ${item.username || "-"} @ ${item.productCode || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
+      }
+    }
+    if (Array.isArray(overview.focusDevices) && overview.focusDevices.length) {
+      lines.push("Focus Devices:");
+      for (const item of overview.focusDevices) {
+        lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | ${item.reason || "-"}`);
       }
     }
   }

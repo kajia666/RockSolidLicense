@@ -42,6 +42,7 @@ Terminology:
 - the snapshot panel also keeps a `Last Action Result` recap so operators can see whether the handled object still appears in the current focus set, whether the severity improved or worsened, and whether the object moved in or out of the recommended queue
 - the same recap now adds an explicit follow-up conclusion, so operators can quickly tell whether the next step is `Close Out`, `Monitor`, `Follow Up`, or `Escalate`
 - the recap also renders clickable follow-up actions, so operators can reopen the current focus, jump straight back to the recommended control, or refresh the snapshot without rebuilding context manually
+- the snapshot overview now also surfaces an `Escalate First` section ahead of the normal queue so the highest-priority queue entries stand out before operators scan the rest of the list
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints

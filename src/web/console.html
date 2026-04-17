@@ -453,6 +453,12 @@
         cursor: pointer;
       }
 
+      .snapshot-focus-item.urgent {
+        border-color: rgba(160, 66, 44, 0.22);
+        background: rgba(255, 246, 243, 0.94);
+        box-shadow: 0 10px 24px rgba(160, 66, 44, 0.08);
+      }
+
       .snapshot-focus-head {
         display: flex;
         flex-wrap: wrap;
@@ -1725,6 +1731,37 @@
         return parts.join("");
       }
 
+      function isUrgentQueueItem(item = {}, index = 0) {
+        const severity = focusSeverityClass(item?.severity);
+        return severity === "critical" || severity === "high" || (index === 0 && severity === "medium");
+      }
+
+      function renderOverviewQueueItem(item = {}, index = 0, keyPrefix = "queue", urgent = false) {
+        const focusKey = `${keyPrefix}:${index}`;
+        const urgentFlag = urgent || isUrgentQueueItem(item, index);
+        adminOpsFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
+        const headTags = [
+          renderFocusSeverityBadge(item),
+          urgentFlag ? `<span class="tag danger">ESCALATE</span>` : "",
+          `<span class="tag">#${escapeHtml(index + 1)}</span>`
+        ].filter(Boolean).join("");
+        return `<button type="button" class="snapshot-focus-item${urgentFlag ? " urgent" : ""}" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${headTags}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${renderFocusActionLine(item)}</button>`;
+      }
+
+      function renderEscalationQueue(items = []) {
+        if (!Array.isArray(items) || !items.length) {
+          return "";
+        }
+        const urgentEntries = items
+          .map((item, index) => ({ item, index }))
+          .filter(({ item, index }) => isUrgentQueueItem(item, index))
+          .slice(0, 3);
+        if (!urgentEntries.length) {
+          return "";
+        }
+        return `<div class="snapshot-focus-list">${urgentEntries.map(({ item, index }) => renderOverviewQueueItem(item, index, "priority-queue", true)).join("")}</div>`;
+      }
+
       function renderOverviewDetailList(items = [], kind, renderTitle, renderMeta) {
         if (!Array.isArray(items) || !items.length) {
           return `<div class="hint">暂无重点对象。</div>`;
@@ -1740,11 +1777,7 @@
         if (!Array.isArray(items) || !items.length) {
           return `<div class="hint">暂无建议处理队列。</div>`;
         }
-        return `<div class="snapshot-focus-list">${items.map((item, index) => {
-          const focusKey = `queue:${index}`;
-          adminOpsFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
-          return `<button type="button" class="snapshot-focus-item" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${renderFocusActionLine(item)}</button>`;
-        }).join("")}</div>`;
+        return `<div class="snapshot-focus-list">${items.map((item, index) => renderOverviewQueueItem(item, index, "queue")).join("")}</div>`;
       }
 
       function applyAdminRecommendedControl(control = {}) {
@@ -1994,6 +2027,7 @@
         const focusFingerprints = Array.isArray(overview.focusFingerprints) ? overview.focusFingerprints : [];
         const queueSummary = overview.queueSummary || {};
         const recommendedQueue = Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : [];
+        const escalationQueueMarkup = renderEscalationQueue(recommendedQueue);
         const focusAccounts = Array.isArray(overview.focusAccounts) ? overview.focusAccounts : [];
         const focusSessions = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
         const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
@@ -2041,6 +2075,13 @@
             <div class="hint">重点设备</div>
             <div class="audit-meta">${renderOverviewTags(focusFingerprints, "fingerprint", "fingerprint")}</div>
           </div>
+          ${escalationQueueMarkup ? `
+          <div>
+            <div class="hint">Escalate First</div>
+            <div class="audit-meta"><span class="tag danger">priority</span><span class="tag">top queue targets</span></div>
+            ${escalationQueueMarkup}
+          </div>
+          ` : ""}
           <div>
             <div class="hint">建议优先处理</div>
             <div class="audit-meta">${renderQueueSummaryTags(queueSummary)}</div>

@@ -366,6 +366,32 @@
         gap: 12px;
       }
 
+      .snapshot-recap {
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(23, 32, 27, 0.08);
+        background: rgba(255, 255, 255, 0.86);
+        display: grid;
+        gap: 8px;
+      }
+
+      .snapshot-recap.attention {
+        border-color: rgba(160, 66, 44, 0.22);
+        background: rgba(255, 246, 243, 0.92);
+      }
+
+      .snapshot-recap.ok {
+        border-color: rgba(15, 124, 104, 0.18);
+        background: rgba(247, 255, 252, 0.9);
+      }
+
+      .snapshot-recap-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
       .snapshot-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -923,6 +949,7 @@
       let adminFocusedRows = [];
       let adminFocusedPanels = [];
       let adminActiveFocus = null;
+      let adminLastMutation = null;
       const AUDIT_PRESET_BUTTONS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
       function el(id) {
@@ -967,6 +994,164 @@
             ...patch
           }
         };
+      }
+
+      function adminFocusMatchesRecord(focus = null, item = {}) {
+        if (!focus || !item) {
+          return false;
+        }
+        const focusItem = focus.item || {};
+        if (focus.kind === "account") {
+          return (focusItem.accountId && item.accountId === focusItem.accountId)
+            || (
+              focusItem.username
+              && focusItem.productCode
+              && item.username === focusItem.username
+              && item.productCode === focusItem.productCode
+            );
+        }
+        if (focus.kind === "entitlement") {
+          return (focusItem.entitlementId && item.entitlementId === focusItem.entitlementId)
+            || (
+              focusItem.username
+              && focusItem.productCode
+              && item.username === focusItem.username
+              && item.productCode === focusItem.productCode
+            );
+        }
+        if (focus.kind === "session") {
+          return (focusItem.sessionId && item.sessionId === focusItem.sessionId)
+            || (
+              focusItem.username
+              && focusItem.productCode
+              && item.username === focusItem.username
+              && item.productCode === focusItem.productCode
+            );
+        }
+        if (focus.kind === "device") {
+          return (focusItem.blockId && item.blockId === focusItem.blockId)
+            || (focusItem.bindingId && item.bindingId === focusItem.bindingId)
+            || (
+              focusItem.fingerprint
+              && focusItem.productCode
+              && item.fingerprint === focusItem.fingerprint
+              && item.productCode === focusItem.productCode
+            );
+        }
+        return false;
+      }
+
+      function collectAdminSnapshotHits(focus = null) {
+        const overview = adminOpsPreview?.overview || {};
+        const hits = [];
+        if (!focus) {
+          return hits;
+        }
+
+        for (const item of Array.isArray(overview.focusAccounts) ? overview.focusAccounts : []) {
+          if (adminFocusMatchesRecord(focus, item)) {
+            hits.push({
+              source: "focusAccounts",
+              severity: item.severity || "",
+              label: `${item.username || "-"} @ ${item.productCode || "-"}`
+            });
+          }
+        }
+
+        for (const item of Array.isArray(overview.focusSessions) ? overview.focusSessions : []) {
+          if (adminFocusMatchesRecord(focus, item)) {
+            hits.push({
+              source: "focusSessions",
+              severity: item.severity || "",
+              label: `${item.sessionId || "-"} | ${item.username || "-"}`
+            });
+          }
+        }
+
+        for (const item of Array.isArray(overview.focusDevices) ? overview.focusDevices : []) {
+          if (adminFocusMatchesRecord(focus, item)) {
+            hits.push({
+              source: "focusDevices",
+              severity: item.severity || "",
+              label: `${item.fingerprint || "-"} @ ${item.productCode || "-"}`
+            });
+          }
+        }
+
+        for (const item of Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : []) {
+          const queueFocus = {
+            kind: item.sourceType || focus.kind,
+            item: {
+              accountId: item.accountId || item.recommendedControl?.accountId || null,
+              entitlementId: item.entitlementId || item.recommendedControl?.entitlementId || null,
+              sessionId: item.sessionId || item.recommendedControl?.sessionId || null,
+              bindingId: item.bindingId || null,
+              blockId: item.blockId || item.recommendedControl?.blockId || null,
+              username: item.username || null,
+              productCode: item.productCode || item.recommendedControl?.productCode || null,
+              fingerprint: item.fingerprint || item.recommendedControl?.fingerprint || null
+            }
+          };
+          if (adminFocusMatchesRecord(focus, queueFocus.item)) {
+            hits.push({
+              source: "recommendedQueue",
+              severity: item.severity || "",
+              label: item.title || item.summary || item.sourceType || "queue-item"
+            });
+          }
+        }
+
+        return hits;
+      }
+
+      function buildAdminMutationRecap(successMessage, focus = null, loadedPanels = [], matchedPanels = [], focusedPanel = "") {
+        const snapshotHits = collectAdminSnapshotHits(focus);
+        const stillFlagged = snapshotHits.length > 0;
+        const status = stillFlagged ? "attention" : "ok";
+        const headline = stillFlagged
+          ? "Still visible in the current snapshot focus."
+          : "No longer visible in the current snapshot focus.";
+        const detail = stillFlagged
+          ? "The object is still part of the current attention set and may need more follow-up."
+          : "The latest snapshot no longer highlights this object as a focus item or queue recommendation.";
+        return {
+          timestamp: new Date().toISOString(),
+          successMessage,
+          focusKind: focus?.kind || "",
+          status,
+          headline,
+          detail,
+          loadedPanels,
+          matchedPanels,
+          focusedPanel,
+          snapshotHits
+        };
+      }
+
+      function renderAdminMutationRecap() {
+        if (!adminLastMutation) {
+          return "";
+        }
+        const hitTags = adminLastMutation.snapshotHits.map((item) => `<span class="tag ${escapeHtml(item.severity || "")}">${escapeHtml(item.source)}${item.severity ? `:${escapeHtml(item.severity)}` : ""}</span>`).join("");
+        const contextTags = [
+          adminLastMutation.focusKind ? `<span class="tag">${escapeHtml(adminLastMutation.focusKind)}</span>` : "",
+          adminLastMutation.focusedPanel ? `<span class="tag ok">control:${escapeHtml(adminLastMutation.focusedPanel)}</span>` : "",
+          adminLastMutation.loadedPanels.length ? `<span class="tag">panels:${escapeHtml(adminLastMutation.loadedPanels.join(","))}</span>` : "",
+          adminLastMutation.matchedPanels.length ? `<span class="tag">matched:${escapeHtml(adminLastMutation.matchedPanels.join(","))}</span>` : ""
+        ].filter(Boolean).join("");
+        return `
+          <div class="snapshot-recap ${escapeHtml(adminLastMutation.status)}">
+            <div class="snapshot-recap-head">
+              <strong>Last Action Result</strong>
+              <span class="tag ${adminLastMutation.status === "attention" ? "danger" : "ok"}">${escapeHtml(adminLastMutation.status.toUpperCase())}</span>
+              <span class="tag">${escapeHtml(formatTime(adminLastMutation.timestamp))}</span>
+            </div>
+            <div>${escapeHtml(adminLastMutation.successMessage)}</div>
+            <div class="hint">${escapeHtml(adminLastMutation.headline)} ${escapeHtml(adminLastMutation.detail)}</div>
+            <div class="audit-meta">${contextTags || `<span class="tag">no-context</span>`}</div>
+            ${hitTags ? `<div><div class="hint">Snapshot hits</div><div class="audit-meta">${hitTags}</div></div>` : ""}
+          </div>
+        `;
       }
 
       function escapeHtml(value) {
@@ -1479,6 +1664,7 @@
 
         box.innerHTML = `
           <div class="hint">生成时间 ${escapeHtml(formatTime(adminOpsPreview.generatedAt))}${adminOpsPreview.fileName ? ` | ${escapeHtml(adminOpsPreview.fileName)}` : ""}${adminOpsLastDownload?.fileName ? ` | 最近下载 ${escapeHtml(adminOpsLastDownload.fileName)}` : ""}</div>
+          ${renderAdminMutationRecap()}
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${escapeHtml(item.value)}</strong><span>${escapeHtml(item.label)}</span></div>`).join("")}</div>
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : `<div class="hint">暂无额外概览提示。</div>`}</div>
           <div>
@@ -2296,6 +2482,14 @@
         if (focusedPanel) {
           suffixParts.push(`control=${focusedPanel}`);
         }
+        adminLastMutation = buildAdminMutationRecap(
+          successMessage,
+          normalizedFocus,
+          loadedPanels,
+          matchedPanels,
+          focusedPanel
+        );
+        renderOpsPreviewSummary();
         setStatus(`${successMessage}${suffixParts.length ? ` | ${suffixParts.join(" | ")}` : ""}.`);
       }
 
@@ -2356,6 +2550,7 @@
         adminOpsPreview = null;
         adminOpsLastDownload = null;
         adminActiveFocus = null;
+        adminLastMutation = null;
         clearFocusedAdminRows();
         clearFocusedAdminPanels();
         renderOpsPreviewSummary();

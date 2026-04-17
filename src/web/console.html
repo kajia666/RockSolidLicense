@@ -1078,7 +1078,8 @@
           }
         }
 
-        for (const item of Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : []) {
+        const recommendedQueue = Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : [];
+        for (const [index, item] of recommendedQueue.entries()) {
           const queueFocus = {
             kind: item.sourceType || focus.kind,
             item: {
@@ -1096,7 +1097,8 @@
             hits.push({
               source: "recommendedQueue",
               severity: item.severity || "",
-              label: item.title || item.summary || item.sourceType || "queue-item"
+              label: item.title || item.summary || item.sourceType || "queue-item",
+              queuePosition: index + 1
             });
           }
         }
@@ -1104,23 +1106,160 @@
         return hits;
       }
 
-      function buildAdminMutationRecap(successMessage, focus = null, loadedPanels = [], matchedPanels = [], focusedPanel = "") {
+      function adminSeverityRank(severity = "") {
+        const normalized = focusSeverityClass(severity);
+        const ranks = {
+          critical: 4,
+          high: 3,
+          medium: 2,
+          low: 1
+        };
+        return ranks[normalized] || 0;
+      }
+
+      function summarizeAdminSnapshotHits(hits = []) {
+        const summary = {
+          hitCount: Array.isArray(hits) ? hits.length : 0,
+          maxSeverity: "",
+          maxSeverityRank: 0,
+          queuePosition: null,
+          queueSeverity: "",
+          sources: []
+        };
+        if (!Array.isArray(hits)) {
+          return summary;
+        }
+        for (const item of hits) {
+          const source = String(item?.source || "").trim();
+          if (source && !summary.sources.includes(source)) {
+            summary.sources.push(source);
+          }
+          const normalizedSeverity = focusSeverityClass(item?.severity);
+          const severityRank = adminSeverityRank(normalizedSeverity);
+          if (severityRank > summary.maxSeverityRank) {
+            summary.maxSeverity = normalizedSeverity;
+            summary.maxSeverityRank = severityRank;
+          }
+          const queuePosition = Number(item?.queuePosition);
+          if (source === "recommendedQueue" && Number.isFinite(queuePosition) && queuePosition > 0) {
+            if (summary.queuePosition === null || queuePosition < summary.queuePosition) {
+              summary.queuePosition = queuePosition;
+              summary.queueSeverity = normalizedSeverity;
+            }
+          }
+        }
+        return summary;
+      }
+
+      function compareAdminMutationSignals(previousHits = [], currentHits = []) {
+        const before = summarizeAdminSnapshotHits(previousHits);
+        const after = summarizeAdminSnapshotHits(currentHits);
+        let trend = "unchanged";
+        if (before.maxSeverityRank > 0 && after.maxSeverityRank === 0) {
+          trend = "cleared";
+        } else if (before.maxSeverityRank === 0 && after.maxSeverityRank > 0) {
+          trend = after.queuePosition !== null ? "queue-added" : "new-signal";
+        } else if (after.maxSeverityRank > before.maxSeverityRank) {
+          trend = "escalated";
+        } else if (after.maxSeverityRank > 0 && before.maxSeverityRank > 0 && after.maxSeverityRank < before.maxSeverityRank) {
+          trend = "downgraded";
+        } else if (before.queuePosition !== null && after.queuePosition === null) {
+          trend = "queue-cleared";
+        } else if (before.queuePosition === null && after.queuePosition !== null) {
+          trend = "queue-added";
+        } else if (before.queuePosition !== null && after.queuePosition !== null && after.queuePosition > before.queuePosition) {
+          trend = "deprioritized";
+        } else if (before.queuePosition !== null && after.queuePosition !== null && after.queuePosition < before.queuePosition) {
+          trend = "prioritized";
+        }
+
+        const trendLabelMap = {
+          cleared: "Resolved",
+          downgraded: "Risk Down",
+          escalated: "Risk Up",
+          "new-signal": "Needs Attention",
+          "queue-cleared": "Queue Cleared",
+          "queue-added": "Queue Added",
+          deprioritized: "Lower Queue",
+          prioritized: "Higher Queue",
+          unchanged: "No Change"
+        };
+        const improvingTrends = new Set(["cleared", "downgraded", "queue-cleared", "deprioritized"]);
+        const worseningTrends = new Set(["escalated", "queue-added", "prioritized"]);
+        const trendTone = improvingTrends.has(trend)
+          ? "ok"
+          : worseningTrends.has(trend)
+            ? "danger"
+            : trend === "new-signal"
+              ? "warning"
+              : after.maxSeverityRank > 0
+              ? "warning"
+              : "ok";
+        let headline = "Still visible in the current snapshot focus.";
+        if (trend === "cleared") {
+          headline = "The refreshed snapshot no longer flags this object.";
+        } else if (trend === "downgraded") {
+          headline = "The refreshed snapshot still flags this object, but at a lower severity.";
+        } else if (trend === "escalated") {
+          headline = "The refreshed snapshot now ranks this object higher than before.";
+        } else if (trend === "new-signal") {
+          headline = "The refreshed snapshot still needs attention for this object.";
+        } else if (trend === "queue-cleared") {
+          headline = "The object dropped out of the recommended queue.";
+        } else if (trend === "queue-added") {
+          headline = "The object is now part of the recommended queue.";
+        } else if (trend === "deprioritized") {
+          headline = "The object moved lower in the recommended queue.";
+        } else if (trend === "prioritized") {
+          headline = "The object moved higher in the recommended queue.";
+        } else if (after.maxSeverityRank === 0) {
+          headline = "No current focus signal is visible for this object.";
+        }
+
+        const detailParts = [];
+        if (before.maxSeverity) {
+          detailParts.push(`before=${before.maxSeverity.toUpperCase()}`);
+        }
+        if (after.maxSeverity) {
+          detailParts.push(`now=${after.maxSeverity.toUpperCase()}`);
+        } else if (before.maxSeverityRank > 0 || before.queuePosition !== null) {
+          detailParts.push("now=clear");
+        }
+        if (before.queuePosition !== null || after.queuePosition !== null) {
+          const beforeQueue = before.queuePosition !== null ? `#${before.queuePosition}` : "out";
+          const afterQueue = after.queuePosition !== null ? `#${after.queuePosition}` : "out";
+          detailParts.push(`queue=${beforeQueue}->${afterQueue}`);
+        }
+        detailParts.push(`signals=${before.hitCount}->${after.hitCount}`);
+
+        return {
+          before,
+          after,
+          trend,
+          trendLabel: trendLabelMap[trend] || "No Change",
+          trendTone,
+          headline,
+          detail: detailParts.join(" | ")
+        };
+      }
+
+      function buildAdminMutationRecap(successMessage, focus = null, loadedPanels = [], matchedPanels = [], focusedPanel = "", previousSnapshotHits = []) {
         const snapshotHits = collectAdminSnapshotHits(focus);
+        const comparison = compareAdminMutationSignals(previousSnapshotHits, snapshotHits);
         const stillFlagged = snapshotHits.length > 0;
         const status = stillFlagged ? "attention" : "ok";
-        const headline = stillFlagged
-          ? "Still visible in the current snapshot focus."
-          : "No longer visible in the current snapshot focus.";
-        const detail = stillFlagged
-          ? "The object is still part of the current attention set and may need more follow-up."
-          : "The latest snapshot no longer highlights this object as a focus item or queue recommendation.";
         return {
           timestamp: new Date().toISOString(),
           successMessage,
           focusKind: focus?.kind || "",
           status,
-          headline,
-          detail,
+          headline: comparison.headline,
+          detail: comparison.detail,
+          trend: comparison.trend,
+          trendLabel: comparison.trendLabel,
+          trendTone: comparison.trendTone,
+          before: comparison.before,
+          after: comparison.after,
           loadedPanels,
           matchedPanels,
           focusedPanel,
@@ -1133,6 +1272,17 @@
           return "";
         }
         const hitTags = adminLastMutation.snapshotHits.map((item) => `<span class="tag ${escapeHtml(item.severity || "")}">${escapeHtml(item.source)}${item.severity ? `:${escapeHtml(item.severity)}` : ""}</span>`).join("");
+        const beforeSeverityClass = focusSeverityClass(adminLastMutation.before?.maxSeverity);
+        const afterSeverityClass = focusSeverityClass(adminLastMutation.after?.maxSeverity);
+        const beforeQueue = adminLastMutation.before?.queuePosition;
+        const afterQueue = adminLastMutation.after?.queuePosition;
+        const progressTags = [
+          adminLastMutation.trendLabel ? `<span class="tag ${escapeHtml(adminLastMutation.trendTone || "")}">${escapeHtml(adminLastMutation.trendLabel)}</span>` : "",
+          adminLastMutation.before?.maxSeverity ? `<span class="tag ${escapeHtml(beforeSeverityClass || "")}">before:${escapeHtml(adminLastMutation.before.maxSeverity.toUpperCase())}</span>` : "",
+          adminLastMutation.after?.maxSeverity ? `<span class="tag ${escapeHtml(afterSeverityClass || "")}">now:${escapeHtml(adminLastMutation.after.maxSeverity.toUpperCase())}</span>` : (adminLastMutation.before?.maxSeverity || beforeQueue !== null ? `<span class="tag ok">now:clear</span>` : ""),
+          (Number.isFinite(beforeQueue) || Number.isFinite(afterQueue)) ? `<span class="tag">queue:${escapeHtml(beforeQueue !== null ? `#${beforeQueue}` : "out")}->${escapeHtml(afterQueue !== null ? `#${afterQueue}` : "out")}</span>` : "",
+          `<span class="tag">signals:${escapeHtml(adminLastMutation.before?.hitCount ?? 0)}->${escapeHtml(adminLastMutation.after?.hitCount ?? 0)}</span>`
+        ].filter(Boolean).join("");
         const contextTags = [
           adminLastMutation.focusKind ? `<span class="tag">${escapeHtml(adminLastMutation.focusKind)}</span>` : "",
           adminLastMutation.focusedPanel ? `<span class="tag ok">control:${escapeHtml(adminLastMutation.focusedPanel)}</span>` : "",
@@ -1148,6 +1298,7 @@
             </div>
             <div>${escapeHtml(adminLastMutation.successMessage)}</div>
             <div class="hint">${escapeHtml(adminLastMutation.headline)} ${escapeHtml(adminLastMutation.detail)}</div>
+            <div class="audit-meta">${progressTags}</div>
             <div class="audit-meta">${contextTags || `<span class="tag">no-context</span>`}</div>
             ${hitTags ? `<div><div class="hint">Snapshot hits</div><div class="audit-meta">${hitTags}</div></div>` : ""}
           </div>
@@ -2439,6 +2590,7 @@
 
       async function refreshAdminAfterMutation(result, successMessage, focus = null, extraTasks = []) {
         const normalizedFocus = focus ? rememberAdminFocus(focus.kind, focus.item) : adminActiveFocus;
+        const previousSnapshotHits = normalizedFocus ? collectAdminSnapshotHits(normalizedFocus) : [];
         for (const task of extraTasks) {
           await task();
         }
@@ -2487,8 +2639,12 @@
           normalizedFocus,
           loadedPanels,
           matchedPanels,
-          focusedPanel
+          focusedPanel,
+          previousSnapshotHits
         );
+        if (adminLastMutation?.trend) {
+          suffixParts.push(`recap=${adminLastMutation.trend}`);
+        }
         renderOpsPreviewSummary();
         setStatus(`${successMessage}${suffixParts.length ? ` | ${suffixParts.join(" | ")}` : ""}.`);
       }

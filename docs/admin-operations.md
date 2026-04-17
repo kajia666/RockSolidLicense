@@ -38,7 +38,7 @@ Terminology:
 - click a focus item from the ops snapshot overview to auto-refresh the most relevant account, entitlement, session, binding, or block table and highlight the matching rows
 - when a focus item carries a recommended control, the matching admin control card is also highlighted so operators can move from triage to action with less scrolling
 - after an admin action succeeds, the console now refreshes the visible snapshot/list context around the same focused object and re-highlights the matching rows and control card
-- the snapshot panel also keeps a `Last Action Result` recap so operators can see whether the handled object still appears in the current focus set or has dropped out of the latest snapshot
+- the snapshot panel also keeps a `Last Action Result` recap so operators can see whether the handled object still appears in the current focus set, whether the severity improved or worsened, and whether the object moved in or out of the recommended queue
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints

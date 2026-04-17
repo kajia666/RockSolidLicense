@@ -392,6 +392,22 @@
         gap: 8px;
       }
 
+      .snapshot-recap-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .snapshot-inline-button {
+        border: 1px solid rgba(23, 32, 27, 0.08);
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 6px 10px;
+        cursor: pointer;
+        font: inherit;
+      }
+
       .snapshot-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -949,6 +965,7 @@
       let adminFocusedRows = [];
       let adminFocusedPanels = [];
       let adminActiveFocus = null;
+      let adminPreparedFocus = null;
       let adminLastMutation = null;
       const AUDIT_PRESET_BUTTONS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
@@ -1241,6 +1258,108 @@
           headline,
           detail: detailParts.join(" | ")
         };
+      }
+
+      function buildAdminFocusTitle(kind, item = {}) {
+        if (kind === "account") {
+          return `${item.username || "-"} @ ${item.productCode || "-"}`;
+        }
+        if (kind === "session") {
+          return `${item.sessionId || "-"} | ${item.username || "-"}`;
+        }
+        if (kind === "entitlement") {
+          return `${item.entitlementId || "-"} | ${item.username || "-"}`;
+        }
+        if (kind === "device") {
+          return `${item.fingerprint || "-"} @ ${item.productCode || "-"}`;
+        }
+        return item.productCode || item.username || item.sessionId || item.fingerprint || kind || "focus-item";
+      }
+
+      function buildAdminFocusSummary(kind, item = {}) {
+        if (kind === "account") {
+          return [
+            `account=${item.accountId || "-"}`,
+            `severity=${item.severity || "-"}`,
+            `issues=${item.issueCount ?? 0}`
+          ].join(" | ");
+        }
+        if (kind === "session") {
+          return [
+            `${item.productCode || "-"} | ${item.status || "-"}`,
+            `severity=${item.severity || "-"}`,
+            `reason=${item.reason || "-"}`
+          ].join(" | ");
+        }
+        if (kind === "entitlement") {
+          return [
+            `${item.productCode || "-"} | ${item.status || "-"}`,
+            `entitlement=${item.entitlementId || "-"}`,
+            `points=${item.remainingPoints ?? "-"}`
+          ].join(" | ");
+        }
+        if (kind === "device") {
+          return [
+            `${item.kind || "-"} | ${item.status || "-"}`,
+            `severity=${item.severity || "-"}`,
+            `reason=${item.reason || "-"}`
+          ].join(" | ");
+        }
+        return item.reason || item.summary || "-";
+      }
+
+      function rememberAdminPreparedFocus(kind, item = {}, preparedControl = "", loadedPanels = [], matchedPanels = [], focusedPanel = "") {
+        if (!kind) {
+          adminPreparedFocus = null;
+          return null;
+        }
+        const clonedItem = cloneAdminFocusValue(item) || {};
+        adminPreparedFocus = {
+          timestamp: new Date().toISOString(),
+          kind,
+          item: clonedItem,
+          title: buildAdminFocusTitle(kind, clonedItem),
+          summary: buildAdminFocusSummary(kind, clonedItem),
+          preparedControl: preparedControl || clonedItem?.recommendedControl?.label || "",
+          severity: focusSeverityClass(clonedItem?.severity),
+          actionHint: clonedItem?.actionHint || clonedItem?.nextAction || "",
+          loadedPanels: Array.isArray(loadedPanels) ? [...loadedPanels] : [],
+          matchedPanels: Array.isArray(matchedPanels) ? [...matchedPanels] : [],
+          focusedPanel: focusedPanel || "",
+          recommendedControl: cloneAdminFocusValue(clonedItem?.recommendedControl) || null
+        };
+        return adminPreparedFocus;
+      }
+
+      function renderAdminPreparedFocus() {
+        if (!adminPreparedFocus) {
+          return "";
+        }
+        const detailTags = [
+          `<span class="tag">${escapeHtml(adminPreparedFocus.kind)}</span>`,
+          adminPreparedFocus.severity ? `<span class="tag ${escapeHtml(adminPreparedFocus.severity)}">${escapeHtml(adminPreparedFocus.severity.toUpperCase())}</span>` : "",
+          adminPreparedFocus.preparedControl ? `<span class="tag ok">${escapeHtml(adminPreparedFocus.preparedControl)}</span>` : "",
+          adminPreparedFocus.focusedPanel ? `<span class="tag">control:${escapeHtml(adminPreparedFocus.focusedPanel)}</span>` : "",
+          adminPreparedFocus.loadedPanels.length ? `<span class="tag">panels:${escapeHtml(adminPreparedFocus.loadedPanels.join(","))}</span>` : "",
+          adminPreparedFocus.matchedPanels.length ? `<span class="tag">matched:${escapeHtml(adminPreparedFocus.matchedPanels.join(","))}</span>` : "",
+          adminPreparedFocus.actionHint ? `<span class="tag warning">next:${escapeHtml(adminPreparedFocus.actionHint)}</span>` : ""
+        ].filter(Boolean).join("");
+        const actionButtons = [
+          `<button type="button" class="snapshot-inline-button" data-prepared-action="reapply">Reapply Focus</button>`,
+          adminPreparedFocus.focusedPanel ? `<button type="button" class="snapshot-inline-button" data-prepared-action="panel">Jump To Control</button>` : ""
+        ].filter(Boolean).join("");
+        return `
+          <div class="snapshot-recap">
+            <div class="snapshot-recap-head">
+              <strong>Prepared Control</strong>
+              <span class="tag">${escapeHtml(formatTime(adminPreparedFocus.timestamp))}</span>
+            </div>
+            <div><strong>${escapeHtml(adminPreparedFocus.title)}</strong></div>
+            <div class="hint">${escapeHtml(adminPreparedFocus.summary)}</div>
+            <div class="audit-meta">${detailTags}</div>
+            ${actionButtons ? `<div class="snapshot-recap-actions">${actionButtons}</div>` : ""}
+          </div>
+        `;
       }
 
       function buildAdminMutationRecap(successMessage, focus = null, loadedPanels = [], matchedPanels = [], focusedPanel = "", previousSnapshotHits = []) {
@@ -1755,6 +1874,8 @@
         loadedPanels = await drillIntoFocusTables(kind, item);
         matchedPanels = focusMatchingRowsForFocus(kind, item);
         const focusedPanel = focusAdminControlPanel(kind, item, item.recommendedControl);
+        rememberAdminPreparedFocus(kind, item, preparedControl, loadedPanels, matchedPanels, focusedPanel);
+        renderOpsPreviewSummary();
         setOutput({
           focusKind: kind,
           preparedControl,
@@ -1815,6 +1936,7 @@
 
         box.innerHTML = `
           <div class="hint">生成时间 ${escapeHtml(formatTime(adminOpsPreview.generatedAt))}${adminOpsPreview.fileName ? ` | ${escapeHtml(adminOpsPreview.fileName)}` : ""}${adminOpsLastDownload?.fileName ? ` | 最近下载 ${escapeHtml(adminOpsLastDownload.fileName)}` : ""}</div>
+          ${renderAdminPreparedFocus()}
           ${renderAdminMutationRecap()}
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${escapeHtml(item.value)}</strong><span>${escapeHtml(item.label)}</span></div>`).join("")}</div>
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : `<div class="hint">暂无额外概览提示。</div>`}</div>
@@ -1899,6 +2021,30 @@
             }
             return applyOpsFocusDetail(focus.kind, focus.item);
           }));
+        }
+        for (const action of box.querySelectorAll("[data-prepared-action]")) {
+          action.addEventListener("click", () => guarded(() => runAdminPreparedAction(action.dataset.preparedAction)));
+        }
+      }
+
+      async function runAdminPreparedAction(action) {
+        if (!adminPreparedFocus) {
+          return;
+        }
+        if (action === "reapply") {
+          await applyOpsFocusDetail(adminPreparedFocus.kind, adminPreparedFocus.item);
+          return;
+        }
+        if (action === "panel") {
+          const focusedPanel = focusAdminControlPanel(
+            adminPreparedFocus.kind,
+            adminPreparedFocus.item,
+            adminPreparedFocus.recommendedControl || adminPreparedFocus.item?.recommendedControl || {}
+          );
+          if (!focusedPanel) {
+            throw new Error("No prepared control panel is available.");
+          }
+          setStatus(`Prepared control refocused: ${focusedPanel}.`);
         }
       }
 
@@ -2642,6 +2788,16 @@
           focusedPanel,
           previousSnapshotHits
         );
+        if (normalizedFocus) {
+          rememberAdminPreparedFocus(
+            normalizedFocus.kind,
+            normalizedFocus.item,
+            normalizedFocus.item?.recommendedControl?.label || "",
+            loadedPanels,
+            matchedPanels,
+            focusedPanel
+          );
+        }
         if (adminLastMutation?.trend) {
           suffixParts.push(`recap=${adminLastMutation.trend}`);
         }
@@ -2706,6 +2862,7 @@
         adminOpsPreview = null;
         adminOpsLastDownload = null;
         adminActiveFocus = null;
+        adminPreparedFocus = null;
         adminLastMutation = null;
         clearFocusedAdminRows();
         clearFocusedAdminPanels();

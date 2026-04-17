@@ -8784,6 +8784,9 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /Last Action Result/);
     assert.match(html, /buildAdminMutationRecap/);
     assert.match(html, /compareAdminMutationSignals/);
+    assert.match(html, /Prepared Control/);
+    assert.match(html, /rememberAdminPreparedFocus/);
+    assert.match(html, /runAdminPreparedAction/);
     assert.match(html, /signals:/);
     assert.match(html, /高频原因/);
     assert.match(html, /建议优先处理/);

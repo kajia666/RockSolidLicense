@@ -507,6 +507,7 @@ ${JSON.stringify(request, null, 2)}`;
         const tokenKeySummary = preview.tokenKeySummary || {};
         const versionManifest = preview.expectedResponse?.versionManifest || {};
         const expectedError = preview.expectedError || null;
+        const clientHardening = preview.clientHardening || packageSnapshot?.manifest?.clientHardening || {};
         const workflow = Array.isArray(preview.workflow) ? preview.workflow : [];
 
         el("startup-preview").innerHTML = `
@@ -519,7 +520,9 @@ ${JSON.stringify(request, null, 2)}`;
           <div class="split-line"><span>Version Rule</span><span>${esc(versionManifest.status || "n/a")} | latest ${esc(versionManifest.latestVersion || "-")}</span></div>
           <div class="split-line"><span>Notices</span><span>${esc(noticeSummary.total ?? 0)} active | ${esc(noticeSummary.blockingTotal ?? 0)} blocking</span></div>
           <div class="split-line"><span>Token Keys</span><span>${esc(String(tokenKeySummary.hasTokenKeys ?? false))} | ${esc(tokenKeySummary.totalKeys ?? 0)} public</span></div>
+          <div class="split-line"><span>Client Hardening</span><span>${esc(clientHardening.profile || "-")} | startup=${esc(String(clientHardening.startupBootstrapRequired ?? false))} | token=${esc(String(clientHardening.localTokenValidationRequired ?? false))} | heartbeat=${esc(String(clientHardening.heartbeatGateRequired ?? false))}</span></div>
           <div class="hint" style="margin-top:12px;">${esc(decision.message || "No startup decision summary available yet.")}</div>
+          ${clientHardening.summary ? `<div class="hint" style="margin-top:10px;">Hardening: ${esc(clientHardening.summary)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">Recommended action: ${esc(decision.recommendedAction || "Review the package JSON for the full startup payload.")}</div>
           ${expectedError ? `<div class="hint" style="margin-top:10px;">Current runtime call result: ${esc(expectedError.code)} (${esc(expectedError.status)})</div>` : ""}
           ${versionManifest.latestDownloadUrl ? `<div class="hint" style="margin-top:10px;">Latest download URL: <span class="mono">${esc(versionManifest.latestDownloadUrl)}</span></div>` : ""}

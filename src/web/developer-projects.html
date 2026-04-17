@@ -56,6 +56,9 @@
             <label>Allow Version Check<select id="batch-allow-version-check"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Notices<select id="batch-allow-notices"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Client Unbind<select id="batch-allow-client-unbind"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Startup Bootstrap<select id="batch-require-startup-bootstrap"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Local Token Validation<select id="batch-require-local-token-validation"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Heartbeat Gate<select id="batch-require-heartbeat-gate"><option value="true">true</option><option value="false">false</option></select></label>
           </div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-batch-feature-btn">Apply Batch Feature Config</button></div>
           <div class="hint" id="batch-feature-note" style="margin-top:12px;">The full feature toggle set below will be written to each selected project.</div>
@@ -87,6 +90,9 @@
             <label>Allow Version Check<select id="create-allow-version-check"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Notices<select id="create-allow-notices"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Client Unbind<select id="create-allow-client-unbind"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Startup Bootstrap<select id="create-require-startup-bootstrap"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Local Token Validation<select id="create-require-local-token-validation"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Heartbeat Gate<select id="create-require-heartbeat-gate"><option value="true">true</option><option value="false">false</option></select></label>
           </div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="create-project-btn">Create Project</button></div>
         </article>
@@ -111,6 +117,9 @@
             <label>Allow Version Check<select id="edit-allow-version-check"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Notices<select id="edit-allow-notices"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Client Unbind<select id="edit-allow-client-unbind"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Startup Bootstrap<select id="edit-require-startup-bootstrap"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Local Token Validation<select id="edit-require-local-token-validation"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Require Heartbeat Gate<select id="edit-require-heartbeat-gate"><option value="true">true</option><option value="false">false</option></select></label>
           </div>
           <div class="actions" style="margin-top:12px;"><button id="save-profile-btn">Save Project Profile</button><button id="save-status-btn">Save Project Status</button><button class="secondary" id="save-feature-btn">Save Feature Config</button><button class="danger" id="rotate-sdk-btn">Rotate SDK Credentials</button></div>
         </article>
@@ -483,15 +492,12 @@
 
       function renderFeatureSummary() {
         const visible = filteredProducts();
-        const counts = {
-          allowRegister: window.RSProductFeatures.countEnabled(visible, "allowRegister"),
-          allowAccountLogin: window.RSProductFeatures.countEnabled(visible, "allowAccountLogin"),
-          allowCardLogin: window.RSProductFeatures.countEnabled(visible, "allowCardLogin"),
-          allowCardRecharge: window.RSProductFeatures.countEnabled(visible, "allowCardRecharge"),
-          allowVersionCheck: window.RSProductFeatures.countEnabled(visible, "allowVersionCheck"),
-          allowNotices: window.RSProductFeatures.countEnabled(visible, "allowNotices"),
-          allowClientUnbind: window.RSProductFeatures.countEnabled(visible, "allowClientUnbind")
-        };
+        const counts = Object.fromEntries(
+          window.RSProductFeatures.entries.map((entry) => [
+            entry.key,
+            window.RSProductFeatures.countEnabled(visible, entry.key)
+          ])
+        );
 
         el("feature-summary-box").innerHTML = window.RSProductFeatures.entries
           .map((entry) => `<div class="pill"><strong>${esc(counts[entry.key] ?? 0)}</strong><span>${esc(entry.summaryLabel)}</span></div>`)

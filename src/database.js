@@ -104,6 +104,9 @@ CREATE TABLE IF NOT EXISTS product_feature_configs (
   allow_version_check INTEGER NOT NULL DEFAULT 1,
   allow_notices INTEGER NOT NULL DEFAULT 1,
   allow_client_unbind INTEGER NOT NULL DEFAULT 1,
+  require_startup_bootstrap INTEGER NOT NULL DEFAULT 1,
+  require_local_token_validation INTEGER NOT NULL DEFAULT 1,
+  require_heartbeat_gate INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -607,6 +610,24 @@ function migrateDatabase(db) {
     "owner_developer_id",
     "ALTER TABLE products ADD COLUMN owner_developer_id TEXT"
   );
+  ensureColumn(
+    db,
+    "product_feature_configs",
+    "require_startup_bootstrap",
+    "ALTER TABLE product_feature_configs ADD COLUMN require_startup_bootstrap INTEGER NOT NULL DEFAULT 1"
+  );
+  ensureColumn(
+    db,
+    "product_feature_configs",
+    "require_local_token_validation",
+    "ALTER TABLE product_feature_configs ADD COLUMN require_local_token_validation INTEGER NOT NULL DEFAULT 1"
+  );
+  ensureColumn(
+    db,
+    "product_feature_configs",
+    "require_heartbeat_gate",
+    "ALTER TABLE product_feature_configs ADD COLUMN require_heartbeat_gate INTEGER NOT NULL DEFAULT 1"
+  );
 }
 
 function ensureColumn(db, tableName, columnName, alterSql) {
@@ -685,10 +706,13 @@ function seedProductFeatureConfigs(db) {
         allow_version_check,
         allow_notices,
         allow_client_unbind,
+        require_startup_bootstrap,
+        require_local_token_validation,
+        require_heartbeat_gate,
         created_at,
         updated_at
       )
-      VALUES (?, 1, 1, 1, 1, 1, 1, 1, ?, ?)
+      VALUES (?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ?, ?)
     `
   );
 

@@ -7,7 +7,10 @@ const PRODUCT_FEATURE_KEYS = Object.freeze([
   "allowCardRecharge",
   "allowVersionCheck",
   "allowNotices",
-  "allowClientUnbind"
+  "allowClientUnbind",
+  "requireStartupBootstrap",
+  "requireLocalTokenValidation",
+  "requireHeartbeatGate"
 ]);
 
 const PRODUCT_FEATURE_COLUMN_MAP = Object.freeze({
@@ -17,7 +20,10 @@ const PRODUCT_FEATURE_COLUMN_MAP = Object.freeze({
   allowCardRecharge: "allow_card_recharge",
   allowVersionCheck: "allow_version_check",
   allowNotices: "allow_notices",
-  allowClientUnbind: "allow_client_unbind"
+  allowClientUnbind: "allow_client_unbind",
+  requireStartupBootstrap: "require_startup_bootstrap",
+  requireLocalTokenValidation: "require_local_token_validation",
+  requireHeartbeatGate: "require_heartbeat_gate"
 });
 
 const DEFAULT_PRODUCT_FEATURE_CONFIG = Object.freeze(
@@ -182,6 +188,7 @@ function productSelectSql(whereClause = "") {
   return `
     SELECT p.*, pfc.allow_register, pfc.allow_account_login, pfc.allow_card_login, pfc.allow_card_recharge,
            pfc.allow_version_check, pfc.allow_notices, pfc.allow_client_unbind,
+           pfc.require_startup_bootstrap, pfc.require_local_token_validation, pfc.require_heartbeat_gate,
            pfc.created_at AS feature_created_at, pfc.updated_at AS feature_updated_at,
            da.id AS owner_developer_id,
            da.username AS owner_developer_username,

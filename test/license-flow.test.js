@@ -3799,6 +3799,9 @@ test("product feature config can selectively disable client-facing capabilities"
     assert.equal(product.featureConfig.allowVersionCheck, true);
     assert.equal(product.featureConfig.allowNotices, true);
     assert.equal(product.featureConfig.allowClientUnbind, true);
+    assert.equal(product.featureConfig.requireStartupBootstrap, true);
+    assert.equal(product.featureConfig.requireLocalTokenValidation, true);
+    assert.equal(product.featureConfig.requireHeartbeatGate, true);
 
     const policy = await postJson(
       baseUrl,
@@ -3889,13 +3892,15 @@ test("product feature config can selectively disable client-facing capabilities"
       `/api/admin/products/${product.id}/feature-config`,
       {
         allowVersionCheck: false,
-        allowNotices: false
+        allowNotices: false,
+        requireLocalTokenValidation: false
       },
       adminSession.token
     );
     assert.equal(passiveToggleUpdate.featureConfig.allowVersionCheck, false);
     assert.equal(passiveToggleUpdate.featureConfig.allowNotices, false);
     assert.equal(passiveToggleUpdate.featureConfig.allowAccountLogin, true);
+    assert.equal(passiveToggleUpdate.featureConfig.requireLocalTokenValidation, false);
 
     const manifest = await signedClientPost(
       baseUrl,
@@ -3968,7 +3973,9 @@ test("product feature config can selectively disable client-facing capabilities"
         allowAccountLogin: false,
         allowCardLogin: false,
         allowCardRecharge: false,
-        allowClientUnbind: false
+        allowClientUnbind: false,
+        requireStartupBootstrap: false,
+        requireHeartbeatGate: false
       },
       adminSession.token
     );
@@ -3979,6 +3986,9 @@ test("product feature config can selectively disable client-facing capabilities"
     assert.equal(restrictiveToggleUpdate.featureConfig.allowClientUnbind, false);
     assert.equal(restrictiveToggleUpdate.featureConfig.allowVersionCheck, false);
     assert.equal(restrictiveToggleUpdate.featureConfig.allowNotices, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.requireStartupBootstrap, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.requireLocalTokenValidation, false);
+    assert.equal(restrictiveToggleUpdate.featureConfig.requireHeartbeatGate, false);
 
     const productList = await getJson(baseUrl, "/api/admin/products", adminSession.token);
     const listedProduct = productList.find((item) => item.code === "FEATURE_APP");
@@ -3986,6 +3996,9 @@ test("product feature config can selectively disable client-facing capabilities"
     assert.equal(listedProduct.featureConfig.allowRegister, false);
     assert.equal(listedProduct.featureConfig.allowVersionCheck, false);
     assert.equal(listedProduct.featureConfig.allowNotices, false);
+    assert.equal(listedProduct.featureConfig.requireStartupBootstrap, false);
+    assert.equal(listedProduct.featureConfig.requireLocalTokenValidation, false);
+    assert.equal(listedProduct.featureConfig.requireHeartbeatGate, false);
 
     const registerDisabled = await signedClientPostExpectError(
       baseUrl,
@@ -5155,7 +5168,8 @@ test("developer release package export bundles integration, versions, and notice
         name: "Release Package Alpha",
         ownerDeveloperId: owner.id,
         featureConfig: {
-          allowCardLogin: false
+          allowCardLogin: false,
+          requireHeartbeatGate: false
         }
       },
       adminSession.token
@@ -5240,15 +5254,18 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releasePackage.manifest.release.readiness.ready, false);
     assert.equal(releasePackage.manifest.release.readiness.candidateVersion, "5.4.0");
     assert.ok(releasePackage.manifest.release.readiness.blockingChecks >= 1);
+    assert.ok(releasePackage.manifest.release.readiness.checks.some((item) => item.key === "client_hardening" && item.level === "attention"));
     assert.equal(releasePackage.deliverySummary.projectCode, "RELPKG_ALPHA");
     assert.equal(releasePackage.deliverySummary.channel, "stable");
     assert.equal(releasePackage.deliverySummary.candidateVersion, "5.4.0");
     assert.equal(releasePackage.deliverySummary.startupStatus, "blocking_notice");
+    assert.equal(releasePackage.deliverySummary.clientHardeningProfile, "balanced");
     assert.equal(releasePackage.deliverySummary.blockingNotices, 1);
     assert.match(releasePackage.deliverySummary.headline, /hold/i);
     assert.equal(releasePackage.deliveryChecklist.status, "hold");
     assert.ok(releasePackage.deliveryChecklist.blockItems >= 1);
     assert.ok(Array.isArray(releasePackage.deliveryChecklist.items));
+    assert.ok(releasePackage.deliveryChecklist.items.some((item) => item.key === "client_hardening" && item.status === "review"));
     assert.ok(releasePackage.deliveryChecklist.items.some((item) => item.key === "handoff_artifacts"));
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
@@ -5262,6 +5279,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.snippets.cppQuickstart, /RELPKG_ALPHA/);
     assert.match(releasePackage.summaryText, /Latest Version: 5.4.0/);
     assert.match(releasePackage.summaryText, /Blocking Notices: 1/);
+    assert.match(releasePackage.summaryText, /Client Hardening: BALANCED/);
     assert.match(releasePackage.summaryText, /Release Readiness: HOLD/);
     assert.match(releasePackage.summaryText, /Delivery Summary:/);
     assert.match(releasePackage.summaryText, /Delivery Checklist:/);
@@ -8334,7 +8352,9 @@ test("batch project integration package export can bundle selected projects with
         code: "INTBUNDLE_ALPHA",
         name: "Integration Bundle Alpha",
         featureConfig: {
-          allowCardLogin: false
+          allowCardLogin: false,
+          requireStartupBootstrap: false,
+          requireLocalTokenValidation: false
         }
       },
       ownerSession.token
@@ -8382,16 +8402,22 @@ test("batch project integration package export can bundle selected projects with
     assert.equal(developerExport.items[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
     assert.equal(developerExport.items[0].manifest.project.code, "INTBUNDLE_ALPHA");
     assert.equal(developerExport.items[0].manifest.project.featureConfig.allowCardLogin, false);
+    assert.equal(developerExport.items[0].manifest.clientHardening.profile, "relaxed");
+    assert.equal(developerExport.items[0].manifest.startupPreview.clientHardening.profile, "relaxed");
+    assert.equal(developerExport.items[0].manifest.startupPreview.request.includeTokenKeys, false);
     assert.equal(developerExport.items[0].manifest.credentials.sdkAppId, alphaProduct.sdkAppId);
     assert.equal(developerExport.items[0].manifest.credentials.sdkAppSecret, alphaProduct.sdkAppSecret);
     assert.equal(developerExport.items[0].manifest.actor.type, "member");
     assert.equal(developerExport.items[0].manifest.actor.role, "viewer");
     assert.match(developerExport.items[0].snippets.cppQuickstart, /rocksolid::LicenseClientWin/);
     assert.match(developerExport.items[0].snippets.cppQuickstart, /INTBUNDLE_ALPHA/);
+    assert.match(developerExport.items[0].snippets.cppQuickstart, /Startup bootstrap is still recommended/);
     assert.match(
       developerExport.items[0].snippets.envTemplate,
       new RegExp(`RS_HTTP_BASE_URL=${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
     );
+    assert.match(developerExport.items[0].snippets.envTemplate, /RS_REQUIRE_STARTUP_BOOTSTRAP=false/);
+    assert.match(developerExport.items[0].snippets.envTemplate, /RS_REQUIRE_LOCAL_TOKEN_VALIDATION=false/);
     assert.equal(developerExport.manifestFiles.length, 1);
     assert.equal(developerExport.manifestFiles[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
     assert.match(developerExport.manifestFiles[0].content, /"code": "INTBUNDLE_ALPHA"/);
@@ -8704,7 +8730,9 @@ test("developer integration package export is scoped and includes cpp quickstart
         code: "EXPORT_ALPHA",
         name: "Export Alpha",
         featureConfig: {
-          allowCardLogin: false
+          allowCardLogin: false,
+          requireStartupBootstrap: false,
+          requireLocalTokenValidation: false
         }
       },
       ownerSession.token
@@ -8746,20 +8774,27 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.equal(byProductId.fileName, "rocksolid-integration-EXPORT_ALPHA.json");
     assert.equal(byProductId.manifest.project.code, "EXPORT_ALPHA");
     assert.equal(byProductId.manifest.project.featureConfig.allowCardLogin, false);
+    assert.equal(byProductId.manifest.clientHardening.profile, "relaxed");
     assert.equal(byProductId.manifest.credentials.sdkAppId, alphaProject.sdkAppId);
     assert.equal(byProductId.manifest.credentials.sdkAppSecret, alphaProject.sdkAppSecret);
     assert.equal(byProductId.manifest.startupPreview.request.productCode, "EXPORT_ALPHA");
     assert.equal(byProductId.manifest.startupPreview.expectedResponse.versionManifest.status, "no_version_rules");
     assert.equal(byProductId.manifest.startupPreview.noticeSummary.blockingTotal, 0);
-    assert.equal(byProductId.manifest.startupPreview.tokenKeySummary.hasTokenKeys, true);
+    assert.equal(byProductId.manifest.startupPreview.tokenKeySummary.hasTokenKeys, false);
     assert.equal(byProductId.manifest.startupPreview.decision.ready, true);
+    assert.equal(byProductId.manifest.startupPreview.clientHardening.profile, "relaxed");
+    assert.equal(byProductId.manifest.startupDefaults.includeTokenKeys, false);
     assert.match(byProductId.snippets.cppQuickstart, /rocksolid::ClientIdentity/);
     assert.match(byProductId.snippets.cppQuickstart, /startup_bootstrap_http/);
     assert.match(byProductId.snippets.cppQuickstart, /evaluate_startup_decision/);
     assert.match(byProductId.snippets.cppQuickstart, /EXPORT_ALPHA/);
+    assert.match(byProductId.snippets.cppQuickstart, /Local licenseToken validation is optional/);
     assert.match(byProductId.snippets.envTemplate, /RS_PROJECT_CODE=EXPORT_ALPHA/);
     assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_ID=/);
     assert.match(byProductId.snippets.envTemplate, /RS_SDK_APP_SECRET=/);
+    assert.match(byProductId.snippets.envTemplate, /RS_REQUIRE_STARTUP_BOOTSTRAP=false/);
+    assert.match(byProductId.snippets.envTemplate, /RS_REQUIRE_LOCAL_TOKEN_VALIDATION=false/);
+    assert.match(byProductId.snippets.envTemplate, /RS_REQUIRE_HEARTBEAT_GATE=true/);
     assert.equal(byProductId.snippets.envFileName, "EXPORT_ALPHA.env");
     assert.equal(byProductId.snippets.cppFileName, "EXPORT_ALPHA.cpp");
 

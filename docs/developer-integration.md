@@ -13,7 +13,7 @@ It is designed to help software authors connect the SDK to their own software by
 
 The page also accepts `productId`, `productCode`, and `channel` in the query string. That allows the project workspace or release workspace to open `/developer/integration` with the matching project already selected, and lets the integration page jump back to project settings or release readiness without losing the current project context.
 
-The page now also summarizes how many visible projects currently have each of the 7 product-level switches enabled:
+The page now also summarizes how many visible projects currently have each of the 10 product-level switches enabled:
 
 - `allowRegister`
 - `allowAccountLogin`
@@ -22,6 +22,11 @@ The page now also summarizes how many visible projects currently have each of th
 - `allowVersionCheck`
 - `allowNotices`
 - `allowClientUnbind`
+- `requireStartupBootstrap`
+- `requireLocalTokenValidation`
+- `requireHeartbeatGate`
+
+The last 3 switches act as project-level client hardening controls. They affect the integration package, startup bootstrap preview, env template, and C++ quickstart guidance so software authors can choose a stricter or more relaxed client-side hardening profile per project.
 
 ## API
 
@@ -61,6 +66,7 @@ The package route returns:
 
 - `fileName`
 - `manifest`
+- `manifest.clientHardening`
 - `manifest.startupPreview`
 - `snippets.envFileName`
 - `snippets.envTemplate`

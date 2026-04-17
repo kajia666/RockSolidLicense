@@ -121,6 +121,9 @@ function createWriteCapableAdapter() {
           allow_version_check: feature?.allow_version_check ?? 1,
           allow_notices: feature?.allow_notices ?? 1,
           allow_client_unbind: feature?.allow_client_unbind ?? 1,
+          require_startup_bootstrap: feature?.require_startup_bootstrap ?? 1,
+          require_local_token_validation: feature?.require_local_token_validation ?? 1,
+          require_heartbeat_gate: feature?.require_heartbeat_gate ?? 1,
           feature_created_at: feature?.created_at ?? product.created_at,
           feature_updated_at: feature?.updated_at ?? product.updated_at,
           owner_developer_username: null,
@@ -508,8 +511,11 @@ function createWriteCapableAdapter() {
         allow_version_check: params[5],
         allow_notices: params[6],
         allow_client_unbind: params[7],
-        created_at: params[8],
-        updated_at: params[9]
+        require_startup_bootstrap: params[8],
+        require_local_token_validation: params[9],
+        require_heartbeat_gate: params[10],
+        created_at: params[11],
+        updated_at: params[12]
       });
       return [];
     }
@@ -2913,12 +2919,14 @@ test("postgres main store can write products and policies through a transaction-
       featureConfig: {
         allowRegister: true,
         allowCardRecharge: false,
-        allowClientUnbind: false
+        allowClientUnbind: false,
+        requireHeartbeatGate: false
       }
     });
     assert.equal(featureUpdated.featureConfig.allowRegister, true);
     assert.equal(featureUpdated.featureConfig.allowCardRecharge, false);
     assert.equal(featureUpdated.featureConfig.allowClientUnbind, false);
+    assert.equal(featureUpdated.featureConfig.requireHeartbeatGate, false);
 
     const policy = await app.services.createPolicy(admin.token, {
       productCode: "PGWRITE",

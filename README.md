@@ -394,6 +394,8 @@ npm run db:postgres:check
 - 项目停用或归档时，会同步回收该项目下的活跃会话，避免旧授权继续在线
 - 管理员和开发者工作台都支持批量状态切换、批量写入项目功能开关、批量轮换 SDK 凭据，以及批量导出当前 SDK 凭据清单，便于一次性停用、归档、恢复、统一项目能力入口，或在泄漏后集中更换密钥
 - 软件作者可以按项目控制 `allowRegister / allowAccountLogin / allowCardLogin / allowCardRecharge / allowVersionCheck / allowNotices / allowClientUnbind`
+- 软件作者也可以按项目控制一组“客户端加固”开关：`requireStartupBootstrap / requireLocalTokenValidation / requireHeartbeatGate`
+- 这组项目级开关影响的是客户端接入建议、启动引导和本地拦截强度；`HMAC` 请求签名、时间戳/nonce 防重放、服务端令牌校验这类核心协议安全仍然保持强制，不提供关闭入口
 - 项目级功能开关关闭后，对应客户端接口会返回“disabled by product”，运行链路也不会继续套用该项目的相关规则
 - 项目 SDK 凭据支持只轮换 `sdkAppSecret`，也支持连同 `sdkAppId` 一起轮换；旧凭据会立即失效，因此更适合在软件作者完成 SDK 配置更新后统一切换
 - 项目中心里的 SDK 凭据批量导出会同时生成 JSON、CSV 和 `.env` 片段，方便软件作者在轮换后把新凭据快速同步给接入工程
@@ -412,6 +414,9 @@ npm run db:postgres:check
 - `allowVersionCheck`
 - `allowNotices`
 - `allowClientUnbind`
+- `requireStartupBootstrap`
+- `requireLocalTokenValidation`
+- `requireHeartbeatGate`
 
 ### 开发者多项目模型
 

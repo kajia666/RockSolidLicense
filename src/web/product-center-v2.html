@@ -407,6 +407,24 @@
                 <option value="false">false</option>
               </select>
             </label>
+            <label>requireStartupBootstrap
+              <select id="create-require-startup-bootstrap">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>requireLocalTokenValidation
+              <select id="create-require-local-token-validation">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>requireHeartbeatGate
+              <select id="create-require-heartbeat-gate">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
           </div>
           <button class="secondary" id="create-btn">Create Product</button>
           <div class="hint">The product is created with SDK app credentials, an initial featureConfig snapshot, and an optional owner developer.</div>
@@ -470,6 +488,24 @@
             </label>
             <label>allowClientUnbind
               <select id="edit-allow-client-unbind">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>requireStartupBootstrap
+              <select id="edit-require-startup-bootstrap">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>requireLocalTokenValidation
+              <select id="edit-require-local-token-validation">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>requireHeartbeatGate
+              <select id="edit-require-heartbeat-gate">
                 <option value="true">true</option>
                 <option value="false">false</option>
               </select>
@@ -590,6 +626,24 @@
             </label>
             <label>Allow Client Unbind
               <select id="batch-allow-client-unbind">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Require Startup Bootstrap
+              <select id="batch-require-startup-bootstrap">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Require Local Token Validation
+              <select id="batch-require-local-token-validation">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Require Heartbeat Gate
+              <select id="batch-require-heartbeat-gate">
                 <option value="true">true</option>
                 <option value="false">false</option>
               </select>
@@ -845,7 +899,10 @@
           allowCardRecharge: stats.cardRechargeOpen ?? 0,
           allowVersionCheck: stats.versionCheckOpen ?? 0,
           allowNotices: stats.noticesOpen ?? 0,
-          allowClientUnbind: stats.clientUnbindOpen ?? 0
+          allowClientUnbind: stats.clientUnbindOpen ?? 0,
+          requireStartupBootstrap: stats.startupBootstrapRequired ?? 0,
+          requireLocalTokenValidation: stats.localTokenValidationRequired ?? 0,
+          requireHeartbeatGate: stats.heartbeatGateRequired ?? 0
         };
 
         el("feature-summary-box").innerHTML = window.RSProductFeatures.entries
@@ -867,7 +924,10 @@
           cardRechargeOpen: featureEnabledCount(items, "allowCardRecharge"),
           versionCheckOpen: featureEnabledCount(items, "allowVersionCheck"),
           noticesOpen: featureEnabledCount(items, "allowNotices"),
-          clientUnbindOpen: featureEnabledCount(items, "allowClientUnbind")
+          clientUnbindOpen: featureEnabledCount(items, "allowClientUnbind"),
+          startupBootstrapRequired: featureEnabledCount(items, "requireStartupBootstrap"),
+          localTokenValidationRequired: featureEnabledCount(items, "requireLocalTokenValidation"),
+          heartbeatGateRequired: featureEnabledCount(items, "requireHeartbeatGate")
         };
 
         el("stats-box").innerHTML = `

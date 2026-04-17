@@ -56,10 +56,13 @@ Typical body:
     "allowRegister": true,
     "allowAccountLogin": true,
     "allowCardLogin": true,
-    "allowCardRecharge": true,
-    "allowVersionCheck": true,
-    "allowNotices": true,
-    "allowClientUnbind": false
+  "allowCardRecharge": true,
+  "allowVersionCheck": true,
+  "allowNotices": true,
+  "allowClientUnbind": false,
+  "requireStartupBootstrap": true,
+  "requireLocalTokenValidation": true,
+  "requireHeartbeatGate": true
   }
 }
 ```
@@ -75,6 +78,11 @@ Typical body:
 - `allowVersionCheck`
 - `allowNotices`
 - `allowClientUnbind`
+- `requireStartupBootstrap`
+- `requireLocalTokenValidation`
+- `requireHeartbeatGate`
+
+The last 3 toggles are project-level client hardening controls. They let the software author decide whether the client should strictly require startup bootstrap, locally verify `licenseToken`, and gate protected features on heartbeat health. Core protocol security stays mandatory even if these project-level toggles are relaxed.
 
 ## Project profile editing
 

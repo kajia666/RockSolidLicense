@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS product_feature_configs (
   allow_version_check BOOLEAN NOT NULL DEFAULT TRUE,
   allow_notices BOOLEAN NOT NULL DEFAULT TRUE,
   allow_client_unbind BOOLEAN NOT NULL DEFAULT TRUE,
+  require_startup_bootstrap BOOLEAN NOT NULL DEFAULT TRUE,
+  require_local_token_validation BOOLEAN NOT NULL DEFAULT TRUE,
+  require_heartbeat_gate BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE

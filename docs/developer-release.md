@@ -109,6 +109,7 @@ The release workspace can now generate a project-scoped release delivery package
 - the selected channel's version manifest
 - a release-specific startup bootstrap preview
 - a release readiness summary with blocking and attention checks
+- a client hardening summary that reflects the project's startup/token/heartbeat gating profile
 - a delivery summary that condenses the main handoff points for software authors and release operators
 - a delivery checklist that turns the handoff into concrete pass/review/block items
 - active runtime notices that affect startup or login
@@ -130,6 +131,7 @@ Typical uses:
 
 - hand the release manager a single deployment snapshot for one software project
 - verify that the download URL, force-update floor, and maintenance notices match the latest SDK credentials
+- confirm whether the project is shipping with a strict, balanced, or relaxed client hardening profile
 - decide whether the selected release should be held, shipped with attention, or treated as ready before rollout
 - export release coordination material for viewer members without giving them write access
 - hand over a matching SHA-256 checksum list so operators can verify downloaded files before distribution

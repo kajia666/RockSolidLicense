@@ -36,6 +36,7 @@ async function loadProductRow(adapter, productId) {
     `
       SELECT p.*, pfc.allow_register, pfc.allow_account_login, pfc.allow_card_login, pfc.allow_card_recharge,
              pfc.allow_version_check, pfc.allow_notices, pfc.allow_client_unbind,
+             pfc.require_startup_bootstrap, pfc.require_local_token_validation, pfc.require_heartbeat_gate,
              pfc.created_at AS feature_created_at, pfc.updated_at AS feature_updated_at,
              da.id AS owner_developer_id,
              da.username AS owner_developer_username,
@@ -63,6 +64,7 @@ async function persistProductFeatureConfig(adapter, productId, body = {}, timest
     `
       SELECT allow_register, allow_account_login, allow_card_login, allow_card_recharge,
              allow_version_check, allow_notices, allow_client_unbind,
+             require_startup_bootstrap, require_local_token_validation, require_heartbeat_gate,
              created_at AS feature_created_at, updated_at AS feature_updated_at
       FROM product_feature_configs
       WHERE product_id = $1
@@ -97,10 +99,13 @@ async function persistProductFeatureConfig(adapter, productId, body = {}, timest
         allow_version_check,
         allow_notices,
         allow_client_unbind,
+        require_startup_bootstrap,
+        require_local_token_validation,
+        require_heartbeat_gate,
         created_at,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       ON CONFLICT(product_id) DO UPDATE SET
         allow_register = EXCLUDED.allow_register,
         allow_account_login = EXCLUDED.allow_account_login,
@@ -109,6 +114,9 @@ async function persistProductFeatureConfig(adapter, productId, body = {}, timest
         allow_version_check = EXCLUDED.allow_version_check,
         allow_notices = EXCLUDED.allow_notices,
         allow_client_unbind = EXCLUDED.allow_client_unbind,
+        require_startup_bootstrap = EXCLUDED.require_startup_bootstrap,
+        require_local_token_validation = EXCLUDED.require_local_token_validation,
+        require_heartbeat_gate = EXCLUDED.require_heartbeat_gate,
         updated_at = EXCLUDED.updated_at
     `,
     [

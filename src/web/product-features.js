@@ -48,6 +48,27 @@
       tagLabel: "unbind",
       summaryLabel: "Client Unbind Open",
       detailLabel: "allowClientUnbind"
+    },
+    {
+      key: "requireStartupBootstrap",
+      fieldSuffix: "require-startup-bootstrap",
+      tagLabel: "startup gate",
+      summaryLabel: "Startup Gate On",
+      detailLabel: "requireStartupBootstrap"
+    },
+    {
+      key: "requireLocalTokenValidation",
+      fieldSuffix: "require-local-token-validation",
+      tagLabel: "token verify",
+      summaryLabel: "Token Verify On",
+      detailLabel: "requireLocalTokenValidation"
+    },
+    {
+      key: "requireHeartbeatGate",
+      fieldSuffix: "require-heartbeat-gate",
+      tagLabel: "heartbeat gate",
+      summaryLabel: "Heartbeat Gate On",
+      detailLabel: "requireHeartbeatGate"
     }
   ]);
 

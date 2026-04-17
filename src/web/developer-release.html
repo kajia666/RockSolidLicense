@@ -620,6 +620,7 @@
         const nextActions = Array.isArray(readiness.nextActions) ? readiness.nextActions : [];
         const request = startupPreview.request || {};
         const noticeSummary = startupPreview.noticeSummary || {};
+        const clientHardening = startupPreview.clientHardening || releasePackage.manifest?.integration?.clientHardening || {};
 
         el("release-readiness").innerHTML = `
           <div style="margin-bottom:10px;">
@@ -632,7 +633,9 @@
           <div class="split-line"><span>Blocking Checks</span><span>${escapeHtml(readiness.blockingChecks ?? 0)}</span></div>
           <div class="split-line"><span>Attention Checks</span><span>${escapeHtml(readiness.attentionChecks ?? 0)}</span></div>
           <div class="split-line"><span>Active Notices</span><span>${escapeHtml(noticeSummary.total ?? 0)} active | ${escapeHtml(noticeSummary.blockingTotal ?? 0)} blocking</span></div>
+          <div class="split-line"><span>Client Hardening</span><span>${escapeHtml(clientHardening.profile || "-")} | startup=${escapeHtml(String(clientHardening.startupBootstrapRequired ?? false))} | token=${escapeHtml(String(clientHardening.localTokenValidationRequired ?? false))} | heartbeat=${escapeHtml(String(clientHardening.heartbeatGateRequired ?? false))}</span></div>
           <div class="hint" style="margin-top:12px;">${escapeHtml(readiness.message || "No release readiness summary available.")}</div>
+          ${clientHardening.summary ? `<div class="hint" style="margin-top:10px;">Client hardening: ${escapeHtml(clientHardening.summary)}</div>` : ""}
           ${checks.length ? `<div class="hint" style="margin-top:12px;">${checks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
@@ -647,8 +650,10 @@
           <div class="split-line"><span>Candidate Version</span><span>${escapeHtml(deliverySummary.candidateVersion || "-")}</span></div>
           <div class="split-line"><span>Startup Status</span><span>${escapeHtml(deliverySummary.startupStatus || "-")}</span></div>
           <div class="split-line"><span>Active Key ID</span><span class="mono">${escapeHtml(deliverySummary.activeKeyId || "-")}</span></div>
+          <div class="split-line"><span>Client Hardening</span><span>${escapeHtml(deliverySummary.clientHardeningProfile || clientHardening.profile || "-")}</span></div>
           <div class="split-line"><span>Artifacts</span><span>${escapeHtml(artifacts.packageJson || "-")} | ${escapeHtml(artifacts.packageSummary || "-")}</span></div>
           <div class="hint" style="margin-top:12px;">${escapeHtml(deliverySummary.summary || "No delivery summary is available yet.")}</div>
+          ${deliverySummary.clientHardeningSummary ? `<div class="hint" style="margin-top:10px;">Hardening: ${escapeHtml(deliverySummary.clientHardeningSummary)}</div>` : ""}
           ${deliverySummary.startupMessage ? `<div class="hint" style="margin-top:10px;">Startup: ${escapeHtml(deliverySummary.startupMessage)}</div>` : ""}
           ${handoffChecks.length ? `<div class="hint" style="margin-top:12px;">${handoffChecks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
           ${deliveryActions.length ? `<div class="hint" style="margin-top:12px;">Handoff actions:<br>${deliveryActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}

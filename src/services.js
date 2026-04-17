@@ -99,7 +99,10 @@ const MANAGED_PRODUCT_FEATURE_KEYS = Object.freeze([
   "allowCardRecharge",
   "allowVersionCheck",
   "allowNotices",
-  "allowClientUnbind"
+  "allowClientUnbind",
+  "requireStartupBootstrap",
+  "requireLocalTokenValidation",
+  "requireHeartbeatGate"
 ]);
 
 function one(db, sql, ...params) {
@@ -492,6 +495,74 @@ function buildIntegrationSigningSnapshot(config) {
   };
 }
 
+function buildClientHardeningProfile(featureConfig = {}) {
+  const startupBootstrapRequired = featureConfig.requireStartupBootstrap !== false;
+  const localTokenValidationRequired = featureConfig.requireLocalTokenValidation !== false;
+  const heartbeatGateRequired = featureConfig.requireHeartbeatGate !== false;
+  const controls = [
+    {
+      key: "requireStartupBootstrap",
+      label: "Startup bootstrap",
+      required: startupBootstrapRequired,
+      requiredSummary: "Call startup-bootstrap before showing login or recharge UI.",
+      relaxedSummary: "Startup bootstrap is recommended, but this project does not force it as a client-side gate."
+    },
+    {
+      key: "requireLocalTokenValidation",
+      label: "Local token validation",
+      required: localTokenValidationRequired,
+      requiredSummary: "Cache public token keys and verify licenseToken signatures locally before unlocking protected features.",
+      relaxedSummary: "Local licenseToken validation is optional here, so the client can rely more heavily on server-side checks."
+    },
+    {
+      key: "requireHeartbeatGate",
+      label: "Heartbeat gate",
+      required: heartbeatGateRequired,
+      requiredSummary: "Keep protected features behind a healthy heartbeat and react quickly to revoked or expired sessions.",
+      relaxedSummary: "Heartbeat is still recommended for online status, but local feature gating after heartbeat loss is relaxed."
+    }
+  ];
+  const requiredCount = controls.filter((item) => item.required).length;
+  let profile = "strict";
+  let title = "Strict client hardening";
+  let summary = "Startup bootstrap, local token validation, and heartbeat gating are all expected in the client.";
+  let nextAction = "Keep the SDK integrated with startup bootstrap, local token checks, and heartbeat-driven feature gating.";
+
+  if (requiredCount === 2) {
+    profile = "balanced";
+    title = "Balanced client hardening";
+    summary = "Most client-side hardening controls stay enabled, but one anti-crack gate is intentionally relaxed for this project.";
+    nextAction = "Confirm the relaxed control matches this project's threat model before shipping the client.";
+  } else if (requiredCount <= 1) {
+    profile = "relaxed";
+    title = "Relaxed client hardening";
+    summary = "This project leans more on server-side authorization and keeps fewer client-side anti-crack gates enabled.";
+    nextAction = "Only use the relaxed profile when the software author intentionally accepts a lower client hardening bar.";
+  }
+
+  return {
+    profile,
+    title,
+    summary,
+    nextAction,
+    requiredCount,
+    totalControls: controls.length,
+    startupBootstrapRequired,
+    localTokenValidationRequired,
+    heartbeatGateRequired,
+    controls: controls.map((item) => ({
+      key: item.key,
+      label: item.label,
+      required: item.required,
+      summary: item.required ? item.requiredSummary : item.relaxedSummary
+    })),
+    coreProtocolNotes: [
+      "HMAC request signing, timestamp/nonce replay protection, and server-side token verification stay mandatory.",
+      "Project hardening toggles change client-side guidance, not the core runtime trust chain."
+    ]
+  };
+}
+
 function buildIntegrationExamples() {
   return {
     http: [
@@ -541,6 +612,7 @@ function buildIntegrationEnvTemplate(manifest) {
   const signing = manifest.signing || {};
   const project = manifest.project || {};
   const credentials = manifest.credentials || {};
+  const clientHardening = manifest.clientHardening || buildClientHardeningProfile(project.featureConfig || {});
 
   return [
     `RS_PROJECT_CODE=${project.code || ""}`,
@@ -556,7 +628,10 @@ function buildIntegrationEnvTemplate(manifest) {
     `RS_TCP_PORT=${tcp.port ?? ""}`,
     `RS_REQUEST_SKEW_SECONDS=${signing.requestSkewSeconds ?? ""}`,
     `RS_TOKEN_ISSUER=${signing.tokenIssuer || ""}`,
-    `RS_ACTIVE_KEY_ID=${signing.activeKeyId || ""}`
+    `RS_ACTIVE_KEY_ID=${signing.activeKeyId || ""}`,
+    `RS_REQUIRE_STARTUP_BOOTSTRAP=${clientHardening.startupBootstrapRequired ? "true" : "false"}`,
+    `RS_REQUIRE_LOCAL_TOKEN_VALIDATION=${clientHardening.localTokenValidationRequired ? "true" : "false"}`,
+    `RS_REQUIRE_HEARTBEAT_GATE=${clientHardening.heartbeatGateRequired ? "true" : "false"}`
   ].join("\n");
 }
 
@@ -566,6 +641,16 @@ function buildIntegrationCppQuickstart(manifest) {
   const transport = manifest.transport || {};
   const http = resolveIntegrationHttpEndpoint(transport.http || {});
   const tcp = transport.tcp || {};
+  const clientHardening = manifest.clientHardening || buildClientHardeningProfile(project.featureConfig || {});
+  const startupComment = clientHardening.startupBootstrapRequired
+    ? "Call startup bootstrap before login or recharge UI and enforce the returned decision."
+    : "Startup bootstrap is still recommended before login, but this project does not force it as a local UI gate.";
+  const tokenComment = clientHardening.localTokenValidationRequired
+    ? "Cache the returned public keys and verify licenseToken signatures locally before unlocking protected features."
+    : "Local licenseToken validation is optional here, but keeping it enabled still raises the patching cost.";
+  const heartbeatComment = clientHardening.heartbeatGateRequired
+    ? "Keep protected features behind a healthy heartbeat and react immediately to revoked or expired sessions."
+    : "Heartbeat is still recommended for online state, but this project uses a softer local feature gate after heartbeat loss.";
 
   return `#include "rocksolid_transport_win.hpp"
 
@@ -590,14 +675,16 @@ const std::string product_code = "${escapeCppStringLiteral(project.code || "")}"
 const std::string client_version = "1.0.0";
 const std::string channel = "stable";
 
+// ${escapeCppStringLiteral(startupComment)}
 const rocksolid::ClientStartupBootstrapResponse startup =
-  client.startup_bootstrap_http({ product_code, client_version, channel, true });
+  client.startup_bootstrap_http({ product_code, client_version, channel, ${clientHardening.localTokenValidationRequired ? "true" : "false"} });
 const rocksolid::ClientStartupDecision startup_decision =
   rocksolid::LicenseClientWin::evaluate_startup_decision(startup);
 
 if (!startup_decision.allow_login) {
   // Show startup_decision.primary_title / primary_message and skip login here.
 } else {
+  // ${escapeCppStringLiteral(tokenComment)}
   rocksolid::LoginRequest login_request{
     product_code,
     "demo_user",
@@ -609,6 +696,7 @@ if (!startup_decision.allow_login) {
   };
 
   const rocksolid::LoginResponse login_result = client.login_http_parsed(login_request);
+  // ${escapeCppStringLiteral(heartbeatComment)}
 }`;
 }
 
@@ -620,8 +708,11 @@ function buildIntegrationStartupWorkflow({
   blockingNoticeRows = [],
   includeTokenKeys = true
 }) {
+  const clientHardening = buildClientHardeningProfile(featureConfig);
   const workflow = [
-    "Call POST /api/client/startup-bootstrap before showing login or recharge UI."
+    clientHardening.startupBootstrapRequired
+      ? "Call POST /api/client/startup-bootstrap before showing login or recharge UI."
+      : "Call POST /api/client/startup-bootstrap during app launch as a recommended pre-login step."
   ];
 
   if (!projectActive) {
@@ -650,10 +741,20 @@ function buildIntegrationStartupWorkflow({
     workflow.push("Startup notices are currently disabled for this project.");
   }
 
-  if (includeTokenKeys) {
+  if (clientHardening.localTokenValidationRequired && includeTokenKeys) {
     workflow.push("Cache the returned public token keys so the client can verify licenseToken signatures locally.");
-  } else {
+  } else if (clientHardening.localTokenValidationRequired) {
     workflow.push("Request token keys during startup if the client also needs local licenseToken verification.");
+  } else if (includeTokenKeys) {
+    workflow.push("Token keys are still included, so the client can optionally verify licenseToken signatures for extra hardening.");
+  } else {
+    workflow.push("Local licenseToken verification is optional for this project, but enabling token key retrieval still raises the reverse-engineering bar.");
+  }
+
+  if (clientHardening.heartbeatGateRequired) {
+    workflow.push("Stop protected features locally when heartbeat renewals fail or the runtime session becomes invalid.");
+  } else {
+    workflow.push("Heartbeat is still recommended for online status, but local feature gating after heartbeat loss is relaxed for this project.");
   }
 
   return workflow;
@@ -666,13 +767,16 @@ async function buildIntegrationStartupPreviewPayload(
   tokenKeys,
   startupRequest = {}
 ) {
+  const featureConfig = snapshotManagedProductFeatureConfig(resolveProductFeatureConfig(db, product));
+  const clientHardening = buildClientHardeningProfile(featureConfig);
   const request = {
     productCode: product.code,
     clientVersion: String(startupRequest.clientVersion ?? "1.0.0").trim() || "1.0.0",
     channel: normalizeChannel(startupRequest.channel, "stable"),
-    includeTokenKeys: startupRequest.includeTokenKeys !== false
+    includeTokenKeys: startupRequest.includeTokenKeys !== undefined
+      ? startupRequest.includeTokenKeys !== false
+      : clientHardening.localTokenValidationRequired
   };
-  const featureConfig = snapshotManagedProductFeatureConfig(resolveProductFeatureConfig(db, product));
   const projectActive = (product.status ?? "active") === "active";
   const versionManifest = featureConfig.allowVersionCheck !== false
     ? await buildVersionManifest(db, store, product, request.clientVersion, request.channel)
@@ -764,12 +868,16 @@ async function buildIntegrationStartupPreviewPayload(
   return {
     request,
     featureConfig,
+    clientHardening,
     runtimeChecks: {
       projectStatus: product.status,
       projectActive,
       versionCheckEnabled: featureConfig.allowVersionCheck !== false,
       noticesEnabled: featureConfig.allowNotices !== false,
-      includeTokenKeys: request.includeTokenKeys
+      includeTokenKeys: request.includeTokenKeys,
+      startupBootstrapRequired: clientHardening.startupBootstrapRequired,
+      localTokenValidationRequired: clientHardening.localTokenValidationRequired,
+      heartbeatGateRequired: clientHardening.heartbeatGateRequired
     },
     noticeSummary: {
       total: activeNoticeRows.length,
@@ -854,6 +962,12 @@ function buildDeveloperIntegrationPackagePayload({
     channel: "stable",
     includeTokenKeys: true
   };
+  const clientHardening = startupPreview?.clientHardening
+    || buildClientHardeningProfile(
+      product?.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {}
+    );
   const manifest = {
     generatedAt,
     developer: developer ?? ownerDeveloper ?? null,
@@ -880,6 +994,7 @@ function buildDeveloperIntegrationPackagePayload({
     transport,
     signing,
     tokenKeys,
+    clientHardening,
     startupDefaults,
     startupPreview,
     examples,
@@ -891,7 +1006,8 @@ function buildDeveloperIntegrationPackagePayload({
     },
     notes: [
       "Replace the demo host values with your public service domain when you deploy behind a reverse proxy or TLS.",
-      "Refresh this package immediately after rotating sdkAppId or sdkAppSecret, then redeploy the client configuration."
+      "Refresh this package immediately after rotating sdkAppId or sdkAppSecret, then redeploy the client configuration.",
+      `${clientHardening.title}: ${clientHardening.summary}`
     ]
   };
 
@@ -1120,6 +1236,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
   const versionManifest = release.versionManifest || {};
   const activeNotices = release.activeNotices || {};
   const readiness = release.readiness || {};
+  const clientHardening = release.startupPreview?.clientHardening || manifest.integration?.clientHardening || {};
   const noticeItems = Array.isArray(activeNotices.items) ? activeNotices.items : [];
   const lines = [
     "RockSolid Release Delivery Package",
@@ -1132,6 +1249,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     `Latest Download URL: ${versionManifest.latestDownloadUrl || "-"}`,
     `Active Notices: ${activeNotices.total ?? 0}`,
     `Blocking Notices: ${activeNotices.blockingTotal ?? 0}`,
+    `Client Hardening: ${String(clientHardening.profile || "-").toUpperCase()}`,
     `Release Readiness: ${String(readiness.status || "unknown").toUpperCase()}`,
     `Release Message: ${readiness.message || "-"}`,
     ""
@@ -1142,8 +1260,12 @@ function buildReleasePackageSummaryText(manifest = {}) {
   lines.push(`- Candidate Version: ${deliverySummary.candidateVersion || "-"}`);
   lines.push(`- Startup Status: ${deliverySummary.startupStatus || "-"}`);
   lines.push(`- Active Key ID: ${deliverySummary.activeKeyId || "-"}`);
+  lines.push(`- Client Hardening: ${String(deliverySummary.clientHardeningProfile || clientHardening.profile || "-").toUpperCase()}`);
   lines.push(`- Blocking Notices: ${deliverySummary.blockingNotices ?? 0}`);
   lines.push(`- Summary: ${deliverySummary.summary || "-"}`);
+  if (deliverySummary.clientHardeningSummary) {
+    lines.push(`- Hardening Summary: ${deliverySummary.clientHardeningSummary}`);
+  }
   if (deliverySummary.artifacts) {
     lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"}`);
   }
@@ -1206,6 +1328,12 @@ function buildReleaseDeliveryChecklistPayload({
   const blockingNotices = activeItems.filter((item) => item.blockLogin);
   const startupDecision = releaseStartupPreview?.decision || {};
   const tokenKeySummary = releaseStartupPreview?.tokenKeySummary || {};
+  const clientHardening = releaseStartupPreview?.clientHardening
+    || buildClientHardeningProfile(
+      product?.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {}
+    );
   const items = [];
 
   items.push({
@@ -1293,6 +1421,15 @@ function buildReleaseDeliveryChecklistPayload({
   });
 
   items.push({
+    key: "client_hardening",
+    label: "Client hardening profile",
+    status: clientHardening.profile === "strict" ? "pass" : "review",
+    summary: clientHardening.summary,
+    artifact: "manifest.integration.clientHardening",
+    nextAction: clientHardening.profile === "strict" ? null : clientHardening.nextAction
+  });
+
+  items.push({
     key: "handoff_artifacts",
     label: "Handoff artifacts",
     status: "pass",
@@ -1333,6 +1470,13 @@ function buildReleaseDeliverySummaryPayload({
   const activeKeyId = integrationPackage?.manifest?.signing?.activeKeyId
     || releaseStartupPreview?.tokenKeySummary?.activeKeyId
     || null;
+  const clientHardening = releaseStartupPreview?.clientHardening
+    || integrationPackage?.manifest?.clientHardening
+    || buildClientHardeningProfile(
+      product?.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {}
+    );
   const blockingNotices = activeNotices.filter((item) => item.blockLogin);
   const startupStatus = releaseStartupPreview?.decision?.status || "unknown";
   const startupMessage = releaseStartupPreview?.decision?.message || null;
@@ -1363,6 +1507,8 @@ function buildReleaseDeliverySummaryPayload({
     startupStatus,
     startupMessage,
     activeKeyId,
+    clientHardeningProfile: clientHardening.profile,
+    clientHardeningSummary: clientHardening.summary,
     activeNotices: activeNotices.length,
     blockingNotices: blockingNotices.length,
     artifacts: {
@@ -1394,6 +1540,7 @@ function buildReleaseReadinessPayload({
       ? product.featureConfig
       : {}
   );
+  const clientHardening = releaseStartupPreview?.clientHardening || buildClientHardeningProfile(featureConfig);
   const latestVersion = versionManifest?.latestVersion || null;
   const latestDownloadUrl = versionManifest?.latestDownloadUrl || null;
   const blockingNotices = activeNotices.filter((item) => item.blockLogin);
@@ -1492,6 +1639,15 @@ function buildReleaseReadinessPayload({
     nextAction: featureConfig.allowVersionCheck === false || featureConfig.allowNotices === false
       ? "Review project feature toggles if this release should enforce upgrade guidance or show startup notices."
       : null
+  });
+
+  checks.push({
+    key: "client_hardening",
+    label: "Client hardening",
+    level: clientHardening.profile === "strict" ? "ok" : "attention",
+    blocking: false,
+    summary: clientHardening.summary,
+    nextAction: clientHardening.profile === "strict" ? null : clientHardening.nextAction
   });
 
   checks.push({

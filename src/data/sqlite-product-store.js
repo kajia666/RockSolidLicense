@@ -59,7 +59,9 @@ function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIs
       `
         UPDATE product_feature_configs
         SET allow_register = ?, allow_account_login = ?, allow_card_login = ?, allow_card_recharge = ?,
-            allow_version_check = ?, allow_notices = ?, allow_client_unbind = ?, updated_at = ?
+            allow_version_check = ?, allow_notices = ?, allow_client_unbind = ?,
+            require_startup_bootstrap = ?, require_local_token_validation = ?, require_heartbeat_gate = ?,
+            updated_at = ?
         WHERE product_id = ?
       `,
       ...values,
@@ -80,10 +82,13 @@ function persistProductFeatureConfig(db, productId, body = {}, timestamp = nowIs
           allow_version_check,
           allow_notices,
           allow_client_unbind,
+          require_startup_bootstrap,
+          require_local_token_validation,
+          require_heartbeat_gate,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       productId,
       ...values,

@@ -40,6 +40,7 @@ copy /Y sdk\CPP_SDK_PACKAGE_README.md "%CPP_ROOT%\README.md" >nul
 copy /Y sdk\VERSION "%CPP_ROOT%\VERSION.txt" >nul
 copy /Y "%RELEASE_DIR%\rocksolid_sdk_static.lib" "%CPP_ROOT%\lib\" >nul
 copy /Y sdk\examples\windows_client_demo.cpp "%CPP_ROOT%\examples\" >nul
+copy /Y sdk\examples\windows_host_skeleton_template.cpp "%CPP_ROOT%\examples\" >nul
 if exist "%CPP_ROOT%\examples\cmake_cpp_consumer" rmdir /s /q "%CPP_ROOT%\examples\cmake_cpp_consumer"
 xcopy /E /I /Y sdk\examples\cmake_cpp_consumer "%CPP_ROOT%\examples\cmake_cpp_consumer\" >nul
 copy /Y sdk\WINDOWS_SDK_GUIDE.md "%CPP_ROOT%\docs\" >nul

@@ -27,6 +27,11 @@ if not exist "%CPP_ROOT%\examples\windows_client_demo.cpp" (
   goto :fail
 )
 
+if not exist "%CPP_ROOT%\examples\windows_host_skeleton_template.cpp" (
+  echo Missing C++ host skeleton template at %CPP_ROOT%\examples\windows_host_skeleton_template.cpp
+  goto :fail
+)
+
 if not exist "%CAPI_ROOT%\examples\c_api_demo.c" (
   echo Missing C API package at %CAPI_ROOT%
   goto :fail
@@ -53,6 +58,16 @@ cl /nologo /EHsc /std:c++17 /DRS_SDK_STATIC ^
   /Fe"%VERIFY_ROOT%\cpp\windows_client_demo.exe" ^
   /Fo"%VERIFY_ROOT%\cpp\\" ^
   /Fd"%VERIFY_ROOT%\cpp\\windows_client_demo.pdb"
+if errorlevel 1 goto :fail
+
+cl /nologo /EHsc /std:c++17 /DRS_SDK_STATIC ^
+  "%CPP_ROOT%\examples\windows_host_skeleton_template.cpp" ^
+  /I "%CPP_ROOT%\include" ^
+  "%CPP_ROOT%\lib\rocksolid_sdk_static.lib" ^
+  bcrypt.lib winhttp.lib ws2_32.lib crypt32.lib ^
+  /Fe"%VERIFY_ROOT%\cpp\windows_host_skeleton_template.exe" ^
+  /Fo"%VERIFY_ROOT%\cpp\\" ^
+  /Fd"%VERIFY_ROOT%\cpp\\windows_host_skeleton_template.pdb"
 if errorlevel 1 goto :fail
 
 cl /nologo ^

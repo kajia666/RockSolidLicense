@@ -34,6 +34,7 @@ Terminology:
 - read recent audit logs
 - use the ops snapshot overview to surface focus accounts, sessions, and devices with severity, next-action hints, and a recommended action queue, then click back into matching filters and quick controls directly
 - use audit preset buttons and row-click backfill inside `/admin` to narrow down common session, device, and entitlement events faster
+- review entitlements from a dedicated admin table, then click a row to prefill entitlement quick controls before freezing, extending, or adjusting points
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints
@@ -139,6 +140,7 @@ Effects:
 - disabling `allowRegister`, `allowAccountLogin`, `allowCardLogin`, `allowCardRecharge`, or `allowClientUnbind` blocks the corresponding signed client endpoint
 - `POST /api/client/bindings` still works when self-unbind is disabled, but the returned `unbindPolicy` will reflect that the product-level switch is off
 - `/admin` ops snapshot preview now surfaces common reasons plus focus account/session/device detail lists, each with severity and next-action hints, and also builds a recommended action queue that can prefill account, entitlement, session, or device controls before drilling down further
+- `/admin` now also includes an `Entitlements Review` table so administrators can inspect matching entitlements directly and copy the selected entitlement into the quick-control form without leaving the console
 
 ### Developer project management
 

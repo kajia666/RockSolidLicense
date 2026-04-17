@@ -662,6 +662,7 @@
             <button class="ghost" id="load-bindings-btn">加载设备</button>
             <button class="ghost" id="load-blocks-btn">加载封禁</button>
             <button class="ghost" id="load-sessions-btn">加载会话</button>
+            <button class="ghost" id="load-entitlements-btn">Load Entitlements</button>
             <button class="secondary" id="preview-ops-export-btn">Preview Ops Snapshot</button>
             <button class="ghost" id="download-ops-json-btn">Download JSON</button>
             <button class="ghost" id="download-ops-summary-btn">Download Summary</button>
@@ -777,6 +778,26 @@
                 </tr>
               </thead>
               <tbody id="accounts-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Entitlements Review</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Product</th>
+                  <th>Policy</th>
+                  <th>Status</th>
+                  <th>Grant</th>
+                  <th>Ends</th>
+                  <th>Sessions</th>
+                </tr>
+              </thead>
+              <tbody id="entitlements-body"></tbody>
             </table>
           </div>
         </article>
@@ -1604,6 +1625,45 @@
         }
       }
 
+      function renderEntitlements(items) {
+        if (!items.length) {
+          renderEmptyRow("entitlements-body", 7, "No matching entitlements.");
+          return;
+        }
+
+        el("entitlements-body").innerHTML = items.map((item) => {
+          const grant = item.grantType === "points"
+            ? `points ${escapeHtml(item.remainingPoints ?? 0)}/${escapeHtml(item.totalPoints ?? 0)}`
+            : `until ${escapeHtml(formatTime(item.endsAt))}`;
+          return `
+            <tr
+              data-entitlement-id="${escapeHtml(item.id)}"
+              data-status="${escapeHtml(item.status)}"
+              data-product-code="${escapeHtml(item.productCode)}"
+              data-username="${escapeHtml(item.username)}"
+            >
+              <td><strong>${escapeHtml(item.username || "-")}</strong><div class="mono">${escapeHtml(shortText(item.id, 20))}</div></td>
+              <td>${escapeHtml(item.productCode || "-")}</td>
+              <td>${escapeHtml(item.policyName || "-")}</td>
+              <td>${renderTag(item.lifecycleStatus || item.status)}</td>
+              <td>${grant}</td>
+              <td>${escapeHtml(formatTime(item.endsAt))}</td>
+              <td>${escapeHtml(item.activeSessionCount ?? 0)}</td>
+            </tr>
+          `;
+        }).join("");
+
+        for (const row of el("entitlements-body").querySelectorAll("tr")) {
+          row.addEventListener("click", () => {
+            el("entitlement-id").value = row.dataset.entitlementId || "";
+            el("entitlement-status").value = row.dataset.status || "active";
+            el("ops-product-code").value = row.dataset.productCode || el("ops-product-code").value;
+            el("ops-username").value = row.dataset.username || el("ops-username").value;
+            setStatus("Entitlement review selection copied into quick controls.");
+          });
+        }
+      }
+
       function renderBindings(items) {
         if (!items.length) {
           renderEmptyRow("bindings-body", 7, "没有匹配的设备绑定。");
@@ -1783,6 +1843,13 @@
         setStatus(`账号列表已刷新，共 ${data.total} 条。`);
       }
 
+      async function loadEntitlements() {
+        const data = await callApi(`/api/admin/entitlements${buildQuery(readOpsFilters())}`);
+        renderEntitlements(data.items);
+        setOutput(data);
+        setStatus(`Entitlements refreshed: ${data.total}`);
+      }
+
       async function loadBindings() {
         const filters = readOpsFilters();
         filters.status = el("ops-binding-status").value;
@@ -1867,6 +1934,7 @@
       async function refreshAllPanels() {
         await refreshDashboard();
         await loadAccounts();
+        await loadEntitlements();
         await loadBindings();
         await loadBlocks();
         await loadSessions();
@@ -1905,6 +1973,9 @@
       el("refresh-dashboard-btn").addEventListener("click", () => guarded(refreshDashboard));
       el("load-audit-btn").addEventListener("click", () => guarded(loadAuditLogs));
       el("load-accounts-btn").addEventListener("click", () => guarded(loadAccounts));
+      if (el("load-entitlements-btn")) {
+        el("load-entitlements-btn").addEventListener("click", () => guarded(loadEntitlements));
+      }
       el("load-bindings-btn").addEventListener("click", () => guarded(loadBindings));
       el("load-blocks-btn").addEventListener("click", () => guarded(loadBlocks));
       el("load-sessions-btn").addEventListener("click", () => guarded(loadSessions));
@@ -2075,6 +2146,9 @@
           });
           setOutput(data);
           setStatus(`Entitlement status updated: ${data.status}`);
+          await loadAccounts();
+          await loadEntitlements();
+          await loadSessions();
           await refreshDashboard();
           await loadAuditLogs();
         }));
@@ -2094,6 +2168,8 @@
           });
           setOutput(data);
           setStatus(`Entitlement extended by ${data.addedDays ?? el("extend-days").value} days.`);
+          await loadAccounts();
+          await loadEntitlements();
           await refreshDashboard();
           await loadAuditLogs();
         }));
@@ -2114,6 +2190,7 @@
           });
           setOutput(data);
           setStatus(`Entitlement points updated: ${data.mode || el("point-mode").value}.`);
+          await loadEntitlements();
           await refreshDashboard();
           await loadAuditLogs();
         }));

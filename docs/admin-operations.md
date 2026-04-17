@@ -43,6 +43,7 @@ Terminology:
 - the same recap now adds an explicit follow-up conclusion, so operators can quickly tell whether the next step is `Close Out`, `Monitor`, `Follow Up`, or `Escalate`
 - the recap also renders clickable follow-up actions, so operators can reopen the current focus, jump straight back to the recommended control, or refresh the snapshot without rebuilding context manually
 - the snapshot overview now also surfaces an `Escalate First` section ahead of the normal queue so the highest-priority queue entries stand out before operators scan the rest of the list
+- those `Escalate First` cards now compress product, user, reason, and suggested control into short tags so operators can triage faster before drilling in
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 
 ## HTTP endpoints

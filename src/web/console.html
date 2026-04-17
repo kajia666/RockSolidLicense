@@ -1738,7 +1738,7 @@
 
       function renderOverviewQueueItem(item = {}, index = 0, keyPrefix = "queue", urgent = false) {
         const focusKey = `${keyPrefix}:${index}`;
-        const urgentFlag = urgent || isUrgentQueueItem(item, index);
+        const urgentFlag = Boolean(urgent);
         adminOpsFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
         const headTags = [
           renderFocusSeverityBadge(item),
@@ -1746,6 +1746,19 @@
           `<span class="tag">#${escapeHtml(index + 1)}</span>`
         ].filter(Boolean).join("");
         return `<button type="button" class="snapshot-focus-item${urgentFlag ? " urgent" : ""}" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${headTags}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${renderFocusActionLine(item)}</button>`;
+      }
+
+      function renderEscalationSummaryTags(item = {}, index = 0) {
+        const tags = [
+          `<span class="tag danger">ESCALATE</span>`,
+          `<span class="tag">#${escapeHtml(index + 1)}</span>`,
+          item.productCode ? `<span class="tag">product:${escapeHtml(item.productCode)}</span>` : "",
+          item.username ? `<span class="tag">user:${escapeHtml(shortText(item.username, 18))}</span>` : "",
+          item.reason ? `<span class="tag warning">reason:${escapeHtml(shortText(item.reason, 24))}</span>` : "",
+          item.recommendedControl?.label ? `<span class="tag ok">control:${escapeHtml(shortText(item.recommendedControl.label, 28))}</span>` : "",
+          (item.actionHint || item.nextAction) ? `<span class="tag">next:${escapeHtml(shortText(item.actionHint || item.nextAction, 28))}</span>` : ""
+        ].filter(Boolean).join("");
+        return tags ? `<div class="audit-meta">${tags}</div>` : "";
       }
 
       function renderEscalationQueue(items = []) {
@@ -1759,7 +1772,11 @@
         if (!urgentEntries.length) {
           return "";
         }
-        return `<div class="snapshot-focus-list">${urgentEntries.map(({ item, index }) => renderOverviewQueueItem(item, index, "priority-queue", true)).join("")}</div>`;
+        return `<div class="snapshot-focus-list">${urgentEntries.map(({ item, index }) => {
+          const focusKey = `priority-queue:${index}`;
+          adminOpsFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
+          return `<button type="button" class="snapshot-focus-item urgent" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${renderEscalationSummaryTags(item, index)}${renderFocusActionLine(item)}</button>`;
+        }).join("")}</div>`;
       }
 
       function renderOverviewDetailList(items = [], kind, renderTitle, renderMeta) {

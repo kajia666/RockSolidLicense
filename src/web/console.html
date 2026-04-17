@@ -314,6 +314,45 @@
         gap: 6px;
       }
 
+      .snapshot-box {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(23, 32, 27, 0.08);
+        background: rgba(255, 255, 255, 0.74);
+        display: grid;
+        gap: 12px;
+      }
+
+      .snapshot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+      }
+
+      .snapshot-stat {
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.84);
+        border: 1px solid rgba(23, 32, 27, 0.08);
+      }
+
+      .snapshot-stat strong {
+        display: block;
+        font-size: 20px;
+      }
+
+      .snapshot-stat span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .snapshot-list {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
       pre {
         margin: 0;
         min-height: 220px;
@@ -541,6 +580,8 @@
           </div>
           <div class="hint">点击下方审计日志行，会自动回填事件筛选、产品代号、用户名以及相关操作 ID。</div>
           <div class="hint">支持通过 <code>/api/admin/ops/export</code> 和 <code>/api/admin/ops/export/download</code> 预览或下载管理员授权运营快照包。</div>
+          <div class="status" id="ops-preview-status">先点击 Preview Ops Snapshot，生成一份可交接的授权运营快照概览。</div>
+          <div class="snapshot-box" id="ops-preview-summary"></div>
         </article>
       </section>
 
@@ -745,6 +786,8 @@
 
     <script>
       let adminToken = "";
+      let adminOpsPreview = null;
+      let adminOpsLastDownload = null;
       const AUDIT_PRESET_BUTTONS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
       function el(id) {
@@ -928,6 +971,53 @@
           el("block-id").value = item.entity_id || "";
         }
         setStatus("已回填审计筛选和相关操作对象，可继续读取日志或直接处理对应记录。");
+      }
+
+      function renderOpsPreviewSummary() {
+        const statusBox = el("ops-preview-status");
+        const box = el("ops-preview-summary");
+        if (!adminOpsPreview || typeof adminOpsPreview !== "object") {
+          statusBox.textContent = "先点击 Preview Ops Snapshot，生成一份可交接的授权运营快照概览。";
+          statusBox.className = "status";
+          box.innerHTML = `<div class="hint">尚未生成管理员授权运营快照预览。</div>`;
+          return;
+        }
+
+        const overview = adminOpsPreview.overview || {};
+        const metrics = overview.metrics || {};
+        const highlights = Array.isArray(overview.highlights) ? overview.highlights : [];
+        const topAuditEvents = Array.isArray(overview.topAuditEvents) ? overview.topAuditEvents : [];
+        const topProducts = Array.isArray(overview.topProducts) ? overview.topProducts : [];
+        const statusText = overview.status === "attention"
+          ? "需要重点排查"
+          : overview.status === "empty"
+            ? "范围为空"
+            : "适合交接";
+        statusBox.textContent = `${statusText} | ${overview.headline || "快照概览已就绪。"}`;
+        statusBox.className = overview.status === "attention" ? "status warn" : "status";
+
+        const cards = [
+          { label: "导出项目", value: adminOpsPreview.summary?.projects ?? 0 },
+          { label: "禁用账号", value: metrics.disabledAccounts ?? 0 },
+          { label: "冻结 / 过期授权", value: `${metrics.frozenEntitlements ?? 0} / ${metrics.expiredEntitlements ?? 0}` },
+          { label: "活跃会话", value: metrics.activeSessions ?? 0 },
+          { label: "活跃封禁", value: metrics.activeBlocks ?? 0 },
+          { label: "最近审计", value: formatTime(overview.latestAuditAt || adminOpsPreview.generatedAt) }
+        ];
+
+        box.innerHTML = `
+          <div class="hint">生成时间 ${escapeHtml(formatTime(adminOpsPreview.generatedAt))}${adminOpsPreview.fileName ? ` | ${escapeHtml(adminOpsPreview.fileName)}` : ""}${adminOpsLastDownload?.fileName ? ` | 最近下载 ${escapeHtml(adminOpsLastDownload.fileName)}` : ""}</div>
+          <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${escapeHtml(item.value)}</strong><span>${escapeHtml(item.label)}</span></div>`).join("")}</div>
+          <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : `<div class="hint">暂无额外概览提示。</div>`}</div>
+          <div>
+            <div class="hint">高频审计事件</div>
+            <div class="audit-meta">${topAuditEvents.length ? topAuditEvents.map((item) => `<span class="tag">${escapeHtml(item.eventType)} x${escapeHtml(item.count)}</span>`).join("") : `<span class="tag">none</span>`}</div>
+          </div>
+          <div>
+            <div class="hint">高频项目</div>
+            <div class="audit-meta">${topProducts.length ? topProducts.map((item) => `<span class="tag">${escapeHtml(item.productCode)} x${escapeHtml(item.count)}</span>`).join("") : `<span class="tag">none</span>`}</div>
+          </div>
+        `;
       }
 
       async function callApi(path, options = {}) {
@@ -1296,6 +1386,8 @@
 
       async function previewOpsExport() {
         const data = await callApi(`/api/admin/ops/export${buildQuery(readAdminOpsExportFilters())}`);
+        adminOpsPreview = data;
+        renderOpsPreviewSummary();
         setOutput(data);
         setStatus(`授权运营快照已生成，覆盖 ${data.summary.projects} 个项目和 ${data.summary.auditLogs} 条审计记录。`);
       }
@@ -1312,6 +1404,8 @@
           download: details,
           filters: readAdminOpsExportFilters()
         });
+        adminOpsLastDownload = details;
+        renderOpsPreviewSummary();
         setStatus(`授权运营快照已下载：${details.fileName}`);
       }
 
@@ -1343,6 +1437,9 @@
           })
         });
         adminToken = data.token;
+        adminOpsPreview = null;
+        adminOpsLastDownload = null;
+        renderOpsPreviewSummary();
         el("session-strip").textContent = `已登录管理员 ${data.admin.username}，Bearer Token：${data.token}`;
         setOutput(data);
         setStatus("管理员登录成功，正在刷新控制台。");
@@ -1617,6 +1714,7 @@
       renderSessions([]);
       renderVersions([]);
       renderAuditLogs([]);
+      renderOpsPreviewSummary();
     </script>
   </body>
 </html>

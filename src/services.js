@@ -1744,9 +1744,183 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
   );
 }
 
+function normalizeSnapshotStatus(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function countSnapshotItems(items = [], statuses = []) {
+  const normalizedStatuses = new Set(statuses.map((value) => normalizeSnapshotStatus(value)));
+  return items.reduce((count, item) => {
+    return normalizedStatuses.has(normalizeSnapshotStatus(item?.status)) ? count + 1 : count;
+  }, 0);
+}
+
+function latestSnapshotTimestamp(values = []) {
+  let latest = null;
+  let latestMs = -1;
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+    const ms = new Date(value).getTime();
+    if (Number.isNaN(ms) || ms <= latestMs) {
+      continue;
+    }
+    latest = value;
+    latestMs = ms;
+  }
+  return latest;
+}
+
+function buildSnapshotTopCounts(items = [], selector, limit = 5) {
+  const counts = new Map();
+  for (const item of items) {
+    const rawValue = selector(item);
+    if (Array.isArray(rawValue)) {
+      for (const entry of rawValue) {
+        const value = String(entry ?? "").trim();
+        if (!value) {
+          continue;
+        }
+        counts.set(value, (counts.get(value) || 0) + 1);
+      }
+      continue;
+    }
+    const value = String(rawValue ?? "").trim();
+    if (!value) {
+      continue;
+    }
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((left, right) => {
+      if (right[1] !== left[1]) {
+        return right[1] - left[1];
+      }
+      return left[0].localeCompare(right[0]);
+    })
+    .slice(0, limit);
+}
+
+function buildSnapshotOverview({
+  generatedAt = nowIso(),
+  projects = [],
+  accounts = [],
+  entitlements = [],
+  sessions = [],
+  bindings = [],
+  blocks = [],
+  auditLogs = []
+} = {}) {
+  const metrics = {
+    activeProjects: projects.reduce((count, item) => count + (normalizeSnapshotStatus(item?.status || "active") === "active" ? 1 : 0), 0),
+    inactiveProjects: projects.reduce((count, item) => count + (normalizeSnapshotStatus(item?.status || "active") !== "active" ? 1 : 0), 0),
+    disabledAccounts: countSnapshotItems(accounts, ["disabled"]),
+    frozenEntitlements: entitlements.reduce((count, item) => {
+      return normalizeSnapshotStatus(item?.lifecycleStatus || item?.status) === "frozen" ? count + 1 : count;
+    }, 0),
+    expiredEntitlements: entitlements.reduce((count, item) => {
+      return normalizeSnapshotStatus(item?.lifecycleStatus || item?.status) === "expired" ? count + 1 : count;
+    }, 0),
+    pointExhaustedEntitlements: entitlements.reduce((count, item) => {
+      const grantType = normalizeSnapshotStatus(item?.grantType || "duration");
+      if (grantType !== "points") {
+        return count;
+      }
+      return Number(item?.remainingPoints || 0) <= 0 ? count + 1 : count;
+    }, 0),
+    activeSessions: countSnapshotItems(sessions, ["active"]),
+    expiredSessions: countSnapshotItems(sessions, ["expired"]),
+    activeBindings: countSnapshotItems(bindings, ["active"]),
+    releasedBindings: countSnapshotItems(bindings, ["revoked", "released"]),
+    activeBlocks: countSnapshotItems(blocks, ["active"]),
+    releasedBlocks: countSnapshotItems(blocks, ["released"])
+  };
+
+  const topAuditEvents = buildSnapshotTopCounts(auditLogs, (item) => item?.eventType, 5)
+    .map(([eventType, count]) => ({ eventType, count }));
+  const topProducts = buildSnapshotTopCounts(
+    [
+      ...projects.map((item) => ({ productCode: item?.code })),
+      ...accounts,
+      ...entitlements,
+      ...sessions,
+      ...bindings,
+      ...blocks,
+      ...auditLogs.map((item) => ({
+        productCode: item?.metadata?.productCode || item?.metadata?.code || item?.metadata?.projectCode || item?.metadata?.softwareCode || item?.metadata?.productCodes || item?.metadata?.projectCodes
+      }))
+    ],
+    (item) => item?.productCode,
+    5
+  ).map(([productCode, count]) => ({ productCode, count }));
+
+  const totalScopeItems = projects.length + accounts.length + entitlements.length + sessions.length + bindings.length + blocks.length + auditLogs.length;
+  const attentionCount = metrics.inactiveProjects
+    + metrics.disabledAccounts
+    + metrics.frozenEntitlements
+    + metrics.expiredEntitlements
+    + metrics.pointExhaustedEntitlements
+    + metrics.activeBlocks;
+
+  let status = "ok";
+  let headline = "Snapshot is ready for handoff and no obvious blockers were detected.";
+  if (!totalScopeItems) {
+    status = "empty";
+    headline = "No scoped projects or authorization records were exported for this snapshot.";
+  } else if (metrics.activeBlocks > 0) {
+    status = "attention";
+    headline = `${metrics.activeBlocks} active device blocks may explain current login failures.`;
+  } else if (attentionCount > 0) {
+    status = "attention";
+    headline = `${attentionCount} scoped records need operational review.`;
+  } else if (metrics.activeSessions > 0) {
+    headline = `${metrics.activeSessions} active sessions are currently visible in this snapshot.`;
+  }
+
+  const highlights = [];
+  if (metrics.inactiveProjects > 0) {
+    highlights.push(`${metrics.inactiveProjects} projects are not active in the exported scope.`);
+  }
+  if (metrics.disabledAccounts > 0) {
+    highlights.push(`${metrics.disabledAccounts} customer accounts are disabled.`);
+  }
+  if (metrics.frozenEntitlements > 0 || metrics.expiredEntitlements > 0) {
+    highlights.push(`${metrics.frozenEntitlements} entitlements are frozen and ${metrics.expiredEntitlements} are expired.`);
+  }
+  if (metrics.pointExhaustedEntitlements > 0) {
+    highlights.push(`${metrics.pointExhaustedEntitlements} point entitlements are fully consumed.`);
+  }
+  if (metrics.activeBlocks > 0) {
+    highlights.push(`${metrics.activeBlocks} active device blocks may be causing repeated login or heartbeat failures.`);
+  }
+  if (metrics.expiredSessions > 0) {
+    highlights.push(`${metrics.expiredSessions} sessions are already expired or revoked inside this scope.`);
+  }
+  if (topAuditEvents.length) {
+    highlights.push(`Top audit events: ${topAuditEvents.slice(0, 3).map((item) => `${item.eventType} x${item.count}`).join(", ")}.`);
+  }
+  if (!highlights.length) {
+    highlights.push("No obvious authorization anomalies were detected in the exported scope.");
+  }
+
+  return {
+    status,
+    headline,
+    generatedAt,
+    latestAuditAt: latestSnapshotTimestamp(auditLogs.map((item) => item?.createdAt)),
+    totalScopeItems,
+    metrics,
+    highlights,
+    topAuditEvents,
+    topProducts
+  };
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
+  const overview = payload.overview || {};
   const lines = [
     "RockSolid Developer Ops Snapshot",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -1771,6 +1945,25 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Blocks: ${summary.blocks ?? 0}`,
     `Audit Logs: ${summary.auditLogs ?? 0}`
   ];
+
+  if (overview && typeof overview === "object" && Object.keys(overview).length) {
+    lines.push("");
+    lines.push(`Overview Status: ${overview.status || "-"}`);
+    lines.push(`Overview Headline: ${overview.headline || "-"}`);
+    lines.push(`Latest Audit At: ${overview.latestAuditAt || "-"}`);
+    if (Array.isArray(overview.highlights) && overview.highlights.length) {
+      lines.push("Highlights:");
+      for (const item of overview.highlights) {
+        lines.push(`- ${item}`);
+      }
+    }
+    if (Array.isArray(overview.topAuditEvents) && overview.topAuditEvents.length) {
+      lines.push("Top Audit Events:");
+      for (const item of overview.topAuditEvents) {
+        lines.push(`- ${item.eventType || "-"} x${item.count ?? 0}`);
+      }
+    }
+  }
 
   if (Array.isArray(payload.projects) && payload.projects.length) {
     lines.push("");
@@ -1833,6 +2026,16 @@ function buildDeveloperOpsSnapshotPayload({
       blocks: normalizedBlocks.length,
       auditLogs: normalizedAuditLogs.length
     },
+    overview: buildSnapshotOverview({
+      generatedAt,
+      projects: normalizedProjects,
+      accounts: normalizedAccounts,
+      entitlements: normalizedEntitlements,
+      sessions: normalizedSessions,
+      bindings: normalizedBindings,
+      blocks: normalizedBlocks,
+      auditLogs: normalizedAuditLogs
+    }),
     projects: normalizedProjects,
     accounts: {
       total: Number(accounts.total ?? normalizedAccounts.length),
@@ -1973,6 +2176,7 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
 function buildAdminOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
+  const overview = payload.overview || {};
   const lines = [
     "RockSolid Admin Ops Snapshot",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -1997,6 +2201,25 @@ function buildAdminOpsSummaryText(payload = {}) {
     `Blocks: ${summary.blocks ?? 0}`,
     `Audit Logs: ${summary.auditLogs ?? 0}`
   ];
+
+  if (overview && typeof overview === "object" && Object.keys(overview).length) {
+    lines.push("");
+    lines.push(`Overview Status: ${overview.status || "-"}`);
+    lines.push(`Overview Headline: ${overview.headline || "-"}`);
+    lines.push(`Latest Audit At: ${overview.latestAuditAt || "-"}`);
+    if (Array.isArray(overview.highlights) && overview.highlights.length) {
+      lines.push("Highlights:");
+      for (const item of overview.highlights) {
+        lines.push(`- ${item}`);
+      }
+    }
+    if (Array.isArray(overview.topAuditEvents) && overview.topAuditEvents.length) {
+      lines.push("Top Audit Events:");
+      for (const item of overview.topAuditEvents) {
+        lines.push(`- ${item.eventType || "-"} x${item.count ?? 0}`);
+      }
+    }
+  }
 
   if (Array.isArray(payload.projects) && payload.projects.length) {
     lines.push("");
@@ -2059,6 +2282,16 @@ function buildAdminOpsSnapshotPayload({
       blocks: normalizedBlocks.length,
       auditLogs: normalizedAuditLogs.length
     },
+    overview: buildSnapshotOverview({
+      generatedAt,
+      projects: normalizedProjects,
+      accounts: normalizedAccounts,
+      entitlements: normalizedEntitlements,
+      sessions: normalizedSessions,
+      bindings: normalizedBindings,
+      blocks: normalizedBlocks,
+      auditLogs: normalizedAuditLogs
+    }),
     projects: normalizedProjects,
     accounts: {
       total: Number(accounts.total ?? normalizedAccounts.length),

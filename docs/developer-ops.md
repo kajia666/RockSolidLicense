@@ -133,3 +133,4 @@ The download route also accepts:
 - releasing a binding frees the device seat and expires any active session using that binding
 - blocking a device fingerprint kicks matching sessions offline and prevents the device from logging in again until unblocked
 - the ops snapshot zip bundles the current scoped project list, accounts, entitlements, sessions, bindings, blocks, and audit logs into one handoff package with SHA-256 checksums
+- the ops snapshot preview and JSON payload now include an `overview` block with a headline, attention counters, highlight bullets, and top audit-event counts for faster scoped troubleshooting

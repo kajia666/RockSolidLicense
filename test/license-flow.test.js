@@ -6260,8 +6260,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.bindings.items[0].productCode, "EXPORT_ALPHA");
     assert.ok(exportSnapshot.auditLogs.items.every((item) => item.eventType === "session.revoke"));
     assert.ok(exportSnapshot.auditLogs.items.every((item) => item.metadata?.productCode === "EXPORT_ALPHA"));
+    assert.equal(exportSnapshot.overview.status, "ok");
+    assert.ok(Array.isArray(exportSnapshot.overview.highlights));
+    assert.ok(exportSnapshot.overview.topAuditEvents.some((item) => item.eventType === "session.revoke"));
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: EXPORT_ALPHA/);
+    assert.match(exportSnapshot.summaryText, /Overview Status: ok/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
@@ -6494,8 +6498,12 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
     assert.equal(exportSnapshot.blocks.items[0].productCode, "ADMIN_EXPORT_ALPHA");
     assert.ok(exportSnapshot.auditLogs.items.every((item) => item.eventType === "session.revoke"));
     assert.ok(exportSnapshot.auditLogs.items.every((item) => item.metadata?.productCode === "ADMIN_EXPORT_ALPHA"));
+    assert.equal(exportSnapshot.overview.status, "attention");
+    assert.equal(exportSnapshot.overview.metrics.activeBlocks, 1);
+    assert.ok(exportSnapshot.overview.topAuditEvents.some((item) => item.eventType === "session.revoke"));
     assert.match(exportSnapshot.summaryText, /RockSolid Admin Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: ADMIN_EXPORT_ALPHA/);
+    assert.match(exportSnapshot.summaryText, /Overview Status: attention/);
 
     const fullSnapshot = await getJson(
       baseUrl,
@@ -8718,6 +8726,7 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /Download Zip/);
     assert.match(html, /ops-entity-type/);
     assert.match(html, /clear-audit-filters-btn/);
+    assert.match(html, /ops-preview-summary/);
     assert.match(html, /session\.login/);
   } finally {
     await app.close();
@@ -8791,6 +8800,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Zip/);
     assert.match(html, /filter-entity-type/);
+    assert.match(html, /snapshot-overview/);
     assert.match(html, /Session Login/);
     assert.match(html, /license_key/);
   } finally {

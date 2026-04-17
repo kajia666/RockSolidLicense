@@ -45,6 +45,7 @@ Terminology:
 - the recap also renders clickable follow-up actions, so operators can reopen the current focus, jump straight back to the recommended control, or refresh the snapshot without rebuilding context manually
 - the snapshot overview now also surfaces an `Escalate First` section ahead of the normal queue so the highest-priority queue entries stand out before operators scan the rest of the list
 - those `Escalate First` cards now compress product, user, reason, suggested control, and impact-scope hints such as issue/session counts into short tags so operators can triage faster before drilling in
+- those same `Escalate First` cards now also expose direct `Open Control` and `Load Full Context` shortcuts, so operators can jump into the recommended control form without always loading every related table first
 - the exported `summary` text now mirrors that `Escalate First` view, including impact-scope hints, so handoff notes and offline triage keep the same priority cues
 - export admin-scoped authorization operations snapshots as JSON, summary, checksums, or zip bundles
 

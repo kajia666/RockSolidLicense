@@ -8802,6 +8802,11 @@ test("admin console page exposes admin ops export controls", async () => {
     assert.match(html, /Escalate First/);
     assert.match(html, /isUrgentQueueItem/);
     assert.match(html, /renderEscalationSummaryTags/);
+    assert.match(html, /renderEscalationActionButtons/);
+    assert.match(html, /runAdminEscalationAction/);
+    assert.match(html, /data-escalation-action/);
+    assert.match(html, /Open Control/);
+    assert.match(html, /Load Full Context/);
     assert.match(html, /ESCALATE/);
     assert.match(html, /Follow-up:/);
     assert.match(html, /follow-up:/);

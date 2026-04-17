@@ -443,6 +443,18 @@
         gap: 8px;
       }
 
+      .snapshot-focus-entry {
+        display: grid;
+        gap: 8px;
+      }
+
+      .snapshot-focus-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 4px;
+      }
+
       .snapshot-focus-item {
         padding: 12px;
         border-radius: 14px;
@@ -1453,6 +1465,28 @@
         return adminPreparedFocus;
       }
 
+      function prepareAdminFocusControlState(kind, item = {}, loadedPanels = [], matchedPanels = [], focusedPanel = "") {
+        rememberAdminFocus(kind, item);
+        const preparedControl = applyAdminRecommendedControl(item.recommendedControl);
+        const resolvedPanel = focusedPanel || focusAdminControlPanel(kind, item, item.recommendedControl);
+        rememberAdminPreparedFocus(kind, item, preparedControl, loadedPanels, matchedPanels, resolvedPanel);
+        renderOpsPreviewSummary();
+        setOutput({
+          focusKind: kind,
+          preparedControl,
+          loadedPanels,
+          matchedPanels,
+          focusedPanel: resolvedPanel,
+          item
+        });
+        return {
+          preparedControl,
+          loadedPanels,
+          matchedPanels,
+          focusedPanel: resolvedPanel
+        };
+      }
+
       function renderAdminPreparedFocus() {
         if (!adminPreparedFocus) {
           return "";
@@ -1846,6 +1880,15 @@
         return tags ? `<div class="audit-meta">${tags}</div>` : "";
       }
 
+      function renderEscalationActionButtons(focusKey, item = {}) {
+        const actions = [];
+        if (item?.recommendedControl?.type || item?.recommendedControl?.label) {
+          actions.push(`<button type="button" class="snapshot-inline-button" data-escalation-focus-key="${escapeHtml(focusKey)}" data-escalation-action="prepare_control">Open Control</button>`);
+        }
+        actions.push(`<button type="button" class="snapshot-inline-button" data-escalation-focus-key="${escapeHtml(focusKey)}" data-escalation-action="load_context">Load Full Context</button>`);
+        return actions.length ? `<div class="snapshot-focus-actions">${actions.join("")}</div>` : "";
+      }
+
       function renderEscalationQueue(items = []) {
         if (!Array.isArray(items) || !items.length) {
           return "";
@@ -1860,7 +1903,7 @@
         return `<div class="snapshot-focus-list">${urgentEntries.map(({ item, index }) => {
           const focusKey = `priority-queue:${index}`;
           adminOpsFocusMap.set(focusKey, { kind: item?.sourceType || "account", item });
-          return `<button type="button" class="snapshot-focus-item urgent" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${renderEscalationSummaryTags(item, index)}${renderFocusActionLine(item)}</button>`;
+          return `<div class="snapshot-focus-entry"><button type="button" class="snapshot-focus-item urgent" data-focus-key="${escapeHtml(focusKey)}"><div class="snapshot-focus-head"><strong>${escapeHtml(item.title || "-")}</strong>${renderFocusSeverityBadge(item)}</div><div class="snapshot-focus-meta">${escapeHtml(item.sourceType || "-")} | ${escapeHtml(item.summary || "-")}</div>${renderEscalationSummaryTags(item, index)}${renderFocusActionLine(item)}</button>${renderEscalationActionButtons(focusKey, item)}</div>`;
         }).join("")}</div>`;
       }
 
@@ -2080,8 +2123,6 @@
             el("unblock-reason").value = item.reason;
           }
         }
-        rememberAdminFocus(kind, item);
-        const preparedControl = applyAdminRecommendedControl(item.recommendedControl);
         let loadedPanels = [];
         let matchedPanels = [];
         if (adminToken) {
@@ -2089,17 +2130,7 @@
         }
         loadedPanels = await drillIntoFocusTables(kind, item);
         matchedPanels = focusMatchingRowsForFocus(kind, item);
-        const focusedPanel = focusAdminControlPanel(kind, item, item.recommendedControl);
-        rememberAdminPreparedFocus(kind, item, preparedControl, loadedPanels, matchedPanels, focusedPanel);
-        renderOpsPreviewSummary();
-        setOutput({
-          focusKind: kind,
-          preparedControl,
-          loadedPanels,
-          matchedPanels,
-          focusedPanel,
-          item
-        });
+        const { preparedControl, focusedPanel } = prepareAdminFocusControlState(kind, item, loadedPanels, matchedPanels);
         const panelBits = loadedPanels.length ? ` | panels=${loadedPanels.join(",")}` : "";
         const matchBits = matchedPanels.length ? ` | matched=${matchedPanels.join(",")}` : "";
         const controlBits = preparedControl ? ` | ${preparedControl}` : "";
@@ -2252,6 +2283,9 @@
         for (const action of box.querySelectorAll("[data-prepared-action]")) {
           action.addEventListener("click", () => guarded(() => runAdminPreparedAction(action.dataset.preparedAction)));
         }
+        for (const action of box.querySelectorAll("[data-escalation-action]")) {
+          action.addEventListener("click", () => guarded(() => runAdminEscalationAction(action.dataset.escalationFocusKey, action.dataset.escalationAction)));
+        }
       }
 
       async function runAdminMutationAction(action) {
@@ -2315,6 +2349,28 @@
             throw new Error("No prepared control panel is available.");
           }
           setStatus(`Prepared control refocused: ${focusedPanel}.`);
+        }
+      }
+
+      async function runAdminEscalationAction(focusKey, action) {
+        const focus = adminOpsFocusMap.get(focusKey);
+        if (!focus) {
+          throw new Error("No escalation focus context is available.");
+        }
+        if (action === "load_context") {
+          await applyOpsFocusDetail(focus.kind, focus.item);
+          return;
+        }
+        if (action === "prepare_control") {
+          const prepared = prepareAdminFocusControlState(focus.kind, focus.item);
+          if (!prepared.preparedControl && !prepared.focusedPanel) {
+            throw new Error("No direct escalation control is available.");
+          }
+          const statusParts = [
+            prepared.preparedControl || "",
+            prepared.focusedPanel ? `control=${prepared.focusedPanel}` : ""
+          ].filter(Boolean);
+          setStatus(`Escalation shortcut prepared: ${statusParts.join(" | ") || focus.kind}.`);
         }
       }
 

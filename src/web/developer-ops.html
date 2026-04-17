@@ -216,6 +216,7 @@
       let snapshot = emptySnapshot();
       let lastExportDownload = null;
       let preparedFocus = null;
+      let lastMutation = null;
       let overviewFocusMap = new Map();
       const AUDIT_PRESETS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
 
@@ -606,6 +607,379 @@
         `;
       }
 
+      function buildFocusPayload(kind, item = {}) {
+        return {
+          kind,
+          item: cloneValue(item) || {},
+          recommendedControl: cloneValue(item?.recommendedControl) || null
+        };
+      }
+
+      function developerFocusMatchesRecord(focus = null, item = {}) {
+        if (!focus || !item) {
+          return false;
+        }
+        const focusItem = focus.item || {};
+        if (focus.kind === "account") {
+          return (focusItem.accountId && item.accountId === focusItem.accountId)
+            || (
+              focusItem.username
+              && item.username === focusItem.username
+              && (!focusItem.productCode || item.productCode === focusItem.productCode)
+            );
+        }
+        if (focus.kind === "entitlement") {
+          return (focusItem.entitlementId && item.entitlementId === focusItem.entitlementId)
+            || (focusItem.id && item.entitlementId === focusItem.id);
+        }
+        if (focus.kind === "session") {
+          return (focusItem.sessionId && item.sessionId === focusItem.sessionId)
+            || (focusItem.id && item.sessionId === focusItem.id)
+            || (
+              focusItem.username
+              && item.username === focusItem.username
+              && (!focusItem.productCode || item.productCode === focusItem.productCode)
+              && (!focusItem.fingerprint || item.fingerprint === focusItem.fingerprint)
+            );
+        }
+        if (focus.kind === "device") {
+          return (focusItem.bindingId && item.bindingId === focusItem.bindingId)
+            || (focusItem.blockId && item.blockId === focusItem.blockId)
+            || (
+              focusItem.fingerprint
+              && item.fingerprint === focusItem.fingerprint
+              && (!focusItem.productCode || item.productCode === focusItem.productCode)
+            );
+        }
+        return false;
+      }
+
+      function collectDeveloperSnapshotHits(focus = null) {
+        const overview = snapshot.raw?.overview || {};
+        const hits = [];
+        if (!focus?.kind) {
+          return hits;
+        }
+        const accountItems = Array.isArray(overview.focusAccounts) ? overview.focusAccounts : [];
+        for (const item of accountItems) {
+          if (!developerFocusMatchesRecord(focus, item)) {
+            continue;
+          }
+          hits.push({
+            source: "focusAccounts",
+            severity: item.severity || "",
+            label: item.username || item.accountId || "account"
+          });
+        }
+        const sessionItems = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
+        for (const item of sessionItems) {
+          if (!developerFocusMatchesRecord(focus, item)) {
+            continue;
+          }
+          hits.push({
+            source: "focusSessions",
+            severity: item.severity || "",
+            label: item.sessionId || item.username || "session"
+          });
+        }
+        const deviceItems = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
+        for (const item of deviceItems) {
+          if (!developerFocusMatchesRecord(focus, item)) {
+            continue;
+          }
+          hits.push({
+            source: "focusDevices",
+            severity: item.severity || "",
+            label: item.fingerprint || item.bindingId || item.blockId || "device"
+          });
+        }
+        const recommendedQueue = Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : [];
+        for (const [index, item] of recommendedQueue.entries()) {
+          const queueFocus = {
+            kind: item.sourceType || focus.kind,
+            item: {
+              accountId: item.accountId || item.recommendedControl?.accountId || null,
+              entitlementId: item.entitlementId || item.recommendedControl?.entitlementId || null,
+              sessionId: item.sessionId || item.recommendedControl?.sessionId || null,
+              bindingId: item.bindingId || null,
+              blockId: item.blockId || item.recommendedControl?.blockId || null,
+              fingerprint: item.fingerprint || item.recommendedControl?.fingerprint || null,
+              username: item.username || null,
+              productCode: item.productCode || item.recommendedControl?.productCode || null
+            }
+          };
+          if (!developerFocusMatchesRecord(focus, queueFocus.item)) {
+            continue;
+          }
+          hits.push({
+            source: "recommendedQueue",
+            severity: item.severity || "",
+            label: item.title || item.summary || item.sourceType || "queue-item",
+            queuePosition: index + 1
+          });
+        }
+        return hits;
+      }
+
+      function developerSeverityRank(severity = "") {
+        const normalized = focusSeverityClass(severity);
+        const ranks = { critical: 4, high: 3, medium: 2, low: 1 };
+        return ranks[normalized] || 0;
+      }
+
+      function summarizeDeveloperSnapshotHits(hits = []) {
+        const summary = {
+          hitCount: Array.isArray(hits) ? hits.length : 0,
+          maxSeverity: "",
+          maxSeverityRank: 0,
+          queuePosition: null
+        };
+        if (!Array.isArray(hits)) {
+          return summary;
+        }
+        for (const item of hits) {
+          const severity = focusSeverityClass(item?.severity);
+          const severityRank = developerSeverityRank(severity);
+          if (severityRank > summary.maxSeverityRank) {
+            summary.maxSeverity = severity;
+            summary.maxSeverityRank = severityRank;
+          }
+          const queuePosition = Number(item?.queuePosition);
+          if (Number.isFinite(queuePosition) && queuePosition > 0) {
+            if (summary.queuePosition === null || queuePosition < summary.queuePosition) {
+              summary.queuePosition = queuePosition;
+            }
+          }
+        }
+        return summary;
+      }
+
+      function buildDeveloperMutationOutcome(before = {}, after = {}) {
+        if ((before.queuePosition !== null || before.maxSeverityRank > 0) && after.maxSeverityRank === 0 && after.queuePosition === null) {
+          return {
+            label: "Mitigated",
+            tone: "ok",
+            hint: "The object is no longer visible in the scoped snapshot focus."
+          };
+        }
+        if (before.queuePosition !== null && after.queuePosition === null) {
+          return {
+            label: "Queue Cleared",
+            tone: "ok",
+            hint: "The object left the recommended action queue inside the current developer scope."
+          };
+        }
+        if (before.maxSeverityRank > after.maxSeverityRank && after.maxSeverityRank > 0) {
+          return {
+            label: "Risk Lowered",
+            tone: "ok",
+            hint: "The object is still visible, but the scoped snapshot now ranks it lower than before."
+          };
+        }
+        if (after.queuePosition !== null && after.queuePosition <= 2) {
+          return {
+            label: "Still Urgent",
+            tone: "danger",
+            hint: "The object is still near the top of the recommended queue and should stay in active handling."
+          };
+        }
+        if (after.maxSeverityRank > 0 || after.queuePosition !== null) {
+          return {
+            label: "Needs Watch",
+            tone: "warning",
+            hint: "The object still appears in the scoped snapshot and needs another follow-up pass."
+          };
+        }
+        return {
+          label: "Routine Monitor",
+          tone: "ok",
+          hint: "No urgent scoped follow-up remains for this object."
+        };
+      }
+
+      function compareDeveloperMutationSignals(previousHits = [], currentHits = []) {
+        const before = summarizeDeveloperSnapshotHits(previousHits);
+        const after = summarizeDeveloperSnapshotHits(currentHits);
+        let trend = "unchanged";
+        if (before.maxSeverityRank > 0 && after.maxSeverityRank === 0) {
+          trend = "cleared";
+        } else if (before.maxSeverityRank === 0 && after.maxSeverityRank > 0) {
+          trend = after.queuePosition !== null ? "queue-added" : "new-signal";
+        } else if (after.maxSeverityRank > before.maxSeverityRank) {
+          trend = "escalated";
+        } else if (after.maxSeverityRank > 0 && before.maxSeverityRank > 0 && after.maxSeverityRank < before.maxSeverityRank) {
+          trend = "downgraded";
+        } else if (before.queuePosition !== null && after.queuePosition === null) {
+          trend = "queue-cleared";
+        } else if (before.queuePosition === null && after.queuePosition !== null) {
+          trend = "queue-added";
+        } else if (before.queuePosition !== null && after.queuePosition !== null && after.queuePosition > before.queuePosition) {
+          trend = "deprioritized";
+        } else if (before.queuePosition !== null && after.queuePosition !== null && after.queuePosition < before.queuePosition) {
+          trend = "prioritized";
+        }
+        const trendLabelMap = {
+          cleared: "Resolved",
+          downgraded: "Risk Down",
+          escalated: "Risk Up",
+          "new-signal": "Needs Attention",
+          "queue-cleared": "Queue Cleared",
+          "queue-added": "Queue Added",
+          deprioritized: "Lower Queue",
+          prioritized: "Higher Queue",
+          unchanged: "No Change"
+        };
+        const improvingTrends = new Set(["cleared", "downgraded", "queue-cleared", "deprioritized"]);
+        const worseningTrends = new Set(["escalated", "queue-added", "prioritized"]);
+        const trendTone = improvingTrends.has(trend)
+          ? "ok"
+          : worseningTrends.has(trend)
+            ? "danger"
+            : after.maxSeverityRank > 0
+              ? "warning"
+              : "ok";
+        const detailParts = [];
+        if (before.maxSeverity) {
+          detailParts.push(`before=${before.maxSeverity.toUpperCase()}`);
+        }
+        if (after.maxSeverity) {
+          detailParts.push(`now=${after.maxSeverity.toUpperCase()}`);
+        } else if (before.maxSeverityRank > 0 || before.queuePosition !== null) {
+          detailParts.push("now=clear");
+        }
+        if (before.queuePosition !== null || after.queuePosition !== null) {
+          const beforeQueue = before.queuePosition !== null ? `#${before.queuePosition}` : "out";
+          const afterQueue = after.queuePosition !== null ? `#${after.queuePosition}` : "out";
+          detailParts.push(`queue=${beforeQueue}->${afterQueue}`);
+        }
+        detailParts.push(`signals=${before.hitCount}->${after.hitCount}`);
+        const outcome = buildDeveloperMutationOutcome(before, after);
+        return {
+          before,
+          after,
+          trend,
+          trendLabel: trendLabelMap[trend] || "No Change",
+          trendTone,
+          outcomeLabel: outcome.label,
+          outcomeTone: outcome.tone,
+          outcomeHint: outcome.hint,
+          headline: after.maxSeverityRank === 0 && after.queuePosition === null
+            ? "The scoped snapshot no longer highlights this object."
+            : "The scoped snapshot still highlights this object after the last action.",
+          detail: detailParts.join(" | ")
+        };
+      }
+
+      function buildDeveloperFollowUp(comparison = {}, focus = null) {
+        const outcomeLabel = String(comparison?.outcomeLabel || "").trim();
+        const recommendedLabel = focus?.item?.recommendedControl?.label || "";
+        const actionHint = focus?.item?.actionHint || focus?.item?.nextAction || "";
+        if (outcomeLabel === "Mitigated" || outcomeLabel === "Queue Cleared") {
+          return {
+            label: "Close Out",
+            tone: "ok",
+            primaryAction: "refresh_snapshot",
+            primaryLabel: "Confirm Snapshot",
+            secondaryAction: "reapply_focus",
+            secondaryLabel: "Review Last Focus",
+            hint: "The current scoped snapshot looks stable enough to confirm and close."
+          };
+        }
+        if (outcomeLabel === "Still Urgent") {
+          return {
+            label: "Escalate",
+            tone: "danger",
+            primaryAction: "jump_controls",
+            primaryLabel: "Return To Controls",
+            secondaryAction: "reapply_focus",
+            secondaryLabel: "Reload Focus",
+            hint: `This object still needs immediate handling.${recommendedLabel || actionHint ? ` Next: ${recommendedLabel || actionHint}.` : ""}`
+          };
+        }
+        if (outcomeLabel === "Risk Lowered" || outcomeLabel === "Needs Watch") {
+          return {
+            label: "Follow Up",
+            tone: "warning",
+            primaryAction: "reapply_focus",
+            primaryLabel: outcomeLabel === "Risk Lowered" ? "Review Lower Risk" : "Review Remaining Risk",
+            secondaryAction: "refresh_snapshot",
+            secondaryLabel: "Recheck Snapshot",
+            hint: "The risk looks better, but another scoped review pass is still recommended."
+          };
+        }
+        return {
+          label: "Monitor",
+          tone: "warning",
+          primaryAction: "refresh_snapshot",
+          primaryLabel: "Refresh Snapshot",
+          secondaryAction: "reapply_focus",
+          secondaryLabel: "Reload Focus",
+          hint: "Keep the object under scoped monitoring."
+        };
+      }
+
+      function buildDeveloperMutationRecap(successMessage, focus = null, previousHits = []) {
+        const snapshotHits = collectDeveloperSnapshotHits(focus);
+        const comparison = compareDeveloperMutationSignals(previousHits, snapshotHits);
+        return {
+          timestamp: new Date().toISOString(),
+          successMessage,
+          focusKind: focus?.kind || "",
+          focusItem: cloneValue(focus?.item) || null,
+          recommendedControl: cloneValue(focus?.recommendedControl || focus?.item?.recommendedControl) || null,
+          trendLabel: comparison.trendLabel,
+          trendTone: comparison.trendTone,
+          outcomeLabel: comparison.outcomeLabel,
+          outcomeTone: comparison.outcomeTone,
+          outcomeHint: comparison.outcomeHint,
+          headline: comparison.headline,
+          detail: comparison.detail,
+          before: comparison.before,
+          after: comparison.after,
+          followUp: buildDeveloperFollowUp(comparison, focus)
+        };
+      }
+
+      function renderDeveloperMutationRecap() {
+        if (!lastMutation) {
+          return "";
+        }
+        const beforeQueue = lastMutation.before?.queuePosition;
+        const afterQueue = lastMutation.after?.queuePosition;
+        const beforeSeverityClass = focusSeverityClass(lastMutation.before?.maxSeverity);
+        const afterSeverityClass = focusSeverityClass(lastMutation.after?.maxSeverity);
+        const progressTags = [
+          lastMutation.trendLabel ? `<span class="tag ${esc(lastMutation.trendTone || "")}">${esc(lastMutation.trendLabel)}</span>` : "",
+          lastMutation.outcomeLabel ? `<span class="tag ${esc(lastMutation.outcomeTone || "")}">${esc(lastMutation.outcomeLabel)}</span>` : "",
+          lastMutation.before?.maxSeverity ? `<span class="tag ${esc(beforeSeverityClass || "")}">before:${esc(lastMutation.before.maxSeverity.toUpperCase())}</span>` : "",
+          lastMutation.after?.maxSeverity ? `<span class="tag ${esc(afterSeverityClass || "")}">now:${esc(lastMutation.after.maxSeverity.toUpperCase())}</span>` : (lastMutation.before?.maxSeverity || beforeQueue !== null ? `<span class="tag ok">now:clear</span>` : ""),
+          (Number.isFinite(beforeQueue) || Number.isFinite(afterQueue)) ? `<span class="tag">queue:${esc(beforeQueue !== null ? `#${beforeQueue}` : "out")}->${esc(afterQueue !== null ? `#${afterQueue}` : "out")}</span>` : "",
+          `<span class="tag">signals:${esc(lastMutation.before?.hitCount ?? 0)}->${esc(lastMutation.after?.hitCount ?? 0)}</span>`
+        ].filter(Boolean).join("");
+        const followUpTags = [
+          lastMutation.followUp?.label ? `<span class="tag ${esc(lastMutation.followUp.tone || "")}">${esc(lastMutation.followUp.label)}</span>` : ""
+        ].filter(Boolean).join("");
+        const followUpButtons = [
+          lastMutation.followUp?.primaryAction ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${esc(lastMutation.followUp.primaryAction)}">${esc(lastMutation.followUp.primaryLabel || "Continue")}</button>` : "",
+          lastMutation.followUp?.secondaryAction ? `<button type="button" class="snapshot-inline-button" data-mutation-action="${esc(lastMutation.followUp.secondaryAction)}">${esc(lastMutation.followUp.secondaryLabel || "Review")}</button>` : ""
+        ].filter(Boolean).join("");
+        return `
+          <div class="snapshot-recap">
+            <div class="snapshot-recap-head">
+              <strong>Last Action Result</strong>
+              <span class="tag">${esc(formatTime(lastMutation.timestamp))}</span>
+            </div>
+            <div>${esc(lastMutation.successMessage)}</div>
+            <div class="hint">${esc(lastMutation.headline)} ${esc(lastMutation.detail)}</div>
+            <div class="audit-meta">${progressTags}</div>
+            ${lastMutation.outcomeHint ? `<div class="hint"><strong>Mitigation:</strong> ${esc(lastMutation.outcomeHint)}</div>` : ""}
+            <div class="audit-meta">${followUpTags}</div>
+            ${lastMutation.followUp?.hint ? `<div class="hint"><strong>Follow-up:</strong> ${esc(lastMutation.followUp.hint)}</div>` : ""}
+            ${followUpButtons ? `<div class="snapshot-recap-actions">${followUpButtons}</div>` : ""}
+          </div>
+        `;
+      }
+
       function focusQuickControlsCard() {
         const card = el("quick-controls-card");
         if (!card) {
@@ -742,6 +1116,44 @@
         }
       }
 
+      async function runDeveloperMutationAction(action) {
+        if (!lastMutation) {
+          return;
+        }
+        const focus = lastMutation.focusKind ? {
+          kind: lastMutation.focusKind,
+          item: lastMutation.focusItem || {},
+          recommendedControl: lastMutation.recommendedControl || lastMutation.focusItem?.recommendedControl || {}
+        } : null;
+        if (action === "refresh_snapshot") {
+          await refreshOps();
+          setStatus("Scoped snapshot refreshed for follow-up review.");
+          return;
+        }
+        if (!focus?.kind) {
+          throw { code: "MISSING_FOCUS", message: "No follow-up focus context is available." };
+        }
+        if (action === "reapply_focus") {
+          await applyOverviewFocusItem(focus.kind, focus.item);
+          return;
+        }
+        if (action === "jump_controls") {
+          const preparedControl = applyRecommendedControl(focus.recommendedControl || {});
+          focusQuickControlsCard();
+          if (!preparedControl) {
+            throw { code: "MISSING_CONTROL", message: "No follow-up control is available." };
+          }
+          rememberPreparedFocus(focus.kind, focus.item, preparedControl);
+          renderSnapshotOverview();
+          setStatus(`Follow-up control prepared: ${preparedControl}.`);
+          setOutput({
+            focusKind: focus.kind,
+            focusItem: focus.item,
+            preparedControl
+          });
+        }
+      }
+
       function renderSnapshotOverview() {
         const statusBox = el("snapshot-overview-status");
         const box = el("snapshot-overview");
@@ -790,6 +1202,7 @@
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           ${renderPreparedFocus()}
+          ${renderDeveloperMutationRecap()}
           <div>
             <div class="hint">Top audit events</div>
             <div class="audit-meta">${renderOverviewTags(topAuditEvents, "eventType", "event")}</div>
@@ -898,6 +1311,14 @@
         bindRows("#snapshot-overview [data-prepared-action]", async (data) => {
           try {
             await runDeveloperPreparedAction(data.preparedAction);
+          } catch (error) {
+            setStatus(`${error.code}: ${error.message}`, true);
+            setOutput({ code:error.code, message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-mutation-action]", async (data) => {
+          try {
+            await runDeveloperMutationAction(data.mutationAction);
           } catch (error) {
             setStatus(`${error.code}: ${error.message}`, true);
             setOutput({ code:error.code, message:error.message });
@@ -1222,10 +1643,22 @@
         snapshot = emptySnapshot();
         lastExportDownload = null;
         preparedFocus = null;
+        lastMutation = null;
         setMeta();
         renderAll();
       }
-      async function act(path, body, okMessage) { const data = await api(path, { method:"POST", body }); await refreshOps(false); setStatus(okMessage); setOutput(data); }
+      async function act(path, body, okMessage) {
+        const focus = preparedFocus ? buildFocusPayload(preparedFocus.kind, preparedFocus.item) : null;
+        const previousHits = focus ? collectDeveloperSnapshotHits(focus) : [];
+        const data = await api(path, { method:"POST", body });
+        await refreshOps(false);
+        if (focus?.kind) {
+          lastMutation = buildDeveloperMutationRecap(okMessage, focus, previousHits);
+          renderSnapshotOverview();
+        }
+        setStatus(okMessage);
+        setOutput(data);
+      }
 
       async function handleExportDownload(format, fallbackFileName, label) {
         const result = await downloadApiFile(`/api/developer/ops/export/download${q({ ...filters(), format })}`, fallbackFileName);

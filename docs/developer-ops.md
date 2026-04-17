@@ -27,6 +27,7 @@ This page is intended for day-to-day authorization operations:
 - review focus account, session, and device detail lists directly from the snapshot overview, including severity, next-action hints, and a recommended action queue, and click them back into the active filters or quick controls
 - use the `Escalate First` slice inside the scoped snapshot overview to jump straight into `Open Control` or `Load Full Context` for the highest-priority queue items
 - the scoped snapshot now also keeps a `Prepared Control` recap after focus or escalation actions, so developers can reapply the same focus or jump back to the prepared quick-control target without rebuilding context by hand
+- after a scoped quick-control action succeeds, the overview now also renders a `Last Action Result` recap with mitigation and follow-up guidance, so the developer can tell whether the current focus is resolved or still needs attention
 - export a scoped troubleshooting snapshot as JSON, summary text, checksums, or zip
 
 ## Developer APIs
@@ -139,4 +140,5 @@ The download route also accepts:
 - the ops snapshot preview and JSON payload now include an `overview` block with a headline, attention counters, highlight bullets, top audit-event counts, common reasons, a recommended action queue, and focus account/session/device detail lists with severity, next-action hints, and recommended-control metadata for faster scoped troubleshooting
 - `/developer/ops` now also surfaces an `Escalate First` view for the most urgent queue items, including compressed impact tags and direct shortcuts into the quick-control form or full context loading flow
 - the same scoped overview now renders a `Prepared Control` card once a focus item or escalation shortcut has primed a quick control, which makes repeated scoped handling less error-prone
+- the scoped overview now also compares the focused object before and after a quick-control mutation, then renders a short mitigation/follow-up recap instead of forcing the developer to infer the result only from refreshed tables
 - focus items in the `/developer/ops` overview can backfill username, reason, fingerprint, and quick-control ids so the next action starts from the right scoped target

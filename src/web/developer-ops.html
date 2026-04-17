@@ -803,12 +803,23 @@
         return ranks[normalized] || 0;
       }
 
+      function isDeveloperEscalateFirstHit(item = {}) {
+        const severity = focusSeverityClass(item?.severity);
+        const queuePosition = Number(item?.queuePosition);
+        if (severity === "critical" || severity === "high") {
+          return true;
+        }
+        return severity === "medium" && queuePosition === 1;
+      }
+
       function summarizeDeveloperSnapshotHits(hits = []) {
         const summary = {
           hitCount: Array.isArray(hits) ? hits.length : 0,
           maxSeverity: "",
           maxSeverityRank: 0,
-          queuePosition: null
+          queuePosition: null,
+          escalateFirst: false,
+          escalateQueuePosition: null
         };
         if (!Array.isArray(hits)) {
           return summary;
@@ -824,6 +835,14 @@
           if (Number.isFinite(queuePosition) && queuePosition > 0) {
             if (summary.queuePosition === null || queuePosition < summary.queuePosition) {
               summary.queuePosition = queuePosition;
+            }
+          }
+          if (isDeveloperEscalateFirstHit(item)) {
+            summary.escalateFirst = true;
+            if (Number.isFinite(queuePosition) && queuePosition > 0) {
+              if (summary.escalateQueuePosition === null || queuePosition < summary.escalateQueuePosition) {
+                summary.escalateQueuePosition = queuePosition;
+              }
             }
           }
         }
@@ -873,6 +892,49 @@
         };
       }
 
+      function buildDeveloperEscalationOutcome(before = {}, after = {}, trend = "unchanged") {
+        if (before.escalateFirst && !after.escalateFirst && after.maxSeverityRank === 0) {
+          return {
+            label: "Mitigated",
+            tone: "ok",
+            hint: "The object has left Escalate First and no active scoped signal remains."
+          };
+        }
+        if (before.escalateFirst && !after.escalateFirst) {
+          return {
+            label: "Escalation Lowered",
+            tone: "ok",
+            hint: "The object has left Escalate First, but lower-priority scoped follow-up is still visible."
+          };
+        }
+        if (after.escalateFirst && (trend === "escalated" || trend === "prioritized" || trend === "queue-added" || !before.escalateFirst)) {
+          return {
+            label: "Still Escalate",
+            tone: "danger",
+            hint: "The object is still in Escalate First and should stay in immediate handling."
+          };
+        }
+        if (after.escalateFirst) {
+          return {
+            label: "Escalation Active",
+            tone: "warning",
+            hint: "The object remains in Escalate First even after the last action."
+          };
+        }
+        if (after.maxSeverityRank > 0 || after.queuePosition !== null) {
+          return {
+            label: "Needs Watch",
+            tone: "warning",
+            hint: "The object left the top scoped escalation tier, but it still needs follow-up."
+          };
+        }
+        return {
+          label: "Routine Monitor",
+          tone: "ok",
+          hint: "No active Escalate First condition remains for this object."
+        };
+      }
+
       function compareDeveloperMutationSignals(previousHits = [], currentHits = []) {
         const before = summarizeDeveloperSnapshotHits(previousHits);
         const after = summarizeDeveloperSnapshotHits(currentHits);
@@ -914,6 +976,24 @@
             : after.maxSeverityRank > 0
               ? "warning"
               : "ok";
+        let escalationLabel = "";
+        let escalationTone = "";
+        if (before.escalateFirst && !after.escalateFirst) {
+          escalationLabel = "Escalate First Cleared";
+          escalationTone = "ok";
+        } else if (!before.escalateFirst && after.escalateFirst) {
+          escalationLabel = "Escalate First Added";
+          escalationTone = "danger";
+        } else if (
+          before.escalateFirst
+          && after.escalateFirst
+          && before.escalateQueuePosition !== null
+          && after.escalateQueuePosition !== null
+          && before.escalateQueuePosition !== after.escalateQueuePosition
+        ) {
+          escalationLabel = after.escalateQueuePosition < before.escalateQueuePosition ? "Escalate First Higher" : "Escalate First Lower";
+          escalationTone = after.escalateQueuePosition < before.escalateQueuePosition ? "danger" : "warning";
+        }
         const detailParts = [];
         if (before.maxSeverity) {
           detailParts.push(`before=${before.maxSeverity.toUpperCase()}`);
@@ -928,17 +1008,28 @@
           const afterQueue = after.queuePosition !== null ? `#${after.queuePosition}` : "out";
           detailParts.push(`queue=${beforeQueue}->${afterQueue}`);
         }
+        if (before.escalateFirst || after.escalateFirst) {
+          const beforeEscalate = before.escalateFirst && before.escalateQueuePosition !== null ? `#${before.escalateQueuePosition}` : "out";
+          const afterEscalate = after.escalateFirst && after.escalateQueuePosition !== null ? `#${after.escalateQueuePosition}` : "out";
+          detailParts.push(`escalate=${beforeEscalate}->${afterEscalate}`);
+        }
         detailParts.push(`signals=${before.hitCount}->${after.hitCount}`);
         const outcome = buildDeveloperMutationOutcome(before, after);
+        const escalationOutcome = buildDeveloperEscalationOutcome(before, after, trend);
         return {
           before,
           after,
           trend,
           trendLabel: trendLabelMap[trend] || "No Change",
           trendTone,
+          escalationLabel,
+          escalationTone,
           outcomeLabel: outcome.label,
           outcomeTone: outcome.tone,
           outcomeHint: outcome.hint,
+          escalationOutcomeLabel: escalationOutcome.label,
+          escalationOutcomeTone: escalationOutcome.tone,
+          escalationOutcomeHint: escalationOutcome.hint,
           headline: after.maxSeverityRank === 0 && after.queuePosition === null
             ? "The scoped snapshot no longer highlights this object."
             : "The scoped snapshot still highlights this object after the last action.",
@@ -996,8 +1087,40 @@
 
       function tuneDeveloperFollowUpPlan(plan = {}, comparison = {}, hasDirectControl = false) {
         const outcomeLabel = String(comparison?.outcomeLabel || "").trim();
+        const escalationOutcomeLabel = String(comparison?.escalationOutcomeLabel || "").trim();
         if (!outcomeLabel) {
           return plan;
+        }
+        if (escalationOutcomeLabel === "Mitigated") {
+          return {
+            ...plan,
+            primaryLabel: "Confirm Mitigation",
+            secondaryAction: plan.secondaryAction || "reapply_focus",
+            secondaryLabel: plan.secondaryLabel || "Review Last Focus"
+          };
+        }
+        if (escalationOutcomeLabel === "Escalation Lowered") {
+          return {
+            ...plan,
+            primaryLabel: plan.primaryAction === "reapply_focus" ? "Review Lower Risk" : (plan.primaryLabel || "Continue"),
+            secondaryLabel: plan.secondaryAction === "refresh_snapshot" ? "Confirm Lower Risk" : (plan.secondaryLabel || "")
+          };
+        }
+        if (escalationOutcomeLabel === "Still Escalate" || escalationOutcomeLabel === "Escalation Active") {
+          return {
+            ...plan,
+            primaryAction: hasDirectControl ? "jump_controls" : "reapply_focus",
+            primaryLabel: hasDirectControl ? "Return To Escalation Control" : "Reload Escalation Focus",
+            secondaryAction: "reapply_focus",
+            secondaryLabel: hasDirectControl ? "Review Escalation Focus" : (plan.secondaryLabel || "")
+          };
+        }
+        if (escalationOutcomeLabel === "Needs Watch") {
+          return {
+            ...plan,
+            primaryLabel: plan.primaryAction === "reapply_focus" ? "Review Remaining Risk" : (plan.primaryLabel || "Continue"),
+            secondaryLabel: plan.secondaryAction === "refresh_snapshot" ? "Recheck Snapshot" : (plan.secondaryLabel || "")
+          };
         }
         if (outcomeLabel === "Mitigated") {
           return {
@@ -1124,9 +1247,14 @@
           recommendedControl: cloneValue(focus?.recommendedControl || focus?.item?.recommendedControl) || null,
           trendLabel: comparison.trendLabel,
           trendTone: comparison.trendTone,
+          escalationLabel: comparison.escalationLabel,
+          escalationTone: comparison.escalationTone,
           outcomeLabel: comparison.outcomeLabel,
           outcomeTone: comparison.outcomeTone,
           outcomeHint: comparison.outcomeHint,
+          escalationOutcomeLabel: comparison.escalationOutcomeLabel,
+          escalationOutcomeTone: comparison.escalationOutcomeTone,
+          escalationOutcomeHint: comparison.escalationOutcomeHint,
           headline: comparison.headline,
           detail: comparison.detail,
           before: comparison.before,
@@ -1145,14 +1273,18 @@
         const afterSeverityClass = focusSeverityClass(lastMutation.after?.maxSeverity);
         const progressTags = [
           lastMutation.trendLabel ? `<span class="tag ${esc(lastMutation.trendTone || "")}">${esc(lastMutation.trendLabel)}</span>` : "",
+          lastMutation.escalationLabel ? `<span class="tag ${esc(lastMutation.escalationTone || "")}">${esc(lastMutation.escalationLabel)}</span>` : "",
+          lastMutation.escalationOutcomeLabel ? `<span class="tag ${esc(lastMutation.escalationOutcomeTone || "")}">${esc(lastMutation.escalationOutcomeLabel)}</span>` : "",
           lastMutation.outcomeLabel ? `<span class="tag ${esc(lastMutation.outcomeTone || "")}">${esc(lastMutation.outcomeLabel)}</span>` : "",
           lastMutation.before?.maxSeverity ? `<span class="tag ${esc(beforeSeverityClass || "")}">before:${esc(lastMutation.before.maxSeverity.toUpperCase())}</span>` : "",
           lastMutation.after?.maxSeverity ? `<span class="tag ${esc(afterSeverityClass || "")}">now:${esc(lastMutation.after.maxSeverity.toUpperCase())}</span>` : (lastMutation.before?.maxSeverity || beforeQueue !== null ? `<span class="tag ok">now:clear</span>` : ""),
           (Number.isFinite(beforeQueue) || Number.isFinite(afterQueue)) ? `<span class="tag">queue:${esc(beforeQueue !== null ? `#${beforeQueue}` : "out")}->${esc(afterQueue !== null ? `#${afterQueue}` : "out")}</span>` : "",
+          (lastMutation.before?.escalateFirst || lastMutation.after?.escalateFirst) ? `<span class="tag">escalate:${esc(lastMutation.before?.escalateFirst && lastMutation.before?.escalateQueuePosition !== null ? `#${lastMutation.before.escalateQueuePosition}` : "out")}->${esc(lastMutation.after?.escalateFirst && lastMutation.after?.escalateQueuePosition !== null ? `#${lastMutation.after.escalateQueuePosition}` : "out")}</span>` : "",
           `<span class="tag">signals:${esc(lastMutation.before?.hitCount ?? 0)}->${esc(lastMutation.after?.hitCount ?? 0)}</span>`
         ].filter(Boolean).join("");
         const followUpTags = [
           lastMutation.followUp?.label ? `<span class="tag ${esc(lastMutation.followUp.tone || "")}">${esc(lastMutation.followUp.label)}</span>` : "",
+          lastMutation.followUp?.priority ? `<span class="tag">follow-up:${esc(lastMutation.followUp.priority)}</span>` : "",
           ...(Array.isArray(lastMutation.followUp?.impactBits) ? lastMutation.followUp.impactBits.map((bit) => `<span class="tag">${esc(bit)}</span>`) : [])
         ].filter(Boolean).join("");
         const followUpButtons = [
@@ -1168,7 +1300,7 @@
             <div>${esc(lastMutation.successMessage)}</div>
             <div class="hint">${esc(lastMutation.headline)} ${esc(lastMutation.detail)}</div>
             <div class="audit-meta">${progressTags}</div>
-            ${lastMutation.outcomeHint ? `<div class="hint"><strong>Mitigation:</strong> ${esc(lastMutation.outcomeHint)}</div>` : ""}
+            ${(lastMutation.escalationOutcomeHint || lastMutation.outcomeHint) ? `<div class="hint"><strong>Mitigation:</strong> ${esc(lastMutation.escalationOutcomeHint || lastMutation.outcomeHint)}</div>` : ""}
             <div class="audit-meta">${followUpTags}</div>
             ${lastMutation.followUp?.hint ? `<div class="hint"><strong>Follow-up:</strong> ${esc(lastMutation.followUp.hint)}</div>` : ""}
             ${followUpButtons ? `<div class="snapshot-recap-actions">${followUpButtons}</div>` : ""}

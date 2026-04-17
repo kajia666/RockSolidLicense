@@ -8912,6 +8912,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /buildDeveloperMutationRecap/);
     assert.match(html, /compareDeveloperMutationSignals/);
     assert.match(html, /buildDeveloperFollowUpImpactBits/);
+    assert.match(html, /buildDeveloperEscalationOutcome/);
+    assert.match(html, /Escalate First Cleared/);
     assert.match(html, /tuneDeveloperFollowUpPlan/);
     assert.match(html, /inferDeveloperActionFocus/);
     assert.match(html, /runDeveloperMutationAction/);

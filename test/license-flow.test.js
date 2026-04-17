@@ -6284,8 +6284,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);
     assert.match(exportSnapshot.summaryText, /Focus Devices:/);
+    assert.match(exportSnapshot.summaryText, /Escalate First:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue Counts:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue:/);
+    assert.match(exportSnapshot.summaryText, /impacts=/);
     assert.match(exportSnapshot.summaryText, /control=/);
     assert.match(exportSnapshot.summaryText, /severity=/);
     assert.match(exportSnapshot.summaryText, /next=/);
@@ -6545,8 +6547,10 @@ test("admin ops export bundles platform snapshots and filtered downloadable asse
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);
     assert.match(exportSnapshot.summaryText, /Focus Devices:/);
     assert.match(exportSnapshot.summaryText, /Focus Fingerprints:/);
+    assert.match(exportSnapshot.summaryText, /Escalate First:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue Counts:/);
     assert.match(exportSnapshot.summaryText, /Recommended Queue:/);
+    assert.match(exportSnapshot.summaryText, /impacts=/);
     assert.match(exportSnapshot.summaryText, /control=/);
     assert.match(exportSnapshot.summaryText, /severity=/);
     assert.match(exportSnapshot.summaryText, /next=/);

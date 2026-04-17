@@ -2681,6 +2681,63 @@ function appendSnapshotQueueSummaryLines(lines = [], overview = {}) {
   }
 }
 
+function buildSnapshotQueueImpactBits(item = {}) {
+  const bits = [];
+  const sourceType = String(item?.sourceType ?? "").trim().toLowerCase();
+  if (sourceType === "account") {
+    bits.push(`issues=${Number(item?.issueCount || 0)}`);
+    if (Number(item?.activeSessionCount || 0) > 0) {
+      bits.push(`sessions=${Number(item.activeSessionCount)}`);
+    }
+    if (Number(item?.activeEntitlementCount || 0) > 0) {
+      bits.push(`entitlements=${Number(item.activeEntitlementCount)}`);
+    }
+    return bits;
+  }
+  if (sourceType === "session") {
+    if (item?.status) {
+      bits.push(`status=${item.status}`);
+    }
+    if (item?.deviceName || item?.fingerprint) {
+      bits.push(`device=${item.deviceName || item.fingerprint}`);
+    }
+    return bits;
+  }
+  if (sourceType === "device") {
+    if (item?.kind) {
+      bits.push(`kind=${item.kind}`);
+    }
+    if (item?.status) {
+      bits.push(`status=${item.status}`);
+    }
+    if (Number(item?.relatedSessionCount || 0) > 0) {
+      bits.push(`sessions=${Number(item.relatedSessionCount)}`);
+    }
+  }
+  return bits;
+}
+
+function appendSnapshotEscalationSummaryLines(lines = [], overview = {}) {
+  const queueItems = Array.isArray(overview?.recommendedQueue) ? overview.recommendedQueue : [];
+  if (!queueItems.length) {
+    return;
+  }
+  const urgentEntries = queueItems
+    .map((item, index) => ({ item, index }))
+    .filter(({ item, index }) => {
+      const severity = String(item?.severity ?? "").trim().toLowerCase();
+      return severity === "critical" || severity === "high" || (index === 0 && severity === "medium");
+    })
+    .slice(0, 3);
+  if (!urgentEntries.length) {
+    return;
+  }
+  lines.push("Escalate First:");
+  for (const { item, index } of urgentEntries) {
+    lines.push(`- [${String(item?.severity || "-").toUpperCase()}][${item?.sourceType || "-"}][#${index + 1}] ${item?.title || "-"} | impacts=${buildSnapshotQueueImpactBits(item).join(", ") || "-"} | reason=${item?.reason || "-"} | control=${item?.recommendedControl?.label || "-"} | next=${item?.nextAction || "-"}`);
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -2763,6 +2820,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | control=${item.recommendedControl?.label || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
+    appendSnapshotEscalationSummaryLines(lines, overview);
     appendSnapshotQueueSummaryLines(lines, overview);
   }
 
@@ -3056,6 +3114,7 @@ function buildAdminOpsSummaryText(payload = {}) {
         lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | control=${item.recommendedControl?.label || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
+    appendSnapshotEscalationSummaryLines(lines, overview);
     appendSnapshotQueueSummaryLines(lines, overview);
   }
 

@@ -786,6 +786,7 @@
           <div class="split-line"><span>Recommended Workspace</span><span>${escapeHtml(recommendedWorkspace.label || "-")}</span></div>
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "No launch workflow summary available.")}</div>
           ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${escapeHtml(recommendedWorkspace.reason)}</div>` : ""}
+          ${renderWorkspaceActionButtons(workspaceActions)}
           ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
@@ -830,7 +831,7 @@
           <div class="split-line"><span>Integration Env</span><span>${escapeHtml(linkedIntegrationSnippets.envFileName || "-")}</span></div>
           <div class="split-line"><span>Host Config</span><span>${escapeHtml(linkedIntegrationSnippets.hostConfigFileName || "-")}</span></div>
           <div class="split-line"><span>Host Skeleton</span><span>${escapeHtml(linkedIntegrationSnippets.hostSkeletonFileName || "-")}</span></div>
-          ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "workspace")} | ${escapeHtml(String(item.priority || "secondary").toUpperCase())} | ${escapeHtml(item.reason || "-")}`).join("<br>")}</div>` : ""}
+          ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "workspace")} | ${escapeHtml(String(item.priority || "secondary").toUpperCase())} | focus=${escapeHtml(item.autofocus || "-")} | ${escapeHtml(item.reason || "-")}`).join("<br>")}</div>` : ""}
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "Review the current lane before handing it to integration or release teammates.")}</div>
           ${recommendedDownloads.length ? `<div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>` : ""}
         `;
@@ -903,6 +904,29 @@
 
       function currentRecommendedWorkspaceAction() {
         return releasePackage?.workflowSummary?.recommendedWorkspace || null;
+      }
+
+      function currentWorkspaceActions() {
+        return Array.isArray(releasePackage?.workflowSummary?.workspaceActions)
+          ? releasePackage.workflowSummary.workspaceActions
+          : [];
+      }
+
+      function renderWorkspaceActionButtons(actions = []) {
+        if (!actions.length) {
+          return "";
+        }
+        return `
+          <div class="actions" style="margin-top:12px;">
+            ${actions.map((item, index) => `
+              <button
+                type="button"
+                class="${index === 0 ? "secondary" : ""}"
+                data-workspace-action-index="${index}"
+              >${escapeHtml(item.label || item.key || "Open workspace")}</button>
+            `).join("")}
+          </div>
+        `;
       }
 
       function navigateToWorkspaceAction(action, target) {
@@ -1292,6 +1316,20 @@
         try {
           const target = currentReleaseTarget();
           navigateToWorkspaceAction(currentRecommendedWorkspaceAction(), target);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("release-readiness").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-workspace-action-index]");
+        if (!button) {
+          return;
+        }
+        try {
+          const index = Number(button.dataset.workspaceActionIndex);
+          const action = currentWorkspaceActions()[index];
+          navigateToWorkspaceAction(action, currentReleaseTarget());
         } catch (error) {
           setStatus(error.message, true);
         }

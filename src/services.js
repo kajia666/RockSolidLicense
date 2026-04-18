@@ -3015,6 +3015,17 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("");
   }
 
+  const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions : [];
+  if (workspaceActions.length) {
+    lines.push("Workspace Path:");
+    for (const item of workspaceActions) {
+      lines.push(
+        `- ${item.label || item.key || "workspace"} | ${String(item.priority || "secondary").toUpperCase()} | focus=${item.autofocus || "-"} | reason=${item.reason || "-"}`
+      );
+    }
+    lines.push("");
+  }
+
   const blockers = Array.isArray(workflowSummary.blockers) ? workflowSummary.blockers : [];
   lines.push("Workflow Blockers:");
   if (blockers.length) {

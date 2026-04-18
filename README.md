@@ -111,7 +111,7 @@
 - [开发者授权运营台](docs/developer-ops.md)
 - [开发者发版工作台](docs/developer-release.md)
 
-现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。上线工作台本身也支持直接下载 linked release summary、integration env、host config、CMake 模板、VS2022 quickstart、C++ quickstart 和 host skeleton，方便把首发 handoff 资料一次拿齐；如果从别的工作台带 `autofocus=handoff` 跳过去，登录或刷新后也会优先自动拉起对应 lane 的 launch workflow，而且这些 linked release / integration 资料现在也可以统一从 `/api/developer/launch-workflow/download` 下发。推荐工作台跳转现在还会继续带上更细的 `autofocus`，把软件作者直接落到项目页的功能配置、接入页的启动/加固区块，或发版页的版本/公告区块，而不只是跳到某个页面。新增的 `handoff-zip` 会输出一份更适合发给集成、测试、发布同事的精简材料包，而完整 `zip` 继续保留更全的 workflow / release / integration 归档内容。
+现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。上线工作台本身也支持直接下载 linked release summary、integration env、host config、CMake 模板、VS2022 quickstart、C++ quickstart 和 host skeleton，方便把首发 handoff 资料一次拿齐；如果从别的工作台带 `autofocus=handoff` 跳过去，登录或刷新后也会优先自动拉起对应 lane 的 launch workflow，而且这些 linked release / integration 资料现在也可以统一从 `/api/developer/launch-workflow/download` 下发。推荐工作台跳转现在还会继续带上更细的 `autofocus`，把软件作者直接落到项目页的功能配置、接入页的启动/加固区块，或发版页的版本/公告区块，而不只是跳到某个页面。项目页和上线工作台现在还会把前几个 `workspaceActions` 直接渲染成按钮，减少“先看摘要再自己判断该点哪个页面”的来回。新增的 `handoff-zip` 会输出一份更适合发给集成、测试、发布同事的精简材料包，而完整 `zip` 继续保留更全的 workflow / release / integration 归档内容。
 
 ## 快速导航
 

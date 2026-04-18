@@ -64,6 +64,8 @@ Recommended workspace jumps now also preserve a more specific `autofocus` hint. 
 - version-rule or notice blockers can land on the release preview block
 - handoff review can land on the combined launch workflow block
 
+The same inline launch workflow block now also exposes the top `workspaceActions` as direct buttons, so the project page is no longer limited to one “recommended workspace” jump. Software authors can click the first few routed actions straight from the inline summary.
+
 The same combined package is also available over:
 
 - `GET /api/developer/launch-workflow`

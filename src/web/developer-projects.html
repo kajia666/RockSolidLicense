@@ -885,7 +885,8 @@
             ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${esc(recommendedWorkspace.reason)}</div>` : ""}
             ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
-            ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "workspace")} | ${esc(String(item.priority || "secondary").toUpperCase())} | ${esc(item.reason || "-")}`).join("<br>")}</div>` : ""}
+            ${renderProjectWorkspaceActionButtons(workspaceActions)}
+            ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "workspace")} | ${esc(String(item.priority || "secondary").toUpperCase())} | focus=${esc(item.autofocus || "-")} | ${esc(item.reason || "-")}`).join("<br>")}</div>` : ""}
             ${checklistItems.length ? `<div class="hint" style="margin-top:12px;">Top workflow checks:<br>${checklistItems.map((item, index) => `${index + 1}. [${esc(String(item.status || "unknown").toUpperCase())}] ${esc(item.label || item.key || "item")} | ${esc(item.summary || "-")}`).join("<br>")}</div>` : ""}
           `;
           return;
@@ -1766,13 +1767,40 @@
         return launchWorkflowPreview.payload?.workflowSummary?.recommendedWorkspace || null;
       }
 
-      function openRecommendedLaunchWorkspace() {
+      function currentLaunchWorkflowWorkspaceActions() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!launchWorkflowPreview || launchWorkflowPreview.productCode !== productCode || launchWorkflowPreview.channel !== channel) {
+          return [];
+        }
+        return Array.isArray(launchWorkflowPreview.payload?.workflowSummary?.workspaceActions)
+          ? launchWorkflowPreview.payload.workflowSummary.workspaceActions
+          : [];
+      }
+
+      function renderProjectWorkspaceActionButtons(actions = []) {
+        if (!actions.length) {
+          return "";
+        }
+        return `
+          <div class="actions" style="margin-top:12px;">
+            ${actions.map((item, index) => `
+              <button
+                type="button"
+                class="${index === 0 ? "secondary" : ""}"
+                data-launch-workspace-action-index="${index}"
+              >${esc(item.label || item.key || "Open workspace")}</button>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function openLaunchWorkspaceAction(action) {
         const productId = el("edit-product-id").value.trim();
         const productCode = el("edit-product-code").value.trim();
         if (!productId || !productCode) {
           throw new Error("Select a project before opening the recommended workspace.");
         }
-        const action = currentLaunchWorkflowRecommendedAction();
         if (!action) {
           throw new Error("Preview Launch Workflow first so the recommended workspace can be resolved.");
         }
@@ -1809,6 +1837,10 @@
           channel: currentReleaseChannel(),
           autofocus: action.autofocus || "handoff"
         });
+      }
+
+      function openRecommendedLaunchWorkspace() {
+        openLaunchWorkspaceAction(currentLaunchWorkflowRecommendedAction());
       }
 
       el("clear-release-preview-btn").addEventListener("click", () => {
@@ -2097,6 +2129,19 @@
       el("launch-open-recommended-btn").addEventListener("click", () => {
         try {
           openRecommendedLaunchWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("detail-launch-workflow").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-launch-workspace-action-index]");
+        if (!button) {
+          return;
+        }
+        try {
+          const index = Number(button.dataset.launchWorkspaceActionIndex);
+          openLaunchWorkspaceAction(currentLaunchWorkflowWorkspaceActions()[index]);
         } catch (error) {
           setStatus(error.message, true);
         }

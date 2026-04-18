@@ -9180,6 +9180,9 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /recommended-download-box/);
     assert.match(html, /hydrateLaunchAutofocus/);
+    assert.match(html, /renderWorkspaceActionButtons/);
+    assert.match(html, /data-workspace-action-index/);
+    assert.match(html, /Workspace path:/);
     assert.match(html, /autofocus/);
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Integration Package/);
@@ -9718,6 +9721,9 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /loadInlineReleasePreview/);
     assert.match(html, /loadInlineIntegrationPreview/);
     assert.match(html, /loadInlineLaunchWorkflow/);
+    assert.match(html, /renderProjectWorkspaceActionButtons/);
+    assert.match(html, /openLaunchWorkspaceAction/);
+    assert.match(html, /data-launch-workspace-action-index/);
     assert.match(html, /autofocus: action\.autofocus \|\| "detail"/);
     assert.match(html, /autofocus: action\.autofocus \|\| "package"/);
     assert.match(html, /downloadUrlFile/);

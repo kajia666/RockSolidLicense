@@ -9447,6 +9447,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Open Release Check/);
     assert.match(html, /Preview Release Readiness/);
     assert.match(html, /Clear Release Preview/);
+    assert.match(html, /Preview Launch Workflow/);
     assert.match(html, /Download Release Summary/);
     assert.match(html, /Download Release Checksums/);
     assert.match(html, /Download Release Zip/);
@@ -9471,8 +9472,10 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /detail-release-channel/);
     assert.match(html, /detail-release-readiness/);
     assert.match(html, /detail-integration-preview/);
+    assert.match(html, /detail-launch-workflow/);
     assert.match(html, /renderReleasePreview/);
     assert.match(html, /renderIntegrationPreview/);
+    assert.match(html, /renderLaunchWorkflow/);
     assert.match(html, /api\/developer\/release-package\/download/);
     assert.match(html, /api\/developer\/integration\/package/);
     assert.match(html, /api\/developer\/integration\/package\/download/);

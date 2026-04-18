@@ -140,7 +140,7 @@
           <div id="detail-box" class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>
           <div class="two" style="margin-top:12px;">
             <label>Release Preview Channel<input id="detail-release-channel" placeholder="stable" /></label>
-            <div class="actions" style="align-self:end;"><button class="secondary" id="preview-release-readiness-btn">Preview Release Readiness</button><button id="clear-release-preview-btn">Clear Release Preview</button></div>
+            <div class="actions" style="align-self:end;"><button class="secondary" id="preview-release-readiness-btn">Preview Release Readiness</button><button class="secondary" id="preview-launch-workflow-btn">Preview Launch Workflow</button><button id="clear-release-preview-btn">Clear Release Preview</button></div>
           </div>
           <div id="detail-release-readiness" class="hint" style="margin-top:12px;">Select a project and preview a channel to inspect release readiness without leaving this page.</div>
           <div class="actions" style="margin-top:12px;">
@@ -179,6 +179,7 @@
             <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
+          <div id="detail-launch-workflow" class="hint" style="margin-top:12px;">Preview the same channel for both release readiness and integration snapshot to see one combined launch workflow summary.</div>
           <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.</div>
         </article>
       </section>
@@ -773,11 +774,78 @@
         `;
       }
 
+      function renderLaunchWorkflow(product = null) {
+        const box = el("detail-launch-workflow");
+        if (!product) {
+          box.textContent = "Preview the same channel for both release readiness and integration snapshot to see one combined launch workflow summary.";
+          return;
+        }
+
+        const channel = currentReleaseChannel();
+        const hasRelease = releasePreview && releasePreview.productCode === product.code && releasePreview.channel === channel;
+        const hasIntegration = integrationPreview && integrationPreview.productCode === product.code && integrationPreview.channel === channel;
+        if (!hasRelease || !hasIntegration) {
+          box.innerHTML = `Use <code>Preview Launch Workflow</code> for <code>${esc(product.code)}</code> on <code>${esc(channel)}</code> to load both release readiness and integration snapshot together.`;
+          return;
+        }
+
+        const releasePayload = releasePreview.payload || {};
+        const integrationPayload = integrationPreview.payload || {};
+        const readiness = releasePayload.manifest?.release?.readiness || {};
+        const checklist = releasePayload.deliveryChecklist || {};
+        const deliverySummary = releasePayload.deliverySummary || {};
+        const startupPreview = integrationPayload.manifest?.startupPreview || {};
+        const startupDecision = startupPreview.decision || {};
+        const startupRequest = startupPreview.request || integrationPayload.manifest?.startupDefaults || {};
+        const tokenKeySummary = startupPreview.tokenKeySummary || {};
+        const clientHardening = startupPreview.clientHardening || integrationPayload.manifest?.clientHardening || {};
+        const tokenKeyTotal = tokenKeySummary.totalKeys ?? integrationPayload.manifest?.tokenKeys?.length ?? 0;
+        const workflowStatus = readiness.status === "hold" || startupDecision.ready === false
+          ? "hold"
+          : readiness.status === "attention" || clientHardening.profile !== "strict"
+            ? "attention"
+            : "ready";
+        const workflowTitle = workflowStatus === "hold"
+          ? "Hold before launch"
+          : workflowStatus === "attention"
+            ? "Review before launch"
+            : "Launch lane looks aligned";
+        const tags = [
+          tag(workflowTitle, workflowStatus === "ready" ? "ok" : workflowStatus === "hold" ? "danger" : ""),
+          tag(`channel:${channel}`, ""),
+          tag(`release:${readiness.status || "unknown"}`, readiness.status === "ready" ? "ok" : readiness.status === "hold" ? "danger" : ""),
+          tag(`startup:${startupDecision.status || "unknown"}`, startupDecision.ready ? "ok" : "danger"),
+          tag(`hardening:${clientHardening.profile || "-"}`, clientHardening.profile === "strict" ? "ok" : ""),
+          tag(`keys:${tokenKeyTotal}`, tokenKeyTotal > 0 ? "ok" : "")
+        ];
+        const nextActions = [];
+        for (const item of Array.isArray(readiness.nextActions) ? readiness.nextActions.slice(0, 2) : []) {
+          nextActions.push(item);
+        }
+        if (clientHardening.nextAction) {
+          nextActions.push(clientHardening.nextAction);
+        }
+        if (workflowStatus === "ready") {
+          nextActions.push("Download the integration handoff files and release summary together for this lane.");
+        }
+
+        box.innerHTML = `
+          <div>${tags.join("")}</div>
+          <div class="hint" style="margin-top:10px;">${esc(readiness.message || deliverySummary.summary || startupDecision.message || "No workflow summary available.")}</div>
+          <div class="split-line" style="margin-top:12px;"><span>Candidate</span><span>${esc(readiness.candidateVersion || deliverySummary.candidateVersion || startupRequest.clientVersion || "-")}</span></div>
+          <div class="split-line"><span>Checklist</span><span>${esc(String(checklist.status || "unknown").toUpperCase())} | block ${esc(checklist.blockItems ?? 0)} | review ${esc(checklist.reviewItems ?? 0)}</span></div>
+          <div class="split-line"><span>Startup Defaults</span><span>${esc(startupRequest.clientVersion || "-")} | includeKeys=${esc(String(startupRequest.includeTokenKeys !== false))}</span></div>
+          <div class="split-line"><span>Recommended Downloads</span><span>release summary + integration env + host config + host skeleton</span></div>
+          ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
+        `;
+      }
+
       function renderDetail(product = null) {
         if (!product) {
           el("detail-box").innerHTML = '<div class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>';
           renderReleasePreview(null);
           renderIntegrationPreview(null);
+          renderLaunchWorkflow(null);
           syncWorkspaceLinks(null);
           return;
         }
@@ -808,6 +876,7 @@
         `;
         renderReleasePreview(product);
         renderIntegrationPreview(product);
+        renderLaunchWorkflow(product);
         syncWorkspaceLinks(product);
       }
 
@@ -816,6 +885,7 @@
         el("open-project-integration-btn").disabled = !hasProduct;
         el("open-project-release-btn").disabled = !hasProduct;
         el("preview-release-readiness-btn").disabled = !hasProduct;
+        el("preview-launch-workflow-btn").disabled = !hasProduct;
         el("clear-release-preview-btn").disabled = !hasProduct && !releasePreview;
         el("preview-integration-package-btn").disabled = !hasProduct;
         el("clear-integration-preview-btn").disabled = !hasProduct && !integrationPreview;
@@ -1357,9 +1427,37 @@
           releasePreview = { productCode, channel, payload };
           const product = findVisibleProductById(productId);
           renderReleasePreview(product);
+          renderLaunchWorkflow(product);
           syncWorkspaceLinks(product);
           setStatus(`Loaded ${productCode} release readiness for channel ${channel}.`);
           setOutput({ releasePreview: payload });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("preview-launch-workflow-btn").addEventListener("click", async () => {
+        try {
+          const productId = el("edit-product-id").value.trim();
+          const productCode = el("edit-product-code").value.trim();
+          if (!productId || !productCode) {
+            throw new Error("Select a project before previewing the launch workflow.");
+          }
+          const channel = currentReleaseChannel();
+          const [releasePayload, integrationPayload] = await Promise.all([
+            api(`/api/developer/release-package${buildRouteQuery({ productCode, channel })}`),
+            api(`/api/developer/integration/package${buildRouteQuery({ productCode, channel })}`)
+          ]);
+          releasePreview = { productCode, channel, payload: releasePayload };
+          integrationPreview = { productCode, channel, payload: integrationPayload };
+          const product = findVisibleProductById(productId);
+          renderReleasePreview(product);
+          renderIntegrationPreview(product);
+          renderLaunchWorkflow(product);
+          syncWorkspaceLinks(product);
+          setStatus(`Loaded ${productCode} launch workflow for channel ${channel}.`);
+          setOutput({ launchWorkflow: { releasePreview: releasePayload, integrationPreview: integrationPayload } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1378,6 +1476,7 @@
           integrationPreview = { productCode, channel, payload };
           const product = findVisibleProductById(productId);
           renderIntegrationPreview(product);
+          renderLaunchWorkflow(product);
           syncWorkspaceLinks(product);
           setStatus(`Loaded ${productCode} integration snapshot for channel ${channel}.`);
           setOutput({ integrationPreview: payload });
@@ -1421,6 +1520,7 @@
         releasePreview = null;
         const product = findVisibleProductById(el("edit-product-id").value.trim());
         renderReleasePreview(product);
+        renderLaunchWorkflow(product);
         syncWorkspaceLinks(product);
         setStatus("Inline release preview cleared.");
       });
@@ -1429,6 +1529,7 @@
         integrationPreview = null;
         const product = findVisibleProductById(el("edit-product-id").value.trim());
         renderIntegrationPreview(product);
+        renderLaunchWorkflow(product);
         syncWorkspaceLinks(product);
         setStatus("Inline integration preview cleared.");
       });
@@ -1437,6 +1538,7 @@
         const product = findVisibleProductById(el("edit-product-id").value.trim());
         renderReleasePreview(product);
         renderIntegrationPreview(product);
+        renderLaunchWorkflow(product);
         syncWorkspaceLinks(product);
       });
 

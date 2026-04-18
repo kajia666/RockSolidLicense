@@ -37,6 +37,15 @@ The project detail card now also supports an inline integration snapshot preview
 - host skeleton snippet
 - integration `zip`
 
+To reduce repeated clicks, the same detail card now also exposes a `Preview Launch Workflow` action. It loads the current channel for both release readiness and integration snapshot together, then renders one combined summary with:
+
+- overall lane status
+- candidate version
+- release checklist counts
+- startup bootstrap decision
+- hardening profile
+- recommended next steps and download hints
+
 ## Scoped APIs
 
 - `GET /api/developer/products`

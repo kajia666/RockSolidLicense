@@ -48,10 +48,13 @@ The package route accepts:
 - `productCode`
 - `projectCode`
 - `softwareCode`
+- `channel`
 
 The package download route accepts the same selectors plus:
 
 - `format=json|env|host-config|cmake|vs2022-guide|vs2022-sln|vs2022|vs2022-filters|vs2022-props|vs2022-local-props|cpp|host-skeleton|checksums|zip`
+
+When `channel` is provided, the package uses that release lane for the generated startup bootstrap preview, startup defaults, and channel-aware handoff snippets such as `.env` and `rocksolid_host_config.env`.
 
 ## Returned data
 

@@ -20,7 +20,7 @@ The detail card now also shows a lightweight "Delivery quick signals" summary. I
 
 The same detail card now also supports an inline release-readiness preview. Software authors can choose a channel such as `stable` and fetch the current `release-package` summary directly inside `/developer/projects` before jumping to the dedicated release workspace. After previewing the result, they can also download the same release package `summary`, `checksums`, or `zip` straight from the project page.
 
-The project detail card now also supports an inline integration snapshot preview. Without leaving `/developer/projects`, software authors can inspect the latest startup bootstrap decision, client hardening profile, token key coverage, and handoff artifact hints for the selected project. The same card also exposes the most common integration handoff files directly:
+The project detail card now also supports an inline integration snapshot preview. Without leaving `/developer/projects`, software authors can inspect the latest startup bootstrap decision, client hardening profile, token key coverage, and handoff artifact hints for the selected project. This preview now follows the same `channel` field used by the inline release-readiness preview, so `stable`, `beta`, and other release lanes stay aligned while checking startup behavior and downloading handoff assets. The same card also exposes the most common integration handoff files directly:
 
 - generated `.env`
 - `rocksolid_host_config.env`

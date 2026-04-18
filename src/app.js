@@ -1124,7 +1124,8 @@ export function createApp(overrides = {}) {
           productId: url.searchParams.get("productId"),
           productCode: url.searchParams.get("productCode"),
           projectCode: url.searchParams.get("projectCode"),
-          softwareCode: url.searchParams.get("softwareCode")
+          softwareCode: url.searchParams.get("softwareCode"),
+          channel: url.searchParams.get("channel")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,
@@ -1138,7 +1139,8 @@ export function createApp(overrides = {}) {
           productId: url.searchParams.get("productId"),
           productCode: url.searchParams.get("productCode"),
           projectCode: url.searchParams.get("projectCode"),
-          softwareCode: url.searchParams.get("softwareCode")
+          softwareCode: url.searchParams.get("softwareCode"),
+          channel: url.searchParams.get("channel")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,

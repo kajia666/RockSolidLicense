@@ -9179,6 +9179,15 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.equal(byProductId.snippets.hostConfigFileName, "rocksolid_host_config.env");
     assert.match(byProductId.snippets.hostConfigEnv, /Copy this file to sdk\/examples\/cmake_cpp_host_consumer\/rocksolid_host_config\.env/);
     assert.match(byProductId.snippets.hostConfigEnv, /RS_PROJECT_CODE=EXPORT_ALPHA/);
+    const byChannel = await getJson(
+      baseUrl,
+      `/api/developer/integration/package?productId=${encodeURIComponent(alphaProject.id)}&channel=beta`,
+      viewerSession.token
+    );
+    assert.equal(byChannel.manifest.startupPreview.request.channel, "beta");
+    assert.equal(byChannel.manifest.startupDefaults.channel, "beta");
+    assert.match(byChannel.snippets.envTemplate, /RS_CHANNEL=beta/);
+    assert.match(byChannel.snippets.hostConfigEnv, /RS_CHANNEL=beta/);
     assert.equal(byProductId.snippets.cmakeFileName, "CMakeLists.txt");
     assert.match(byProductId.snippets.cmakeConsumerTemplate, /find_package\(RockSolidSDK CONFIG REQUIRED/);
     assert.match(byProductId.snippets.cmakeConsumerTemplate, /export_alpha_host_consumer/);

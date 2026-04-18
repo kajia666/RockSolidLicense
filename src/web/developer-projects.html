@@ -720,8 +720,9 @@
           return;
         }
 
-        if (!integrationPreview || integrationPreview.productCode !== product.code) {
-          box.innerHTML = `Preview the integration snapshot for <code>${esc(product.code)}</code> to inspect startup bootstrap defaults, client hardening, and handoff artifacts from this page.`;
+        const channel = currentReleaseChannel();
+        if (!integrationPreview || integrationPreview.productCode !== product.code || integrationPreview.channel !== channel) {
+          box.innerHTML = `Preview the integration snapshot for <code>${esc(product.code)}</code> on <code>${esc(channel)}</code> to inspect startup bootstrap defaults, client hardening, and handoff artifacts from this page.`;
           return;
         }
 
@@ -739,7 +740,7 @@
           tag(clientHardening.profile || "unknown", clientHardening.profile === "strict" ? "ok" : ""),
           tag(`startup:${decision.status || "unknown"}`, decision.ready ? "ok" : ""),
           tag(`token-keys:${tokenKeyTotal}`, tokenKeyTotal > 0 ? "ok" : ""),
-          tag(`channel:${request.channel || "-"}`, ""),
+          tag(`channel:${request.channel || channel || "-"}`, ""),
           tag(`client:${request.clientVersion || "-"}`, "")
         ];
         const artifactTags = [
@@ -1362,12 +1363,13 @@
           if (!productId || !productCode) {
             throw new Error("Select a project before previewing the integration snapshot.");
           }
-          const payload = await api(`/api/developer/integration/package${buildRouteQuery({ productCode })}`);
-          integrationPreview = { productCode, payload };
+          const channel = currentReleaseChannel();
+          const payload = await api(`/api/developer/integration/package${buildRouteQuery({ productCode, channel })}`);
+          integrationPreview = { productCode, channel, payload };
           const product = findVisibleProductById(productId);
           renderIntegrationPreview(product);
           syncWorkspaceLinks(product);
-          setStatus(`Loaded ${productCode} integration snapshot.`);
+          setStatus(`Loaded ${productCode} integration snapshot for channel ${channel}.`);
           setOutput({ integrationPreview: payload });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
@@ -1395,9 +1397,10 @@
         if (!productCode) {
           throw new Error("Select a project before downloading an integration asset.");
         }
+        const channel = currentReleaseChannel();
         const result = await downloadUrlFile(
           "/api/developer/integration/package/download",
-          { productCode, format },
+          { productCode, channel, format },
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -1423,6 +1426,7 @@
       el("detail-release-channel").addEventListener("change", () => {
         const product = findVisibleProductById(el("edit-product-id").value.trim());
         renderReleasePreview(product);
+        renderIntegrationPreview(product);
         syncWorkspaceLinks(product);
       });
 

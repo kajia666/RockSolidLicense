@@ -667,11 +667,11 @@ ${JSON.stringify(request, null, 2)}`;
       }
 
       function buildPackagePath(product) {
-        return `/api/developer/integration/package?productId=${encodeURIComponent(product.id)}`;
+        return `/api/developer/integration/package?productId=${encodeURIComponent(product.id)}&channel=${encodeURIComponent(requestedChannel)}`;
       }
 
       function buildPackageDownloadPath(product, format) {
-        return `/api/developer/integration/package/download?productId=${encodeURIComponent(product.id)}&format=${encodeURIComponent(format)}`;
+        return `/api/developer/integration/package/download?productId=${encodeURIComponent(product.id)}&channel=${encodeURIComponent(requestedChannel)}&format=${encodeURIComponent(format)}`;
       }
 
       function chooseSelected() {

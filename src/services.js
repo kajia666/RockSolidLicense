@@ -1529,9 +1529,16 @@ async function buildDeveloperIntegrationPackagePayloadAsync({
   tokenKeys,
   examples,
   includeOwner = false,
-  generatedAt = nowIso()
+  generatedAt = nowIso(),
+  startupRequest = {}
 }) {
-  const startupPreview = await buildIntegrationStartupPreviewPayload(db, store, product, tokenKeys);
+  const startupPreview = await buildIntegrationStartupPreviewPayload(
+    db,
+    store,
+    product,
+    tokenKeys,
+    startupRequest
+  );
   return buildDeveloperIntegrationPackagePayload({
     developer,
     actor,
@@ -10663,7 +10670,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         transport,
         signing,
         tokenKeys,
-        examples: buildIntegrationExamples()
+        examples: buildIntegrationExamples(),
+        startupRequest: {
+          channel: selector.channel
+        }
       });
     },
 

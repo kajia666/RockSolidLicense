@@ -203,6 +203,7 @@
             <button id="generate-release-package-btn">Generate Launch Workflow</button>
           </div>
           <div class="actions">
+            <button class="secondary" id="open-recommended-workspace-btn">Open Recommended Workspace</button>
             <button class="secondary" id="open-release-project-btn">Open Project Workspace</button>
             <button class="secondary" id="open-release-integration-btn">Open Integration Package</button>
             <button class="secondary" id="open-release-release-btn">Open Release Check</button>
@@ -628,6 +629,7 @@
       function syncReleaseWorkspaceLinks() {
         const target = currentReleaseTarget();
         const hasProduct = Boolean(target.productCode);
+        el("open-recommended-workspace-btn").disabled = !(hasProduct && releasePackage?.workflowSummary?.recommendedWorkspace);
         el("open-release-project-btn").disabled = !hasProduct;
         el("open-release-integration-btn").disabled = !hasProduct;
         el("open-release-release-btn").disabled = !hasProduct;
@@ -766,6 +768,8 @@
         const nextActions = Array.isArray(workflowSummary.nextActions) ? workflowSummary.nextActions : [];
         const blockers = Array.isArray(workflowSummary.blockers) ? workflowSummary.blockers : [];
         const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
+        const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
+        const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions : [];
         const linkedIntegrationSnippets = linkedIntegrationPackage.snippets || {};
 
         el("release-readiness").innerHTML = `
@@ -779,7 +783,9 @@
           <div class="split-line"><span>Checklist</span><span>${escapeHtml(String(workflowChecklist.status || "unknown").toUpperCase())} | pass ${escapeHtml(workflowChecklist.passItems ?? 0)} | review ${escapeHtml(workflowChecklist.reviewItems ?? 0)} | block ${escapeHtml(workflowChecklist.blockItems ?? 0)}</span></div>
           <div class="split-line"><span>Client Hardening</span><span>${escapeHtml(workflowSummary.clientHardeningProfile || clientHardening.profile || "-")}</span></div>
           <div class="split-line"><span>Token Keys</span><span>${escapeHtml(workflowSummary.tokenKeyTotal ?? 0)}${workflowSummary.activeKeyId ? ` | active ${escapeHtml(workflowSummary.activeKeyId)}` : ""}</span></div>
+          <div class="split-line"><span>Recommended Workspace</span><span>${escapeHtml(recommendedWorkspace.label || "-")}</span></div>
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "No launch workflow summary available.")}</div>
+          ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${escapeHtml(recommendedWorkspace.reason)}</div>` : ""}
           ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
@@ -824,6 +830,7 @@
           <div class="split-line"><span>Integration Env</span><span>${escapeHtml(linkedIntegrationSnippets.envFileName || "-")}</span></div>
           <div class="split-line"><span>Host Config</span><span>${escapeHtml(linkedIntegrationSnippets.hostConfigFileName || "-")}</span></div>
           <div class="split-line"><span>Host Skeleton</span><span>${escapeHtml(linkedIntegrationSnippets.hostSkeletonFileName || "-")}</span></div>
+          ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "workspace")} | ${escapeHtml(String(item.priority || "secondary").toUpperCase())} | ${escapeHtml(item.reason || "-")}`).join("<br>")}</div>` : ""}
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "Review the current lane before handing it to integration or release teammates.")}</div>
           ${recommendedDownloads.length ? `<div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>` : ""}
         `;
@@ -892,6 +899,48 @@
 
       function linkedIntegrationPackageData() {
         return releasePackage?.integrationPackage || null;
+      }
+
+      function currentRecommendedWorkspaceAction() {
+        return releasePackage?.workflowSummary?.recommendedWorkspace || null;
+      }
+
+      function navigateToWorkspaceAction(action, target) {
+        if (!action || !target?.productCode) {
+          throw new Error("Generate a launch workflow package before opening the recommended workspace.");
+        }
+        if (action.key === "project") {
+          window.location.href = buildWorkspaceUrl("/developer/projects", {
+            productId: currentReleaseProductId(target.productCode),
+            productCode: target.productCode,
+            channel: target.channel
+          });
+          return;
+        }
+        if (action.key === "integration") {
+          window.location.href = buildWorkspaceUrl("/developer/integration", {
+            productId: currentReleaseProductId(target.productCode),
+            productCode: target.productCode,
+            channel: target.channel,
+            autofocus: action.autofocus || "package"
+          });
+          return;
+        }
+        if (action.key === "release") {
+          window.location.href = buildWorkspaceUrl("/developer/releases", {
+            productId: currentReleaseProductId(target.productCode),
+            productCode: target.productCode,
+            channel: target.channel,
+            autofocus: action.autofocus || "package"
+          });
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          productId: currentReleaseProductId(target.productCode),
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: action.autofocus || "handoff"
+        });
       }
 
       async function downloadLinkedReleaseAsset(format, fallbackFileName, label) {
@@ -1236,6 +1285,15 @@
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode
         });
+      });
+
+      el("open-recommended-workspace-btn").addEventListener("click", () => {
+        try {
+          const target = currentReleaseTarget();
+          navigateToWorkspaceAction(currentRecommendedWorkspaceAction(), target);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
       });
 
       el("open-release-integration-btn").addEventListener("click", () => {

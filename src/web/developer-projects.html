@@ -195,6 +195,7 @@
             <button class="secondary" id="launch-download-host-skeleton-btn">Host Skeleton</button>
           </div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="launch-open-recommended-btn">Open Recommended Workspace</button>
             <button class="secondary" id="launch-open-workflow-btn">Open Launch Workspace</button>
             <button class="secondary" id="launch-open-integration-btn">Open Integration Workspace</button>
             <button class="secondary" id="launch-open-release-btn">Open Release Workspace</button>
@@ -808,6 +809,8 @@
           const workflowChecklist = payload.workflowChecklist || {};
           const checklistItems = Array.isArray(workflowChecklist.items) ? workflowChecklist.items.slice(0, 4) : [];
           const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 5) : [];
+          const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
+          const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions.slice(0, 3) : [];
           const checklistCounts = workflowSummary.checklistCounts || {};
           const tags = [
             tag(workflowSummary.title || "Launch workflow", workflowSummary.status === "ready" ? "ok" : workflowSummary.status === "hold" ? "danger" : ""),
@@ -827,10 +830,13 @@
             <div class="split-line"><span>Launch Package</span><span>${esc(payload.summaryFileName || "-")} | ${esc(payload.checklistFileName || "-")}</span></div>
             <div class="split-line"><span>Recommended Handoff</span><span>${esc(recommendedDownloads.find((item) => item.key === "launch_handoff_zip")?.fileName || payload.handoffZipFileName || "-")}</span></div>
             <div class="split-line"><span>Full Workflow Zip</span><span>${esc(recommendedDownloads.find((item) => item.key === "launch_workflow_zip")?.fileName || `${String(payload.fileName || "launch-workflow.json").replace(/\.json$/i, ".zip")}`)}</span></div>
+            <div class="split-line"><span>Recommended Workspace</span><span>${esc(recommendedWorkspace.label || "-")}</span></div>
             <div class="split-line"><span>Workflow Checklist</span><span>${esc(String(workflowChecklist.status || "unknown").toUpperCase())} | pass ${esc(workflowChecklist.passItems ?? 0)} | review ${esc(workflowChecklist.reviewItems ?? 0)} | block ${esc(workflowChecklist.blockItems ?? 0)}</span></div>
             <div class="split-line"><span>Recommended Downloads</span><span>${esc(workflowSummary.downloadSummary || recommendedDownloads.map((item) => item.label).join(" + ") || "-")}</span></div>
+            ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${esc(recommendedWorkspace.reason)}</div>` : ""}
             ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
+            ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "workspace")} | ${esc(String(item.priority || "secondary").toUpperCase())} | ${esc(item.reason || "-")}`).join("<br>")}</div>` : ""}
             ${checklistItems.length ? `<div class="hint" style="margin-top:12px;">Top workflow checks:<br>${checklistItems.map((item, index) => `${index + 1}. [${esc(String(item.status || "unknown").toUpperCase())}] ${esc(item.label || item.key || "item")} | ${esc(item.summary || "-")}`).join("<br>")}</div>` : ""}
           `;
           return;
@@ -939,6 +945,7 @@
         el("open-project-integration-btn").disabled = !hasProduct;
         el("open-project-launch-btn").disabled = !hasProduct;
         el("open-project-release-btn").disabled = !hasProduct;
+        el("launch-open-recommended-btn").disabled = !(hasProduct && launchWorkflowPreview && launchWorkflowPreview.productCode === product.code && launchWorkflowPreview.channel === currentReleaseChannel());
         el("launch-open-workflow-btn").disabled = !hasProduct;
         el("launch-open-integration-btn").disabled = !hasProduct;
         el("launch-open-release-btn").disabled = !hasProduct;
@@ -1626,6 +1633,58 @@
         });
       }
 
+      function currentLaunchWorkflowRecommendedAction() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!launchWorkflowPreview || launchWorkflowPreview.productCode !== productCode || launchWorkflowPreview.channel !== channel) {
+          return null;
+        }
+        return launchWorkflowPreview.payload?.workflowSummary?.recommendedWorkspace || null;
+      }
+
+      function openRecommendedLaunchWorkspace() {
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          throw new Error("Select a project before opening the recommended workspace.");
+        }
+        const action = currentLaunchWorkflowRecommendedAction();
+        if (!action) {
+          throw new Error("Preview Launch Workflow first so the recommended workspace can be resolved.");
+        }
+        if (action.key === "project") {
+          window.location.href = buildWorkspaceUrl("/developer/projects", {
+            productId,
+            productCode,
+            channel: currentReleaseChannel()
+          });
+          return;
+        }
+        if (action.key === "integration") {
+          window.location.href = buildWorkspaceUrl("/developer/integration", {
+            productId,
+            productCode,
+            channel: currentReleaseChannel()
+          });
+          return;
+        }
+        if (action.key === "release") {
+          window.location.href = buildWorkspaceUrl("/developer/releases", {
+            productId,
+            productCode,
+            channel: currentReleaseChannel(),
+            autofocus: action.autofocus || "package"
+          });
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          productId,
+          productCode,
+          channel: currentReleaseChannel(),
+          autofocus: action.autofocus || "handoff"
+        });
+      }
+
       el("clear-release-preview-btn").addEventListener("click", () => {
         releasePreview = null;
         launchWorkflowPreview = null;
@@ -1904,6 +1963,14 @@
       el("launch-open-release-btn").addEventListener("click", () => {
         try {
           openProjectReleaseWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("launch-open-recommended-btn").addEventListener("click", () => {
+        try {
+          openRecommendedLaunchWorkspace();
         } catch (error) {
           setStatus(error.message, true);
         }

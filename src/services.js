@@ -2833,6 +2833,92 @@ function buildLaunchWorkflowSummaryPayload({
     blockers.push(`startup: ${startupDecision.message}`);
   }
 
+  const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+    ? product.featureConfig
+    : {};
+  const workspaceActions = [];
+  const pushWorkspaceAction = (action) => {
+    if (!action || !action.key) {
+      return;
+    }
+    if (workspaceActions.some((item) => item.key === action.key)) {
+      return;
+    }
+    workspaceActions.push(action);
+  };
+
+  if ((product?.status ?? "active") !== "active") {
+    pushWorkspaceAction({
+      key: "project",
+      label: "Open Project Workspace",
+      priority: "primary",
+      reason: `Project status is ${product?.status || "inactive"} and should be switched back to active before rollout.`,
+      autofocus: "product"
+    });
+  }
+  if (startupDecision.ready === false || tokenKeyTotal === 0) {
+    pushWorkspaceAction({
+      key: "integration",
+      label: "Open Integration Workspace",
+      priority: workspaceActions.length ? "secondary" : "primary",
+      reason: startupDecision.ready === false
+        ? (startupDecision.recommendedAction || startupDecision.message || "Startup bootstrap still needs integration-side fixes.")
+        : "Token key coverage should be reviewed in the integration package before rollout.",
+      autofocus: "package"
+    });
+  }
+  if (
+    readiness.status === "hold"
+    || readiness.status === "attention"
+    || featureConfig.allowVersionCheck === false
+    || featureConfig.allowNotices === false
+  ) {
+    pushWorkspaceAction({
+      key: "release",
+      label: "Open Release Workspace",
+      priority: workspaceActions.length ? "secondary" : "primary",
+      reason: readiness.status === "hold"
+        ? (readiness.message || "Release blockers should be cleared before launch.")
+        : readiness.status === "attention"
+          ? (readiness.message || "Release readiness still needs a final pass.")
+          : "Version-check and notice toggles should be reviewed before handoff.",
+      autofocus: "package"
+    });
+  }
+  if (clientHardening.profile !== "strict") {
+    pushWorkspaceAction({
+      key: "integration",
+      label: "Open Integration Workspace",
+      priority: workspaceActions.length ? "secondary" : "primary",
+      reason: "Client hardening settings still need confirmation for this lane.",
+      autofocus: "package"
+    });
+  }
+  pushWorkspaceAction({
+    key: "launch",
+    label: "Stay in Launch Workflow",
+    priority: workspaceActions.length ? "secondary" : "primary",
+    reason: workflowStatus === "ready"
+      ? "This lane looks aligned. Download the recommended handoff zip and keep the full workflow zip for archive."
+      : "Use the launch workflow workspace to keep release, startup, and handoff context together while you finish review.",
+    autofocus: "handoff"
+  });
+  pushWorkspaceAction({
+    key: "project",
+    label: "Open Project Workspace",
+    priority: workspaceActions.length ? "secondary" : "primary",
+    reason: "Use the project workspace when you need to adjust project status, feature toggles, or download handoff assets inline.",
+    autofocus: "product"
+  });
+
+  const recommendedWorkspace = workspaceActions[0] || {
+    key: "launch",
+    label: "Stay in Launch Workflow",
+    priority: "primary",
+    reason: "Use the launch workflow workspace to review this lane end-to-end.",
+    autofocus: "handoff"
+  };
+
   return {
     status: workflowStatus,
     title: workflowTitle,
@@ -2854,6 +2940,8 @@ function buildLaunchWorkflowSummaryPayload({
     activeKeyId: tokenKeySummary.activeKeyId || null,
     recommendedDownloads,
     downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
+    recommendedWorkspace,
+    workspaceActions,
     nextActions,
     blockers,
     projectCode: product?.code || null
@@ -2886,11 +2974,19 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   ];
 
   const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
+  const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
   if (recommendedDownloads.length) {
     lines.push("Recommended Downloads:");
     for (const item of recommendedDownloads) {
       lines.push(`- ${item.label || item.key || "download"} | ${item.fileName || "-"}`);
     }
+    lines.push("");
+  }
+
+  if (recommendedWorkspace.label || recommendedWorkspace.key) {
+    lines.push("Recommended Workspace:");
+    lines.push(`- ${recommendedWorkspace.label || recommendedWorkspace.key || "-"}`);
+    lines.push(`- reason: ${recommendedWorkspace.reason || "-"}`);
     lines.push("");
   }
 

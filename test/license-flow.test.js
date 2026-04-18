@@ -5504,6 +5504,11 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(launchWorkflow.workflowSummary.startupStatus, "force_update_required");
     assert.equal(launchWorkflow.workflowSummary.clientHardeningProfile, "balanced");
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.recommendedDownloads));
+    assert.equal(launchWorkflow.workflowSummary.recommendedWorkspace.key, "integration");
+    assert.match(launchWorkflow.workflowSummary.recommendedWorkspace.label, /Integration Workspace/);
+    assert.ok(Array.isArray(launchWorkflow.workflowSummary.workspaceActions));
+    assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "integration"));
+    assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "release"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_zip"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_checksums"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
@@ -5517,6 +5522,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
     assert.match(launchWorkflow.summaryText, /Workflow Status: HOLD/);
     assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
+    assert.match(launchWorkflow.summaryText, /Recommended Workspace:/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
     assert.match(launchWorkflow.checklistText, /RockSolid Launch Workflow Checklist/);
@@ -9162,6 +9168,7 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Download Launch Checksums/);
     assert.match(html, /Download Launch Zip/);
     assert.match(html, /Recommended Handoff/);
+    assert.match(html, /Open Recommended Workspace/);
     assert.match(html, /Download Recommended Handoff Zip/);
     assert.match(html, /Download Handoff Checksums/);
     assert.match(html, /Download Release Summary/);
@@ -9675,6 +9682,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Integration Zip/);
     assert.match(html, /Download Recommended Handoff/);
+    assert.match(html, /Open Recommended Workspace/);
     assert.match(html, /Launch Summary/);
     assert.match(html, /Launch Checklist/);
     assert.match(html, /Launch Checksums/);

@@ -7,6 +7,7 @@ It is meant to give software authors one combined place to inspect:
 - release readiness for one project/channel
 - startup bootstrap decisions
 - client hardening profile
+- recommended workspace routing
 - recommended handoff files
 - combined launch summary, checklist, checksums, and zip bundle
 
@@ -86,6 +87,7 @@ The same page now also keeps the most common lane-specific handoff files one cli
 
 - recommended handoff zip
 - recommended handoff checksums
+- recommended workspace jump
 - linked release summary
 - linked integration `.env`
 - linked `rocksolid_host_config.env`

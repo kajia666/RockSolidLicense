@@ -52,6 +52,7 @@ The launch workflow block now also includes direct quick actions so software aut
 
 - download the curated recommended handoff zip
 - download launch summary / checklist / checksums / full workflow zip
+- jump straight into the recommended workspace for the current lane
 - download release summary only
 - download integration env / host config / host skeleton
 - jump straight into the integration or release workspace with the same project and channel

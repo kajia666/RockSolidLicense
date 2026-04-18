@@ -5283,6 +5283,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.snippets.vs2022ProjectFileName, /RELPKG_ALPHA_host_consumer\.vcxproj/i);
     assert.match(releasePackage.snippets.vs2022ProjectTemplate, /PlatformToolset>v143</);
     assert.match(releasePackage.snippets.vs2022ProjectTemplate, /ROCKSOLID_SDK_ROOT/);
+    assert.match(releasePackage.snippets.vs2022ProjectTemplate, /UseDebugLibraries>false</);
+    assert.match(releasePackage.snippets.vs2022ProjectTemplate, /RuntimeLibrary>MultiThreaded</);
     assert.equal(releasePackage.snippets.cppFileName, "RELPKG_ALPHA.cpp");
     assert.equal(releasePackage.snippets.hostSkeletonFileName, "RELPKG_ALPHA-host-skeleton.cpp");
     assert.equal(releasePackage.snippets.hardeningFileName, "RELPKG_ALPHA-hardening-guide.txt");
@@ -8511,6 +8513,8 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerExport.items[0].snippets.vs2022ProjectFileName, /INTBUNDLE_ALPHA_host_consumer\.vcxproj/i);
     assert.match(developerExport.items[0].snippets.vs2022ProjectTemplate, /PlatformToolset>v143</);
     assert.match(developerExport.items[0].snippets.vs2022ProjectTemplate, /ROCKSOLID_SDK_ROOT/);
+    assert.match(developerExport.items[0].snippets.vs2022ProjectTemplate, /UseDebugLibraries>false</);
+    assert.match(developerExport.items[0].snippets.vs2022ProjectTemplate, /RuntimeLibrary>MultiThreaded</);
     assert.equal(developerExport.manifestFiles.length, 1);
     assert.equal(developerExport.manifestFiles[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
     assert.match(developerExport.manifestFiles[0].content, /"code": "INTBUNDLE_ALPHA"/);
@@ -8990,6 +8994,8 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(byProductId.snippets.vs2022ProjectFileName, /EXPORT_ALPHA_host_consumer\.vcxproj/i);
     assert.match(byProductId.snippets.vs2022ProjectTemplate, /PlatformToolset>v143</);
     assert.match(byProductId.snippets.vs2022ProjectTemplate, /ROCKSOLID_SDK_ROOT/);
+    assert.match(byProductId.snippets.vs2022ProjectTemplate, /UseDebugLibraries>false</);
+    assert.match(byProductId.snippets.vs2022ProjectTemplate, /RuntimeLibrary>MultiThreaded</);
     assert.equal(byProductId.snippets.cppFileName, "EXPORT_ALPHA.cpp");
 
     const byProjectCode = await getJson(

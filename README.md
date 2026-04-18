@@ -9,7 +9,7 @@
 - 服务端按策略校验机器绑定、会话状态、版本规则、公告维护窗口与网络规则
 - 登录成功后签发 RSA `licenseToken`，并通过心跳维持在线状态
 - Windows C/C++ SDK 已支持 HTTP/TCP 通信、签名、令牌验签、版本检查、公告拉取、启动决策辅助、结构化错误处理、绑定查询和自助解绑
-- SDK 交付物现在同时提供高层 demo、项目级 host skeleton、可直接下发 `rocksolid_host_config.env`、`CMakeLists.txt`、VS2022 `.vcxproj` 的宿主工程骨架、hardening guide 和发布/接入包模板，方便软件作者按项目策略接入
+- SDK 交付物现在同时提供高层 demo、项目级 host skeleton、可直接下发 `rocksolid_host_config.env`、`CMakeLists.txt`、VS2022 `.vcxproj/.sln` 的宿主工程骨架、hardening guide 和发布/接入包模板，方便软件作者按项目策略接入
 
 这套系统现在更偏向“网络验证 / 软件授权平台”，而不是账单结算系统。代理、库存和结算相关能力保留为辅助运营模块，不是当前仓库的唯一重心。
 

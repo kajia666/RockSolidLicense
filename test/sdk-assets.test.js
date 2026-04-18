@@ -11,11 +11,17 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
-test("sdk cpp package assets include the host skeleton template and packaging hooks", () => {
+test("sdk cpp package assets include host skeleton plus cmake and VS2022 consumer hooks", () => {
   const template = readText("sdk/examples/windows_host_skeleton_template.cpp");
   const cmakeHostConsumerMain = readText("sdk/examples/cmake_cpp_host_consumer/main.cpp");
   const cmakeHostConsumerCmake = readText("sdk/examples/cmake_cpp_host_consumer/CMakeLists.txt");
   const cmakeHostConsumerEnv = readText("sdk/examples/cmake_cpp_host_consumer/rocksolid_host_config.env.example");
+  const vs2022HostConsumerMain = readText("sdk/examples/vs2022_cpp_host_consumer/main.cpp");
+  const vs2022HostConsumerProject = readText("sdk/examples/vs2022_cpp_host_consumer/RockSolidSDKCppHostConsumer.vcxproj");
+  const vs2022HostConsumerFilters = readText("sdk/examples/vs2022_cpp_host_consumer/RockSolidSDKCppHostConsumer.vcxproj.filters");
+  const vs2022HostConsumerSolution = readText("sdk/examples/vs2022_cpp_host_consumer/RockSolidSDKCppHostConsumer.sln");
+  const vs2022HostConsumerEnv = readText("sdk/examples/vs2022_cpp_host_consumer/rocksolid_host_config.env.example");
+  const dedupEnvRunner = readText("sdk/run_with_dedup_env.mjs");
   const packageScript = readText("sdk/package_release.bat");
   const verifyScript = readText("sdk/verify_release_package.bat");
   const packageReadme = readText("sdk/CPP_SDK_PACKAGE_README.md");
@@ -38,22 +44,45 @@ test("sdk cpp package assets include the host skeleton template and packaging ho
   assert.match(cmakeHostConsumerEnv, /RS_PROJECT_CODE=MY_SOFTWARE/);
   assert.match(cmakeHostConsumerEnv, /RS_INCLUDE_TOKEN_KEYS=true/);
   assert.match(cmakeHostConsumerEnv, /RS_RUN_NETWORK_DEMO=false/);
+  assert.match(vs2022HostConsumerMain, /\.\.\\\\cmake_cpp_host_consumer\\\\main\.cpp/);
+  assert.match(vs2022HostConsumerProject, /PlatformToolset>v143</);
+  assert.match(vs2022HostConsumerProject, /ROCKSOLID_SDK_ROOT/);
+  assert.match(vs2022HostConsumerProject, /rocksolid_sdk_static\.lib/);
+  assert.match(vs2022HostConsumerProject, /RuntimeLibrary>MultiThreaded</);
+  assert.match(vs2022HostConsumerProject, /rocksolid_host_config\.env\.example/);
+  assert.match(vs2022HostConsumerFilters, /Source Files/);
+  assert.match(vs2022HostConsumerFilters, /Config/);
+  assert.match(vs2022HostConsumerSolution, /RockSolidSDKCppHostConsumer\.vcxproj/);
+  assert.match(vs2022HostConsumerEnv, /RS_PROJECT_CODE=MY_SOFTWARE/);
+  assert.match(vs2022HostConsumerEnv, /RS_RUN_NETWORK_DEMO=false/);
+  assert.match(dedupEnvRunner, /process\.env/);
+  assert.match(dedupEnvRunner, /name\.toLowerCase\(\)/);
+  assert.match(dedupEnvRunner, /spawnSync/);
 
   assert.match(packageScript, /windows_host_skeleton_template\.cpp/);
   assert.match(packageScript, /cmake_cpp_host_consumer/);
+  assert.match(packageScript, /vs2022_cpp_host_consumer/);
   assert.match(verifyScript, /windows_host_skeleton_template\.cpp/);
   assert.match(verifyScript, /windows_host_skeleton_template\.exe/);
   assert.match(verifyScript, /cmake_cpp_host_consumer/);
-  assert.match(verifyScript, /cmake-cpp-host-consumer-build/);
+  assert.match(verifyScript, /cmake-cpp-validate-build/);
+  assert.match(verifyScript, /RockSolidSDKCppHostConsumer\.vcxproj/);
+  assert.match(verifyScript, /Configuration=Release/);
+  assert.match(verifyScript, /RockSolidSDKCppHostConsumer\.exe/);
+  assert.match(verifyScript, /where msbuild/);
+  assert.match(verifyScript, /run_with_dedup_env\.mjs/);
 
   assert.match(packageReadme, /windows_host_skeleton_template\.cpp/);
   assert.match(packageReadme, /cmake_cpp_host_consumer/);
+  assert.match(packageReadme, /vs2022_cpp_host_consumer/);
   assert.match(packageReadme, /rocksolid_host_config\.env/);
   assert.match(packageReadme, /host-app startup\/login\/heartbeat skeleton/);
 
   assert.match(guide, /windows_host_skeleton_template\.cpp/);
   assert.match(guide, /cmake_cpp_host_consumer/);
+  assert.match(guide, /vs2022_cpp_host_consumer/);
   assert.match(guide, /rocksolid_host_config\.env/);
   assert.match(buildGuide, /host-app-oriented C\+\+ skeleton template/);
   assert.match(buildGuide, /CMake consumer skeleton/);
+  assert.match(buildGuide, /native VS2022 consumer example/);
 });

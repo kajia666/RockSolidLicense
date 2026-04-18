@@ -18,6 +18,7 @@ set "CPP_ROOT=%RELEASE_ROOT%\%CPP_NAME%"
 set "CAPI_ROOT=%RELEASE_ROOT%\%CAPI_NAME%"
 set "VERIFY_ROOT=%RELEASE_ROOT%\validation-%RS_SDK_VERSION%-%RANDOM%%RANDOM%"
 set "CMAKE_EXE="
+set "MSBUILD_EXE="
 
 for %%I in ("%CPP_ROOT%") do set "CPP_ROOT_FULL=%%~fI"
 for %%I in ("%CAPI_ROOT%") do set "CAPI_ROOT_FULL=%%~fI"
@@ -49,6 +50,21 @@ if not exist "%CPP_ROOT%\examples\cmake_cpp_host_consumer\CMakeLists.txt" (
 
 if not exist "%CPP_ROOT%\examples\cmake_cpp_host_consumer\rocksolid_host_config.env.example" (
   echo Missing packaged host consumer env template at %CPP_ROOT%\examples\cmake_cpp_host_consumer\rocksolid_host_config.env.example
+  goto :fail
+)
+
+if not exist "%CPP_ROOT%\examples\vs2022_cpp_host_consumer\RockSolidSDKCppHostConsumer.sln" (
+  echo Missing packaged VS2022 host consumer solution at %CPP_ROOT%\examples\vs2022_cpp_host_consumer\RockSolidSDKCppHostConsumer.sln
+  goto :fail
+)
+
+if not exist "%CPP_ROOT%\examples\vs2022_cpp_host_consumer\RockSolidSDKCppHostConsumer.vcxproj" (
+  echo Missing packaged VS2022 host consumer project at %CPP_ROOT%\examples\vs2022_cpp_host_consumer\RockSolidSDKCppHostConsumer.vcxproj
+  goto :fail
+)
+
+if not exist "%CPP_ROOT%\examples\vs2022_cpp_host_consumer\rocksolid_host_config.env.example" (
+  echo Missing packaged VS2022 host consumer env template at %CPP_ROOT%\examples\vs2022_cpp_host_consumer\rocksolid_host_config.env.example
   goto :fail
 )
 
@@ -100,6 +116,39 @@ if errorlevel 1 (
   goto :fail
 )
 
+where msbuild >nul 2>nul
+if not errorlevel 1 (
+  for /f "delims=" %%I in ('where msbuild') do (
+    set "MSBUILD_EXE=%%I"
+    goto :msbuild_found
+  )
+)
+
+for %%I in (
+  "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
+  "C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe"
+  "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+  "C:\Program Files (x86)\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
+  "C:\Program Files (x86)\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe"
+  "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+) do (
+  if exist %%~I (
+    set "MSBUILD_EXE=%%~I"
+    goto :msbuild_found
+  )
+)
+
+goto :msbuild_done
+
+:msbuild_found
+node sdk\run_with_dedup_env.mjs --cwd "%CPP_ROOT%\examples\vs2022_cpp_host_consumer" ^
+  "%MSBUILD_EXE%" RockSolidSDKCppHostConsumer.vcxproj /m /p:Configuration=Release /p:Platform=x64
+if errorlevel 1 (
+  if not exist "%CPP_ROOT%\examples\vs2022_cpp_host_consumer\build\Release\RockSolidSDKCppHostConsumer.exe" goto :fail
+)
+
+:msbuild_done
+
 where cmake >nul 2>nul
 if not errorlevel 1 (
   for /f "delims=" %%I in ('where cmake') do (
@@ -147,12 +196,6 @@ mkdir "%VERIFY_ROOT%\cmake-capi-validate" 2>nul
 >>"%VERIFY_ROOT%\cmake-cpp-validate\CMakeLists.txt" echo endif()
 
 "%CMAKE_EXE%" -S "%VERIFY_ROOT%\cmake-cpp-validate" -B "%VERIFY_ROOT%\cmake-cpp-validate-build" -G "NMake Makefiles"
-if errorlevel 1 goto :fail
-
-"%CMAKE_EXE%" -S "%CPP_ROOT%\examples\cmake_cpp_host_consumer" -B "%VERIFY_ROOT%\cmake-cpp-host-consumer-build" -G "NMake Makefiles"
-if errorlevel 1 goto :fail
-
-"%CMAKE_EXE%" --build "%VERIFY_ROOT%\cmake-cpp-host-consumer-build"
 if errorlevel 1 goto :fail
 
 > "%VERIFY_ROOT%\cmake-capi-validate\CMakeLists.txt" echo cmake_minimum_required(VERSION 3.20)

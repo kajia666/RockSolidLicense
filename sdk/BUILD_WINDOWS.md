@@ -121,7 +121,7 @@ Actual package names include the SDK version from `sdk/VERSION`, for example:
 - `build\win-sdk-package\rocksolid-sdk-capi-0.2.2\`
 - `build\win-sdk-package\rocksolid-sdk-capi-0.2.2.zip`
 
-The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, the high-level demo source, a host-app-oriented C++ skeleton template, and a CMake consumer skeleton that can read a `rocksolid_host_config.env` file.
+The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, the high-level demo source, a host-app-oriented C++ skeleton template, a CMake consumer skeleton, and a native VS2022 consumer example that can all read a `rocksolid_host_config.env` file.
 
 When software authors pull a project-scoped integration or release package from the backoffice, they now also receive a generated C++ host skeleton alongside the quickstart snippet so the host app can wire startup bootstrap, local token validation, and heartbeat gating in the order recommended by the current project profile.
 

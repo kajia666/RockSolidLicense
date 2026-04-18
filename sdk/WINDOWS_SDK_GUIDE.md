@@ -91,7 +91,7 @@ If you only want to verify an already-packaged release directory:
 call sdk\verify_release_package.bat build\win-sdk-package
 ```
 
-This validation flow checks the packaged C++ and C examples directly, and if `cmake.exe` is available it also validates the packaged `RockSolidSDKConfig.cmake` files.
+This validation flow checks the packaged C++ and C examples directly, builds the packaged native VS2022 host-consumer project when `MSBuild.exe` is available, and if `cmake.exe` is available it also validates the packaged `RockSolidSDKConfig.cmake` files.
 
 For most Windows software authors, VS2022 is a strong default choice here:
 
@@ -278,7 +278,9 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - The integration package now includes both a project-specific hardening guide and a project-aware C++ host skeleton so software authors can align startup, token validation, and heartbeat gating with the current project profile.
 - The packaged SDK examples now include both `windows_client_demo.cpp` and `windows_host_skeleton_template.cpp`, so software authors can choose between a demo-first sample and a host-app-oriented baseline.
 - The packaged SDK now also includes `examples/cmake_cpp_host_consumer/`, which is a minimal `find_package(...)` project that turns the host skeleton flow into a standalone CMake consumer app.
+- The packaged SDK now also includes `examples/vs2022_cpp_host_consumer/`, which is a ready-to-open VS2022 solution and project for software authors who prefer native Visual Studio workflows.
 - The CMake host consumer can read `rocksolid_host_config.env`, and its sample env file uses the same `RS_*` keys emitted by the project integration and release package downloads.
+- The VS2022 host consumer ships the same `rocksolid_host_config.env.example` keys and defaults `ROCKSOLID_SDK_ROOT` to the extracted SDK package root, so it is usually enough to copy over the generated host-config file and add demo credentials.
 - The generated integration and release packages now also emit a matching `CMakeLists.txt`, so software authors can start from the same minimal consumer shape even before they customize the packaged SDK example.
 - `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
 - `rs_sdk_version_string()` and `rocksolid::sdk_version_string()` let your host application report the exact SDK build it is using.

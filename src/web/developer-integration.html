@@ -36,7 +36,7 @@
         <article class="card">
           <h2>Project Selector</h2>
           <label>Project Code<select id="project-select"></select></label>
-          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cmake-btn">Download CMake Template</button><button class="secondary" id="download-package-vs2022-guide-btn">Download VS2022 Quickstart</button><button class="secondary" id="download-package-vs2022-sln-btn">Download VS2022 Solution</button><button class="secondary" id="download-package-vs2022-btn">Download VS2022 Project</button><button class="secondary" id="download-package-vs2022-props-btn">Download VS2022 Props</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
+          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cmake-btn">Download CMake Template</button><button class="secondary" id="download-package-vs2022-guide-btn">Download VS2022 Quickstart</button><button class="secondary" id="download-package-vs2022-sln-btn">Download VS2022 Solution</button><button class="secondary" id="download-package-vs2022-btn">Download VS2022 Project</button><button class="secondary" id="download-package-vs2022-filters-btn">Download VS2022 Filters</button><button class="secondary" id="download-package-vs2022-props-btn">Download VS2022 Props</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
           <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace or release handoff check with the same project prefilled.</div>
@@ -138,13 +138,18 @@
 
       <section class="wide">
         <article class="card">
+          <h2>VS2022 Filters</h2>
+          <pre id="vs2022-filters-snippet">Select a project to generate a VS2022 filters file for Solution Explorer grouping.</pre>
+        </article>
+        <article class="card">
           <h2>CMake Consumer</h2>
           <pre id="cmake-snippet">Select a project to generate a minimal CMake consumer template.</pre>
         </article>
-        <article class="card">
-          <h2>Hardening Guide</h2>
-          <pre id="hardening-guide">Select a project to generate a project-specific client hardening guide.</pre>
-        </article>
+      </section>
+
+      <section class="card">
+        <h2>Hardening Guide</h2>
+        <pre id="hardening-guide">Select a project to generate a project-specific client hardening guide.</pre>
       </section>
 
       <section class="wide">
@@ -523,6 +528,7 @@ ${JSON.stringify(request, null, 2)}`;
           el("vs2022-snippet").textContent = "Select a project to generate a VS2022 host project template.";
           el("vs2022-props-snippet").textContent = "Select a project to generate a reusable VS2022 props sheet.";
           el("vs2022-guide-snippet").textContent = "Select a project to generate a first-run VS2022 quickstart guide.";
+          el("vs2022-filters-snippet").textContent = "Select a project to generate a VS2022 filters file for Solution Explorer grouping.";
           el("cmake-snippet").textContent = "Select a project to generate a minimal CMake consumer template.";
           el("hardening-guide").textContent = "Select a project to generate a project-specific client hardening guide.";
           el("startup-preview").textContent = selectedProduct
@@ -543,6 +549,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("vs2022-snippet").textContent = packageSnapshot.snippets?.vs2022ProjectTemplate || "";
         el("vs2022-props-snippet").textContent = packageSnapshot.snippets?.vs2022PropsTemplate || "";
         el("vs2022-guide-snippet").textContent = packageSnapshot.snippets?.vs2022GuideText || "";
+        el("vs2022-filters-snippet").textContent = packageSnapshot.snippets?.vs2022FiltersTemplate || "";
         el("cmake-snippet").textContent = packageSnapshot.snippets?.cmakeConsumerTemplate || "";
         el("hardening-guide").textContent = packageSnapshot.snippets?.hardeningGuide || "";
         renderStartupPreview();
@@ -601,6 +608,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("download-package-vs2022-guide-btn").disabled = disabled;
         el("download-package-vs2022-sln-btn").disabled = disabled;
         el("download-package-vs2022-btn").disabled = disabled;
+        el("download-package-vs2022-filters-btn").disabled = disabled;
         el("download-package-vs2022-props-btn").disabled = disabled;
         el("download-package-cpp-btn").disabled = disabled;
         el("download-package-host-skeleton-btn").disabled = disabled;
@@ -844,6 +852,15 @@ ${JSON.stringify(request, null, 2)}`;
       el("download-package-vs2022-btn").addEventListener("click", async () => {
         try {
           await handlePackageDownload("vs2022", "rocksolid_host_consumer.vcxproj", "Integration package VS2022 project");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-package-vs2022-filters-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("vs2022-filters", "rocksolid_host_consumer.vcxproj.filters", "Integration package VS2022 filters");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

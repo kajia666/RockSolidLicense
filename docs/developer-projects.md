@@ -22,12 +22,16 @@ The same detail card now also supports an inline release-readiness preview. Soft
 
 The project detail card now also supports an inline integration snapshot preview. Without leaving `/developer/projects`, software authors can inspect the latest startup bootstrap decision, client hardening profile, token key coverage, and handoff artifact hints for the selected project. This preview now follows the same `channel` field used by the inline release-readiness preview, so `stable`, `beta`, and other release lanes stay aligned while checking startup behavior and downloading handoff assets. The same card also exposes the most common integration handoff files directly:
 
+- package JSON
 - generated `.env`
 - `rocksolid_host_config.env`
+- checksum manifest
+- C++ quickstart
 - `CMakeLists.txt`
 - VS2022 quickstart guide
 - VS2022 `.sln`
 - VS2022 `.vcxproj`
+- VS2022 `.vcxproj.filters`
 - VS2022 `.props`
 - VS2022 `.local.props`
 - host skeleton snippet

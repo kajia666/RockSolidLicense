@@ -159,6 +159,12 @@
             <button class="secondary" id="download-inline-integration-zip-btn">Download Integration Zip</button>
           </div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="download-inline-integration-json-btn">Download Integration JSON</button>
+            <button class="secondary" id="download-inline-integration-checksums-btn">Download Integration Checksums</button>
+            <button class="secondary" id="download-inline-integration-cpp-btn">Download C++ Quickstart</button>
+            <button class="secondary" id="download-inline-integration-vs2022-filters-btn">Download VS2022 Filters</button>
+          </div>
+          <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="download-inline-integration-cmake-btn">Download CMake Template</button>
             <button class="secondary" id="download-inline-integration-vs2022-guide-btn">Download VS2022 Quickstart</button>
             <button class="secondary" id="download-inline-integration-host-skeleton-btn">Download Host Skeleton</button>
@@ -816,11 +822,15 @@
         el("download-inline-release-summary-btn").disabled = !hasProduct;
         el("download-inline-release-checksums-btn").disabled = !hasProduct;
         el("download-inline-release-zip-btn").disabled = !hasProduct;
+        el("download-inline-integration-json-btn").disabled = !hasProduct;
         el("download-inline-integration-env-btn").disabled = !hasProduct;
         el("download-inline-integration-host-config-btn").disabled = !hasProduct;
+        el("download-inline-integration-checksums-btn").disabled = !hasProduct;
+        el("download-inline-integration-cpp-btn").disabled = !hasProduct;
         el("download-inline-integration-zip-btn").disabled = !hasProduct;
         el("download-inline-integration-cmake-btn").disabled = !hasProduct;
         el("download-inline-integration-vs2022-guide-btn").disabled = !hasProduct;
+        el("download-inline-integration-vs2022-filters-btn").disabled = !hasProduct;
         el("download-inline-integration-host-skeleton-btn").disabled = !hasProduct;
         el("download-inline-integration-vs2022-sln-btn").disabled = !hasProduct;
         el("download-inline-integration-vs2022-btn").disabled = !hasProduct;
@@ -1457,6 +1467,15 @@
         }
       });
 
+      el("download-inline-integration-json-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("json", "integration-package.json", "Inline integration JSON");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       el("download-inline-integration-env-btn").addEventListener("click", async () => {
         try {
           await downloadInlineIntegrationAsset("env", "integration.env", "Inline integration env");
@@ -1484,6 +1503,24 @@
         }
       });
 
+      el("download-inline-integration-checksums-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("checksums", "integration-package-sha256.txt", "Inline integration checksums");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-cpp-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("cpp", "project.cpp", "Inline integration C++ quickstart");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       el("download-inline-integration-cmake-btn").addEventListener("click", async () => {
         try {
           await downloadInlineIntegrationAsset("cmake", "CMakeLists.txt", "Inline integration CMake template");
@@ -1505,6 +1542,15 @@
       el("download-inline-integration-host-skeleton-btn").addEventListener("click", async () => {
         try {
           await downloadInlineIntegrationAsset("host-skeleton", "project-host-skeleton.cpp", "Inline integration host skeleton");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-vs2022-filters-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("vs2022-filters", "rocksolid_host_consumer.vcxproj.filters", "Inline integration VS2022 filters");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

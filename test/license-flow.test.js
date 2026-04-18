@@ -9447,6 +9447,10 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Download Integration Host Config/);
     assert.match(html, /Download CMake Template/);
     assert.match(html, /Download VS2022 Quickstart/);
+    assert.match(html, /Download VS2022 Solution/);
+    assert.match(html, /Download VS2022 Project/);
+    assert.match(html, /Download VS2022 Props/);
+    assert.match(html, /Download VS2022 Local Props/);
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Integration Zip/);
     assert.match(html, /window\.location\.search/);

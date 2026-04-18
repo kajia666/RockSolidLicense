@@ -164,6 +164,12 @@
             <button class="secondary" id="download-inline-integration-host-skeleton-btn">Download Host Skeleton</button>
           </div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="download-inline-integration-vs2022-sln-btn">Download VS2022 Solution</button>
+            <button class="secondary" id="download-inline-integration-vs2022-btn">Download VS2022 Project</button>
+            <button class="secondary" id="download-inline-integration-vs2022-props-btn">Download VS2022 Props</button>
+            <button class="secondary" id="download-inline-integration-vs2022-local-props-btn">Download VS2022 Local Props</button>
+          </div>
+          <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
@@ -741,6 +747,9 @@
           payload.snippets?.hostConfigFileName ? tag(`host:${payload.snippets.hostConfigFileName}`, "ok") : "",
           payload.snippets?.cmakeFileName ? tag("cmake", "") : "",
           payload.snippets?.vs2022GuideFileName ? tag("vs2022", "") : "",
+          payload.snippets?.vs2022SolutionFileName ? tag("vs2022-sln", "") : "",
+          payload.snippets?.vs2022ProjectFileName ? tag("vs2022-vcxproj", "") : "",
+          payload.snippets?.vs2022PropsFileName ? tag("vs2022-props", "") : "",
           payload.snippets?.hostSkeletonFileName ? tag("host skeleton", "") : ""
         ].filter(Boolean);
 
@@ -812,6 +821,10 @@
         el("download-inline-integration-cmake-btn").disabled = !hasProduct;
         el("download-inline-integration-vs2022-guide-btn").disabled = !hasProduct;
         el("download-inline-integration-host-skeleton-btn").disabled = !hasProduct;
+        el("download-inline-integration-vs2022-sln-btn").disabled = !hasProduct;
+        el("download-inline-integration-vs2022-btn").disabled = !hasProduct;
+        el("download-inline-integration-vs2022-props-btn").disabled = !hasProduct;
+        el("download-inline-integration-vs2022-local-props-btn").disabled = !hasProduct;
         const channel = currentReleaseChannel();
         el("detail-navigation-hint").textContent = hasProduct
           ? `Open ${product.code} in Developer Integration or Developer Releases with channel ${channel} already selected, or preview release and integration snapshots inline here.`
@@ -1488,6 +1501,42 @@
       el("download-inline-integration-host-skeleton-btn").addEventListener("click", async () => {
         try {
           await downloadInlineIntegrationAsset("host-skeleton", "project-host-skeleton.cpp", "Inline integration host skeleton");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-vs2022-sln-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("vs2022-sln", "rocksolid_host_consumer.sln", "Inline integration VS2022 solution");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-vs2022-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("vs2022", "rocksolid_host_consumer.vcxproj", "Inline integration VS2022 project");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-vs2022-props-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("vs2022-props", "RockSolidSDK.props", "Inline integration VS2022 props");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-vs2022-local-props-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("vs2022-local-props", "RockSolidSDK.local.props", "Inline integration VS2022 local props");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

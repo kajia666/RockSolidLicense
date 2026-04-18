@@ -26,6 +26,10 @@ The project detail card now also supports an inline integration snapshot preview
 - `rocksolid_host_config.env`
 - `CMakeLists.txt`
 - VS2022 quickstart guide
+- VS2022 `.sln`
+- VS2022 `.vcxproj`
+- VS2022 `.props`
+- VS2022 `.local.props`
 - host skeleton snippet
 - integration `zip`
 

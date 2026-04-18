@@ -5274,6 +5274,9 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releasePackage.manifest.actor.type, "member");
     assert.equal(releasePackage.manifest.actor.role, "viewer");
     assert.equal(releasePackage.snippets.envFileName, "RELPKG_ALPHA.env");
+    assert.equal(releasePackage.snippets.hostConfigFileName, "rocksolid_host_config.env");
+    assert.match(releasePackage.snippets.hostConfigEnv, /Copy this file to sdk\/examples\/cmake_cpp_host_consumer\/rocksolid_host_config\.env/);
+    assert.match(releasePackage.snippets.hostConfigEnv, /RS_PROJECT_CODE=RELPKG_ALPHA/);
     assert.equal(releasePackage.snippets.cppFileName, "RELPKG_ALPHA.cpp");
     assert.equal(releasePackage.snippets.hostSkeletonFileName, "RELPKG_ALPHA-host-skeleton.cpp");
     assert.equal(releasePackage.snippets.hardeningFileName, "RELPKG_ALPHA-hardening-guide.txt");
@@ -5291,6 +5294,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Delivery Summary:/);
     assert.match(releasePackage.summaryText, /Delivery Checklist:/);
     assert.match(releasePackage.summaryText, /Release Checks:/);
+    assert.match(releasePackage.summaryText, /hostConfig=host-config\/rocksolid_host_config\.env/);
 
     const releaseSummaryDownload = await getText(
       baseUrl,
@@ -5311,6 +5315,16 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseEnvDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.env"/);
     assert.match(releaseEnvDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
 
+    const releaseHostConfigDownload = await getText(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=host-config",
+      viewerSession.token
+    );
+    assert.match(releaseHostConfigDownload.contentType || "", /^text\/plain/);
+    assert.match(releaseHostConfigDownload.contentDisposition || "", /attachment; filename="rocksolid_host_config\.env"/);
+    assert.match(releaseHostConfigDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
+    assert.match(releaseHostConfigDownload.body, /RS_RUN_NETWORK_DEMO=false/);
+
     const releaseHostSkeletonDownload = await getText(
       baseUrl,
       "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=host-skeleton",
@@ -5330,6 +5344,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseChecksumsDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*-sha256\.txt"/);
     assert.match(releaseChecksumsDownload.body, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA\.env/);
+    assert.match(releaseChecksumsDownload.body, /host-config\/rocksolid_host_config\.env/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA-host-skeleton\.cpp/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA-hardening-guide\.txt/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA\.cpp/);
@@ -5344,6 +5359,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releaseZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
     const releaseZipText = releaseZipDownload.body.toString("latin1");
     assert.match(releaseZipText, /RELPKG_ALPHA\.env/);
+    assert.match(releaseZipText, /rocksolid_host_config\.env/);
     assert.match(releaseZipText, /RELPKG_ALPHA\.cpp/);
     assert.match(releaseZipText, /RELPKG_ALPHA-host-skeleton\.cpp/);
     assert.match(releaseZipText, /RELPKG_ALPHA-hardening-guide\.txt/);
@@ -8448,14 +8464,19 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerExport.items[0].snippets.envTemplate, /RS_INCLUDE_TOKEN_KEYS=false/);
     assert.match(developerExport.items[0].snippets.envTemplate, /RS_RUN_NETWORK_DEMO=false/);
     assert.match(developerExport.items[0].snippets.envTemplate, /RS_DEMO_USERNAME=demo_user/);
+    assert.equal(developerExport.items[0].snippets.hostConfigFileName, "rocksolid_host_config.env");
+    assert.match(developerExport.items[0].snippets.hostConfigEnv, /Copy this file to sdk\/examples\/cmake_cpp_host_consumer\/rocksolid_host_config\.env/);
+    assert.match(developerExport.items[0].snippets.hostConfigEnv, /RS_PROJECT_CODE=INTBUNDLE_ALPHA/);
     assert.equal(developerExport.manifestFiles.length, 1);
     assert.equal(developerExport.manifestFiles[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
     assert.match(developerExport.manifestFiles[0].content, /"code": "INTBUNDLE_ALPHA"/);
     assert.equal(developerExport.envFiles[0].fileName, "INTBUNDLE_ALPHA.env");
+    assert.equal(developerExport.hostConfigFiles[0].fileName, "INTBUNDLE_ALPHA-rocksolid_host_config.env");
     assert.equal(developerExport.cppFiles[0].fileName, "INTBUNDLE_ALPHA.cpp");
     assert.equal(developerExport.hostSkeletonFiles[0].fileName, "INTBUNDLE_ALPHA-host-skeleton.cpp");
     assert.match(developerExport.manifestBundleText, /### rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(developerExport.cppBundleText, /### INTBUNDLE_ALPHA\.cpp/);
+    assert.match(developerExport.hostConfigBundleText, /### INTBUNDLE_ALPHA-rocksolid_host_config\.env/);
     assert.match(developerExport.hostSkeletonBundleText, /### INTBUNDLE_ALPHA-host-skeleton\.cpp/);
 
     const manifestDownload = await postText(
@@ -8486,6 +8507,20 @@ test("batch project integration package export can bundle selected projects with
     assert.match(hostSkeletonBundleDownload.body, /### INTBUNDLE_ALPHA-host-skeleton\.cpp/);
     assert.match(hostSkeletonBundleDownload.body, /FeatureGate/);
 
+    const hostConfigBundleDownload = await postText(
+      baseUrl,
+      "/api/developer/products/integration-packages/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "host-config"
+      },
+      viewerSession.token
+    );
+    assert.match(hostConfigBundleDownload.contentType || "", /^text\/plain/);
+    assert.match(hostConfigBundleDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*-host-config\.txt"/);
+    assert.match(hostConfigBundleDownload.body, /### INTBUNDLE_ALPHA-rocksolid_host_config\.env/);
+    assert.match(hostConfigBundleDownload.body, /RS_RUN_NETWORK_DEMO=false/);
+
     const developerZipDownload = await postBinary(
       baseUrl,
       "/api/developer/products/integration-packages/export/download",
@@ -8500,6 +8535,7 @@ test("batch project integration package export can bundle selected projects with
     assert.equal(developerZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
     const developerZipText = developerZipDownload.body.toString("latin1");
     assert.match(developerZipText, /INTBUNDLE_ALPHA\.env/);
+    assert.match(developerZipText, /INTBUNDLE_ALPHA-rocksolid_host_config\.env/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA\.cpp/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA-host-skeleton\.cpp/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA-hardening-guide\.txt/);
@@ -8519,6 +8555,7 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerChecksumsDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*-sha256\.txt"/);
     assert.match(developerChecksumsDownload.body, /rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(developerChecksumsDownload.body, /env\/INTBUNDLE_ALPHA\.env/);
+    assert.match(developerChecksumsDownload.body, /host-config\/INTBUNDLE_ALPHA-rocksolid_host_config\.env/);
     assert.match(developerChecksumsDownload.body, /cpp\/INTBUNDLE_ALPHA\.cpp/);
     assert.match(developerChecksumsDownload.body, /host-skeleton\/INTBUNDLE_ALPHA-host-skeleton\.cpp/);
     assert.match(developerChecksumsDownload.body, /hardening\/INTBUNDLE_ALPHA-hardening-guide\.txt/);
@@ -8856,6 +8893,9 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(byProductId.snippets.envTemplate, /RS_CHANNEL=stable/);
     assert.match(byProductId.snippets.envTemplate, /RS_RUN_NETWORK_DEMO=false/);
     assert.equal(byProductId.snippets.envFileName, "EXPORT_ALPHA.env");
+    assert.equal(byProductId.snippets.hostConfigFileName, "rocksolid_host_config.env");
+    assert.match(byProductId.snippets.hostConfigEnv, /Copy this file to sdk\/examples\/cmake_cpp_host_consumer\/rocksolid_host_config\.env/);
+    assert.match(byProductId.snippets.hostConfigEnv, /RS_PROJECT_CODE=EXPORT_ALPHA/);
     assert.equal(byProductId.snippets.cppFileName, "EXPORT_ALPHA.cpp");
 
     const byProjectCode = await getJson(
@@ -8883,6 +8923,16 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.equal(envDownload.contentType, "text/plain; charset=utf-8");
     assert.match(envDownload.contentDisposition || "", /EXPORT_ALPHA\.env/);
     assert.match(envDownload.body, /RS_PROJECT_CODE=EXPORT_ALPHA/);
+
+    const hostConfigDownload = await getText(
+      baseUrl,
+      "/api/developer/integration/package/download?projectCode=EXPORT_ALPHA&format=host-config",
+      viewerSession.token
+    );
+    assert.equal(hostConfigDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(hostConfigDownload.contentDisposition || "", /rocksolid_host_config\.env/);
+    assert.match(hostConfigDownload.body, /RS_PROJECT_CODE=EXPORT_ALPHA/);
+    assert.match(hostConfigDownload.body, /RS_RUN_NETWORK_DEMO=false/);
 
     const cppDownload = await getText(
       baseUrl,
@@ -8912,6 +8962,7 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(checksumsDownload.contentDisposition || "", /rocksolid-integration-EXPORT_ALPHA-sha256\.txt/);
     assert.match(checksumsDownload.body, /rocksolid-integration-EXPORT_ALPHA\.json/);
     assert.match(checksumsDownload.body, /env\/EXPORT_ALPHA\.env/);
+    assert.match(checksumsDownload.body, /host-config\/rocksolid_host_config\.env/);
     assert.match(checksumsDownload.body, /cpp\/EXPORT_ALPHA\.cpp/);
     assert.match(checksumsDownload.body, /host-skeleton\/EXPORT_ALPHA-host-skeleton\.cpp/);
 
@@ -8926,6 +8977,7 @@ test("developer integration package export is scoped and includes cpp quickstart
     const zipText = zipDownload.body.toString("latin1");
     assert.match(zipText, /rocksolid-integration-EXPORT_ALPHA\.json/);
     assert.match(zipText, /EXPORT_ALPHA\.env/);
+    assert.match(zipText, /rocksolid_host_config\.env/);
     assert.match(zipText, /EXPORT_ALPHA\.cpp/);
     assert.match(zipText, /EXPORT_ALPHA-host-skeleton\.cpp/);
     assert.match(zipText, /SHA256SUMS\.txt/);
@@ -9095,6 +9147,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Refresh Integration Package/);
     assert.match(html, /Download JSON/);
     assert.match(html, /Download Env/);
+    assert.match(html, /Download Host Config/);
     assert.match(html, /Download C\+\+/);
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Checksums/);
@@ -9108,6 +9161,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /C\+\+ Quickstart/);
     assert.match(html, /Host Skeleton/);
     assert.match(html, /Environment Template/);
+    assert.match(html, /Host Config/);
     assert.match(html, /Hardening Guide/);
     assert.match(html, /x-rs-app-id/);
     assert.match(html, /window\.RSProductFeatures/);
@@ -9235,7 +9289,9 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Delivery Checklist/);
     assert.match(html, /Package Summary/);
     assert.match(html, /Host Skeleton/);
+    assert.match(html, /Host Config/);
     assert.match(html, /Hardening Guide/);
+    assert.match(html, /Download Host Config/);
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);

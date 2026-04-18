@@ -272,7 +272,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - The integration package now includes both a project-specific hardening guide and a project-aware C++ host skeleton so software authors can align startup, token validation, and heartbeat gating with the current project profile.
 - The packaged SDK examples now include both `windows_client_demo.cpp` and `windows_host_skeleton_template.cpp`, so software authors can choose between a demo-first sample and a host-app-oriented baseline.
 - The packaged SDK now also includes `examples/cmake_cpp_host_consumer/`, which is a minimal `find_package(...)` project that turns the host skeleton flow into a standalone CMake consumer app.
-- The CMake host consumer can read `rocksolid_host_config.env`, and its sample env file uses the same `RS_*` keys emitted by the project integration package.
+- The CMake host consumer can read `rocksolid_host_config.env`, and its sample env file uses the same `RS_*` keys emitted by the project integration and release package downloads.
 - `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
 - `rs_sdk_version_string()` and `rocksolid::sdk_version_string()` let your host application report the exact SDK build it is using.
 - `BindingsRequest` and `UnbindRequest` support either `username/password` or direct `card_key` management flows.

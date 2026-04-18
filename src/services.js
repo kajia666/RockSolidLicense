@@ -697,6 +697,16 @@ function buildIntegrationEnvTemplate(manifest) {
   ].join("\n");
 }
 
+function buildIntegrationHostConfigTemplate(manifest) {
+  return [
+    "# Copy this file to sdk/examples/cmake_cpp_host_consumer/rocksolid_host_config.env",
+    "# or place it next to the packaged CMake host consumer example before running the network demo.",
+    "# Add real demo credentials, then flip RS_RUN_NETWORK_DEMO=true when you want the example to log in.",
+    "",
+    buildIntegrationEnvTemplate(manifest)
+  ].join("\n");
+}
+
 function buildIntegrationCppQuickstart(manifest) {
   const project = manifest.project || {};
   const credentials = manifest.credentials || {};
@@ -1293,6 +1303,8 @@ function buildDeveloperIntegrationPackagePayload({
     snippets: {
       envFileName: `${product.code}.env`,
       envTemplate: buildIntegrationEnvTemplate(manifest),
+      hostConfigFileName: "rocksolid_host_config.env",
+      hostConfigEnv: buildIntegrationHostConfigTemplate(manifest),
       cppFileName: `${product.code}.cpp`,
       cppQuickstart: buildIntegrationCppQuickstart(manifest),
       hostSkeletonFileName: `${product.code}-host-skeleton.cpp`,
@@ -1462,6 +1474,13 @@ function buildIntegrationPackageEnvFiles(items = []) {
   }));
 }
 
+function buildIntegrationPackageHostConfigFiles(items = []) {
+  return items.map((item) => ({
+    fileName: `${item.code}-rocksolid_host_config.env`,
+    content: item.snippets?.hostConfigEnv || ""
+  }));
+}
+
 function buildIntegrationPackageCppFiles(items = []) {
   return items.map((item) => ({
     fileName: `${item.code}.cpp`,
@@ -1488,6 +1507,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
   const timestampTag = buildExportTimestampTag(generatedAt);
   const manifestFiles = buildIntegrationPackageManifestFiles(items);
   const envFiles = buildIntegrationPackageEnvFiles(items);
+  const hostConfigFiles = buildIntegrationPackageHostConfigFiles(items);
   const cppFiles = buildIntegrationPackageCppFiles(items);
   const hostSkeletonFiles = buildIntegrationPackageHostSkeletonFiles(items);
   const hardeningFiles = buildIntegrationPackageHardeningFiles(items);
@@ -1504,17 +1524,20 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     fileName: `rocksolid-integration-packages-${timestampTag}.json`,
     manifestArchiveName: `rocksolid-integration-packages-${timestampTag}-manifests.txt`,
     envArchiveName: `rocksolid-integration-packages-${timestampTag}-env.txt`,
+    hostConfigArchiveName: `rocksolid-integration-packages-${timestampTag}-host-config.txt`,
     cppArchiveName: `rocksolid-integration-packages-${timestampTag}-cpp.txt`,
     hostSkeletonArchiveName: `rocksolid-integration-packages-${timestampTag}-host-skeleton.txt`,
     hardeningArchiveName: `rocksolid-integration-packages-${timestampTag}-hardening.txt`,
     items,
     manifestFiles,
     envFiles,
+    hostConfigFiles,
     cppFiles,
     hostSkeletonFiles,
     hardeningFiles,
     manifestBundleText: buildNamedFileBundleText(manifestFiles),
     envBundleText: buildNamedFileBundleText(envFiles),
+    hostConfigBundleText: buildNamedFileBundleText(hostConfigFiles),
     cppBundleText: buildNamedFileBundleText(cppFiles),
     hostSkeletonBundleText: buildNamedFileBundleText(hostSkeletonFiles),
     hardeningBundleText: buildNamedFileBundleText(hardeningFiles)
@@ -1560,7 +1583,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push(`- Hardening Summary: ${deliverySummary.clientHardeningSummary}`);
   }
   if (deliverySummary.artifacts) {
-    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
+    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | hostConfig=${deliverySummary.artifacts.hostConfig || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
   }
   lines.push("");
 
@@ -1726,9 +1749,9 @@ function buildReleaseDeliveryChecklistPayload({
     key: "handoff_artifacts",
     label: "Handoff artifacts",
     status: "pass",
-    summary: "JSON package, summary text, env template, C++ quickstart, and host skeleton are bundled for handoff.",
-    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
-    nextAction: "Send the matching JSON, summary, env, quickstart, and host skeleton snippets together so integration stays aligned."
+    summary: "JSON package, summary text, env template, host config, C++ quickstart, and host skeleton are bundled for handoff.",
+    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.hostConfig || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
+    nextAction: "Send the matching JSON, summary, env, host config, quickstart, and host skeleton snippets together so integration stays aligned."
   });
 
   const blockItems = items.filter((item) => item.status === "block").length;
@@ -1756,6 +1779,7 @@ function buildReleaseDeliverySummaryPayload({
   fileName,
   summaryFileName,
   envFileName,
+  hostConfigFileName,
   cppFileName,
   hostSkeletonFileName
 }) {
@@ -1809,6 +1833,7 @@ function buildReleaseDeliverySummaryPayload({
       packageJson: fileName || "release-package.json",
       packageSummary: summaryFileName || "release-package.txt",
       envTemplate: `snippets/${envFileName || "project.env"}`,
+      hostConfig: `host-config/${hostConfigFileName || "rocksolid_host_config.env"}`,
       cppQuickstart: `snippets/${cppFileName || "project.cpp"}`,
       hostSkeleton: `snippets/${hostSkeletonFileName || "project-host-skeleton.cpp"}`
     },
@@ -2019,6 +2044,7 @@ function buildReleasePackagePayload({
     releaseStartupPreview
   });
   const envFileName = `${product.code}.env`;
+  const hostConfigFileName = "rocksolid_host_config.env";
   const cppFileName = `${product.code}.cpp`;
   const hostSkeletonFileName = `${product.code}-host-skeleton.cpp`;
   const hardeningFileName = `${product.code}-hardening-guide.txt`;
@@ -2035,6 +2061,7 @@ function buildReleasePackagePayload({
     fileName,
     summaryFileName,
     envFileName,
+    hostConfigFileName,
     cppFileName,
     hostSkeletonFileName
   });
@@ -2080,6 +2107,7 @@ function buildReleasePackagePayload({
     integration: integrationPackage?.manifest ?? null,
     snippets: {
       envFileName,
+      hostConfigFileName,
       cppFileName,
       hostSkeletonFileName
     },
@@ -2098,6 +2126,8 @@ function buildReleasePackagePayload({
     snippets: {
       envFileName,
       envTemplate: integrationPackage?.snippets?.envTemplate || "",
+      hostConfigFileName,
+      hostConfigEnv: integrationPackage?.snippets?.hostConfigEnv || "",
       cppFileName,
       cppQuickstart: integrationPackage?.snippets?.cppQuickstart || "",
       hostSkeletonFileName,
@@ -2180,6 +2210,10 @@ function buildReleasePackageFiles(payload) {
       body: payload.snippets?.envTemplate || ""
     },
     {
+      path: `host-config/${payload.snippets?.hostConfigFileName || "rocksolid_host_config.env"}`,
+      body: payload.snippets?.hostConfigEnv || ""
+    },
+    {
       path: `snippets/${payload.snippets?.cppFileName || "project.cpp"}`,
       body: payload.snippets?.cppQuickstart || ""
     },
@@ -2219,6 +2253,12 @@ function buildIntegrationPackageExportFiles(payload) {
       body: file.content || ""
     });
   }
+  for (const file of payload.hostConfigFiles || []) {
+    files.push({
+      path: `host-config/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
   for (const file of payload.cppFiles || []) {
     files.push({
       path: `cpp/${file.fileName}`,
@@ -2255,6 +2295,10 @@ function buildSingleIntegrationPackageFiles(payload) {
     {
       path: `env/${payload.snippets?.envFileName || "project.env"}`,
       body: payload.snippets?.envTemplate || ""
+    },
+    {
+      path: `host-config/${payload.snippets?.hostConfigFileName || "rocksolid_host_config.env"}`,
+      body: payload.snippets?.hostConfigEnv || ""
     },
     {
       path: `cpp/${payload.snippets?.cppFileName || "project.cpp"}`,
@@ -2351,7 +2395,7 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "summary", "env", "host-config", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
@@ -2385,6 +2429,13 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
       body: payload.snippets?.envTemplate || ""
     };
   }
+  if (normalizedFormat === "host-config") {
+    return {
+      fileName: payload.snippets?.hostConfigFileName || "rocksolid_host_config.env",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.hostConfigEnv || ""
+    };
+  }
   if (normalizedFormat === "cpp") {
     return {
       fileName: payload.snippets?.cppFileName || "project.cpp",
@@ -2410,7 +2461,7 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "manifests", "env", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "manifests", "env", "host-config", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_EXPORT_FORMAT",
     "Integration export format"
@@ -2444,6 +2495,13 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
       body: payload.envBundleText || ""
     };
   }
+  if (normalizedFormat === "host-config") {
+    return {
+      fileName: payload.hostConfigArchiveName || "integration-host-config.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.hostConfigBundleText || ""
+    };
+  }
   if (normalizedFormat === "cpp") {
     return {
       fileName: payload.cppArchiveName || "integration-cpp.txt",
@@ -2469,7 +2527,7 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "env", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "env", "host-config", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_PACKAGE_FORMAT",
     "Integration package format"
@@ -2494,6 +2552,13 @@ function buildIntegrationPackageDownloadAsset(payload, format = "json") {
       fileName: payload.snippets?.envFileName || "project.env",
       contentType: "text/plain; charset=utf-8",
       body: payload.snippets?.envTemplate || ""
+    };
+  }
+  if (normalizedFormat === "host-config") {
+    return {
+      fileName: payload.snippets?.hostConfigFileName || "rocksolid_host_config.env",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.hostConfigEnv || ""
     };
   }
   if (normalizedFormat === "cpp") {

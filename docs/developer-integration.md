@@ -28,7 +28,7 @@ The page now also summarizes how many visible projects currently have each of th
 
 The last 3 switches act as project-level client hardening controls. They affect the integration package, startup bootstrap preview, env template, C++ quickstart guidance, and generated C++ host skeleton so software authors can choose a stricter or more relaxed client-side hardening profile per project.
 
-The generated `.env` template is now also shaped to work with the packaged CMake host consumer example. In practice that means a software author can usually start from the project integration `.env`, add the demo login credentials, flip `RS_RUN_NETWORK_DEMO=true`, and then use the same values inside the host consumer skeleton.
+The generated `.env` template is now also shaped to work with the packaged CMake host consumer example. The package additionally emits a dedicated `rocksolid_host_config.env`, so a software author can usually download that file directly, add the demo login credentials, flip `RS_RUN_NETWORK_DEMO=true`, and then drop it into the packaged host consumer skeleton without renaming fields by hand.
 
 ## API
 
@@ -51,7 +51,7 @@ The package route accepts:
 
 The package download route accepts the same selectors plus:
 
-- `format=json|env|cpp|host-skeleton|checksums|zip`
+- `format=json|env|host-config|cpp|host-skeleton|checksums|zip`
 
 ## Returned data
 
@@ -72,6 +72,8 @@ The package route returns:
 - `manifest.startupPreview`
 - `snippets.envFileName`
 - `snippets.envTemplate`
+- `snippets.hostConfigFileName`
+- `snippets.hostConfigEnv`
 - `snippets.cppFileName`
 - `snippets.cppQuickstart`
 - `snippets.hostSkeletonFileName`
@@ -85,16 +87,18 @@ The batch package export routes return:
 - `items`
 - `manifestFiles`
 - `envFiles`
+- `hostConfigFiles`
 - `cppFiles`
 - `hostSkeletonFiles`
 - `manifestBundleText`
 - `envBundleText`
+- `hostConfigBundleText`
 - `cppBundleText`
 - `hostSkeletonBundleText`
 
 The batch package download routes accept the same body selectors as the export routes plus:
 
-- `format=json|manifests|env|cpp|host-skeleton|checksums|zip`
+- `format=json|manifests|env|host-config|cpp|host-skeleton|checksums|zip`
 
 Typical shape:
 
@@ -141,10 +145,10 @@ The page and API are useful when the software author needs to:
 - adapt a dedicated `startup-bootstrap` request before showing the local login UI
 - confirm whether recharge and client-unbind are open for a scoped project before exposing those SDK flows
 - export a current project integration package after rotating `sdkAppSecret` or `sdkAppId`
-- download the current single-project integration package directly as JSON, `.env`, C++ quickstart, host skeleton, or one zip handoff bundle
+- download the current single-project integration package directly as JSON, `.env`, `rocksolid_host_config.env`, C++ quickstart, host skeleton, or one zip handoff bundle
 - download a matching SHA-256 checksum list for the generated handoff files
 - export multiple project integration packages in one request from the project workspace when several software products need the same deployment refresh
-- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, and environment template that already lines up with the packaged CMake host consumer example
+- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, dedicated host config file, and environment template that already line up with the packaged CMake host consumer example
 
 ## Request signing headers
 

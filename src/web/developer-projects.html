@@ -180,6 +180,17 @@
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
           <div id="detail-launch-workflow" class="hint" style="margin-top:12px;">Preview the same channel for both release readiness and integration snapshot to see one combined launch workflow summary.</div>
+          <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="launch-download-handoff-btn">Download Recommended Handoff</button>
+            <button class="secondary" id="launch-download-release-summary-btn">Release Summary</button>
+            <button class="secondary" id="launch-download-integration-env-btn">Integration Env</button>
+            <button class="secondary" id="launch-download-host-config-btn">Host Config</button>
+            <button class="secondary" id="launch-download-host-skeleton-btn">Host Skeleton</button>
+          </div>
+          <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="launch-open-integration-btn">Open Integration Workspace</button>
+            <button class="secondary" id="launch-open-release-btn">Open Release Workspace</button>
+          </div>
           <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.</div>
         </article>
       </section>
@@ -884,11 +895,18 @@
         const hasProduct = Boolean(product);
         el("open-project-integration-btn").disabled = !hasProduct;
         el("open-project-release-btn").disabled = !hasProduct;
+        el("launch-open-integration-btn").disabled = !hasProduct;
+        el("launch-open-release-btn").disabled = !hasProduct;
         el("preview-release-readiness-btn").disabled = !hasProduct;
         el("preview-launch-workflow-btn").disabled = !hasProduct;
         el("clear-release-preview-btn").disabled = !hasProduct && !releasePreview;
         el("preview-integration-package-btn").disabled = !hasProduct;
         el("clear-integration-preview-btn").disabled = !hasProduct && !integrationPreview;
+        el("launch-download-handoff-btn").disabled = !hasProduct;
+        el("launch-download-release-summary-btn").disabled = !hasProduct;
+        el("launch-download-integration-env-btn").disabled = !hasProduct;
+        el("launch-download-host-config-btn").disabled = !hasProduct;
+        el("launch-download-host-skeleton-btn").disabled = !hasProduct;
         el("download-inline-release-summary-btn").disabled = !hasProduct;
         el("download-inline-release-checksums-btn").disabled = !hasProduct;
         el("download-inline-release-zip-btn").disabled = !hasProduct;
@@ -1387,32 +1405,19 @@
       });
 
       el("open-project-integration-btn").addEventListener("click", () => {
-        const productId = el("edit-product-id").value.trim();
-        const productCode = el("edit-product-code").value.trim();
-        if (!productId || !productCode) {
-          setStatus("Select a project before opening Developer Integration.", true);
-          return;
+        try {
+          openProjectIntegrationWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
         }
-        window.location.href = buildWorkspaceUrl("/developer/integration", {
-          productId,
-          productCode,
-          channel: currentReleaseChannel()
-        });
       });
 
       el("open-project-release-btn").addEventListener("click", () => {
-        const productId = el("edit-product-id").value.trim();
-        const productCode = el("edit-product-code").value.trim();
-        if (!productId || !productCode) {
-          setStatus("Select a project before opening Developer Releases.", true);
-          return;
+        try {
+          openProjectReleaseWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
         }
-        window.location.href = buildWorkspaceUrl("/developer/releases", {
-          productId,
-          productCode,
-          channel: currentReleaseChannel(),
-          autofocus: "package"
-        });
       });
 
       el("preview-release-readiness-btn").addEventListener("click", async () => {
@@ -1514,6 +1519,33 @@
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
         return result;
+      }
+
+      function openProjectIntegrationWorkspace() {
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          throw new Error("Select a project before opening Developer Integration.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/integration", {
+          productId,
+          productCode,
+          channel: currentReleaseChannel()
+        });
+      }
+
+      function openProjectReleaseWorkspace() {
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          throw new Error("Select a project before opening Developer Releases.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/releases", {
+          productId,
+          productCode,
+          channel: currentReleaseChannel(),
+          autofocus: "package"
+        });
       }
 
       el("clear-release-preview-btn").addEventListener("click", () => {
@@ -1692,6 +1724,73 @@
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-handoff-btn").addEventListener("click", async () => {
+        try {
+          const downloaded = [];
+          downloaded.push((await downloadInlineReleaseAsset("summary", "release-summary.txt", "Launch workflow release summary")).fileName);
+          downloaded.push((await downloadInlineIntegrationAsset("env", "integration.env", "Launch workflow integration env")).fileName);
+          downloaded.push((await downloadInlineIntegrationAsset("host-config", "rocksolid_host_config.env", "Launch workflow host config")).fileName);
+          downloaded.push((await downloadInlineIntegrationAsset("host-skeleton", "project-host-skeleton.cpp", "Launch workflow host skeleton")).fileName);
+          setStatus(`Launch workflow handoff downloaded: ${downloaded.join(", ")}`);
+          setOutput({ launchWorkflowDownloads: downloaded });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-release-summary-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineReleaseAsset("summary", "release-summary.txt", "Launch workflow release summary");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-integration-env-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("env", "integration.env", "Launch workflow integration env");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-host-config-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("host-config", "rocksolid_host_config.env", "Launch workflow host config");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-host-skeleton-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("host-skeleton", "project-host-skeleton.cpp", "Launch workflow host skeleton");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-open-integration-btn").addEventListener("click", () => {
+        try {
+          openProjectIntegrationWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("launch-open-release-btn").addEventListener("click", () => {
+        try {
+          openProjectReleaseWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
         }
       });
 

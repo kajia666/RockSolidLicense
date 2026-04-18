@@ -46,6 +46,13 @@ To reduce repeated clicks, the same detail card now also exposes a `Preview Laun
 - hardening profile
 - recommended next steps and download hints
 
+The launch workflow block now also includes direct quick actions so software authors can immediately:
+
+- download the recommended handoff set
+- download release summary only
+- download integration env / host config / host skeleton
+- jump straight into the integration or release workspace with the same project and channel
+
 ## Scoped APIs
 
 - `GET /api/developer/products`

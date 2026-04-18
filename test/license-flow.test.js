@@ -9467,6 +9467,12 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Download VS2022 Local Props/);
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Integration Zip/);
+    assert.match(html, /Download Recommended Handoff/);
+    assert.match(html, /Release Summary/);
+    assert.match(html, /Integration Env/);
+    assert.match(html, /Host Config/);
+    assert.match(html, /Open Integration Workspace/);
+    assert.match(html, /Open Release Workspace/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /Delivery quick signals/);
     assert.match(html, /detail-release-channel/);

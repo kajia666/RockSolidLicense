@@ -20,6 +20,7 @@ Recommended default:
 
 - Use `static .lib` as the main distribution for the full C++ SDK
 - Use `DLL` mainly for the low-level C API in [rocksolid_sdk.h](/D:/code/OnlineVerification/sdk/include/rocksolid_sdk.h)
+- For Windows software authors, VS2022 is a very good default IDE/toolchain because it matches `v143`, ships MSVC+CMake together, and fits the SDK's current native Windows focus
 
 Why:
 
@@ -123,6 +124,8 @@ Actual package names include the SDK version from `sdk/VERSION`, for example:
 The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, headers, docs, the high-level demo source, a host-app-oriented C++ skeleton template, and a CMake consumer skeleton that can read a `rocksolid_host_config.env` file.
 
 When software authors pull a project-scoped integration or release package from the backoffice, they now also receive a generated C++ host skeleton alongside the quickstart snippet so the host app can wire startup bootstrap, local token validation, and heartbeat gating in the order recommended by the current project profile.
+
+Those project-scoped handoff packages now also emit a VS2022 `.vcxproj`, so software authors who prefer native Visual Studio projects do not need to start from CMake unless they want to.
 
 The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, import library, docs, and a C demo source.
 

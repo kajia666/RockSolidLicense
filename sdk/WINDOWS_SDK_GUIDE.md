@@ -93,6 +93,12 @@ call sdk\verify_release_package.bat build\win-sdk-package
 
 This validation flow checks the packaged C++ and C examples directly, and if `cmake.exe` is available it also validates the packaged `RockSolidSDKConfig.cmake` files.
 
+For most Windows software authors, VS2022 is a strong default choice here:
+
+- it matches the SDK's current native Windows focus
+- it ships the `v143` MSVC toolset the package targets
+- it can open both native `.vcxproj` projects and CMake consumers
+
 Use the `cpp` package when the integrator wants the full `LicenseClientWin` feature set.
 
 Use the `capi` package when the integrator only needs the stable low-level C binary interface.

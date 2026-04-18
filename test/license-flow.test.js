@@ -5280,6 +5280,9 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releasePackage.snippets.cmakeFileName, "CMakeLists.txt");
     assert.match(releasePackage.snippets.cmakeConsumerTemplate, /find_package\(RockSolidSDK CONFIG REQUIRED/);
     assert.match(releasePackage.snippets.cmakeConsumerTemplate, /relpkg_alpha_host_consumer/);
+    assert.match(releasePackage.snippets.vs2022ProjectFileName, /RELPKG_ALPHA_host_consumer\.vcxproj/i);
+    assert.match(releasePackage.snippets.vs2022ProjectTemplate, /PlatformToolset>v143</);
+    assert.match(releasePackage.snippets.vs2022ProjectTemplate, /ROCKSOLID_SDK_ROOT/);
     assert.equal(releasePackage.snippets.cppFileName, "RELPKG_ALPHA.cpp");
     assert.equal(releasePackage.snippets.hostSkeletonFileName, "RELPKG_ALPHA-host-skeleton.cpp");
     assert.equal(releasePackage.snippets.hardeningFileName, "RELPKG_ALPHA-hardening-guide.txt");
@@ -5299,6 +5302,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Release Checks:/);
     assert.match(releasePackage.summaryText, /hostConfig=host-config\/rocksolid_host_config\.env/);
     assert.match(releasePackage.summaryText, /cmake=cmake-consumer\/CMakeLists\.txt/);
+    assert.match(releasePackage.summaryText, /vs2022=vs2022-consumer\/RELPKG_ALPHA_host_consumer\.vcxproj/);
 
     const releaseSummaryDownload = await getText(
       baseUrl,
@@ -5339,6 +5343,16 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseCMakeDownload.body, /find_package\(RockSolidSDK CONFIG REQUIRED/);
     assert.match(releaseCMakeDownload.body, /relpkg_alpha_host_consumer/);
 
+    const releaseVs2022Download = await getText(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=vs2022",
+      viewerSession.token
+    );
+    assert.match(releaseVs2022Download.contentType || "", /^text\/plain/);
+    assert.match(releaseVs2022Download.contentDisposition || "", /attachment; filename="RELPKG_ALPHA_host_consumer\.vcxproj"/);
+    assert.match(releaseVs2022Download.body, /PlatformToolset>v143</);
+    assert.match(releaseVs2022Download.body, /ROCKSOLID_SDK_ROOT/);
+
     const releaseHostSkeletonDownload = await getText(
       baseUrl,
       "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=host-skeleton",
@@ -5362,6 +5376,9 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseChecksumsDownload.body, /cmake-consumer\/CMakeLists\.txt/);
     assert.match(releaseChecksumsDownload.body, /cmake-consumer\/main\.cpp/);
     assert.match(releaseChecksumsDownload.body, /cmake-consumer\/rocksolid_host_config\.env/);
+    assert.match(releaseChecksumsDownload.body, /vs2022-consumer\/RELPKG_ALPHA_host_consumer\.vcxproj/);
+    assert.match(releaseChecksumsDownload.body, /vs2022-consumer\/main\.cpp/);
+    assert.match(releaseChecksumsDownload.body, /vs2022-consumer\/rocksolid_host_config\.env/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA-host-skeleton\.cpp/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA-hardening-guide\.txt/);
     assert.match(releaseChecksumsDownload.body, /snippets\/RELPKG_ALPHA\.cpp/);
@@ -5379,6 +5396,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseZipText, /rocksolid_host_config\.env/);
     assert.match(releaseZipText, /cmake-consumer\/CMakeLists\.txt/);
     assert.match(releaseZipText, /cmake-consumer\/main\.cpp/);
+    assert.match(releaseZipText, /vs2022-consumer\/RELPKG_ALPHA_host_consumer\.vcxproj/);
+    assert.match(releaseZipText, /vs2022-consumer\/main\.cpp/);
     assert.match(releaseZipText, /RELPKG_ALPHA\.cpp/);
     assert.match(releaseZipText, /RELPKG_ALPHA-host-skeleton\.cpp/);
     assert.match(releaseZipText, /RELPKG_ALPHA-hardening-guide\.txt/);
@@ -8489,18 +8508,23 @@ test("batch project integration package export can bundle selected projects with
     assert.equal(developerExport.items[0].snippets.cmakeFileName, "CMakeLists.txt");
     assert.match(developerExport.items[0].snippets.cmakeConsumerTemplate, /find_package\(RockSolidSDK CONFIG REQUIRED/);
     assert.match(developerExport.items[0].snippets.cmakeConsumerTemplate, /rocksolid_sdk_cmake_dir/i);
+    assert.match(developerExport.items[0].snippets.vs2022ProjectFileName, /INTBUNDLE_ALPHA_host_consumer\.vcxproj/i);
+    assert.match(developerExport.items[0].snippets.vs2022ProjectTemplate, /PlatformToolset>v143</);
+    assert.match(developerExport.items[0].snippets.vs2022ProjectTemplate, /ROCKSOLID_SDK_ROOT/);
     assert.equal(developerExport.manifestFiles.length, 1);
     assert.equal(developerExport.manifestFiles[0].fileName, "rocksolid-integration-INTBUNDLE_ALPHA.json");
     assert.match(developerExport.manifestFiles[0].content, /"code": "INTBUNDLE_ALPHA"/);
     assert.equal(developerExport.envFiles[0].fileName, "INTBUNDLE_ALPHA.env");
     assert.equal(developerExport.hostConfigFiles[0].fileName, "INTBUNDLE_ALPHA-rocksolid_host_config.env");
     assert.equal(developerExport.cmakeFiles[0].fileName, "INTBUNDLE_ALPHA/CMakeLists.txt");
+    assert.equal(developerExport.vs2022Files[0].fileName, "INTBUNDLE_ALPHA/INTBUNDLE_ALPHA_host_consumer.vcxproj");
     assert.equal(developerExport.cppFiles[0].fileName, "INTBUNDLE_ALPHA.cpp");
     assert.equal(developerExport.hostSkeletonFiles[0].fileName, "INTBUNDLE_ALPHA-host-skeleton.cpp");
     assert.match(developerExport.manifestBundleText, /### rocksolid-integration-INTBUNDLE_ALPHA\.json/);
     assert.match(developerExport.cppBundleText, /### INTBUNDLE_ALPHA\.cpp/);
     assert.match(developerExport.hostConfigBundleText, /### INTBUNDLE_ALPHA-rocksolid_host_config\.env/);
     assert.match(developerExport.cmakeBundleText, /### INTBUNDLE_ALPHA\/CMakeLists\.txt/);
+    assert.match(developerExport.vs2022BundleText, /### INTBUNDLE_ALPHA\/INTBUNDLE_ALPHA_host_consumer\.vcxproj/);
     assert.match(developerExport.hostSkeletonBundleText, /### INTBUNDLE_ALPHA-host-skeleton\.cpp/);
 
     const manifestDownload = await postText(
@@ -8559,6 +8583,20 @@ test("batch project integration package export can bundle selected projects with
     assert.match(cmakeBundleDownload.body, /### INTBUNDLE_ALPHA\/CMakeLists\.txt/);
     assert.match(cmakeBundleDownload.body, /find_package\(RockSolidSDK CONFIG REQUIRED/);
 
+    const vs2022BundleDownload = await postText(
+      baseUrl,
+      "/api/developer/products/integration-packages/export/download",
+      {
+        productIds: [alphaProduct.id],
+        format: "vs2022"
+      },
+      viewerSession.token
+    );
+    assert.match(vs2022BundleDownload.contentType || "", /^text\/plain/);
+    assert.match(vs2022BundleDownload.contentDisposition || "", /attachment; filename="rocksolid-integration-packages-.*-vs2022\.txt"/);
+    assert.match(vs2022BundleDownload.body, /### INTBUNDLE_ALPHA\/INTBUNDLE_ALPHA_host_consumer\.vcxproj/);
+    assert.match(vs2022BundleDownload.body, /PlatformToolset>v143</);
+
     const developerZipDownload = await postBinary(
       baseUrl,
       "/api/developer/products/integration-packages/export/download",
@@ -8577,6 +8615,9 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerZipText, /cmake-consumer\/INTBUNDLE_ALPHA\/CMakeLists\.txt/);
     assert.match(developerZipText, /cmake-consumer\/INTBUNDLE_ALPHA\/main\.cpp/);
     assert.match(developerZipText, /cmake-consumer\/INTBUNDLE_ALPHA\/rocksolid_host_config\.env/);
+    assert.match(developerZipText, /vs2022-consumer\/INTBUNDLE_ALPHA\/INTBUNDLE_ALPHA_host_consumer\.vcxproj/);
+    assert.match(developerZipText, /vs2022-consumer\/INTBUNDLE_ALPHA\/main\.cpp/);
+    assert.match(developerZipText, /vs2022-consumer\/INTBUNDLE_ALPHA\/rocksolid_host_config\.env/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA\.cpp/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA-host-skeleton\.cpp/);
     assert.match(developerZipText, /INTBUNDLE_ALPHA-hardening-guide\.txt/);
@@ -8600,6 +8641,9 @@ test("batch project integration package export can bundle selected projects with
     assert.match(developerChecksumsDownload.body, /cmake-consumer\/INTBUNDLE_ALPHA\/CMakeLists\.txt/);
     assert.match(developerChecksumsDownload.body, /cmake-consumer\/INTBUNDLE_ALPHA\/main\.cpp/);
     assert.match(developerChecksumsDownload.body, /cmake-consumer\/INTBUNDLE_ALPHA\/rocksolid_host_config\.env/);
+    assert.match(developerChecksumsDownload.body, /vs2022-consumer\/INTBUNDLE_ALPHA\/INTBUNDLE_ALPHA_host_consumer\.vcxproj/);
+    assert.match(developerChecksumsDownload.body, /vs2022-consumer\/INTBUNDLE_ALPHA\/main\.cpp/);
+    assert.match(developerChecksumsDownload.body, /vs2022-consumer\/INTBUNDLE_ALPHA\/rocksolid_host_config\.env/);
     assert.match(developerChecksumsDownload.body, /cpp\/INTBUNDLE_ALPHA\.cpp/);
     assert.match(developerChecksumsDownload.body, /host-skeleton\/INTBUNDLE_ALPHA-host-skeleton\.cpp/);
     assert.match(developerChecksumsDownload.body, /hardening\/INTBUNDLE_ALPHA-hardening-guide\.txt/);
@@ -8943,6 +8987,9 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.equal(byProductId.snippets.cmakeFileName, "CMakeLists.txt");
     assert.match(byProductId.snippets.cmakeConsumerTemplate, /find_package\(RockSolidSDK CONFIG REQUIRED/);
     assert.match(byProductId.snippets.cmakeConsumerTemplate, /export_alpha_host_consumer/);
+    assert.match(byProductId.snippets.vs2022ProjectFileName, /EXPORT_ALPHA_host_consumer\.vcxproj/i);
+    assert.match(byProductId.snippets.vs2022ProjectTemplate, /PlatformToolset>v143</);
+    assert.match(byProductId.snippets.vs2022ProjectTemplate, /ROCKSOLID_SDK_ROOT/);
     assert.equal(byProductId.snippets.cppFileName, "EXPORT_ALPHA.cpp");
 
     const byProjectCode = await getJson(
@@ -8991,6 +9038,16 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(cmakeDownload.body, /find_package\(RockSolidSDK CONFIG REQUIRED/);
     assert.match(cmakeDownload.body, /export_alpha_host_consumer/);
 
+    const vs2022Download = await getText(
+      baseUrl,
+      "/api/developer/integration/package/download?projectCode=EXPORT_ALPHA&format=vs2022",
+      viewerSession.token
+    );
+    assert.equal(vs2022Download.contentType, "text/plain; charset=utf-8");
+    assert.match(vs2022Download.contentDisposition || "", /EXPORT_ALPHA_host_consumer\.vcxproj/);
+    assert.match(vs2022Download.body, /PlatformToolset>v143</);
+    assert.match(vs2022Download.body, /ROCKSOLID_SDK_ROOT/);
+
     const cppDownload = await getText(
       baseUrl,
       "/api/developer/integration/package/download?softwareCode=EXPORT_ALPHA&format=cpp",
@@ -9023,6 +9080,9 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(checksumsDownload.body, /cmake-consumer\/CMakeLists\.txt/);
     assert.match(checksumsDownload.body, /cmake-consumer\/main\.cpp/);
     assert.match(checksumsDownload.body, /cmake-consumer\/rocksolid_host_config\.env/);
+    assert.match(checksumsDownload.body, /vs2022-consumer\/EXPORT_ALPHA_host_consumer\.vcxproj/);
+    assert.match(checksumsDownload.body, /vs2022-consumer\/main\.cpp/);
+    assert.match(checksumsDownload.body, /vs2022-consumer\/rocksolid_host_config\.env/);
     assert.match(checksumsDownload.body, /cpp\/EXPORT_ALPHA\.cpp/);
     assert.match(checksumsDownload.body, /host-skeleton\/EXPORT_ALPHA-host-skeleton\.cpp/);
 
@@ -9040,6 +9100,8 @@ test("developer integration package export is scoped and includes cpp quickstart
     assert.match(zipText, /rocksolid_host_config\.env/);
     assert.match(zipText, /cmake-consumer\/CMakeLists\.txt/);
     assert.match(zipText, /cmake-consumer\/main\.cpp/);
+    assert.match(zipText, /vs2022-consumer\/EXPORT_ALPHA_host_consumer\.vcxproj/);
+    assert.match(zipText, /vs2022-consumer\/main\.cpp/);
     assert.match(zipText, /EXPORT_ALPHA\.cpp/);
     assert.match(zipText, /EXPORT_ALPHA-host-skeleton\.cpp/);
     assert.match(zipText, /SHA256SUMS\.txt/);
@@ -9211,6 +9273,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Download Env/);
     assert.match(html, /Download Host Config/);
     assert.match(html, /Download CMake Template/);
+    assert.match(html, /Download VS2022 Project/);
     assert.match(html, /Download C\+\+/);
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Checksums/);
@@ -9225,6 +9288,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Host Skeleton/);
     assert.match(html, /Environment Template/);
     assert.match(html, /Host Config/);
+    assert.match(html, /VS2022 Project/);
     assert.match(html, /CMake Consumer/);
     assert.match(html, /Hardening Guide/);
     assert.match(html, /x-rs-app-id/);
@@ -9355,9 +9419,11 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Host Skeleton/);
     assert.match(html, /Host Config/);
     assert.match(html, /CMake Consumer/);
+    assert.match(html, /VS2022 Project/);
     assert.match(html, /Hardening Guide/);
     assert.match(html, /Download Host Config/);
     assert.match(html, /Download CMake Template/);
+    assert.match(html, /Download VS2022 Project/);
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);

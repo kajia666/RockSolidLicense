@@ -882,6 +882,7 @@
             <div class="split-line"><span>Recommended Workspace</span><span>${esc(recommendedWorkspace.label || "-")}</span></div>
             <div class="split-line"><span>Workflow Checklist</span><span>${esc(String(workflowChecklist.status || "unknown").toUpperCase())} | pass ${esc(workflowChecklist.passItems ?? 0)} | review ${esc(workflowChecklist.reviewItems ?? 0)} | block ${esc(workflowChecklist.blockItems ?? 0)}</span></div>
             <div class="split-line"><span>Recommended Downloads</span><span>${esc(workflowSummary.downloadSummary || recommendedDownloads.map((item) => item.label).join(" + ") || "-")}</span></div>
+            ${renderProjectRecommendedDownloadButtons(recommendedDownloads)}
             ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${esc(recommendedWorkspace.reason)}</div>` : ""}
             ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
@@ -1778,6 +1779,17 @@
           : [];
       }
 
+      function currentLaunchWorkflowRecommendedDownloads() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!launchWorkflowPreview || launchWorkflowPreview.productCode !== productCode || launchWorkflowPreview.channel !== channel) {
+          return [];
+        }
+        return Array.isArray(launchWorkflowPreview.payload?.workflowSummary?.recommendedDownloads)
+          ? launchWorkflowPreview.payload.workflowSummary.recommendedDownloads
+          : [];
+      }
+
       function renderProjectWorkspaceActionButtons(actions = []) {
         if (!actions.length) {
           return "";
@@ -1790,6 +1802,23 @@
                 class="${index === 0 ? "secondary" : ""}"
                 data-launch-workspace-action-index="${index}"
               >${esc(item.label || item.key || "Open workspace")}</button>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderProjectRecommendedDownloadButtons(downloads = []) {
+        if (!downloads.length) {
+          return "";
+        }
+        return `
+          <div class="actions" style="margin-top:12px;">
+            ${downloads.map((item, index) => `
+              <button
+                type="button"
+                class="${index === 0 ? "secondary" : ""}"
+                data-launch-download-index="${index}"
+              >${esc(item.label || item.key || "Download asset")}</button>
             `).join("")}
           </div>
         `;
@@ -1841,6 +1870,70 @@
 
       function openRecommendedLaunchWorkspace() {
         openLaunchWorkspaceAction(currentLaunchWorkflowRecommendedAction());
+      }
+
+      async function downloadLaunchRecommendedItem(item) {
+        if (!item?.key) {
+          throw new Error("Preview Launch Workflow first so the recommended downloads can be resolved.");
+        }
+        switch (item.key) {
+          case "launch_handoff_zip":
+            return downloadLaunchWorkflowAsset(
+              "handoff-zip",
+              item.fileName || launchWorkflowPreview?.payload?.handoffZipFileName || "launch-workflow-handoff.zip",
+              item.label || "Launch workflow handoff"
+            );
+          case "launch_handoff_checksums":
+            return downloadLaunchWorkflowAsset(
+              "handoff-checksums",
+              item.fileName || launchWorkflowPreview?.payload?.handoffChecksumsFileName || "launch-workflow-handoff-sha256.txt",
+              item.label || "Launch workflow handoff checksums"
+            );
+          case "launch_workflow_zip":
+            return downloadLaunchWorkflowAsset(
+              "zip",
+              item.fileName || "launch-workflow.zip",
+              item.label || "Launch workflow zip"
+            );
+          case "launch_summary":
+            return downloadLaunchWorkflowAsset(
+              "summary",
+              item.fileName || "launch-workflow.txt",
+              item.label || "Launch workflow summary"
+            );
+          case "launch_checklist":
+            return downloadLaunchWorkflowAsset(
+              "checklist",
+              item.fileName || "launch-workflow-checklist.txt",
+              item.label || "Launch workflow checklist"
+            );
+          case "release_summary":
+            return downloadInlineReleaseAsset(
+              "summary",
+              item.fileName || "release-summary.txt",
+              item.label || "Launch workflow release summary"
+            );
+          case "integration_env":
+            return downloadInlineIntegrationAsset(
+              "env",
+              item.fileName || "integration.env",
+              item.label || "Launch workflow integration env"
+            );
+          case "integration_host_config":
+            return downloadInlineIntegrationAsset(
+              "host-config",
+              item.fileName || "rocksolid_host_config.env",
+              item.label || "Launch workflow host config"
+            );
+          case "integration_host_skeleton":
+            return downloadInlineIntegrationAsset(
+              "host-skeleton",
+              item.fileName || "project-host-skeleton.cpp",
+              item.label || "Launch workflow host skeleton"
+            );
+          default:
+            throw new Error(`Unsupported recommended download key: ${item.key}`);
+        }
       }
 
       el("clear-release-preview-btn").addEventListener("click", () => {
@@ -2134,16 +2227,29 @@
         }
       });
 
-      el("detail-launch-workflow").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-launch-workspace-action-index]");
-        if (!button) {
+      el("detail-launch-workflow").addEventListener("click", async (event) => {
+        const workspaceButton = event.target.closest("[data-launch-workspace-action-index]");
+        if (workspaceButton) {
+          try {
+            const index = Number(workspaceButton.dataset.launchWorkspaceActionIndex);
+            openLaunchWorkspaceAction(currentLaunchWorkflowWorkspaceActions()[index]);
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const downloadButton = event.target.closest("[data-launch-download-index]");
+        if (!downloadButton) {
           return;
         }
         try {
-          const index = Number(button.dataset.launchWorkspaceActionIndex);
-          openLaunchWorkspaceAction(currentLaunchWorkflowWorkspaceActions()[index]);
+          const index = Number(downloadButton.dataset.launchDownloadIndex);
+          const item = currentLaunchWorkflowRecommendedDownloads()[index];
+          const result = await downloadLaunchRecommendedItem(item);
+          setOutput({ launchWorkflowDownload: { key: item?.key || null, fileName: result?.fileName || item?.fileName || null } });
         } catch (error) {
-          setStatus(error.message, true);
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
       });
 

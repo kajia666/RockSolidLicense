@@ -9181,7 +9181,9 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /recommended-download-box/);
     assert.match(html, /hydrateLaunchAutofocus/);
     assert.match(html, /renderWorkspaceActionButtons/);
+    assert.match(html, /renderRecommendedDownloadButtons/);
     assert.match(html, /data-workspace-action-index/);
+    assert.match(html, /data-recommended-download-index/);
     assert.match(html, /Workspace path:/);
     assert.match(html, /autofocus/);
     assert.match(html, /Open Project Workspace/);
@@ -9674,6 +9676,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Download Integration Env/);
     assert.match(html, /Download Integration Host Config/);
     assert.match(html, /Download Integration Checksums/);
+    assert.match(html, /renderProjectRecommendedDownloadButtons/);
+    assert.match(html, /data-launch-download-index/);
     assert.match(html, /Download C\+\+ Quickstart/);
     assert.match(html, /Download CMake Template/);
     assert.match(html, /Download VS2022 Quickstart/);

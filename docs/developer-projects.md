@@ -66,6 +66,8 @@ Recommended workspace jumps now also preserve a more specific `autofocus` hint. 
 
 The same inline launch workflow block now also exposes the top `workspaceActions` as direct buttons, so the project page is no longer limited to one “recommended workspace” jump. Software authors can click the first few routed actions straight from the inline summary.
 
+The same inline block now also turns the first lane-specific `recommendedDownloads` into direct buttons, so software authors can pull the recommended handoff zip, release summary, or integration host files from the project detail card without leaving the page.
+
 The same combined package is also available over:
 
 - `GET /api/developer/launch-workflow`

@@ -96,6 +96,8 @@ The same page now also keeps the most common lane-specific handoff files one cli
 - linked C++ quickstart
 - linked host skeleton
 
+The same handoff summary can now also render the top `recommendedDownloads` as direct buttons. That keeps the lane-specific handoff zip, launch summary/checklist, release summary, and integration host files one click away from the workflow summary itself.
+
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.
 
 Those files now also come from the same `/api/developer/launch-workflow/download` endpoint, so the launch workflow workspace can stay on one unified download route instead of mixing multiple release and integration download APIs. The recommended handoff zip is intentionally smaller than the full workflow zip: it keeps the launch summary/checklist, release summary, host config, CMake consumer, VS2022 consumer files, C++ quickstart, host skeleton, and hardening guide together for handoff, while the full workflow zip still preserves the larger release/integration JSON archive.

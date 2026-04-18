@@ -833,6 +833,7 @@
           <div class="split-line"><span>Host Skeleton</span><span>${escapeHtml(linkedIntegrationSnippets.hostSkeletonFileName || "-")}</span></div>
           ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "workspace")} | ${escapeHtml(String(item.priority || "secondary").toUpperCase())} | focus=${escapeHtml(item.autofocus || "-")} | ${escapeHtml(item.reason || "-")}`).join("<br>")}</div>` : ""}
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "Review the current lane before handing it to integration or release teammates.")}</div>
+          ${renderRecommendedDownloadButtons(recommendedDownloads)}
           ${recommendedDownloads.length ? `<div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>` : ""}
         `;
         el("release-summary").textContent = releasePackage.summaryText || "";
@@ -912,6 +913,12 @@
           : [];
       }
 
+      function currentRecommendedDownloads() {
+        return Array.isArray(releasePackage?.workflowSummary?.recommendedDownloads)
+          ? releasePackage.workflowSummary.recommendedDownloads
+          : [];
+      }
+
       function renderWorkspaceActionButtons(actions = []) {
         if (!actions.length) {
           return "";
@@ -924,6 +931,23 @@
                 class="${index === 0 ? "secondary" : ""}"
                 data-workspace-action-index="${index}"
               >${escapeHtml(item.label || item.key || "Open workspace")}</button>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderRecommendedDownloadButtons(downloads = []) {
+        if (!downloads.length) {
+          return "";
+        }
+        return `
+          <div class="actions" style="margin-top:12px;">
+            ${downloads.map((item, index) => `
+              <button
+                type="button"
+                class="${index === 0 ? "secondary" : ""}"
+                data-recommended-download-index="${index}"
+              >${escapeHtml(item.label || item.key || "Download asset")}</button>
             `).join("")}
           </div>
         `;
@@ -1005,6 +1029,70 @@
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
         return result;
+      }
+
+      async function downloadRecommendedWorkflowItem(item) {
+        if (!item?.key) {
+          throw new Error("Generate a launch workflow package before downloading recommended files.");
+        }
+        switch (item.key) {
+          case "launch_handoff_zip":
+            return downloadRecommendedHandoffAsset(
+              "handoff-zip",
+              item.fileName || releasePackage?.handoffZipFileName || "launch-workflow-handoff.zip",
+              item.label || "Recommended handoff zip"
+            );
+          case "launch_handoff_checksums":
+            return downloadRecommendedHandoffAsset(
+              "handoff-checksums",
+              item.fileName || releasePackage?.handoffChecksumsFileName || "launch-workflow-handoff-sha256.txt",
+              item.label || "Recommended handoff checksums"
+            );
+          case "launch_workflow_zip":
+            return downloadRecommendedHandoffAsset(
+              "zip",
+              item.fileName || releasePackage?.zipFileName || "launch-workflow.zip",
+              item.label || "Launch workflow zip"
+            );
+          case "launch_summary":
+            return downloadRecommendedHandoffAsset(
+              "summary",
+              item.fileName || releasePackage?.summaryFileName || "launch-workflow.txt",
+              item.label || "Launch workflow summary"
+            );
+          case "launch_checklist":
+            return downloadRecommendedHandoffAsset(
+              "checklist",
+              item.fileName || releasePackage?.checklistFileName || "launch-workflow-checklist.txt",
+              item.label || "Launch workflow checklist"
+            );
+          case "release_summary":
+            return downloadLinkedReleaseAsset(
+              "summary",
+              item.fileName || linkedReleasePackageData()?.summaryFileName || "release-summary.txt",
+              item.label || "Release summary"
+            );
+          case "integration_env":
+            return downloadLinkedIntegrationAsset(
+              "env",
+              item.fileName || linkedIntegrationPackageData()?.snippets?.envFileName || "project.env",
+              item.label || "Integration env"
+            );
+          case "integration_host_config":
+            return downloadLinkedIntegrationAsset(
+              "host-config",
+              item.fileName || linkedIntegrationPackageData()?.snippets?.hostConfigFileName || "rocksolid_host_config.env",
+              item.label || "Integration host config"
+            );
+          case "integration_host_skeleton":
+            return downloadLinkedIntegrationAsset(
+              "host-skeleton",
+              item.fileName || linkedIntegrationPackageData()?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp",
+              item.label || "Host skeleton"
+            );
+          default:
+            throw new Error(`Unsupported recommended download key: ${item.key}`);
+        }
       }
 
       function renderProjects() {
@@ -1332,6 +1420,22 @@
           navigateToWorkspaceAction(action, currentReleaseTarget());
         } catch (error) {
           setStatus(error.message, true);
+        }
+      });
+
+      el("recommended-download-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-recommended-download-index]");
+        if (!button) {
+          return;
+        }
+        try {
+          const index = Number(button.dataset.recommendedDownloadIndex);
+          const item = currentRecommendedDownloads()[index];
+          const result = await downloadRecommendedWorkflowItem(item);
+          setOutput({ recommendedDownload: { key: item?.key || null, fileName: result?.fileName || item?.fileName || null } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
       });
 

@@ -125,7 +125,7 @@ The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, header
 
 When software authors pull a project-scoped integration or release package from the backoffice, they now also receive a generated C++ host skeleton alongside the quickstart snippet so the host app can wire startup bootstrap, local token validation, and heartbeat gating in the order recommended by the current project profile.
 
-Those project-scoped handoff packages now also emit a VS2022 `.vcxproj` plus `RockSolidSDK.props`, so software authors who prefer native Visual Studio projects do not need to start from CMake unless they want to.
+Those project-scoped handoff packages now also emit a VS2022 `.sln/.vcxproj` plus `RockSolidSDK.props`, so software authors who prefer native Visual Studio projects do not need to start from CMake unless they want to.
 
 The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, import library, docs, and a C demo source.
 

@@ -210,6 +210,7 @@
             <button class="secondary" id="download-release-package-env-btn">Download Env Template</button>
             <button class="secondary" id="download-release-package-host-config-btn">Download Host Config</button>
             <button class="secondary" id="download-release-package-cmake-btn">Download CMake Template</button>
+            <button class="secondary" id="download-release-package-vs2022-sln-btn">Download VS2022 Solution</button>
             <button class="secondary" id="download-release-package-vs2022-btn">Download VS2022 Project</button>
             <button class="secondary" id="download-release-package-vs2022-props-btn">Download VS2022 Props</button>
             <button class="secondary" id="download-release-package-cpp-btn">Download C++ Quickstart</button>
@@ -356,16 +357,20 @@
 
       <section class="table-grid">
         <article class="card">
-          <h2>VS2022 Project</h2>
-          <pre id="release-vs2022-project">Generate a release package to preview the packaged VS2022 project template here.</pre>
+          <h2>VS2022 Solution</h2>
+          <pre id="release-vs2022-sln">Generate a release package to preview the packaged VS2022 solution here.</pre>
         </article>
         <article class="card">
-          <h2>VS2022 Props</h2>
-          <pre id="release-vs2022-props">Generate a release package to preview the packaged VS2022 props sheet here.</pre>
+          <h2>VS2022 Project</h2>
+          <pre id="release-vs2022-project">Generate a release package to preview the packaged VS2022 project template here.</pre>
         </article>
       </section>
 
       <section class="table-grid">
+        <article class="card">
+          <h2>VS2022 Props</h2>
+          <pre id="release-vs2022-props">Generate a release package to preview the packaged VS2022 props sheet here.</pre>
+        </article>
         <article class="card">
           <h2>CMake Consumer</h2>
           <pre id="release-cmake-template">Generate a release package to preview the packaged CMake consumer template here.</pre>
@@ -603,7 +608,7 @@
           }
         });
         const hasPackage = Boolean(releasePackage);
-        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-host-config-btn", "download-release-package-cmake-btn", "download-release-package-vs2022-btn", "download-release-package-vs2022-props-btn", "download-release-package-cpp-btn", "download-release-package-host-skeleton-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
+        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-host-config-btn", "download-release-package-cmake-btn", "download-release-package-vs2022-sln-btn", "download-release-package-vs2022-btn", "download-release-package-vs2022-props-btn", "download-release-package-cpp-btn", "download-release-package-host-skeleton-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
           const node = el(id);
           if (node) {
             node.disabled = readDisabled || !hasPackage;
@@ -650,6 +655,7 @@
           el("release-summary").textContent = "Generate a release package to preview its summary text here.";
           el("release-host-skeleton").textContent = "Generate a release package to preview the current C++ host skeleton here.";
           el("release-host-config").textContent = "Generate a release package to preview the packaged CMake host config here.";
+          el("release-vs2022-sln").textContent = "Generate a release package to preview the packaged VS2022 solution here.";
           el("release-vs2022-project").textContent = "Generate a release package to preview the packaged VS2022 project template here.";
           el("release-vs2022-props").textContent = "Generate a release package to preview the packaged VS2022 props sheet here.";
           el("release-cmake-template").textContent = "Generate a release package to preview the packaged CMake consumer template here.";
@@ -696,7 +702,7 @@
           <div class="split-line"><span>Startup Status</span><span>${escapeHtml(deliverySummary.startupStatus || "-")}</span></div>
           <div class="split-line"><span>Active Key ID</span><span class="mono">${escapeHtml(deliverySummary.activeKeyId || "-")}</span></div>
           <div class="split-line"><span>Client Hardening</span><span>${escapeHtml(deliverySummary.clientHardeningProfile || clientHardening.profile || "-")}</span></div>
-          <div class="split-line"><span>Artifacts</span><span>${escapeHtml(artifacts.packageJson || "-")} | ${escapeHtml(artifacts.packageSummary || "-")} | ${escapeHtml(artifacts.hostConfig || "-")} | ${escapeHtml(artifacts.cmakeConsumer || "-")} | ${escapeHtml(artifacts.vs2022Consumer || "-")}</span></div>
+          <div class="split-line"><span>Artifacts</span><span>${escapeHtml(artifacts.packageJson || "-")} | ${escapeHtml(artifacts.packageSummary || "-")} | ${escapeHtml(artifacts.hostConfig || "-")} | ${escapeHtml(artifacts.cmakeConsumer || "-")} | ${escapeHtml(artifacts.vs2022Solution || "-")} | ${escapeHtml(artifacts.vs2022Consumer || "-")} | ${escapeHtml(artifacts.vs2022Props || "-")}</span></div>
           <div class="hint" style="margin-top:12px;">${escapeHtml(deliverySummary.summary || "No delivery summary is available yet.")}</div>
           ${deliverySummary.clientHardeningSummary ? `<div class="hint" style="margin-top:10px;">Hardening: ${escapeHtml(deliverySummary.clientHardeningSummary)}</div>` : ""}
           ${deliverySummary.startupMessage ? `<div class="hint" style="margin-top:10px;">Startup: ${escapeHtml(deliverySummary.startupMessage)}</div>` : ""}
@@ -718,6 +724,7 @@
         el("release-summary").textContent = releasePackage.summaryText || "";
         el("release-host-skeleton").textContent = releasePackage.snippets?.hostSkeletonCpp || "";
         el("release-host-config").textContent = releasePackage.snippets?.hostConfigEnv || "";
+        el("release-vs2022-sln").textContent = releasePackage.snippets?.vs2022SolutionTemplate || "";
         el("release-vs2022-project").textContent = releasePackage.snippets?.vs2022ProjectTemplate || "";
         el("release-vs2022-props").textContent = releasePackage.snippets?.vs2022PropsTemplate || "";
         el("release-cmake-template").textContent = releasePackage.snippets?.cmakeConsumerTemplate || "";
@@ -1146,6 +1153,24 @@
             releasePackage.snippets?.cmakeFileName || "CMakeLists.txt"
           );
           setStatus(`Release package CMake template downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-release-package-vs2022-sln-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-sln" })}`,
+            releasePackage.snippets?.vs2022SolutionFileName || "rocksolid_host_consumer.sln"
+          );
+          setStatus(`Release package VS2022 solution downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

@@ -36,7 +36,7 @@
         <article class="card">
           <h2>Project Selector</h2>
           <label>Project Code<select id="project-select"></select></label>
-          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cmake-btn">Download CMake Template</button><button class="secondary" id="download-package-vs2022-btn">Download VS2022 Project</button><button class="secondary" id="download-package-vs2022-props-btn">Download VS2022 Props</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
+          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cmake-btn">Download CMake Template</button><button class="secondary" id="download-package-vs2022-sln-btn">Download VS2022 Solution</button><button class="secondary" id="download-package-vs2022-btn">Download VS2022 Project</button><button class="secondary" id="download-package-vs2022-props-btn">Download VS2022 Props</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
           <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace or release handoff check with the same project prefilled.</div>
@@ -116,16 +116,20 @@
 
       <section class="wide">
         <article class="card">
-          <h2>VS2022 Project</h2>
-          <pre id="vs2022-snippet">Select a project to generate a VS2022 host project template.</pre>
+          <h2>VS2022 Solution</h2>
+          <pre id="vs2022-sln-snippet">Select a project to generate a VS2022 solution template.</pre>
         </article>
         <article class="card">
-          <h2>VS2022 Props</h2>
-          <pre id="vs2022-props-snippet">Select a project to generate a reusable VS2022 props sheet.</pre>
+          <h2>VS2022 Project</h2>
+          <pre id="vs2022-snippet">Select a project to generate a VS2022 host project template.</pre>
         </article>
       </section>
 
       <section class="wide">
+        <article class="card">
+          <h2>VS2022 Props</h2>
+          <pre id="vs2022-props-snippet">Select a project to generate a reusable VS2022 props sheet.</pre>
+        </article>
         <article class="card">
           <h2>CMake Consumer</h2>
           <pre id="cmake-snippet">Select a project to generate a minimal CMake consumer template.</pre>
@@ -509,6 +513,7 @@ ${JSON.stringify(request, null, 2)}`;
           el("host-skeleton-snippet").textContent = "Select a project to generate a project-aware C++ host skeleton.";
           el("env-snippet").textContent = "Select a project to generate an environment template.";
           el("host-config-snippet").textContent = "Select a project to generate a host config file for the packaged CMake consumer.";
+          el("vs2022-sln-snippet").textContent = "Select a project to generate a VS2022 solution template.";
           el("vs2022-snippet").textContent = "Select a project to generate a VS2022 host project template.";
           el("vs2022-props-snippet").textContent = "Select a project to generate a reusable VS2022 props sheet.";
           el("cmake-snippet").textContent = "Select a project to generate a minimal CMake consumer template.";
@@ -527,6 +532,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("host-skeleton-snippet").textContent = packageSnapshot.snippets?.hostSkeletonCpp || "";
         el("env-snippet").textContent = packageSnapshot.snippets?.envTemplate || "";
         el("host-config-snippet").textContent = packageSnapshot.snippets?.hostConfigEnv || "";
+        el("vs2022-sln-snippet").textContent = packageSnapshot.snippets?.vs2022SolutionTemplate || "";
         el("vs2022-snippet").textContent = packageSnapshot.snippets?.vs2022ProjectTemplate || "";
         el("vs2022-props-snippet").textContent = packageSnapshot.snippets?.vs2022PropsTemplate || "";
         el("cmake-snippet").textContent = packageSnapshot.snippets?.cmakeConsumerTemplate || "";
@@ -584,6 +590,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("download-package-env-btn").disabled = disabled;
         el("download-package-host-config-btn").disabled = disabled;
         el("download-package-cmake-btn").disabled = disabled;
+        el("download-package-vs2022-sln-btn").disabled = disabled;
         el("download-package-vs2022-btn").disabled = disabled;
         el("download-package-vs2022-props-btn").disabled = disabled;
         el("download-package-cpp-btn").disabled = disabled;
@@ -801,6 +808,15 @@ ${JSON.stringify(request, null, 2)}`;
       el("download-package-cmake-btn").addEventListener("click", async () => {
         try {
           await handlePackageDownload("cmake", "CMakeLists.txt", "Integration package CMake template");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-package-vs2022-sln-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("vs2022-sln", "rocksolid_host_consumer.sln", "Integration package VS2022 solution");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

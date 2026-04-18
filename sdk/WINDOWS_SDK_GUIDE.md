@@ -281,6 +281,7 @@ const rocksolid::UnbindResponse unbind = client.unbind_tcp_parsed(unbind_request
 - The packaged SDK now also includes `examples/vs2022_cpp_host_consumer/`, which is a ready-to-open VS2022 solution, project, and `RockSolidSDK.props` sheet for software authors who prefer native Visual Studio workflows.
 - The CMake host consumer can read `rocksolid_host_config.env`, and its sample env file uses the same `RS_*` keys emitted by the project integration and release package downloads.
 - The VS2022 host consumer ships the same `rocksolid_host_config.env.example` keys and defaults `ROCKSOLID_SDK_ROOT` in `RockSolidSDK.props` to the extracted SDK package root, so it is usually enough to copy over the generated host-config file and add demo credentials.
+- The project-scoped integration and release packages now also emit a matching VS2022 `.sln/.vcxproj/.props` trio, so software authors can start from a ready-to-open solution instead of wiring a native project by hand.
 - The generated integration and release packages now also emit a matching `CMakeLists.txt`, so software authors can start from the same minimal consumer shape even before they customize the packaged SDK example.
 - `ApiException` exposes `code()`, `status()`, `transport_status()`, and `details()` so your client can branch on server error codes like `CLIENT_VERSION_REJECTED` or `LOGIN_BLOCKED_BY_NOTICE`.
 - `rs_sdk_version_string()` and `rocksolid::sdk_version_string()` let your host application report the exact SDK build it is using.

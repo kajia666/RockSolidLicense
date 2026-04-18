@@ -6,6 +6,7 @@ It is intended for software authors who need a dedicated place to manage project
 
 The selected project detail card now also exposes direct handoff links into:
 
+- `/developer/launch-workflow?productId=...&productCode=...&channel=stable`
 - `/developer/integration?productId=...&productCode=...`
 - `/developer/releases?productId=...&productCode=...&channel=stable`
 

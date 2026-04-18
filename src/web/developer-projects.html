@@ -13,7 +13,7 @@
       <section class="hero">
         <h1>Developer Project Workspace</h1>
         <p class="sub">Create projects, manage product-level feature toggles, inspect scoped metrics, and rotate SDK credentials from one dedicated workspace.</p>
-        <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
+        <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/launch-workflow">Developer Launch Workflow</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/projects</code></div>
           <div class="pill">APIs: <code>/api/developer/products</code>, <code>/api/developer/products/:productId/profile</code>, <code>/api/developer/products/:productId/status</code>, <code>/api/developer/products/status/batch</code>, <code>/api/developer/products/:productId/feature-config</code>, <code>/api/developer/products/feature-config/batch</code>, <code>/api/developer/products/:productId/sdk-credentials/rotate</code>, <code>/api/developer/products/sdk-credentials/rotate/batch</code>, <code>/api/developer/products/sdk-credentials/export</code>, <code>/api/developer/products/sdk-credentials/export/download</code>, <code>/api/developer/products/integration-packages/export</code>, <code>/api/developer/products/integration-packages/export/download</code></div>
@@ -177,6 +177,7 @@
           </div>
           <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
+            <button class="secondary" id="open-project-launch-btn">Open Launch Workflow</button>
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
           <div id="detail-launch-workflow" class="hint" style="margin-top:12px;">Preview the same channel for both release readiness and integration snapshot to see one combined launch workflow summary.</div>
@@ -193,6 +194,7 @@
             <button class="secondary" id="launch-download-host-skeleton-btn">Host Skeleton</button>
           </div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="launch-open-workflow-btn">Open Launch Workspace</button>
             <button class="secondary" id="launch-open-integration-btn">Open Integration Workspace</button>
             <button class="secondary" id="launch-open-release-btn">Open Release Workspace</button>
           </div>
@@ -932,7 +934,9 @@
       function syncWorkspaceLinks(product = null) {
         const hasProduct = Boolean(product);
         el("open-project-integration-btn").disabled = !hasProduct;
+        el("open-project-launch-btn").disabled = !hasProduct;
         el("open-project-release-btn").disabled = !hasProduct;
+        el("launch-open-workflow-btn").disabled = !hasProduct;
         el("launch-open-integration-btn").disabled = !hasProduct;
         el("launch-open-release-btn").disabled = !hasProduct;
         el("preview-release-readiness-btn").disabled = !hasProduct;
@@ -967,8 +971,8 @@
         el("download-inline-integration-vs2022-local-props-btn").disabled = !hasProduct;
         const channel = currentReleaseChannel();
         el("detail-navigation-hint").textContent = hasProduct
-          ? `Open ${product.code} in Developer Integration or Developer Releases with channel ${channel} already selected, or preview release and integration snapshots inline here.`
-          : "Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.";
+          ? `Open ${product.code} in Developer Launch Workflow, Developer Integration, or Developer Releases with channel ${channel} already selected, or preview release and integration snapshots inline here.`
+          : "Select a project to open its launch workflow, integration package, or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.";
       }
 
       function setSelection(product = null) {
@@ -1584,6 +1588,19 @@
           throw new Error("Select a project before opening Developer Integration.");
         }
         window.location.href = buildWorkspaceUrl("/developer/integration", {
+          productId,
+          productCode,
+          channel: currentReleaseChannel()
+        });
+      }
+
+      function openProjectLaunchWorkspace() {
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          throw new Error("Select a project before opening Developer Launch Workflow.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           productId,
           productCode,
           channel: currentReleaseChannel()

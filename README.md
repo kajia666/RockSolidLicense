@@ -105,12 +105,13 @@
 
 - [开发者子账号与项目级权限](docs/developer-members.md)
 - [开发者接入中心](docs/developer-integration.md)
+- [开发者上线工作台](docs/developer-launch-workflow.md)
 - [开发者项目工作台](docs/developer-projects.md)
 - [开发者授权策略与卡密工作台](docs/developer-license.md)
 - [开发者授权运营台](docs/developer-ops.md)
 - [开发者发版工作台](docs/developer-release.md)
 
-现在开发者项目中心、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。
+现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。
 
 ## 快速导航
 
@@ -134,6 +135,7 @@ node src/server.js
 - 产品中心：`http://127.0.0.1:3000/admin/products`
 - 开发者中心：`http://127.0.0.1:3000/developer`
 - 开发者接入中心：`http://127.0.0.1:3000/developer/integration`
+- 开发者上线工作台：`http://127.0.0.1:3000/developer/launch-workflow`
 - 开发者项目中心：`http://127.0.0.1:3000/developer/projects`
 - 开发者授权中心：`http://127.0.0.1:3000/developer/licenses`
 - 开发者运营台：`http://127.0.0.1:3000/developer/ops`

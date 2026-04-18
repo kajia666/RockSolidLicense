@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RockSolidLicense Developer Releases</title>
+    <title>RockSolidLicense Developer Launch Workflow</title>
     <style>
       :root {
         --bg: #f4efe4;
@@ -127,8 +127,8 @@
   <body>
     <main class="shell">
       <section class="hero">
-        <h1>Developer Release Center</h1>
-        <p class="sub">Manage client version rules and startup notices inside your own project scope. This workspace is built for software authors who need to publish upgrades, drive forced updates, and coordinate maintenance windows without leaving the developer backoffice.</p>
+        <h1>Developer Launch Workflow</h1>
+        <p class="sub">Generate one combined launch handoff for a selected project and channel. This workspace keeps release readiness, startup bootstrap, client hardening, and handoff artifacts in one place so software authors can make launch decisions faster.</p>
         <div class="nav">
           <a href="/developer">Developer Center</a>
           |
@@ -147,8 +147,8 @@
           <a href="/developer/security">Developer Security</a>
         </div>
         <div class="pill-row">
-          <div class="pill">Route: <code>/developer/releases</code></div>
-          <div class="pill">APIs: <code>/api/developer/client-versions</code>, <code>/api/developer/notices</code>, <code>/api/developer/release-package</code>, and <code>/api/developer/release-package/download</code></div>
+          <div class="pill">Route: <code>/developer/launch-workflow</code></div>
+          <div class="pill">APIs: <code>/api/developer/launch-workflow</code> and <code>/api/developer/launch-workflow/download</code></div>
           <div class="pill">Scoped to assigned projects. Viewer members stay read-only.</div>
         </div>
         <div class="project-list" id="project-list"></div>
@@ -165,7 +165,7 @@
             <button class="danger" id="logout-btn">Logout</button>
           </div>
           <div class="hint" id="session-meta">No developer session yet.</div>
-          <div class="status" id="status-box">Sign in to manage versions and notices.</div>
+          <div class="status" id="status-box">Sign in to generate launch workflow packages.</div>
         </article>
 
         <article class="card">
@@ -195,23 +195,26 @@
         </article>
 
         <article class="card">
-          <h2>Release Delivery Package</h2>
+          <h2>Launch Workflow Package</h2>
           <label>Project Code<input id="package-product-code" placeholder="ALPHA_APP" /></label>
           <label>Channel<input id="package-channel" value="stable" placeholder="stable" /></label>
           <div class="actions">
-            <button class="secondary" id="use-filter-project-btn">Use Filter Project</button>
-            <button id="generate-release-package-btn">Generate Release Package</button>
+            <button class="secondary" id="use-filter-project-btn">Use Current Project</button>
+            <button id="generate-release-package-btn">Generate Launch Workflow</button>
           </div>
           <div class="actions">
             <button class="secondary" id="open-release-project-btn">Open Project Workspace</button>
-            <button class="secondary" id="open-release-launch-btn">Open Launch Workflow</button>
             <button class="secondary" id="open-release-integration-btn">Open Integration Package</button>
+            <button class="secondary" id="open-release-release-btn">Open Release Check</button>
           </div>
           <div class="actions">
-            <button class="secondary" id="download-release-package-json-btn">Download Package JSON</button>
-            <button class="secondary" id="download-release-package-summary-btn">Download Summary</button>
-            <button class="secondary" id="download-release-package-env-btn">Download Env Template</button>
-            <button class="secondary" id="download-release-package-host-config-btn">Download Host Config</button>
+            <button class="secondary" id="download-release-package-json-btn">Download Launch JSON</button>
+            <button class="secondary" id="download-release-package-summary-btn">Download Launch Summary</button>
+            <button class="secondary" id="download-release-package-env-btn">Download Launch Checklist</button>
+            <button class="secondary" id="download-release-package-host-config-btn">Download Launch Checksums</button>
+            <button class="secondary" id="download-release-package-zip-btn">Download Launch Zip</button>
+          </div>
+          <div class="actions" style="display:none;">
             <button class="secondary" id="download-release-package-cmake-btn">Download CMake Template</button>
             <button class="secondary" id="download-release-package-vs2022-guide-btn">Download VS2022 Quickstart</button>
             <button class="secondary" id="download-release-package-vs2022-sln-btn">Download VS2022 Solution</button>
@@ -222,10 +225,9 @@
             <button class="secondary" id="download-release-package-cpp-btn">Download C++ Quickstart</button>
             <button class="secondary" id="download-release-package-host-skeleton-btn">Download Host Skeleton</button>
             <button class="secondary" id="download-release-package-checksums-btn">Download Checksums</button>
-            <button class="secondary" id="download-release-package-zip-btn">Download Zip Archive</button>
           </div>
-          <div class="hint" id="release-package-hint">Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.</div>
-          <div class="hint" id="release-route-hint" style="margin-top:12px;">Open this page from the project, launch workflow, or integration workspaces to prefill the selected project and channel.</div>
+          <div class="hint" id="release-package-hint">Generate a combined launch workflow package for the selected project and channel, then download the summary, checklist, checksum manifest, or full handoff zip.</div>
+          <div class="hint" id="release-route-hint" style="margin-top:12px;">Open this page from the project, integration, or release workspaces to keep the selected project and channel in sync.</div>
         </article>
 
         <article class="card">
@@ -331,78 +333,79 @@
 
       <section class="table-grid">
         <article class="card">
-          <h2>Release Readiness</h2>
-          <div id="release-readiness" class="hint">Generate a release package to evaluate whether the selected channel looks ready for rollout.</div>
+          <h2>Launch Workflow Summary</h2>
+          <div id="release-readiness" class="hint">Generate a launch workflow package to evaluate whether the selected lane looks ready for rollout.</div>
         </article>
         <article class="card">
-          <h2>Delivery Summary</h2>
-          <div id="delivery-summary" class="hint">Generate a release package to see the handoff summary for software authors and release operators.</div>
+          <h2>Linked Release Signals</h2>
+          <div id="delivery-summary" class="hint">Generate a launch workflow package to see the linked release summary and integration hardening signals.</div>
         </article>
       </section>
 
       <section class="card">
-        <h2>Delivery Checklist</h2>
-        <div id="delivery-checklist" class="hint">Generate a release package to see the step-by-step handoff checklist.</div>
+        <h2>Launch Workflow Checklist</h2>
+        <div id="delivery-checklist" class="hint">Generate a launch workflow package to see the combined checklist built from release, startup, key coverage, and handoff packaging.</div>
       </section>
 
       <section class="card">
-        <h2>Package Summary</h2>
-        <pre id="release-summary">Generate a release package to preview its summary text here.</pre>
+        <h2>Launch Summary</h2>
+        <pre id="release-summary">Generate a launch workflow package to preview its summary text here.</pre>
       </section>
 
       <section class="table-grid">
         <article class="card">
           <h2>Host Skeleton</h2>
-          <pre id="release-host-skeleton">Generate a release package to preview the current C++ host skeleton here.</pre>
+          <pre id="release-host-skeleton">Generate a launch workflow package to preview the linked C++ host skeleton here.</pre>
         </article>
         <article class="card">
           <h2>Host Config</h2>
-          <pre id="release-host-config">Generate a release package to preview the packaged CMake host config here.</pre>
+          <pre id="release-host-config">Generate a launch workflow package to preview the linked host config here.</pre>
         </article>
       </section>
 
       <section class="table-grid">
         <article class="card">
           <h2>VS2022 Solution</h2>
-          <pre id="release-vs2022-sln">Generate a release package to preview the packaged VS2022 solution here.</pre>
+          <pre id="release-vs2022-sln">Generate a launch workflow package to preview the linked VS2022 solution here.</pre>
         </article>
         <article class="card">
           <h2>VS2022 Project</h2>
-          <pre id="release-vs2022-project">Generate a release package to preview the packaged VS2022 project template here.</pre>
+          <pre id="release-vs2022-project">Generate a launch workflow package to preview the linked VS2022 project template here.</pre>
         </article>
       </section>
 
       <section class="table-grid">
         <article class="card">
           <h2>VS2022 Props</h2>
-          <pre id="release-vs2022-props">Generate a release package to preview the packaged VS2022 props sheet here.</pre>
+          <pre id="release-vs2022-props">Generate a launch workflow package to preview the linked VS2022 props sheet here.</pre>
         </article>
         <article class="card">
           <h2>VS2022 Local Props</h2>
-          <pre id="release-vs2022-local-props">Generate a release package to preview the packaged VS2022 local props here.</pre>
+          <pre id="release-vs2022-local-props">Generate a launch workflow package to preview the linked VS2022 local props here.</pre>
         </article>
       </section>
 
       <section class="table-grid">
         <article class="card">
           <h2>VS2022 Quickstart</h2>
-          <pre id="release-vs2022-guide">Generate a release package to preview the packaged VS2022 quickstart here.</pre>
+          <pre id="release-vs2022-guide">Generate a launch workflow package to preview the linked VS2022 quickstart here.</pre>
         </article>
+        <article class="card">
           <h2>VS2022 Filters</h2>
-          <pre id="release-vs2022-filters">Generate a release package to preview the packaged VS2022 filters file here.</pre>
+          <pre id="release-vs2022-filters">Generate a launch workflow package to preview the linked VS2022 filters file here.</pre>
         </article>
       </section>
 
       <section class="table-grid">
         <article class="card">
           <h2>CMake Consumer</h2>
-          <pre id="release-cmake-template">Generate a release package to preview the packaged CMake consumer template here.</pre>
+          <pre id="release-cmake-template">Generate a launch workflow package to preview the linked CMake consumer template here.</pre>
         </article>
       </section>
 
       <section class="card">
         <h2>Hardening Guide</h2>
-        <pre id="release-hardening-guide">Generate a release package to preview the current client hardening guide here.</pre>
+        <pre id="release-hardening-guide">Generate a launch workflow package to preview the linked client hardening guide here.</pre>
       </section>
 
       <section class="table-grid">
@@ -566,19 +569,19 @@
         const target = currentReleaseTarget();
         const hasProduct = Boolean(target.productCode);
         el("open-release-project-btn").disabled = !hasProduct;
-        el("open-release-launch-btn").disabled = !hasProduct;
         el("open-release-integration-btn").disabled = !hasProduct;
+        el("open-release-release-btn").disabled = !hasProduct;
         el("release-route-hint").textContent = hasProduct
-          ? `Release checks are prefilled for ${target.productCode} on ${target.channel}. Open Developer Projects, Developer Launch Workflow, or Developer Integration with the same project preserved.`
-          : "Open this page from the project, launch workflow, or integration workspaces to prefill the selected project and channel.";
+          ? `Launch workflow is prefilled for ${target.productCode} on ${target.channel}. Open Developer Projects, Developer Integration, or Developer Releases with the same project preserved.`
+          : "Open this page from the project, integration, or release workspaces to prefill the selected project and channel.";
       }
 
       function syncReleasePackageHint() {
         const productCode = el("package-product-code").value.trim();
         const channel = el("package-channel").value.trim() || "stable";
         el("release-package-hint").textContent = productCode
-          ? `Generate the ${productCode} release handoff package for channel ${channel}, then download server-generated attachments for JSON, summary, env, C++ quickstart, or the host skeleton.`
-          : "Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.";
+          ? `Generate the ${productCode} launch workflow package for channel ${channel}, then download the combined summary, checklist, checksums, or the full handoff zip.`
+          : "Generate a combined launch workflow package for the selected project and channel, then download the summary, checklist, checksum manifest, or full handoff zip.";
         syncReleaseWorkspaceLinks();
       }
 
@@ -673,92 +676,90 @@
 
       function renderReleaseReadiness() {
         if (!releasePackage) {
-          el("release-readiness").textContent = "Generate a release package to evaluate whether the selected channel looks ready for rollout.";
-          el("delivery-summary").textContent = "Generate a release package to see the handoff summary for software authors and release operators.";
-          el("delivery-checklist").textContent = "Generate a release package to see the step-by-step handoff checklist.";
-          el("release-summary").textContent = "Generate a release package to preview its summary text here.";
-          el("release-host-skeleton").textContent = "Generate a release package to preview the current C++ host skeleton here.";
-          el("release-host-config").textContent = "Generate a release package to preview the packaged CMake host config here.";
-          el("release-vs2022-sln").textContent = "Generate a release package to preview the packaged VS2022 solution here.";
-          el("release-vs2022-project").textContent = "Generate a release package to preview the packaged VS2022 project template here.";
-          el("release-vs2022-props").textContent = "Generate a release package to preview the packaged VS2022 props sheet here.";
-          el("release-vs2022-local-props").textContent = "Generate a release package to preview the packaged VS2022 local props here.";
-          el("release-vs2022-guide").textContent = "Generate a release package to preview the packaged VS2022 quickstart here.";
-          el("release-vs2022-filters").textContent = "Generate a release package to preview the packaged VS2022 filters file here.";
-          el("release-cmake-template").textContent = "Generate a release package to preview the packaged CMake consumer template here.";
-          el("release-hardening-guide").textContent = "Generate a release package to preview the current client hardening guide here.";
+          el("release-readiness").textContent = "Generate a launch workflow package to evaluate whether the selected lane looks ready for rollout.";
+          el("delivery-summary").textContent = "Generate a launch workflow package to inspect the linked release and integration signals in one place.";
+          el("delivery-checklist").textContent = "Generate a launch workflow package to see the combined workflow checklist.";
+          el("release-summary").textContent = "Generate a launch workflow package to preview its summary text here.";
+          el("release-host-skeleton").textContent = "Generate a launch workflow package to preview the linked C++ host skeleton here.";
+          el("release-host-config").textContent = "Generate a launch workflow package to preview the linked host config here.";
+          el("release-vs2022-sln").textContent = "Generate a launch workflow package to preview the linked VS2022 solution here.";
+          el("release-vs2022-project").textContent = "Generate a launch workflow package to preview the linked VS2022 project template here.";
+          el("release-vs2022-props").textContent = "Generate a launch workflow package to preview the linked VS2022 props sheet here.";
+          el("release-vs2022-local-props").textContent = "Generate a launch workflow package to preview the linked VS2022 local props here.";
+          el("release-vs2022-guide").textContent = "Generate a launch workflow package to preview the linked VS2022 quickstart here.";
+          el("release-vs2022-filters").textContent = "Generate a launch workflow package to preview the linked VS2022 filters file here.";
+          el("release-cmake-template").textContent = "Generate a launch workflow package to preview the linked CMake consumer template here.";
+          el("release-hardening-guide").textContent = "Generate a launch workflow package to preview the linked client hardening guide here.";
           return;
         }
 
-        const readiness = releasePackage.manifest?.release?.readiness || {};
-        const deliverySummary = releasePackage.deliverySummary || releasePackage.manifest?.release?.deliverySummary || {};
-        const deliveryChecklist = releasePackage.deliveryChecklist || releasePackage.manifest?.release?.deliveryChecklist || {};
-        const startupPreview = releasePackage.manifest?.release?.startupPreview || {};
-        const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
-        const nextActions = Array.isArray(readiness.nextActions) ? readiness.nextActions : [];
-        const request = startupPreview.request || {};
-        const noticeSummary = startupPreview.noticeSummary || {};
-        const clientHardening = startupPreview.clientHardening || releasePackage.manifest?.integration?.clientHardening || {};
+        const workflowSummary = releasePackage.workflowSummary || {};
+        const workflowChecklist = releasePackage.workflowChecklist || {};
+        const linkedReleasePackage = releasePackage.releasePackage || {};
+        const linkedIntegrationPackage = releasePackage.integrationPackage || {};
+        const linkedReleaseSummary = linkedReleasePackage.deliverySummary || linkedReleasePackage.manifest?.release?.deliverySummary || {};
+        const linkedReleaseReadiness = linkedReleasePackage.manifest?.release?.readiness || {};
+        const startupPreview = linkedIntegrationPackage.manifest?.startupPreview || linkedReleasePackage.manifest?.release?.startupPreview || {};
+        const clientHardening = startupPreview.clientHardening || linkedIntegrationPackage.manifest?.clientHardening || {};
+        const workflowItems = Array.isArray(workflowChecklist.items) ? workflowChecklist.items : [];
+        const nextActions = Array.isArray(workflowSummary.nextActions) ? workflowSummary.nextActions : [];
+        const blockers = Array.isArray(workflowSummary.blockers) ? workflowSummary.blockers : [];
+        const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
 
         el("release-readiness").innerHTML = `
           <div style="margin-bottom:10px;">
-            ${renderTag(readiness.title || readiness.status || "unknown", readiness.ready === true)}
-            ${renderTag(String(readiness.status || "unknown").toUpperCase(), readiness.ready === true)}
-            ${startupPreview.runtimeChecks?.projectActive ? renderTag("PROJECT ACTIVE", true) : renderTag("PROJECT INACTIVE", false)}
+            ${renderTag(workflowSummary.title || workflowSummary.status || "unknown", workflowSummary.status === "ready")}
+            ${renderTag(String(workflowSummary.status || "unknown").toUpperCase(), workflowSummary.status === "ready")}
+            ${renderTag(`release:${workflowSummary.releaseStatus || "unknown"}`, workflowSummary.releaseStatus === "ready")}
+            ${renderTag(`startup:${workflowSummary.startupStatus || "unknown"}`, workflowSummary.startupReady !== false)}
           </div>
-          <div class="split-line"><span>Candidate Version</span><span>${escapeHtml(readiness.candidateVersion || "-")}</span></div>
-          <div class="split-line"><span>Startup Channel</span><span>${escapeHtml(request.channel || "-")}</span></div>
-          <div class="split-line"><span>Blocking Checks</span><span>${escapeHtml(readiness.blockingChecks ?? 0)}</span></div>
-          <div class="split-line"><span>Attention Checks</span><span>${escapeHtml(readiness.attentionChecks ?? 0)}</span></div>
-          <div class="split-line"><span>Active Notices</span><span>${escapeHtml(noticeSummary.total ?? 0)} active | ${escapeHtml(noticeSummary.blockingTotal ?? 0)} blocking</span></div>
-          <div class="split-line"><span>Client Hardening</span><span>${escapeHtml(clientHardening.profile || "-")} | startup=${escapeHtml(String(clientHardening.startupBootstrapRequired ?? false))} | token=${escapeHtml(String(clientHardening.localTokenValidationRequired ?? false))} | heartbeat=${escapeHtml(String(clientHardening.heartbeatGateRequired ?? false))}</span></div>
-          <div class="hint" style="margin-top:12px;">${escapeHtml(readiness.message || "No release readiness summary available.")}</div>
-          ${clientHardening.summary ? `<div class="hint" style="margin-top:10px;">Client hardening: ${escapeHtml(clientHardening.summary)}</div>` : ""}
-          ${checks.length ? `<div class="hint" style="margin-top:12px;">${checks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
+          <div class="split-line"><span>Candidate Version</span><span>${escapeHtml(workflowSummary.candidateVersion || "-")}</span></div>
+          <div class="split-line"><span>Checklist</span><span>${escapeHtml(String(workflowChecklist.status || "unknown").toUpperCase())} | pass ${escapeHtml(workflowChecklist.passItems ?? 0)} | review ${escapeHtml(workflowChecklist.reviewItems ?? 0)} | block ${escapeHtml(workflowChecklist.blockItems ?? 0)}</span></div>
+          <div class="split-line"><span>Client Hardening</span><span>${escapeHtml(workflowSummary.clientHardeningProfile || clientHardening.profile || "-")}</span></div>
+          <div class="split-line"><span>Token Keys</span><span>${escapeHtml(workflowSummary.tokenKeyTotal ?? 0)}${workflowSummary.activeKeyId ? ` | active ${escapeHtml(workflowSummary.activeKeyId)}` : ""}</span></div>
+          <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "No launch workflow summary available.")}</div>
+          ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
-        const handoffChecks = Array.isArray(deliverySummary.handoffChecks) ? deliverySummary.handoffChecks : [];
-        const deliveryActions = Array.isArray(deliverySummary.nextActions) ? deliverySummary.nextActions : [];
-        const artifacts = deliverySummary.artifacts || {};
+
+        const linkedArtifacts = linkedReleaseSummary.artifacts || {};
         el("delivery-summary").innerHTML = `
           <div style="margin-bottom:10px;">
-            ${renderTag(deliverySummary.headline || deliverySummary.status || "summary", deliverySummary.status === "ready")}
-            ${renderTag(String(deliverySummary.status || "unknown").toUpperCase(), deliverySummary.status === "ready")}
+            ${renderTag(linkedReleaseSummary.headline || "linked release", linkedReleaseSummary.status === "ready")}
+            ${renderTag(String(linkedReleaseSummary.status || "unknown").toUpperCase(), linkedReleaseSummary.status === "ready")}
+            ${renderTag(`hardening:${workflowSummary.clientHardeningProfile || clientHardening.profile || "-"}`, workflowSummary.clientHardeningProfile === "strict")}
           </div>
-          <div class="split-line"><span>Candidate Version</span><span>${escapeHtml(deliverySummary.candidateVersion || "-")}</span></div>
-          <div class="split-line"><span>Startup Status</span><span>${escapeHtml(deliverySummary.startupStatus || "-")}</span></div>
-          <div class="split-line"><span>Active Key ID</span><span class="mono">${escapeHtml(deliverySummary.activeKeyId || "-")}</span></div>
-          <div class="split-line"><span>Client Hardening</span><span>${escapeHtml(deliverySummary.clientHardeningProfile || clientHardening.profile || "-")}</span></div>
-          <div class="split-line"><span>Artifacts</span><span>${escapeHtml(artifacts.packageJson || "-")} | ${escapeHtml(artifacts.packageSummary || "-")} | ${escapeHtml(artifacts.hostConfig || "-")} | ${escapeHtml(artifacts.cmakeConsumer || "-")} | ${escapeHtml(artifacts.vs2022Guide || "-")} | ${escapeHtml(artifacts.vs2022Solution || "-")} | ${escapeHtml(artifacts.vs2022Consumer || "-")} | ${escapeHtml(artifacts.vs2022Filters || "-")} | ${escapeHtml(artifacts.vs2022Props || "-")} | ${escapeHtml(artifacts.vs2022LocalProps || "-")}</span></div>
-          <div class="hint" style="margin-top:12px;">${escapeHtml(deliverySummary.summary || "No delivery summary is available yet.")}</div>
-          ${deliverySummary.clientHardeningSummary ? `<div class="hint" style="margin-top:10px;">Hardening: ${escapeHtml(deliverySummary.clientHardeningSummary)}</div>` : ""}
-          ${deliverySummary.startupMessage ? `<div class="hint" style="margin-top:10px;">Startup: ${escapeHtml(deliverySummary.startupMessage)}</div>` : ""}
-          ${handoffChecks.length ? `<div class="hint" style="margin-top:12px;">${handoffChecks.map((item) => `${escapeHtml(String(item.level || "info").toUpperCase())} | ${escapeHtml(item.label || item.key || "check")} | ${escapeHtml(item.summary || "-")}`).join("<br>")}</div>` : ""}
-          ${deliveryActions.length ? `<div class="hint" style="margin-top:12px;">Handoff actions:<br>${deliveryActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
+          <div class="split-line"><span>Launch Summary</span><span>${escapeHtml(releasePackage.summaryFileName || "-")}</span></div>
+          <div class="split-line"><span>Launch Checklist</span><span>${escapeHtml(releasePackage.checklistFileName || "-")}</span></div>
+          <div class="split-line"><span>Release Summary</span><span>${escapeHtml(linkedReleasePackage.summaryFileName || "-")}</span></div>
+          <div class="split-line"><span>Startup Status</span><span>${escapeHtml(linkedReleaseSummary.startupStatus || workflowSummary.startupStatus || "-")}</span></div>
+          <div class="split-line"><span>Blocking Notices</span><span>${escapeHtml(linkedReleaseSummary.blockingNotices ?? linkedReleaseReadiness.blockingChecks ?? 0)}</span></div>
+          <div class="split-line"><span>Artifacts</span><span>${escapeHtml(linkedArtifacts.packageJson || "-")} | ${escapeHtml(linkedArtifacts.packageSummary || "-")} | ${escapeHtml(linkedArtifacts.hostConfig || "-")} | ${escapeHtml(linkedArtifacts.cmakeConsumer || "-")} | ${escapeHtml(linkedArtifacts.vs2022Guide || "-")}</span></div>
+          ${recommendedDownloads.length ? `<div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>` : ""}
         `;
-        const checklistItems = Array.isArray(deliveryChecklist.items) ? deliveryChecklist.items : [];
-        el("delivery-checklist").innerHTML = checklistItems.length
+
+        el("delivery-checklist").innerHTML = workflowItems.length
           ? `
             <div style="margin-bottom:10px;">
-              ${renderTag(String(deliveryChecklist.status || "unknown").toUpperCase(), deliveryChecklist.status === "ready")}
-              ${renderTag(`pass:${deliveryChecklist.passItems ?? 0}`, true)}
-              ${renderTag(`review:${deliveryChecklist.reviewItems ?? 0}`, false)}
-              ${renderTag(`block:${deliveryChecklist.blockItems ?? 0}`, false)}
+              ${renderTag(String(workflowChecklist.status || "unknown").toUpperCase(), workflowChecklist.status === "ready")}
+              ${renderTag(`pass:${workflowChecklist.passItems ?? 0}`, true)}
+              ${renderTag(`review:${workflowChecklist.reviewItems ?? 0}`, false)}
+              ${renderTag(`block:${workflowChecklist.blockItems ?? 0}`, false)}
             </div>
-            <div class="hint">${checklistItems.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "unknown").toUpperCase())}] ${escapeHtml(item.label || item.key || "item")} | ${escapeHtml(item.summary || "-")}${item.artifact ? ` | artifact=${escapeHtml(item.artifact)}` : ""}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}`).join("<br>")}</div>
+            <div class="hint">${workflowItems.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "unknown").toUpperCase())}] ${escapeHtml(item.label || item.key || "item")} | ${escapeHtml(item.summary || "-")}${item.artifact ? ` | artifact=${escapeHtml(item.artifact)}` : ""}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}`).join("<br>")}</div>
           `
-          : "No delivery checklist is available yet.";
+          : "No launch workflow checklist is available yet.";
         el("release-summary").textContent = releasePackage.summaryText || "";
-        el("release-host-skeleton").textContent = releasePackage.snippets?.hostSkeletonCpp || "";
-        el("release-host-config").textContent = releasePackage.snippets?.hostConfigEnv || "";
-        el("release-vs2022-sln").textContent = releasePackage.snippets?.vs2022SolutionTemplate || "";
-        el("release-vs2022-project").textContent = releasePackage.snippets?.vs2022ProjectTemplate || "";
-        el("release-vs2022-props").textContent = releasePackage.snippets?.vs2022PropsTemplate || "";
-        el("release-vs2022-local-props").textContent = releasePackage.snippets?.vs2022LocalPropsTemplate || "";
-        el("release-vs2022-guide").textContent = releasePackage.snippets?.vs2022GuideText || "";
-        el("release-vs2022-filters").textContent = releasePackage.snippets?.vs2022FiltersTemplate || "";
-        el("release-cmake-template").textContent = releasePackage.snippets?.cmakeConsumerTemplate || "";
-        el("release-hardening-guide").textContent = releasePackage.snippets?.hardeningGuide || "";
+        el("release-host-skeleton").textContent = linkedIntegrationPackage.snippets?.hostSkeletonCpp || "";
+        el("release-host-config").textContent = linkedIntegrationPackage.snippets?.hostConfigEnv || "";
+        el("release-vs2022-sln").textContent = linkedIntegrationPackage.snippets?.vs2022SolutionTemplate || "";
+        el("release-vs2022-project").textContent = linkedIntegrationPackage.snippets?.vs2022ProjectTemplate || "";
+        el("release-vs2022-props").textContent = linkedIntegrationPackage.snippets?.vs2022PropsTemplate || "";
+        el("release-vs2022-local-props").textContent = linkedIntegrationPackage.snippets?.vs2022LocalPropsTemplate || "";
+        el("release-vs2022-guide").textContent = linkedIntegrationPackage.snippets?.vs2022GuideText || "";
+        el("release-vs2022-filters").textContent = linkedIntegrationPackage.snippets?.vs2022FiltersTemplate || "";
+        el("release-cmake-template").textContent = linkedIntegrationPackage.snippets?.cmakeConsumerTemplate || "";
+        el("release-hardening-guide").textContent = linkedIntegrationPackage.snippets?.hardeningGuide || "";
       }
 
       async function api(path, options = {}) {
@@ -971,9 +972,9 @@
         const productCode = el("package-product-code").value.trim();
         const channel = el("package-channel").value.trim() || "stable";
         if (!productCode) {
-          throw new Error("Enter a project code before generating a release package.");
+          throw new Error("Enter a project code before generating a launch workflow package.");
         }
-        const data = await api(`/api/developer/release-package${q({ productCode, channel })}`);
+        const data = await api(`/api/developer/launch-workflow${q({ productCode, channel })}`);
         releasePackage = data;
         renderReleaseReadiness();
         syncPermissions();
@@ -991,7 +992,7 @@
           });
           token = data.token;
           await refreshWorkspace();
-          setStatus("Developer release workspace loaded.");
+          setStatus("Developer launch workflow workspace loaded.");
         } catch (error) {
           token = "";
           clearWorkspace();
@@ -1003,7 +1004,7 @@
       el("refresh-btn").addEventListener("click", async () => {
         try {
           await refreshWorkspace();
-          setStatus("Release workspace refreshed.");
+          setStatus("Launch workflow workspace refreshed.");
         } catch (error) {
           setStatus(`${error.code}: ${error.message}`, true);
           setOutput({ code: error.code, message: error.message });
@@ -1054,7 +1055,7 @@
         el("package-product-code").value = el("filter-product-code").value.trim();
         el("package-channel").value = el("filter-channel").value.trim() || "stable";
         syncReleasePackageHint();
-        setStatus("Package selector synced from the current filters.");
+        setStatus("Launch workflow target synced from the current filters.");
       });
 
       ["filter-product-code", "filter-channel", "package-product-code", "package-channel"].forEach((id) => {
@@ -1066,7 +1067,7 @@
       el("generate-release-package-btn").addEventListener("click", async () => {
         try {
           const data = await generateReleasePackage();
-          setStatus(`Release package generated for ${data.manifest.project.code}.`);
+          setStatus(`Launch workflow generated for ${data.manifest.project.code}.`);
           setOutput(data);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
@@ -1086,20 +1087,6 @@
         });
       });
 
-      el("open-release-launch-btn").addEventListener("click", () => {
-        const target = currentReleaseTarget();
-        if (!target.productCode) {
-          setStatus("Enter a project code before opening Developer Launch Workflow.", true);
-          return;
-        }
-        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
-          productId: currentReleaseProductId(target.productCode),
-          productCode: target.productCode,
-          channel: target.channel,
-          autofocus: "package"
-        });
-      });
-
       el("open-release-integration-btn").addEventListener("click", () => {
         const target = currentReleaseTarget();
         if (!target.productCode) {
@@ -1113,6 +1100,20 @@
         });
       });
 
+      el("open-release-release-btn").addEventListener("click", () => {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          setStatus("Enter a project code before opening Developer Releases.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/releases", {
+          productId: currentReleaseProductId(target.productCode),
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "package"
+        });
+      });
+
       el("download-release-package-json-btn").addEventListener("click", async () => {
         try {
           if (!releasePackage) {
@@ -1121,10 +1122,10 @@
           const productCode = el("package-product-code").value.trim();
           const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "json" })}`,
-            releasePackage.fileName || "release-package.json"
+            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "json" })}`,
+            releasePackage.fileName || "launch-workflow.json"
           );
-          setStatus(`Release package JSON downloaded: ${result.fileName}`);
+          setStatus(`Launch workflow JSON downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1139,10 +1140,10 @@
           const productCode = el("package-product-code").value.trim();
           const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "summary" })}`,
-            releasePackage.summaryFileName || "release-package.txt"
+            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "summary" })}`,
+            releasePackage.summaryFileName || "launch-workflow.txt"
           );
-          setStatus(`Release package summary downloaded: ${result.fileName}`);
+          setStatus(`Launch workflow summary downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1157,10 +1158,10 @@
           const productCode = el("package-product-code").value.trim();
           const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "env" })}`,
-            releasePackage.snippets?.envFileName || "project.env"
+            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "checklist" })}`,
+            releasePackage.checklistFileName || "launch-workflow-checklist.txt"
           );
-          setStatus(`Release package env template downloaded: ${result.fileName}`);
+          setStatus(`Launch workflow checklist downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1175,10 +1176,10 @@
           const productCode = el("package-product-code").value.trim();
           const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "host-config" })}`,
-            releasePackage.snippets?.hostConfigFileName || "rocksolid_host_config.env"
+            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "checksums" })}`,
+            (releasePackage.fileName || "launch-workflow.json").replace(/\.json$/i, "-sha256.txt")
           );
-          setStatus(`Release package host config downloaded: ${result.fileName}`);
+          setStatus(`Launch workflow checksums downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1373,10 +1374,10 @@
           const productCode = el("package-product-code").value.trim();
           const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "zip" })}`,
-            (releasePackage.fileName || "release-package.json").replace(/\.json$/i, ".zip")
+            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "zip" })}`,
+            (releasePackage.fileName || "launch-workflow.json").replace(/\.json$/i, ".zip")
           );
-          setStatus(`Release package zip archive downloaded: ${result.fileName}`);
+          setStatus(`Launch workflow zip archive downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1452,7 +1453,7 @@
       clearWorkspace();
       syncReleasePackageHint();
       syncPermissions();
-      setStatus("Sign in to manage versions and notices.");
+        setStatus("Sign in to generate launch workflow packages.");
       setOutput("Waiting for actions...");
     </script>
   </body>

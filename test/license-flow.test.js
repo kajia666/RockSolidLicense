@@ -9054,8 +9054,47 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Rotate SDK Credentials/);
+    assert.match(html, /Developer Launch Workflow/);
+    assert.match(html, /\/developer\/launch-workflow/);
+    assert.match(html, /api\/developer\/launch-workflow/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch workflow page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/launch-workflow`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Launch Workflow/);
+    assert.match(html, /api\/developer\/launch-workflow/);
+    assert.match(html, /api\/developer\/launch-workflow\/download/);
+    assert.match(html, /Generate Launch Workflow/);
+    assert.match(html, /Download Launch JSON/);
+    assert.match(html, /Download Launch Summary/);
+    assert.match(html, /Download Launch Checklist/);
+    assert.match(html, /Download Launch Checksums/);
+    assert.match(html, /Download Launch Zip/);
+    assert.match(html, /Open Project Workspace/);
+    assert.match(html, /Open Integration Package/);
+    assert.match(html, /Open Release Check/);
+    assert.match(html, /Launch Workflow Summary/);
+    assert.match(html, /Linked Release Signals/);
+    assert.match(html, /Launch Workflow Checklist/);
+    assert.match(html, /Launch Summary/);
+    assert.match(html, /VS2022 Quickstart/);
+    assert.match(html, /VS2022 Filters/);
+    assert.match(html, /CMake Consumer/);
+    assert.match(html, /Hardening Guide/);
+    assert.match(html, /window\.location\.search/);
+    assert.match(html, /\/developer\/launch-workflow/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -9519,6 +9558,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Status Filter/);
     assert.match(html, /Apply Filter/);
     assert.match(html, /Open Integration Package/);
+    assert.match(html, /Open Launch Workflow/);
     assert.match(html, /Open Release Check/);
     assert.match(html, /Preview Release Readiness/);
     assert.match(html, /Clear Release Preview/);
@@ -9546,6 +9586,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Launch Summary/);
     assert.match(html, /Launch Checklist/);
     assert.match(html, /Launch Checksums/);
+    assert.match(html, /Open Launch Workspace/);
     assert.match(html, /Release Summary/);
     assert.match(html, /Integration Env/);
     assert.match(html, /Host Config/);
@@ -9688,6 +9729,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
     assert.match(html, /Open Project Workspace/);
+    assert.match(html, /Open Launch Workflow/);
     assert.match(html, /Open Release Check/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /Startup Bootstrap Preview/);
@@ -9853,6 +9895,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip Archive/);
     assert.match(html, /Open Project Workspace/);
+    assert.match(html, /Open Launch Workflow/);
     assert.match(html, /Open Integration Package/);
     assert.match(html, /release-route-hint/);
     assert.match(html, /applyRoutePrefill/);

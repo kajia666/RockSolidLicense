@@ -13,7 +13,7 @@
       <section class="hero">
         <h1>Developer Integration Center</h1>
         <p class="sub">Centralize project credentials, public token keys, startup bootstrap behavior, HTTP/TCP endpoint information, and ready-to-adapt request examples for software authors integrating the SDK.</p>
-        <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
+        <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/launch-workflow">Developer Launch Workflow</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/integration</code></div>
           <div class="pill">APIs: <code>/api/developer/integration</code>, <code>/api/developer/integration/package</code>, <code>/api/developer/integration/package/download</code></div>
@@ -38,8 +38,8 @@
           <label>Project Code<select id="project-select"></select></label>
           <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cmake-btn">Download CMake Template</button><button class="secondary" id="download-package-vs2022-guide-btn">Download VS2022 Quickstart</button><button class="secondary" id="download-package-vs2022-sln-btn">Download VS2022 Solution</button><button class="secondary" id="download-package-vs2022-btn">Download VS2022 Project</button><button class="secondary" id="download-package-vs2022-filters-btn">Download VS2022 Filters</button><button class="secondary" id="download-package-vs2022-props-btn">Download VS2022 Props</button><button class="secondary" id="download-package-vs2022-local-props-btn">Download VS2022 Local Props</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
-          <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
-          <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace or release handoff check with the same project prefilled.</div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-launch-workflow-btn">Open Launch Workflow</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
+          <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace, launch workflow handoff, or release handoff check with the same project prefilled.</div>
         </article>
 
         <article class="card">
@@ -629,10 +629,11 @@ ${JSON.stringify(request, null, 2)}`;
       function syncWorkspaceLinks(product = null) {
         const hasProduct = Boolean(product);
         el("open-project-workspace-btn").disabled = !hasProduct;
+        el("open-launch-workflow-btn").disabled = !hasProduct;
         el("open-release-check-btn").disabled = !hasProduct;
         el("workspace-link-hint").textContent = hasProduct
-          ? `Open ${product.code} in Developer Projects or Developer Releases with channel ${requestedChannel} already filled in.`
-          : "Select a project to jump into its settings workspace or release handoff check with the same project prefilled.";
+          ? `Open ${product.code} in Developer Projects, Developer Launch Workflow, or Developer Releases with channel ${requestedChannel} already filled in.`
+          : "Select a project to jump into its settings workspace, launch workflow handoff, or release handoff check with the same project prefilled.";
       }
 
       function renderSelected() {
@@ -939,6 +940,19 @@ ${JSON.stringify(request, null, 2)}`;
         window.location.href = buildWorkspaceUrl("/developer/projects", {
           productId: selectedProduct.id,
           productCode: selectedProduct.code
+        });
+      });
+
+      el("open-launch-workflow-btn").addEventListener("click", () => {
+        if (!selectedProduct) {
+          setStatus("Select a project before opening Developer Launch Workflow.", true);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          productId: selectedProduct.id,
+          productCode: selectedProduct.code,
+          channel: requestedChannel,
+          autofocus: "package"
         });
       });
 

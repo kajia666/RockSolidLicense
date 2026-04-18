@@ -9082,6 +9082,14 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Download Launch Checklist/);
     assert.match(html, /Download Launch Checksums/);
     assert.match(html, /Download Launch Zip/);
+    assert.match(html, /Recommended Handoff/);
+    assert.match(html, /Download Release Summary/);
+    assert.match(html, /Download Integration Env/);
+    assert.match(html, /Download Host Config/);
+    assert.match(html, /Download CMake Template/);
+    assert.match(html, /Download VS2022 Quickstart/);
+    assert.match(html, /Download C\+\+ Quickstart/);
+    assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Integration Package/);
     assert.match(html, /Open Release Check/);

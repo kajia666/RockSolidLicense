@@ -60,6 +60,16 @@ That makes it easier for software authors to move between:
 
 without losing `productCode` or `channel`.
 
+The same page now also keeps the most common lane-specific handoff files one click away, including:
+
+- linked release summary
+- linked integration `.env`
+- linked `rocksolid_host_config.env`
+- linked `CMakeLists.txt`
+- linked VS2022 quickstart
+- linked C++ quickstart
+- linked host skeleton
+
 ## Typical use
 
 Use `/developer/launch-workflow` when a software author wants one quick answer to:

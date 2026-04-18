@@ -348,6 +348,22 @@
       </section>
 
       <section class="card">
+        <h2>Recommended Handoff</h2>
+        <div id="recommended-download-box" class="hint">Generate a launch workflow package to see the recommended downloads and lane-specific handoff guidance.</div>
+        <div class="actions" style="margin-top:12px;">
+          <button class="secondary" id="download-linked-release-summary-btn">Download Release Summary</button>
+          <button class="secondary" id="download-linked-integration-env-btn">Download Integration Env</button>
+          <button class="secondary" id="download-linked-host-config-btn">Download Host Config</button>
+          <button class="secondary" id="download-linked-cmake-btn">Download CMake Template</button>
+        </div>
+        <div class="actions" style="margin-top:12px;">
+          <button class="secondary" id="download-linked-vs2022-guide-btn">Download VS2022 Quickstart</button>
+          <button class="secondary" id="download-linked-cpp-btn">Download C++ Quickstart</button>
+          <button class="secondary" id="download-linked-host-skeleton-btn">Download Host Skeleton</button>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Launch Summary</h2>
         <pre id="release-summary">Generate a launch workflow package to preview its summary text here.</pre>
       </section>
@@ -544,6 +560,14 @@
         };
       }
 
+      function currentLaunchDownloadTarget() {
+        const target = currentReleaseTarget();
+        return {
+          productCode: target.productCode,
+          channel: target.channel || "stable"
+        };
+      }
+
       function currentReleaseProductId(productCode) {
         const normalized = String(productCode || "").trim().toUpperCase();
         if (!normalized) {
@@ -635,7 +659,7 @@
           }
         });
         const hasPackage = Boolean(releasePackage);
-        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-host-config-btn", "download-release-package-cmake-btn", "download-release-package-vs2022-guide-btn", "download-release-package-vs2022-sln-btn", "download-release-package-vs2022-btn", "download-release-package-vs2022-filters-btn", "download-release-package-vs2022-props-btn", "download-release-package-vs2022-local-props-btn", "download-release-package-cpp-btn", "download-release-package-host-skeleton-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
+        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-host-config-btn", "download-release-package-cmake-btn", "download-release-package-vs2022-guide-btn", "download-release-package-vs2022-sln-btn", "download-release-package-vs2022-btn", "download-release-package-vs2022-filters-btn", "download-release-package-vs2022-props-btn", "download-release-package-vs2022-local-props-btn", "download-release-package-cpp-btn", "download-release-package-host-skeleton-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn", "download-linked-release-summary-btn", "download-linked-integration-env-btn", "download-linked-host-config-btn", "download-linked-cmake-btn", "download-linked-vs2022-guide-btn", "download-linked-cpp-btn", "download-linked-host-skeleton-btn"].forEach((id) => {
           const node = el(id);
           if (node) {
             node.disabled = readDisabled || !hasPackage;
@@ -679,6 +703,7 @@
           el("release-readiness").textContent = "Generate a launch workflow package to evaluate whether the selected lane looks ready for rollout.";
           el("delivery-summary").textContent = "Generate a launch workflow package to inspect the linked release and integration signals in one place.";
           el("delivery-checklist").textContent = "Generate a launch workflow package to see the combined workflow checklist.";
+          el("recommended-download-box").textContent = "Generate a launch workflow package to see the recommended downloads and lane-specific handoff guidance.";
           el("release-summary").textContent = "Generate a launch workflow package to preview its summary text here.";
           el("release-host-skeleton").textContent = "Generate a launch workflow package to preview the linked C++ host skeleton here.";
           el("release-host-config").textContent = "Generate a launch workflow package to preview the linked host config here.";
@@ -705,6 +730,7 @@
         const nextActions = Array.isArray(workflowSummary.nextActions) ? workflowSummary.nextActions : [];
         const blockers = Array.isArray(workflowSummary.blockers) ? workflowSummary.blockers : [];
         const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
+        const linkedIntegrationSnippets = linkedIntegrationPackage.snippets || {};
 
         el("release-readiness").innerHTML = `
           <div style="margin-bottom:10px;">
@@ -749,17 +775,31 @@
             <div class="hint">${workflowItems.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "unknown").toUpperCase())}] ${escapeHtml(item.label || item.key || "item")} | ${escapeHtml(item.summary || "-")}${item.artifact ? ` | artifact=${escapeHtml(item.artifact)}` : ""}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}`).join("<br>")}</div>
           `
           : "No launch workflow checklist is available yet.";
+        el("recommended-download-box").innerHTML = `
+          <div style="margin-bottom:10px;">
+            ${renderTag(String(workflowSummary.status || "unknown").toUpperCase(), workflowSummary.status === "ready")}
+            ${renderTag(`release:${workflowSummary.releaseStatus || "unknown"}`, workflowSummary.releaseStatus === "ready")}
+            ${renderTag(`startup:${workflowSummary.startupStatus || "unknown"}`, workflowSummary.startupReady !== false)}
+          </div>
+          <div class="split-line"><span>Recommended Handoff Zip</span><span>${escapeHtml(recommendedDownloads.find((item) => item.key === "launch_handoff_zip")?.fileName || releasePackage.zipFileName || "-")}</span></div>
+          <div class="split-line"><span>Linked Release Summary</span><span>${escapeHtml(linkedReleasePackage.summaryFileName || "-")}</span></div>
+          <div class="split-line"><span>Integration Env</span><span>${escapeHtml(linkedIntegrationSnippets.envFileName || "-")}</span></div>
+          <div class="split-line"><span>Host Config</span><span>${escapeHtml(linkedIntegrationSnippets.hostConfigFileName || "-")}</span></div>
+          <div class="split-line"><span>Host Skeleton</span><span>${escapeHtml(linkedIntegrationSnippets.hostSkeletonFileName || "-")}</span></div>
+          <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "Review the current lane before handing it to integration or release teammates.")}</div>
+          ${recommendedDownloads.length ? `<div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>` : ""}
+        `;
         el("release-summary").textContent = releasePackage.summaryText || "";
-        el("release-host-skeleton").textContent = linkedIntegrationPackage.snippets?.hostSkeletonCpp || "";
-        el("release-host-config").textContent = linkedIntegrationPackage.snippets?.hostConfigEnv || "";
-        el("release-vs2022-sln").textContent = linkedIntegrationPackage.snippets?.vs2022SolutionTemplate || "";
-        el("release-vs2022-project").textContent = linkedIntegrationPackage.snippets?.vs2022ProjectTemplate || "";
-        el("release-vs2022-props").textContent = linkedIntegrationPackage.snippets?.vs2022PropsTemplate || "";
-        el("release-vs2022-local-props").textContent = linkedIntegrationPackage.snippets?.vs2022LocalPropsTemplate || "";
-        el("release-vs2022-guide").textContent = linkedIntegrationPackage.snippets?.vs2022GuideText || "";
-        el("release-vs2022-filters").textContent = linkedIntegrationPackage.snippets?.vs2022FiltersTemplate || "";
-        el("release-cmake-template").textContent = linkedIntegrationPackage.snippets?.cmakeConsumerTemplate || "";
-        el("release-hardening-guide").textContent = linkedIntegrationPackage.snippets?.hardeningGuide || "";
+        el("release-host-skeleton").textContent = linkedIntegrationSnippets.hostSkeletonCpp || "";
+        el("release-host-config").textContent = linkedIntegrationSnippets.hostConfigEnv || "";
+        el("release-vs2022-sln").textContent = linkedIntegrationSnippets.vs2022SolutionTemplate || "";
+        el("release-vs2022-project").textContent = linkedIntegrationSnippets.vs2022ProjectTemplate || "";
+        el("release-vs2022-props").textContent = linkedIntegrationSnippets.vs2022PropsTemplate || "";
+        el("release-vs2022-local-props").textContent = linkedIntegrationSnippets.vs2022LocalPropsTemplate || "";
+        el("release-vs2022-guide").textContent = linkedIntegrationSnippets.vs2022GuideText || "";
+        el("release-vs2022-filters").textContent = linkedIntegrationSnippets.vs2022FiltersTemplate || "";
+        el("release-cmake-template").textContent = linkedIntegrationSnippets.cmakeConsumerTemplate || "";
+        el("release-hardening-guide").textContent = linkedIntegrationSnippets.hardeningGuide || "";
       }
 
       async function api(path, options = {}) {
@@ -806,6 +846,40 @@
         );
         downloadBlob(fileName, blob);
         return { fileName };
+      }
+
+      function linkedReleasePackageData() {
+        return releasePackage?.releasePackage || null;
+      }
+
+      function linkedIntegrationPackageData() {
+        return releasePackage?.integrationPackage || null;
+      }
+
+      async function downloadLinkedReleaseAsset(format, fallbackFileName, label) {
+        if (!releasePackage) {
+          throw new Error("Generate a launch workflow package before downloading linked release assets.");
+        }
+        const target = currentLaunchDownloadTarget();
+        const result = await downloadApiFile(
+          `/api/developer/release-package/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
+      }
+
+      async function downloadLinkedIntegrationAsset(format, fallbackFileName, label) {
+        if (!releasePackage) {
+          throw new Error("Generate a launch workflow package before downloading linked integration assets.");
+        }
+        const target = currentLaunchDownloadTarget();
+        const result = await downloadApiFile(
+          `/api/developer/integration/package/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
       }
 
       function renderProjects() {
@@ -1188,16 +1262,12 @@
 
       el("download-release-package-cmake-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "cmake" })}`,
-            releasePackage.snippets?.cmakeFileName || "CMakeLists.txt"
+          const result = await downloadLinkedIntegrationAsset(
+            "cmake",
+            linkedIntegrationPackageData()?.snippets?.cmakeFileName || "CMakeLists.txt",
+            "Linked CMake template"
           );
-          setStatus(`Release package CMake template downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "cmake", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1206,16 +1276,12 @@
 
       el("download-release-package-vs2022-guide-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-guide" })}`,
-            releasePackage.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md"
+          const result = await downloadLinkedIntegrationAsset(
+            "vs2022-guide",
+            linkedIntegrationPackageData()?.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md",
+            "Linked VS2022 quickstart"
           );
-          setStatus(`Release package VS2022 quickstart downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "vs2022-guide", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1224,16 +1290,12 @@
 
       el("download-release-package-vs2022-sln-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-sln" })}`,
-            releasePackage.snippets?.vs2022SolutionFileName || "rocksolid_host_consumer.sln"
+          const result = await downloadLinkedIntegrationAsset(
+            "vs2022-sln",
+            linkedIntegrationPackageData()?.snippets?.vs2022SolutionFileName || "rocksolid_host_consumer.sln",
+            "Linked VS2022 solution"
           );
-          setStatus(`Release package VS2022 solution downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "vs2022-sln", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1242,16 +1304,12 @@
 
       el("download-release-package-vs2022-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022" })}`,
-            releasePackage.snippets?.vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj"
+          const result = await downloadLinkedIntegrationAsset(
+            "vs2022",
+            linkedIntegrationPackageData()?.snippets?.vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj",
+            "Linked VS2022 project"
           );
-          setStatus(`Release package VS2022 project downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "vs2022", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1260,16 +1318,12 @@
 
       el("download-release-package-vs2022-filters-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-filters" })}`,
-            releasePackage.snippets?.vs2022FiltersFileName || "rocksolid_host_consumer.vcxproj.filters"
+          const result = await downloadLinkedIntegrationAsset(
+            "vs2022-filters",
+            linkedIntegrationPackageData()?.snippets?.vs2022FiltersFileName || "rocksolid_host_consumer.vcxproj.filters",
+            "Linked VS2022 filters"
           );
-          setStatus(`Release package VS2022 filters downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "vs2022-filters", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1278,16 +1332,12 @@
 
       el("download-release-package-cpp-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "cpp" })}`,
-            releasePackage.snippets?.cppFileName || "project.cpp"
+          const result = await downloadLinkedIntegrationAsset(
+            "cpp",
+            linkedIntegrationPackageData()?.snippets?.cppFileName || "project.cpp",
+            "Linked C++ quickstart"
           );
-          setStatus(`Release package C++ quickstart downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "cpp", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1296,16 +1346,12 @@
 
       el("download-release-package-vs2022-props-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-props" })}`,
-            releasePackage.snippets?.vs2022PropsFileName || "RockSolidSDK.props"
+          const result = await downloadLinkedIntegrationAsset(
+            "vs2022-props",
+            linkedIntegrationPackageData()?.snippets?.vs2022PropsFileName || "RockSolidSDK.props",
+            "Linked VS2022 props"
           );
-          setStatus(`Release package VS2022 props downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "vs2022-props", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1314,16 +1360,12 @@
 
       el("download-release-package-vs2022-local-props-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-local-props" })}`,
-            releasePackage.snippets?.vs2022LocalPropsFileName || "RockSolidSDK.local.props"
+          const result = await downloadLinkedIntegrationAsset(
+            "vs2022-local-props",
+            linkedIntegrationPackageData()?.snippets?.vs2022LocalPropsFileName || "RockSolidSDK.local.props",
+            "Linked VS2022 local props"
           );
-          setStatus(`Release package VS2022 local props downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "vs2022-local-props", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1332,16 +1374,12 @@
 
       el("download-release-package-host-skeleton-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "host-skeleton" })}`,
-            releasePackage.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"
+          const result = await downloadLinkedIntegrationAsset(
+            "host-skeleton",
+            linkedIntegrationPackageData()?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp",
+            "Linked host skeleton"
           );
-          setStatus(`Release package host skeleton downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "host-skeleton", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1350,16 +1388,110 @@
 
       el("download-release-package-checksums-btn").addEventListener("click", async () => {
         try {
-          if (!releasePackage) {
-            return;
-          }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
-          const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "checksums" })}`,
-            (releasePackage.fileName || "release-package.json").replace(/\.json$/i, "-sha256.txt")
+          const result = await downloadLinkedReleaseAsset(
+            "checksums",
+            (linkedReleasePackageData()?.fileName || "release-package.json").replace(/\.json$/i, "-sha256.txt"),
+            "Linked release checksums"
           );
-          setStatus(`Release package checksums downloaded: ${result.fileName}`);
+          setOutput({ linkedDownload: { format: "release-checksums", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-release-summary-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLinkedReleaseAsset(
+            "summary",
+            linkedReleasePackageData()?.summaryFileName || "release-summary.txt",
+            "Linked release summary"
+          );
+          setOutput({ linkedDownload: { format: "release-summary", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-integration-env-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLinkedIntegrationAsset(
+            "env",
+            linkedIntegrationPackageData()?.snippets?.envFileName || "rocksolid.env",
+            "Linked integration env"
+          );
+          setOutput({ linkedDownload: { format: "integration-env", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-host-config-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLinkedIntegrationAsset(
+            "host-config",
+            linkedIntegrationPackageData()?.snippets?.hostConfigFileName || "rocksolid_host_config.env",
+            "Linked host config"
+          );
+          setOutput({ linkedDownload: { format: "host-config", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-cmake-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLinkedIntegrationAsset(
+            "cmake",
+            linkedIntegrationPackageData()?.snippets?.cmakeFileName || "CMakeLists.txt",
+            "Linked CMake template"
+          );
+          setOutput({ linkedDownload: { format: "cmake", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-vs2022-guide-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLinkedIntegrationAsset(
+            "vs2022-guide",
+            linkedIntegrationPackageData()?.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md",
+            "Linked VS2022 quickstart"
+          );
+          setOutput({ linkedDownload: { format: "vs2022-guide", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-cpp-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLinkedIntegrationAsset(
+            "cpp",
+            linkedIntegrationPackageData()?.snippets?.cppFileName || "project.cpp",
+            "Linked C++ quickstart"
+          );
+          setOutput({ linkedDownload: { format: "cpp", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-host-skeleton-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLinkedIntegrationAsset(
+            "host-skeleton",
+            linkedIntegrationPackageData()?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp",
+            "Linked host skeleton"
+          );
+          setOutput({ linkedDownload: { format: "host-skeleton", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

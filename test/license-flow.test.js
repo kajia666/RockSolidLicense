@@ -5491,6 +5491,80 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseZipText, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(releaseZipText, /SHA256SUMS\.txt/);
 
+    const launchWorkflow = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=RELPKG_ALPHA&channel=stable",
+      viewerSession.token
+    );
+    assert.match(launchWorkflow.fileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-/);
+    assert.match(launchWorkflow.summaryFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt$/);
+    assert.match(launchWorkflow.checklistFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt$/);
+    assert.equal(launchWorkflow.workflowSummary.status, "hold");
+    assert.equal(launchWorkflow.workflowSummary.releaseStatus, "hold");
+    assert.equal(launchWorkflow.workflowSummary.startupStatus, "force_update_required");
+    assert.equal(launchWorkflow.workflowSummary.clientHardeningProfile, "balanced");
+    assert.ok(Array.isArray(launchWorkflow.workflowSummary.recommendedDownloads));
+    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_zip"));
+    assert.equal(launchWorkflow.workflowChecklist.status, "hold");
+    assert.ok(launchWorkflow.workflowChecklist.blockItems >= 1);
+    assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "launch_handoff_package"));
+    assert.equal(launchWorkflow.releasePackage.manifest.project.code, "RELPKG_ALPHA");
+    assert.equal(launchWorkflow.integrationPackage.manifest.project.code, "RELPKG_ALPHA");
+    assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
+    assert.match(launchWorkflow.summaryText, /Workflow Status: HOLD/);
+    assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
+    assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
+    assert.match(launchWorkflow.checklistText, /RockSolid Launch Workflow Checklist/);
+    assert.match(launchWorkflow.checklistText, /\[BLOCK\] Startup bootstrap decision/);
+
+    const launchSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=summary",
+      viewerSession.token
+    );
+    assert.match(launchSummaryDownload.contentType || "", /^text\/plain/);
+    assert.match(launchSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt"/);
+    assert.match(launchSummaryDownload.body, /Workflow Status: HOLD/);
+    assert.match(launchSummaryDownload.body, /Combined launch workflow zip/);
+
+    const launchChecklistDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=checklist",
+      viewerSession.token
+    );
+    assert.match(launchChecklistDownload.contentType || "", /^text\/plain/);
+    assert.match(launchChecklistDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt"/);
+    assert.match(launchChecklistDownload.body, /RockSolid Launch Workflow Checklist/);
+    assert.match(launchChecklistDownload.body, /\[BLOCK\] Startup bootstrap decision/);
+
+    const launchChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=checksums",
+      viewerSession.token
+    );
+    assert.match(launchChecksumsDownload.contentType || "", /^text\/plain/);
+    assert.match(launchChecksumsDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-sha256\.txt"/);
+    assert.match(launchChecksumsDownload.body, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.json/);
+    assert.match(launchChecksumsDownload.body, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+    assert.match(launchChecksumsDownload.body, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
+
+    const launchZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=zip",
+      viewerSession.token
+    );
+    assert.match(launchZipDownload.contentType || "", /^application\/zip/);
+    assert.match(launchZipDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.zip"/);
+    assert.equal(launchZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const launchZipText = launchZipDownload.body.toString("latin1");
+    assert.match(launchZipText, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.json/);
+    assert.match(launchZipText, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt/);
+    assert.match(launchZipText, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+    assert.match(launchZipText, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
+    assert.match(launchZipText, /integration\/host-config\/rocksolid_host_config\.env/);
+    assert.match(launchZipText, /integration\/host-skeleton\/RELPKG_ALPHA-host-skeleton\.cpp/);
+    assert.match(launchZipText, /SHA256SUMS\.txt/);
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/release-package?productCode=RELPKG_BETA&channel=stable",
@@ -5501,6 +5575,7 @@ test("developer release package export bundles integration, versions, and notice
 
     const viewerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=120", viewerSession.token);
     assert.ok(viewerAuditLogs.items.some((entry) => entry.event_type === "product.release-package.export"));
+    assert.ok(viewerAuditLogs.items.some((entry) => entry.event_type === "product.launch-workflow.export"));
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -9468,6 +9543,9 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Integration Zip/);
     assert.match(html, /Download Recommended Handoff/);
+    assert.match(html, /Launch Summary/);
+    assert.match(html, /Launch Checklist/);
+    assert.match(html, /Launch Checksums/);
     assert.match(html, /Release Summary/);
     assert.match(html, /Integration Env/);
     assert.match(html, /Host Config/);
@@ -9483,9 +9561,12 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /renderIntegrationPreview/);
     assert.match(html, /renderLaunchWorkflow/);
     assert.match(html, /api\/developer\/release-package\/download/);
+    assert.match(html, /api\/developer\/launch-workflow/);
+    assert.match(html, /api\/developer\/launch-workflow\/download/);
     assert.match(html, /api\/developer\/integration\/package/);
     assert.match(html, /api\/developer\/integration\/package\/download/);
     assert.match(html, /downloadInlineReleaseAsset/);
+    assert.match(html, /downloadLaunchWorkflowAsset/);
     assert.match(html, /downloadInlineIntegrationAsset/);
     assert.match(html, /downloadUrlFile/);
     assert.match(html, /buildDeliveryQuickSignals/);

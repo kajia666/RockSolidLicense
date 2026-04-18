@@ -37,21 +37,28 @@ The project detail card now also supports an inline integration snapshot preview
 - host skeleton snippet
 - integration `zip`
 
-To reduce repeated clicks, the same detail card now also exposes a `Preview Launch Workflow` action. It loads the current channel for both release readiness and integration snapshot together, then renders one combined summary with:
+To reduce repeated clicks, the same detail card now also exposes a `Preview Launch Workflow` action. It now loads a dedicated launch-workflow package for the current project/channel, keeps the inline release and integration previews in sync, and renders one combined summary with:
 
 - overall lane status
 - candidate version
 - release checklist counts
 - startup bootstrap decision
 - hardening profile
+- workflow blockers
 - recommended next steps and download hints
 
 The launch workflow block now also includes direct quick actions so software authors can immediately:
 
-- download the recommended handoff set
+- download the combined recommended handoff zip
+- download launch summary / checklist / checksums
 - download release summary only
 - download integration env / host config / host skeleton
 - jump straight into the integration or release workspace with the same project and channel
+
+The same combined package is also available over:
+
+- `GET /api/developer/launch-workflow`
+- `GET /api/developer/launch-workflow/download`
 
 ## Scoped APIs
 

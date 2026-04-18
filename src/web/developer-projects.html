@@ -182,6 +182,11 @@
           <div id="detail-launch-workflow" class="hint" style="margin-top:12px;">Preview the same channel for both release readiness and integration snapshot to see one combined launch workflow summary.</div>
           <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="launch-download-handoff-btn">Download Recommended Handoff</button>
+            <button class="secondary" id="launch-download-workflow-summary-btn">Launch Summary</button>
+            <button class="secondary" id="launch-download-workflow-checklist-btn">Launch Checklist</button>
+            <button class="secondary" id="launch-download-workflow-checksums-btn">Launch Checksums</button>
+          </div>
+          <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="launch-download-release-summary-btn">Release Summary</button>
             <button class="secondary" id="launch-download-integration-env-btn">Integration Env</button>
             <button class="secondary" id="launch-download-host-config-btn">Host Config</button>
@@ -217,6 +222,7 @@
       let batchProductIds = new Set();
       let releasePreview = null;
       let integrationPreview = null;
+      let launchWorkflowPreview = null;
 
       function el(id) {
         return document.getElementById(id);
@@ -793,6 +799,38 @@
         }
 
         const channel = currentReleaseChannel();
+        if (launchWorkflowPreview && launchWorkflowPreview.productCode === product.code && launchWorkflowPreview.channel === channel) {
+          const payload = launchWorkflowPreview.payload || {};
+          const workflowSummary = payload.workflowSummary || {};
+          const workflowChecklist = payload.workflowChecklist || {};
+          const checklistItems = Array.isArray(workflowChecklist.items) ? workflowChecklist.items.slice(0, 4) : [];
+          const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 5) : [];
+          const checklistCounts = workflowSummary.checklistCounts || {};
+          const tags = [
+            tag(workflowSummary.title || "Launch workflow", workflowSummary.status === "ready" ? "ok" : workflowSummary.status === "hold" ? "danger" : ""),
+            tag(`channel:${workflowSummary.channel || channel}`, ""),
+            tag(`release:${workflowSummary.releaseStatus || "unknown"}`, workflowSummary.releaseStatus === "ready" ? "ok" : workflowSummary.releaseStatus === "hold" ? "danger" : ""),
+            tag(`startup:${workflowSummary.startupStatus || "unknown"}`, workflowSummary.startupReady === false ? "danger" : "ok"),
+            tag(`hardening:${workflowSummary.clientHardeningProfile || "-"}`, workflowSummary.clientHardeningProfile === "strict" ? "ok" : ""),
+            tag(`block:${checklistCounts.block ?? workflowChecklist.blockItems ?? 0}`, (checklistCounts.block ?? workflowChecklist.blockItems ?? 0) > 0 ? "danger" : "ok")
+          ];
+          const blockers = Array.isArray(workflowSummary.blockers) ? workflowSummary.blockers.slice(0, 3) : [];
+          const nextActions = Array.isArray(workflowSummary.nextActions) ? workflowSummary.nextActions.slice(0, 4) : [];
+
+          box.innerHTML = `
+            <div>${tags.join("")}</div>
+            <div class="hint" style="margin-top:10px;">${esc(workflowSummary.message || "No launch workflow summary available.")}</div>
+            <div class="split-line" style="margin-top:12px;"><span>Candidate</span><span>${esc(workflowSummary.candidateVersion || "-")}</span></div>
+            <div class="split-line"><span>Launch Package</span><span>${esc(payload.summaryFileName || "-")} | ${esc(payload.checklistFileName || "-")}</span></div>
+            <div class="split-line"><span>Workflow Checklist</span><span>${esc(String(workflowChecklist.status || "unknown").toUpperCase())} | pass ${esc(workflowChecklist.passItems ?? 0)} | review ${esc(workflowChecklist.reviewItems ?? 0)} | block ${esc(workflowChecklist.blockItems ?? 0)}</span></div>
+            <div class="split-line"><span>Recommended Downloads</span><span>${esc(workflowSummary.downloadSummary || recommendedDownloads.map((item) => item.label).join(" + ") || "-")}</span></div>
+            ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
+            ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
+            ${checklistItems.length ? `<div class="hint" style="margin-top:12px;">Top workflow checks:<br>${checklistItems.map((item, index) => `${index + 1}. [${esc(String(item.status || "unknown").toUpperCase())}] ${esc(item.label || item.key || "item")} | ${esc(item.summary || "-")}`).join("<br>")}</div>` : ""}
+          `;
+          return;
+        }
+
         const hasRelease = releasePreview && releasePreview.productCode === product.code && releasePreview.channel === channel;
         const hasIntegration = integrationPreview && integrationPreview.productCode === product.code && integrationPreview.channel === channel;
         if (!hasRelease || !hasIntegration) {
@@ -903,6 +941,9 @@
         el("preview-integration-package-btn").disabled = !hasProduct;
         el("clear-integration-preview-btn").disabled = !hasProduct && !integrationPreview;
         el("launch-download-handoff-btn").disabled = !hasProduct;
+        el("launch-download-workflow-summary-btn").disabled = !hasProduct;
+        el("launch-download-workflow-checklist-btn").disabled = !hasProduct;
+        el("launch-download-workflow-checksums-btn").disabled = !hasProduct;
         el("launch-download-release-summary-btn").disabled = !hasProduct;
         el("launch-download-integration-env-btn").disabled = !hasProduct;
         el("launch-download-host-config-btn").disabled = !hasProduct;
@@ -1430,6 +1471,7 @@
           const channel = currentReleaseChannel();
           const payload = await api(`/api/developer/release-package${buildRouteQuery({ productCode, channel })}`);
           releasePreview = { productCode, channel, payload };
+          launchWorkflowPreview = null;
           const product = findVisibleProductById(productId);
           renderReleasePreview(product);
           renderLaunchWorkflow(product);
@@ -1450,19 +1492,17 @@
             throw new Error("Select a project before previewing the launch workflow.");
           }
           const channel = currentReleaseChannel();
-          const [releasePayload, integrationPayload] = await Promise.all([
-            api(`/api/developer/release-package${buildRouteQuery({ productCode, channel })}`),
-            api(`/api/developer/integration/package${buildRouteQuery({ productCode, channel })}`)
-          ]);
-          releasePreview = { productCode, channel, payload: releasePayload };
-          integrationPreview = { productCode, channel, payload: integrationPayload };
+          const payload = await api(`/api/developer/launch-workflow${buildRouteQuery({ productCode, channel })}`);
+          launchWorkflowPreview = { productCode, channel, payload };
+          releasePreview = payload.releasePackage ? { productCode, channel, payload: payload.releasePackage } : null;
+          integrationPreview = payload.integrationPackage ? { productCode, channel, payload: payload.integrationPackage } : null;
           const product = findVisibleProductById(productId);
           renderReleasePreview(product);
           renderIntegrationPreview(product);
           renderLaunchWorkflow(product);
           syncWorkspaceLinks(product);
-          setStatus(`Loaded ${productCode} launch workflow for channel ${channel}.`);
-          setOutput({ launchWorkflow: { releasePreview: releasePayload, integrationPreview: integrationPayload } });
+          setStatus(`Loaded ${productCode} launch workflow package for channel ${channel}.`);
+          setOutput({ launchWorkflow: payload });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1479,6 +1519,7 @@
           const channel = currentReleaseChannel();
           const payload = await api(`/api/developer/integration/package${buildRouteQuery({ productCode, channel })}`);
           integrationPreview = { productCode, channel, payload };
+          launchWorkflowPreview = null;
           const product = findVisibleProductById(productId);
           renderIntegrationPreview(product);
           renderLaunchWorkflow(product);
@@ -1499,6 +1540,21 @@
         const channel = currentReleaseChannel();
         const result = await downloadUrlFile(
           "/api/developer/release-package/download",
+          { productCode, channel, format },
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
+      }
+
+      async function downloadLaunchWorkflowAsset(format, fallbackFileName, label) {
+        const productCode = el("edit-product-code").value.trim();
+        if (!productCode) {
+          throw new Error("Select a project before downloading a launch workflow asset.");
+        }
+        const channel = currentReleaseChannel();
+        const result = await downloadUrlFile(
+          "/api/developer/launch-workflow/download",
           { productCode, channel, format },
           fallbackFileName
         );
@@ -1550,6 +1606,7 @@
 
       el("clear-release-preview-btn").addEventListener("click", () => {
         releasePreview = null;
+        launchWorkflowPreview = null;
         const product = findVisibleProductById(el("edit-product-id").value.trim());
         renderReleasePreview(product);
         renderLaunchWorkflow(product);
@@ -1559,6 +1616,7 @@
 
       el("clear-integration-preview-btn").addEventListener("click", () => {
         integrationPreview = null;
+        launchWorkflowPreview = null;
         const product = findVisibleProductById(el("edit-product-id").value.trim());
         renderIntegrationPreview(product);
         renderLaunchWorkflow(product);
@@ -1729,13 +1787,38 @@
 
       el("launch-download-handoff-btn").addEventListener("click", async () => {
         try {
-          const downloaded = [];
-          downloaded.push((await downloadInlineReleaseAsset("summary", "release-summary.txt", "Launch workflow release summary")).fileName);
-          downloaded.push((await downloadInlineIntegrationAsset("env", "integration.env", "Launch workflow integration env")).fileName);
-          downloaded.push((await downloadInlineIntegrationAsset("host-config", "rocksolid_host_config.env", "Launch workflow host config")).fileName);
-          downloaded.push((await downloadInlineIntegrationAsset("host-skeleton", "project-host-skeleton.cpp", "Launch workflow host skeleton")).fileName);
-          setStatus(`Launch workflow handoff downloaded: ${downloaded.join(", ")}`);
-          setOutput({ launchWorkflowDownloads: downloaded });
+          const result = await downloadLaunchWorkflowAsset("zip", "launch-workflow.zip", "Launch workflow handoff");
+          setOutput({ launchWorkflowDownload: { format: "zip", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-workflow-summary-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLaunchWorkflowAsset("summary", "launch-workflow.txt", "Launch workflow summary");
+          setOutput({ launchWorkflowDownload: { format: "summary", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-workflow-checklist-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLaunchWorkflowAsset("checklist", "launch-workflow-checklist.txt", "Launch workflow checklist");
+          setOutput({ launchWorkflowDownload: { format: "checklist", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-workflow-checksums-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLaunchWorkflowAsset("checksums", "launch-workflow-sha256.txt", "Launch workflow checksums");
+          setOutput({ launchWorkflowDownload: { format: "checksums", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

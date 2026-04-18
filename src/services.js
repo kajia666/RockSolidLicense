@@ -2624,6 +2624,451 @@ function buildReleasePackagePayload({
   };
 }
 
+function normalizeLaunchWorkflowChecklistStatus(status = "unknown") {
+  const normalized = String(status || "unknown").trim().toLowerCase() || "unknown";
+  if (normalized === "ready" || normalized === "pass") {
+    return "pass";
+  }
+  if (normalized === "hold" || normalized === "block" || normalized === "blocking") {
+    return "block";
+  }
+  return "review";
+}
+
+function buildLaunchWorkflowChecklistPayload({
+  releasePackage,
+  integrationPackage,
+  summaryFileName = "launch-workflow.txt",
+  checklistFileName = "launch-workflow-checklist.txt",
+  zipFileName = "launch-workflow.zip"
+}) {
+  const readiness = releasePackage?.manifest?.release?.readiness || {};
+  const deliverySummary = releasePackage?.deliverySummary || {};
+  const deliveryChecklist = releasePackage?.deliveryChecklist || {};
+  const startupPreview = integrationPackage?.manifest?.startupPreview || releasePackage?.manifest?.release?.startupPreview || {};
+  const startupDecision = startupPreview.decision || {};
+  const tokenKeySummary = startupPreview.tokenKeySummary || {};
+  const clientHardening = startupPreview.clientHardening || integrationPackage?.manifest?.clientHardening || {};
+  const tokenKeyTotal = tokenKeySummary.totalKeys ?? integrationPackage?.manifest?.tokenKeys?.length ?? 0;
+  const items = [
+    {
+      key: "release_readiness",
+      label: "Release readiness",
+      status: normalizeLaunchWorkflowChecklistStatus(readiness.status || "unknown"),
+      summary: readiness.message || deliverySummary.summary || "Review the release lane before rollout.",
+      artifact: releasePackage?.summaryFileName || "release-package.txt",
+      nextAction: Array.isArray(readiness.nextActions) && readiness.nextActions[0]
+        ? readiness.nextActions[0]
+        : "Regenerate the release package after fixing blocking or review items."
+    },
+    {
+      key: "release_delivery_checklist",
+      label: "Release delivery checklist",
+      status: normalizeLaunchWorkflowChecklistStatus(deliveryChecklist.status || "unknown"),
+      summary: `pass ${deliveryChecklist.passItems ?? 0} | review ${deliveryChecklist.reviewItems ?? 0} | block ${deliveryChecklist.blockItems ?? 0}`,
+      artifact: `${summaryFileName} | ${checklistFileName}`,
+      nextAction: deliveryChecklist.blockItems > 0
+        ? "Resolve block items from the release delivery checklist before shipping."
+        : deliveryChecklist.reviewItems > 0
+          ? "Review the remaining checklist items before handing the lane to release operations."
+          : "The release delivery checklist looks aligned for this lane."
+    },
+    {
+      key: "startup_bootstrap",
+      label: "Startup bootstrap decision",
+      status: startupDecision.ready === false ? "block" : startupDecision.status === "ready" ? "pass" : "review",
+      summary: startupDecision.message || `Startup decision is ${startupDecision.status || "unknown"}.`,
+      artifact: integrationPackage?.fileName || "integration-package.json",
+      nextAction: startupDecision.ready === false
+        ? "Fix the startup blockers, then regenerate the launch workflow for the same channel."
+        : "Keep the startup bootstrap defaults aligned with the selected channel."
+    },
+    {
+      key: "client_hardening",
+      label: "Client hardening profile",
+      status: clientHardening.profile === "strict" ? "pass" : "review",
+      summary: clientHardening.summary || `Profile ${String(clientHardening.profile || "unknown").toUpperCase()}`,
+      artifact: integrationPackage?.snippets?.hardeningFileName || "project-hardening-guide.txt",
+      nextAction: clientHardening.nextAction || "Confirm whether this lane should stay strict, balanced, or relaxed before handoff."
+    },
+    {
+      key: "token_keys",
+      label: "Token key coverage",
+      status: tokenKeyTotal > 0 ? "pass" : "review",
+      summary: tokenKeyTotal > 0
+        ? `${tokenKeyTotal} public key(s) available${tokenKeySummary.activeKeyId ? `, active ${tokenKeySummary.activeKeyId}` : ""}.`
+        : "No embedded token public keys were included in this startup preview.",
+      artifact: integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env",
+      nextAction: tokenKeyTotal > 0
+        ? "Keep the embedded key list in sync with active token verification keys."
+        : "Decide whether local token verification should ship with embedded public keys for this lane."
+    },
+    {
+      key: "launch_handoff_package",
+      label: "Launch handoff package",
+      status: "pass",
+      summary: "A combined launch workflow package is available for release, QA, and integration handoff.",
+      artifact: `${zipFileName} | ${summaryFileName} | ${checklistFileName}`,
+      nextAction: "Download the combined handoff zip for this channel, or grab individual release and integration artifacts as needed."
+    }
+  ];
+
+  const passItems = items.filter((item) => item.status === "pass").length;
+  const reviewItems = items.filter((item) => item.status === "review").length;
+  const blockItems = items.filter((item) => item.status === "block").length;
+  const status = blockItems > 0 ? "hold" : reviewItems > 0 ? "attention" : "ready";
+
+  return {
+    status,
+    ready: status === "ready",
+    passItems,
+    reviewItems,
+    blockItems,
+    items
+  };
+}
+
+function buildLaunchWorkflowSummaryPayload({
+  product,
+  channel = "stable",
+  releasePackage,
+  integrationPackage,
+  workflowChecklist = {},
+  fileName = "launch-workflow.json",
+  summaryFileName = "launch-workflow.txt",
+  checklistFileName = "launch-workflow-checklist.txt"
+}) {
+  const readiness = releasePackage?.manifest?.release?.readiness || {};
+  const deliverySummary = releasePackage?.deliverySummary || {};
+  const startupPreview = integrationPackage?.manifest?.startupPreview || releasePackage?.manifest?.release?.startupPreview || {};
+  const startupDecision = startupPreview.decision || {};
+  const startupRequest = startupPreview.request || integrationPackage?.manifest?.startupDefaults || {};
+  const tokenKeySummary = startupPreview.tokenKeySummary || {};
+  const clientHardening = startupPreview.clientHardening || integrationPackage?.manifest?.clientHardening || {};
+  const tokenKeyTotal = tokenKeySummary.totalKeys ?? integrationPackage?.manifest?.tokenKeys?.length ?? 0;
+  const workflowStatus = workflowChecklist.status || (
+    readiness.status === "hold" || startupDecision.ready === false
+      ? "hold"
+      : readiness.status === "attention" || clientHardening.profile !== "strict"
+        ? "attention"
+        : "ready"
+  );
+  const workflowTitle = workflowStatus === "hold"
+    ? "Hold before launch"
+    : workflowStatus === "attention"
+      ? "Review before launch"
+      : "Launch lane looks aligned";
+  const recommendedDownloads = [
+    {
+      key: "launch_handoff_zip",
+      label: "Combined launch workflow zip",
+      fileName: `${buildArchiveRootName(fileName, "launch-workflow")}.zip`
+    },
+    {
+      key: "launch_summary",
+      label: "Launch workflow summary",
+      fileName: summaryFileName
+    },
+    {
+      key: "launch_checklist",
+      label: "Launch workflow checklist",
+      fileName: checklistFileName
+    },
+    {
+      key: "release_summary",
+      label: "Release summary",
+      fileName: releasePackage?.summaryFileName || "release-package.txt"
+    },
+    {
+      key: "integration_env",
+      label: "Integration env",
+      fileName: integrationPackage?.snippets?.envFileName || "project.env"
+    },
+    {
+      key: "integration_host_config",
+      label: "Integration host config",
+      fileName: integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env"
+    },
+    {
+      key: "integration_host_skeleton",
+      label: "Host skeleton",
+      fileName: integrationPackage?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"
+    }
+  ];
+  const nextActions = [];
+  for (const item of Array.isArray(readiness.nextActions) ? readiness.nextActions.slice(0, 2) : []) {
+    nextActions.push(item);
+  }
+  if (clientHardening.nextAction) {
+    nextActions.push(clientHardening.nextAction);
+  }
+  if (!nextActions.length) {
+    nextActions.push("Download the combined launch workflow package and review the checklist before rollout.");
+  } else if (workflowStatus === "ready") {
+    nextActions.push("Download the combined launch workflow package for release, QA, and integration handoff.");
+  }
+
+  const blockers = [];
+  for (const item of Array.isArray(readiness.checks) ? readiness.checks : []) {
+    if (String(item.level || "").toLowerCase() === "blocking") {
+      blockers.push(`${item.label || item.key || "release"}: ${item.summary || "-"}`);
+    }
+  }
+  if (startupDecision.ready === false && startupDecision.message) {
+    blockers.push(`startup: ${startupDecision.message}`);
+  }
+
+  return {
+    status: workflowStatus,
+    title: workflowTitle,
+    message: readiness.message || deliverySummary.summary || startupDecision.message || clientHardening.summary || "No launch workflow summary available.",
+    channel,
+    candidateVersion: readiness.candidateVersion || deliverySummary.candidateVersion || startupRequest.clientVersion || null,
+    releaseStatus: readiness.status || "unknown",
+    startupStatus: startupDecision.status || "unknown",
+    startupReady: startupDecision.ready !== false,
+    clientHardeningProfile: clientHardening.profile || "unknown",
+    clientHardeningTitle: clientHardening.title || null,
+    checklistStatus: workflowChecklist.status || "unknown",
+    checklistCounts: {
+      pass: workflowChecklist.passItems ?? 0,
+      review: workflowChecklist.reviewItems ?? 0,
+      block: workflowChecklist.blockItems ?? 0
+    },
+    tokenKeyTotal,
+    activeKeyId: tokenKeySummary.activeKeyId || null,
+    recommendedDownloads,
+    downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
+    nextActions,
+    blockers,
+    projectCode: product?.code || null
+  };
+}
+
+function buildLaunchWorkflowPackageSummaryText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const workflowSummary = payload.workflowSummary || manifest.workflowSummary || {};
+  const workflowChecklist = payload.workflowChecklist || manifest.workflowChecklist || {};
+  const releasePackage = payload.releasePackage || {};
+  const integrationPackage = payload.integrationPackage || {};
+  const lines = [
+    "RockSolid Launch Workflow Package",
+    `Generated At: ${manifest.generatedAt || ""}`,
+    `Project Code: ${project.code || ""}`,
+    `Project Name: ${project.name || ""}`,
+    `Channel: ${workflowSummary.channel || manifest.channel || "stable"}`,
+    `Workflow Status: ${String(workflowSummary.status || "unknown").toUpperCase()}`,
+    `Workflow Title: ${workflowSummary.title || "-"}`,
+    `Candidate Version: ${workflowSummary.candidateVersion || "-"}`,
+    `Release Status: ${String(workflowSummary.releaseStatus || "unknown").toUpperCase()}`,
+    `Startup Status: ${String(workflowSummary.startupStatus || "unknown").toUpperCase()}`,
+    `Client Hardening: ${String(workflowSummary.clientHardeningProfile || "unknown").toUpperCase()}`,
+    `Token Keys: ${workflowSummary.tokenKeyTotal ?? 0}${workflowSummary.activeKeyId ? ` | active=${workflowSummary.activeKeyId}` : ""}`,
+    `Checklist: ${String(workflowChecklist.status || "unknown").toUpperCase()} | pass=${workflowChecklist.passItems ?? 0} | review=${workflowChecklist.reviewItems ?? 0} | block=${workflowChecklist.blockItems ?? 0}`,
+    `Message: ${workflowSummary.message || "-"}`,
+    ""
+  ];
+
+  const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
+  if (recommendedDownloads.length) {
+    lines.push("Recommended Downloads:");
+    for (const item of recommendedDownloads) {
+      lines.push(`- ${item.label || item.key || "download"} | ${item.fileName || "-"}`);
+    }
+    lines.push("");
+  }
+
+  const blockers = Array.isArray(workflowSummary.blockers) ? workflowSummary.blockers : [];
+  lines.push("Workflow Blockers:");
+  if (blockers.length) {
+    for (const item of blockers) {
+      lines.push(`- ${item}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+
+  const nextActions = Array.isArray(workflowSummary.nextActions) ? workflowSummary.nextActions : [];
+  if (nextActions.length) {
+    lines.push("Recommended Next Actions:");
+    for (const item of nextActions) {
+      lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
+
+  const checklistItems = Array.isArray(workflowChecklist.items) ? workflowChecklist.items : [];
+  if (checklistItems.length) {
+    lines.push("Workflow Checklist:");
+    for (const item of checklistItems) {
+      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("Linked Packages:");
+  lines.push(`- release=${releasePackage.fileName || "-"}`);
+  lines.push(`- releaseSummary=${releasePackage.summaryFileName || "-"}`);
+  lines.push(`- integration=${integrationPackage.fileName || "-"}`);
+  lines.push(`- integrationEnv=${integrationPackage.snippets?.envFileName || "-"}`);
+  lines.push(`- hostConfig=${integrationPackage.snippets?.hostConfigFileName || "-"}`);
+  lines.push(`- hostSkeleton=${integrationPackage.snippets?.hostSkeletonFileName || "-"}`);
+
+  return lines.join("\n");
+}
+
+function buildLaunchWorkflowChecklistText(payload = {}) {
+  const workflowSummary = payload.workflowSummary || payload.manifest?.workflowSummary || {};
+  const workflowChecklist = payload.workflowChecklist || payload.manifest?.workflowChecklist || {};
+  const lines = [
+    "RockSolid Launch Workflow Checklist",
+    `Status: ${String(workflowChecklist.status || "unknown").toUpperCase()} | pass=${workflowChecklist.passItems ?? 0} | review=${workflowChecklist.reviewItems ?? 0} | block=${workflowChecklist.blockItems ?? 0}`,
+    `Workflow Title: ${workflowSummary.title || "-"}`,
+    `Message: ${workflowSummary.message || "-"}`,
+    ""
+  ];
+
+  for (const item of Array.isArray(workflowChecklist.items) ? workflowChecklist.items : []) {
+    lines.push(`[${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"}`);
+    lines.push(`summary: ${item.summary || "-"}`);
+    lines.push(`artifact: ${item.artifact || "-"}`);
+    lines.push(`next: ${item.nextAction || "-"}`);
+    lines.push("");
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
+function buildLaunchWorkflowPackagePayload({
+  generatedAt = nowIso(),
+  developer,
+  actor,
+  product,
+  channel = "stable",
+  releasePackage,
+  integrationPackage
+}) {
+  const normalizedChannel = normalizeChannel(channel);
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const fileName = `rocksolid-launch-workflow-${product.code}-${normalizedChannel}-${timestampTag}.json`;
+  const summaryFileName = `rocksolid-launch-workflow-${product.code}-${normalizedChannel}-${timestampTag}.txt`;
+  const checklistFileName = `rocksolid-launch-workflow-${product.code}-${normalizedChannel}-${timestampTag}-checklist.txt`;
+  const zipFileName = `${buildArchiveRootName(fileName, "launch-workflow")}.zip`;
+  const workflowChecklist = buildLaunchWorkflowChecklistPayload({
+    releasePackage,
+    integrationPackage,
+    summaryFileName,
+    checklistFileName,
+    zipFileName
+  });
+  const workflowSummary = buildLaunchWorkflowSummaryPayload({
+    product,
+    channel: normalizedChannel,
+    releasePackage,
+    integrationPackage,
+    workflowChecklist,
+    fileName,
+    summaryFileName,
+    checklistFileName
+  });
+  const manifest = {
+    generatedAt,
+    developer: developer ?? null,
+    actor: actor ?? null,
+    channel: normalizedChannel,
+    project: {
+      id: product.id,
+      code: product.code,
+      projectCode: product.projectCode ?? product.code,
+      softwareCode: product.softwareCode ?? product.code,
+      name: product.name,
+      description: product.description ?? "",
+      status: product.status,
+      updatedAt: product.updatedAt,
+      featureConfig: product.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {}
+    },
+    workflowSummary,
+    workflowChecklist,
+    snippets: {
+      summaryFileName,
+      checklistFileName,
+      recommendedDownloadFileNames: workflowSummary.recommendedDownloads.map((item) => item.fileName).filter(Boolean),
+      releaseSummaryFileName: releasePackage?.summaryFileName || null,
+      integrationEnvFileName: integrationPackage?.snippets?.envFileName || null,
+      integrationHostConfigFileName: integrationPackage?.snippets?.hostConfigFileName || null,
+      integrationHostSkeletonFileName: integrationPackage?.snippets?.hostSkeletonFileName || null
+    },
+    notes: [
+      "This package combines the current release readiness lane and integration snapshot for a single project/channel handoff.",
+      "Regenerate it whenever the target channel changes, or after updating version rules, notices, SDK credentials, or startup hardening."
+    ]
+  };
+
+  const payload = {
+    fileName,
+    summaryFileName,
+    checklistFileName,
+    manifest,
+    workflowSummary,
+    workflowChecklist,
+    releasePackage,
+    integrationPackage,
+    snippets: manifest.snippets,
+    summaryText: "",
+    checklistText: ""
+  };
+
+  payload.summaryText = buildLaunchWorkflowPackageSummaryText(payload);
+  payload.checklistText = buildLaunchWorkflowChecklistText(payload);
+  return payload;
+}
+
+function buildLaunchWorkflowPackageFiles(payload) {
+  const files = [
+    {
+      path: payload.fileName || "launch-workflow.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: payload.summaryFileName || "launch-workflow.txt",
+      body: payload.summaryText || ""
+    },
+    {
+      path: payload.checklistFileName || "launch-workflow-checklist.txt",
+      body: payload.checklistText || ""
+    }
+  ];
+
+  if (payload.releasePackage) {
+    for (const file of buildReleasePackageFiles(payload.releasePackage)) {
+      files.push({
+        path: `release/${file.path}`,
+        body: file.body
+      });
+    }
+  }
+
+  if (payload.integrationPackage) {
+    for (const file of buildSingleIntegrationPackageFiles(payload.integrationPackage)) {
+      files.push({
+        path: `integration/${file.path}`,
+        body: file.body
+      });
+    }
+  }
+
+  return files;
+}
+
+function buildLaunchWorkflowPackageZipEntries(payload) {
+  const root = buildArchiveRootName(payload.fileName, "launch-workflow");
+  return buildZipEntriesFromFiles(root, buildLaunchWorkflowPackageFiles(payload));
+}
+
 function normalizeDownloadFormat(value, supported = [], fallback = "json", code = "INVALID_EXPORT_FORMAT", label = "Export format") {
   const normalized = String(value ?? fallback).trim().toLowerCase() || fallback;
   if (!supported.includes(normalized)) {
@@ -3131,6 +3576,51 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 
   return {
     fileName: payload.fileName || "release-package.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
+function buildLaunchWorkflowPackageDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "checklist", "zip", "checksums"],
+    "json",
+    "INVALID_LAUNCH_WORKFLOW_PACKAGE_FORMAT",
+    "Launch workflow package format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "launch-workflow")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildLaunchWorkflowPackageZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "launch-workflow"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildLaunchWorkflowPackageFiles(payload))
+    };
+  }
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "launch-workflow.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "checklist") {
+    return {
+      fileName: payload.checklistFileName || "launch-workflow-checklist.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.checklistText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "launch-workflow.json",
     contentType: "application/json; charset=utf-8",
     body: JSON.stringify(payload, null, 2)
   };
@@ -10767,8 +11257,48 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return payload;
     },
 
+    async developerLaunchWorkflowPackage(token, selector = {}, options = {}) {
+      const [releasePackage, integrationPackage] = await Promise.all([
+        this.developerReleasePackage(token, selector, options),
+        this.developerIntegrationPackage(token, selector, options)
+      ]);
+      const project = releasePackage?.manifest?.project || integrationPackage?.manifest?.project || {};
+      const payload = buildLaunchWorkflowPackagePayload({
+        generatedAt: releasePackage?.manifest?.generatedAt || integrationPackage?.manifest?.generatedAt || nowIso(),
+        developer: releasePackage?.manifest?.developer || integrationPackage?.manifest?.developer || null,
+        actor: releasePackage?.manifest?.actor || integrationPackage?.manifest?.actor || null,
+        product: {
+          id: project.id,
+          code: project.code,
+          projectCode: project.projectCode ?? project.code,
+          softwareCode: project.softwareCode ?? project.code,
+          name: project.name,
+          description: project.description,
+          status: project.status,
+          updatedAt: project.updatedAt,
+          featureConfig: project.featureConfig && typeof project.featureConfig === "object"
+            ? project.featureConfig
+            : {}
+        },
+        channel: releasePackage?.manifest?.release?.channel || selector.channel || "stable",
+        releasePackage,
+        integrationPackage
+      });
+      const session = requireDeveloperSession(db, token);
+      auditDeveloperSession(db, session, "product.launch-workflow.export", "product", project.id, {
+        code: project.code,
+        channel: payload.manifest.channel,
+        fileName: payload.fileName
+      });
+      return payload;
+    },
+
     releasePackageDownloadAsset(payload, format = "json") {
       return buildReleasePackageDownloadAsset(payload, format);
+    },
+
+    launchWorkflowPackageDownloadAsset(payload, format = "json") {
+      return buildLaunchWorkflowPackageDownloadAsset(payload, format);
     },
 
     integrationPackageExportDownloadAsset(payload, format = "json") {

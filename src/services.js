@@ -3584,7 +3584,29 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildLaunchWorkflowPackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "checklist", "zip", "checksums"],
+    [
+      "json",
+      "summary",
+      "checklist",
+      "zip",
+      "checksums",
+      "release-json",
+      "release-summary",
+      "release-checksums",
+      "integration-json",
+      "integration-env",
+      "integration-host-config",
+      "integration-cmake",
+      "integration-vs2022-guide",
+      "integration-vs2022-sln",
+      "integration-vs2022",
+      "integration-vs2022-filters",
+      "integration-vs2022-props",
+      "integration-vs2022-local-props",
+      "integration-cpp",
+      "integration-host-skeleton",
+      "integration-checksums"
+    ],
     "json",
     "INVALID_LAUNCH_WORKFLOW_PACKAGE_FORMAT",
     "Launch workflow package format"
@@ -3617,6 +3639,54 @@ function buildLaunchWorkflowPackageDownloadAsset(payload, format = "json") {
       contentType: "text/plain; charset=utf-8",
       body: payload.checklistText || ""
     };
+  }
+  if (normalizedFormat === "release-json") {
+    return buildReleasePackageDownloadAsset(payload.releasePackage || {}, "json");
+  }
+  if (normalizedFormat === "release-summary") {
+    return buildReleasePackageDownloadAsset(payload.releasePackage || {}, "summary");
+  }
+  if (normalizedFormat === "release-checksums") {
+    return buildReleasePackageDownloadAsset(payload.releasePackage || {}, "checksums");
+  }
+  if (normalizedFormat === "integration-json") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "json");
+  }
+  if (normalizedFormat === "integration-env") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "env");
+  }
+  if (normalizedFormat === "integration-host-config") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "host-config");
+  }
+  if (normalizedFormat === "integration-cmake") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "cmake");
+  }
+  if (normalizedFormat === "integration-vs2022-guide") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "vs2022-guide");
+  }
+  if (normalizedFormat === "integration-vs2022-sln") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "vs2022-sln");
+  }
+  if (normalizedFormat === "integration-vs2022") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "vs2022");
+  }
+  if (normalizedFormat === "integration-vs2022-filters") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "vs2022-filters");
+  }
+  if (normalizedFormat === "integration-vs2022-props") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "vs2022-props");
+  }
+  if (normalizedFormat === "integration-vs2022-local-props") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "vs2022-local-props");
+  }
+  if (normalizedFormat === "integration-cpp") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "cpp");
+  }
+  if (normalizedFormat === "integration-host-skeleton") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "host-skeleton");
+  }
+  if (normalizedFormat === "integration-checksums") {
+    return buildIntegrationPackageDownloadAsset(payload.integrationPackage || {}, "checksums");
   }
 
   return {

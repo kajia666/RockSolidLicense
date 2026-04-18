@@ -34,6 +34,22 @@ Download formats:
 - `checklist`
 - `checksums`
 - `zip`
+- `release-json`
+- `release-summary`
+- `release-checksums`
+- `integration-json`
+- `integration-env`
+- `integration-host-config`
+- `integration-cmake`
+- `integration-vs2022-guide`
+- `integration-vs2022-sln`
+- `integration-vs2022`
+- `integration-vs2022-filters`
+- `integration-vs2022-props`
+- `integration-vs2022-local-props`
+- `integration-cpp`
+- `integration-host-skeleton`
+- `integration-checksums`
 
 ## Workspace behavior
 
@@ -71,6 +87,8 @@ The same page now also keeps the most common lane-specific handoff files one cli
 - linked VS2022 quickstart
 - linked C++ quickstart
 - linked host skeleton
+
+Those files now also come from the same `/api/developer/launch-workflow/download` endpoint, so the launch workflow workspace can stay on one unified download route instead of mixing multiple release and integration download APIs.
 
 ## Typical use
 

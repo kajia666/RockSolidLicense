@@ -5548,6 +5548,42 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchChecksumsDownload.body, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(launchChecksumsDownload.body, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
 
+    const launchLinkedReleaseSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=release-summary",
+      viewerSession.token
+    );
+    assert.match(launchLinkedReleaseSummaryDownload.contentType || "", /^text\/plain/);
+    assert.match(launchLinkedReleaseSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*\.txt"/);
+    assert.match(launchLinkedReleaseSummaryDownload.body, /RockSolid Release Delivery Package/);
+
+    const launchLinkedIntegrationEnvDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=integration-env",
+      viewerSession.token
+    );
+    assert.match(launchLinkedIntegrationEnvDownload.contentType || "", /^text\/plain/);
+    assert.match(launchLinkedIntegrationEnvDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.env"/);
+    assert.match(launchLinkedIntegrationEnvDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
+
+    const launchLinkedHostConfigDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=integration-host-config",
+      viewerSession.token
+    );
+    assert.match(launchLinkedHostConfigDownload.contentType || "", /^text\/plain/);
+    assert.match(launchLinkedHostConfigDownload.contentDisposition || "", /attachment; filename="rocksolid_host_config\.env"/);
+    assert.match(launchLinkedHostConfigDownload.body, /RS_PROJECT_CODE=RELPKG_ALPHA/);
+
+    const launchLinkedCppDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=integration-cpp",
+      viewerSession.token
+    );
+    assert.match(launchLinkedCppDownload.contentType || "", /^text\/plain/);
+    assert.match(launchLinkedCppDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.cpp"/);
+    assert.match(launchLinkedCppDownload.body, /startup_bootstrap_http/);
+
     const launchZipDownload = await getBinary(
       baseUrl,
       "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=zip",

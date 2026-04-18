@@ -896,7 +896,7 @@
         }
         const target = currentLaunchDownloadTarget();
         const result = await downloadApiFile(
-          `/api/developer/release-package/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
+          `/api/developer/launch-workflow/download${q({ productCode: target.productCode, channel: target.channel, format: `release-${format}` })}`,
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -909,7 +909,7 @@
         }
         const target = currentLaunchDownloadTarget();
         const result = await downloadApiFile(
-          `/api/developer/integration/package/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
+          `/api/developer/launch-workflow/download${q({ productCode: target.productCode, channel: target.channel, format: `integration-${format}` })}`,
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);

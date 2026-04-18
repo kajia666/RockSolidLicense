@@ -144,6 +144,11 @@
           </div>
           <div id="detail-release-readiness" class="hint" style="margin-top:12px;">Select a project and preview a channel to inspect release readiness without leaving this page.</div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="download-inline-release-summary-btn">Download Release Summary</button>
+            <button class="secondary" id="download-inline-release-checksums-btn">Download Release Checksums</button>
+            <button class="secondary" id="download-inline-release-zip-btn">Download Release Zip</button>
+          </div>
+          <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
@@ -706,6 +711,9 @@
         el("open-project-release-btn").disabled = !hasProduct;
         el("preview-release-readiness-btn").disabled = !hasProduct;
         el("clear-release-preview-btn").disabled = !hasProduct && !releasePreview;
+        el("download-inline-release-summary-btn").disabled = !hasProduct;
+        el("download-inline-release-checksums-btn").disabled = !hasProduct;
+        el("download-inline-release-zip-btn").disabled = !hasProduct;
         const channel = currentReleaseChannel();
         el("detail-navigation-hint").textContent = hasProduct
           ? `Open ${product.code} in Developer Integration or Developer Releases with channel ${channel} already selected, or preview readiness inline here.`
@@ -1235,6 +1243,21 @@
         }
       });
 
+      async function downloadInlineReleaseAsset(format, fallbackFileName, label) {
+        const productCode = el("edit-product-code").value.trim();
+        if (!productCode) {
+          throw new Error("Select a project before downloading a release asset.");
+        }
+        const channel = currentReleaseChannel();
+        const result = await downloadApiFile(
+          "/api/developer/release-package/download",
+          { productCode, channel, format },
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
+      }
+
       el("clear-release-preview-btn").addEventListener("click", () => {
         releasePreview = null;
         const product = findVisibleProductById(el("edit-product-id").value.trim());
@@ -1247,6 +1270,33 @@
         const product = findVisibleProductById(el("edit-product-id").value.trim());
         renderReleasePreview(product);
         syncWorkspaceLinks(product);
+      });
+
+      el("download-inline-release-summary-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineReleaseAsset("summary", "release-summary.txt", "Inline release summary");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-release-checksums-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineReleaseAsset("checksums", "release-checksums.txt", "Inline release checksums");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-release-zip-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineReleaseAsset("zip", "release-package.zip", "Inline release zip");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
       });
 
       el("detail-release-channel").value = requestedChannel;

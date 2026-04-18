@@ -9711,6 +9711,15 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /downloadInlineReleaseAsset/);
     assert.match(html, /downloadLaunchWorkflowAsset/);
     assert.match(html, /downloadInlineIntegrationAsset/);
+    assert.match(html, /requestedAutofocus/);
+    assert.match(html, /currentProjectAutofocusTarget/);
+    assert.match(html, /focusProjectAutofocusTarget/);
+    assert.match(html, /hydrateProjectAutofocus/);
+    assert.match(html, /loadInlineReleasePreview/);
+    assert.match(html, /loadInlineIntegrationPreview/);
+    assert.match(html, /loadInlineLaunchWorkflow/);
+    assert.match(html, /autofocus: action\.autofocus \|\| "detail"/);
+    assert.match(html, /autofocus: action\.autofocus \|\| "package"/);
     assert.match(html, /downloadUrlFile/);
     assert.match(html, /buildDeliveryQuickSignals/);
     assert.match(html, /Save Project Profile/);
@@ -9853,6 +9862,10 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /x-rs-app-id/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
+    assert.match(html, /requestedAutofocus/);
+    assert.match(html, /currentIntegrationAutofocusTarget/);
+    assert.match(html, /focusIntegrationAutofocusTarget/);
+    assert.match(html, /hydrateIntegrationAutofocus/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -10003,6 +10016,10 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /autofocus/);
     assert.match(html, /release-route-hint/);
     assert.match(html, /applyRoutePrefill/);
+    assert.match(html, /requestedAutofocus/);
+    assert.match(html, /currentReleaseAutofocusTarget/);
+    assert.match(html, /focusReleaseAutofocusTarget/);
+    assert.match(html, /hydrateReleaseAutofocus/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

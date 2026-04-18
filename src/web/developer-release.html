@@ -456,6 +456,7 @@
       const requestedProductId = (routeParams.get("productId") || "").trim();
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
       let token = "";
       let actor = null;
       let projects = [];
@@ -502,6 +503,54 @@
 
       function buildWorkspaceUrl(path, params = {}) {
         return `${path}${q(params)}`;
+      }
+
+      function currentReleaseAutofocusTarget() {
+        const target = requestedAutofocus || "package";
+        if (target === "versions") {
+          return "version-body";
+        }
+        if (target === "notices") {
+          return "notice-table-body";
+        }
+        if (target === "summary") {
+          return "release-summary";
+        }
+        if (target === "checklist") {
+          return "delivery-checklist";
+        }
+        if (target === "host-config") {
+          return "release-host-config";
+        }
+        if (target === "host-skeleton") {
+          return "release-host-skeleton";
+        }
+        if (target === "cmake") {
+          return "release-cmake-template";
+        }
+        return "generate-release-package-btn";
+      }
+
+      function focusReleaseAutofocusTarget() {
+        const node = el(currentReleaseAutofocusTarget());
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function shouldAutoGenerateReleasePackage() {
+        return Boolean(token && requestedProductCode && requestedAutofocus);
+      }
+
+      function currentReleasePackageMatchesRequestedRoute() {
+        if (!releasePackage?.manifest?.project?.code) {
+          return false;
+        }
+        const currentCode = String(releasePackage.manifest.project.code || "").trim().toUpperCase();
+        const currentChannel = String(releasePackage.manifest.release?.channel || "").trim().toLowerCase();
+        return currentCode === requestedProductCode.toUpperCase()
+          && currentChannel === requestedChannel.toLowerCase();
       }
 
       function toBoolean(value) {
@@ -580,6 +629,24 @@
           ? `Generate the ${productCode} release handoff package for channel ${channel}, then download server-generated attachments for JSON, summary, env, C++ quickstart, or the host skeleton.`
           : "Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.";
         syncReleaseWorkspaceLinks();
+      }
+
+      async function hydrateReleaseAutofocus() {
+        if (!requestedAutofocus) {
+          return;
+        }
+        if (!shouldAutoGenerateReleasePackage()) {
+          focusReleaseAutofocusTarget();
+          return;
+        }
+        if (!currentReleasePackageMatchesRequestedRoute()) {
+          const data = await generateReleasePackage();
+          setStatus(`Release package auto-loaded for ${data.manifest.project.code}.`);
+          setOutput(data);
+        } else {
+          setStatus(`Release package kept in sync for ${releasePackage.manifest.project.code}.`);
+        }
+        focusReleaseAutofocusTarget();
       }
 
       function syncPermissions() {
@@ -991,7 +1058,10 @@
           });
           token = data.token;
           await refreshWorkspace();
-          setStatus("Developer release workspace loaded.");
+          await hydrateReleaseAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentReleasePackageMatchesRequestedRoute()) {
+            setStatus("Developer release workspace loaded.");
+          }
         } catch (error) {
           token = "";
           clearWorkspace();
@@ -1003,7 +1073,10 @@
       el("refresh-btn").addEventListener("click", async () => {
         try {
           await refreshWorkspace();
-          setStatus("Release workspace refreshed.");
+          await hydrateReleaseAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentReleasePackageMatchesRequestedRoute()) {
+            setStatus("Release workspace refreshed.");
+          }
         } catch (error) {
           setStatus(`${error.code}: ${error.message}`, true);
           setOutput({ code: error.code, message: error.message });

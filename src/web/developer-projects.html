@@ -217,6 +217,7 @@
       const requestedProductId = (routeParams.get("productId") || "").trim();
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
 
       let token = "";
       let profile = null;
@@ -274,6 +275,54 @@
 
       function buildWorkspaceUrl(path, params = {}) {
         return `${path}${buildRouteQuery(params)}`;
+      }
+
+      function currentProjectAutofocusTarget() {
+        const target = requestedAutofocus || "detail";
+        if (target === "release" || target === "package" || target === "versions" || target === "notices") {
+          return "detail-release-readiness";
+        }
+        if (
+          target === "integration"
+          || target === "startup"
+          || target === "hardening"
+          || target === "host-config"
+          || target === "host-skeleton"
+          || target === "cmake"
+          || target === "vs2022"
+          || target === "vs2022-guide"
+        ) {
+          return "detail-integration-preview";
+        }
+        if (target === "launch" || target === "handoff" || target === "summary" || target === "checklist") {
+          return "detail-launch-workflow";
+        }
+        return "detail-box";
+      }
+
+      function focusProjectAutofocusTarget() {
+        const node = el(currentProjectAutofocusTarget());
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function shouldAutoFocusProjectWorkspace() {
+        return Boolean(token && requestedProductCode && requestedAutofocus);
+      }
+
+      function currentProjectMatchesRequestedRoute() {
+        const productCode = el("edit-product-code").value.trim();
+        return Boolean(productCode) && productCode.toUpperCase() === requestedProductCode.toUpperCase();
+      }
+
+      function currentInlinePreviewMatchesRequestedRoute(preview) {
+        if (!preview) {
+          return false;
+        }
+        return String(preview.productCode || "").trim().toUpperCase() === requestedProductCode.toUpperCase()
+          && String(preview.channel || "").trim().toLowerCase() === requestedChannel.toLowerCase();
       }
 
       function currentReleaseChannel() {
@@ -1075,6 +1124,7 @@
         batchProductIds = new Set();
         releasePreview = null;
         integrationPreview = null;
+        launchWorkflowPreview = null;
         renderProjects();
         setMeta();
         setSelection(null);
@@ -1126,6 +1176,114 @@
         return data;
       }
 
+      async function loadInlineReleasePreview(options = {}) {
+        const { autoFocus = false } = options;
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          throw new Error("Select a project before previewing release readiness.");
+        }
+        const channel = currentReleaseChannel();
+        const payload = await api(`/api/developer/release-package${buildRouteQuery({ productCode, channel })}`);
+        releasePreview = { productCode, channel, payload };
+        launchWorkflowPreview = null;
+        const product = findVisibleProductById(productId);
+        renderReleasePreview(product);
+        renderLaunchWorkflow(product);
+        syncWorkspaceLinks(product);
+        setStatus(autoFocus
+          ? `Release readiness auto-loaded for ${productCode} on channel ${channel}.`
+          : `Loaded ${productCode} release readiness for channel ${channel}.`);
+        setOutput({ releasePreview: payload });
+        return payload;
+      }
+
+      async function loadInlineLaunchWorkflow(options = {}) {
+        const { autoFocus = false } = options;
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          throw new Error("Select a project before previewing the launch workflow.");
+        }
+        const channel = currentReleaseChannel();
+        const payload = await api(`/api/developer/launch-workflow${buildRouteQuery({ productCode, channel })}`);
+        launchWorkflowPreview = { productCode, channel, payload };
+        releasePreview = payload.releasePackage ? { productCode, channel, payload: payload.releasePackage } : null;
+        integrationPreview = payload.integrationPackage ? { productCode, channel, payload: payload.integrationPackage } : null;
+        const product = findVisibleProductById(productId);
+        renderReleasePreview(product);
+        renderIntegrationPreview(product);
+        renderLaunchWorkflow(product);
+        syncWorkspaceLinks(product);
+        setStatus(autoFocus
+          ? `Launch workflow auto-loaded for ${productCode} on channel ${channel}.`
+          : `Loaded ${productCode} launch workflow package for channel ${channel}.`);
+        setOutput({ launchWorkflow: payload });
+        return payload;
+      }
+
+      async function loadInlineIntegrationPreview(options = {}) {
+        const { autoFocus = false } = options;
+        const productId = el("edit-product-id").value.trim();
+        const productCode = el("edit-product-code").value.trim();
+        if (!productId || !productCode) {
+          throw new Error("Select a project before previewing the integration snapshot.");
+        }
+        const channel = currentReleaseChannel();
+        const payload = await api(`/api/developer/integration/package${buildRouteQuery({ productCode, channel })}`);
+        integrationPreview = { productCode, channel, payload };
+        launchWorkflowPreview = null;
+        const product = findVisibleProductById(productId);
+        renderIntegrationPreview(product);
+        renderLaunchWorkflow(product);
+        syncWorkspaceLinks(product);
+        setStatus(autoFocus
+          ? `Integration snapshot auto-loaded for ${productCode} on channel ${channel}.`
+          : `Loaded ${productCode} integration snapshot for channel ${channel}.`);
+        setOutput({ integrationPreview: payload });
+        return payload;
+      }
+
+      async function hydrateProjectAutofocus() {
+        if (!requestedAutofocus) {
+          return;
+        }
+        if (!shouldAutoFocusProjectWorkspace()) {
+          focusProjectAutofocusTarget();
+          return;
+        }
+        if (!currentProjectMatchesRequestedRoute()) {
+          return;
+        }
+        const selectedCode = el("edit-product-code").value.trim() || requestedProductCode;
+        const target = currentProjectAutofocusTarget();
+        if (target === "detail-release-readiness") {
+          if (!currentInlinePreviewMatchesRequestedRoute(releasePreview)) {
+            await loadInlineReleasePreview({ autoFocus: true });
+          } else {
+            setStatus(`Release readiness kept in sync for ${selectedCode}.`);
+            setOutput({ releasePreview: releasePreview.payload });
+          }
+        } else if (target === "detail-integration-preview") {
+          if (!currentInlinePreviewMatchesRequestedRoute(integrationPreview)) {
+            await loadInlineIntegrationPreview({ autoFocus: true });
+          } else {
+            setStatus(`Integration snapshot kept in sync for ${selectedCode}.`);
+            setOutput({ integrationPreview: integrationPreview.payload });
+          }
+        } else if (target === "detail-launch-workflow") {
+          if (!currentInlinePreviewMatchesRequestedRoute(launchWorkflowPreview)) {
+            await loadInlineLaunchWorkflow({ autoFocus: true });
+          } else {
+            setStatus(`Launch workflow kept in sync for ${selectedCode}.`);
+            setOutput({ launchWorkflow: launchWorkflowPreview.payload });
+          }
+        } else {
+          setStatus(`Project workspace focused on ${selectedCode}.`);
+        }
+        focusProjectAutofocusTarget();
+      }
+
       el("login-btn").addEventListener("click", async () => {
         try {
           const data = await api("/api/developer/login", {
@@ -1140,7 +1298,12 @@
           actor = data.actor || null;
           setMeta();
           await refresh();
-          setStatus(`Workspace loaded for ${data.actor?.username || data.developer?.username}.`);
+          if (requestedAutofocus && requestedProductCode) {
+            await hydrateProjectAutofocus();
+          }
+          if (!requestedAutofocus || !requestedProductCode || !currentProjectMatchesRequestedRoute()) {
+            setStatus(`Workspace loaded for ${data.actor?.username || data.developer?.username}.`);
+          }
         } catch (error) {
           clearSession();
           setStatus(`${error.code}: ${error.message}`, true);
@@ -1151,7 +1314,12 @@
       el("refresh-btn").addEventListener("click", async () => {
         try {
           await refresh();
-          setStatus("Project workspace refreshed.");
+          if (requestedAutofocus && requestedProductCode) {
+            await hydrateProjectAutofocus();
+          }
+          if (!requestedAutofocus || !requestedProductCode || !currentProjectMatchesRequestedRoute()) {
+            setStatus("Project workspace refreshed.");
+          }
         } catch (error) {
           setStatus(`${error.code}: ${error.message}`, true);
           setOutput({ code: error.code, message: error.message });
@@ -1478,21 +1646,7 @@
 
       el("preview-release-readiness-btn").addEventListener("click", async () => {
         try {
-          const productId = el("edit-product-id").value.trim();
-          const productCode = el("edit-product-code").value.trim();
-          if (!productId || !productCode) {
-            throw new Error("Select a project before previewing release readiness.");
-          }
-          const channel = currentReleaseChannel();
-          const payload = await api(`/api/developer/release-package${buildRouteQuery({ productCode, channel })}`);
-          releasePreview = { productCode, channel, payload };
-          launchWorkflowPreview = null;
-          const product = findVisibleProductById(productId);
-          renderReleasePreview(product);
-          renderLaunchWorkflow(product);
-          syncWorkspaceLinks(product);
-          setStatus(`Loaded ${productCode} release readiness for channel ${channel}.`);
-          setOutput({ releasePreview: payload });
+          await loadInlineReleasePreview();
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1501,23 +1655,7 @@
 
       el("preview-launch-workflow-btn").addEventListener("click", async () => {
         try {
-          const productId = el("edit-product-id").value.trim();
-          const productCode = el("edit-product-code").value.trim();
-          if (!productId || !productCode) {
-            throw new Error("Select a project before previewing the launch workflow.");
-          }
-          const channel = currentReleaseChannel();
-          const payload = await api(`/api/developer/launch-workflow${buildRouteQuery({ productCode, channel })}`);
-          launchWorkflowPreview = { productCode, channel, payload };
-          releasePreview = payload.releasePackage ? { productCode, channel, payload: payload.releasePackage } : null;
-          integrationPreview = payload.integrationPackage ? { productCode, channel, payload: payload.integrationPackage } : null;
-          const product = findVisibleProductById(productId);
-          renderReleasePreview(product);
-          renderIntegrationPreview(product);
-          renderLaunchWorkflow(product);
-          syncWorkspaceLinks(product);
-          setStatus(`Loaded ${productCode} launch workflow package for channel ${channel}.`);
-          setOutput({ launchWorkflow: payload });
+          await loadInlineLaunchWorkflow();
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1526,21 +1664,7 @@
 
       el("preview-integration-package-btn").addEventListener("click", async () => {
         try {
-          const productId = el("edit-product-id").value.trim();
-          const productCode = el("edit-product-code").value.trim();
-          if (!productId || !productCode) {
-            throw new Error("Select a project before previewing the integration snapshot.");
-          }
-          const channel = currentReleaseChannel();
-          const payload = await api(`/api/developer/integration/package${buildRouteQuery({ productCode, channel })}`);
-          integrationPreview = { productCode, channel, payload };
-          launchWorkflowPreview = null;
-          const product = findVisibleProductById(productId);
-          renderIntegrationPreview(product);
-          renderLaunchWorkflow(product);
-          syncWorkspaceLinks(product);
-          setStatus(`Loaded ${productCode} integration snapshot for channel ${channel}.`);
-          setOutput({ integrationPreview: payload });
+          await loadInlineIntegrationPreview();
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1656,7 +1780,8 @@
           window.location.href = buildWorkspaceUrl("/developer/projects", {
             productId,
             productCode,
-            channel: currentReleaseChannel()
+            channel: currentReleaseChannel(),
+            autofocus: action.autofocus || "detail"
           });
           return;
         }
@@ -1664,7 +1789,8 @@
           window.location.href = buildWorkspaceUrl("/developer/integration", {
             productId,
             productCode,
-            channel: currentReleaseChannel()
+            channel: currentReleaseChannel(),
+            autofocus: action.autofocus || "package"
           });
           return;
         }

@@ -182,6 +182,7 @@
       const requestedProductId = (routeParams.get("productId") || "").trim();
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
       let token = "";
       let snapshot = null;
       let selectedProduct = null;
@@ -284,6 +285,65 @@
 
       function buildWorkspaceUrl(path, params = {}) {
         return `${path}${buildRouteQuery(params)}`;
+      }
+
+      function currentIntegrationAutofocusTarget() {
+        const target = requestedAutofocus || "package";
+        if (target === "startup") {
+          return "startup-preview";
+        }
+        if (target === "hardening") {
+          return "hardening-guide";
+        }
+        if (target === "host-config") {
+          return "host-config-snippet";
+        }
+        if (target === "host-skeleton") {
+          return "host-skeleton-snippet";
+        }
+        if (target === "cmake") {
+          return "cmake-snippet";
+        }
+        if (target === "vs2022" || target === "vs2022-guide") {
+          return "vs2022-guide-snippet";
+        }
+        if (target === "detail" || target === "features") {
+          return "project-detail";
+        }
+        return "package-json";
+      }
+
+      function focusIntegrationAutofocusTarget() {
+        const node = el(currentIntegrationAutofocusTarget());
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function shouldAutoFocusIntegrationWorkspace() {
+        return Boolean(token && requestedProductCode && requestedAutofocus);
+      }
+
+      function currentIntegrationMatchesRequestedRoute() {
+        if (!selectedProduct?.code) {
+          return false;
+        }
+        return String(selectedProduct.code || "").trim().toUpperCase() === requestedProductCode.toUpperCase();
+      }
+
+      async function hydrateIntegrationAutofocus() {
+        if (!requestedAutofocus) {
+          return;
+        }
+        if (!shouldAutoFocusIntegrationWorkspace()) {
+          focusIntegrationAutofocusTarget();
+          return;
+        }
+        if (!currentIntegrationMatchesRequestedRoute()) {
+          return;
+        }
+        focusIntegrationAutofocusTarget();
       }
 
       function findRequestedProduct(items = []) {
@@ -742,7 +802,12 @@ ${JSON.stringify(request, null, 2)}`;
           });
           token = data.token;
           await refresh();
-          setStatus("Developer integration snapshot loaded.");
+          await hydrateIntegrationAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentIntegrationMatchesRequestedRoute()) {
+            setStatus("Developer integration snapshot loaded.");
+          } else {
+            setStatus(`Developer integration workspace focused on ${selectedProduct?.code || requestedProductCode}.`);
+          }
         } catch (error) {
           clear();
           setStatus(`${error.code}: ${error.message}`, true);
@@ -753,7 +818,12 @@ ${JSON.stringify(request, null, 2)}`;
       el("refresh-btn").addEventListener("click", async () => {
         try {
           await refresh();
-          setStatus("Developer integration snapshot refreshed.");
+          await hydrateIntegrationAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentIntegrationMatchesRequestedRoute()) {
+            setStatus("Developer integration snapshot refreshed.");
+          } else {
+            setStatus(`Developer integration workspace kept in sync for ${selectedProduct?.code || requestedProductCode}.`);
+          }
         } catch (error) {
           setStatus(`${error.code}: ${error.message}`, true);
           setOutput({ code: error.code, message: error.message });

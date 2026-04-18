@@ -10,7 +10,7 @@ The selected project detail card now also exposes direct handoff links into:
 - `/developer/integration?productId=...&productCode=...`
 - `/developer/releases?productId=...&productCode=...&channel=stable`
 
-`/developer/projects` also accepts `productId` or `productCode` in the query string so the page can reopen with the same project preselected.
+`/developer/projects` also accepts `productId`, `productCode`, `channel`, and `autofocus` in the query string so the page can reopen with the same project preselected and, after sign-in or refresh, auto-load the matching inline release preview, integration preview, or launch workflow block when the route is carrying a recommended workspace hint.
 
 The detail card now also shows a lightweight "Delivery quick signals" summary. It is not the same as the full release readiness package, but it helps software authors spot obvious blockers such as:
 
@@ -56,6 +56,13 @@ The launch workflow block now also includes direct quick actions so software aut
 - download release summary only
 - download integration env / host config / host skeleton
 - jump straight into the integration or release workspace with the same project and channel
+
+Recommended workspace jumps now also preserve a more specific `autofocus` hint. That means:
+
+- project-level blockers can land back on the project detail or feature-config area
+- startup bootstrap, token-key, and hardening issues can land on the integration preview block
+- version-rule or notice blockers can land on the release preview block
+- handoff review can land on the combined launch workflow block
 
 The same combined package is also available over:
 

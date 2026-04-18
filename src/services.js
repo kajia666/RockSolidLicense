@@ -2836,6 +2836,12 @@ function buildLaunchWorkflowSummaryPayload({
   const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
     ? product.featureConfig
     : {};
+  const readinessChecks = Array.isArray(readiness.checks) ? readiness.checks : [];
+  const findReadinessCheck = (key) => readinessChecks.find((item) => item?.key === key) || null;
+  const noticeCheck = findReadinessCheck("notices");
+  const versionRuleCheck = findReadinessCheck("version_rule");
+  const downloadUrlCheck = findReadinessCheck("download_url");
+  const runtimeCoverageCheck = findReadinessCheck("runtime_coverage");
   const workspaceActions = [];
   const pushWorkspaceAction = (action) => {
     if (!action || !action.key) {
@@ -2853,7 +2859,16 @@ function buildLaunchWorkflowSummaryPayload({
       label: "Open Project Workspace",
       priority: "primary",
       reason: `Project status is ${product?.status || "inactive"} and should be switched back to active before rollout.`,
-      autofocus: "product"
+      autofocus: "detail"
+    });
+  }
+  if (featureConfig.allowVersionCheck === false || featureConfig.allowNotices === false) {
+    pushWorkspaceAction({
+      key: "project",
+      label: "Open Project Workspace",
+      priority: workspaceActions.length ? "secondary" : "primary",
+      reason: runtimeCoverageCheck?.summary || "Project feature toggles should be reviewed before launch.",
+      autofocus: "features"
     });
   }
   if (startupDecision.ready === false || tokenKeyTotal === 0) {
@@ -2864,15 +2879,25 @@ function buildLaunchWorkflowSummaryPayload({
       reason: startupDecision.ready === false
         ? (startupDecision.recommendedAction || startupDecision.message || "Startup bootstrap still needs integration-side fixes.")
         : "Token key coverage should be reviewed in the integration package before rollout.",
-      autofocus: "package"
+      autofocus: "startup"
     });
   }
   if (
     readiness.status === "hold"
     || readiness.status === "attention"
-    || featureConfig.allowVersionCheck === false
-    || featureConfig.allowNotices === false
   ) {
+    let releaseAutofocus = "package";
+    if (
+      noticeCheck
+      && (noticeCheck.blocking === true || String(noticeCheck.level || "").toLowerCase() === "attention")
+    ) {
+      releaseAutofocus = "notices";
+    } else if (
+      (versionRuleCheck && String(versionRuleCheck.level || "").toLowerCase() === "attention")
+      || (downloadUrlCheck && String(downloadUrlCheck.level || "").toLowerCase() === "attention")
+    ) {
+      releaseAutofocus = "versions";
+    }
     pushWorkspaceAction({
       key: "release",
       label: "Open Release Workspace",
@@ -2881,8 +2906,8 @@ function buildLaunchWorkflowSummaryPayload({
         ? (readiness.message || "Release blockers should be cleared before launch.")
         : readiness.status === "attention"
           ? (readiness.message || "Release readiness still needs a final pass.")
-          : "Version-check and notice toggles should be reviewed before handoff.",
-      autofocus: "package"
+          : "Release rules and notices should be reviewed before handoff.",
+      autofocus: releaseAutofocus
     });
   }
   if (clientHardening.profile !== "strict") {
@@ -2891,7 +2916,7 @@ function buildLaunchWorkflowSummaryPayload({
       label: "Open Integration Workspace",
       priority: workspaceActions.length ? "secondary" : "primary",
       reason: "Client hardening settings still need confirmation for this lane.",
-      autofocus: "package"
+      autofocus: "hardening"
     });
   }
   pushWorkspaceAction({
@@ -2908,7 +2933,7 @@ function buildLaunchWorkflowSummaryPayload({
     label: "Open Project Workspace",
     priority: workspaceActions.length ? "secondary" : "primary",
     reason: "Use the project workspace when you need to adjust project status, feature toggles, or download handoff assets inline.",
-    autofocus: "product"
+    autofocus: "detail"
   });
 
   const recommendedWorkspace = workspaceActions[0] || {

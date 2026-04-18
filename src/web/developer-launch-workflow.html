@@ -913,7 +913,8 @@
           window.location.href = buildWorkspaceUrl("/developer/projects", {
             productId: currentReleaseProductId(target.productCode),
             productCode: target.productCode,
-            channel: target.channel
+            channel: target.channel,
+            autofocus: action.autofocus || "detail"
           });
           return;
         }

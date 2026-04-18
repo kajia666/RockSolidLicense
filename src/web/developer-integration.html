@@ -36,7 +36,7 @@
         <article class="card">
           <h2>Project Selector</h2>
           <label>Project Code<select id="project-select"></select></label>
-          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
+          <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cmake-btn">Download CMake Template</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
           <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace or release handoff check with the same project prefilled.</div>
@@ -114,9 +114,15 @@
         </article>
       </section>
 
-      <section class="card">
-        <h2>Hardening Guide</h2>
-        <pre id="hardening-guide">Select a project to generate a project-specific client hardening guide.</pre>
+      <section class="wide">
+        <article class="card">
+          <h2>CMake Consumer</h2>
+          <pre id="cmake-snippet">Select a project to generate a minimal CMake consumer template.</pre>
+        </article>
+        <article class="card">
+          <h2>Hardening Guide</h2>
+          <pre id="hardening-guide">Select a project to generate a project-specific client hardening guide.</pre>
+        </article>
       </section>
 
       <section class="wide">
@@ -491,6 +497,7 @@ ${JSON.stringify(request, null, 2)}`;
           el("host-skeleton-snippet").textContent = "Select a project to generate a project-aware C++ host skeleton.";
           el("env-snippet").textContent = "Select a project to generate an environment template.";
           el("host-config-snippet").textContent = "Select a project to generate a host config file for the packaged CMake consumer.";
+          el("cmake-snippet").textContent = "Select a project to generate a minimal CMake consumer template.";
           el("hardening-guide").textContent = "Select a project to generate a project-specific client hardening guide.";
           el("startup-preview").textContent = selectedProduct
             ? "Refresh the integration package to inspect the current startup bootstrap decision."
@@ -506,6 +513,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("host-skeleton-snippet").textContent = packageSnapshot.snippets?.hostSkeletonCpp || "";
         el("env-snippet").textContent = packageSnapshot.snippets?.envTemplate || "";
         el("host-config-snippet").textContent = packageSnapshot.snippets?.hostConfigEnv || "";
+        el("cmake-snippet").textContent = packageSnapshot.snippets?.cmakeConsumerTemplate || "";
         el("hardening-guide").textContent = packageSnapshot.snippets?.hardeningGuide || "";
         renderStartupPreview();
       }
@@ -559,6 +567,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("download-package-json-btn").disabled = disabled;
         el("download-package-env-btn").disabled = disabled;
         el("download-package-host-config-btn").disabled = disabled;
+        el("download-package-cmake-btn").disabled = disabled;
         el("download-package-cpp-btn").disabled = disabled;
         el("download-package-host-skeleton-btn").disabled = disabled;
         el("download-package-checksums-btn").disabled = disabled;
@@ -765,6 +774,15 @@ ${JSON.stringify(request, null, 2)}`;
       el("download-package-host-config-btn").addEventListener("click", async () => {
         try {
           await handlePackageDownload("host-config", "rocksolid_host_config.env", "Integration package host config");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-package-cmake-btn").addEventListener("click", async () => {
+        try {
+          await handlePackageDownload("cmake", "CMakeLists.txt", "Integration package CMake template");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

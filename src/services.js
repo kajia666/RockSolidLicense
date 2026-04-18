@@ -707,6 +707,38 @@ function buildIntegrationHostConfigTemplate(manifest) {
   ].join("\n");
 }
 
+function buildIntegrationCMakeConsumerTemplate(manifest) {
+  const project = manifest.project || {};
+  const startupDefaults = manifest.startupDefaults || {};
+  const targetBase = String(project.code || "rocksolid_host_consumer")
+    .trim()
+    .replace(/[^A-Za-z0-9_]+/g, "_")
+    .replace(/^[0-9]/, "_$&")
+    || "rocksolid_host_consumer";
+  const targetName = `${targetBase.toLowerCase()}_host_consumer`;
+  const channel = String(startupDefaults.channel ?? "stable").trim() || "stable";
+
+  return `cmake_minimum_required(VERSION 3.20)
+
+project(${targetName} LANGUAGES CXX)
+
+set(ROCKSOLID_SDK_CMAKE_DIR "" CACHE PATH "Path to the extracted RockSolid SDK package cmake folder")
+
+if(NOT ROCKSOLID_SDK_CMAKE_DIR)
+  message(FATAL_ERROR "Set ROCKSOLID_SDK_CMAKE_DIR to the packaged RockSolid SDK cmake directory before configuring this consumer project.")
+endif()
+
+find_package(RockSolidSDK CONFIG REQUIRED PATHS "\${ROCKSOLID_SDK_CMAKE_DIR}" NO_DEFAULT_PATH)
+
+add_executable(${targetName} main.cpp)
+target_compile_features(${targetName} PRIVATE cxx_std_17)
+target_link_libraries(${targetName} PRIVATE RockSolidSDK::cpp_static)
+
+message(STATUS "Configured ${targetName} for ${escapeCppStringLiteral(project.code || "")} (${escapeCppStringLiteral(channel)})")
+message(STATUS "Keep rocksolid_host_config.env next to the built executable or working directory before enabling RS_RUN_NETWORK_DEMO=true.")
+`;
+}
+
 function buildIntegrationCppQuickstart(manifest) {
   const project = manifest.project || {};
   const credentials = manifest.credentials || {};
@@ -1305,6 +1337,8 @@ function buildDeveloperIntegrationPackagePayload({
       envTemplate: buildIntegrationEnvTemplate(manifest),
       hostConfigFileName: "rocksolid_host_config.env",
       hostConfigEnv: buildIntegrationHostConfigTemplate(manifest),
+      cmakeFileName: "CMakeLists.txt",
+      cmakeConsumerTemplate: buildIntegrationCMakeConsumerTemplate(manifest),
       cppFileName: `${product.code}.cpp`,
       cppQuickstart: buildIntegrationCppQuickstart(manifest),
       hostSkeletonFileName: `${product.code}-host-skeleton.cpp`,
@@ -1481,6 +1515,13 @@ function buildIntegrationPackageHostConfigFiles(items = []) {
   }));
 }
 
+function buildIntegrationPackageCMakeFiles(items = []) {
+  return items.map((item) => ({
+    fileName: `${item.code}/CMakeLists.txt`,
+    content: item.snippets?.cmakeConsumerTemplate || ""
+  }));
+}
+
 function buildIntegrationPackageCppFiles(items = []) {
   return items.map((item) => ({
     fileName: `${item.code}.cpp`,
@@ -1508,6 +1549,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
   const manifestFiles = buildIntegrationPackageManifestFiles(items);
   const envFiles = buildIntegrationPackageEnvFiles(items);
   const hostConfigFiles = buildIntegrationPackageHostConfigFiles(items);
+  const cmakeFiles = buildIntegrationPackageCMakeFiles(items);
   const cppFiles = buildIntegrationPackageCppFiles(items);
   const hostSkeletonFiles = buildIntegrationPackageHostSkeletonFiles(items);
   const hardeningFiles = buildIntegrationPackageHardeningFiles(items);
@@ -1525,6 +1567,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     manifestArchiveName: `rocksolid-integration-packages-${timestampTag}-manifests.txt`,
     envArchiveName: `rocksolid-integration-packages-${timestampTag}-env.txt`,
     hostConfigArchiveName: `rocksolid-integration-packages-${timestampTag}-host-config.txt`,
+    cmakeArchiveName: `rocksolid-integration-packages-${timestampTag}-cmake.txt`,
     cppArchiveName: `rocksolid-integration-packages-${timestampTag}-cpp.txt`,
     hostSkeletonArchiveName: `rocksolid-integration-packages-${timestampTag}-host-skeleton.txt`,
     hardeningArchiveName: `rocksolid-integration-packages-${timestampTag}-hardening.txt`,
@@ -1532,12 +1575,14 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     manifestFiles,
     envFiles,
     hostConfigFiles,
+    cmakeFiles,
     cppFiles,
     hostSkeletonFiles,
     hardeningFiles,
     manifestBundleText: buildNamedFileBundleText(manifestFiles),
     envBundleText: buildNamedFileBundleText(envFiles),
     hostConfigBundleText: buildNamedFileBundleText(hostConfigFiles),
+    cmakeBundleText: buildNamedFileBundleText(cmakeFiles),
     cppBundleText: buildNamedFileBundleText(cppFiles),
     hostSkeletonBundleText: buildNamedFileBundleText(hostSkeletonFiles),
     hardeningBundleText: buildNamedFileBundleText(hardeningFiles)
@@ -1583,7 +1628,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push(`- Hardening Summary: ${deliverySummary.clientHardeningSummary}`);
   }
   if (deliverySummary.artifacts) {
-    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | hostConfig=${deliverySummary.artifacts.hostConfig || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
+    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | hostConfig=${deliverySummary.artifacts.hostConfig || "-"} | cmake=${deliverySummary.artifacts.cmakeConsumer || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
   }
   lines.push("");
 
@@ -1749,9 +1794,9 @@ function buildReleaseDeliveryChecklistPayload({
     key: "handoff_artifacts",
     label: "Handoff artifacts",
     status: "pass",
-    summary: "JSON package, summary text, env template, host config, C++ quickstart, and host skeleton are bundled for handoff.",
-    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.hostConfig || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
-    nextAction: "Send the matching JSON, summary, env, host config, quickstart, and host skeleton snippets together so integration stays aligned."
+    summary: "JSON package, summary text, env template, host config, CMake consumer template, C++ quickstart, and host skeleton are bundled for handoff.",
+    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.hostConfig || "-"} | ${deliverySummary.artifacts?.cmakeConsumer || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
+    nextAction: "Send the matching JSON, summary, env, host config, CMake template, quickstart, and host skeleton snippets together so integration stays aligned."
   });
 
   const blockItems = items.filter((item) => item.status === "block").length;
@@ -1780,6 +1825,7 @@ function buildReleaseDeliverySummaryPayload({
   summaryFileName,
   envFileName,
   hostConfigFileName,
+  cmakeFileName,
   cppFileName,
   hostSkeletonFileName
 }) {
@@ -1834,6 +1880,7 @@ function buildReleaseDeliverySummaryPayload({
       packageSummary: summaryFileName || "release-package.txt",
       envTemplate: `snippets/${envFileName || "project.env"}`,
       hostConfig: `host-config/${hostConfigFileName || "rocksolid_host_config.env"}`,
+      cmakeConsumer: `cmake-consumer/${cmakeFileName || "CMakeLists.txt"}`,
       cppQuickstart: `snippets/${cppFileName || "project.cpp"}`,
       hostSkeleton: `snippets/${hostSkeletonFileName || "project-host-skeleton.cpp"}`
     },
@@ -2045,6 +2092,7 @@ function buildReleasePackagePayload({
   });
   const envFileName = `${product.code}.env`;
   const hostConfigFileName = "rocksolid_host_config.env";
+  const cmakeFileName = "CMakeLists.txt";
   const cppFileName = `${product.code}.cpp`;
   const hostSkeletonFileName = `${product.code}-host-skeleton.cpp`;
   const hardeningFileName = `${product.code}-hardening-guide.txt`;
@@ -2062,6 +2110,7 @@ function buildReleasePackagePayload({
     summaryFileName,
     envFileName,
     hostConfigFileName,
+    cmakeFileName,
     cppFileName,
     hostSkeletonFileName
   });
@@ -2108,6 +2157,7 @@ function buildReleasePackagePayload({
     snippets: {
       envFileName,
       hostConfigFileName,
+      cmakeFileName,
       cppFileName,
       hostSkeletonFileName
     },
@@ -2128,6 +2178,8 @@ function buildReleasePackagePayload({
       envTemplate: integrationPackage?.snippets?.envTemplate || "",
       hostConfigFileName,
       hostConfigEnv: integrationPackage?.snippets?.hostConfigEnv || "",
+      cmakeFileName,
+      cmakeConsumerTemplate: integrationPackage?.snippets?.cmakeConsumerTemplate || "",
       cppFileName,
       cppQuickstart: integrationPackage?.snippets?.cppQuickstart || "",
       hostSkeletonFileName,
@@ -2214,6 +2266,18 @@ function buildReleasePackageFiles(payload) {
       body: payload.snippets?.hostConfigEnv || ""
     },
     {
+      path: `cmake-consumer/${payload.snippets?.cmakeFileName || "CMakeLists.txt"}`,
+      body: payload.snippets?.cmakeConsumerTemplate || ""
+    },
+    {
+      path: "cmake-consumer/main.cpp",
+      body: payload.snippets?.hostSkeletonCpp || ""
+    },
+    {
+      path: "cmake-consumer/rocksolid_host_config.env",
+      body: payload.snippets?.hostConfigEnv || ""
+    },
+    {
       path: `snippets/${payload.snippets?.cppFileName || "project.cpp"}`,
       body: payload.snippets?.cppQuickstart || ""
     },
@@ -2259,6 +2323,21 @@ function buildIntegrationPackageExportFiles(payload) {
       body: file.content || ""
     });
   }
+  for (const file of payload.cmakeFiles || []) {
+    const projectCode = String(file.fileName || "").split("/")[0] || "project";
+    files.push({
+      path: `cmake-consumer/${file.fileName}`,
+      body: file.content || ""
+    });
+    files.push({
+      path: `cmake-consumer/${projectCode}/main.cpp`,
+      body: payload.items?.find((item) => item.code === projectCode)?.snippets?.hostSkeletonCpp || ""
+    });
+    files.push({
+      path: `cmake-consumer/${projectCode}/rocksolid_host_config.env`,
+      body: payload.items?.find((item) => item.code === projectCode)?.snippets?.hostConfigEnv || ""
+    });
+  }
   for (const file of payload.cppFiles || []) {
     files.push({
       path: `cpp/${file.fileName}`,
@@ -2298,6 +2377,18 @@ function buildSingleIntegrationPackageFiles(payload) {
     },
     {
       path: `host-config/${payload.snippets?.hostConfigFileName || "rocksolid_host_config.env"}`,
+      body: payload.snippets?.hostConfigEnv || ""
+    },
+    {
+      path: `cmake-consumer/${payload.snippets?.cmakeFileName || "CMakeLists.txt"}`,
+      body: payload.snippets?.cmakeConsumerTemplate || ""
+    },
+    {
+      path: "cmake-consumer/main.cpp",
+      body: payload.snippets?.hostSkeletonCpp || ""
+    },
+    {
+      path: "cmake-consumer/rocksolid_host_config.env",
       body: payload.snippets?.hostConfigEnv || ""
     },
     {
@@ -2395,7 +2486,7 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "host-config", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "summary", "env", "host-config", "cmake", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
@@ -2436,6 +2527,13 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
       body: payload.snippets?.hostConfigEnv || ""
     };
   }
+  if (normalizedFormat === "cmake") {
+    return {
+      fileName: payload.snippets?.cmakeFileName || "CMakeLists.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.cmakeConsumerTemplate || ""
+    };
+  }
   if (normalizedFormat === "cpp") {
     return {
       fileName: payload.snippets?.cppFileName || "project.cpp",
@@ -2461,7 +2559,7 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "manifests", "env", "host-config", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "manifests", "env", "host-config", "cmake", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_EXPORT_FORMAT",
     "Integration export format"
@@ -2502,6 +2600,13 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
       body: payload.hostConfigBundleText || ""
     };
   }
+  if (normalizedFormat === "cmake") {
+    return {
+      fileName: payload.cmakeArchiveName || "integration-cmake.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.cmakeBundleText || ""
+    };
+  }
   if (normalizedFormat === "cpp") {
     return {
       fileName: payload.cppArchiveName || "integration-cpp.txt",
@@ -2527,7 +2632,7 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "env", "host-config", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "env", "host-config", "cmake", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_PACKAGE_FORMAT",
     "Integration package format"
@@ -2559,6 +2664,13 @@ function buildIntegrationPackageDownloadAsset(payload, format = "json") {
       fileName: payload.snippets?.hostConfigFileName || "rocksolid_host_config.env",
       contentType: "text/plain; charset=utf-8",
       body: payload.snippets?.hostConfigEnv || ""
+    };
+  }
+  if (normalizedFormat === "cmake") {
+    return {
+      fileName: payload.snippets?.cmakeFileName || "CMakeLists.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.cmakeConsumerTemplate || ""
     };
   }
   if (normalizedFormat === "cpp") {

@@ -115,6 +115,7 @@ The release workspace can now generate a project-scoped release delivery package
 - active runtime notices that affect startup or login
 - ready-to-download `.env` and C/C++ quickstart snippets
 - a dedicated `rocksolid_host_config.env` for the packaged CMake host consumer example
+- a project-aware `CMakeLists.txt` for the packaged CMake host consumer example
 - a project-aware C++ host skeleton that maps startup, local token validation, and heartbeat gating into host-app flow
 - a project-specific hardening guide text snippet for SDK integrators
 
@@ -130,7 +131,7 @@ The package route accepts:
 
 The download route accepts the same selectors plus:
 
-- `format=json|summary|env|host-config|cpp|host-skeleton|checksums|zip`
+- `format=json|summary|env|host-config|cmake|cpp|host-skeleton|checksums|zip`
 
 Typical uses:
 

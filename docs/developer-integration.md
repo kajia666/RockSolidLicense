@@ -28,7 +28,7 @@ The page now also summarizes how many visible projects currently have each of th
 
 The last 3 switches act as project-level client hardening controls. They affect the integration package, startup bootstrap preview, env template, C++ quickstart guidance, and generated C++ host skeleton so software authors can choose a stricter or more relaxed client-side hardening profile per project.
 
-The generated `.env` template is now also shaped to work with the packaged CMake host consumer example. The package additionally emits a dedicated `rocksolid_host_config.env`, so a software author can usually download that file directly, add the demo login credentials, flip `RS_RUN_NETWORK_DEMO=true`, and then drop it into the packaged host consumer skeleton without renaming fields by hand.
+The generated `.env` template is now also shaped to work with the packaged CMake host consumer example. The package additionally emits a dedicated `rocksolid_host_config.env` and a project-aware `CMakeLists.txt`, so a software author can usually download those files directly, add the demo login credentials, flip `RS_RUN_NETWORK_DEMO=true`, and then drop them into a minimal host consumer project without renaming fields by hand.
 
 ## API
 
@@ -74,6 +74,8 @@ The package route returns:
 - `snippets.envTemplate`
 - `snippets.hostConfigFileName`
 - `snippets.hostConfigEnv`
+- `snippets.cmakeFileName`
+- `snippets.cmakeConsumerTemplate`
 - `snippets.cppFileName`
 - `snippets.cppQuickstart`
 - `snippets.hostSkeletonFileName`
@@ -88,11 +90,13 @@ The batch package export routes return:
 - `manifestFiles`
 - `envFiles`
 - `hostConfigFiles`
+- `cmakeFiles`
 - `cppFiles`
 - `hostSkeletonFiles`
 - `manifestBundleText`
 - `envBundleText`
 - `hostConfigBundleText`
+- `cmakeBundleText`
 - `cppBundleText`
 - `hostSkeletonBundleText`
 
@@ -148,7 +152,7 @@ The page and API are useful when the software author needs to:
 - download the current single-project integration package directly as JSON, `.env`, `rocksolid_host_config.env`, C++ quickstart, host skeleton, or one zip handoff bundle
 - download a matching SHA-256 checksum list for the generated handoff files
 - export multiple project integration packages in one request from the project workspace when several software products need the same deployment refresh
-- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, dedicated host config file, and environment template that already line up with the packaged CMake host consumer example
+- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, dedicated host config file, project-aware `CMakeLists.txt`, and environment template that already line up with the packaged CMake host consumer example
 
 ## Request signing headers
 

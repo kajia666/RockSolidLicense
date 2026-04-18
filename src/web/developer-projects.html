@@ -138,11 +138,16 @@
         <article class="card">
           <h2>Project Detail</h2>
           <div id="detail-box" class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>
+          <div class="two" style="margin-top:12px;">
+            <label>Release Preview Channel<input id="detail-release-channel" placeholder="stable" /></label>
+            <div class="actions" style="align-self:end;"><button class="secondary" id="preview-release-readiness-btn">Preview Release Readiness</button><button id="clear-release-preview-btn">Clear Release Preview</button></div>
+          </div>
+          <div id="detail-release-readiness" class="hint" style="margin-top:12px;">Select a project and preview a channel to inspect release readiness without leaving this page.</div>
           <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
-          <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces.</div>
+          <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release readiness inline.</div>
         </article>
       </section>
 
@@ -158,6 +163,7 @@
       const routeParams = new URLSearchParams(window.location.search);
       const requestedProductId = (routeParams.get("productId") || "").trim();
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
 
       let token = "";
       let profile = null;
@@ -165,6 +171,7 @@
       let products = [];
       let dashboard = { summary: null, projects: [], generatedAt: null };
       let batchProductIds = new Set();
+      let releasePreview = null;
 
       function el(id) {
         return document.getElementById(id);
@@ -212,6 +219,10 @@
 
       function buildWorkspaceUrl(path, params = {}) {
         return `${path}${buildRouteQuery(params)}`;
+      }
+
+      function currentReleaseChannel() {
+        return (el("detail-release-channel")?.value || "").trim() || requestedChannel || "stable";
       }
 
       function findRequestedProduct(items = []) {
@@ -612,9 +623,51 @@
         return { status, title, tags, message, nextAction };
       }
 
+      function renderReleasePreview(product = null) {
+        const box = el("detail-release-readiness");
+        if (!product) {
+          box.textContent = "Select a project and preview a channel to inspect release readiness without leaving this page.";
+          return;
+        }
+
+        const channel = currentReleaseChannel();
+        if (!releasePreview || releasePreview.productCode !== product.code || releasePreview.channel !== channel) {
+          box.innerHTML = `Preview <code>${esc(channel)}</code> to load a release-readiness snapshot for <code>${esc(product.code)}</code>.`;
+          return;
+        }
+
+        const payload = releasePreview.payload || {};
+        const readiness = payload.manifest?.release?.readiness || {};
+        const deliverySummary = payload.deliverySummary || {};
+        const checklist = payload.deliveryChecklist || {};
+        const nextActions = Array.isArray(readiness.nextActions) ? readiness.nextActions.slice(0, 3) : [];
+        const checklistItems = Array.isArray(checklist.items) ? checklist.items.slice(0, 4) : [];
+        const blockingTotal = deliverySummary.blockingNotices ?? readiness.blockingChecks ?? 0;
+        const summaryTags = [
+          tag((readiness.title || readiness.status || "unknown").toUpperCase(), readiness.ready === true ? "ok" : readiness.status === "hold" ? "danger" : ""),
+          tag(`channel:${channel}`, ""),
+          tag(`candidate:${readiness.candidateVersion || "-"}`, readiness.candidateVersion ? "ok" : ""),
+          tag(`startup:${deliverySummary.startupStatus || "unknown"}`, deliverySummary.startupStatus === "blocking_notice" ? "danger" : ""),
+          tag(`blocking:${blockingTotal}`, blockingTotal > 0 ? "danger" : "ok"),
+          tag(`hardening:${deliverySummary.clientHardeningProfile || "-"}`, deliverySummary.clientHardeningProfile === "strict" ? "ok" : "")
+        ];
+
+        box.innerHTML = `
+          <div>${summaryTags.join("")}</div>
+          <div class="hint" style="margin-top:10px;">${esc(readiness.message || deliverySummary.summary || "No release readiness summary available.")}</div>
+          <div class="split-line" style="margin-top:12px;"><span>Latest Version</span><span>${esc(payload.manifest?.release?.versionManifest?.latestVersion || "-")}</span></div>
+          <div class="split-line"><span>Blocking Checks</span><span>${esc(readiness.blockingChecks ?? 0)}</span></div>
+          <div class="split-line"><span>Attention Checks</span><span>${esc(readiness.attentionChecks ?? 0)}</span></div>
+          <div class="split-line"><span>Checklist Status</span><span>${esc(String(checklist.status || "unknown").toUpperCase())} | blocks ${esc(checklist.blockItems ?? 0)} | review ${esc(checklist.reviewItems ?? 0)}</span></div>
+          ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
+          ${checklistItems.length ? `<div class="hint" style="margin-top:12px;">Top checklist items:<br>${checklistItems.map((item, index) => `${index + 1}. [${esc(String(item.status || "unknown").toUpperCase())}] ${esc(item.label || item.key || "item")} | ${esc(item.summary || "-")}`).join("<br>")}</div>` : ""}
+        `;
+      }
+
       function renderDetail(product = null) {
         if (!product) {
           el("detail-box").innerHTML = '<div class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>';
+          renderReleasePreview(null);
           syncWorkspaceLinks(null);
           return;
         }
@@ -643,6 +696,7 @@
           <div class="hint" style="margin-top:14px;">Current featureConfig</div>
           <div style="margin-top:8px;">${renderFeatureDetails(features)}</div>
         `;
+        renderReleasePreview(product);
         syncWorkspaceLinks(product);
       }
 
@@ -650,9 +704,12 @@
         const hasProduct = Boolean(product);
         el("open-project-integration-btn").disabled = !hasProduct;
         el("open-project-release-btn").disabled = !hasProduct;
+        el("preview-release-readiness-btn").disabled = !hasProduct;
+        el("clear-release-preview-btn").disabled = !hasProduct && !releasePreview;
+        const channel = currentReleaseChannel();
         el("detail-navigation-hint").textContent = hasProduct
-          ? `Open ${product.code} in Developer Integration or Developer Releases with the same project already selected.`
-          : "Select a project to open its integration package or release handoff check in the dedicated workspaces.";
+          ? `Open ${product.code} in Developer Integration or Developer Releases with channel ${channel} already selected, or preview readiness inline here.`
+          : "Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release readiness inline.";
       }
 
       function setSelection(product = null) {
@@ -742,6 +799,7 @@
         products = [];
         dashboard = { summary: null, projects: [], generatedAt: null };
         batchProductIds = new Set();
+        releasePreview = null;
         renderProjects();
         setMeta();
         setSelection(null);
@@ -1136,7 +1194,8 @@
         }
         window.location.href = buildWorkspaceUrl("/developer/integration", {
           productId,
-          productCode
+          productCode,
+          channel: currentReleaseChannel()
         });
       });
 
@@ -1150,11 +1209,47 @@
         window.location.href = buildWorkspaceUrl("/developer/releases", {
           productId,
           productCode,
-          channel: "stable",
+          channel: currentReleaseChannel(),
           autofocus: "package"
         });
       });
 
+      el("preview-release-readiness-btn").addEventListener("click", async () => {
+        try {
+          const productId = el("edit-product-id").value.trim();
+          const productCode = el("edit-product-code").value.trim();
+          if (!productId || !productCode) {
+            throw new Error("Select a project before previewing release readiness.");
+          }
+          const channel = currentReleaseChannel();
+          const payload = await api(`/api/developer/release-package${buildRouteQuery({ productCode, channel })}`);
+          releasePreview = { productCode, channel, payload };
+          const product = findVisibleProductById(productId);
+          renderReleasePreview(product);
+          syncWorkspaceLinks(product);
+          setStatus(`Loaded ${productCode} release readiness for channel ${channel}.`);
+          setOutput({ releasePreview: payload });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("clear-release-preview-btn").addEventListener("click", () => {
+        releasePreview = null;
+        const product = findVisibleProductById(el("edit-product-id").value.trim());
+        renderReleasePreview(product);
+        syncWorkspaceLinks(product);
+        setStatus("Inline release preview cleared.");
+      });
+
+      el("detail-release-channel").addEventListener("change", () => {
+        const product = findVisibleProductById(el("edit-product-id").value.trim());
+        renderReleasePreview(product);
+        syncWorkspaceLinks(product);
+      });
+
+      el("detail-release-channel").value = requestedChannel;
       writeFeatureConfig("create", {});
       writeFeatureConfig("edit", {});
       writeFeatureConfig("batch", {});

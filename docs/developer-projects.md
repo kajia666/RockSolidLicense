@@ -18,6 +18,8 @@ The detail card now also shows a lightweight "Delivery quick signals" summary. I
 - active blocking notices
 - startup version-check or notice toggles being turned off
 
+The same detail card now also supports an inline release-readiness preview. Software authors can choose a channel such as `stable` and fetch the current `release-package` summary directly inside `/developer/projects` before jumping to the dedicated release workspace.
+
 ## Scoped APIs
 
 - `GET /api/developer/products`

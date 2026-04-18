@@ -9,7 +9,7 @@
 - 服务端按策略校验机器绑定、会话状态、版本规则、公告维护窗口与网络规则
 - 登录成功后签发 RSA `licenseToken`，并通过心跳维持在线状态
 - Windows C/C++ SDK 已支持 HTTP/TCP 通信、签名、令牌验签、版本检查、公告拉取、启动决策辅助、结构化错误处理、绑定查询和自助解绑
-- SDK 交付物现在同时提供高层 demo、项目级 host skeleton、可直接下发 `rocksolid_host_config.env`、`CMakeLists.txt`、VS2022 `.vcxproj/.props/.sln` 的宿主工程骨架、hardening guide 和发布/接入包模板，方便软件作者按项目策略接入
+- SDK 交付物现在同时提供高层 demo、项目级 host skeleton、可直接下发 `rocksolid_host_config.env`、`CMakeLists.txt`、VS2022 `.vcxproj/.props/.sln` 与项目级 quickstart 的宿主工程骨架、hardening guide 和发布/接入包模板，方便软件作者按项目策略接入
 
 这套系统现在更偏向“网络验证 / 软件授权平台”，而不是账单结算系统。代理、库存和结算相关能力保留为辅助运营模块，不是当前仓库的唯一重心。
 
@@ -53,7 +53,7 @@
 - 产品级功能开关
 - 项目 SDK 凭据轮换
 - 批量 SDK 凭据 / 集成包 / 发版包导出与 zip 下载
-- 开发者接入中心单项目集成包直接下载，并支持单独下载项目级 C++ host skeleton、`rocksolid_host_config.env`、`CMakeLists.txt` 与 VS2022 `.sln/.vcxproj/.props`
+- 开发者接入中心单项目集成包直接下载，并支持单独下载项目级 C++ host skeleton、`rocksolid_host_config.env`、`CMakeLists.txt` 与 VS2022 `.sln/.vcxproj/.props/.md`
 - 项目中心 / 接入中心 / 发版中心跨页预填联动
 - 项目页发版快速信号摘要
 - 开发者多项目归属
@@ -400,7 +400,7 @@ npm run db:postgres:check
 - 项目级功能开关关闭后，对应客户端接口会返回“disabled by product”，运行链路也不会继续套用该项目的相关规则
 - 项目 SDK 凭据支持只轮换 `sdkAppSecret`，也支持连同 `sdkAppId` 一起轮换；旧凭据会立即失效，因此更适合在软件作者完成 SDK 配置更新后统一切换
 - 项目中心里的 SDK 凭据批量导出会同时生成 JSON、CSV 和 `.env` 片段，方便软件作者在轮换后把新凭据快速同步给接入工程
-- 项目中心现在也支持批量导出集成包，单次导出会包含每个项目的接入清单 JSON、`.env` 模板、C/C++ 快速接入片段、按项目策略生成的 C++ host skeleton、VS2022 `.sln/.vcxproj/.props`，以及自动生成的 client hardening guide，适合给多个软件项目同时下发最新 SDK 配置
+- 项目中心现在也支持批量导出集成包，单次导出会包含每个项目的接入清单 JSON、`.env` 模板、C/C++ 快速接入片段、按项目策略生成的 C++ host skeleton、VS2022 `.sln/.vcxproj/.props/.md`，以及自动生成的 client hardening guide，适合给多个软件项目同时下发最新 SDK 配置
 - 集成包批量导出现在也支持服务端附件下载，可以直接拿到整包 JSON、manifest 合集、`.env` 合集或 C/C++ 片段合集，而不需要前端自己拼文本
 - 发布交付包和批量集成包下载现在都支持 `zip` 归档，便于直接发给软件作者、测试同事或集成同事做离线交接
 - SDK 凭据包、集成包和发布交付包现在都会附带 `SHA-256` 校验清单，支持单独下载校验文本，也会自动打进 `zip` 包里
@@ -438,7 +438,7 @@ npm run db:postgres:check
 - `/admin`：管理员控制台，可处理账号、授权、会话、绑定、设备封禁和审计日志，支持审计快捷筛选、日志行回填、可点击的快照概览卡、直接可点的授权审查列表，以及从快照重点对象自动联动相关列表并高亮匹配记录、自动聚焦对应控制卡片，并在动作成功后围绕同一对象自动刷新上下文，还会在快照区显示最近一次动作是否仍处于重点关注中、风险级别是改善还是升高、是否移出了推荐处置队列、是否已经脱离 `Escalate First` 级别，以及更直接的 `Mitigated / Escalation Lowered / Still Escalate` 这类缓解结论；这些结果还会进一步驱动更贴合语境的 follow-up 按钮文案，帮助管理员更自然地继续 `Close Out / Monitor / Follow Up / Escalate`，同时保留 `issues / sessions / entitlements / points` 这类影响范围提示；快照顶部会额外突出 `Escalate First` 高优先级对象，并把产品、用户、原因、建议动作以及影响范围指标压缩成更短摘要，还支持直接 `Open Control` 或 `Load Full Context`，这些重点摘要也会同步进导出的 `summary` 文本
 - `/admin/products`：管理员产品中心，可创建开发者、分配项目归属、编辑项目资料、切换单个或批量项目状态、按关键字和状态筛选项目，并支持单个或批量调整项目级功能开关、批量轮换 SDK 凭据、批量导出凭据清单和批量集成包
 - `/developer`：开发者总览中心，展示项目数、在线会话、卡密、强更规则、阻断公告、网络规则和功能开关覆盖情况
-- `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息、启动引导 `startup-bootstrap` 预览、示例请求，并导出当前项目的接入包、环境模板、C++ 快速接入片段、项目级 host skeleton，以及 VS2022 `.sln/.vcxproj/.props`
+- `/developer/integration`：开发者接入中心，查看项目 SDK 凭据、公钥集、HTTP/TCP 接入信息、启动引导 `startup-bootstrap` 预览、示例请求，并导出当前项目的接入包、环境模板、C++ 快速接入片段、项目级 host skeleton，以及 VS2022 `.sln/.vcxproj/.props/.md`
 - `/developer/projects`：开发者项目中心，处理项目创建、资料编辑、单个或批量状态切换、关键字与状态筛选、单个或批量功能开关配置，以及单个或批量 SDK 凭据轮换、凭据导出和批量集成包导出
 - `/developer/licenses`：开发者授权中心，维护策略、卡密批次、卡密状态和卡密导出
 - `/developer/ops`：开发者授权运营台，处理账号冻结、授权续期、点数调账、强制下线、设备解绑、设备封禁，并支持审计快捷筛选、日志行回填、可点击的快照概览卡、重点账号/会话/设备明细、`Escalate First` 高优先级对象摘要、`Prepared Control` 回显卡，以及动作完成后的 `Last Action Result / Mitigation / Follow-up` 回显；这些回显现在不仅能跟随快照焦点，也能尽量跟随表格选中对象或快速控制表单中的当前目标，并会结合结果状态、影响范围、`Escalate First` 变化、当前对象摘要和命中的快照信号给出更贴合的下一步入口，同时保留直接 `Open Control / Load Full Context` 的 scoped 处置入口与 ops 快照包导出

@@ -912,6 +912,60 @@ function buildIntegrationVs2022PropsTemplate(manifest) {
 `;
 }
 
+function buildIntegrationVs2022QuickstartTemplate(manifest) {
+  const project = manifest.project || {};
+  const startupDefaults = manifest.startupDefaults || {};
+  const clientHardening = manifest.clientHardening || {};
+  const projectBase = buildIntegrationConsumerProjectBaseName(manifest);
+  const solutionName = `${projectBase}_host_consumer.sln`;
+  const projectName = `${projectBase}_host_consumer.vcxproj`;
+  const channel = String(startupDefaults.channel ?? "stable").trim() || "stable";
+  const clientVersion = String(startupDefaults.clientVersion ?? "1.0.0").trim() || "1.0.0";
+
+  const requirementLine = (enabled, requiredLabel, optionalLabel) => (
+    enabled ? `REQUIRED: ${requiredLabel}` : `OPTIONAL: ${optionalLabel}`
+  );
+
+  return [
+    `# VS2022 Quickstart for ${project.code || "ROCKSOLID_APP"}`,
+    "",
+    "This handoff is meant for software authors who want to open a ready-made native Visual Studio 2022 solution instead of wiring a project by hand.",
+    "",
+    "Files inside vs2022-consumer/:",
+    `- ${solutionName}: open this solution in VS2022 first.`,
+    `- ${projectName}: the generated host project referenced by the solution.`,
+    "- RockSolidSDK.props: include/lib/runtime settings. Change ROCKSOLID_SDK_ROOT here if the SDK package lives elsewhere.",
+    "- main.cpp: the generated project-aware host skeleton. Replace or adapt this with your real protected app entry flow.",
+    "- rocksolid_host_config.env: runtime settings the host skeleton reads for startup bootstrap, login, token verification, and heartbeat behavior.",
+    "",
+    `Project: ${project.code || "-"} (${project.name || "Unnamed Project"})`,
+    `Default startup channel: ${channel}`,
+    `Default client version: ${clientVersion}`,
+    clientHardening.profile
+      ? `Client hardening profile: ${clientHardening.profile}`
+      : "Client hardening profile: balanced",
+    clientHardening.summary
+      ? `Client hardening summary: ${clientHardening.summary}`
+      : "Client hardening summary: Review the package JSON for the full runtime expectations.",
+    `- startup-bootstrap: ${requirementLine(clientHardening.startupBootstrapRequired, "Run startup_bootstrap_http(...) before allowing protected features.", "You can phase this in later, but startup bootstrap is still the recommended default.")}`,
+    `- local token validation: ${requirementLine(clientHardening.localTokenValidationRequired, "Verify the returned licenseToken locally before trusting entitlement data.", "You can start with service-side trust first, then turn on local validation when the host flow is ready.")}`,
+    `- heartbeat gate: ${requirementLine(clientHardening.heartbeatGateRequired, "Use heartbeat results to keep protected features gated while the session stays healthy.", "You can start by observing heartbeats, then make them gate protected features once the host flow is stable.")}`,
+    "",
+    "First-run checklist:",
+    "1. Extract the rocksolid-sdk-cpp package next to the handoff folder, or edit ROCKSOLID_SDK_ROOT in RockSolidSDK.props to the extracted SDK root.",
+    `2. Keep ${solutionName}, ${projectName}, RockSolidSDK.props, main.cpp, and rocksolid_host_config.env together inside the same vs2022-consumer/ folder.`,
+    `3. Review rocksolid_host_config.env and confirm RS_PROJECT_CODE=${project.code || ""}, RS_CHANNEL=${channel}, RS_CLIENT_VERSION=${clientVersion}, RS_APP_ID, RS_APP_SECRET, RS_API_BASE_URL, and RS_HTTP_HOST match the target environment.`,
+    "4. For a smoke test, set RS_RUN_NETWORK_DEMO=true and fill RS_DEMO_USERNAME plus RS_DEMO_PASSWORD with a real test account or card-login flow.",
+    "5. Open the solution in VS2022, choose x64 Debug or x64 Release, then build the solution.",
+    "6. Run the built executable with the working directory still pointing at the vs2022-consumer/ folder so rocksolid_host_config.env can be found.",
+    "",
+    "Before shipping:",
+    "- Replace demo credentials, and set RS_RUN_NETWORK_DEMO=false once the host app has taken over the real login/startup flow.",
+    "- Replace local/testing API hosts with the public TLS domain or reverse-proxy endpoint that production clients should call.",
+    "- Re-download this handoff package after rotating sdkAppId, sdkAppSecret, token keys, or project hardening settings so the VS2022 assets stay aligned."
+  ].join("\n");
+}
+
 function buildIntegrationCppQuickstart(manifest) {
   const project = manifest.project || {};
   const credentials = manifest.credentials || {};
@@ -1518,6 +1572,8 @@ function buildDeveloperIntegrationPackagePayload({
       vs2022ProjectTemplate: buildIntegrationVs2022ProjectTemplate(manifest),
       vs2022PropsFileName: "RockSolidSDK.props",
       vs2022PropsTemplate: buildIntegrationVs2022PropsTemplate(manifest),
+      vs2022GuideFileName: `${buildIntegrationConsumerProjectBaseName(manifest)}_vs2022_quickstart.md`,
+      vs2022GuideText: buildIntegrationVs2022QuickstartTemplate(manifest),
       cppFileName: `${product.code}.cpp`,
       cppQuickstart: buildIntegrationCppQuickstart(manifest),
       hostSkeletonFileName: `${product.code}-host-skeleton.cpp`,
@@ -1722,6 +1778,13 @@ function buildIntegrationPackageVs2022PropsFiles(items = []) {
   }));
 }
 
+function buildIntegrationPackageVs2022GuideFiles(items = []) {
+  return items.map((item) => ({
+    fileName: `${item.code}/${item.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md"}`,
+    content: item.snippets?.vs2022GuideText || ""
+  }));
+}
+
 function buildIntegrationPackageCppFiles(items = []) {
   return items.map((item) => ({
     fileName: `${item.code}.cpp`,
@@ -1753,6 +1816,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
   const vs2022SolutionFiles = buildIntegrationPackageVs2022SolutionFiles(items);
   const vs2022Files = buildIntegrationPackageVs2022Files(items);
   const vs2022PropsFiles = buildIntegrationPackageVs2022PropsFiles(items);
+  const vs2022GuideFiles = buildIntegrationPackageVs2022GuideFiles(items);
   const cppFiles = buildIntegrationPackageCppFiles(items);
   const hostSkeletonFiles = buildIntegrationPackageHostSkeletonFiles(items);
   const hardeningFiles = buildIntegrationPackageHardeningFiles(items);
@@ -1774,6 +1838,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     vs2022SolutionArchiveName: `rocksolid-integration-packages-${timestampTag}-vs2022-sln.txt`,
     vs2022ArchiveName: `rocksolid-integration-packages-${timestampTag}-vs2022.txt`,
     vs2022PropsArchiveName: `rocksolid-integration-packages-${timestampTag}-vs2022-props.txt`,
+    vs2022GuideArchiveName: `rocksolid-integration-packages-${timestampTag}-vs2022-guide.txt`,
     cppArchiveName: `rocksolid-integration-packages-${timestampTag}-cpp.txt`,
     hostSkeletonArchiveName: `rocksolid-integration-packages-${timestampTag}-host-skeleton.txt`,
     hardeningArchiveName: `rocksolid-integration-packages-${timestampTag}-hardening.txt`,
@@ -1785,6 +1850,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     vs2022SolutionFiles,
     vs2022Files,
     vs2022PropsFiles,
+    vs2022GuideFiles,
     cppFiles,
     hostSkeletonFiles,
     hardeningFiles,
@@ -1795,6 +1861,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     vs2022SolutionBundleText: buildNamedFileBundleText(vs2022SolutionFiles),
     vs2022BundleText: buildNamedFileBundleText(vs2022Files),
     vs2022PropsBundleText: buildNamedFileBundleText(vs2022PropsFiles),
+    vs2022GuideBundleText: buildNamedFileBundleText(vs2022GuideFiles),
     cppBundleText: buildNamedFileBundleText(cppFiles),
     hostSkeletonBundleText: buildNamedFileBundleText(hostSkeletonFiles),
     hardeningBundleText: buildNamedFileBundleText(hardeningFiles)
@@ -1840,7 +1907,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push(`- Hardening Summary: ${deliverySummary.clientHardeningSummary}`);
   }
   if (deliverySummary.artifacts) {
-    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | hostConfig=${deliverySummary.artifacts.hostConfig || "-"} | cmake=${deliverySummary.artifacts.cmakeConsumer || "-"} | vs2022Sln=${deliverySummary.artifacts.vs2022Solution || "-"} | vs2022=${deliverySummary.artifacts.vs2022Consumer || "-"} | vs2022Props=${deliverySummary.artifacts.vs2022Props || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
+    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | hostConfig=${deliverySummary.artifacts.hostConfig || "-"} | cmake=${deliverySummary.artifacts.cmakeConsumer || "-"} | vs2022Guide=${deliverySummary.artifacts.vs2022Guide || "-"} | vs2022Sln=${deliverySummary.artifacts.vs2022Solution || "-"} | vs2022=${deliverySummary.artifacts.vs2022Consumer || "-"} | vs2022Props=${deliverySummary.artifacts.vs2022Props || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
   }
   lines.push("");
 
@@ -2006,9 +2073,9 @@ function buildReleaseDeliveryChecklistPayload({
     key: "handoff_artifacts",
     label: "Handoff artifacts",
     status: "pass",
-    summary: "JSON package, summary text, env template, host config, CMake consumer template, VS2022 solution, VS2022 project template, VS2022 props sheet, C++ quickstart, and host skeleton are bundled for handoff.",
-    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.hostConfig || "-"} | ${deliverySummary.artifacts?.cmakeConsumer || "-"} | ${deliverySummary.artifacts?.vs2022Solution || "-"} | ${deliverySummary.artifacts?.vs2022Consumer || "-"} | ${deliverySummary.artifacts?.vs2022Props || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
-    nextAction: "Send the matching JSON, summary, env, host config, CMake template, VS2022 solution, VS2022 project template, VS2022 props sheet, quickstart, and host skeleton snippets together so integration stays aligned."
+    summary: "JSON package, summary text, env template, host config, CMake consumer template, VS2022 quickstart, VS2022 solution, VS2022 project template, VS2022 props sheet, C++ quickstart, and host skeleton are bundled for handoff.",
+    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.hostConfig || "-"} | ${deliverySummary.artifacts?.cmakeConsumer || "-"} | ${deliverySummary.artifacts?.vs2022Guide || "-"} | ${deliverySummary.artifacts?.vs2022Solution || "-"} | ${deliverySummary.artifacts?.vs2022Consumer || "-"} | ${deliverySummary.artifacts?.vs2022Props || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
+    nextAction: "Send the matching JSON, summary, env, host config, CMake template, VS2022 quickstart, VS2022 solution, VS2022 project template, VS2022 props sheet, quickstart, and host skeleton snippets together so integration stays aligned."
   });
 
   const blockItems = items.filter((item) => item.status === "block").length;
@@ -2038,6 +2105,7 @@ function buildReleaseDeliverySummaryPayload({
   envFileName,
   hostConfigFileName,
   cmakeFileName,
+  vs2022GuideFileName,
   vs2022SolutionFileName,
   vs2022ProjectFileName,
   vs2022PropsFileName,
@@ -2096,6 +2164,7 @@ function buildReleaseDeliverySummaryPayload({
       envTemplate: `snippets/${envFileName || "project.env"}`,
       hostConfig: `host-config/${hostConfigFileName || "rocksolid_host_config.env"}`,
       cmakeConsumer: `cmake-consumer/${cmakeFileName || "CMakeLists.txt"}`,
+      vs2022Guide: `vs2022-consumer/${vs2022GuideFileName || "rocksolid_vs2022_quickstart.md"}`,
       vs2022Solution: `vs2022-consumer/${vs2022SolutionFileName || "rocksolid_host_consumer.sln"}`,
       vs2022Consumer: `vs2022-consumer/${vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj"}`,
       vs2022Props: `vs2022-consumer/${vs2022PropsFileName || "RockSolidSDK.props"}`,
@@ -2311,6 +2380,7 @@ function buildReleasePackagePayload({
   const envFileName = `${product.code}.env`;
   const hostConfigFileName = "rocksolid_host_config.env";
   const cmakeFileName = "CMakeLists.txt";
+  const vs2022GuideFileName = `${buildIntegrationConsumerProjectBaseName(integrationPackage?.manifest || { project: product })}_vs2022_quickstart.md`;
   const vs2022SolutionFileName = `${buildIntegrationConsumerProjectBaseName(integrationPackage?.manifest || { project: product })}_host_consumer.sln`;
   const vs2022ProjectFileName = `${buildIntegrationConsumerProjectBaseName(integrationPackage?.manifest || { project: product })}_host_consumer.vcxproj`;
   const vs2022PropsFileName = "RockSolidSDK.props";
@@ -2332,6 +2402,7 @@ function buildReleasePackagePayload({
     envFileName,
     hostConfigFileName,
     cmakeFileName,
+    vs2022GuideFileName,
     vs2022SolutionFileName,
     vs2022ProjectFileName,
     vs2022PropsFileName,
@@ -2382,6 +2453,7 @@ function buildReleasePackagePayload({
       envFileName,
       hostConfigFileName,
       cmakeFileName,
+      vs2022GuideFileName,
       vs2022SolutionFileName,
       vs2022ProjectFileName,
       vs2022PropsFileName,
@@ -2407,6 +2479,8 @@ function buildReleasePackagePayload({
       hostConfigEnv: integrationPackage?.snippets?.hostConfigEnv || "",
       cmakeFileName,
       cmakeConsumerTemplate: integrationPackage?.snippets?.cmakeConsumerTemplate || "",
+      vs2022GuideFileName,
+      vs2022GuideText: integrationPackage?.snippets?.vs2022GuideText || "",
       vs2022SolutionFileName,
       vs2022SolutionTemplate: integrationPackage?.snippets?.vs2022SolutionTemplate || "",
       vs2022ProjectFileName,
@@ -2501,6 +2575,10 @@ function buildReleasePackageFiles(payload) {
     {
       path: `cmake-consumer/${payload.snippets?.cmakeFileName || "CMakeLists.txt"}`,
       body: payload.snippets?.cmakeConsumerTemplate || ""
+    },
+    {
+      path: `vs2022-consumer/${payload.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md"}`,
+      body: payload.snippets?.vs2022GuideText || ""
     },
     {
       path: `vs2022-consumer/${payload.snippets?.vs2022SolutionFileName || "rocksolid_host_consumer.sln"}`,
@@ -2618,6 +2696,12 @@ function buildIntegrationPackageExportFiles(payload) {
       body: file.content || ""
     });
   }
+  for (const file of payload.vs2022GuideFiles || []) {
+    files.push({
+      path: `vs2022-consumer/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
   for (const file of payload.cppFiles || []) {
     files.push({
       path: `cpp/${file.fileName}`,
@@ -2662,6 +2746,10 @@ function buildSingleIntegrationPackageFiles(payload) {
     {
       path: `cmake-consumer/${payload.snippets?.cmakeFileName || "CMakeLists.txt"}`,
       body: payload.snippets?.cmakeConsumerTemplate || ""
+    },
+    {
+      path: `vs2022-consumer/${payload.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md"}`,
+      body: payload.snippets?.vs2022GuideText || ""
     },
     {
       path: `vs2022-consumer/${payload.snippets?.vs2022SolutionFileName || "rocksolid_host_consumer.sln"}`,
@@ -2786,7 +2874,7 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "host-config", "cmake", "vs2022-sln", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "summary", "env", "host-config", "cmake", "vs2022-guide", "vs2022-sln", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
@@ -2832,6 +2920,13 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
       fileName: payload.snippets?.cmakeFileName || "CMakeLists.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.snippets?.cmakeConsumerTemplate || ""
+    };
+  }
+  if (normalizedFormat === "vs2022-guide") {
+    return {
+      fileName: payload.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.vs2022GuideText || ""
     };
   }
   if (normalizedFormat === "vs2022-sln") {
@@ -2880,7 +2975,7 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "manifests", "env", "host-config", "cmake", "vs2022-sln", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "manifests", "env", "host-config", "cmake", "vs2022-guide", "vs2022-sln", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_EXPORT_FORMAT",
     "Integration export format"
@@ -2926,6 +3021,13 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
       fileName: payload.cmakeArchiveName || "integration-cmake.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.cmakeBundleText || ""
+    };
+  }
+  if (normalizedFormat === "vs2022-guide") {
+    return {
+      fileName: payload.vs2022GuideArchiveName || "integration-vs2022-guide.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.vs2022GuideBundleText || ""
     };
   }
   if (normalizedFormat === "vs2022-sln") {
@@ -2974,7 +3076,7 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "env", "host-config", "cmake", "vs2022-sln", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "env", "host-config", "cmake", "vs2022-guide", "vs2022-sln", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_PACKAGE_FORMAT",
     "Integration package format"
@@ -3013,6 +3115,13 @@ function buildIntegrationPackageDownloadAsset(payload, format = "json") {
       fileName: payload.snippets?.cmakeFileName || "CMakeLists.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.snippets?.cmakeConsumerTemplate || ""
+    };
+  }
+  if (normalizedFormat === "vs2022-guide") {
+    return {
+      fileName: payload.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.vs2022GuideText || ""
     };
   }
   if (normalizedFormat === "vs2022-sln") {

@@ -19,6 +19,7 @@ test("sdk cpp package assets include host skeleton plus cmake and VS2022 consume
   const vs2022HostConsumerMain = readText("sdk/examples/vs2022_cpp_host_consumer/main.cpp");
   const vs2022HostConsumerProject = readText("sdk/examples/vs2022_cpp_host_consumer/RockSolidSDKCppHostConsumer.vcxproj");
   const vs2022HostConsumerFilters = readText("sdk/examples/vs2022_cpp_host_consumer/RockSolidSDKCppHostConsumer.vcxproj.filters");
+  const vs2022HostConsumerProps = readText("sdk/examples/vs2022_cpp_host_consumer/RockSolidSDK.props");
   const vs2022HostConsumerSolution = readText("sdk/examples/vs2022_cpp_host_consumer/RockSolidSDKCppHostConsumer.sln");
   const vs2022HostConsumerEnv = readText("sdk/examples/vs2022_cpp_host_consumer/rocksolid_host_config.env.example");
   const dedupEnvRunner = readText("sdk/run_with_dedup_env.mjs");
@@ -46,12 +47,15 @@ test("sdk cpp package assets include host skeleton plus cmake and VS2022 consume
   assert.match(cmakeHostConsumerEnv, /RS_RUN_NETWORK_DEMO=false/);
   assert.match(vs2022HostConsumerMain, /\.\.\\\\cmake_cpp_host_consumer\\\\main\.cpp/);
   assert.match(vs2022HostConsumerProject, /PlatformToolset>v143</);
-  assert.match(vs2022HostConsumerProject, /ROCKSOLID_SDK_ROOT/);
-  assert.match(vs2022HostConsumerProject, /rocksolid_sdk_static\.lib/);
-  assert.match(vs2022HostConsumerProject, /RuntimeLibrary>MultiThreaded</);
+  assert.match(vs2022HostConsumerProject, /Import Project="RockSolidSDK\.props"/);
+  assert.doesNotMatch(vs2022HostConsumerProject, /rocksolid_sdk_static\.lib/);
   assert.match(vs2022HostConsumerProject, /rocksolid_host_config\.env\.example/);
   assert.match(vs2022HostConsumerFilters, /Source Files/);
   assert.match(vs2022HostConsumerFilters, /Config/);
+  assert.match(vs2022HostConsumerFilters, /RockSolidSDK\.props/);
+  assert.match(vs2022HostConsumerProps, /ROCKSOLID_SDK_ROOT/);
+  assert.match(vs2022HostConsumerProps, /AdditionalLibraryDirectories>/);
+  assert.match(vs2022HostConsumerProps, /rocksolid_sdk_static\.lib/);
   assert.match(vs2022HostConsumerSolution, /RockSolidSDKCppHostConsumer\.vcxproj/);
   assert.match(vs2022HostConsumerEnv, /RS_PROJECT_CODE=MY_SOFTWARE/);
   assert.match(vs2022HostConsumerEnv, /RS_RUN_NETWORK_DEMO=false/);

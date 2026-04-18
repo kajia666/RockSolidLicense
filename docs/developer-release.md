@@ -116,11 +116,11 @@ The release workspace can now generate a project-scoped release delivery package
 - ready-to-download `.env` and C/C++ quickstart snippets
 - a dedicated `rocksolid_host_config.env` for the packaged CMake host consumer example
 - a project-aware `CMakeLists.txt` for the packaged CMake host consumer example
-- a VS2022 `.vcxproj` for software authors who prefer native Visual Studio projects
+- a VS2022 `.vcxproj` plus `RockSolidSDK.props` for software authors who prefer native Visual Studio projects
 - a project-aware C++ host skeleton that maps startup, local token validation, and heartbeat gating into host-app flow
 - a project-specific hardening guide text snippet for SDK integrators
 
-The release package `.env` template now also carries the extra demo/runtime keys used by the packaged CMake host consumer example, and the package emits a dedicated `rocksolid_host_config.env` for that example. That keeps release handoff closer to a real executable skeleton instead of stopping at raw SDK credentials.
+The release package `.env` template now also carries the extra demo/runtime keys used by the packaged CMake host consumer example, and the package emits a dedicated `rocksolid_host_config.env` plus a reusable `RockSolidSDK.props` for the VS2022 handoff. That keeps release handoff closer to a real executable skeleton instead of stopping at raw SDK credentials.
 
 The package route accepts:
 
@@ -132,7 +132,7 @@ The package route accepts:
 
 The download route accepts the same selectors plus:
 
-- `format=json|summary|env|host-config|cmake|vs2022|cpp|host-skeleton|checksums|zip`
+- `format=json|summary|env|host-config|cmake|vs2022|vs2022-props|cpp|host-skeleton|checksums|zip`
 
 Typical uses:
 

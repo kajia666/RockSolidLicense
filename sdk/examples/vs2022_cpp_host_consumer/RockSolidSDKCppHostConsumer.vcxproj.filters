@@ -12,6 +12,9 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <None Include="RockSolidSDK.props">
+      <Filter>Config</Filter>
+    </None>
     <None Include="rocksolid_host_config.env.example">
       <Filter>Config</Filter>
     </None>

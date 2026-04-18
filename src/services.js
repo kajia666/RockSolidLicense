@@ -803,16 +803,42 @@ function buildIntegrationVs2022ProjectTemplate(manifest) {
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="RockSolidSDK.props" Condition="exists('RockSolidSDK.props')" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="RockSolidSDK.props" Condition="exists('RockSolidSDK.props')" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <None Include="RockSolidSDK.props" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
+<!-- Project: ${project.code || "-"} | Channel: ${channel} | Set ROCKSOLID_SDK_ROOT to the extracted rocksolid-sdk-cpp package root before building in VS2022. -->
+`;
+}
+
+function buildIntegrationVs2022PropsTemplate(manifest) {
+  const project = manifest.project || {};
+  const startupDefaults = manifest.startupDefaults || {};
+  const projectBase = buildIntegrationConsumerProjectBaseName(manifest);
+  const projectName = `${projectBase}_host_consumer`;
+  const channel = String(startupDefaults.channel ?? "stable").trim() || "stable";
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros">
     <ROCKSOLID_SDK_ROOT Condition="'$(ROCKSOLID_SDK_ROOT)'==''">$(MSBuildThisFileDirectory)..\\..\\rocksolid-sdk-cpp</ROCKSOLID_SDK_ROOT>
+    <ROCKSOLID_TARGET_NAME Condition="'$(ROCKSOLID_TARGET_NAME)'==''">${projectName}</ROCKSOLID_TARGET_NAME>
+  </PropertyGroup>
+  <PropertyGroup>
     <OutDir>$(MSBuildThisFileDirectory)build\\$(Configuration)\\</OutDir>
     <IntDir>$(MSBuildThisFileDirectory)build\\obj\\$(Configuration)\\</IntDir>
-    <TargetName>${projectName}</TargetName>
+    <TargetName>$(ROCKSOLID_TARGET_NAME)</TargetName>
+    <LocalDebuggerWorkingDirectory>$(MSBuildThisFileDirectory)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -850,11 +876,6 @@ function buildIntegrationVs2022ProjectTemplate(manifest) {
       <AdditionalLibraryDirectories>$(ROCKSOLID_SDK_ROOT)\\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
-  <Import Project="$(VCTargetsPath)\\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
 </Project>
 <!-- Project: ${project.code || "-"} | Channel: ${channel} | Set ROCKSOLID_SDK_ROOT to the extracted rocksolid-sdk-cpp package root before building in VS2022. -->
 `;
@@ -1462,6 +1483,8 @@ function buildDeveloperIntegrationPackagePayload({
       cmakeConsumerTemplate: buildIntegrationCMakeConsumerTemplate(manifest),
       vs2022ProjectFileName: `${buildIntegrationConsumerProjectBaseName(manifest)}_host_consumer.vcxproj`,
       vs2022ProjectTemplate: buildIntegrationVs2022ProjectTemplate(manifest),
+      vs2022PropsFileName: "RockSolidSDK.props",
+      vs2022PropsTemplate: buildIntegrationVs2022PropsTemplate(manifest),
       cppFileName: `${product.code}.cpp`,
       cppQuickstart: buildIntegrationCppQuickstart(manifest),
       hostSkeletonFileName: `${product.code}-host-skeleton.cpp`,
@@ -1652,6 +1675,13 @@ function buildIntegrationPackageVs2022Files(items = []) {
   }));
 }
 
+function buildIntegrationPackageVs2022PropsFiles(items = []) {
+  return items.map((item) => ({
+    fileName: `${item.code}/${item.snippets?.vs2022PropsFileName || "RockSolidSDK.props"}`,
+    content: item.snippets?.vs2022PropsTemplate || ""
+  }));
+}
+
 function buildIntegrationPackageCppFiles(items = []) {
   return items.map((item) => ({
     fileName: `${item.code}.cpp`,
@@ -1681,6 +1711,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
   const hostConfigFiles = buildIntegrationPackageHostConfigFiles(items);
   const cmakeFiles = buildIntegrationPackageCMakeFiles(items);
   const vs2022Files = buildIntegrationPackageVs2022Files(items);
+  const vs2022PropsFiles = buildIntegrationPackageVs2022PropsFiles(items);
   const cppFiles = buildIntegrationPackageCppFiles(items);
   const hostSkeletonFiles = buildIntegrationPackageHostSkeletonFiles(items);
   const hardeningFiles = buildIntegrationPackageHardeningFiles(items);
@@ -1700,6 +1731,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     hostConfigArchiveName: `rocksolid-integration-packages-${timestampTag}-host-config.txt`,
     cmakeArchiveName: `rocksolid-integration-packages-${timestampTag}-cmake.txt`,
     vs2022ArchiveName: `rocksolid-integration-packages-${timestampTag}-vs2022.txt`,
+    vs2022PropsArchiveName: `rocksolid-integration-packages-${timestampTag}-vs2022-props.txt`,
     cppArchiveName: `rocksolid-integration-packages-${timestampTag}-cpp.txt`,
     hostSkeletonArchiveName: `rocksolid-integration-packages-${timestampTag}-host-skeleton.txt`,
     hardeningArchiveName: `rocksolid-integration-packages-${timestampTag}-hardening.txt`,
@@ -1709,6 +1741,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     hostConfigFiles,
     cmakeFiles,
     vs2022Files,
+    vs2022PropsFiles,
     cppFiles,
     hostSkeletonFiles,
     hardeningFiles,
@@ -1717,6 +1750,7 @@ function buildProductIntegrationPackageExportBundle(items = [], options = {}) {
     hostConfigBundleText: buildNamedFileBundleText(hostConfigFiles),
     cmakeBundleText: buildNamedFileBundleText(cmakeFiles),
     vs2022BundleText: buildNamedFileBundleText(vs2022Files),
+    vs2022PropsBundleText: buildNamedFileBundleText(vs2022PropsFiles),
     cppBundleText: buildNamedFileBundleText(cppFiles),
     hostSkeletonBundleText: buildNamedFileBundleText(hostSkeletonFiles),
     hardeningBundleText: buildNamedFileBundleText(hardeningFiles)
@@ -1762,7 +1796,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push(`- Hardening Summary: ${deliverySummary.clientHardeningSummary}`);
   }
   if (deliverySummary.artifacts) {
-    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | hostConfig=${deliverySummary.artifacts.hostConfig || "-"} | cmake=${deliverySummary.artifacts.cmakeConsumer || "-"} | vs2022=${deliverySummary.artifacts.vs2022Consumer || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
+    lines.push(`- Artifacts: json=${deliverySummary.artifacts.packageJson || "-"} | summary=${deliverySummary.artifacts.packageSummary || "-"} | env=${deliverySummary.artifacts.envTemplate || "-"} | hostConfig=${deliverySummary.artifacts.hostConfig || "-"} | cmake=${deliverySummary.artifacts.cmakeConsumer || "-"} | vs2022=${deliverySummary.artifacts.vs2022Consumer || "-"} | vs2022Props=${deliverySummary.artifacts.vs2022Props || "-"} | cpp=${deliverySummary.artifacts.cppQuickstart || "-"} | hostSkeleton=${deliverySummary.artifacts.hostSkeleton || "-"}`);
   }
   lines.push("");
 
@@ -1928,9 +1962,9 @@ function buildReleaseDeliveryChecklistPayload({
     key: "handoff_artifacts",
     label: "Handoff artifacts",
     status: "pass",
-    summary: "JSON package, summary text, env template, host config, CMake consumer template, VS2022 project template, C++ quickstart, and host skeleton are bundled for handoff.",
-    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.hostConfig || "-"} | ${deliverySummary.artifacts?.cmakeConsumer || "-"} | ${deliverySummary.artifacts?.vs2022Consumer || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
-    nextAction: "Send the matching JSON, summary, env, host config, CMake template, VS2022 project template, quickstart, and host skeleton snippets together so integration stays aligned."
+    summary: "JSON package, summary text, env template, host config, CMake consumer template, VS2022 project template, VS2022 props sheet, C++ quickstart, and host skeleton are bundled for handoff.",
+    artifact: `${deliverySummary.artifacts?.packageJson || "-"} | ${deliverySummary.artifacts?.packageSummary || "-"} | ${deliverySummary.artifacts?.envTemplate || "-"} | ${deliverySummary.artifacts?.hostConfig || "-"} | ${deliverySummary.artifacts?.cmakeConsumer || "-"} | ${deliverySummary.artifacts?.vs2022Consumer || "-"} | ${deliverySummary.artifacts?.vs2022Props || "-"} | ${deliverySummary.artifacts?.cppQuickstart || "-"} | ${deliverySummary.artifacts?.hostSkeleton || "-"}`,
+    nextAction: "Send the matching JSON, summary, env, host config, CMake template, VS2022 project template, VS2022 props sheet, quickstart, and host skeleton snippets together so integration stays aligned."
   });
 
   const blockItems = items.filter((item) => item.status === "block").length;
@@ -1961,6 +1995,7 @@ function buildReleaseDeliverySummaryPayload({
   hostConfigFileName,
   cmakeFileName,
   vs2022ProjectFileName,
+  vs2022PropsFileName,
   cppFileName,
   hostSkeletonFileName
 }) {
@@ -2017,6 +2052,7 @@ function buildReleaseDeliverySummaryPayload({
       hostConfig: `host-config/${hostConfigFileName || "rocksolid_host_config.env"}`,
       cmakeConsumer: `cmake-consumer/${cmakeFileName || "CMakeLists.txt"}`,
       vs2022Consumer: `vs2022-consumer/${vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj"}`,
+      vs2022Props: `vs2022-consumer/${vs2022PropsFileName || "RockSolidSDK.props"}`,
       cppQuickstart: `snippets/${cppFileName || "project.cpp"}`,
       hostSkeleton: `snippets/${hostSkeletonFileName || "project-host-skeleton.cpp"}`
     },
@@ -2230,6 +2266,7 @@ function buildReleasePackagePayload({
   const hostConfigFileName = "rocksolid_host_config.env";
   const cmakeFileName = "CMakeLists.txt";
   const vs2022ProjectFileName = `${buildIntegrationConsumerProjectBaseName(integrationPackage?.manifest || { project: product })}_host_consumer.vcxproj`;
+  const vs2022PropsFileName = "RockSolidSDK.props";
   const cppFileName = `${product.code}.cpp`;
   const hostSkeletonFileName = `${product.code}-host-skeleton.cpp`;
   const hardeningFileName = `${product.code}-hardening-guide.txt`;
@@ -2249,6 +2286,7 @@ function buildReleasePackagePayload({
     hostConfigFileName,
     cmakeFileName,
     vs2022ProjectFileName,
+    vs2022PropsFileName,
     cppFileName,
     hostSkeletonFileName
   });
@@ -2297,6 +2335,7 @@ function buildReleasePackagePayload({
       hostConfigFileName,
       cmakeFileName,
       vs2022ProjectFileName,
+      vs2022PropsFileName,
       cppFileName,
       hostSkeletonFileName
     },
@@ -2321,6 +2360,8 @@ function buildReleasePackagePayload({
       cmakeConsumerTemplate: integrationPackage?.snippets?.cmakeConsumerTemplate || "",
       vs2022ProjectFileName,
       vs2022ProjectTemplate: integrationPackage?.snippets?.vs2022ProjectTemplate || "",
+      vs2022PropsFileName,
+      vs2022PropsTemplate: integrationPackage?.snippets?.vs2022PropsTemplate || "",
       cppFileName,
       cppQuickstart: integrationPackage?.snippets?.cppQuickstart || "",
       hostSkeletonFileName,
@@ -2423,6 +2464,10 @@ function buildReleasePackageFiles(payload) {
       body: payload.snippets?.vs2022ProjectTemplate || ""
     },
     {
+      path: `vs2022-consumer/${payload.snippets?.vs2022PropsFileName || "RockSolidSDK.props"}`,
+      body: payload.snippets?.vs2022PropsTemplate || ""
+    },
+    {
       path: "vs2022-consumer/main.cpp",
       body: payload.snippets?.hostSkeletonCpp || ""
     },
@@ -2506,6 +2551,12 @@ function buildIntegrationPackageExportFiles(payload) {
       body: payload.items?.find((item) => item.code === projectCode)?.snippets?.hostConfigEnv || ""
     });
   }
+  for (const file of payload.vs2022PropsFiles || []) {
+    files.push({
+      path: `vs2022-consumer/${file.fileName}`,
+      body: file.content || ""
+    });
+  }
   for (const file of payload.cppFiles || []) {
     files.push({
       path: `cpp/${file.fileName}`,
@@ -2562,6 +2613,10 @@ function buildSingleIntegrationPackageFiles(payload) {
     {
       path: `vs2022-consumer/${payload.snippets?.vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj"}`,
       body: payload.snippets?.vs2022ProjectTemplate || ""
+    },
+    {
+      path: `vs2022-consumer/${payload.snippets?.vs2022PropsFileName || "RockSolidSDK.props"}`,
+      body: payload.snippets?.vs2022PropsTemplate || ""
     },
     {
       path: "vs2022-consumer/main.cpp",
@@ -2666,7 +2721,7 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "host-config", "cmake", "vs2022", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "summary", "env", "host-config", "cmake", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
@@ -2721,6 +2776,13 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
       body: payload.snippets?.vs2022ProjectTemplate || ""
     };
   }
+  if (normalizedFormat === "vs2022-props") {
+    return {
+      fileName: payload.snippets?.vs2022PropsFileName || "RockSolidSDK.props",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.vs2022PropsTemplate || ""
+    };
+  }
   if (normalizedFormat === "cpp") {
     return {
       fileName: payload.snippets?.cppFileName || "project.cpp",
@@ -2746,7 +2808,7 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "manifests", "env", "host-config", "cmake", "vs2022", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "manifests", "env", "host-config", "cmake", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_EXPORT_FORMAT",
     "Integration export format"
@@ -2801,6 +2863,13 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
       body: payload.vs2022BundleText || ""
     };
   }
+  if (normalizedFormat === "vs2022-props") {
+    return {
+      fileName: payload.vs2022PropsArchiveName || "integration-vs2022-props.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.vs2022PropsBundleText || ""
+    };
+  }
   if (normalizedFormat === "cpp") {
     return {
       fileName: payload.cppArchiveName || "integration-cpp.txt",
@@ -2826,7 +2895,7 @@ function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
 function buildIntegrationPackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "env", "host-config", "cmake", "vs2022", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "env", "host-config", "cmake", "vs2022", "vs2022-props", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_INTEGRATION_PACKAGE_FORMAT",
     "Integration package format"
@@ -2872,6 +2941,13 @@ function buildIntegrationPackageDownloadAsset(payload, format = "json") {
       fileName: payload.snippets?.vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj",
       contentType: "text/plain; charset=utf-8",
       body: payload.snippets?.vs2022ProjectTemplate || ""
+    };
+  }
+  if (normalizedFormat === "vs2022-props") {
+    return {
+      fileName: payload.snippets?.vs2022PropsFileName || "RockSolidSDK.props",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.snippets?.vs2022PropsTemplate || ""
     };
   }
   if (normalizedFormat === "cpp") {

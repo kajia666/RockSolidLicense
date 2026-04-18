@@ -15,6 +15,9 @@
     <None Include="RockSolidSDK.props">
       <Filter>Config</Filter>
     </None>
+    <None Include="RockSolidSDK.local.props">
+      <Filter>Config</Filter>
+    </None>
     <None Include="rocksolid_host_config.env.example">
       <Filter>Config</Filter>
     </None>

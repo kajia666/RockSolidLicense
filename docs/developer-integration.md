@@ -28,7 +28,7 @@ The page now also summarizes how many visible projects currently have each of th
 
 The last 3 switches act as project-level client hardening controls. They affect the integration package, startup bootstrap preview, env template, C++ quickstart guidance, and generated C++ host skeleton so software authors can choose a stricter or more relaxed client-side hardening profile per project.
 
-The generated `.env` template is now also shaped to work with the packaged CMake host consumer example. The package additionally emits a dedicated `rocksolid_host_config.env`, a project-aware `CMakeLists.txt`, a VS2022 `.sln/.vcxproj/.vcxproj.filters` set plus `RockSolidSDK.props`, and a project-aware `VS2022 quickstart` markdown guide so a software author can usually download those files directly, add the demo login credentials, flip `RS_RUN_NETWORK_DEMO=true`, and then drop them into a minimal host consumer project without renaming fields by hand.
+The generated `.env` template is now also shaped to work with the packaged CMake host consumer example. The package additionally emits a dedicated `rocksolid_host_config.env`, a project-aware `CMakeLists.txt`, a VS2022 `.sln/.vcxproj/.vcxproj.filters` set plus `RockSolidSDK.props` and `RockSolidSDK.local.props`, and a project-aware `VS2022 quickstart` markdown guide so a software author can usually download those files directly, add the demo login credentials, flip `RS_RUN_NETWORK_DEMO=true`, and then drop them into a minimal host consumer project without renaming fields by hand.
 
 ## API
 
@@ -51,7 +51,7 @@ The package route accepts:
 
 The package download route accepts the same selectors plus:
 
-- `format=json|env|host-config|cmake|vs2022-guide|vs2022-sln|vs2022|vs2022-filters|vs2022-props|cpp|host-skeleton|checksums|zip`
+- `format=json|env|host-config|cmake|vs2022-guide|vs2022-sln|vs2022|vs2022-filters|vs2022-props|vs2022-local-props|cpp|host-skeleton|checksums|zip`
 
 ## Returned data
 
@@ -86,6 +86,8 @@ The package route returns:
 - `snippets.vs2022FiltersTemplate`
 - `snippets.vs2022PropsFileName`
 - `snippets.vs2022PropsTemplate`
+- `snippets.vs2022LocalPropsFileName`
+- `snippets.vs2022LocalPropsTemplate`
 - `snippets.cppFileName`
 - `snippets.cppQuickstart`
 - `snippets.hostSkeletonFileName`
@@ -106,6 +108,7 @@ The batch package export routes return:
 - `vs2022Files`
 - `vs2022FiltersFiles`
 - `vs2022PropsFiles`
+- `vs2022LocalPropsFiles`
 - `cppFiles`
 - `hostSkeletonFiles`
 - `manifestBundleText`
@@ -117,12 +120,13 @@ The batch package export routes return:
 - `vs2022BundleText`
 - `vs2022FiltersBundleText`
 - `vs2022PropsBundleText`
+- `vs2022LocalPropsBundleText`
 - `cppBundleText`
 - `hostSkeletonBundleText`
 
 The batch package download routes accept the same body selectors as the export routes plus:
 
-- `format=json|manifests|env|host-config|cmake|vs2022-guide|vs2022-sln|vs2022|vs2022-filters|vs2022-props|cpp|host-skeleton|checksums|zip`
+- `format=json|manifests|env|host-config|cmake|vs2022-guide|vs2022-sln|vs2022|vs2022-filters|vs2022-props|vs2022-local-props|cpp|host-skeleton|checksums|zip`
 
 Typical shape:
 
@@ -169,10 +173,10 @@ The page and API are useful when the software author needs to:
 - adapt a dedicated `startup-bootstrap` request before showing the local login UI
 - confirm whether recharge and client-unbind are open for a scoped project before exposing those SDK flows
 - export a current project integration package after rotating `sdkAppSecret` or `sdkAppId`
-- download the current single-project integration package directly as JSON, `.env`, `rocksolid_host_config.env`, `CMakeLists.txt`, `VS2022 quickstart.md`, VS2022 `.sln/.vcxproj/.vcxproj.filters/.props`, C++ quickstart, host skeleton, or one zip handoff bundle
+- download the current single-project integration package directly as JSON, `.env`, `rocksolid_host_config.env`, `CMakeLists.txt`, `VS2022 quickstart.md`, VS2022 `.sln/.vcxproj/.vcxproj.filters/.props/.local.props`, C++ quickstart, host skeleton, or one zip handoff bundle
 - download a matching SHA-256 checksum list for the generated handoff files
 - export multiple project integration packages in one request from the project workspace when several software products need the same deployment refresh
-- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, dedicated host config file, project-aware `CMakeLists.txt`, `VS2022 quickstart.md`, VS2022 `.sln/.vcxproj/.vcxproj.filters/.props`, and environment template that already line up with the packaged host consumer examples
+- hand the software author a ready-to-copy C++ quickstart snippet, project-aware host skeleton, dedicated host config file, project-aware `CMakeLists.txt`, `VS2022 quickstart.md`, VS2022 `.sln/.vcxproj/.vcxproj.filters/.props/.local.props`, and environment template that already line up with the packaged host consumer examples
 
 ## Request signing headers
 

@@ -125,7 +125,7 @@ The `rocksolid-sdk-cpp` package contains the full C++ SDK static library, header
 
 When software authors pull a project-scoped integration or release package from the backoffice, they now also receive a generated C++ host skeleton alongside the quickstart snippet so the host app can wire startup bootstrap, local token validation, and heartbeat gating in the order recommended by the current project profile.
 
-Those project-scoped handoff packages now also emit a VS2022 `.sln/.vcxproj` plus `RockSolidSDK.props` and a project-aware `VS2022 quickstart` markdown guide, so software authors who prefer native Visual Studio projects do not need to start from CMake unless they want to.
+Those project-scoped handoff packages now also emit a VS2022 `.sln/.vcxproj` plus `RockSolidSDK.props`, `RockSolidSDK.local.props`, and a project-aware `VS2022 quickstart` markdown guide, so software authors who prefer native Visual Studio projects do not need to start from CMake unless they want to.
 
 The `rocksolid-sdk-capi` package contains the low-level C API header, DLL, import library, docs, and a C demo source.
 
@@ -193,3 +193,5 @@ When you hand this SDK to a software author, match the host app behavior to the 
 3. `relaxed`: the host app can lean more on server-side authorization, but startup bootstrap and local token validation are still recommended where practical.
 
 The generated integration package and release package now include a project-specific hardening guide text file. Use that file as the final source of truth for the current project's startup, token-validation, and heartbeat expectations.
+
+When you hand off the VS2022 files, prefer changing `RockSolidSDK.local.props` for workstation-specific overrides instead of editing the shared `RockSolidSDK.props`.

@@ -9090,6 +9090,9 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Download VS2022 Quickstart/);
     assert.match(html, /Download C\+\+ Quickstart/);
     assert.match(html, /Download Host Skeleton/);
+    assert.match(html, /recommended-download-box/);
+    assert.match(html, /hydrateLaunchAutofocus/);
+    assert.match(html, /autofocus/);
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Integration Package/);
     assert.match(html, /Open Release Check/);
@@ -9600,6 +9603,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Host Config/);
     assert.match(html, /Open Integration Workspace/);
     assert.match(html, /Open Release Workspace/);
+    assert.match(html, /autofocus/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /Delivery quick signals/);
     assert.match(html, /detail-release-channel/);
@@ -9739,6 +9743,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Launch Workflow/);
     assert.match(html, /Open Release Check/);
+    assert.match(html, /autofocus/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /Startup Bootstrap Preview/);
     assert.match(html, /Startup Bootstrap Example/);
@@ -9905,6 +9910,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Launch Workflow/);
     assert.match(html, /Open Integration Package/);
+    assert.match(html, /autofocus/);
     assert.match(html, /release-route-hint/);
     assert.match(html, /applyRoutePrefill/);
   } finally {

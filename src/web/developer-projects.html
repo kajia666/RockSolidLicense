@@ -1603,7 +1603,8 @@
         window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           productId,
           productCode,
-          channel: currentReleaseChannel()
+          channel: currentReleaseChannel(),
+          autofocus: "handoff"
         });
       }
 

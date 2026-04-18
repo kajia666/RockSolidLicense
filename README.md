@@ -111,7 +111,7 @@
 - [开发者授权运营台](docs/developer-ops.md)
 - [开发者发版工作台](docs/developer-release.md)
 
-现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。上线工作台本身也支持直接下载 linked release summary、integration env、host config、CMake 模板、VS2022 quickstart、C++ quickstart 和 host skeleton，方便把首发 handoff 资料一次拿齐。
+现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。上线工作台本身也支持直接下载 linked release summary、integration env、host config、CMake 模板、VS2022 quickstart、C++ quickstart 和 host skeleton，方便把首发 handoff 资料一次拿齐；如果从别的工作台带 `autofocus=handoff` 跳过去，登录或刷新后也会优先自动拉起对应 lane 的 launch workflow。
 
 ## 快速导航
 

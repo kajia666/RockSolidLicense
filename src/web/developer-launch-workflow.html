@@ -475,6 +475,7 @@
       const requestedProductId = (routeParams.get("productId") || "").trim();
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
       let token = "";
       let actor = null;
       let projects = [];
@@ -566,6 +567,39 @@
           productCode: target.productCode,
           channel: target.channel || "stable"
         };
+      }
+
+      function currentLaunchAutofocusTarget() {
+        const target = requestedAutofocus || "package";
+        if (target === "handoff" || target === "recommended") {
+          return "recommended-download-box";
+        }
+        if (target === "summary") {
+          return "release-summary";
+        }
+        return "generate-release-package-btn";
+      }
+
+      function focusLaunchAutofocusTarget() {
+        const node = el(currentLaunchAutofocusTarget());
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function shouldAutoGenerateLaunchWorkflow() {
+        return Boolean(token && requestedProductCode && requestedAutofocus);
+      }
+
+      function currentPackageMatchesRequestedRoute() {
+        if (!releasePackage?.manifest?.project?.code) {
+          return false;
+        }
+        const currentCode = String(releasePackage.manifest.project.code || "").trim().toUpperCase();
+        const currentChannel = String(releasePackage.manifest.channel || "").trim().toLowerCase();
+        return currentCode === requestedProductCode.toUpperCase()
+          && currentChannel === requestedChannel.toLowerCase();
       }
 
       function currentReleaseProductId(productCode) {
@@ -1055,6 +1089,26 @@
         return data;
       }
 
+      async function hydrateLaunchAutofocus() {
+        if (!requestedAutofocus) {
+          return;
+        }
+
+        if (!shouldAutoGenerateLaunchWorkflow()) {
+          focusLaunchAutofocusTarget();
+          return;
+        }
+
+        if (!currentPackageMatchesRequestedRoute()) {
+          const data = await generateReleasePackage();
+          setStatus(`Launch workflow auto-loaded for ${data.manifest.project.code}.`);
+          setOutput(data);
+        } else {
+          setStatus(`Launch workflow kept in sync for ${releasePackage.manifest.project.code}.`);
+        }
+        focusLaunchAutofocusTarget();
+      }
+
       el("login-btn").addEventListener("click", async () => {
         try {
           const data = await api("/api/developer/login", {
@@ -1066,7 +1120,10 @@
           });
           token = data.token;
           await refreshWorkspace();
-          setStatus("Developer launch workflow workspace loaded.");
+          await hydrateLaunchAutofocus();
+          if (!requestedAutofocus || !requestedProductCode) {
+            setStatus("Developer launch workflow workspace loaded.");
+          }
         } catch (error) {
           token = "";
           clearWorkspace();
@@ -1078,7 +1135,10 @@
       el("refresh-btn").addEventListener("click", async () => {
         try {
           await refreshWorkspace();
-          setStatus("Launch workflow workspace refreshed.");
+          await hydrateLaunchAutofocus();
+          if (!requestedAutofocus || !requestedProductCode) {
+            setStatus("Launch workflow workspace refreshed.");
+          }
         } catch (error) {
           setStatus(`${error.code}: ${error.message}`, true);
           setOutput({ code: error.code, message: error.message });

@@ -12,6 +12,8 @@ It is meant to give software authors one combined place to inspect:
 
 This page accepts `productId`, `productCode`, and `channel` in the query string so the project workspace, integration workspace, or release workspace can open the same launch lane without re-entering project context.
 
+It can also accept `autofocus=handoff` so the page prefers the recommended handoff section and, after sign-in or refresh, auto-loads the matching launch workflow package for that routed lane when possible.
+
 ## Scoped APIs
 
 - `GET /api/developer/launch-workflow`

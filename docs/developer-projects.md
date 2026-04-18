@@ -18,7 +18,7 @@ The detail card now also shows a lightweight "Delivery quick signals" summary. I
 - active blocking notices
 - startup version-check or notice toggles being turned off
 
-The same detail card now also supports an inline release-readiness preview. Software authors can choose a channel such as `stable` and fetch the current `release-package` summary directly inside `/developer/projects` before jumping to the dedicated release workspace. After previewing the result, they can also download the same release package `summary`, `checksums`, or `zip` straight from the project page.
+The same detail card now also supports an inline release-readiness preview. Software authors can choose a channel such as `stable` and fetch the current `release-package` summary directly inside `/developer/projects` before jumping to the dedicated release workspace. After previewing the result, they can also download the same release package `summary`, `checksums`, or `zip` straight from the project page, alongside the most common integration assets such as the generated `.env`, `rocksolid_host_config.env`, and integration `zip`.
 
 ## Scoped APIs
 

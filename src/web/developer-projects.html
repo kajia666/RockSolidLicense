@@ -149,6 +149,11 @@
             <button class="secondary" id="download-inline-release-zip-btn">Download Release Zip</button>
           </div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="download-inline-integration-env-btn">Download Integration Env</button>
+            <button class="secondary" id="download-inline-integration-host-config-btn">Download Integration Host Config</button>
+            <button class="secondary" id="download-inline-integration-zip-btn">Download Integration Zip</button>
+          </div>
+          <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
@@ -506,6 +511,28 @@
         return { fileName };
       }
 
+      async function downloadUrlFile(path, params = {}, fallbackFileName) {
+        const query = buildRouteQuery(params);
+        const response = await fetch(`${path}${query}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (!response.ok) {
+          let errorPayload = null;
+          try {
+            errorPayload = await response.json();
+          } catch {
+            errorPayload = null;
+          }
+          const error = new Error(errorPayload?.error?.message || `Request failed: ${response.status}`);
+          error.code = errorPayload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        const blob = await response.blob();
+        const fileName = downloadFileNameFromHeaders(response.headers.get("content-disposition"), fallbackFileName);
+        downloadBlob(fileName, blob);
+        return { fileName };
+      }
+
       function renderFeatureSummary() {
         const visible = filteredProducts();
         const counts = Object.fromEntries(
@@ -714,6 +741,9 @@
         el("download-inline-release-summary-btn").disabled = !hasProduct;
         el("download-inline-release-checksums-btn").disabled = !hasProduct;
         el("download-inline-release-zip-btn").disabled = !hasProduct;
+        el("download-inline-integration-env-btn").disabled = !hasProduct;
+        el("download-inline-integration-host-config-btn").disabled = !hasProduct;
+        el("download-inline-integration-zip-btn").disabled = !hasProduct;
         const channel = currentReleaseChannel();
         el("detail-navigation-hint").textContent = hasProduct
           ? `Open ${product.code} in Developer Integration or Developer Releases with channel ${channel} already selected, or preview readiness inline here.`
@@ -1249,9 +1279,23 @@
           throw new Error("Select a project before downloading a release asset.");
         }
         const channel = currentReleaseChannel();
-        const result = await downloadApiFile(
+        const result = await downloadUrlFile(
           "/api/developer/release-package/download",
           { productCode, channel, format },
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
+      }
+
+      async function downloadInlineIntegrationAsset(format, fallbackFileName, label) {
+        const productCode = el("edit-product-code").value.trim();
+        if (!productCode) {
+          throw new Error("Select a project before downloading an integration asset.");
+        }
+        const result = await downloadUrlFile(
+          "/api/developer/integration/package/download",
+          { productCode, format },
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -1293,6 +1337,33 @@
       el("download-inline-release-zip-btn").addEventListener("click", async () => {
         try {
           await downloadInlineReleaseAsset("zip", "release-package.zip", "Inline release zip");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-env-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("env", "integration.env", "Inline integration env");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-host-config-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("host-config", "rocksolid_host_config.env", "Inline integration host config");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-zip-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("zip", "integration-package.zip", "Inline integration zip");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

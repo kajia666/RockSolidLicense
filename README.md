@@ -56,7 +56,7 @@
 - 开发者接入中心单项目集成包直接下载，并支持单独下载项目级 C++ host skeleton、`rocksolid_host_config.env`、`CMakeLists.txt` 与 VS2022 `.sln/.vcxproj/.vcxproj.filters/.props/.local.props/.md`
 - 项目中心 / 接入中心 / 发版中心跨页预填联动
 - 项目页发版快速信号摘要
-- 项目页内联发版 readiness 预览，可按 channel 直接查看候选版本、阻断项、检查清单和下一步动作；项目页也支持同 channel 的 integration snapshot 预览，以及一键 `Preview Launch Workflow` 加载统一的 launch workflow package，在同页查看 workflow blocker / checklist / next steps，并直接下载 launch `summary / checklist / checksums / zip`、release `summary / checksums / zip` 以及常用 integration `json / env / host-config / checksums / cpp / cmake / vs2022-guide / vs2022-sln / vs2022 / vs2022-filters / vs2022-props / vs2022-local-props / host-skeleton / zip`
+- 项目页内联发版 readiness 预览，可按 channel 直接查看候选版本、阻断项、检查清单和下一步动作；项目页也支持同 channel 的 integration snapshot 预览，以及一键 `Preview Launch Workflow` 加载统一的 launch workflow package，在同页查看 workflow blocker / checklist / next steps，并直接下载 launch `handoff-zip / summary / checklist / checksums / zip`、release `summary / checksums / zip` 以及常用 integration `json / env / host-config / checksums / cpp / cmake / vs2022-guide / vs2022-sln / vs2022 / vs2022-filters / vs2022-props / vs2022-local-props / host-skeleton / zip`
 - 开发者多项目归属
 - 开发者主账号 + 子账号
 - 子账号按项目授权与角色控制
@@ -111,7 +111,7 @@
 - [开发者授权运营台](docs/developer-ops.md)
 - [开发者发版工作台](docs/developer-release.md)
 
-现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。上线工作台本身也支持直接下载 linked release summary、integration env、host config、CMake 模板、VS2022 quickstart、C++ quickstart 和 host skeleton，方便把首发 handoff 资料一次拿齐；如果从别的工作台带 `autofocus=handoff` 跳过去，登录或刷新后也会优先自动拉起对应 lane 的 launch workflow，而且这些 linked release / integration 资料现在也可以统一从 `/api/developer/launch-workflow/download` 下发。
+现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。上线工作台本身也支持直接下载 linked release summary、integration env、host config、CMake 模板、VS2022 quickstart、C++ quickstart 和 host skeleton，方便把首发 handoff 资料一次拿齐；如果从别的工作台带 `autofocus=handoff` 跳过去，登录或刷新后也会优先自动拉起对应 lane 的 launch workflow，而且这些 linked release / integration 资料现在也可以统一从 `/api/developer/launch-workflow/download` 下发。新增的 `handoff-zip` 会输出一份更适合发给集成、测试、发布同事的精简材料包，而完整 `zip` 继续保留更全的 workflow / release / integration 归档内容。
 
 ## 快速导航
 

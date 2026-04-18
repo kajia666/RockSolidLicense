@@ -226,7 +226,7 @@
             <button class="secondary" id="download-release-package-host-skeleton-btn">Download Host Skeleton</button>
             <button class="secondary" id="download-release-package-checksums-btn">Download Checksums</button>
           </div>
-          <div class="hint" id="release-package-hint">Generate a combined launch workflow package for the selected project and channel, then download the summary, checklist, checksum manifest, or full handoff zip.</div>
+          <div class="hint" id="release-package-hint">Generate a combined launch workflow package for the selected project and channel, then download either the recommended handoff zip for teammates or the full workflow zip for archive and deep review.</div>
           <div class="hint" id="release-route-hint" style="margin-top:12px;">Open this page from the project, integration, or release workspaces to keep the selected project and channel in sync.</div>
         </article>
 
@@ -351,12 +351,14 @@
         <h2>Recommended Handoff</h2>
         <div id="recommended-download-box" class="hint">Generate a launch workflow package to see the recommended downloads and lane-specific handoff guidance.</div>
         <div class="actions" style="margin-top:12px;">
+          <button class="secondary" id="download-linked-handoff-zip-btn">Download Recommended Handoff Zip</button>
+          <button class="secondary" id="download-linked-handoff-checksums-btn">Download Handoff Checksums</button>
           <button class="secondary" id="download-linked-release-summary-btn">Download Release Summary</button>
           <button class="secondary" id="download-linked-integration-env-btn">Download Integration Env</button>
-          <button class="secondary" id="download-linked-host-config-btn">Download Host Config</button>
-          <button class="secondary" id="download-linked-cmake-btn">Download CMake Template</button>
         </div>
         <div class="actions" style="margin-top:12px;">
+          <button class="secondary" id="download-linked-host-config-btn">Download Host Config</button>
+          <button class="secondary" id="download-linked-cmake-btn">Download CMake Template</button>
           <button class="secondary" id="download-linked-vs2022-guide-btn">Download VS2022 Quickstart</button>
           <button class="secondary" id="download-linked-cpp-btn">Download C++ Quickstart</button>
           <button class="secondary" id="download-linked-host-skeleton-btn">Download Host Skeleton</button>
@@ -815,7 +817,9 @@
             ${renderTag(`release:${workflowSummary.releaseStatus || "unknown"}`, workflowSummary.releaseStatus === "ready")}
             ${renderTag(`startup:${workflowSummary.startupStatus || "unknown"}`, workflowSummary.startupReady !== false)}
           </div>
-          <div class="split-line"><span>Recommended Handoff Zip</span><span>${escapeHtml(recommendedDownloads.find((item) => item.key === "launch_handoff_zip")?.fileName || releasePackage.zipFileName || "-")}</span></div>
+          <div class="split-line"><span>Recommended Handoff Zip</span><span>${escapeHtml(recommendedDownloads.find((item) => item.key === "launch_handoff_zip")?.fileName || releasePackage.handoffZipFileName || "-")}</span></div>
+          <div class="split-line"><span>Handoff Checksums</span><span>${escapeHtml(recommendedDownloads.find((item) => item.key === "launch_handoff_checksums")?.fileName || releasePackage.handoffChecksumsFileName || "-")}</span></div>
+          <div class="split-line"><span>Full Launch Workflow Zip</span><span>${escapeHtml(recommendedDownloads.find((item) => item.key === "launch_workflow_zip")?.fileName || releasePackage.zipFileName || "-")}</span></div>
           <div class="split-line"><span>Linked Release Summary</span><span>${escapeHtml(linkedReleasePackage.summaryFileName || "-")}</span></div>
           <div class="split-line"><span>Integration Env</span><span>${escapeHtml(linkedIntegrationSnippets.envFileName || "-")}</span></div>
           <div class="split-line"><span>Host Config</span><span>${escapeHtml(linkedIntegrationSnippets.hostConfigFileName || "-")}</span></div>
@@ -897,6 +901,19 @@
         const target = currentLaunchDownloadTarget();
         const result = await downloadApiFile(
           `/api/developer/launch-workflow/download${q({ productCode: target.productCode, channel: target.channel, format: `release-${format}` })}`,
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
+      }
+
+      async function downloadRecommendedHandoffAsset(format, fallbackFileName, label) {
+        if (!releasePackage) {
+          throw new Error("Generate a launch workflow package before downloading recommended handoff assets.");
+        }
+        const target = currentLaunchDownloadTarget();
+        const result = await downloadApiFile(
+          `/api/developer/launch-workflow/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -1468,6 +1485,34 @@
             "Linked release summary"
           );
           setOutput({ linkedDownload: { format: "release-summary", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-handoff-zip-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadRecommendedHandoffAsset(
+            "handoff-zip",
+            (releasePackage?.handoffZipFileName || "launch-workflow-handoff.zip"),
+            "Recommended handoff zip"
+          );
+          setOutput({ linkedDownload: { format: "handoff-zip", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-linked-handoff-checksums-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadRecommendedHandoffAsset(
+            "handoff-checksums",
+            (releasePackage?.handoffChecksumsFileName || "launch-workflow-handoff-sha256.txt"),
+            "Recommended handoff checksums"
+          );
+          setOutput({ linkedDownload: { format: "handoff-checksums", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

@@ -2640,7 +2640,9 @@ function buildLaunchWorkflowChecklistPayload({
   integrationPackage,
   summaryFileName = "launch-workflow.txt",
   checklistFileName = "launch-workflow-checklist.txt",
-  zipFileName = "launch-workflow.zip"
+  zipFileName = "launch-workflow.zip",
+  handoffZipFileName = "launch-workflow-handoff.zip",
+  handoffChecksumsFileName = "launch-workflow-handoff-sha256.txt"
 }) {
   const readiness = releasePackage?.manifest?.release?.readiness || {};
   const deliverySummary = releasePackage?.deliverySummary || {};
@@ -2707,9 +2709,9 @@ function buildLaunchWorkflowChecklistPayload({
       key: "launch_handoff_package",
       label: "Launch handoff package",
       status: "pass",
-      summary: "A combined launch workflow package is available for release, QA, and integration handoff.",
-      artifact: `${zipFileName} | ${summaryFileName} | ${checklistFileName}`,
-      nextAction: "Download the combined handoff zip for this channel, or grab individual release and integration artifacts as needed."
+      summary: "A curated recommended handoff zip and the full launch workflow archive are both available for release, QA, and integration handoff.",
+      artifact: `${handoffZipFileName} | ${handoffChecksumsFileName} | ${zipFileName} | ${summaryFileName} | ${checklistFileName}`,
+      nextAction: "Send the recommended handoff zip to release, QA, and integration teammates, and keep the full workflow zip for archive or deep review."
     }
   ];
 
@@ -2736,7 +2738,10 @@ function buildLaunchWorkflowSummaryPayload({
   workflowChecklist = {},
   fileName = "launch-workflow.json",
   summaryFileName = "launch-workflow.txt",
-  checklistFileName = "launch-workflow-checklist.txt"
+  checklistFileName = "launch-workflow-checklist.txt",
+  zipFileName = "launch-workflow.zip",
+  handoffZipFileName = "launch-workflow-handoff.zip",
+  handoffChecksumsFileName = "launch-workflow-handoff-sha256.txt"
 }) {
   const readiness = releasePackage?.manifest?.release?.readiness || {};
   const deliverySummary = releasePackage?.deliverySummary || {};
@@ -2761,8 +2766,18 @@ function buildLaunchWorkflowSummaryPayload({
   const recommendedDownloads = [
     {
       key: "launch_handoff_zip",
+      label: "Recommended handoff zip",
+      fileName: handoffZipFileName
+    },
+    {
+      key: "launch_handoff_checksums",
+      label: "Recommended handoff checksums",
+      fileName: handoffChecksumsFileName
+    },
+    {
+      key: "launch_workflow_zip",
       label: "Combined launch workflow zip",
-      fileName: `${buildArchiveRootName(fileName, "launch-workflow")}.zip`
+      fileName: zipFileName
     },
     {
       key: "launch_summary",
@@ -2803,9 +2818,9 @@ function buildLaunchWorkflowSummaryPayload({
     nextActions.push(clientHardening.nextAction);
   }
   if (!nextActions.length) {
-    nextActions.push("Download the combined launch workflow package and review the checklist before rollout.");
+    nextActions.push("Download the recommended handoff zip and review the launch checklist before rollout.");
   } else if (workflowStatus === "ready") {
-    nextActions.push("Download the combined launch workflow package for release, QA, and integration handoff.");
+    nextActions.push("Download the recommended handoff zip for release, QA, and integration handoff, and keep the full workflow zip for archive.");
   }
 
   const blockers = [];
@@ -2956,12 +2971,16 @@ function buildLaunchWorkflowPackagePayload({
   const summaryFileName = `rocksolid-launch-workflow-${product.code}-${normalizedChannel}-${timestampTag}.txt`;
   const checklistFileName = `rocksolid-launch-workflow-${product.code}-${normalizedChannel}-${timestampTag}-checklist.txt`;
   const zipFileName = `${buildArchiveRootName(fileName, "launch-workflow")}.zip`;
+  const handoffZipFileName = `${buildArchiveRootName(fileName, "launch-workflow")}-handoff.zip`;
+  const handoffChecksumsFileName = buildChecksumFileName(handoffZipFileName, "launch-workflow-handoff");
   const workflowChecklist = buildLaunchWorkflowChecklistPayload({
     releasePackage,
     integrationPackage,
     summaryFileName,
     checklistFileName,
-    zipFileName
+    zipFileName,
+    handoffZipFileName,
+    handoffChecksumsFileName
   });
   const workflowSummary = buildLaunchWorkflowSummaryPayload({
     product,
@@ -2971,7 +2990,10 @@ function buildLaunchWorkflowPackagePayload({
     workflowChecklist,
     fileName,
     summaryFileName,
-    checklistFileName
+    checklistFileName,
+    zipFileName,
+    handoffZipFileName,
+    handoffChecksumsFileName
   });
   const manifest = {
     generatedAt,
@@ -2996,6 +3018,8 @@ function buildLaunchWorkflowPackagePayload({
     snippets: {
       summaryFileName,
       checklistFileName,
+      handoffZipFileName,
+      handoffChecksumsFileName,
       recommendedDownloadFileNames: workflowSummary.recommendedDownloads.map((item) => item.fileName).filter(Boolean),
       releaseSummaryFileName: releasePackage?.summaryFileName || null,
       integrationEnvFileName: integrationPackage?.snippets?.envFileName || null,
@@ -3012,6 +3036,8 @@ function buildLaunchWorkflowPackagePayload({
     fileName,
     summaryFileName,
     checklistFileName,
+    handoffZipFileName,
+    handoffChecksumsFileName,
     manifest,
     workflowSummary,
     workflowChecklist,
@@ -3064,9 +3090,112 @@ function buildLaunchWorkflowPackageFiles(payload) {
   return files;
 }
 
+function appendLaunchWorkflowFileIfPresent(files, path, body) {
+  if (!path) {
+    return;
+  }
+  if (body === undefined || body === null || body === "") {
+    return;
+  }
+  files.push({
+    path,
+    body
+  });
+}
+
+function buildLaunchWorkflowRecommendedHandoffFiles(payload) {
+  const files = [];
+  const releasePackage = payload.releasePackage || {};
+  const integrationPackage = payload.integrationPackage || {};
+  const snippets = integrationPackage.snippets || {};
+
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `launch/${payload.summaryFileName || "launch-workflow.txt"}`,
+    payload.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `launch/${payload.checklistFileName || "launch-workflow-checklist.txt"}`,
+    payload.checklistText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `release/${releasePackage.summaryFileName || "release-package.txt"}`,
+    releasePackage.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/snippets/${snippets.envFileName || "project.env"}`,
+    snippets.envTemplate || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/host-config/${snippets.hostConfigFileName || "rocksolid_host_config.env"}`,
+    snippets.hostConfigEnv || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/cmake-consumer/${snippets.cmakeFileName || "CMakeLists.txt"}`,
+    snippets.cmakeConsumerTemplate || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/vs2022-consumer/${snippets.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md"}`,
+    snippets.vs2022GuideText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/vs2022-consumer/${snippets.vs2022SolutionFileName || "rocksolid_host_consumer.sln"}`,
+    snippets.vs2022SolutionTemplate || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/vs2022-consumer/${snippets.vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj"}`,
+    snippets.vs2022ProjectTemplate || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/vs2022-consumer/${snippets.vs2022FiltersFileName || "rocksolid_host_consumer.vcxproj.filters"}`,
+    snippets.vs2022FiltersTemplate || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/vs2022-consumer/${snippets.vs2022PropsFileName || "RockSolidSDK.props"}`,
+    snippets.vs2022PropsTemplate || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/vs2022-consumer/${snippets.vs2022LocalPropsFileName || "RockSolidSDK.local.props"}`,
+    snippets.vs2022LocalPropsTemplate || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/snippets/${snippets.cppFileName || "project.cpp"}`,
+    snippets.cppQuickstart || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/snippets/${snippets.hostSkeletonFileName || "project-host-skeleton.cpp"}`,
+    snippets.hostSkeletonCpp || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/snippets/${snippets.hardeningFileName || "project-hardening-guide.txt"}`,
+    snippets.hardeningGuide || ""
+  );
+
+  return files;
+}
+
 function buildLaunchWorkflowPackageZipEntries(payload) {
   const root = buildArchiveRootName(payload.fileName, "launch-workflow");
   return buildZipEntriesFromFiles(root, buildLaunchWorkflowPackageFiles(payload));
+}
+
+function buildLaunchWorkflowRecommendedHandoffZipEntries(payload) {
+  const root = buildArchiveRootName(payload.handoffZipFileName, "launch-workflow-handoff");
+  return buildZipEntriesFromFiles(root, buildLaunchWorkflowRecommendedHandoffFiles(payload));
 }
 
 function normalizeDownloadFormat(value, supported = [], fallback = "json", code = "INVALID_EXPORT_FORMAT", label = "Export format") {
@@ -3588,6 +3717,8 @@ function buildLaunchWorkflowPackageDownloadAsset(payload, format = "json") {
       "json",
       "summary",
       "checklist",
+      "handoff-zip",
+      "handoff-checksums",
       "zip",
       "checksums",
       "release-json",
@@ -3612,6 +3743,20 @@ function buildLaunchWorkflowPackageDownloadAsset(payload, format = "json") {
     "Launch workflow package format"
   );
 
+  if (normalizedFormat === "handoff-zip") {
+    return {
+      fileName: payload.handoffZipFileName || `${buildArchiveRootName(payload.fileName, "launch-workflow")}-handoff.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildLaunchWorkflowRecommendedHandoffZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "handoff-checksums") {
+    return {
+      fileName: payload.handoffChecksumsFileName || buildChecksumFileName(payload.handoffZipFileName, "launch-workflow-handoff"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildLaunchWorkflowRecommendedHandoffFiles(payload))
+    };
+  }
   if (normalizedFormat === "zip") {
     return {
       fileName: `${buildArchiveRootName(payload.fileName, "launch-workflow")}.zip`,

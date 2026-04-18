@@ -32,6 +32,8 @@ Download formats:
 - `json`
 - `summary`
 - `checklist`
+- `handoff-zip`
+- `handoff-checksums`
 - `checksums`
 - `zip`
 - `release-json`
@@ -59,6 +61,8 @@ The launch workflow package combines:
 - the linked integration package
 - workflow-level summary text
 - workflow checklist text
+- a curated recommended handoff zip for teammates
+- the full workflow zip for archive and deep review
 - recommended downloads
 - launch blockers
 - next actions for the current lane
@@ -80,6 +84,8 @@ without losing `productCode` or `channel`.
 
 The same page now also keeps the most common lane-specific handoff files one click away, including:
 
+- recommended handoff zip
+- recommended handoff checksums
 - linked release summary
 - linked integration `.env`
 - linked `rocksolid_host_config.env`
@@ -88,7 +94,7 @@ The same page now also keeps the most common lane-specific handoff files one cli
 - linked C++ quickstart
 - linked host skeleton
 
-Those files now also come from the same `/api/developer/launch-workflow/download` endpoint, so the launch workflow workspace can stay on one unified download route instead of mixing multiple release and integration download APIs.
+Those files now also come from the same `/api/developer/launch-workflow/download` endpoint, so the launch workflow workspace can stay on one unified download route instead of mixing multiple release and integration download APIs. The recommended handoff zip is intentionally smaller than the full workflow zip: it keeps the launch summary/checklist, release summary, host config, CMake consumer, VS2022 consumer files, C++ quickstart, host skeleton, and hardening guide together for handoff, while the full workflow zip still preserves the larger release/integration JSON archive.
 
 ## Typical use
 

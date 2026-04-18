@@ -186,6 +186,7 @@
             <button class="secondary" id="launch-download-workflow-summary-btn">Launch Summary</button>
             <button class="secondary" id="launch-download-workflow-checklist-btn">Launch Checklist</button>
             <button class="secondary" id="launch-download-workflow-checksums-btn">Launch Checksums</button>
+            <button class="secondary" id="launch-download-workflow-zip-btn">Launch Zip</button>
           </div>
           <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="launch-download-release-summary-btn">Release Summary</button>
@@ -824,6 +825,8 @@
             <div class="hint" style="margin-top:10px;">${esc(workflowSummary.message || "No launch workflow summary available.")}</div>
             <div class="split-line" style="margin-top:12px;"><span>Candidate</span><span>${esc(workflowSummary.candidateVersion || "-")}</span></div>
             <div class="split-line"><span>Launch Package</span><span>${esc(payload.summaryFileName || "-")} | ${esc(payload.checklistFileName || "-")}</span></div>
+            <div class="split-line"><span>Recommended Handoff</span><span>${esc(recommendedDownloads.find((item) => item.key === "launch_handoff_zip")?.fileName || payload.handoffZipFileName || "-")}</span></div>
+            <div class="split-line"><span>Full Workflow Zip</span><span>${esc(recommendedDownloads.find((item) => item.key === "launch_workflow_zip")?.fileName || `${String(payload.fileName || "launch-workflow.json").replace(/\.json$/i, ".zip")}`)}</span></div>
             <div class="split-line"><span>Workflow Checklist</span><span>${esc(String(workflowChecklist.status || "unknown").toUpperCase())} | pass ${esc(workflowChecklist.passItems ?? 0)} | review ${esc(workflowChecklist.reviewItems ?? 0)} | block ${esc(workflowChecklist.blockItems ?? 0)}</span></div>
             <div class="split-line"><span>Recommended Downloads</span><span>${esc(workflowSummary.downloadSummary || recommendedDownloads.map((item) => item.label).join(" + ") || "-")}</span></div>
             ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
@@ -948,6 +951,7 @@
         el("launch-download-workflow-summary-btn").disabled = !hasProduct;
         el("launch-download-workflow-checklist-btn").disabled = !hasProduct;
         el("launch-download-workflow-checksums-btn").disabled = !hasProduct;
+        el("launch-download-workflow-zip-btn").disabled = !hasProduct;
         el("launch-download-release-summary-btn").disabled = !hasProduct;
         el("launch-download-integration-env-btn").disabled = !hasProduct;
         el("launch-download-host-config-btn").disabled = !hasProduct;
@@ -1805,8 +1809,8 @@
 
       el("launch-download-handoff-btn").addEventListener("click", async () => {
         try {
-          const result = await downloadLaunchWorkflowAsset("zip", "launch-workflow.zip", "Launch workflow handoff");
-          setOutput({ launchWorkflowDownload: { format: "zip", fileName: result.fileName } });
+          const result = await downloadLaunchWorkflowAsset("handoff-zip", "launch-workflow-handoff.zip", "Launch workflow handoff");
+          setOutput({ launchWorkflowDownload: { format: "handoff-zip", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1837,6 +1841,16 @@
         try {
           const result = await downloadLaunchWorkflowAsset("checksums", "launch-workflow-sha256.txt", "Launch workflow checksums");
           setOutput({ launchWorkflowDownload: { format: "checksums", fileName: result.fileName } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("launch-download-workflow-zip-btn").addEventListener("click", async () => {
+        try {
+          const result = await downloadLaunchWorkflowAsset("zip", "launch-workflow.zip", "Launch workflow zip");
+          setOutput({ launchWorkflowDownload: { format: "zip", fileName: result.fileName } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

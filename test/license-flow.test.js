@@ -5505,6 +5505,10 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(launchWorkflow.workflowSummary.clientHardeningProfile, "balanced");
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.recommendedDownloads));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_zip"));
+    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_checksums"));
+    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
+    assert.match(launchWorkflow.handoffZipFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip$/);
+    assert.match(launchWorkflow.handoffChecksumsFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff-sha256\.txt$/);
     assert.equal(launchWorkflow.workflowChecklist.status, "hold");
     assert.ok(launchWorkflow.workflowChecklist.blockItems >= 1);
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "launch_handoff_package"));
@@ -5513,6 +5517,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
     assert.match(launchWorkflow.summaryText, /Workflow Status: HOLD/);
     assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
+    assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
     assert.match(launchWorkflow.checklistText, /RockSolid Launch Workflow Checklist/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Startup bootstrap decision/);
@@ -5525,6 +5530,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchSummaryDownload.contentType || "", /^text\/plain/);
     assert.match(launchSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt"/);
     assert.match(launchSummaryDownload.body, /Workflow Status: HOLD/);
+    assert.match(launchSummaryDownload.body, /Recommended handoff zip/);
     assert.match(launchSummaryDownload.body, /Combined launch workflow zip/);
 
     const launchChecklistDownload = await getText(
@@ -5547,6 +5553,19 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchChecksumsDownload.body, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(launchChecksumsDownload.body, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(launchChecksumsDownload.body, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
+
+    const launchHandoffChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=handoff-checksums",
+      viewerSession.token
+    );
+    assert.match(launchHandoffChecksumsDownload.contentType || "", /^text\/plain/);
+    assert.match(launchHandoffChecksumsDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff-sha256\.txt"/);
+    assert.match(launchHandoffChecksumsDownload.body, /launch\/rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt/);
+    assert.match(launchHandoffChecksumsDownload.body, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.txt/);
+    assert.match(launchHandoffChecksumsDownload.body, /integration\/host-config\/rocksolid_host_config\.env/);
+    assert.doesNotMatch(launchHandoffChecksumsDownload.body, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+    assert.doesNotMatch(launchHandoffChecksumsDownload.body, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
 
     const launchLinkedReleaseSummaryDownload = await getText(
       baseUrl,
@@ -5583,6 +5602,30 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchLinkedCppDownload.contentType || "", /^text\/plain/);
     assert.match(launchLinkedCppDownload.contentDisposition || "", /attachment; filename="RELPKG_ALPHA\.cpp"/);
     assert.match(launchLinkedCppDownload.body, /startup_bootstrap_http/);
+
+    const launchHandoffZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=handoff-zip",
+      viewerSession.token
+    );
+    assert.match(launchHandoffZipDownload.contentType || "", /^application\/zip/);
+    assert.match(launchHandoffZipDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip"/);
+    assert.equal(launchHandoffZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const launchHandoffZipText = launchHandoffZipDownload.body.toString("latin1");
+    assert.match(launchHandoffZipText, /launch\/rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt/);
+    assert.match(launchHandoffZipText, /launch\/rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt/);
+    assert.match(launchHandoffZipText, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.txt/);
+    assert.match(launchHandoffZipText, /integration\/host-config\/rocksolid_host_config\.env/);
+    assert.match(launchHandoffZipText, /integration\/cmake-consumer\/CMakeLists\.txt/);
+    assert.match(launchHandoffZipText, /integration\/vs2022-consumer\/RELPKG_ALPHA_host_consumer\.sln/);
+    assert.match(launchHandoffZipText, /integration\/vs2022-consumer\/RockSolidSDK\.props/);
+    assert.match(launchHandoffZipText, /integration\/vs2022-consumer\/RockSolidSDK\.local\.props/);
+    assert.match(launchHandoffZipText, /integration\/snippets\/RELPKG_ALPHA\.cpp/);
+    assert.match(launchHandoffZipText, /integration\/snippets\/RELPKG_ALPHA-host-skeleton\.cpp/);
+    assert.match(launchHandoffZipText, /integration\/snippets\/RELPKG_ALPHA-hardening-guide\.txt/);
+    assert.match(launchHandoffZipText, /SHA256SUMS\.txt/);
+    assert.doesNotMatch(launchHandoffZipText, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+    assert.doesNotMatch(launchHandoffZipText, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
 
     const launchZipDownload = await getBinary(
       baseUrl,
@@ -9119,6 +9162,8 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Download Launch Checksums/);
     assert.match(html, /Download Launch Zip/);
     assert.match(html, /Recommended Handoff/);
+    assert.match(html, /Download Recommended Handoff Zip/);
+    assert.match(html, /Download Handoff Checksums/);
     assert.match(html, /Download Release Summary/);
     assert.match(html, /Download Integration Env/);
     assert.match(html, /Download Host Config/);
@@ -9633,6 +9678,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Launch Summary/);
     assert.match(html, /Launch Checklist/);
     assert.match(html, /Launch Checksums/);
+    assert.match(html, /Launch Zip/);
     assert.match(html, /Open Launch Workspace/);
     assert.match(html, /Release Summary/);
     assert.match(html, /Integration Env/);

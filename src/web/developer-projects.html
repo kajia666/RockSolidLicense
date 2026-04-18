@@ -144,6 +144,11 @@
           </div>
           <div id="detail-release-readiness" class="hint" style="margin-top:12px;">Select a project and preview a channel to inspect release readiness without leaving this page.</div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="preview-integration-package-btn">Preview Integration Snapshot</button>
+            <button id="clear-integration-preview-btn">Clear Integration Preview</button>
+          </div>
+          <div id="detail-integration-preview" class="hint" style="margin-top:12px;">Select a project to inspect the latest integration snapshot without leaving this page.</div>
+          <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="download-inline-release-summary-btn">Download Release Summary</button>
             <button class="secondary" id="download-inline-release-checksums-btn">Download Release Checksums</button>
             <button class="secondary" id="download-inline-release-zip-btn">Download Release Zip</button>
@@ -154,10 +159,15 @@
             <button class="secondary" id="download-inline-integration-zip-btn">Download Integration Zip</button>
           </div>
           <div class="actions" style="margin-top:12px;">
+            <button class="secondary" id="download-inline-integration-cmake-btn">Download CMake Template</button>
+            <button class="secondary" id="download-inline-integration-vs2022-guide-btn">Download VS2022 Quickstart</button>
+            <button class="secondary" id="download-inline-integration-host-skeleton-btn">Download Host Skeleton</button>
+          </div>
+          <div class="actions" style="margin-top:12px;">
             <button class="secondary" id="open-project-integration-btn">Open Integration Package</button>
             <button class="secondary" id="open-project-release-btn">Open Release Check</button>
           </div>
-          <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release readiness inline.</div>
+          <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.</div>
         </article>
       </section>
 
@@ -182,6 +192,7 @@
       let dashboard = { summary: null, projects: [], generatedAt: null };
       let batchProductIds = new Set();
       let releasePreview = null;
+      let integrationPreview = null;
 
       function el(id) {
         return document.getElementById(id);
@@ -696,10 +707,61 @@
         `;
       }
 
+      function renderIntegrationPreview(product = null) {
+        const box = el("detail-integration-preview");
+        if (!product) {
+          box.textContent = "Select a project to inspect the latest integration snapshot without leaving this page.";
+          return;
+        }
+
+        if (!integrationPreview || integrationPreview.productCode !== product.code) {
+          box.innerHTML = `Preview the integration snapshot for <code>${esc(product.code)}</code> to inspect startup bootstrap defaults, client hardening, and handoff artifacts from this page.`;
+          return;
+        }
+
+        const payload = integrationPreview.payload || {};
+        const manifest = payload.manifest || {};
+        const startupPreview = manifest.startupPreview || {};
+        const decision = startupPreview.decision || {};
+        const request = startupPreview.request || manifest.startupDefaults || {};
+        const versionManifest = startupPreview.expectedResponse?.versionManifest || {};
+        const tokenKeySummary = startupPreview.tokenKeySummary || {};
+        const clientHardening = startupPreview.clientHardening || manifest.clientHardening || {};
+        const workflow = Array.isArray(startupPreview.workflow) ? startupPreview.workflow.slice(0, 4) : [];
+        const tokenKeyTotal = tokenKeySummary.totalKeys ?? manifest.tokenKeys?.length ?? 0;
+        const summaryTags = [
+          tag(clientHardening.profile || "unknown", clientHardening.profile === "strict" ? "ok" : ""),
+          tag(`startup:${decision.status || "unknown"}`, decision.ready ? "ok" : ""),
+          tag(`token-keys:${tokenKeyTotal}`, tokenKeyTotal > 0 ? "ok" : ""),
+          tag(`channel:${request.channel || "-"}`, ""),
+          tag(`client:${request.clientVersion || "-"}`, "")
+        ];
+        const artifactTags = [
+          payload.snippets?.envFileName ? tag(`env:${payload.snippets.envFileName}`, "ok") : "",
+          payload.snippets?.hostConfigFileName ? tag(`host:${payload.snippets.hostConfigFileName}`, "ok") : "",
+          payload.snippets?.cmakeFileName ? tag("cmake", "") : "",
+          payload.snippets?.vs2022GuideFileName ? tag("vs2022", "") : "",
+          payload.snippets?.hostSkeletonFileName ? tag("host skeleton", "") : ""
+        ].filter(Boolean);
+
+        box.innerHTML = `
+          <div>${summaryTags.join("")}</div>
+          <div class="hint" style="margin-top:10px;">${esc(decision.message || clientHardening.summary || "No integration summary available.")}</div>
+          <div class="split-line" style="margin-top:12px;"><span>Startup Bootstrap</span><span>${esc(decision.status || "unknown")} | includeKeys=${esc(String(request.includeTokenKeys !== false))}</span></div>
+          <div class="split-line"><span>Version Preview</span><span>${esc(versionManifest.status || "n/a")} | latest ${esc(versionManifest.latestVersion || "-")}</span></div>
+          <div class="split-line"><span>Token Keys</span><span>${esc(tokenKeySummary.activeKeyId || "-")} | ${esc(tokenKeyTotal)} public</span></div>
+          <div class="split-line"><span>Client Hardening</span><span>${esc(clientHardening.title || clientHardening.profile || "-")}</span></div>
+          ${artifactTags.length ? `<div class="hint" style="margin-top:12px;">Artifacts: ${artifactTags.join("")}</div>` : ""}
+          ${clientHardening.nextAction ? `<div class="hint" style="margin-top:10px;">Next: ${esc(clientHardening.nextAction)}</div>` : ""}
+          ${workflow.length ? `<div class="hint" style="margin-top:12px;">Startup workflow:<br>${workflow.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
+        `;
+      }
+
       function renderDetail(product = null) {
         if (!product) {
           el("detail-box").innerHTML = '<div class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>';
           renderReleasePreview(null);
+          renderIntegrationPreview(null);
           syncWorkspaceLinks(null);
           return;
         }
@@ -729,6 +791,7 @@
           <div style="margin-top:8px;">${renderFeatureDetails(features)}</div>
         `;
         renderReleasePreview(product);
+        renderIntegrationPreview(product);
         syncWorkspaceLinks(product);
       }
 
@@ -738,16 +801,21 @@
         el("open-project-release-btn").disabled = !hasProduct;
         el("preview-release-readiness-btn").disabled = !hasProduct;
         el("clear-release-preview-btn").disabled = !hasProduct && !releasePreview;
+        el("preview-integration-package-btn").disabled = !hasProduct;
+        el("clear-integration-preview-btn").disabled = !hasProduct && !integrationPreview;
         el("download-inline-release-summary-btn").disabled = !hasProduct;
         el("download-inline-release-checksums-btn").disabled = !hasProduct;
         el("download-inline-release-zip-btn").disabled = !hasProduct;
         el("download-inline-integration-env-btn").disabled = !hasProduct;
         el("download-inline-integration-host-config-btn").disabled = !hasProduct;
         el("download-inline-integration-zip-btn").disabled = !hasProduct;
+        el("download-inline-integration-cmake-btn").disabled = !hasProduct;
+        el("download-inline-integration-vs2022-guide-btn").disabled = !hasProduct;
+        el("download-inline-integration-host-skeleton-btn").disabled = !hasProduct;
         const channel = currentReleaseChannel();
         el("detail-navigation-hint").textContent = hasProduct
-          ? `Open ${product.code} in Developer Integration or Developer Releases with channel ${channel} already selected, or preview readiness inline here.`
-          : "Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release readiness inline.";
+          ? `Open ${product.code} in Developer Integration or Developer Releases with channel ${channel} already selected, or preview release and integration snapshots inline here.`
+          : "Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.";
       }
 
       function setSelection(product = null) {
@@ -838,6 +906,7 @@
         dashboard = { summary: null, projects: [], generatedAt: null };
         batchProductIds = new Set();
         releasePreview = null;
+        integrationPreview = null;
         renderProjects();
         setMeta();
         setSelection(null);
@@ -1273,6 +1342,26 @@
         }
       });
 
+      el("preview-integration-package-btn").addEventListener("click", async () => {
+        try {
+          const productId = el("edit-product-id").value.trim();
+          const productCode = el("edit-product-code").value.trim();
+          if (!productId || !productCode) {
+            throw new Error("Select a project before previewing the integration snapshot.");
+          }
+          const payload = await api(`/api/developer/integration/package${buildRouteQuery({ productCode })}`);
+          integrationPreview = { productCode, payload };
+          const product = findVisibleProductById(productId);
+          renderIntegrationPreview(product);
+          syncWorkspaceLinks(product);
+          setStatus(`Loaded ${productCode} integration snapshot.`);
+          setOutput({ integrationPreview: payload });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       async function downloadInlineReleaseAsset(format, fallbackFileName, label) {
         const productCode = el("edit-product-code").value.trim();
         if (!productCode) {
@@ -1308,6 +1397,14 @@
         renderReleasePreview(product);
         syncWorkspaceLinks(product);
         setStatus("Inline release preview cleared.");
+      });
+
+      el("clear-integration-preview-btn").addEventListener("click", () => {
+        integrationPreview = null;
+        const product = findVisibleProductById(el("edit-product-id").value.trim());
+        renderIntegrationPreview(product);
+        syncWorkspaceLinks(product);
+        setStatus("Inline integration preview cleared.");
       });
 
       el("detail-release-channel").addEventListener("change", () => {
@@ -1364,6 +1461,33 @@
       el("download-inline-integration-zip-btn").addEventListener("click", async () => {
         try {
           await downloadInlineIntegrationAsset("zip", "integration-package.zip", "Inline integration zip");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-cmake-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("cmake", "CMakeLists.txt", "Inline integration CMake template");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-vs2022-guide-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("vs2022-guide", "rocksolid_vs2022_quickstart.md", "Inline integration VS2022 quickstart");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-inline-integration-host-skeleton-btn").addEventListener("click", async () => {
+        try {
+          await downloadInlineIntegrationAsset("host-skeleton", "project-host-skeleton.cpp", "Inline integration host skeleton");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

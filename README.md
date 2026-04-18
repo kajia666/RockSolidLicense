@@ -56,7 +56,7 @@
 - 开发者接入中心单项目集成包直接下载，并支持单独下载项目级 C++ host skeleton、`rocksolid_host_config.env`、`CMakeLists.txt` 与 VS2022 `.sln/.vcxproj/.vcxproj.filters/.props/.local.props/.md`
 - 项目中心 / 接入中心 / 发版中心跨页预填联动
 - 项目页发版快速信号摘要
-- 项目页内联发版 readiness 预览，可按 channel 直接查看候选版本、阻断项、检查清单和下一步动作，并直接下载 release `summary / checksums / zip` 以及常用 integration `env / host-config / zip`
+- 项目页内联发版 readiness 预览，可按 channel 直接查看候选版本、阻断项、检查清单和下一步动作；项目页也支持内联 integration snapshot 预览，并直接下载 release `summary / checksums / zip` 以及常用 integration `env / host-config / cmake / vs2022-guide / host-skeleton / zip`
 - 开发者多项目归属
 - 开发者主账号 + 子账号
 - 子账号按项目授权与角色控制

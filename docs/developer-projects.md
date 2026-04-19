@@ -95,6 +95,8 @@ That same inline launch workflow block now also shows the first slice of:
 
 So the project workspace is no longer limited to "what is blocked right now". It can also give software authors a short operational view of what to stage first and what to watch during the first launch window.
 
+Those inline recommendation rows are now actionable as well. So from the project page, a software author can move straight from "what should we stage first" into the matching workspace or bootstrap action without re-reading the same launch summary elsewhere.
+
 Those routed clicks now preserve the action title and summary too. When the project page sends someone into Integration or Releases from the inline launch workflow, the target page can show which launch-workflow step triggered the route.
 
 The same combined package is also available over:

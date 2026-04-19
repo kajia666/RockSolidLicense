@@ -3100,7 +3100,8 @@ function buildLaunchAuthorizationOperationalPlan({
       target: "Enable account login or direct-card login",
       current: "No runtime login path",
       summary: "End users still have no runtime sign-in path for this project.",
-      nextAction: "Adjust the project authorization preset before launch so at least one login path is available."
+      nextAction: "Adjust the project authorization preset before launch so at least one login path is available.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("project", "auth-preset", "Open Project Workspace")
     });
   }
 
@@ -3116,7 +3117,14 @@ function buildLaunchAuthorizationOperationalPlan({
       : "Keep one active duration policy ready for first-sale activation and renewals.",
     nextAction: policyCount > 0
       ? "Keep one starter policy active for the launch lane."
-      : "Create one active starter policy before issuing cards or opening first-user access."
+      : "Create one active starter policy before issuing cards or opening first-user access.",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "policy-create", "Open License Workspace"),
+    bootstrapAction: policyCount > 0
+      ? null
+      : createLaunchWorkflowBootstrapAction({
+          summary: "Create a starter policy automatically for this launch lane.",
+          plan: ["starter policy"]
+        })
   });
 
   if (cardLoginEnabled || cardRechargeEnabled) {
@@ -3143,7 +3151,14 @@ function buildLaunchAuthorizationOperationalPlan({
           : "Recharge flows need fresh cards staged before rollout so renewals can succeed on day one.",
       nextAction: freshCardCount > 0
         ? "Keep a starter card buffer available for the first launch window."
-        : "Issue at least one starter card batch before opening login or recharge."
+        : "Issue at least one starter card batch before opening login or recharge.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
+      bootstrapAction: freshCardCount > 0
+        ? null
+        : createLaunchWorkflowBootstrapAction({
+            summary: "Issue starter launch cards automatically for this lane.",
+            plan: ["starter card batch"]
+          })
     });
   }
 
@@ -3167,7 +3182,18 @@ function buildLaunchAuthorizationOperationalPlan({
         ? "Keep at least one starter account reserved for internal smoke tests and support."
         : closedRegistration
           ? "Seed one or more starter accounts before launch, or reopen registration."
-          : "Optionally seed one internal QA/support account before launch."
+          : "Optionally seed one internal QA/support account before launch.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+        closedRegistration ? "licenses" : "project",
+        closedRegistration ? "starter-account" : "auth-preset",
+        closedRegistration ? "Open License Workspace" : "Open Project Workspace"
+      ),
+      bootstrapAction: accountCount > 0
+        ? null
+        : createLaunchWorkflowBootstrapAction({
+            summary: "Seed a starter account automatically for the current lane.",
+            plan: ["starter account"]
+          })
     });
   }
 
@@ -3180,7 +3206,8 @@ function buildLaunchAuthorizationOperationalPlan({
       target: "At least 1 internal active entitlement",
       current: `${activeEntitlementCount} active`,
       summary: "Account-only lanes benefit from one internal entitlement so QA can exercise runtime gating before the first customer arrives.",
-      nextAction: "Prepare one internal entitlement or a private demo account for smoke testing before launch."
+      nextAction: "Prepare one internal entitlement or a private demo account for smoke testing before launch.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "quickstart", "Open License Workspace")
     });
   }
 
@@ -3192,7 +3219,8 @@ function buildLaunchAuthorizationOperationalPlan({
       count: 50,
       prefix: `${batchPrefix}DL`,
       purpose: "First-sale activations and QA smoke tests",
-      nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales."
+      nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace")
     });
   }
 
@@ -3206,7 +3234,8 @@ function buildLaunchAuthorizationOperationalPlan({
       purpose: "Renewal, recharge, and early support top-ups",
       nextAction: cardLoginEnabled
         ? "Keep recharge stock separate from direct-login stock so renewals do not consume the initial sales batch."
-        : "Issue one recharge-ready batch before the first renewal or top-up request arrives."
+        : "Issue one recharge-ready batch before the first renewal or top-up request arrives.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace")
     });
   }
 
@@ -3215,7 +3244,8 @@ function buildLaunchAuthorizationOperationalPlan({
       key: "starter_account_handoff",
       label: "Rotate and hand off starter credentials",
       timing: "Before launch and at T+0",
-      summary: "Securely hand off seed account credentials to QA or support, then replace temporary passwords once the first sign-in succeeds."
+      summary: "Securely hand off seed account credentials to QA or support, then replace temporary passwords once the first sign-in succeeds.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "starter-account", "Open License Workspace")
     });
   }
 
@@ -3223,7 +3253,8 @@ function buildLaunchAuthorizationOperationalPlan({
     key: "runtime_smoke",
     label: "Verify first real sign-ins",
     timing: "T+0 to T+30m",
-    summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine."
+    summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine.",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Stay in Launch Workflow")
   });
 
   if (cardLoginEnabled || cardRechargeEnabled) {
@@ -3231,7 +3262,8 @@ function buildLaunchAuthorizationOperationalPlan({
       key: "card_redemption_watch",
       label: "Watch first card redemptions",
       timing: "T+0 to T+2h",
-      summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up."
+      summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace")
     });
   }
 
@@ -3240,7 +3272,8 @@ function buildLaunchAuthorizationOperationalPlan({
       key: "startup_rule_watch",
       label: "Watch notices and version gates",
       timing: "T+0 to T+2h",
-      summary: "Confirm launch-day notices, maintenance copy, and version rules are not blocking healthy clients by mistake."
+      summary: "Confirm launch-day notices, maintenance copy, and version rules are not blocking healthy clients by mistake.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("release", "versions", "Open Release Workspace")
     });
   }
 
@@ -3248,7 +3281,8 @@ function buildLaunchAuthorizationOperationalPlan({
     key: "session_review",
     label: "Review early sessions and device state",
     timing: "T+0 to T+4h",
-    summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users."
+    summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users.",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Stay in Launch Workflow")
   });
 
   return {

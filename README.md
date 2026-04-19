@@ -62,6 +62,7 @@
 - 开发者授权中心现在补了 `Launch Authorization Quickstart`，会按项目当前登录模式、策略数、卡密库存、起步账号状态给出首发建议，并能一键预填 starter duration / points policy、starter card batch 和 starter account；当项目走账号登录但关闭公开注册时，也可以直接在授权中心补首发种子账号；如果登录路径已经合理，还可以直接运行一键 `Launch Bootstrap`，自动补齐缺的 starter policy / fresh card batch / starter account
 - 上线工作台和项目页内联 `Launch Workflow` 现在也能直接运行 `Launch Bootstrap`。如果当前 lane 的首发授权缺项可以自动补齐，摘要、action plan、checklist 和主操作区都会给出一键入口，执行后会自动刷新当前 lane，减少先跳到授权页再返回的往返
 - 现在 `Launch Authorization Quickstart`、`Launch Workflow` 和项目页内联 launch summary 还会给出结构化的“首批库存建议 / 首批发卡建议 / 首发后第一轮运营动作”，帮助软件作者把首发准备、首批发卡和上线后前几小时的运营检查连成一条更实操的链路
+- 上面这些首发建议现在也不只是说明文字了，软件作者可以直接从建议旁边跳到授权预设、授权中心、上线工作台，或者直接运行 `Launch Bootstrap`，把“看建议 -> 去处理”压成更短的动作链
 - 开发者多项目归属
 - 开发者主账号 + 子账号
 - 子账号按项目授权与角色控制

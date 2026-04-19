@@ -804,9 +804,9 @@
           ${renderWorkspaceActionButtons(workspaceActions)}
           ${actionPlan.length ? `<div class="hint" style="margin-top:12px;">Action plan: ${escapeHtml(workflowSummary.actionPlanSummary || actionPlan.map((item) => item.title || item.key || "step").join(" -> "))}</div>` : ""}
           ${renderActionPlanCards(actionPlan)}
-          ${renderLaunchRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatInventoryRecommendation)}
-          ${renderLaunchRecommendationList("First Batch Card Suggestions", firstBatchCardRecommendations, formatCardBatchRecommendation)}
-          ${renderLaunchRecommendationList("First Ops Actions", firstOpsActions, formatOpsAction)}
+          ${renderLaunchRecommendationList("Initial Inventory Recommendations", "inventory", inventoryRecommendations, formatInventoryRecommendation)}
+          ${renderLaunchRecommendationList("First Batch Card Suggestions", "card-batches", firstBatchCardRecommendations, formatCardBatchRecommendation)}
+          ${renderLaunchRecommendationList("First Ops Actions", "ops", firstOpsActions, formatOpsAction)}
           ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
@@ -944,6 +944,26 @@
           : [];
       }
 
+      function currentAuthorizationRecommendationItems(groupKey = "") {
+        const recommendations = releasePackage?.workflowSummary?.authorizationLaunchRecommendations || {};
+        if (groupKey === "inventory") {
+          return Array.isArray(recommendations.inventoryRecommendations)
+            ? recommendations.inventoryRecommendations
+            : [];
+        }
+        if (groupKey === "card-batches") {
+          return Array.isArray(recommendations.firstBatchCardRecommendations)
+            ? recommendations.firstBatchCardRecommendations
+            : [];
+        }
+        if (groupKey === "ops") {
+          return Array.isArray(recommendations.firstOpsActions)
+            ? recommendations.firstOpsActions
+            : [];
+        }
+        return [];
+      }
+
       function currentChecklistItems() {
         return Array.isArray(releasePackage?.workflowChecklist?.items)
           ? releasePackage.workflowChecklist.items
@@ -1002,14 +1022,25 @@
         return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`;
       }
 
-      function renderLaunchRecommendationList(title, items = [], formatter) {
+      function renderLaunchRecommendationList(title, groupKey, items = [], formatter) {
         if (!items.length) {
           return "";
         }
         return `
           <div class="hint" style="margin-top:12px;">
             <strong>${escapeHtml(title)}</strong><br>
-            ${items.map((item, index) => `${index + 1}. ${escapeHtml(formatter(item))}`).join("<br>")}
+            ${items.map((item, index) => `
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+                <div>${index + 1}. ${escapeHtml(formatter(item))}</div>
+                ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction) ? `
+                  <div class="actions" style="margin-top:8px;">
+                    ${item.workspaceAction ? `<button type="button" class="secondary" data-recommendation-workspace-group="${escapeHtml(groupKey)}" data-recommendation-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                    ${item.recommendedDownload ? `<button type="button" data-recommendation-download-group="${escapeHtml(groupKey)}" data-recommendation-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
+                    ${item.bootstrapAction ? `<button type="button" class="secondary" data-recommendation-bootstrap-group="${escapeHtml(groupKey)}" data-recommendation-bootstrap-index="${index}">${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                  </div>
+                ` : ""}
+              </div>
+            `).join("")}
           </div>
         `;
       }
@@ -1579,6 +1610,21 @@
       });
 
       el("release-readiness").addEventListener("click", (event) => {
+        const recommendationWorkspaceButton = event.target.closest("[data-recommendation-workspace-index]");
+        if (recommendationWorkspaceButton) {
+          try {
+            const groupKey = recommendationWorkspaceButton.dataset.recommendationWorkspaceGroup || "";
+            const index = Number(recommendationWorkspaceButton.dataset.recommendationWorkspaceIndex);
+            const item = currentAuthorizationRecommendationItems(groupKey)[index];
+            navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget(), {
+              title: item?.label || item?.key,
+              summary: item?.summary || item?.nextAction
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
         const actionPlanWorkspaceButton = event.target.closest("[data-action-plan-workspace-index]");
         if (actionPlanWorkspaceButton) {
           try {
@@ -1607,6 +1653,47 @@
       });
 
         el("release-readiness").addEventListener("click", async (event) => {
+          const recommendationBootstrapButton = event.target.closest("[data-recommendation-bootstrap-index]");
+          if (recommendationBootstrapButton) {
+            try {
+              await runLaunchBootstrap();
+              const groupKey = recommendationBootstrapButton.dataset.recommendationBootstrapGroup || "";
+              const index = Number(recommendationBootstrapButton.dataset.recommendationBootstrapIndex);
+              const item = currentAuthorizationRecommendationItems(groupKey)[index];
+              setOutput({
+                recommendationBootstrap: {
+                  group: groupKey,
+                  key: item?.bootstrapAction?.key || null,
+                  label: item?.bootstrapAction?.label || null
+                },
+                launchWorkflow: releasePackage
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
+          const recommendationDownloadButton = event.target.closest("[data-recommendation-download-index]");
+          if (recommendationDownloadButton) {
+            try {
+              const groupKey = recommendationDownloadButton.dataset.recommendationDownloadGroup || "";
+              const index = Number(recommendationDownloadButton.dataset.recommendationDownloadIndex);
+              const item = currentAuthorizationRecommendationItems(groupKey)[index];
+              const result = await downloadRecommendedWorkflowItem(item?.recommendedDownload);
+              setOutput({
+                recommendationDownload: {
+                  group: groupKey,
+                  key: item?.recommendedDownload?.key || null,
+                  fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+                }
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
           const actionPlanBootstrapButton = event.target.closest("[data-action-plan-bootstrap-index]");
           if (actionPlanBootstrapButton) {
             try {

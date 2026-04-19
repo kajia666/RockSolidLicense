@@ -44,6 +44,14 @@ That helps a software author answer three practical launch questions in one plac
 - what first batch of sellable or recharge cards should be issued
 - what should be checked in the first launch window after users begin signing in
 
+Those recommendation rows can now also carry direct actions. So instead of only reading the suggestion, a software author can immediately:
+
+- open the project authorization preset
+- prefill a starter policy or starter card batch
+- prefill a starter account
+- jump back into launch workflow
+- run `Launch Bootstrap`
+
 ## Scope
 
 - owners can manage every product they own

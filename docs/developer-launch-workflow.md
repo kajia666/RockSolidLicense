@@ -116,6 +116,12 @@ Authorization readiness inside the launch workflow now also carries more operati
 
 That makes the launch workflow useful not only for "is this lane blocked" but also for "what should we stock first", "what kind of first card batches should we issue", and "what should operations watch right after launch".
 
+Those recommendation rows are now actionable too. When the current lane knows the next best fix, the launch workflow can expose direct buttons beside the recommendation so the software author can:
+
+- jump into the right workspace
+- run `Launch Bootstrap`
+- or follow a recommended download
+
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.
 
 Those routed jumps now also carry the originating step title and reason into the next workspace. So when an action-plan item or checklist item sends someone to Integration or Releases, the target page can explain which workflow step triggered the jump instead of only showing a generic autofocus hint.

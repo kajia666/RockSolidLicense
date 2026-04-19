@@ -5514,6 +5514,10 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.authorizationLaunchRecommendations?.firstOpsActions));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.inventoryRecommendations.length >= 1);
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.length >= 1);
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.inventoryRecommendations.some((item) => item.workspaceAction?.key));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.inventoryRecommendations.some((item) => item.bootstrapAction?.key));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstBatchCardRecommendations.some((item) => item.workspaceAction?.key === "licenses"));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.key));
     assert.equal(launchWorkflow.workflowSummary.recommendedWorkspace.key, "integration");
     assert.match(launchWorkflow.workflowSummary.recommendedWorkspace.label, /Integration Workspace/);
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.workspaceActions));
@@ -9511,6 +9515,8 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Initial Inventory Recommendations/);
     assert.match(html, /First Batch Card Suggestions/);
     assert.match(html, /First Ops Actions/);
+    assert.match(html, /data-recommendation-workspace-index/);
+    assert.match(html, /data-recommendation-bootstrap-index/);
     assert.match(html, /renderChecklistItemButtons/);
     assert.match(html, /renderActionPlanCards/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
@@ -10052,6 +10058,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Initial Inventory Recommendations/);
     assert.match(html, /First Batch Card Suggestions/);
     assert.match(html, /First Ops Actions/);
+    assert.match(html, /data-launch-recommendation-workspace-index/);
+    assert.match(html, /data-launch-recommendation-bootstrap-index/);
     assert.match(html, /Open Launch Workspace/);
     assert.match(html, /Release Summary/);
     assert.match(html, /Integration Env/);

@@ -515,7 +515,9 @@
             status: "missing",
             target: "Enable account login or direct-card login",
             current: "No runtime login path",
-            summary: "Adjust the project authorization preset before launch so end users have at least one sign-in path."
+            summary: "Adjust the project authorization preset before launch so end users have at least one sign-in path.",
+            actionKey: "open-project-auth",
+            actionLabel: "Open Authorization Preset"
           });
         }
 
@@ -528,7 +530,9 @@
           current: `${policyCount} active`,
           summary: policyCount > 0
             ? "Keep one starter policy active for the launch lane."
-            : "Create one active starter policy before issuing cards or onboarding first users."
+            : "Create one active starter policy before issuing cards or onboarding first users.",
+          actionKey: recommendedGrantType === "points" ? "load-points-policy" : "load-duration-policy",
+          actionLabel: recommendedGrantType === "points" ? "Prepare Starter Points Policy" : "Prepare Starter Duration Policy"
         });
 
         if (cardLoginEnabled || cardRechargeEnabled) {
@@ -549,7 +553,9 @@
             current: `${freshCardCount} fresh`,
             summary: freshCardCount > 0
               ? "Keep a starter card buffer available for the first launch window."
-              : "Issue at least one starter card batch before opening login or recharge."
+              : "Issue at least one starter card batch before opening login or recharge.",
+            actionKey: "load-card-batch",
+            actionLabel: "Prepare Starter Card Batch"
           });
         }
 
@@ -568,7 +574,9 @@
               ? "Keep at least one starter account reserved for internal smoke tests and support."
               : closedRegistration
                 ? "Seed one or more starter accounts before launch, or reopen registration."
-                : "Optionally seed one internal QA/support account before launch."
+                : "Optionally seed one internal QA/support account before launch.",
+            actionKey: closedRegistration ? "load-starter-account" : "open-project-auth",
+            actionLabel: closedRegistration ? "Prepare Starter Account" : "Open Authorization Preset"
           });
         }
 
@@ -580,7 +588,9 @@
             status: "recommended",
             target: "At least 1 internal active entitlement",
             current: `${activeEntitlementCount} active`,
-            summary: "Prepare one internal entitlement or a private demo account for smoke testing before launch."
+            summary: "Prepare one internal entitlement or a private demo account for smoke testing before launch.",
+            actionKey: "open-launch",
+            actionLabel: "Open Launch Workflow"
           });
         }
 
@@ -604,7 +614,9 @@
             grantType: recommendedGrantType,
             prefix: `${prefix}DL`,
             purpose: "First-sale activations and QA smoke tests",
-            nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales."
+            nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales.",
+            actionKey: "load-card-batch",
+            actionLabel: "Prepare Suggested Batch"
           });
         }
         if (cardRechargeEnabled) {
@@ -617,7 +629,9 @@
             purpose: "Renewal, recharge, and early support top-ups",
             nextAction: cardLoginEnabled
               ? "Keep recharge stock separate from direct-login stock so renewals do not consume the initial sales batch."
-              : "Issue one recharge-ready batch before the first renewal or top-up request arrives."
+              : "Issue one recharge-ready batch before the first renewal or top-up request arrives.",
+            actionKey: "load-card-batch",
+            actionLabel: "Prepare Recharge Batch"
           });
         }
         return items;
@@ -634,21 +648,27 @@
             key: "starter_account_handoff",
             label: "Rotate and hand off starter credentials",
             timing: "Before launch and at T+0",
-            summary: "Securely hand off seed account credentials to QA or support, then replace temporary passwords once the first sign-in succeeds."
+            summary: "Securely hand off seed account credentials to QA or support, then replace temporary passwords once the first sign-in succeeds.",
+            actionKey: "load-starter-account",
+            actionLabel: "Review Starter Account"
           });
         }
         items.push({
           key: "runtime_smoke",
           label: "Verify first real sign-ins",
           timing: "T+0 to T+30m",
-          summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine."
+          summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine.",
+          actionKey: "open-launch",
+          actionLabel: "Open Launch Workflow"
         });
         if (cardLoginEnabled || cardRechargeEnabled) {
           items.push({
             key: "card_redemption_watch",
             label: "Watch first card redemptions",
             timing: "T+0 to T+2h",
-            summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up."
+            summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up.",
+            actionKey: "refresh-scope",
+            actionLabel: "Refresh Inventory"
           });
         }
         if (featureConfig.allowVersionCheck !== false || featureConfig.allowNotices !== false) {
@@ -656,14 +676,18 @@
             key: "startup_rule_watch",
             label: "Watch notices and version gates",
             timing: "T+0 to T+2h",
-            summary: "Confirm launch-day notices, maintenance copy, and version rules are not blocking healthy clients by mistake."
+            summary: "Confirm launch-day notices, maintenance copy, and version rules are not blocking healthy clients by mistake.",
+            actionKey: "open-launch",
+            actionLabel: "Open Launch Workflow"
           });
         }
         items.push({
           key: "session_review",
           label: "Review early sessions and device state",
           timing: "T+0 to T+4h",
-          summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users."
+          summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users.",
+          actionKey: "open-launch",
+          actionLabel: "Open Launch Workflow"
         });
         return items;
       }
@@ -684,7 +708,12 @@
         if (!items.length) {
           return "";
         }
-        return `<div class="hint" style="margin-top:12px;"><strong>${esc(title)}</strong><br>${items.map((item, index) => `${index + 1}. ${esc(formatter(item))}`).join("<br>")}</div>`;
+        return `<div class="hint" style="margin-top:12px;"><strong>${esc(title)}</strong><br>${items.map((item, index) => `
+          <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+            <div>${index + 1}. ${esc(formatter(item))}</div>
+            ${item.actionKey ? `<div class="actions" style="margin-top:8px;"><button type="button" class="secondary" data-launch-quickstart-action="${esc(item.actionKey)}">${esc(item.actionLabel || item.actionKey)}</button></div>` : ""}
+          </div>
+        `).join("")}</div>`;
       }
 
       function renderQuickstartActionButtons(actions = []) {

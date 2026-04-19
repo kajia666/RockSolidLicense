@@ -2897,6 +2897,107 @@ function buildLaunchWorkflowAuthorizationReadiness({
   };
 }
 
+function buildLaunchAuthorizationModeSummary(featureConfig = {}) {
+  const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+  const registerEnabled = featureConfig.allowRegister !== false;
+  const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+  return [
+    accountLoginEnabled ? (registerEnabled ? "account+register" : "account-only") : null,
+    cardLoginEnabled ? "direct-card" : null
+  ].filter(Boolean).join(" + ") || "no-login-path";
+}
+
+function recommendLaunchStarterGrantType(featureConfig = {}, policies = []) {
+  if (policies.some((item) => item?.grantType === "duration")) {
+    return "duration";
+  }
+  if (policies.some((item) => item?.grantType === "points")) {
+    return "points";
+  }
+  return featureConfig.allowCardLogin !== false || featureConfig.allowCardRecharge !== false
+    ? "duration"
+    : "duration";
+}
+
+function buildLaunchStarterBatchPrefix(productCode = "") {
+  return String(productCode || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "")
+    .slice(0, 10) || "ROCKSOLID";
+}
+
+function buildLaunchStarterAccountUsername(productCode = "", count = 0) {
+  const base = String(productCode || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 16) || "starter";
+  return `${base}_seed_${String(Math.max(1, count + 1)).padStart(2, "0")}`;
+}
+
+function buildLaunchStarterAccountPassword(productCode = "") {
+  const prefix = String(productCode || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 8) || "starter";
+  return `${prefix}@${randomToken(4)}`;
+}
+
+function buildLaunchStarterPolicyDraft(product = {}, policies = []) {
+  const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+    ? product.featureConfig
+    : {};
+  const grantType = recommendLaunchStarterGrantType(featureConfig, policies);
+  const productLabel = String(product?.name || product?.code || "Launch").trim() || "Launch";
+
+  return {
+    name: grantType === "points"
+      ? `${productLabel} Launch 100 Points`
+      : `${productLabel} Launch 30 Days`,
+    grantType,
+    durationDays: grantType === "points" ? 0 : 30,
+    grantPoints: grantType === "points" ? 100 : 0,
+    maxDevices: 1,
+    allowConcurrentSessions: false,
+    heartbeatIntervalSeconds: 60,
+    heartbeatTimeoutSeconds: 180,
+    tokenTtlSeconds: 300,
+    bindMode: "strict",
+    bindFields: "",
+    allowClientUnbind: false,
+    clientUnbindLimit: 0,
+    clientUnbindWindowDays: 30,
+    clientUnbindDeductDays: 0
+  };
+}
+
+function buildLaunchStarterCardBatchDraft(product = {}, policies = []) {
+  const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+    ? product.featureConfig
+    : {};
+  const activePolicies = policies.filter((item) => normalizeProductStatus(item?.status || "active") === "active");
+  const preferredGrantType = recommendLaunchStarterGrantType(featureConfig, activePolicies);
+  const preferredPolicy = activePolicies.find((item) => item?.grantType === preferredGrantType)
+    || activePolicies[0]
+    || null;
+
+  return {
+    policyId: preferredPolicy?.id || "",
+    count: 50,
+    prefix: buildLaunchStarterBatchPrefix(product?.code || ""),
+    notes: `Launch starter batch | modes=${buildLaunchAuthorizationModeSummary(featureConfig)}`
+  };
+}
+
+function buildLaunchStarterAccountDraft(product = {}, accountCount = 0) {
+  return {
+    username: buildLaunchStarterAccountUsername(product?.code || "", accountCount),
+    password: buildLaunchStarterAccountPassword(product?.code || "")
+  };
+}
+
 function buildLaunchWorkflowChecklistPayload({
   releasePackage,
   integrationPackage,
@@ -13067,6 +13168,194 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return {
         ...manageRow,
         created: true
+      };
+    },
+
+    async developerBootstrapLicenseQuickstart(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireField(body, "productCode");
+
+      const productCode = readProductCodeInput(body);
+      const product = await getStoreActiveProductByCode(productCode);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product.id,
+          owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+        },
+        "products.read",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only view projects assigned to your developer account."
+      );
+
+      const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {};
+      const collectState = async () => {
+        const [policies, cardsPayload, accountsPayload] = await Promise.all([
+          this.developerListPolicies(token, { productCode }),
+          this.developerListCards(token, { productCode }),
+          this.developerListAccounts(token, { productCode })
+        ]);
+        const policyItems = Array.isArray(policies) ? policies : [];
+        const activePolicies = policyItems.filter((item) => normalizeProductStatus(item?.status || "active") === "active");
+        const cardItems = Array.isArray(cardsPayload?.items) ? cardsPayload.items : [];
+        const freshCards = cardItems.filter((item) =>
+          normalizeCardControlStatus(item?.status || "active") === "active" && item?.usageStatus === "unused"
+        );
+        const redeemedCards = cardItems.filter((item) => item?.usageStatus === "redeemed");
+        const accountItems = Array.isArray(accountsPayload?.items) ? accountsPayload.items : [];
+        const authorization = buildLaunchWorkflowAuthorizationReadiness({
+          product,
+          metrics: {
+            policies: activePolicies.length,
+            cardsFresh: freshCards.length,
+            cardsRedeemed: redeemedCards.length,
+            accounts: accountItems.length,
+            activeEntitlements: 0
+          }
+        });
+        return {
+          policies: policyItems,
+          activePolicies,
+          cards: cardItems,
+          freshCards,
+          accounts: accountItems,
+          authorization
+        };
+      };
+
+      const before = await collectState();
+      const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+      const registerEnabled = featureConfig.allowRegister !== false;
+      const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+      const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+      const missingLoginPath = !accountLoginEnabled && !cardLoginEnabled;
+
+      if (missingLoginPath) {
+        throw new AppError(
+          409,
+          "LAUNCH_BOOTSTRAP_BLOCKED",
+          "Enable account login or direct-card login in the project authorization preset before running launch bootstrap."
+        );
+      }
+
+      const needsPolicy = before.activePolicies.length <= 0;
+      const needsCards = (cardLoginEnabled || cardRechargeEnabled) && before.freshCards.length <= 0;
+      const needsStarterAccount = accountLoginEnabled && !registerEnabled && before.accounts.length <= 0;
+
+      if (!needsPolicy && !needsCards && !needsStarterAccount) {
+        return {
+          productCode,
+          productName: product.name,
+          modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
+          created: {},
+          skipped: ["No quickstart bootstrap actions were needed."],
+          before: {
+            authorization: before.authorization,
+            counts: {
+              policies: before.activePolicies.length,
+              freshCards: before.freshCards.length,
+              accounts: before.accounts.length
+            }
+          },
+          after: {
+            authorization: before.authorization,
+            counts: {
+              policies: before.activePolicies.length,
+              freshCards: before.freshCards.length,
+              accounts: before.accounts.length
+            }
+          },
+          message: `Launch quickstart is already staged for ${productCode}.`
+        };
+      }
+
+      const created = {};
+      let effectivePolicies = before.activePolicies.slice();
+
+      if (needsPolicy) {
+        created.policy = await this.developerCreatePolicy(token, {
+          productCode,
+          ...buildLaunchStarterPolicyDraft(product, effectivePolicies)
+        });
+        effectivePolicies = [created.policy, ...effectivePolicies];
+      }
+
+      if (needsCards) {
+        const cardBatchDraft = buildLaunchStarterCardBatchDraft(product, effectivePolicies);
+        if (!cardBatchDraft.policyId) {
+          throw new AppError(
+            409,
+            "LAUNCH_BOOTSTRAP_POLICY_REQUIRED",
+            "Create or keep at least one active starter policy before issuing bootstrap card inventory."
+          );
+        }
+        created.cardBatch = await this.developerCreateCardBatch(token, {
+          productCode,
+          ...cardBatchDraft
+        });
+      }
+
+      if (needsStarterAccount) {
+        const starterAccountDraft = buildLaunchStarterAccountDraft(product, before.accounts.length);
+        const account = await this.developerCreateAccount(token, {
+          productCode,
+          username: starterAccountDraft.username,
+          password: starterAccountDraft.password
+        });
+        created.account = {
+          ...account,
+          temporaryPassword: starterAccountDraft.password
+        };
+      }
+
+      const after = await collectState();
+
+      auditDeveloperSession(db, session, "license.quickstart.bootstrap", "product", product.id, {
+        productCode,
+        createdPolicy: Boolean(created.policy),
+        createdCardBatch: Boolean(created.cardBatch),
+        createdAccount: Boolean(created.account),
+        policyId: created.policy?.id ?? null,
+        batchCode: created.cardBatch?.batchCode ?? null,
+        starterUsername: created.account?.username ?? null,
+        beforeStatus: before.authorization.status,
+        afterStatus: after.authorization.status
+      });
+
+      const createdParts = [
+        created.policy ? `policy:${created.policy.name}` : null,
+        created.cardBatch ? `cards:${created.cardBatch.count}` : null,
+        created.account ? `account:${created.account.username}` : null
+      ].filter(Boolean);
+
+      return {
+        productCode,
+        productName: product.name,
+        modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
+        created,
+        skipped: [],
+        before: {
+          authorization: before.authorization,
+          counts: {
+            policies: before.activePolicies.length,
+            freshCards: before.freshCards.length,
+            accounts: before.accounts.length
+          }
+        },
+        after: {
+          authorization: after.authorization,
+          counts: {
+            policies: after.activePolicies.length,
+            freshCards: after.freshCards.length,
+            accounts: after.accounts.length
+          }
+        },
+        message: createdParts.length
+          ? `Launch quickstart bootstrap created ${createdParts.join(", ")} for ${productCode}.`
+          : `Launch quickstart bootstrap completed for ${productCode}.`
       };
     },
 

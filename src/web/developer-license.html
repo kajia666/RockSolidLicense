@@ -326,6 +326,7 @@
             summary: "Review the launch-ready login path, starter policies, starter card inventory, and first-launch account access in one quickstart block before drilling into individual controls.",
             actions: [
               { key: "fill-route-product", label: "Use Routed Project" },
+              { key: "run-bootstrap", label: "Run Launch Bootstrap" },
               { key: "scroll-target", label: "Jump To Quickstart" },
               { key: "apply-filters", label: "Refresh Scoped Inventory" },
               { key: "open-project", label: "Open Project Workspace" },
@@ -339,6 +340,7 @@
             summary: "Seed one or more starter accounts for this project when account login is enabled but public registration is closed.",
             actions: [
               { key: "fill-route-product", label: "Use Routed Project" },
+              { key: "run-bootstrap", label: "Run Launch Bootstrap" },
               { key: "load-starter-account", label: "Prefill Starter Account" },
               { key: "scroll-target", label: "Jump To Starter Account" },
               { key: "apply-filters", label: "Refresh Scoped Inventory" },
@@ -411,8 +413,8 @@
           ${actions.length ? `
             <div class="actions" style="margin-top:12px;">
               ${actions.map((item) => {
-                const needsProduct = item.key === "open-project" || item.key === "open-launch" || item.key === "load-starter-account";
-                const needsSession = item.key === "apply-filters";
+                const needsProduct = item.key === "open-project" || item.key === "open-launch" || item.key === "load-starter-account" || item.key === "run-bootstrap";
+                const needsSession = item.key === "apply-filters" || item.key === "run-bootstrap";
                 const disabled = (needsProduct && !hasProduct) || (needsSession && !token);
                 return `<button type="button" class="${item.key === "open-launch" ? "secondary" : ""}" data-license-route-focus-action="${esc(item.key)}" ${disabled ? "disabled" : ""}>${esc(item.label || item.key)}</button>`;
               }).join("")}
@@ -527,7 +529,8 @@
         const featureConfig = product?.featureConfig || {};
         const authPreset = currentAuthorizationPreset(featureConfig);
         const authSummary = currentAuthorizationDescription(featureConfig);
-        const policyCount = Number(metrics.policies ?? productPolicies.length ?? 0);
+        const activePolicyCount = productPolicies.filter((item) => String(item.status || "active").toLowerCase() === "active").length;
+        const policyCount = Number(activePolicyCount || metrics.policies || 0);
         const freshCardCount = Number(metrics.cardsFresh ?? productCards.filter((item) => item.usageStatus === "unused").length ?? 0);
         const accountCount = Number(metrics.accounts ?? 0);
         const registerEnabled = featureConfig.allowRegister !== false;
@@ -535,6 +538,7 @@
         const cardLoginEnabled = featureConfig.allowCardLogin !== false;
         const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
         const recommendedGrantType = recommendStarterGrantType(featureConfig, productPolicies);
+        const bootstrapPlan = [];
         const checks = [];
         const actions = [
           { key: "load-duration-policy", label: "Load Duration Policy Template", secondary: true },
@@ -560,6 +564,7 @@
         if (policyCount <= 0) {
           status = "block";
           headline = "Launch is blocked until this project has at least one starter policy.";
+          bootstrapPlan.push(recommendedGrantType === "points" ? "create starter points policy" : "create starter duration policy");
           checks.push({
             label: "Policies",
             tone: "danger",
@@ -577,6 +582,7 @@
         if ((cardLoginEnabled || cardRechargeEnabled) && freshCardCount <= 0) {
           status = "block";
           headline = "Launch still needs fresh card inventory for the configured login or recharge path.";
+          bootstrapPlan.push("issue starter card batch");
           checks.push({
             label: "Fresh Cards",
             tone: "danger",
@@ -598,6 +604,7 @@
           headline = status === "block"
             ? headline
             : "First-launch account access still needs attention.";
+          bootstrapPlan.push("seed starter account");
           checks.push({
             label: "Starter Accounts",
             tone: "danger",
@@ -615,6 +622,10 @@
                 : `${accountCount} starter account(s) already exist for closed registration.`)
               : "Account login is not part of the current launch mode."
           });
+        }
+
+        if ((accountLoginEnabled || cardLoginEnabled) && bootstrapPlan.length) {
+          actions.unshift({ key: "run-bootstrap", label: "Run Launch Bootstrap" });
         }
 
         if (status === "ready") {
@@ -641,6 +652,7 @@
           </div>
           <div class="hint" style="margin-top:10px;">${esc(headline)}</div>
           <div class="hint" style="margin-top:10px;">Current starter picture: policies=${esc(policyCount)} | freshCards=${esc(freshCardCount)} | accounts=${esc(accountCount)} | recommendedGrant=${esc(recommendedGrantType)}</div>
+          <div class="hint" style="margin-top:6px;">Bootstrap plan: ${esc(bootstrapPlan.length ? bootstrapPlan.join(" -> ") : "Nothing pending.")}</div>
           <div style="margin-top:12px;">${checks.map((item) => tag(`${item.label}: ${item.detail}`, item.tone)).join("")}</div>
           ${renderQuickstartActionButtons(actions)}
         `;
@@ -1047,6 +1059,26 @@
         setStatus(`Prepared a starter account template for ${productCode}.`);
       }
 
+      async function runLaunchQuickstartBootstrap() {
+        const { productCode } = currentLaunchQuickstartContext();
+        if (!productCode) {
+          throw new Error("Choose a project before running launch bootstrap.");
+        }
+        const data = await api("/api/developer/license-quickstart/bootstrap", {
+          method: "POST",
+          body: { productCode }
+        });
+        if (data?.created?.account) {
+          el("account-product-code").value = productCode;
+          el("account-username").value = data.created.account.username || "";
+          el("account-password").value = data.created.account.temporaryPassword || "";
+          el("account-seed-note").textContent = `Starter account created for ${productCode}. The temporary password is shown in this form and in API Output. Hand it off securely before replacing it.`;
+        }
+        await refresh();
+        setStatus(data?.message || `Launch quickstart bootstrap completed for ${productCode}.`);
+        setOutput(data);
+      }
+
       el("policy-grant-type").addEventListener("change", () => {
         const isPoints = el("policy-grant-type").value === "points";
         el("policy-duration-days").disabled = isPoints;
@@ -1305,6 +1337,10 @@
             openProjectAuthorizationPreset();
             return;
           }
+          if (actionKey === "run-bootstrap") {
+            await runLaunchQuickstartBootstrap();
+            return;
+          }
           if (actionKey === "load-starter-account") {
             fillStarterAccountTemplate();
             return;
@@ -1338,6 +1374,10 @@
           }
           if (actionKey === "load-starter-account") {
             fillStarterAccountTemplate();
+            return;
+          }
+          if (actionKey === "run-bootstrap") {
+            await runLaunchQuickstartBootstrap();
             return;
           }
           if (actionKey === "open-project-auth") {

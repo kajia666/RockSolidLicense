@@ -30,6 +30,8 @@ and it can prefill:
 - a starter card-batch draft using the current project code and the first active policy in scope
 - a starter account draft when account login is enabled but public registration stays closed
 
+The same quickstart block can now also run a one-click `Launch Bootstrap`. When the current project already has a valid login path, that bootstrap can create the missing starter policy, starter card batch, and starter account in one pass, then return the generated starter-account password in the response so the software author can hand it off securely.
+
 ## Scope
 
 - owners can manage every product they own
@@ -79,6 +81,7 @@ Typical creation body:
 - `GET /api/developer/accounts`
 - `POST /api/developer/accounts`
 - `POST /api/developer/accounts/:accountId/status`
+- `POST /api/developer/license-quickstart/bootstrap`
 
 Typical starter-account body:
 
@@ -87,6 +90,14 @@ Typical starter-account body:
   "productCode": "ALPHA_APP",
   "username": "alpha_seed_01",
   "password": "TemporaryPass123!"
+}
+```
+
+Typical launch-bootstrap body:
+
+```json
+{
+  "productCode": "ALPHA_APP"
 }
 ```
 

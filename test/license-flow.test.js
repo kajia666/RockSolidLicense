@@ -5870,6 +5870,102 @@ test("launch workflow routes starter-account blockers into developer licenses an
   }
 });
 
+test("developer license quickstart bootstrap can create starter launch assets in one pass", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.bootstrap.owner",
+        password: "LaunchBootstrapOwner123!",
+        displayName: "Launch Bootstrap Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "BOOT_ALPHA",
+        name: "Bootstrap Alpha",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: true,
+          allowCardLogin: false,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.bootstrap.owner",
+      password: "LaunchBootstrapOwner123!"
+    });
+
+    const bootstrap = await postJson(
+      baseUrl,
+      "/api/developer/license-quickstart/bootstrap",
+      { productCode: "BOOT_ALPHA" },
+      ownerSession.token
+    );
+
+    assert.equal(bootstrap.productCode, "BOOT_ALPHA");
+    assert.ok(bootstrap.created.policy);
+    assert.ok(bootstrap.created.cardBatch);
+    assert.ok(bootstrap.created.account);
+    assert.match(bootstrap.created.policy.name, /Launch/i);
+    assert.equal(bootstrap.created.cardBatch.count, 50);
+    assert.match(bootstrap.created.account.username, /^boot_alpha_seed_/);
+    assert.match(bootstrap.created.account.temporaryPassword || "", /@/);
+    assert.equal(bootstrap.before.authorization.status, "block");
+    assert.notEqual(bootstrap.after.authorization.status, "block");
+
+    const policies = await getJson(
+      baseUrl,
+      "/api/developer/policies?productCode=BOOT_ALPHA",
+      ownerSession.token
+    );
+    assert.ok(policies.some((item) => item.id === bootstrap.created.policy.id));
+
+    const cards = await getJson(
+      baseUrl,
+      "/api/developer/cards?productCode=BOOT_ALPHA",
+      ownerSession.token
+    );
+    assert.ok(cards.items.some((item) => item.batchCode === bootstrap.created.cardBatch.batchCode));
+
+    const accounts = await getJson(
+      baseUrl,
+      "/api/developer/accounts?productCode=BOOT_ALPHA",
+      ownerSession.token
+    );
+    assert.ok(accounts.items.some((item) => item.username === bootstrap.created.account.username));
+
+    const launchWorkflow = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=BOOT_ALPHA&channel=stable",
+      ownerSession.token
+    );
+    assert.notEqual(launchWorkflow.workflowSummary.authorizationStatus, "block");
+    assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no starter accounts exist/i);
+    assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no fresh cards/i);
+    assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no entitlement policies/i);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -10228,8 +10324,10 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /Load Points Policy Template/);
     assert.match(html, /Load Starter Account Template/);
     assert.match(html, /Load Starter Card Batch/);
+    assert.match(html, /Run Launch Bootstrap/);
     assert.match(html, /Create Starter Account/);
     assert.match(html, /api\/developer\/accounts/);
+    assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /account-product-code/);
     assert.match(html, /launch-quickstart-box/);
     assert.match(html, /route-focus-box/);
@@ -10242,6 +10340,9 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /fillStarterPolicyTemplate/);
     assert.match(html, /fillStarterAccountTemplate/);
     assert.match(html, /fillStarterBatchTemplate/);
+    assert.match(html, /runLaunchQuickstartBootstrap/);
+    assert.match(html, /run-bootstrap/);
+    assert.match(html, /Bootstrap plan:/);
     assert.match(html, /starterAccountUsername/);
     assert.match(html, /openProjectAuthorizationPreset/);
     assert.match(html, /data-launch-quickstart-action/);

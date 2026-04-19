@@ -210,6 +210,7 @@
             <button class="secondary" id="launch-open-workflow-btn">Open Launch Workspace</button>
             <button class="secondary" id="launch-open-integration-btn">Open Integration Workspace</button>
             <button class="secondary" id="launch-open-release-btn">Open Release Workspace</button>
+            <button class="secondary" id="launch-run-bootstrap-btn">Run Launch Bootstrap</button>
           </div>
           <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.</div>
         </article>
@@ -1162,6 +1163,8 @@
 
       function syncWorkspaceLinks(product = null) {
         const hasProduct = Boolean(product);
+        const bootstrapAction = currentLaunchWorkflowBootstrapAction();
+        el("launch-run-bootstrap-btn").textContent = bootstrapAction?.label || "Run Launch Bootstrap";
         el("open-project-integration-btn").disabled = !hasProduct;
         el("open-project-launch-btn").disabled = !hasProduct;
         el("open-project-release-btn").disabled = !hasProduct;
@@ -1169,6 +1172,7 @@
         el("launch-open-workflow-btn").disabled = !hasProduct;
         el("launch-open-integration-btn").disabled = !hasProduct;
         el("launch-open-release-btn").disabled = !hasProduct;
+        el("launch-run-bootstrap-btn").disabled = !hasProduct || !token;
         el("preview-release-readiness-btn").disabled = !hasProduct;
         el("preview-launch-workflow-btn").disabled = !hasProduct;
         el("clear-release-preview-btn").disabled = !hasProduct && !releasePreview;
@@ -2080,6 +2084,15 @@
         return launchWorkflowPreview.payload?.workflowSummary?.recommendedWorkspace || null;
       }
 
+      function currentLaunchWorkflowBootstrapAction() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!launchWorkflowPreview || launchWorkflowPreview.productCode !== productCode || launchWorkflowPreview.channel !== channel) {
+          return null;
+        }
+        return launchWorkflowPreview.payload?.workflowSummary?.launchBootstrapAction || null;
+      }
+
       function currentLaunchWorkflowWorkspaceActions() {
         const productCode = el("edit-product-code").value.trim();
         const channel = currentReleaseChannel();
@@ -2171,6 +2184,7 @@
                 <div class="actions" style="margin-top:10px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-checklist-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-launch-checklist-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
+                  ${item.bootstrapAction ? `<button type="button" class="secondary" data-launch-checklist-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -2191,6 +2205,7 @@
                 <div class="actions" style="margin-top:10px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-action-plan-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-launch-action-plan-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
+                  ${item.bootstrapAction ? `<button type="button" class="secondary" data-launch-action-plan-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -2287,6 +2302,25 @@
 
       function openRecommendedLaunchWorkspace() {
         openLaunchWorkspaceAction(currentLaunchWorkflowRecommendedAction());
+      }
+
+      async function runLaunchWorkflowBootstrap() {
+        const productCode = el("edit-product-code").value.trim();
+        if (!productCode) {
+          throw new Error("Select a project before running Launch Bootstrap.");
+        }
+        const bootstrap = await api("/api/developer/license-quickstart/bootstrap", {
+          method: "POST",
+          body: { productCode }
+        });
+        await refresh();
+        const workflow = await loadInlineLaunchWorkflow();
+        const accountNote = bootstrap?.created?.account?.temporaryPassword
+          ? " Temporary starter account password is included in API Output for secure handoff."
+          : "";
+        setStatus(`${bootstrap?.message || `Launch Bootstrap completed for ${productCode}.`} Launch workflow refreshed.${accountNote}`);
+        setOutput({ launchBootstrap: bootstrap, launchWorkflow: workflow });
+        return { bootstrap, launchWorkflow: workflow };
       }
 
       async function downloadLaunchRecommendedItem(item) {
@@ -2636,6 +2670,15 @@
         }
       });
 
+      el("launch-run-bootstrap-btn").addEventListener("click", async () => {
+        try {
+          await runLaunchWorkflowBootstrap();
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       el("launch-open-recommended-btn").addEventListener("click", () => {
         try {
           openRecommendedLaunchWorkspace();
@@ -2645,6 +2688,25 @@
       });
 
       el("detail-launch-workflow").addEventListener("click", async (event) => {
+        const actionPlanBootstrapButton = event.target.closest("[data-launch-action-plan-bootstrap-index]");
+        if (actionPlanBootstrapButton) {
+          try {
+            const index = Number(actionPlanBootstrapButton.dataset.launchActionPlanBootstrapIndex);
+            const item = currentLaunchWorkflowActionPlan()[index];
+            await runLaunchWorkflowBootstrap();
+            setOutput({
+              launchWorkflowBootstrap: {
+                key: item?.bootstrapAction?.key || null,
+                label: item?.bootstrapAction?.label || null
+              },
+              launchWorkflow: launchWorkflowPreview?.payload || null
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const actionPlanWorkspaceButton = event.target.closest("[data-launch-action-plan-workspace-index]");
         if (actionPlanWorkspaceButton) {
           try {
@@ -2693,14 +2755,33 @@
             });
           } catch (error) {
             setStatus(error.message, true);
+            }
+            return;
           }
-          return;
-        }
-        const downloadButton = event.target.closest("[data-launch-download-index]");
-        if (downloadButton) {
-          try {
-            const index = Number(downloadButton.dataset.launchDownloadIndex);
-            const item = currentLaunchWorkflowRecommendedDownloads()[index];
+          const checklistBootstrapButton = event.target.closest("[data-launch-checklist-bootstrap-index]");
+          if (checklistBootstrapButton) {
+            try {
+              const index = Number(checklistBootstrapButton.dataset.launchChecklistBootstrapIndex);
+              const item = currentLaunchWorkflowChecklistItems()[index];
+              await runLaunchWorkflowBootstrap();
+              setOutput({
+                launchWorkflowBootstrap: {
+                  key: item?.bootstrapAction?.key || null,
+                  label: item?.bootstrapAction?.label || null
+                },
+                launchWorkflow: launchWorkflowPreview?.payload || null
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
+          const downloadButton = event.target.closest("[data-launch-download-index]");
+          if (downloadButton) {
+            try {
+              const index = Number(downloadButton.dataset.launchDownloadIndex);
+              const item = currentLaunchWorkflowRecommendedDownloads()[index];
             const result = await downloadLaunchRecommendedItem(item);
             setOutput({ launchWorkflowDownload: { key: item?.key || null, fileName: result?.fileName || item?.fileName || null } });
           } catch (error) {

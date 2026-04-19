@@ -85,6 +85,8 @@ The top checklist items in that inline launch workflow summary are now actionabl
 
 That same inline block now also renders the first few `Action Plan` steps. So if the current lane clearly needs startup fixes first, then release cleanup, then handoff packaging, the project page can present that sequence directly and make each step clickable.
 
+When those authorization blockers are auto-fixable, the same inline launch workflow block now also exposes `Run Launch Bootstrap`. So the project page can create the missing starter policy, starter card batch, or starter account directly, then refresh the same launch lane without forcing the software author to switch into the license workspace first.
+
 Those routed clicks now preserve the action title and summary too. When the project page sends someone into Integration or Releases from the inline launch workflow, the target page can show which launch-workflow step triggered the route.
 
 The same combined package is also available over:

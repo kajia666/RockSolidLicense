@@ -2706,6 +2706,23 @@ function createLaunchWorkflowDownloadShortcut(key, fileName = "", label = "") {
   };
 }
 
+function createLaunchWorkflowBootstrapAction({
+  key = "launch_bootstrap",
+  label = "Run Launch Bootstrap",
+  summary = "",
+  plan = []
+} = {}) {
+  if (!key) {
+    return null;
+  }
+  return {
+    key,
+    label: label || "Run Launch Bootstrap",
+    summary: summary || "",
+    plan: Array.isArray(plan) ? plan.filter(Boolean) : []
+  };
+}
+
 function createLaunchWorkflowActionPlanStep({
   key,
   title = "",
@@ -2713,7 +2730,8 @@ function createLaunchWorkflowActionPlanStep({
   status = "review",
   priority = "secondary",
   workspaceAction = null,
-  recommendedDownload = null
+  recommendedDownload = null,
+  bootstrapAction = null
 } = {}) {
   if (!key) {
     return null;
@@ -2725,7 +2743,8 @@ function createLaunchWorkflowActionPlanStep({
     status: status || "review",
     priority: priority || "secondary",
     workspaceAction: workspaceAction || null,
-    recommendedDownload: recommendedDownload || null
+    recommendedDownload: recommendedDownload || null,
+    bootstrapAction: bootstrapAction || null
   };
 }
 
@@ -2762,6 +2781,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
   ].filter(Boolean).join(" + ") || "no-login-path";
   const issues = [];
   const nextActions = [];
+  const bootstrapPlan = [];
   let status = "pass";
   let workspaceKey = "licenses";
   let workspaceAutofocus = "quickstart";
@@ -2804,6 +2824,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
   }
 
   if (policyCount <= 0) {
+    bootstrapPlan.push("starter policy");
     pushIssue(
       "block",
       "No entitlement policies exist for this project yet, so there is nothing to issue, recharge, or renew.",
@@ -2817,6 +2838,9 @@ function buildLaunchWorkflowAuthorizationReadiness({
   }
 
   if (cardLoginEnabled && freshCardCount <= 0) {
+    if (!bootstrapPlan.includes("starter card batch")) {
+      bootstrapPlan.push("starter card batch");
+    }
     pushIssue(
       accountPathReady ? "review" : "block",
       "Direct-card login is enabled, but there are no fresh cards available for sale or activation.",
@@ -2830,6 +2854,9 @@ function buildLaunchWorkflowAuthorizationReadiness({
   }
 
   if (cardRechargeEnabled && freshCardCount <= 0) {
+    if (!bootstrapPlan.includes("starter card batch")) {
+      bootstrapPlan.push("starter card batch");
+    }
     pushIssue(
       accountPathReady || cardPathReady ? "review" : "block",
       "Card recharge is enabled, but there are no fresh cards ready for top-up or renewal workflows.",
@@ -2843,6 +2870,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
   }
 
   if (accountLoginEnabled && !registerEnabled && accountCount <= 0) {
+    bootstrapPlan.push("starter account");
     pushIssue(
       cardPathReady ? "review" : "block",
       "Account login is enabled, but registration is disabled and no starter accounts exist in this project.",
@@ -2861,6 +2889,26 @@ function buildLaunchWorkflowAuthorizationReadiness({
       "The project has no active entitlements and no fresh card inventory yet, so first-sale operations have not been staged.",
       "Stage at least one starter policy and one initial card batch before rollout."
     );
+  }
+
+  const bootstrapEligible = bootstrapPlan.length > 0 && (accountLoginEnabled || cardLoginEnabled);
+  const bootstrapSummary = bootstrapEligible
+    ? `Run Launch Bootstrap to create ${bootstrapPlan.join(", ")} automatically before launch.`
+    : null;
+  const bootstrapAction = bootstrapEligible
+    ? createLaunchWorkflowBootstrapAction({
+        summary: bootstrapSummary,
+        plan: bootstrapPlan
+      })
+    : null;
+
+  if (bootstrapEligible) {
+    workspaceKey = "licenses";
+    workspaceAutofocus = "quickstart";
+    workspaceLabel = "Open License Workspace";
+    if (bootstrapSummary && !nextActions.includes(bootstrapSummary)) {
+      nextActions.unshift(bootstrapSummary);
+    }
   }
 
   if (!nextActions.length) {
@@ -2893,7 +2941,11 @@ function buildLaunchWorkflowAuthorizationReadiness({
     cardPathReady,
     workspaceKey,
     workspaceAutofocus,
-    workspaceLabel
+    workspaceLabel,
+    bootstrapEligible,
+    bootstrapSummary,
+    bootstrapPlan,
+    bootstrapAction
   };
 }
 
@@ -3058,15 +3110,18 @@ function buildLaunchWorkflowChecklistPayload({
       status: authReadiness.status || "review",
       summary: authReadiness.summary || "Review login paths, starter policies, and sellable card inventory before launch.",
       artifact: `modes=${authReadiness.loginModeSummary || "-"} | policies=${authReadiness.inventory?.policies ?? 0} | freshCards=${authReadiness.inventory?.freshCards ?? 0} | accounts=${authReadiness.inventory?.accounts ?? 0}`,
-      nextAction: Array.isArray(authReadiness.nextActions) && authReadiness.nextActions[0]
+      nextAction: authReadiness.bootstrapSummary || (
+        Array.isArray(authReadiness.nextActions) && authReadiness.nextActions[0]
         ? authReadiness.nextActions[0]
-        : "Review authorization paths, policies, and card inventory before rollout.",
+        : "Review authorization paths, policies, and card inventory before rollout."
+      ),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut(
         authReadiness.workspaceKey || "licenses",
         authReadiness.workspaceAutofocus || "policy-control",
         authReadiness.workspaceLabel || "Open License Workspace"
       ),
-      recommendedDownload: null
+      recommendedDownload: null,
+      bootstrapAction: authReadiness.bootstrapAction || null
     },
     {
       key: "startup_bootstrap",
@@ -3390,7 +3445,8 @@ function buildLaunchWorkflowSummaryPayload({
       status: item.status || "review",
       priority: index === 0 ? "primary" : "secondary",
       workspaceAction: item.workspaceAction || null,
-      recommendedDownload: item.recommendedDownload || null
+      recommendedDownload: item.recommendedDownload || null,
+      bootstrapAction: item.bootstrapAction || null
     }));
   }
   if (
@@ -3487,12 +3543,14 @@ function buildLaunchWorkflowSummaryPayload({
       block: workflowChecklist.blockItems ?? 0
     },
     tokenKeyTotal,
-    activeKeyId: tokenKeySummary.activeKeyId || null,
-    recommendedDownloads,
-    downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
-    recommendedWorkspace,
-    workspaceActions,
-    actionPlan,
+      activeKeyId: tokenKeySummary.activeKeyId || null,
+      launchBootstrapAction: authReadiness.bootstrapAction || null,
+      launchBootstrapSummary: authReadiness.bootstrapSummary || null,
+      recommendedDownloads,
+      downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
+      recommendedWorkspace,
+      workspaceActions,
+      actionPlan,
     actionPlanSummary: actionPlan.map((item) => item.title || item.key || "step").join(" -> "),
     nextActions,
     blockers,
@@ -3544,12 +3602,22 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("");
   }
 
+  if (workflowSummary.launchBootstrapAction?.label) {
+    lines.push("Launch Bootstrap:");
+    lines.push(`- ${workflowSummary.launchBootstrapAction.label}`);
+    lines.push(`- summary: ${workflowSummary.launchBootstrapSummary || workflowSummary.launchBootstrapAction.summary || "-"}`);
+    if (Array.isArray(workflowSummary.launchBootstrapAction.plan) && workflowSummary.launchBootstrapAction.plan.length) {
+      lines.push(`- plan: ${workflowSummary.launchBootstrapAction.plan.join(" -> ")}`);
+    }
+    lines.push("");
+  }
+
   const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : [];
   if (actionPlan.length) {
     lines.push("Action Plan:");
     for (const item of actionPlan) {
       lines.push(
-        `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}`
+          `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`
       );
     }
     lines.push("");
@@ -3590,7 +3658,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   if (checklistItems.length) {
     lines.push("Workflow Checklist:");
     for (const item of checklistItems) {
-      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}`);
+      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`);
     }
     lines.push("");
   }
@@ -3627,6 +3695,9 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
     }
     if (item.recommendedDownload) {
       lines.push(`download: ${item.recommendedDownload.label || item.recommendedDownload.key || "-"} | ${item.recommendedDownload.fileName || "-"}`);
+    }
+    if (item.bootstrapAction) {
+      lines.push(`bootstrap: ${item.bootstrapAction.label || item.bootstrapAction.key || "-"}`);
     }
     lines.push("");
   }

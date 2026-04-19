@@ -106,6 +106,8 @@ That same checklist now includes an authorization-readiness check. It verifies w
 
 The launch workflow summary itself now also derives an `Action Plan`. It takes the highest-priority blocked or review items, turns them into a short ordered path, and lets the software author jump to the right workspace or download the right file from that path directly.
 
+When the current authorization blockers can be fixed automatically, the same launch workflow package now also exposes `Run Launch Bootstrap`. That action can create the missing starter policy, starter card batch, or starter account for the routed project, then regenerate the same lane immediately so the software author can verify whether the blocker really cleared.
+
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.
 
 Those routed jumps now also carry the originating step title and reason into the next workspace. So when an action-plan item or checklist item sends someone to Integration or Releases, the target page can explain which workflow step triggered the jump instead of only showing a generic autofocus hint.

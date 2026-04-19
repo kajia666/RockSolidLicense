@@ -201,6 +201,7 @@
           <div class="actions">
             <button class="secondary" id="use-filter-project-btn">Use Current Project</button>
             <button id="generate-release-package-btn">Generate Launch Workflow</button>
+            <button class="secondary" id="run-launch-bootstrap-btn">Run Launch Bootstrap</button>
           </div>
           <div class="actions">
             <button class="secondary" id="open-recommended-workspace-btn">Open Recommended Workspace</button>
@@ -629,6 +630,9 @@
       function syncReleaseWorkspaceLinks() {
         const target = currentReleaseTarget();
         const hasProduct = Boolean(target.productCode);
+        const bootstrapAction = currentLaunchBootstrapAction();
+        el("run-launch-bootstrap-btn").textContent = bootstrapAction?.label || "Run Launch Bootstrap";
+        el("run-launch-bootstrap-btn").disabled = !(hasProduct && token && canReadReleaseWorkspace());
         el("open-recommended-workspace-btn").disabled = !(hasProduct && releasePackage?.workflowSummary?.recommendedWorkspace);
         el("open-release-project-btn").disabled = !hasProduct;
         el("open-release-integration-btn").disabled = !hasProduct;
@@ -690,7 +694,7 @@
             node.disabled = writeDisabled;
           }
         });
-        ["package-product-code", "package-channel", "use-filter-project-btn", "generate-release-package-btn"].forEach((id) => {
+        ["package-product-code", "package-channel", "use-filter-project-btn", "generate-release-package-btn", "run-launch-bootstrap-btn"].forEach((id) => {
           const node = el(id);
           if (node) {
             node.disabled = readDisabled;
@@ -911,6 +915,10 @@
         return releasePackage?.workflowSummary?.recommendedWorkspace || null;
       }
 
+      function currentLaunchBootstrapAction() {
+        return releasePackage?.workflowSummary?.launchBootstrapAction || null;
+      }
+
       function currentWorkspaceActions() {
         return Array.isArray(releasePackage?.workflowSummary?.workspaceActions)
           ? releasePackage.workflowSummary.workspaceActions
@@ -976,14 +984,15 @@
         return items.map((item, index) => `
           <div style="margin-top:12px; padding-top:12px; border-top:1px dashed rgba(148,163,184,0.35);">
             <div>${renderTag(String(item.status || "unknown").toUpperCase(), item.status === "pass")} ${escapeHtml(item.label || item.key || "item")}</div>
-            <div class="hint" style="margin-top:8px;">${escapeHtml(item.summary || "-")}</div>
-            <div class="hint" style="margin-top:6px;">artifact=${escapeHtml(item.artifact || "-")}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}</div>
-            <div class="actions" style="margin-top:10px;">
-              ${item.workspaceAction ? `<button type="button" class="secondary" data-checklist-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
-              ${item.recommendedDownload ? `<button type="button" data-checklist-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
+              <div class="hint" style="margin-top:8px;">${escapeHtml(item.summary || "-")}</div>
+              <div class="hint" style="margin-top:6px;">artifact=${escapeHtml(item.artifact || "-")}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}</div>
+              <div class="actions" style="margin-top:10px;">
+                ${item.workspaceAction ? `<button type="button" class="secondary" data-checklist-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                ${item.recommendedDownload ? `<button type="button" data-checklist-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
+                ${item.bootstrapAction ? `<button type="button" class="secondary" data-checklist-bootstrap-index="${index}">${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+              </div>
             </div>
-          </div>
-        `).join("");
+          `).join("");
       }
 
       function renderActionPlanCards(items = []) {
@@ -999,6 +1008,7 @@
                 <div class="actions" style="margin-top:10px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-action-plan-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-action-plan-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
+                  ${item.bootstrapAction ? `<button type="button" class="secondary" data-action-plan-bootstrap-index="${index}">${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -1363,6 +1373,24 @@
         return data;
       }
 
+      async function runLaunchBootstrap() {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running Launch Bootstrap.");
+        }
+        const bootstrap = await api("/api/developer/license-quickstart/bootstrap", {
+          method: "POST",
+          body: { productCode: target.productCode }
+        });
+        const data = await generateReleasePackage();
+        const accountNote = bootstrap?.created?.account?.temporaryPassword
+          ? " Temporary starter account password is included in API Output for secure handoff."
+          : "";
+        setStatus(`${bootstrap?.message || `Launch Bootstrap completed for ${target.productCode}.`} Launch workflow reloaded.${accountNote}`);
+        setOutput({ launchBootstrap: bootstrap, launchWorkflow: data });
+        return { bootstrap, launchWorkflow: data };
+      }
+
       async function hydrateLaunchAutofocus() {
         if (!requestedAutofocus) {
           return;
@@ -1483,6 +1511,15 @@
         }
       });
 
+      el("run-launch-bootstrap-btn").addEventListener("click", async () => {
+        try {
+          await runLaunchBootstrap();
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       el("open-release-project-btn").addEventListener("click", () => {
         const target = currentReleaseTarget();
         if (!target.productCode) {
@@ -1532,11 +1569,30 @@
         }
       });
 
-      el("release-readiness").addEventListener("click", async (event) => {
-        const actionPlanDownloadButton = event.target.closest("[data-action-plan-download-index]");
-        if (!actionPlanDownloadButton) {
-          return;
-        }
+        el("release-readiness").addEventListener("click", async (event) => {
+          const actionPlanBootstrapButton = event.target.closest("[data-action-plan-bootstrap-index]");
+          if (actionPlanBootstrapButton) {
+            try {
+              const index = Number(actionPlanBootstrapButton.dataset.actionPlanBootstrapIndex);
+              const item = currentActionPlan()[index];
+              await runLaunchBootstrap();
+              setOutput({
+                actionPlanBootstrap: {
+                  key: item?.bootstrapAction?.key || null,
+                  label: item?.bootstrapAction?.label || null
+                },
+                launchWorkflow: releasePackage
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
+          const actionPlanDownloadButton = event.target.closest("[data-action-plan-download-index]");
+          if (!actionPlanDownloadButton) {
+            return;
+          }
         try {
           const index = Number(actionPlanDownloadButton.dataset.actionPlanDownloadIndex);
           const item = currentActionPlan()[index];
@@ -1564,10 +1620,29 @@
         }
       });
 
-      el("delivery-checklist").addEventListener("click", async (event) => {
-        const workspaceButton = event.target.closest("[data-checklist-workspace-index]");
-        if (workspaceButton) {
-          try {
+        el("delivery-checklist").addEventListener("click", async (event) => {
+          const bootstrapButton = event.target.closest("[data-checklist-bootstrap-index]");
+          if (bootstrapButton) {
+            try {
+              const index = Number(bootstrapButton.dataset.checklistBootstrapIndex);
+              const item = currentChecklistItems()[index];
+              await runLaunchBootstrap();
+              setOutput({
+                checklistBootstrap: {
+                  key: item?.bootstrapAction?.key || null,
+                  label: item?.bootstrapAction?.label || null
+                },
+                launchWorkflow: releasePackage
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
+          const workspaceButton = event.target.closest("[data-checklist-workspace-index]");
+          if (workspaceButton) {
+            try {
             const index = Number(workspaceButton.dataset.checklistWorkspaceIndex);
             const item = currentChecklistItems()[index];
             navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget(), {

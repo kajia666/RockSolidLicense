@@ -12,12 +12,13 @@
     <main class="shell">
       <section class="hero">
         <h1>Developer Integration Center</h1>
-        <p class="sub">Centralize project credentials, public token keys, startup bootstrap behavior, HTTP/TCP endpoint information, and ready-to-adapt request examples for software authors integrating the SDK.</p>
+        <p class="sub">Centralize project credentials, public token keys, startup bootstrap behavior, HTTP/TCP endpoint information, and ready-to-adapt request examples for software authors integrating the SDK. This is an internal author workspace, not an end-user download page.</p>
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/launch-workflow">Developer Launch Workflow</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/integration</code></div>
           <div class="pill">APIs: <code>/api/developer/integration</code>, <code>/api/developer/integration/package</code>, <code>/api/developer/integration/package/download</code></div>
           <div class="pill">Includes scoped projects, token keys, transport data, and a default startup bootstrap preview.</div>
+          <div class="pill">For software authors and their integration teammates. Not for distributing the final encrypted client to end users.</div>
         </div>
         <div class="stats" id="stats-box"></div>
         <div class="pill-row" id="feature-summary-box"></div>
@@ -37,7 +38,7 @@
           <h2>Project Selector</h2>
           <label>Project Code<select id="project-select"></select></label>
           <div class="actions"><button class="secondary" id="use-selected-btn">Use Selected Project</button><button id="generate-package-btn">Refresh Integration Package</button><button class="secondary" id="download-package-json-btn">Download JSON</button><button class="secondary" id="download-package-env-btn">Download Env</button><button class="secondary" id="download-package-host-config-btn">Download Host Config</button><button class="secondary" id="download-package-cmake-btn">Download CMake Template</button><button class="secondary" id="download-package-vs2022-guide-btn">Download VS2022 Quickstart</button><button class="secondary" id="download-package-vs2022-sln-btn">Download VS2022 Solution</button><button class="secondary" id="download-package-vs2022-btn">Download VS2022 Project</button><button class="secondary" id="download-package-vs2022-filters-btn">Download VS2022 Filters</button><button class="secondary" id="download-package-vs2022-props-btn">Download VS2022 Props</button><button class="secondary" id="download-package-vs2022-local-props-btn">Download VS2022 Local Props</button><button class="secondary" id="download-package-cpp-btn">Download C++</button><button class="secondary" id="download-package-host-skeleton-btn">Download Host Skeleton</button><button class="secondary" id="download-package-checksums-btn">Download Checksums</button><button class="secondary" id="download-package-zip-btn">Download Zip</button></div>
-          <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
+          <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package. These files are internal SDK handoff assets for the software author side.</div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-launch-workflow-btn">Open Launch Workflow</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
           <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace, launch workflow handoff, or release handoff check with the same project prefilled.</div>
           <div class="hint" id="route-focus-box" style="margin-top:12px;">Open this page from launch workflow or a routed workspace action to focus startup, hardening, or packaged host assets for the current lane.</div>

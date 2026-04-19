@@ -111,6 +111,8 @@
 - [开发者授权运营台](docs/developer-ops.md)
 - [开发者发版工作台](docs/developer-release.md)
 
+补一句定位说明：这里的“开发者接入中心 / 发版中心 / 上线工作台”都是给软件作者自己和他的开发、测试、发布同事使用的后台工作台，不是给终端用户下载最终加密后软件的页面。正常流程仍然是软件作者接入 SDK、保护并构建自己的软件，然后再把最终客户端分发给自己的用户。
+
 现在开发者项目中心、上线工作台、接入中心、发版中心之间支持基于 `productId / productCode / channel` 的跨页预填，软件作者可以带着当前项目上下文在几个工作台之间切换，减少重复手填项目编码。上线工作台本身也支持直接下载 linked release summary、integration env、host config、CMake 模板、VS2022 quickstart、C++ quickstart 和 host skeleton，方便把首发 handoff 资料一次拿齐；如果从别的工作台带 `autofocus=handoff` 跳过去，登录或刷新后也会优先自动拉起对应 lane 的 launch workflow，而且这些 linked release / integration 资料现在也可以统一从 `/api/developer/launch-workflow/download` 下发。推荐工作台跳转现在还会继续带上更细的 `autofocus`，把软件作者直接落到项目页的功能配置、接入页的启动/加固区块，或发版页的版本/公告区块，而不只是跳到某个页面。项目页和上线工作台现在还会把前几个 `workspaceActions` 直接渲染成按钮，减少“先看摘要再自己判断该点哪个页面”的来回；同一块摘要里的前几个 `recommendedDownloads` 也会直接渲染成按钮，让软件作者在 summary 里就能把 lane 最推荐的 handoff 文件拿走。现在连 launch workflow checklist 里的重点检查项也会带上“打开对应工作台 / 下载对应文件”的快捷动作，把“发现问题 -> 去处理”这条链再压短一层；而新的 `Action Plan` 会把当前 lane 最值得先做的几步直接排出来，进一步减少软件作者自己翻译摘要的成本。项目页、接入页和发版页现在都会把 routed `autofocus` 解释成更具体的 `Route Focus` 卡片，让软件作者点进来后马上知道“为什么落在这里、先点哪几个动作”，而不只是滚到某一段；现在这些跨页跳转还会继续带上 `routeTitle / routeReason`，把“是哪个 launch workflow 步骤或项目 handoff 把你送到这里”的上下文也一起保留下来。新增的 `handoff-zip` 会输出一份更适合发给集成、测试、发布同事的精简材料包，而完整 `zip` 继续保留更全的 workflow / release / integration 归档内容。
 
 ## 快速导航

@@ -9868,6 +9868,7 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /api\/developer\/integration/);
     assert.match(html, /api\/developer\/integration\/package/);
     assert.match(html, /api\/developer\/integration\/package\/download/);
+    assert.match(html, /not an end-user download page/i);
     assert.match(html, /api\/client\/login/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Token Keys/);
@@ -10035,6 +10036,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/notices/);
     assert.match(html, /api\/developer\/release-package/);
     assert.match(html, /api\/developer\/release-package\/download/);
+    assert.match(html, /not the page where end users download the final encrypted client build/i);
     assert.match(html, /Scoped to assigned projects/);
     assert.match(html, /Release Delivery Package/);
     assert.match(html, /Generate Release Package/);

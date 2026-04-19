@@ -7,6 +7,8 @@ The developer release workspace gives software authors a dedicated place to mana
 - startup announcements
 - maintenance notices that can temporarily block login
 
+This workspace is also for the software-author side only. It helps the author or release teammate manage version rules, notices, and release handoff files. The actual encrypted client build still needs to be produced by the software author and distributed to end users separately.
+
 Route:
 
 - `/developer/releases`

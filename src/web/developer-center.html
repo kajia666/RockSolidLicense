@@ -294,6 +294,35 @@
 
       <section class="grid">
         <article class="card">
+          <h2>Software Author Workflow</h2>
+          <div class="hint" style="margin-top:10px;">These developer pages are internal workspaces for the software author and their development, QA, or release teammates. They are not the place where end users download the finished protected client.</div>
+          <div class="hint" style="margin-top:12px;">Typical author-side sequence:</div>
+          <div class="hint" style="margin-top:8px;">1. Create a project and configure feature toggles.</div>
+          <div class="hint">2. Download SDK-facing handoff files from Integration.</div>
+          <div class="hint">3. Wire the SDK into your own software and protect/build the final client.</div>
+          <div class="hint">4. Use Launch Workflow and Releases to check startup, notices, version rules, and handoff state.</div>
+          <div class="actions" style="margin-top:12px;">
+            <button type="button" class="secondary" onclick="window.location.href='/developer/projects'">Open Project Workspace</button>
+            <button type="button" class="secondary" onclick="window.location.href='/developer/integration'">Open Integration Center</button>
+            <button type="button" class="secondary" onclick="window.location.href='/developer/launch-workflow'">Open Launch Workflow</button>
+            <button type="button" class="secondary" onclick="window.location.href='/developer/releases'">Open Release Center</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>End User Runtime Flow</h2>
+          <div class="hint" style="margin-top:10px;">The end user does not use these developer workspaces. They receive the final client program produced by the software author, then interact with the runtime authorization flow inside that client.</div>
+          <div class="hint" style="margin-top:12px;">Typical end-user sequence:</div>
+          <div class="hint" style="margin-top:8px;">1. Download the finished software from the software author.</div>
+          <div class="hint">2. Launch the client with the embedded SDK.</div>
+          <div class="hint">3. Register, log in, or redeem a card key.</div>
+          <div class="hint">4. Keep running under token validation, heartbeat, version rules, notices, and policy checks.</div>
+          <div class="hint" style="margin-top:12px;">This is why Integration, Launch Workflow, and Releases are author-side preparation pages rather than customer download pages.</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
           <h2>Developer Session</h2>
           <label>Username<input id="username" placeholder="developer.username" /></label>
           <label>Password<input id="password" type="password" placeholder="Password" /></label>

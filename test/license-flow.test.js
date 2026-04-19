@@ -9155,6 +9155,11 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /Developer Launch Workflow/);
     assert.match(html, /\/developer\/launch-workflow/);
     assert.match(html, /api\/developer\/launch-workflow/);
+    assert.match(html, /Software Author Workflow/);
+    assert.match(html, /End User Runtime Flow/);
+    assert.match(html, /not the place where end users download the finished protected client/i);
+    assert.match(html, /Open Integration Center/);
+    assert.match(html, /Open Release Center/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
   } finally {

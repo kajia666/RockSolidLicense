@@ -889,6 +889,7 @@
             ${renderProjectWorkspaceActionButtons(workspaceActions)}
             ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "workspace")} | ${esc(String(item.priority || "secondary").toUpperCase())} | focus=${esc(item.autofocus || "-")} | ${esc(item.reason || "-")}`).join("<br>")}</div>` : ""}
             ${checklistItems.length ? `<div class="hint" style="margin-top:12px;">Top workflow checks:<br>${checklistItems.map((item, index) => `${index + 1}. [${esc(String(item.status || "unknown").toUpperCase())}] ${esc(item.label || item.key || "item")} | ${esc(item.summary || "-")}`).join("<br>")}</div>` : ""}
+            ${renderProjectChecklistActionCards(checklistItems)}
           `;
           return;
         }
@@ -1790,6 +1791,17 @@
           : [];
       }
 
+      function currentLaunchWorkflowChecklistItems() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!launchWorkflowPreview || launchWorkflowPreview.productCode !== productCode || launchWorkflowPreview.channel !== channel) {
+          return [];
+        }
+        return Array.isArray(launchWorkflowPreview.payload?.workflowChecklist?.items)
+          ? launchWorkflowPreview.payload.workflowChecklist.items
+          : [];
+      }
+
       function renderProjectWorkspaceActionButtons(actions = []) {
         if (!actions.length) {
           return "";
@@ -1819,6 +1831,26 @@
                 class="${index === 0 ? "secondary" : ""}"
                 data-launch-download-index="${index}"
               >${esc(item.label || item.key || "Download asset")}</button>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderProjectChecklistActionCards(items = []) {
+        if (!items.length) {
+          return "";
+        }
+        return `
+          <div style="margin-top:12px;">
+            ${items.map((item, index) => `
+              <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.35);">
+                <div>${tag(String(item.status || "unknown").toUpperCase(), item.status === "pass" ? "ok" : item.status === "block" ? "danger" : "")} ${esc(item.label || item.key || "item")}</div>
+                <div class="hint" style="margin-top:8px;">${esc(item.summary || "-")}</div>
+                <div class="actions" style="margin-top:10px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-checklist-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-launch-checklist-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
+                </div>
+              </div>
             `).join("")}
           </div>
         `;
@@ -2238,15 +2270,39 @@
           }
           return;
         }
+        const checklistWorkspaceButton = event.target.closest("[data-launch-checklist-workspace-index]");
+        if (checklistWorkspaceButton) {
+          try {
+            const index = Number(checklistWorkspaceButton.dataset.launchChecklistWorkspaceIndex);
+            const item = currentLaunchWorkflowChecklistItems()[index];
+            openLaunchWorkspaceAction(item?.workspaceAction);
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
         const downloadButton = event.target.closest("[data-launch-download-index]");
-        if (!downloadButton) {
+        if (downloadButton) {
+          try {
+            const index = Number(downloadButton.dataset.launchDownloadIndex);
+            const item = currentLaunchWorkflowRecommendedDownloads()[index];
+            const result = await downloadLaunchRecommendedItem(item);
+            setOutput({ launchWorkflowDownload: { key: item?.key || null, fileName: result?.fileName || item?.fileName || null } });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
+        const checklistDownloadButton = event.target.closest("[data-launch-checklist-download-index]");
+        if (!checklistDownloadButton) {
           return;
         }
         try {
-          const index = Number(downloadButton.dataset.launchDownloadIndex);
-          const item = currentLaunchWorkflowRecommendedDownloads()[index];
-          const result = await downloadLaunchRecommendedItem(item);
-          setOutput({ launchWorkflowDownload: { key: item?.key || null, fileName: result?.fileName || item?.fileName || null } });
+          const index = Number(checklistDownloadButton.dataset.launchChecklistDownloadIndex);
+          const item = currentLaunchWorkflowChecklistItems()[index];
+          const result = await downloadLaunchRecommendedItem(item?.recommendedDownload);
+          setOutput({ launchWorkflowDownload: { key: item?.recommendedDownload?.key || null, fileName: result?.fileName || item?.recommendedDownload?.fileName || null } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

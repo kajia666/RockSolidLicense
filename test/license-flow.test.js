@@ -5517,6 +5517,9 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(launchWorkflow.workflowChecklist.status, "hold");
     assert.ok(launchWorkflow.workflowChecklist.blockItems >= 1);
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "launch_handoff_package"));
+    assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.workspaceAction?.key === "integration"));
+    assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.recommendedDownload?.key === "release_summary"));
+    assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.recommendedDownload?.key === "launch_handoff_zip"));
     assert.equal(launchWorkflow.releasePackage.manifest.project.code, "RELPKG_ALPHA");
     assert.equal(launchWorkflow.integrationPackage.manifest.project.code, "RELPKG_ALPHA");
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
@@ -5525,8 +5528,12 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /Recommended Workspace:/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
+    assert.match(launchWorkflow.summaryText, /workspace=Open Integration Workspace@startup/);
+    assert.match(launchWorkflow.summaryText, /download=Release summary:/);
     assert.match(launchWorkflow.checklistText, /RockSolid Launch Workflow Checklist/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Startup bootstrap decision/);
+    assert.match(launchWorkflow.checklistText, /workspace: Open Integration Workspace \| focus=startup/);
+    assert.match(launchWorkflow.checklistText, /download: Recommended handoff zip \| rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip/);
 
     const launchSummaryDownload = await getText(
       baseUrl,
@@ -5548,6 +5555,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchChecklistDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt"/);
     assert.match(launchChecklistDownload.body, /RockSolid Launch Workflow Checklist/);
     assert.match(launchChecklistDownload.body, /\[BLOCK\] Startup bootstrap decision/);
+    assert.match(launchChecklistDownload.body, /workspace: Open Integration Workspace \| focus=startup/);
 
     const launchChecksumsDownload = await getText(
       baseUrl,
@@ -9182,8 +9190,11 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /hydrateLaunchAutofocus/);
     assert.match(html, /renderWorkspaceActionButtons/);
     assert.match(html, /renderRecommendedDownloadButtons/);
+    assert.match(html, /renderChecklistItemButtons/);
     assert.match(html, /data-workspace-action-index/);
     assert.match(html, /data-recommended-download-index/);
+    assert.match(html, /data-checklist-workspace-index/);
+    assert.match(html, /data-checklist-download-index/);
     assert.match(html, /Workspace path:/);
     assert.match(html, /autofocus/);
     assert.match(html, /Open Project Workspace/);
@@ -9677,7 +9688,10 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Download Integration Host Config/);
     assert.match(html, /Download Integration Checksums/);
     assert.match(html, /renderProjectRecommendedDownloadButtons/);
+    assert.match(html, /renderProjectChecklistActionCards/);
     assert.match(html, /data-launch-download-index/);
+    assert.match(html, /data-launch-checklist-workspace-index/);
+    assert.match(html, /data-launch-checklist-download-index/);
     assert.match(html, /Download C\+\+ Quickstart/);
     assert.match(html, /Download CMake Template/);
     assert.match(html, /Download VS2022 Quickstart/);

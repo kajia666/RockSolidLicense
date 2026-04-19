@@ -2635,6 +2635,70 @@ function normalizeLaunchWorkflowChecklistStatus(status = "unknown") {
   return "review";
 }
 
+function pickLaunchWorkflowReleaseAutofocus(readiness = {}) {
+  const readinessChecks = Array.isArray(readiness?.checks) ? readiness.checks : [];
+  const findReadinessCheck = (key) => readinessChecks.find((item) => item?.key === key) || null;
+  const noticeCheck = findReadinessCheck("notices");
+  const versionRuleCheck = findReadinessCheck("version_rule");
+  const downloadUrlCheck = findReadinessCheck("download_url");
+  if (
+    noticeCheck
+    && (noticeCheck.blocking === true || String(noticeCheck.level || "").toLowerCase() === "attention")
+  ) {
+    return "notices";
+  }
+  if (
+    (versionRuleCheck && String(versionRuleCheck.level || "").toLowerCase() === "attention")
+    || (downloadUrlCheck && String(downloadUrlCheck.level || "").toLowerCase() === "attention")
+  ) {
+    return "versions";
+  }
+  return "package";
+}
+
+function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "") {
+  if (!key) {
+    return null;
+  }
+  if (key === "project") {
+    return {
+      key,
+      label: label || "Open Project Workspace",
+      autofocus: autofocus || "detail"
+    };
+  }
+  if (key === "integration") {
+    return {
+      key,
+      label: label || "Open Integration Workspace",
+      autofocus: autofocus || "package"
+    };
+  }
+  if (key === "release") {
+    return {
+      key,
+      label: label || "Open Release Workspace",
+      autofocus: autofocus || "package"
+    };
+  }
+  return {
+    key: "launch",
+    label: label || "Stay in Launch Workflow",
+    autofocus: autofocus || "handoff"
+  };
+}
+
+function createLaunchWorkflowDownloadShortcut(key, fileName = "", label = "") {
+  if (!key) {
+    return null;
+  }
+  return {
+    key,
+    fileName: fileName || "",
+    label: label || key
+  };
+}
+
 function buildLaunchWorkflowChecklistPayload({
   releasePackage,
   integrationPackage,
@@ -2652,6 +2716,7 @@ function buildLaunchWorkflowChecklistPayload({
   const tokenKeySummary = startupPreview.tokenKeySummary || {};
   const clientHardening = startupPreview.clientHardening || integrationPackage?.manifest?.clientHardening || {};
   const tokenKeyTotal = tokenKeySummary.totalKeys ?? integrationPackage?.manifest?.tokenKeys?.length ?? 0;
+  const releaseAutofocus = pickLaunchWorkflowReleaseAutofocus(readiness);
   const items = [
     {
       key: "release_readiness",
@@ -2661,7 +2726,13 @@ function buildLaunchWorkflowChecklistPayload({
       artifact: releasePackage?.summaryFileName || "release-package.txt",
       nextAction: Array.isArray(readiness.nextActions) && readiness.nextActions[0]
         ? readiness.nextActions[0]
-        : "Regenerate the release package after fixing blocking or review items."
+        : "Regenerate the release package after fixing blocking or review items.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("release", releaseAutofocus),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "release_summary",
+        releasePackage?.summaryFileName || "release-package.txt",
+        "Release summary"
+      )
     },
     {
       key: "release_delivery_checklist",
@@ -2673,7 +2744,13 @@ function buildLaunchWorkflowChecklistPayload({
         ? "Resolve block items from the release delivery checklist before shipping."
         : deliveryChecklist.reviewItems > 0
           ? "Review the remaining checklist items before handing the lane to release operations."
-          : "The release delivery checklist looks aligned for this lane."
+          : "The release delivery checklist looks aligned for this lane.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff"),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_checklist",
+        checklistFileName,
+        "Launch workflow checklist"
+      )
     },
     {
       key: "startup_bootstrap",
@@ -2683,7 +2760,13 @@ function buildLaunchWorkflowChecklistPayload({
       artifact: integrationPackage?.fileName || "integration-package.json",
       nextAction: startupDecision.ready === false
         ? "Fix the startup blockers, then regenerate the launch workflow for the same channel."
-        : "Keep the startup bootstrap defaults aligned with the selected channel."
+        : "Keep the startup bootstrap defaults aligned with the selected channel.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("integration", "startup"),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "integration_env",
+        integrationPackage?.snippets?.envFileName || "project.env",
+        "Integration env"
+      )
     },
     {
       key: "client_hardening",
@@ -2691,7 +2774,13 @@ function buildLaunchWorkflowChecklistPayload({
       status: clientHardening.profile === "strict" ? "pass" : "review",
       summary: clientHardening.summary || `Profile ${String(clientHardening.profile || "unknown").toUpperCase()}`,
       artifact: integrationPackage?.snippets?.hardeningFileName || "project-hardening-guide.txt",
-      nextAction: clientHardening.nextAction || "Confirm whether this lane should stay strict, balanced, or relaxed before handoff."
+      nextAction: clientHardening.nextAction || "Confirm whether this lane should stay strict, balanced, or relaxed before handoff.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("integration", "hardening"),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "integration_host_skeleton",
+        integrationPackage?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp",
+        "Host skeleton"
+      )
     },
     {
       key: "token_keys",
@@ -2703,7 +2792,13 @@ function buildLaunchWorkflowChecklistPayload({
       artifact: integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env",
       nextAction: tokenKeyTotal > 0
         ? "Keep the embedded key list in sync with active token verification keys."
-        : "Decide whether local token verification should ship with embedded public keys for this lane."
+        : "Decide whether local token verification should ship with embedded public keys for this lane.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("integration", "startup"),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "integration_host_config",
+        integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env",
+        "Integration host config"
+      )
     },
     {
       key: "launch_handoff_package",
@@ -2711,7 +2806,13 @@ function buildLaunchWorkflowChecklistPayload({
       status: "pass",
       summary: "A curated recommended handoff zip and the full launch workflow archive are both available for release, QA, and integration handoff.",
       artifact: `${handoffZipFileName} | ${handoffChecksumsFileName} | ${zipFileName} | ${summaryFileName} | ${checklistFileName}`,
-      nextAction: "Send the recommended handoff zip to release, QA, and integration teammates, and keep the full workflow zip for archive or deep review."
+      nextAction: "Send the recommended handoff zip to release, QA, and integration teammates, and keep the full workflow zip for archive or deep review.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff"),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_handoff_zip",
+        handoffZipFileName,
+        "Recommended handoff zip"
+      )
     }
   ];
 
@@ -2886,18 +2987,7 @@ function buildLaunchWorkflowSummaryPayload({
     readiness.status === "hold"
     || readiness.status === "attention"
   ) {
-    let releaseAutofocus = "package";
-    if (
-      noticeCheck
-      && (noticeCheck.blocking === true || String(noticeCheck.level || "").toLowerCase() === "attention")
-    ) {
-      releaseAutofocus = "notices";
-    } else if (
-      (versionRuleCheck && String(versionRuleCheck.level || "").toLowerCase() === "attention")
-      || (downloadUrlCheck && String(downloadUrlCheck.level || "").toLowerCase() === "attention")
-    ) {
-      releaseAutofocus = "versions";
-    }
+    const releaseAutofocus = pickLaunchWorkflowReleaseAutofocus(readiness);
     pushWorkspaceAction({
       key: "release",
       label: "Open Release Workspace",
@@ -3050,7 +3140,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   if (checklistItems.length) {
     lines.push("Workflow Checklist:");
     for (const item of checklistItems) {
-      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}`);
+      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}`);
     }
     lines.push("");
   }
@@ -3082,6 +3172,12 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
     lines.push(`summary: ${item.summary || "-"}`);
     lines.push(`artifact: ${item.artifact || "-"}`);
     lines.push(`next: ${item.nextAction || "-"}`);
+    if (item.workspaceAction) {
+      lines.push(`workspace: ${item.workspaceAction.label || item.workspaceAction.key || "-"} | focus=${item.workspaceAction.autofocus || "-"}`);
+    }
+    if (item.recommendedDownload) {
+      lines.push(`download: ${item.recommendedDownload.label || item.recommendedDownload.key || "-"} | ${item.recommendedDownload.fileName || "-"}`);
+    }
     lines.push("");
   }
 

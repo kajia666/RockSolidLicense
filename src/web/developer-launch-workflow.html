@@ -816,6 +816,7 @@
               ${renderTag(`block:${workflowChecklist.blockItems ?? 0}`, false)}
             </div>
             <div class="hint">${workflowItems.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "unknown").toUpperCase())}] ${escapeHtml(item.label || item.key || "item")} | ${escapeHtml(item.summary || "-")}${item.artifact ? ` | artifact=${escapeHtml(item.artifact)}` : ""}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}`).join("<br>")}</div>
+            ${renderChecklistItemButtons(workflowItems)}
           `
           : "No launch workflow checklist is available yet.";
         el("recommended-download-box").innerHTML = `
@@ -919,6 +920,12 @@
           : [];
       }
 
+      function currentChecklistItems() {
+        return Array.isArray(releasePackage?.workflowChecklist?.items)
+          ? releasePackage.workflowChecklist.items
+          : [];
+      }
+
       function renderWorkspaceActionButtons(actions = []) {
         if (!actions.length) {
           return "";
@@ -951,6 +958,23 @@
             `).join("")}
           </div>
         `;
+      }
+
+      function renderChecklistItemButtons(items = []) {
+        if (!items.length) {
+          return "";
+        }
+        return items.map((item, index) => `
+          <div style="margin-top:12px; padding-top:12px; border-top:1px dashed rgba(148,163,184,0.35);">
+            <div>${renderTag(String(item.status || "unknown").toUpperCase(), item.status === "pass")} ${escapeHtml(item.label || item.key || "item")}</div>
+            <div class="hint" style="margin-top:8px;">${escapeHtml(item.summary || "-")}</div>
+            <div class="hint" style="margin-top:6px;">artifact=${escapeHtml(item.artifact || "-")}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}</div>
+            <div class="actions" style="margin-top:10px;">
+              ${item.workspaceAction ? `<button type="button" class="secondary" data-checklist-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+              ${item.recommendedDownload ? `<button type="button" data-checklist-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
+            </div>
+          </div>
+        `).join("");
       }
 
       function navigateToWorkspaceAction(action, target) {
@@ -1433,6 +1457,33 @@
           const item = currentRecommendedDownloads()[index];
           const result = await downloadRecommendedWorkflowItem(item);
           setOutput({ recommendedDownload: { key: item?.key || null, fileName: result?.fileName || item?.fileName || null } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("delivery-checklist").addEventListener("click", async (event) => {
+        const workspaceButton = event.target.closest("[data-checklist-workspace-index]");
+        if (workspaceButton) {
+          try {
+            const index = Number(workspaceButton.dataset.checklistWorkspaceIndex);
+            const item = currentChecklistItems()[index];
+            navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget());
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const downloadButton = event.target.closest("[data-checklist-download-index]");
+        if (!downloadButton) {
+          return;
+        }
+        try {
+          const index = Number(downloadButton.dataset.checklistDownloadIndex);
+          const item = currentChecklistItems()[index];
+          const result = await downloadRecommendedWorkflowItem(item?.recommendedDownload);
+          setOutput({ checklistDownload: { key: item?.recommendedDownload?.key || null, fileName: result?.fileName || item?.recommendedDownload?.fileName || null } });
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

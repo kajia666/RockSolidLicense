@@ -68,6 +68,8 @@ The same inline launch workflow block now also exposes the top `workspaceActions
 
 The same inline block now also turns the first lane-specific `recommendedDownloads` into direct buttons, so software authors can pull the recommended handoff zip, release summary, or integration host files from the project detail card without leaving the page.
 
+The top checklist items in that inline launch workflow summary are now actionable as well. Each item can expose a direct workspace jump and artifact download, so the project page can move from “what is blocked” to “open the right workspace or download the right file” without another round-trip.
+
 The same combined package is also available over:
 
 - `GET /api/developer/launch-workflow`

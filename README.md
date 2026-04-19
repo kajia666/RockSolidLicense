@@ -51,12 +51,14 @@
 - 项目启用 / 停用 / 归档
 - 项目状态批量切换
 - 产品级功能开关
+- 项目级授权预设（Hybrid Launch / Account + Recharge / Direct Card / Account Only）
 - 项目 SDK 凭据轮换
 - 批量 SDK 凭据 / 集成包 / 发版包导出与 zip 下载
 - 开发者接入中心单项目集成包直接下载，并支持单独下载项目级 C++ host skeleton、`rocksolid_host_config.env`、`CMakeLists.txt` 与 VS2022 `.sln/.vcxproj/.vcxproj.filters/.props/.local.props/.md`
 - 项目中心 / 接入中心 / 发版中心跨页预填联动
 - 项目页发版快速信号摘要
 - 项目页内联发版 readiness 预览，可按 channel 直接查看候选版本、阻断项、检查清单和下一步动作；项目页也支持同 channel 的 integration snapshot 预览，以及一键 `Preview Launch Workflow` 加载统一的 launch workflow package，在同页查看 workflow blocker / checklist / next steps / recommended workspace，并直接下载 launch `handoff-zip / summary / checklist / checksums / zip`、release `summary / checksums / zip` 以及常用 integration `json / env / host-config / checksums / cpp / cmake / vs2022-guide / vs2022-sln / vs2022 / vs2022-filters / vs2022-props / vs2022-local-props / host-skeleton / zip`
+- 项目页现在可直接按授权预设切换首发登录策略，并在 launch workflow 发现“无登录路径 / 禁止注册但无初始账号”这类阻断时回落到 `auth-preset` 焦点，帮助软件作者更快修正首发授权链
 - 开发者多项目归属
 - 开发者主账号 + 子账号
 - 子账号按项目授权与角色控制

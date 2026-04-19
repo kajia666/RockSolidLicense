@@ -48,6 +48,11 @@
           </div>
           <div class="hint" id="batch-status-note" style="margin-top:12px;">Choose a status target for the selected projects. Disabled or archived will revoke active sessions.</div>
           <div class="hint" style="margin-top:12px;">Batch Feature Config</div>
+          <div id="batch-auth-preset-controls" class="three" style="margin-top:12px;">
+            <label>Batch Authorization Preset<select id="batch-auth-preset"></select></label>
+            <div class="actions" style="align-self:end;"><button class="secondary" id="load-batch-auth-preset-btn">Load Batch Preset</button><button id="apply-batch-auth-preset-btn">Apply Batch Preset Now</button></div>
+            <div class="hint" id="batch-auth-preset-note">Choose a preset to fill the batch feature toggles or apply it to all selected projects in one step.</div>
+          </div>
           <div class="toggle-grid" style="margin-top:12px;">
             <label>Allow Register<select id="batch-allow-register"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Account Login<select id="batch-allow-account-login"><option value="true">true</option><option value="false">false</option></select></label>
@@ -109,6 +114,11 @@
           <div class="hint" id="single-status-note" style="margin-top:12px;">Active keeps the selected project available. Disabled or archived will revoke active sessions for that project.</div>
           <label style="margin-top:12px;">Description<textarea id="edit-product-description" placeholder="Optional project description"></textarea></label>
           <div class="hint" style="margin:12px 0 8px;">FeatureConfig</div>
+          <div id="edit-auth-preset-controls" class="three" style="margin-bottom:12px;">
+            <label>Authorization Preset<select id="edit-auth-preset"></select></label>
+            <div class="actions" style="align-self:end;"><button class="secondary" id="load-edit-auth-preset-btn">Load Preset To Form</button><button id="apply-edit-auth-preset-btn">Apply Preset Now</button></div>
+            <div class="hint" id="edit-auth-preset-note">Use a project-level preset to switch between hybrid launch, account recharge, direct-card, or seeded-account strategies faster.</div>
+          </div>
           <div class="toggle-grid">
             <label>Allow Register<select id="edit-allow-register"><option value="true">true</option><option value="false">false</option></select></label>
             <label>Allow Account Login<select id="edit-allow-account-login"><option value="true">true</option><option value="false">false</option></select></label>
@@ -214,6 +224,7 @@
     <script src="/assets/product-features.js"></script>
     <script>
       const FEATURE_KEYS = window.RSProductFeatures.keys;
+      const AUTHORIZATION_PRESETS = window.RSProductFeatures.authorizationPresets || [];
       const routeParams = new URLSearchParams(window.location.search);
       const requestedProductId = (routeParams.get("productId") || "").trim();
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
@@ -282,6 +293,9 @@
 
       function currentProjectAutofocusTarget() {
         const target = requestedAutofocus || "detail";
+        if (target === "auth-preset" || target === "authorization") {
+          return "edit-auth-preset-controls";
+        }
         if (target === "release" || target === "package" || target === "versions" || target === "notices") {
           return "detail-release-readiness";
         }
@@ -305,6 +319,17 @@
 
       function currentProjectRouteFocus() {
         const target = requestedAutofocus || "detail";
+        if (target === "auth-preset" || target === "authorization") {
+          return {
+            title: "Project authorization preset focus",
+            summary: "Choose a project-level authorization preset, then save or apply it so login mode, recharge mode, and client-side gates match the intended launch strategy.",
+            actions: [
+              { key: "scroll-target", label: "Scroll To Preset Controls" },
+              { key: "preview-launch", label: "Preview Launch Workflow" },
+              { key: "open-launch", label: "Open Launch Workspace" }
+            ]
+          };
+        }
         if (target === "release" || target === "package" || target === "versions" || target === "notices") {
           return {
             title: "Project release focus",
@@ -439,6 +464,52 @@
         });
       }
 
+      function populateAuthorizationPresetSelect(selectId) {
+        const node = el(selectId);
+        if (!node) {
+          return;
+        }
+        node.innerHTML = [
+          '<option value="custom">custom</option>',
+          ...AUTHORIZATION_PRESETS.map((preset) => `<option value="${esc(preset.key)}">${esc(preset.label)}</option>`)
+        ].join("");
+      }
+
+      function describeAuthorizationPreset(featureConfig = {}) {
+        const preset = window.RSProductFeatures.inferAuthorizationPreset(featureConfig);
+        const configSummary = window.RSProductFeatures.describeAuthorizationConfig(featureConfig);
+        return { preset, configSummary };
+      }
+
+      function syncAuthorizationPresetUi(prefix) {
+        const config = readFeatureConfig(prefix);
+        const { preset, configSummary } = describeAuthorizationPreset(config);
+        const select = el(`${prefix}-auth-preset`);
+        const note = el(`${prefix}-auth-preset-note`);
+        if (select) {
+          select.value = preset?.key || "custom";
+        }
+        if (note) {
+          note.textContent = preset
+            ? `${preset.label}: ${preset.summary} Current config: ${configSummary.summary}.`
+            : `Custom strategy: ${configSummary.summary}. Use a preset to align login mode and local gates faster.`;
+        }
+      }
+
+      function loadAuthorizationPresetToForm(prefix, presetKey) {
+        const preset = window.RSProductFeatures.applyAuthorizationPreset(prefix, presetKey, (fieldId, value) => {
+          const node = el(fieldId);
+          if (node) {
+            node.value = value;
+          }
+        });
+        if (!preset) {
+          throw new Error("Choose a built-in authorization preset first.");
+        }
+        syncAuthorizationPresetUi(prefix);
+        return preset;
+      }
+
       function renderFeatureTags(featureConfig = {}) {
         return window.RSProductFeatures.renderTagList(
           featureConfig,
@@ -515,6 +586,8 @@
           : "No projects selected for batch operations.";
         el("apply-batch-status-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("apply-batch-feature-btn").disabled = !canWriteProducts() || totalSelected === 0;
+        el("load-batch-auth-preset-btn").disabled = !canWriteProducts() || totalSelected === 0;
+        el("apply-batch-auth-preset-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("apply-batch-rotate-btn").disabled = !canWriteProducts() || totalSelected === 0;
         el("export-batch-sdk-btn").disabled = !canReadProducts() || totalSelected === 0;
         el("download-batch-sdk-zip-btn").disabled = !canReadProducts() || totalSelected === 0;
@@ -527,6 +600,7 @@
         syncBatchRotateHint(totalSelected);
         syncBatchExportHint(totalSelected);
         syncBatchPackageHint(totalSelected);
+        syncAuthorizationPresetUi("batch");
       }
 
       function pruneBatchSelection(items = []) {
@@ -554,9 +628,13 @@
         el("save-profile-btn").disabled = editDisabled;
         el("save-status-btn").disabled = editDisabled;
         el("save-feature-btn").disabled = editDisabled;
+        el("edit-auth-preset").disabled = editDisabled || !el("edit-product-id").value.trim();
+        el("load-edit-auth-preset-btn").disabled = editDisabled || !el("edit-product-id").value.trim();
+        el("apply-edit-auth-preset-btn").disabled = editDisabled || !el("edit-product-id").value.trim();
         el("rotate-sdk-btn").disabled = editDisabled;
         el("rotate-sdk-app-id").disabled = editDisabled;
         el("batch-status").disabled = editDisabled;
+        el("batch-auth-preset").disabled = editDisabled || batchProductIds.size === 0;
         el("batch-rotate-sdk-app-id").disabled = editDisabled;
         el("apply-batch-status-btn").disabled = editDisabled || batchProductIds.size === 0;
         el("apply-batch-feature-btn").disabled = editDisabled || batchProductIds.size === 0;
@@ -1051,6 +1129,8 @@
         const metrics = findProjectMetrics(product.code);
         const features = product.featureConfig || {};
         const delivery = buildDeliveryQuickSignals(product, metrics, features);
+        const authPreset = window.RSProductFeatures.inferAuthorizationPreset(features);
+        const authSummary = window.RSProductFeatures.describeAuthorizationConfig(features);
         el("detail-box").innerHTML = `
           <div class="split-line"><span>Project</span><span><strong>${esc(product.code)}</strong> | ${esc(product.name)}</span></div>
           <div class="split-line"><span>Description</span><span>${esc(product.description || "No description")}</span></div>
@@ -1058,6 +1138,7 @@
           <div class="split-line"><span>SDK App ID</span><span class="mono">${esc(product.sdkAppId)}</span></div>
           <div class="split-line"><span>SDK App Secret</span><span class="mono">${esc(product.sdkAppSecret)}</span></div>
           <div class="split-line"><span>Updated</span><span>${esc(fmt(product.updatedAt))}</span></div>
+          <div class="split-line"><span>Authorization Strategy</span><span>${esc(authPreset?.label || "Custom")} | ${esc(authSummary.summary)}</span></div>
           <div class="hint" style="margin-top:14px;">Scoped dashboard</div>
           <div class="split-line"><span>Policies</span><span>${esc(metrics.policies ?? 0)}</span></div>
           <div class="split-line"><span>Cards</span><span>fresh ${esc(metrics.cardsFresh ?? 0)} | redeemed ${esc(metrics.cardsRedeemed ?? 0)}</span></div>
@@ -1170,8 +1251,10 @@
           el("edit-sdk-app-id").value = "";
           el("edit-product-status").value = "active";
           writeFeatureConfig("edit", {});
+          syncAuthorizationPresetUi("edit");
           renderDetail(null);
           syncStatusImpactHint("single-status-note", "active", 1);
+          syncPermissions();
           return;
         }
 
@@ -1182,8 +1265,10 @@
         el("edit-sdk-app-id").value = product.sdkAppId;
         el("edit-product-status").value = product.status || "active";
         writeFeatureConfig("edit", product.featureConfig || {});
+        syncAuthorizationPresetUi("edit");
         renderDetail(product);
         syncStatusImpactHint("single-status-note", product.status || "active", 1);
+        syncPermissions();
       }
 
       function renderProjects() {
@@ -1490,8 +1575,89 @@
         syncStatusImpactHint("single-status-note", el("edit-product-status").value, 1);
       });
 
+      for (const key of FEATURE_KEYS) {
+        el(featureFieldId("edit", key)).addEventListener("change", () => {
+          syncAuthorizationPresetUi("edit");
+        });
+        el(featureFieldId("batch", key)).addEventListener("change", () => {
+          syncAuthorizationPresetUi("batch");
+        });
+      }
+
+      el("load-edit-auth-preset-btn").addEventListener("click", () => {
+        try {
+          if (!el("edit-product-id").value.trim()) {
+            throw new Error("Select a project before loading an authorization preset.");
+          }
+          const preset = loadAuthorizationPresetToForm("edit", el("edit-auth-preset").value);
+          setStatus(`Loaded ${preset.label} into the project feature form.`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("apply-edit-auth-preset-btn").addEventListener("click", async () => {
+        try {
+          const productId = el("edit-product-id").value.trim();
+          if (!productId) {
+            throw new Error("Select a project before applying an authorization preset.");
+          }
+          const preset = window.RSProductFeatures.presetForKey(el("edit-auth-preset").value);
+          if (!preset) {
+            throw new Error("Choose a built-in authorization preset first.");
+          }
+          await postAndRefresh(
+            `/api/developer/products/${encodeURIComponent(productId)}/feature-config`,
+            preset.featureConfig,
+            `${preset.label} applied.`
+          );
+          setSelection(findVisibleProductById(productId));
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       el("batch-status").addEventListener("change", () => {
         syncBatchSelectionUi();
+      });
+
+      el("load-batch-auth-preset-btn").addEventListener("click", () => {
+        try {
+          if (!batchProductIds.size) {
+            throw new Error("Select at least one project before loading a batch authorization preset.");
+          }
+          const preset = loadAuthorizationPresetToForm("batch", el("batch-auth-preset").value);
+          setStatus(`Loaded ${preset.label} into the batch feature form.`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("apply-batch-auth-preset-btn").addEventListener("click", async () => {
+        try {
+          const productIds = [...batchProductIds];
+          if (!productIds.length) {
+            throw new Error("Select at least one project before applying a batch authorization preset.");
+          }
+          const preset = window.RSProductFeatures.presetForKey(el("batch-auth-preset").value);
+          if (!preset) {
+            throw new Error("Choose a built-in batch authorization preset first.");
+          }
+          const data = await api("/api/developer/products/feature-config/batch", {
+            method: "POST",
+            body: {
+              productIds,
+              ...preset.featureConfig
+            }
+          });
+          await refresh();
+          setStatus(`${preset.label} applied to ${data.changed}/${data.total} project(s).`);
+          setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
       });
 
       el("batch-rotate-sdk-app-id").addEventListener("change", () => {
@@ -2559,9 +2725,13 @@
       });
 
       el("detail-release-channel").value = requestedChannel;
+      populateAuthorizationPresetSelect("edit-auth-preset");
+      populateAuthorizationPresetSelect("batch-auth-preset");
       writeFeatureConfig("create", {});
       writeFeatureConfig("edit", {});
       writeFeatureConfig("batch", {});
+      syncAuthorizationPresetUi("edit");
+      syncAuthorizationPresetUi("batch");
       clearSession();
       renderProjects();
       renderStats();

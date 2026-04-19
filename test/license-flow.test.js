@@ -5694,6 +5694,72 @@ test("developer release package export bundles integration, versions, and notice
   }
 });
 
+test("launch workflow routes login-path blockers to project authorization presets", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.authpreset.owner",
+        password: "LaunchAuthPresetOwner123!",
+        displayName: "Launch Auth Preset Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "AUTHPRESET_ALPHA",
+        name: "Auth Preset Alpha",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: false,
+          allowCardLogin: false,
+          allowCardRecharge: false
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.authpreset.owner",
+      password: "LaunchAuthPresetOwner123!"
+    });
+
+    const launchWorkflow = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=AUTHPRESET_ALPHA&channel=stable",
+      ownerSession.token
+    );
+
+    assert.equal(launchWorkflow.workflowSummary.authorizationStatus, "block");
+    assert.match(launchWorkflow.workflowSummary.authorizationSummary || "", /modes=no-login-path/);
+
+    const authChecklistItem = launchWorkflow.workflowChecklist.items.find((item) => item.key === "authorization_readiness");
+    assert.ok(authChecklistItem);
+    assert.equal(authChecklistItem.workspaceAction?.key, "project");
+    assert.equal(authChecklistItem.workspaceAction?.autofocus, "auth-preset");
+
+    const authActionPlanItem = launchWorkflow.workflowSummary.actionPlan.find((item) => item.key === "authorization_readiness");
+    assert.ok(authActionPlanItem);
+    assert.equal(authActionPlanItem.workspaceAction?.key, "project");
+    assert.equal(authActionPlanItem.workspaceAction?.autofocus, "auth-preset");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -9791,6 +9857,15 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Save Project Profile/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
+    assert.match(html, /Authorization Strategy/);
+    assert.match(html, /Authorization Preset/);
+    assert.match(html, /Batch Authorization Preset/);
+    assert.match(html, /Load Preset To Form/);
+    assert.match(html, /Apply Preset Now/);
+    assert.match(html, /Project authorization preset focus/);
+    assert.match(html, /syncAuthorizationPresetUi/);
+    assert.match(html, /loadAuthorizationPresetToForm/);
+    assert.match(html, /auth-preset/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

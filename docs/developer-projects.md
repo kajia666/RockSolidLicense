@@ -23,6 +23,15 @@ The detail card now also shows a lightweight "Delivery quick signals" summary. I
 
 The same detail card now also supports an inline release-readiness preview. Software authors can choose a channel such as `stable` and fetch the current `release-package` summary directly inside `/developer/projects` before jumping to the dedicated release workspace. After previewing the result, they can also download the same release package `summary`, `checksums`, or `zip` straight from the project page.
 
+The project settings card now also includes project-level authorization presets so software authors can switch the launch login model without manually touching every feature toggle first. The built-in presets cover:
+
+- `Hybrid Launch`: account register/login + direct-card login + card recharge
+- `Account + Recharge`: account register/login + recharge, but no direct-card login
+- `Direct Card`: direct-card login only for card-first launches
+- `Account Only`: seeded-account login without open registration
+
+When the current toggle set does not match one of those presets exactly, the page keeps the project in `custom` mode and explains the active login and local-gate mix. Launch-workflow blockers can now route back into this same preset area with `autofocus=auth-preset`, so software authors can fix the first-launch sign-in path faster.
+
 The project detail card now also supports an inline integration snapshot preview. Without leaving `/developer/projects`, software authors can inspect the latest startup bootstrap decision, client hardening profile, token key coverage, and handoff artifact hints for the selected project. This preview now follows the same `channel` field used by the inline release-readiness preview, so `stable`, `beta`, and other release lanes stay aligned while checking startup behavior and downloading handoff assets. The same card also exposes the most common integration handoff files directly:
 
 - package JSON

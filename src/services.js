@@ -2797,7 +2797,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
       "Enable account login or direct-card login in the project feature config before launch.",
       {
         key: "project",
-        autofocus: "features",
+        autofocus: "auth-preset",
         label: "Open Project Workspace"
       }
     );
@@ -2849,7 +2849,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
       "Either enable registration, seed starter accounts, or rely on direct-card login for first launch.",
       {
         key: "project",
-        autofocus: "features",
+        autofocus: "auth-preset",
         label: "Open Project Workspace"
       }
     );

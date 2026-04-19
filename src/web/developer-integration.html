@@ -40,6 +40,7 @@
           <div class="hint">Select one of your visible projects to generate ready-to-adapt HTTP/TCP examples, inspect the matching SDK credentials, and export a current C/C++ integration package.</div>
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="open-project-workspace-btn">Open Project Workspace</button><button class="secondary" id="open-launch-workflow-btn">Open Launch Workflow</button><button class="secondary" id="open-release-check-btn">Open Release Check</button></div>
           <div class="hint" id="workspace-link-hint" style="margin-top:12px;">Select a project to jump into its settings workspace, launch workflow handoff, or release handoff check with the same project prefilled.</div>
+          <div class="hint" id="route-focus-box" style="margin-top:12px;">Open this page from launch workflow or a routed workspace action to focus startup, hardening, or packaged host assets for the current lane.</div>
         </article>
 
         <article class="card">
@@ -285,6 +286,98 @@
 
       function buildWorkspaceUrl(path, params = {}) {
         return `${path}${buildRouteQuery(params)}`;
+      }
+
+      function currentIntegrationRouteFocus() {
+        const target = requestedAutofocus || "package";
+        if (target === "startup") {
+          return {
+            title: "Startup bootstrap focus",
+            summary: "Review the startup decision, token key coverage, and bootstrap defaults for this lane before shipping.",
+            actions: [
+              { key: "refresh-package", label: "Refresh Integration Package" },
+              { key: "scroll-target", label: "Scroll To Startup Preview" },
+              { key: "download-env", label: "Download Env" },
+              { key: "download-host-config", label: "Download Host Config" }
+            ]
+          };
+        }
+        if (target === "hardening") {
+          return {
+            title: "Client hardening focus",
+            summary: "Confirm the hardening profile, host behavior, and local enforcement expectations for this lane.",
+            actions: [
+              { key: "refresh-package", label: "Refresh Integration Package" },
+              { key: "scroll-target", label: "Scroll To Hardening Guide" },
+              { key: "download-host-skeleton", label: "Download Host Skeleton" },
+              { key: "download-cpp", label: "Download C++ Quickstart" }
+            ]
+          };
+        }
+        if (target === "host-config") {
+          return {
+            title: "Host config focus",
+            summary: "Pull the packaged host config and keep the integration env aligned with the same lane.",
+            actions: [
+              { key: "download-host-config", label: "Download Host Config" },
+              { key: "download-env", label: "Download Env" },
+              { key: "scroll-target", label: "Scroll To Host Config" }
+            ]
+          };
+        }
+        if (target === "host-skeleton") {
+          return {
+            title: "Host skeleton focus",
+            summary: "Use the generated host skeleton and quickstart as the fastest route to wire the SDK into the host application.",
+            actions: [
+              { key: "download-host-skeleton", label: "Download Host Skeleton" },
+              { key: "download-cpp", label: "Download C++ Quickstart" },
+              { key: "scroll-target", label: "Scroll To Host Skeleton" }
+            ]
+          };
+        }
+        if (target === "cmake") {
+          return {
+            title: "CMake consumer focus",
+            summary: "Use the packaged CMake consumer together with the lane-specific host config when wiring the SDK into a CMake build.",
+            actions: [
+              { key: "download-cmake", label: "Download CMake Template" },
+              { key: "download-host-config", label: "Download Host Config" },
+              { key: "scroll-target", label: "Scroll To CMake Consumer" }
+            ]
+          };
+        }
+        if (target === "vs2022" || target === "vs2022-guide") {
+          return {
+            title: "VS2022 setup focus",
+            summary: "Use the packaged VS2022 assets to get a Windows host project running with the same lane-specific integration inputs.",
+            actions: [
+              { key: "download-vs2022-guide", label: "Download VS2022 Quickstart" },
+              { key: "download-vs2022-sln", label: "Download VS2022 Solution" },
+              { key: "scroll-target", label: "Scroll To VS2022 Assets" }
+            ]
+          };
+        }
+        if (target === "detail" || target === "features") {
+          return {
+            title: "Project detail focus",
+            summary: "Review the project status and feature toggles first, then come back to the integration package if you still need packaged assets.",
+            actions: [
+              { key: "open-project", label: "Open Project Workspace" },
+              { key: "open-launch", label: "Open Launch Workflow" },
+              { key: "scroll-target", label: "Scroll To Project Detail" }
+            ]
+          };
+        }
+        return {
+          title: "Integration package focus",
+          summary: "Refresh the lane-specific integration package, then download the most relevant host assets for implementation and handoff.",
+          actions: [
+            { key: "refresh-package", label: "Refresh Integration Package" },
+            { key: "download-json", label: "Download JSON" },
+            { key: "download-zip", label: "Download Zip" }
+          ]
+        };
       }
 
       function currentIntegrationAutofocusTarget() {
@@ -696,6 +789,30 @@ ${JSON.stringify(request, null, 2)}`;
           : "Select a project to jump into its settings workspace, launch workflow handoff, or release handoff check with the same project prefilled.";
       }
 
+      function renderIntegrationRouteFocus(product = selectedProduct) {
+        const focus = currentIntegrationRouteFocus();
+        const hasProduct = Boolean(product);
+        const channel = requestedChannel || "stable";
+        const canRunPackageActions = hasProduct && !el("generate-package-btn").disabled;
+        const canDownloadAssets = hasProduct && Boolean(packageSnapshot) && !el("download-package-json-btn").disabled;
+        const actions = Array.isArray(focus.actions) ? focus.actions : [];
+        el("route-focus-box").innerHTML = `
+          <div>${tag(focus.title || "Integration route focus", hasProduct)} ${tag(`focus:${requestedAutofocus || "package"}`, requestedAutofocus !== "")} ${tag(`channel:${channel}`, true)}</div>
+          <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${product.code}.` : `${focus.summary} Select a visible project first.`)}</div>
+          ${actions.length ? `
+            <div class="actions" style="margin-top:12px;">
+              ${actions.map((item) => {
+                const disabled = (
+                  !hasProduct
+                  || ((item.key === "refresh-package" || item.key === "open-project" || item.key === "open-launch" || item.key === "open-release" || item.key === "scroll-target") ? !canRunPackageActions : !canDownloadAssets)
+                );
+                return `<button type="button" class="${item.key === "refresh-package" || item.key.startsWith("open-") ? "secondary" : ""}" data-route-focus-action="${esc(item.key)}" ${disabled ? "disabled" : ""}>${esc(item.label || item.key || "Action")}</button>`;
+              }).join("")}
+            </div>
+          ` : ""}
+        `;
+      }
+
       function renderSelected() {
         const product = selectedProduct;
         if (!product) {
@@ -708,6 +825,7 @@ ${JSON.stringify(request, null, 2)}`;
           renderPackage();
           syncPackageActions();
           syncWorkspaceLinks(null);
+          renderIntegrationRouteFocus(null);
           return;
         }
 
@@ -725,6 +843,7 @@ ${JSON.stringify(request, null, 2)}`;
         el("tcp-example").textContent = buildTcpExample(product);
         syncPackageActions();
         syncWorkspaceLinks(product);
+        renderIntegrationRouteFocus(product);
       }
 
       function buildPackagePath(product) {
@@ -751,6 +870,7 @@ ${JSON.stringify(request, null, 2)}`;
 
         packageSnapshot = await api(buildPackagePath(selectedProduct));
         renderPackage();
+        renderIntegrationRouteFocus(selectedProduct);
         setOutput(packageSnapshot);
       }
 
@@ -771,6 +891,7 @@ ${JSON.stringify(request, null, 2)}`;
         renderTokenKeys();
         renderPackage();
         syncPackageActions();
+        renderIntegrationRouteFocus(null);
         setOutput("Waiting for actions...");
       }
 
@@ -874,6 +995,51 @@ ${JSON.stringify(request, null, 2)}`;
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
+      }
+
+      async function handleIntegrationRouteFocusAction(actionKey) {
+        if (!selectedProduct && actionKey !== "scroll-target") {
+          throw new Error("Select a project before using route-focus actions.");
+        }
+        if (actionKey === "refresh-package") {
+          await chooseSelectedAndRefreshPackage();
+          setStatus(`Integration package refreshed for ${(selectedProduct || {}).code || "selected project"}.`);
+          return;
+        }
+        if (actionKey === "scroll-target") {
+          focusIntegrationAutofocusTarget();
+          setStatus(`Focused integration section: ${requestedAutofocus || "package"}.`);
+          return;
+        }
+        if (actionKey === "open-project") {
+          el("open-project-workspace-btn").click();
+          return;
+        }
+        if (actionKey === "open-launch") {
+          el("open-launch-workflow-btn").click();
+          return;
+        }
+        if (actionKey === "open-release") {
+          el("open-release-check-btn").click();
+          return;
+        }
+        const downloadMap = {
+          "download-json": ["json", "integration-package.json", "Integration package JSON"],
+          "download-zip": ["zip", "integration-package.zip", "Integration package zip"],
+          "download-env": ["env", "project.env", "Integration package env template"],
+          "download-host-config": ["host-config", "rocksolid_host_config.env", "Integration package host config"],
+          "download-cmake": ["cmake", "CMakeLists.txt", "Integration package CMake template"],
+          "download-vs2022-guide": ["vs2022-guide", "rocksolid_vs2022_quickstart.md", "Integration package VS2022 quickstart"],
+          "download-vs2022-sln": ["vs2022-sln", "rocksolid_host_consumer.sln", "Integration package VS2022 solution"],
+          "download-cpp": ["cpp", "project.cpp", "Integration package C++ quickstart"],
+          "download-host-skeleton": ["host-skeleton", "project-host-skeleton.cpp", "Integration package host skeleton"]
+        };
+        const mapped = downloadMap[actionKey];
+        if (!mapped) {
+          throw new Error(`Unsupported integration route-focus action: ${actionKey}`);
+        }
+        await handlePackageDownload(mapped[0], mapped[1], mapped[2]);
       }
 
       el("download-package-json-btn").addEventListener("click", async () => {
@@ -1039,6 +1205,19 @@ ${JSON.stringify(request, null, 2)}`;
         });
       });
 
+      el("route-focus-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-route-focus-action]");
+        if (!button) {
+          return;
+        }
+        try {
+          await handleIntegrationRouteFocusAction(button.dataset.routeFocusAction || "");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       clear();
       renderStats();
       renderTransport();
@@ -1047,6 +1226,7 @@ ${JSON.stringify(request, null, 2)}`;
       renderPackage();
       syncPackageActions();
       syncWorkspaceLinks(null);
+      renderIntegrationRouteFocus(null);
     </script>
   </body>
 </html>

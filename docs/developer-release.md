@@ -15,6 +15,8 @@ The page accepts `productId`, `productCode`, `channel`, and `autofocus` in the q
 
 When `autofocus` is present, the page can automatically load the routed release package and focus the most relevant section after sign-in or refresh. Typical values include `versions`, `notices`, `summary`, `checklist`, `host-config`, `host-skeleton`, and `cmake`.
 
+The page now also renders a `Route Focus` card for that routed context. So a software author who lands here from launch workflow with `autofocus=versions`, `autofocus=notices`, or `autofocus=summary` sees a short explanation of the release concern plus the most relevant refresh/download/open actions immediately.
+
 ## Scoped APIs
 
 - `GET /api/developer/client-versions`

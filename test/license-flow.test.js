@@ -9899,8 +9899,12 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /feature-summary-box/);
     assert.match(html, /requestedAutofocus/);
     assert.match(html, /currentIntegrationAutofocusTarget/);
+    assert.match(html, /currentIntegrationRouteFocus/);
+    assert.match(html, /renderIntegrationRouteFocus/);
     assert.match(html, /focusIntegrationAutofocusTarget/);
     assert.match(html, /hydrateIntegrationAutofocus/);
+    assert.match(html, /route-focus-box/);
+    assert.match(html, /data-route-focus-action/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -10053,8 +10057,12 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /applyRoutePrefill/);
     assert.match(html, /requestedAutofocus/);
     assert.match(html, /currentReleaseAutofocusTarget/);
+    assert.match(html, /currentReleaseRouteFocus/);
+    assert.match(html, /renderReleaseRouteFocus/);
     assert.match(html, /focusReleaseAutofocusTarget/);
     assert.match(html, /hydrateReleaseAutofocus/);
+    assert.match(html, /release-route-focus-box/);
+    assert.match(html, /data-release-route-focus-action/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

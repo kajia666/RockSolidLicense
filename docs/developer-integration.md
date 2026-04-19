@@ -15,6 +15,8 @@ The page also accepts `productId`, `productCode`, `channel`, and `autofocus` in 
 
 When `autofocus` is provided, the page can automatically scroll to and emphasize the routed section after sign-in or refresh. Typical values include `startup`, `hardening`, `host-config`, `host-skeleton`, `cmake`, and `vs2022-guide`.
 
+The page now also renders a `Route Focus` card for that routed context. So a software author who lands here from launch workflow with `autofocus=startup` or `autofocus=hardening` gets a short explanation of why this lane was routed to integration plus a few lane-specific refresh/download actions right away.
+
 The page now also summarizes how many visible projects currently have each of the 10 product-level switches enabled:
 
 - `allowRegister`

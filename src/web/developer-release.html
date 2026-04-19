@@ -226,6 +226,7 @@
           </div>
           <div class="hint" id="release-package-hint">Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.</div>
           <div class="hint" id="release-route-hint" style="margin-top:12px;">Open this page from the project, launch workflow, or integration workspaces to prefill the selected project and channel.</div>
+          <div class="hint" id="release-route-focus-box" style="margin-top:12px;">Open this page from launch workflow or another routed workspace action to focus release rules, notices, package summary, or packaged host assets for the current lane.</div>
         </article>
 
         <article class="card">
@@ -505,6 +506,85 @@
         return `${path}${q(params)}`;
       }
 
+      function currentReleaseRouteFocus() {
+        const target = requestedAutofocus || "package";
+        if (target === "versions") {
+          return {
+            title: "Version-rule focus",
+            summary: "Review the current release rule, minimum allowed version, and download URL for this lane before rollout.",
+            actions: [
+              { key: "refresh-package", label: "Refresh Release Package" },
+              { key: "scroll-target", label: "Scroll To Version Rules" },
+              { key: "download-summary", label: "Download Summary" }
+            ]
+          };
+        }
+        if (target === "notices") {
+          return {
+            title: "Notice focus",
+            summary: "Review active notices and login-blocking maintenance windows before handing the lane to release operations.",
+            actions: [
+              { key: "refresh-package", label: "Refresh Release Package" },
+              { key: "scroll-target", label: "Scroll To Notices" },
+              { key: "download-summary", label: "Download Summary" }
+            ]
+          };
+        }
+        if (target === "summary" || target === "checklist") {
+          return {
+            title: "Release handoff focus",
+            summary: "Use the release summary and checklist as the final release-operations handoff for this lane.",
+            actions: [
+              { key: "refresh-package", label: "Refresh Release Package" },
+              { key: "download-summary", label: "Download Summary" },
+              { key: "download-checksums", label: "Download Checksums" }
+            ]
+          };
+        }
+        if (target === "host-config") {
+          return {
+            title: "Packaged host config focus",
+            summary: "Pull the packaged host config or jump back to integration if the host runtime inputs need another pass.",
+            actions: [
+              { key: "download-host-config", label: "Download Host Config" },
+              { key: "open-integration", label: "Open Integration Package" },
+              { key: "scroll-target", label: "Scroll To Host Config" }
+            ]
+          };
+        }
+        if (target === "host-skeleton") {
+          return {
+            title: "Packaged host skeleton focus",
+            summary: "Use the packaged host skeleton and integration workspace together when the host-side SDK wiring still needs work.",
+            actions: [
+              { key: "download-host-skeleton", label: "Download Host Skeleton" },
+              { key: "open-integration", label: "Open Integration Package" },
+              { key: "scroll-target", label: "Scroll To Host Skeleton" }
+            ]
+          };
+        }
+        if (target === "cmake") {
+          return {
+            title: "CMake consumer focus",
+            summary: "Review the packaged CMake consumer together with the host config before passing the lane to Windows or cross-platform developers.",
+            actions: [
+              { key: "download-cmake", label: "Download CMake Template" },
+              { key: "download-host-config", label: "Download Host Config" },
+              { key: "scroll-target", label: "Scroll To CMake Consumer" }
+            ]
+          };
+        }
+        return {
+          title: "Release package focus",
+          summary: "Generate or refresh the release package, then hand the right packaged assets to release, QA, and integration teammates.",
+          actions: [
+            { key: "refresh-package", label: "Refresh Release Package" },
+            { key: "download-summary", label: "Download Summary" },
+            { key: "download-zip", label: "Download Zip Archive" }
+          ]
+        };
+      }
+
       function currentReleaseAutofocusTarget() {
         const target = requestedAutofocus || "package";
         if (target === "versions") {
@@ -600,6 +680,19 @@
           || (requestedProductId && requestedProductCode.toUpperCase() === normalized ? requestedProductId : "");
       }
 
+      async function downloadCurrentReleaseAsset(format, fallbackFileName, label) {
+        if (!releasePackage) {
+          throw new Error("Generate a release package before downloading routed release assets.");
+        }
+        const target = currentReleaseTarget();
+        const result = await downloadApiFile(
+          `/api/developer/release-package/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
+        return result;
+      }
+
       function applyRoutePrefill() {
         if (requestedProductCode) {
           ["filter-product-code", "package-product-code", "version-product-code", "notice-product-code"].forEach((id) => {
@@ -622,6 +715,27 @@
           : "Open this page from the project, launch workflow, or integration workspaces to prefill the selected project and channel.";
       }
 
+      function renderReleaseRouteFocus() {
+        const focus = currentReleaseRouteFocus();
+        const target = currentReleaseTarget();
+        const hasProduct = Boolean(target.productCode);
+        const canRefresh = hasProduct && !el("generate-release-package-btn").disabled;
+        const canDownload = Boolean(releasePackage) && !el("download-release-package-summary-btn").disabled;
+        const actions = Array.isArray(focus.actions) ? focus.actions : [];
+        el("release-route-focus-box").innerHTML = `
+          <div>${escapeHtml(focus.title || "Release route focus")} ${hasProduct ? `<span class="tag ok">${escapeHtml(`channel:${target.channel || requestedChannel}`)}</span>` : ""} ${requestedAutofocus ? `<span class="tag">${escapeHtml(`focus:${requestedAutofocus}`)}</span>` : ""}</div>
+          <div class="hint" style="margin-top:10px;">${escapeHtml(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project first.`)}</div>
+          ${actions.length ? `
+            <div class="actions" style="margin-top:12px;">
+              ${actions.map((item) => {
+                const disabled = !hasProduct || ((item.key === "refresh-package" || item.key === "open-project" || item.key === "open-launch" || item.key === "open-integration" || item.key === "scroll-target") ? !canRefresh : !canDownload);
+                return `<button type="button" class="${item.key === "refresh-package" || item.key.startsWith("open-") ? "secondary" : ""}" data-release-route-focus-action="${escapeHtml(item.key)}" ${disabled ? "disabled" : ""}>${escapeHtml(item.label || item.key || "Action")}</button>`;
+              }).join("")}
+            </div>
+          ` : ""}
+        `;
+      }
+
       function syncReleasePackageHint() {
         const productCode = el("package-product-code").value.trim();
         const channel = el("package-channel").value.trim() || "stable";
@@ -629,6 +743,7 @@
           ? `Generate the ${productCode} release handoff package for channel ${channel}, then download server-generated attachments for JSON, summary, env, C++ quickstart, or the host skeleton.`
           : "Generate a handoff package that combines the selected project's integration material, active version rules, and runtime notices for the chosen channel.";
         syncReleaseWorkspaceLinks();
+        renderReleaseRouteFocus();
       }
 
       async function hydrateReleaseAutofocus() {
@@ -705,6 +820,7 @@
             node.disabled = readDisabled || !hasPackage;
           }
         });
+        renderReleaseRouteFocus();
       }
 
       function downloadBlob(filename, blob) {
@@ -1184,6 +1300,55 @@
           productCode: target.productCode,
           channel: target.channel
         });
+      });
+
+      el("release-route-focus-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-release-route-focus-action]");
+        if (!button) {
+          return;
+        }
+        const actionKey = button.dataset.releaseRouteFocusAction || "";
+        try {
+          if (actionKey === "refresh-package") {
+            const data = await generateReleasePackage();
+            setStatus(`Release package generated for ${data.manifest.project.code}.`);
+            setOutput(data);
+            return;
+          }
+          if (actionKey === "scroll-target") {
+            focusReleaseAutofocusTarget();
+            setStatus(`Focused release section: ${requestedAutofocus || "package"}.`);
+            return;
+          }
+          if (actionKey === "open-project") {
+            el("open-release-project-btn").click();
+            return;
+          }
+          if (actionKey === "open-launch") {
+            el("open-release-launch-btn").click();
+            return;
+          }
+          if (actionKey === "open-integration") {
+            el("open-release-integration-btn").click();
+            return;
+          }
+          const downloadMap = {
+            "download-summary": ["summary", "release-package.txt", "Release package summary"],
+            "download-checksums": ["checksums", "release-package-sha256.txt", "Release package checksums"],
+            "download-zip": ["zip", "release-package.zip", "Release package zip"],
+            "download-host-config": ["host-config", "rocksolid_host_config.env", "Release package host config"],
+            "download-host-skeleton": ["host-skeleton", "project-host-skeleton.cpp", "Release package host skeleton"],
+            "download-cmake": ["cmake", "CMakeLists.txt", "Release package CMake template"]
+          };
+          const mapped = downloadMap[actionKey];
+          if (!mapped) {
+            throw new Error(`Unsupported release route-focus action: ${actionKey}`);
+          }
+          await downloadCurrentReleaseAsset(mapped[0], mapped[1], mapped[2]);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
       });
 
       el("download-release-package-json-btn").addEventListener("click", async () => {

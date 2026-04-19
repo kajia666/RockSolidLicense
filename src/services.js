@@ -2699,6 +2699,29 @@ function createLaunchWorkflowDownloadShortcut(key, fileName = "", label = "") {
   };
 }
 
+function createLaunchWorkflowActionPlanStep({
+  key,
+  title = "",
+  summary = "",
+  status = "review",
+  priority = "secondary",
+  workspaceAction = null,
+  recommendedDownload = null
+} = {}) {
+  if (!key) {
+    return null;
+  }
+  return {
+    key,
+    title: title || key,
+    summary: summary || "-",
+    status: status || "review",
+    priority: priority || "secondary",
+    workspaceAction: workspaceAction || null,
+    recommendedDownload: recommendedDownload || null
+  };
+}
+
 function buildLaunchWorkflowChecklistPayload({
   releasePackage,
   integrationPackage,
@@ -3033,6 +3056,57 @@ function buildLaunchWorkflowSummaryPayload({
     reason: "Use the launch workflow workspace to review this lane end-to-end.",
     autofocus: "handoff"
   };
+  const checklistItems = Array.isArray(workflowChecklist.items) ? workflowChecklist.items : [];
+  const actionPlan = [];
+  const pushActionPlan = (step) => {
+    if (!step || !step.key) {
+      return;
+    }
+    if (actionPlan.some((item) => item.key === step.key)) {
+      return;
+    }
+    actionPlan.push(step);
+  };
+  const actionableChecklistItems = checklistItems.filter((item) => item && (item.status === "block" || item.status === "review"));
+  for (const [index, item] of actionableChecklistItems.slice(0, 3).entries()) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: item.key,
+      title: item.label || item.key || "Launch step",
+      summary: item.nextAction || item.summary || "-",
+      status: item.status || "review",
+      priority: index === 0 ? "primary" : "secondary",
+      workspaceAction: item.workspaceAction || null,
+      recommendedDownload: item.recommendedDownload || null
+    }));
+  }
+  if (!actionPlan.length) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_handoff_zip",
+      title: "Send the recommended handoff zip",
+      summary: "Share the curated handoff package with release, QA, and integration teammates.",
+      status: "pass",
+      priority: "primary",
+      recommendedDownload: createLaunchWorkflowDownloadShortcut("launch_handoff_zip", handoffZipFileName, "Recommended handoff zip")
+    }));
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_checklist",
+      title: "Keep the launch checklist nearby",
+      summary: "Use the checklist while doing the final rollout review for this lane.",
+      status: "pass",
+      priority: "secondary",
+      recommendedDownload: createLaunchWorkflowDownloadShortcut("launch_checklist", checklistFileName, "Launch workflow checklist")
+    }));
+  }
+  pushActionPlan(createLaunchWorkflowActionPlanStep({
+    key: "launch_workspace",
+    title: workflowStatus === "ready" ? "Keep the lane in launch workflow for final review" : "Use launch workflow as the control tower",
+    summary: workflowStatus === "ready"
+      ? "Keep the combined launch workflow view handy while release, QA, and integration handoff happens."
+      : "Use the combined launch workflow view to keep release, startup, and handoff context together while you clear review items.",
+    status: workflowStatus === "ready" ? "pass" : workflowStatus === "hold" ? "block" : "review",
+    priority: actionPlan.length ? "secondary" : "primary",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff")
+  }));
 
   return {
     status: workflowStatus,
@@ -3057,6 +3131,8 @@ function buildLaunchWorkflowSummaryPayload({
     downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
     recommendedWorkspace,
     workspaceActions,
+    actionPlan,
+    actionPlanSummary: actionPlan.map((item) => item.title || item.key || "step").join(" -> "),
     nextActions,
     blockers,
     projectCode: product?.code || null
@@ -3102,6 +3178,17 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("Recommended Workspace:");
     lines.push(`- ${recommendedWorkspace.label || recommendedWorkspace.key || "-"}`);
     lines.push(`- reason: ${recommendedWorkspace.reason || "-"}`);
+    lines.push("");
+  }
+
+  const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : [];
+  if (actionPlan.length) {
+    lines.push("Action Plan:");
+    for (const item of actionPlan) {
+      lines.push(
+        `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}`
+      );
+    }
     lines.push("");
   }
 

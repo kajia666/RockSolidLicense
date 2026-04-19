@@ -70,6 +70,8 @@ The same inline block now also turns the first lane-specific `recommendedDownloa
 
 The top checklist items in that inline launch workflow summary are now actionable as well. Each item can expose a direct workspace jump and artifact download, so the project page can move from “what is blocked” to “open the right workspace or download the right file” without another round-trip.
 
+That same inline block now also renders the first few `Action Plan` steps. So if the current lane clearly needs startup fixes first, then release cleanup, then handoff packaging, the project page can present that sequence directly and make each step clickable.
+
 The same combined package is also available over:
 
 - `GET /api/developer/launch-workflow`

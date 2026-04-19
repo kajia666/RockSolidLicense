@@ -770,6 +770,7 @@
         const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
         const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
         const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions : [];
+        const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : [];
         const linkedIntegrationSnippets = linkedIntegrationPackage.snippets || {};
 
         el("release-readiness").innerHTML = `
@@ -787,6 +788,8 @@
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "No launch workflow summary available.")}</div>
           ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${escapeHtml(recommendedWorkspace.reason)}</div>` : ""}
           ${renderWorkspaceActionButtons(workspaceActions)}
+          ${actionPlan.length ? `<div class="hint" style="margin-top:12px;">Action plan: ${escapeHtml(workflowSummary.actionPlanSummary || actionPlan.map((item) => item.title || item.key || "step").join(" -> "))}</div>` : ""}
+          ${renderActionPlanCards(actionPlan)}
           ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
@@ -926,6 +929,12 @@
           : [];
       }
 
+      function currentActionPlan() {
+        return Array.isArray(releasePackage?.workflowSummary?.actionPlan)
+          ? releasePackage.workflowSummary.actionPlan
+          : [];
+      }
+
       function renderWorkspaceActionButtons(actions = []) {
         if (!actions.length) {
           return "";
@@ -975,6 +984,26 @@
             </div>
           </div>
         `).join("");
+      }
+
+      function renderActionPlanCards(items = []) {
+        if (!items.length) {
+          return "";
+        }
+        return `
+          <div style="margin-top:12px;">
+            ${items.map((item, index) => `
+              <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.35);">
+                <div>${renderTag(String(item.priority || "secondary").toUpperCase(), item.priority === "primary")} ${renderTag(String(item.status || "unknown").toUpperCase(), item.status === "pass")} ${escapeHtml(item.title || item.key || "step")}</div>
+                <div class="hint" style="margin-top:8px;">${escapeHtml(item.summary || "-")}</div>
+                <div class="actions" style="margin-top:10px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-action-plan-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-action-plan-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
       }
 
       function navigateToWorkspaceAction(action, target) {
@@ -1434,6 +1463,17 @@
       });
 
       el("release-readiness").addEventListener("click", (event) => {
+        const actionPlanWorkspaceButton = event.target.closest("[data-action-plan-workspace-index]");
+        if (actionPlanWorkspaceButton) {
+          try {
+            const index = Number(actionPlanWorkspaceButton.dataset.actionPlanWorkspaceIndex);
+            const item = currentActionPlan()[index];
+            navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget());
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
         const button = event.target.closest("[data-workspace-action-index]");
         if (!button) {
           return;
@@ -1444,6 +1484,22 @@
           navigateToWorkspaceAction(action, currentReleaseTarget());
         } catch (error) {
           setStatus(error.message, true);
+        }
+      });
+
+      el("release-readiness").addEventListener("click", async (event) => {
+        const actionPlanDownloadButton = event.target.closest("[data-action-plan-download-index]");
+        if (!actionPlanDownloadButton) {
+          return;
+        }
+        try {
+          const index = Number(actionPlanDownloadButton.dataset.actionPlanDownloadIndex);
+          const item = currentActionPlan()[index];
+          const result = await downloadRecommendedWorkflowItem(item?.recommendedDownload);
+          setOutput({ actionPlanDownload: { key: item?.recommendedDownload?.key || null, fileName: result?.fileName || item?.recommendedDownload?.fileName || null } });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
       });
 

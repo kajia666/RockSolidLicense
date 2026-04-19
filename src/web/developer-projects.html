@@ -860,6 +860,7 @@
           const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 5) : [];
           const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
           const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions.slice(0, 3) : [];
+          const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan.slice(0, 3) : [];
           const checklistCounts = workflowSummary.checklistCounts || {};
           const tags = [
             tag(workflowSummary.title || "Launch workflow", workflowSummary.status === "ready" ? "ok" : workflowSummary.status === "hold" ? "danger" : ""),
@@ -884,6 +885,8 @@
             <div class="split-line"><span>Recommended Downloads</span><span>${esc(workflowSummary.downloadSummary || recommendedDownloads.map((item) => item.label).join(" + ") || "-")}</span></div>
             ${renderProjectRecommendedDownloadButtons(recommendedDownloads)}
             ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${esc(recommendedWorkspace.reason)}</div>` : ""}
+            ${actionPlan.length ? `<div class="hint" style="margin-top:12px;">Action plan: ${esc(workflowSummary.actionPlanSummary || actionPlan.map((item) => item.title || item.key || "step").join(" -> "))}</div>` : ""}
+            ${renderProjectActionPlanCards(actionPlan)}
             ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${renderProjectWorkspaceActionButtons(workspaceActions)}
@@ -1802,6 +1805,17 @@
           : [];
       }
 
+      function currentLaunchWorkflowActionPlan() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!launchWorkflowPreview || launchWorkflowPreview.productCode !== productCode || launchWorkflowPreview.channel !== channel) {
+          return [];
+        }
+        return Array.isArray(launchWorkflowPreview.payload?.workflowSummary?.actionPlan)
+          ? launchWorkflowPreview.payload.workflowSummary.actionPlan
+          : [];
+      }
+
       function renderProjectWorkspaceActionButtons(actions = []) {
         if (!actions.length) {
           return "";
@@ -1849,6 +1863,26 @@
                 <div class="actions" style="margin-top:10px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-checklist-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-launch-checklist-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderProjectActionPlanCards(items = []) {
+        if (!items.length) {
+          return "";
+        }
+        return `
+          <div style="margin-top:12px;">
+            ${items.map((item, index) => `
+              <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.35);">
+                <div>${tag(String(item.priority || "secondary").toUpperCase(), item.priority === "primary" ? "ok" : "")} ${tag(String(item.status || "unknown").toUpperCase(), item.status === "pass" ? "ok" : item.status === "block" ? "danger" : "")} ${esc(item.title || item.key || "step")}</div>
+                <div class="hint" style="margin-top:8px;">${esc(item.summary || "-")}</div>
+                <div class="actions" style="margin-top:10px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-action-plan-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-launch-action-plan-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -2260,6 +2294,17 @@
       });
 
       el("detail-launch-workflow").addEventListener("click", async (event) => {
+        const actionPlanWorkspaceButton = event.target.closest("[data-launch-action-plan-workspace-index]");
+        if (actionPlanWorkspaceButton) {
+          try {
+            const index = Number(actionPlanWorkspaceButton.dataset.launchActionPlanWorkspaceIndex);
+            const item = currentLaunchWorkflowActionPlan()[index];
+            openLaunchWorkspaceAction(item?.workspaceAction);
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
         const workspaceButton = event.target.closest("[data-launch-workspace-action-index]");
         if (workspaceButton) {
           try {
@@ -2267,6 +2312,19 @@
             openLaunchWorkspaceAction(currentLaunchWorkflowWorkspaceActions()[index]);
           } catch (error) {
             setStatus(error.message, true);
+          }
+          return;
+        }
+        const actionPlanDownloadButton = event.target.closest("[data-launch-action-plan-download-index]");
+        if (actionPlanDownloadButton) {
+          try {
+            const index = Number(actionPlanDownloadButton.dataset.launchActionPlanDownloadIndex);
+            const item = currentLaunchWorkflowActionPlan()[index];
+            const result = await downloadLaunchRecommendedItem(item?.recommendedDownload);
+            setOutput({ launchWorkflowDownload: { key: item?.recommendedDownload?.key || null, fileName: result?.fileName || item?.recommendedDownload?.fileName || null } });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
           }
           return;
         }

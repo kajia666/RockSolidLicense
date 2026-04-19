@@ -17,6 +17,8 @@ When `autofocus` is present, the page can automatically load the routed release 
 
 The page now also renders a `Route Focus` card for that routed context. So a software author who lands here from launch workflow with `autofocus=versions`, `autofocus=notices`, or `autofocus=summary` sees a short explanation of the release concern plus the most relevant refresh/download/open actions immediately.
 
+If the route also carries `routeTitle` or `routeReason`, that card now keeps the originating launch-workflow or project handoff step visible too. This gives the release page a more specific explanation than a plain autofocus target alone.
+
 ## Scoped APIs
 
 - `GET /api/developer/client-versions`

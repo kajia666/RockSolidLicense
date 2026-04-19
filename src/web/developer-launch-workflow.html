@@ -1006,16 +1006,41 @@
         `;
       }
 
-      function navigateToWorkspaceAction(action, target) {
+      function buildWorkspaceRouteContext(action, routeContext = {}) {
+        return {
+          routeTitle: String(
+            routeContext.routeTitle
+            || routeContext.title
+            || routeContext.label
+            || action?.label
+            || action?.title
+            || action?.key
+            || ""
+          ).trim(),
+          routeReason: String(
+            routeContext.routeReason
+            || routeContext.reason
+            || routeContext.summary
+            || action?.reason
+            || action?.summary
+            || ""
+          ).trim()
+        };
+      }
+
+      function navigateToWorkspaceAction(action, target, routeContext = {}) {
         if (!action || !target?.productCode) {
           throw new Error("Generate a launch workflow package before opening the recommended workspace.");
         }
+        const routed = buildWorkspaceRouteContext(action, routeContext);
         if (action.key === "project") {
           window.location.href = buildWorkspaceUrl("/developer/projects", {
             productId: currentReleaseProductId(target.productCode),
             productCode: target.productCode,
             channel: target.channel,
-            autofocus: action.autofocus || "detail"
+            autofocus: action.autofocus || "detail",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
           });
           return;
         }
@@ -1024,7 +1049,9 @@
             productId: currentReleaseProductId(target.productCode),
             productCode: target.productCode,
             channel: target.channel,
-            autofocus: action.autofocus || "package"
+            autofocus: action.autofocus || "package",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
           });
           return;
         }
@@ -1033,7 +1060,9 @@
             productId: currentReleaseProductId(target.productCode),
             productCode: target.productCode,
             channel: target.channel,
-            autofocus: action.autofocus || "package"
+            autofocus: action.autofocus || "package",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
           });
           return;
         }
@@ -1041,7 +1070,9 @@
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,
           channel: target.channel,
-          autofocus: action.autofocus || "handoff"
+          autofocus: action.autofocus || "handoff",
+          routeTitle: routed.routeTitle,
+          routeReason: routed.routeReason
         });
       }
 
@@ -1468,7 +1499,10 @@
           try {
             const index = Number(actionPlanWorkspaceButton.dataset.actionPlanWorkspaceIndex);
             const item = currentActionPlan()[index];
-            navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget());
+            navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget(), {
+              title: item?.title || item?.key,
+              summary: item?.summary
+            });
           } catch (error) {
             setStatus(error.message, true);
           }
@@ -1525,7 +1559,10 @@
           try {
             const index = Number(workspaceButton.dataset.checklistWorkspaceIndex);
             const item = currentChecklistItems()[index];
-            navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget());
+            navigateToWorkspaceAction(item?.workspaceAction, currentReleaseTarget(), {
+              title: item?.label || item?.title || item?.key,
+              summary: item?.summary || item?.nextAction
+            });
           } catch (error) {
             setStatus(error.message, true);
           }
@@ -1555,7 +1592,9 @@
         window.location.href = buildWorkspaceUrl("/developer/integration", {
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,
-          channel: target.channel
+          channel: target.channel,
+          routeTitle: "Launch workflow handoff",
+          routeReason: `Continue integration follow-up for ${target.productCode} on lane ${target.channel} from the launch workflow workspace.`
         });
       });
 
@@ -1569,7 +1608,9 @@
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,
           channel: target.channel,
-          autofocus: "package"
+          autofocus: "package",
+          routeTitle: "Launch workflow handoff",
+          routeReason: `Continue release checks for ${target.productCode} on lane ${target.channel} from the launch workflow workspace.`
         });
       });
 

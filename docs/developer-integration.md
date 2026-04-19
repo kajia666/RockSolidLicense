@@ -17,6 +17,8 @@ When `autofocus` is provided, the page can automatically scroll to and emphasize
 
 The page now also renders a `Route Focus` card for that routed context. So a software author who lands here from launch workflow with `autofocus=startup` or `autofocus=hardening` gets a short explanation of why this lane was routed to integration plus a few lane-specific refresh/download actions right away.
 
+If the route also carries `routeTitle` or `routeReason`, that card now keeps the originating launch-workflow or handoff step visible too. This makes the routed context more concrete than a plain autofocus hint.
+
 The page now also summarizes how many visible projects currently have each of the 10 product-level switches enabled:
 
 - `allowRegister`

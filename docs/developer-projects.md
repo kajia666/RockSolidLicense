@@ -72,6 +72,8 @@ The top checklist items in that inline launch workflow summary are now actionabl
 
 That same inline block now also renders the first few `Action Plan` steps. So if the current lane clearly needs startup fixes first, then release cleanup, then handoff packaging, the project page can present that sequence directly and make each step clickable.
 
+Those routed clicks now preserve the action title and summary too. When the project page sends someone into Integration or Releases from the inline launch workflow, the target page can show which launch-workflow step triggered the route.
+
 The same combined package is also available over:
 
 - `GET /api/developer/launch-workflow`

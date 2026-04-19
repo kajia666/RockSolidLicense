@@ -458,6 +458,8 @@
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
       let token = "";
       let actor = null;
       let projects = [];
@@ -723,7 +725,8 @@
         const canDownload = Boolean(releasePackage) && !el("download-release-package-summary-btn").disabled;
         const actions = Array.isArray(focus.actions) ? focus.actions : [];
         el("release-route-focus-box").innerHTML = `
-          <div>${escapeHtml(focus.title || "Release route focus")} ${hasProduct ? `<span class="tag ok">${escapeHtml(`channel:${target.channel || requestedChannel}`)}</span>` : ""} ${requestedAutofocus ? `<span class="tag">${escapeHtml(`focus:${requestedAutofocus}`)}</span>` : ""}</div>
+          <div>${escapeHtml(focus.title || "Release route focus")} ${requestedRouteTitle ? `<span class="tag ok">${escapeHtml(`from:${requestedRouteTitle}`)}</span>` : ""} ${hasProduct ? `<span class="tag ok">${escapeHtml(`channel:${target.channel || requestedChannel}`)}</span>` : ""} ${requestedAutofocus ? `<span class="tag">${escapeHtml(`focus:${requestedAutofocus}`)}</span>` : ""}</div>
+          ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${escapeHtml(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${escapeHtml(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project first.`)}</div>
           ${actions.length ? `
             <div class="actions" style="margin-top:12px;">
@@ -1271,7 +1274,9 @@
         }
         window.location.href = buildWorkspaceUrl("/developer/projects", {
           productId: currentReleaseProductId(target.productCode),
-          productCode: target.productCode
+          productCode: target.productCode,
+          routeTitle: requestedRouteTitle || currentReleaseRouteFocus().title || "Release workspace handoff",
+          routeReason: requestedRouteReason || `Continue ${target.productCode} from the release workspace.`
         });
       });
 
@@ -1285,7 +1290,9 @@
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,
           channel: target.channel,
-          autofocus: "handoff"
+          autofocus: "handoff",
+          routeTitle: requestedRouteTitle || currentReleaseRouteFocus().title || "Release workspace handoff",
+          routeReason: requestedRouteReason || `Review the combined launch workflow for ${target.productCode} after the release check.`
         });
       });
 
@@ -1298,7 +1305,9 @@
         window.location.href = buildWorkspaceUrl("/developer/integration", {
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,
-          channel: target.channel
+          channel: target.channel,
+          routeTitle: requestedRouteTitle || currentReleaseRouteFocus().title || "Release workspace handoff",
+          routeReason: requestedRouteReason || `Continue integration follow-up for ${target.productCode} after the release review.`
         });
       });
 

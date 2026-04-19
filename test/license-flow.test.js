@@ -9205,6 +9205,8 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /data-action-plan-download-index/);
     assert.match(html, /Workspace path:/);
     assert.match(html, /autofocus/);
+    assert.match(html, /routeTitle/);
+    assert.match(html, /routeReason/);
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Integration Package/);
     assert.match(html, /Open Release Check/);
@@ -9755,6 +9757,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /data-launch-workspace-action-index/);
     assert.match(html, /autofocus: action\.autofocus \|\| "detail"/);
     assert.match(html, /autofocus: action\.autofocus \|\| "package"/);
+    assert.match(html, /routeTitle/);
+    assert.match(html, /routeReason/);
     assert.match(html, /downloadUrlFile/);
     assert.match(html, /buildDeliveryQuickSignals/);
     assert.match(html, /Save Project Profile/);
@@ -9898,12 +9902,15 @@ test("developer integration page is served from the dedicated route", async () =
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
     assert.match(html, /requestedAutofocus/);
+    assert.match(html, /requestedRouteTitle/);
+    assert.match(html, /requestedRouteReason/);
     assert.match(html, /currentIntegrationAutofocusTarget/);
     assert.match(html, /currentIntegrationRouteFocus/);
     assert.match(html, /renderIntegrationRouteFocus/);
     assert.match(html, /focusIntegrationAutofocusTarget/);
     assert.match(html, /hydrateIntegrationAutofocus/);
     assert.match(html, /route-focus-box/);
+    assert.match(html, /Route reason:/);
     assert.match(html, /data-route-focus-action/);
   } finally {
     await app.close();
@@ -10056,12 +10063,15 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /release-route-hint/);
     assert.match(html, /applyRoutePrefill/);
     assert.match(html, /requestedAutofocus/);
+    assert.match(html, /requestedRouteTitle/);
+    assert.match(html, /requestedRouteReason/);
     assert.match(html, /currentReleaseAutofocusTarget/);
     assert.match(html, /currentReleaseRouteFocus/);
     assert.match(html, /renderReleaseRouteFocus/);
     assert.match(html, /focusReleaseAutofocusTarget/);
     assert.match(html, /hydrateReleaseAutofocus/);
     assert.match(html, /release-route-focus-box/);
+    assert.match(html, /Route reason:/);
     assert.match(html, /data-release-route-focus-action/);
   } finally {
     await app.close();

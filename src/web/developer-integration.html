@@ -184,6 +184,8 @@
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
       let token = "";
       let snapshot = null;
       let selectedProduct = null;
@@ -797,7 +799,8 @@ ${JSON.stringify(request, null, 2)}`;
         const canDownloadAssets = hasProduct && Boolean(packageSnapshot) && !el("download-package-json-btn").disabled;
         const actions = Array.isArray(focus.actions) ? focus.actions : [];
         el("route-focus-box").innerHTML = `
-          <div>${tag(focus.title || "Integration route focus", hasProduct)} ${tag(`focus:${requestedAutofocus || "package"}`, requestedAutofocus !== "")} ${tag(`channel:${channel}`, true)}</div>
+          <div>${tag(focus.title || "Integration route focus", hasProduct)} ${requestedRouteTitle ? tag(`from:${requestedRouteTitle}`, true) : ""} ${tag(`focus:${requestedAutofocus || "package"}`, requestedAutofocus !== "")} ${tag(`channel:${channel}`, true)}</div>
+          ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${product.code}.` : `${focus.summary} Select a visible project first.`)}</div>
           ${actions.length ? `
             <div class="actions" style="margin-top:12px;">
@@ -1175,7 +1178,9 @@ ${JSON.stringify(request, null, 2)}`;
         }
         window.location.href = buildWorkspaceUrl("/developer/projects", {
           productId: selectedProduct.id,
-          productCode: selectedProduct.code
+          productCode: selectedProduct.code,
+          routeTitle: requestedRouteTitle || currentIntegrationRouteFocus().title || "Integration workspace handoff",
+          routeReason: requestedRouteReason || `Continue ${selectedProduct.code} from the integration workspace.`
         });
       });
 
@@ -1188,7 +1193,9 @@ ${JSON.stringify(request, null, 2)}`;
           productId: selectedProduct.id,
           productCode: selectedProduct.code,
           channel: requestedChannel,
-          autofocus: "handoff"
+          autofocus: "handoff",
+          routeTitle: requestedRouteTitle || currentIntegrationRouteFocus().title || "Integration workspace handoff",
+          routeReason: requestedRouteReason || `Review the launch workflow handoff for ${selectedProduct.code} after the integration check.`
         });
       });
 
@@ -1201,7 +1208,9 @@ ${JSON.stringify(request, null, 2)}`;
           productId: selectedProduct.id,
           productCode: selectedProduct.code,
           channel: requestedChannel,
-          autofocus: "package"
+          autofocus: "package",
+          routeTitle: requestedRouteTitle || currentIntegrationRouteFocus().title || "Integration workspace handoff",
+          routeReason: requestedRouteReason || `Continue release checks for ${selectedProduct.code} after the integration review.`
         });
       });
 

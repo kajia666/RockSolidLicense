@@ -218,6 +218,8 @@
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
 
       let token = "";
       let profile = null;
@@ -1725,41 +1727,50 @@
       function openProjectIntegrationWorkspace() {
         const productId = el("edit-product-id").value.trim();
         const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
         if (!productId || !productCode) {
           throw new Error("Select a project before opening Developer Integration.");
         }
         window.location.href = buildWorkspaceUrl("/developer/integration", {
           productId,
           productCode,
-          channel: currentReleaseChannel()
+          channel,
+          routeTitle: requestedRouteTitle || "Project workspace handoff",
+          routeReason: requestedRouteReason || `Continue ${productCode} integration setup for lane ${channel} from the project workspace.`
         });
       }
 
       function openProjectLaunchWorkspace() {
         const productId = el("edit-product-id").value.trim();
         const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
         if (!productId || !productCode) {
           throw new Error("Select a project before opening Developer Launch Workflow.");
         }
         window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           productId,
           productCode,
-          channel: currentReleaseChannel(),
-          autofocus: "handoff"
+          channel,
+          autofocus: "handoff",
+          routeTitle: requestedRouteTitle || "Project workspace handoff",
+          routeReason: requestedRouteReason || `Review launch workflow handoff for ${productCode} on lane ${channel} from the project workspace.`
         });
       }
 
       function openProjectReleaseWorkspace() {
         const productId = el("edit-product-id").value.trim();
         const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
         if (!productId || !productCode) {
           throw new Error("Select a project before opening Developer Releases.");
         }
         window.location.href = buildWorkspaceUrl("/developer/releases", {
           productId,
           productCode,
-          channel: currentReleaseChannel(),
-          autofocus: "package"
+          channel,
+          autofocus: "package",
+          routeTitle: requestedRouteTitle || "Project workspace handoff",
+          routeReason: requestedRouteReason || `Continue release checks for ${productCode} on lane ${channel} from the project workspace.`
         });
       }
 
@@ -1890,21 +1901,47 @@
         `;
       }
 
-      function openLaunchWorkspaceAction(action) {
+      function buildLaunchWorkspaceRouteContext(action, routeContext = {}) {
+        return {
+          routeTitle: String(
+            routeContext.routeTitle
+            || routeContext.title
+            || routeContext.label
+            || action?.label
+            || action?.title
+            || action?.key
+            || ""
+          ).trim(),
+          routeReason: String(
+            routeContext.routeReason
+            || routeContext.reason
+            || routeContext.summary
+            || action?.reason
+            || action?.summary
+            || ""
+          ).trim()
+        };
+      }
+
+      function openLaunchWorkspaceAction(action, routeContext = {}) {
         const productId = el("edit-product-id").value.trim();
         const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
         if (!productId || !productCode) {
           throw new Error("Select a project before opening the recommended workspace.");
         }
         if (!action) {
           throw new Error("Preview Launch Workflow first so the recommended workspace can be resolved.");
         }
+        const routed = buildLaunchWorkspaceRouteContext(action, routeContext);
         if (action.key === "project") {
           window.location.href = buildWorkspaceUrl("/developer/projects", {
             productId,
             productCode,
-            channel: currentReleaseChannel(),
-            autofocus: action.autofocus || "detail"
+            channel,
+            autofocus: action.autofocus || "detail",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
           });
           return;
         }
@@ -1912,8 +1949,10 @@
           window.location.href = buildWorkspaceUrl("/developer/integration", {
             productId,
             productCode,
-            channel: currentReleaseChannel(),
-            autofocus: action.autofocus || "package"
+            channel,
+            autofocus: action.autofocus || "package",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
           });
           return;
         }
@@ -1921,16 +1960,20 @@
           window.location.href = buildWorkspaceUrl("/developer/releases", {
             productId,
             productCode,
-            channel: currentReleaseChannel(),
-            autofocus: action.autofocus || "package"
+            channel,
+            autofocus: action.autofocus || "package",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
           });
           return;
         }
         window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           productId,
           productCode,
-          channel: currentReleaseChannel(),
-          autofocus: action.autofocus || "handoff"
+          channel,
+          autofocus: action.autofocus || "handoff",
+          routeTitle: routed.routeTitle,
+          routeReason: routed.routeReason
         });
       }
 
@@ -2299,7 +2342,10 @@
           try {
             const index = Number(actionPlanWorkspaceButton.dataset.launchActionPlanWorkspaceIndex);
             const item = currentLaunchWorkflowActionPlan()[index];
-            openLaunchWorkspaceAction(item?.workspaceAction);
+            openLaunchWorkspaceAction(item?.workspaceAction, {
+              title: item?.title || item?.key,
+              summary: item?.summary
+            });
           } catch (error) {
             setStatus(error.message, true);
           }
@@ -2333,7 +2379,10 @@
           try {
             const index = Number(checklistWorkspaceButton.dataset.launchChecklistWorkspaceIndex);
             const item = currentLaunchWorkflowChecklistItems()[index];
-            openLaunchWorkspaceAction(item?.workspaceAction);
+            openLaunchWorkspaceAction(item?.workspaceAction, {
+              title: item?.label || item?.title || item?.key,
+              summary: item?.summary
+            });
           } catch (error) {
             setStatus(error.message, true);
           }

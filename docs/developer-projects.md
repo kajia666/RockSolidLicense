@@ -87,6 +87,14 @@ That same inline block now also renders the first few `Action Plan` steps. So if
 
 When those authorization blockers are auto-fixable, the same inline launch workflow block now also exposes `Run Launch Bootstrap`. So the project page can create the missing starter policy, starter card batch, or starter account directly, then refresh the same launch lane without forcing the software author to switch into the license workspace first.
 
+That same inline launch workflow block now also shows the first slice of:
+
+- `Initial Inventory Recommendations`
+- `First Batch Card Suggestions`
+- `First Ops Actions`
+
+So the project workspace is no longer limited to "what is blocked right now". It can also give software authors a short operational view of what to stage first and what to watch during the first launch window.
+
 Those routed clicks now preserve the action title and summary too. When the project page sends someone into Integration or Releases from the inline launch workflow, the target page can show which launch-workflow step triggered the route.
 
 The same combined package is also available over:

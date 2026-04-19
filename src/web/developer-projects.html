@@ -998,6 +998,16 @@
           const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
           const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions.slice(0, 3) : [];
           const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan.slice(0, 3) : [];
+          const authorizationLaunchRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
+          const inventoryRecommendations = Array.isArray(authorizationLaunchRecommendations.inventoryRecommendations)
+            ? authorizationLaunchRecommendations.inventoryRecommendations.slice(0, 3)
+            : [];
+          const firstBatchCardRecommendations = Array.isArray(authorizationLaunchRecommendations.firstBatchCardRecommendations)
+            ? authorizationLaunchRecommendations.firstBatchCardRecommendations.slice(0, 2)
+            : [];
+          const firstOpsActions = Array.isArray(authorizationLaunchRecommendations.firstOpsActions)
+            ? authorizationLaunchRecommendations.firstOpsActions.slice(0, 3)
+            : [];
           const checklistCounts = workflowSummary.checklistCounts || {};
           const tags = [
             tag(workflowSummary.title || "Launch workflow", workflowSummary.status === "ready" ? "ok" : workflowSummary.status === "hold" ? "danger" : ""),
@@ -1024,6 +1034,9 @@
             ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${esc(recommendedWorkspace.reason)}</div>` : ""}
             ${actionPlan.length ? `<div class="hint" style="margin-top:12px;">Action plan: ${esc(workflowSummary.actionPlanSummary || actionPlan.map((item) => item.title || item.key || "step").join(" -> "))}</div>` : ""}
             ${renderProjectActionPlanCards(actionPlan)}
+            ${renderProjectRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatProjectInventoryRecommendation)}
+            ${renderProjectRecommendationList("First Batch Card Suggestions", firstBatchCardRecommendations, formatProjectCardBatchRecommendation)}
+            ${renderProjectRecommendationList("First Ops Actions", firstOpsActions, formatProjectOpsAction)}
             ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${renderProjectWorkspaceActionButtons(workspaceActions)}
@@ -2167,6 +2180,30 @@
                 data-launch-download-index="${index}"
               >${esc(item.label || item.key || "Download asset")}</button>
             `).join("")}
+          </div>
+        `;
+      }
+
+      function formatProjectInventoryRecommendation(item = {}) {
+        return `[${String(item.priority || "recommended").toUpperCase()}][${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "inventory"} | target=${item.target || "-"} | current=${item.current || "-"} | ${item.nextAction || item.summary || "-"}`;
+      }
+
+      function formatProjectCardBatchRecommendation(item = {}) {
+        return `${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`;
+      }
+
+      function formatProjectOpsAction(item = {}) {
+        return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`;
+      }
+
+      function renderProjectRecommendationList(title, items = [], formatter) {
+        if (!items.length) {
+          return "";
+        }
+        return `
+          <div class="hint" style="margin-top:12px;">
+            <strong>${esc(title)}</strong><br>
+            ${items.map((item, index) => `${index + 1}. ${esc(formatter(item))}`).join("<br>")}
           </div>
         `;
       }

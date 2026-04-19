@@ -775,6 +775,16 @@
         const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
         const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions : [];
         const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : [];
+        const authorizationLaunchRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
+        const inventoryRecommendations = Array.isArray(authorizationLaunchRecommendations.inventoryRecommendations)
+          ? authorizationLaunchRecommendations.inventoryRecommendations
+          : [];
+        const firstBatchCardRecommendations = Array.isArray(authorizationLaunchRecommendations.firstBatchCardRecommendations)
+          ? authorizationLaunchRecommendations.firstBatchCardRecommendations
+          : [];
+        const firstOpsActions = Array.isArray(authorizationLaunchRecommendations.firstOpsActions)
+          ? authorizationLaunchRecommendations.firstOpsActions
+          : [];
         const linkedIntegrationSnippets = linkedIntegrationPackage.snippets || {};
 
         el("release-readiness").innerHTML = `
@@ -794,6 +804,9 @@
           ${renderWorkspaceActionButtons(workspaceActions)}
           ${actionPlan.length ? `<div class="hint" style="margin-top:12px;">Action plan: ${escapeHtml(workflowSummary.actionPlanSummary || actionPlan.map((item) => item.title || item.key || "step").join(" -> "))}</div>` : ""}
           ${renderActionPlanCards(actionPlan)}
+          ${renderLaunchRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatInventoryRecommendation)}
+          ${renderLaunchRecommendationList("First Batch Card Suggestions", firstBatchCardRecommendations, formatCardBatchRecommendation)}
+          ${renderLaunchRecommendationList("First Ops Actions", firstOpsActions, formatOpsAction)}
           ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Next actions:<br>${nextActions.map((item, index) => `${index + 1}. ${escapeHtml(item)}`).join("<br>")}</div>` : ""}
         `;
@@ -973,6 +986,30 @@
                 data-recommended-download-index="${index}"
               >${escapeHtml(item.label || item.key || "Download asset")}</button>
             `).join("")}
+          </div>
+        `;
+      }
+
+      function formatInventoryRecommendation(item = {}) {
+        return `[${String(item.priority || "recommended").toUpperCase()}][${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "inventory"} | target=${item.target || "-"} | current=${item.current || "-"} | ${item.nextAction || item.summary || "-"}`;
+      }
+
+      function formatCardBatchRecommendation(item = {}) {
+        return `${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`;
+      }
+
+      function formatOpsAction(item = {}) {
+        return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`;
+      }
+
+      function renderLaunchRecommendationList(title, items = [], formatter) {
+        if (!items.length) {
+          return "";
+        }
+        return `
+          <div class="hint" style="margin-top:12px;">
+            <strong>${escapeHtml(title)}</strong><br>
+            ${items.map((item, index) => `${index + 1}. ${escapeHtml(formatter(item))}`).join("<br>")}
           </div>
         `;
       }

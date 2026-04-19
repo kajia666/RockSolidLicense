@@ -2759,7 +2759,8 @@ function mergeLaunchWorkflowReviewStatus(current = "pass", next = "pass") {
 
 function buildLaunchWorkflowAuthorizationReadiness({
   product = {},
-  metrics = {}
+  metrics = {},
+  policies = []
 } = {}) {
   const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
     ? product.featureConfig
@@ -2779,6 +2780,16 @@ function buildLaunchWorkflowAuthorizationReadiness({
     accountLoginEnabled ? (registerEnabled ? "account+register" : "account-only") : null,
     cardLoginEnabled ? "direct-card" : null
   ].filter(Boolean).join(" + ") || "no-login-path";
+  const launchRecommendations = buildLaunchAuthorizationOperationalPlan({
+    product,
+    metrics: {
+      policies: policyCount,
+      cardsFresh: freshCardCount,
+      accounts: accountCount,
+      activeEntitlements: activeEntitlementCount
+    },
+    policies
+  });
   const issues = [];
   const nextActions = [];
   const bootstrapPlan = [];
@@ -2945,7 +2956,8 @@ function buildLaunchWorkflowAuthorizationReadiness({
     bootstrapEligible,
     bootstrapSummary,
     bootstrapPlan,
-    bootstrapAction
+    bootstrapAction,
+    launchRecommendations
   };
 }
 
@@ -3047,6 +3059,202 @@ function buildLaunchStarterAccountDraft(product = {}, accountCount = 0) {
   return {
     username: buildLaunchStarterAccountUsername(product?.code || "", accountCount),
     password: buildLaunchStarterAccountPassword(product?.code || "")
+  };
+}
+
+function buildLaunchAuthorizationOperationalPlan({
+  product = {},
+  metrics = {},
+  policies = []
+} = {}) {
+  const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+    ? product.featureConfig
+    : {};
+  const policyCount = Number(metrics.policies ?? 0);
+  const freshCardCount = Number(metrics.cardsFresh ?? 0);
+  const accountCount = Number(metrics.accounts ?? 0);
+  const activeEntitlementCount = Number(metrics.activeEntitlements ?? 0);
+  const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+  const registerEnabled = featureConfig.allowRegister !== false;
+  const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+  const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+  const preferredGrantType = recommendLaunchStarterGrantType(featureConfig, Array.isArray(policies) ? policies : []);
+  const batchPrefix = buildLaunchStarterBatchPrefix(product?.code || "");
+  const inventoryRecommendations = [];
+  const firstBatchCardRecommendations = [];
+  const firstOpsActions = [];
+
+  const pushInventoryRecommendation = (item) => {
+    if (!item?.key) {
+      return;
+    }
+    inventoryRecommendations.push(item);
+  };
+
+  if (!accountLoginEnabled && !cardLoginEnabled) {
+    pushInventoryRecommendation({
+      key: "login_path",
+      label: "Launch login path",
+      priority: "required",
+      status: "missing",
+      target: "Enable account login or direct-card login",
+      current: "No runtime login path",
+      summary: "End users still have no runtime sign-in path for this project.",
+      nextAction: "Adjust the project authorization preset before launch so at least one login path is available."
+    });
+  }
+
+  pushInventoryRecommendation({
+    key: "starter_policy",
+    label: preferredGrantType === "points" ? "Starter points policy" : "Starter duration policy",
+    priority: "required",
+    status: policyCount > 0 ? "ready" : "missing",
+    target: "At least 1 active starter policy",
+    current: `${policyCount} active`,
+    summary: preferredGrantType === "points"
+      ? "Keep one active points policy ready for recharge or usage-based launch flows."
+      : "Keep one active duration policy ready for first-sale activation and renewals.",
+    nextAction: policyCount > 0
+      ? "Keep one starter policy active for the launch lane."
+      : "Create one active starter policy before issuing cards or opening first-user access."
+  });
+
+  if (cardLoginEnabled || cardRechargeEnabled) {
+    const targetCount = cardLoginEnabled && cardRechargeEnabled
+      ? "50-100 fresh cards"
+      : cardLoginEnabled
+        ? "50 fresh cards"
+        : "100 fresh cards";
+    pushInventoryRecommendation({
+      key: "starter_card_inventory",
+      label: cardLoginEnabled && cardRechargeEnabled
+        ? "Starter card inventory"
+        : cardLoginEnabled
+          ? "Direct-card starter inventory"
+          : "Recharge starter inventory",
+      priority: "required",
+      status: freshCardCount > 0 ? "ready" : "missing",
+      target: targetCount,
+      current: `${freshCardCount} fresh`,
+      summary: cardLoginEnabled && cardRechargeEnabled
+        ? "This lane needs enough fresh cards for both first-sale activation and recharge top-ups."
+        : cardLoginEnabled
+          ? "Direct-card login needs sellable fresh cards before the first customer arrives."
+          : "Recharge flows need fresh cards staged before rollout so renewals can succeed on day one.",
+      nextAction: freshCardCount > 0
+        ? "Keep a starter card buffer available for the first launch window."
+        : "Issue at least one starter card batch before opening login or recharge."
+    });
+  }
+
+  if (accountLoginEnabled) {
+    const closedRegistration = !registerEnabled;
+    const starterTarget = closedRegistration ? "1-3 starter accounts" : "1 internal QA/support account";
+    const status = closedRegistration
+      ? (accountCount > 0 ? "ready" : "missing")
+      : (accountCount > 0 ? "ready" : "recommended");
+    pushInventoryRecommendation({
+      key: "starter_accounts",
+      label: closedRegistration ? "Starter accounts" : "Internal starter accounts",
+      priority: closedRegistration ? "required" : "recommended",
+      status,
+      target: starterTarget,
+      current: `${accountCount} visible`,
+      summary: closedRegistration
+        ? "Closed registration lanes still need at least one seed account for internal QA, support, or launch smoke tests."
+        : "Open registration is enough for customers, but keeping one internal starter account still helps QA and support.",
+      nextAction: accountCount > 0
+        ? "Keep at least one starter account reserved for internal smoke tests and support."
+        : closedRegistration
+          ? "Seed one or more starter accounts before launch, or reopen registration."
+          : "Optionally seed one internal QA/support account before launch."
+    });
+  }
+
+  if (accountLoginEnabled && !cardLoginEnabled && !cardRechargeEnabled && activeEntitlementCount <= 0) {
+    pushInventoryRecommendation({
+      key: "starter_entitlements",
+      label: "Internal starter entitlements",
+      priority: "recommended",
+      status: "recommended",
+      target: "At least 1 internal active entitlement",
+      current: `${activeEntitlementCount} active`,
+      summary: "Account-only lanes benefit from one internal entitlement so QA can exercise runtime gating before the first customer arrives.",
+      nextAction: "Prepare one internal entitlement or a private demo account for smoke testing before launch."
+    });
+  }
+
+  if (cardLoginEnabled) {
+    firstBatchCardRecommendations.push({
+      key: "direct_card_batch",
+      label: "Direct-card launch batch",
+      grantType: preferredGrantType,
+      count: 50,
+      prefix: `${batchPrefix}DL`,
+      purpose: "First-sale activations and QA smoke tests",
+      nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales."
+    });
+  }
+
+  if (cardRechargeEnabled) {
+    firstBatchCardRecommendations.push({
+      key: "recharge_batch",
+      label: "Recharge starter batch",
+      grantType: preferredGrantType === "points" ? "points" : preferredGrantType,
+      count: cardLoginEnabled ? 100 : 50,
+      prefix: `${batchPrefix}RC`,
+      purpose: "Renewal, recharge, and early support top-ups",
+      nextAction: cardLoginEnabled
+        ? "Keep recharge stock separate from direct-login stock so renewals do not consume the initial sales batch."
+        : "Issue one recharge-ready batch before the first renewal or top-up request arrives."
+    });
+  }
+
+  if (accountLoginEnabled && !registerEnabled) {
+    firstOpsActions.push({
+      key: "starter_account_handoff",
+      label: "Rotate and hand off starter credentials",
+      timing: "Before launch and at T+0",
+      summary: "Securely hand off seed account credentials to QA or support, then replace temporary passwords once the first sign-in succeeds."
+    });
+  }
+
+  firstOpsActions.push({
+    key: "runtime_smoke",
+    label: "Verify first real sign-ins",
+    timing: "T+0 to T+30m",
+    summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine."
+  });
+
+  if (cardLoginEnabled || cardRechargeEnabled) {
+    firstOpsActions.push({
+      key: "card_redemption_watch",
+      label: "Watch first card redemptions",
+      timing: "T+0 to T+2h",
+      summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up."
+    });
+  }
+
+  if (featureConfig.allowVersionCheck !== false || featureConfig.allowNotices !== false) {
+    firstOpsActions.push({
+      key: "startup_rule_watch",
+      label: "Watch notices and version gates",
+      timing: "T+0 to T+2h",
+      summary: "Confirm launch-day notices, maintenance copy, and version rules are not blocking healthy clients by mistake."
+    });
+  }
+
+  firstOpsActions.push({
+    key: "session_review",
+    label: "Review early sessions and device state",
+    timing: "T+0 to T+4h",
+    summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users."
+  });
+
+  return {
+    inventoryRecommendations,
+    firstBatchCardRecommendations,
+    firstOpsActions
   };
 }
 
@@ -3536,6 +3744,11 @@ function buildLaunchWorkflowSummaryPayload({
     authorizationMessage: authReadiness.message || null,
     authorizationModeSummary: authReadiness.loginModeSummary || null,
     authorizationInventory: authReadiness.inventory || {},
+    authorizationLaunchRecommendations: authReadiness.launchRecommendations || {
+      inventoryRecommendations: [],
+      firstBatchCardRecommendations: [],
+      firstOpsActions: []
+    },
     checklistStatus: workflowChecklist.status || "unknown",
     checklistCounts: {
       pass: workflowChecklist.passItems ?? 0,
@@ -3612,6 +3825,40 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("");
   }
 
+  const authorizationRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
+  const inventoryRecommendations = Array.isArray(authorizationRecommendations.inventoryRecommendations)
+    ? authorizationRecommendations.inventoryRecommendations
+    : [];
+  if (inventoryRecommendations.length) {
+    lines.push("Initial Inventory Recommendations:");
+    for (const item of inventoryRecommendations) {
+      lines.push(`- [${String(item.priority || "recommended").toUpperCase()}][${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "inventory"} | target=${item.target || "-"} | current=${item.current || "-"} | ${item.nextAction || item.summary || "-"}`);
+    }
+    lines.push("");
+  }
+
+  const firstBatchCardRecommendations = Array.isArray(authorizationRecommendations.firstBatchCardRecommendations)
+    ? authorizationRecommendations.firstBatchCardRecommendations
+    : [];
+  if (firstBatchCardRecommendations.length) {
+    lines.push("First Batch Card Suggestions:");
+    for (const item of firstBatchCardRecommendations) {
+      lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`);
+    }
+    lines.push("");
+  }
+
+  const firstOpsActions = Array.isArray(authorizationRecommendations.firstOpsActions)
+    ? authorizationRecommendations.firstOpsActions
+    : [];
+  if (firstOpsActions.length) {
+    lines.push("First Ops Actions:");
+    for (const item of firstOpsActions) {
+      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`);
+    }
+    lines.push("");
+  }
+
   const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : [];
   if (actionPlan.length) {
     lines.push("Action Plan:");
@@ -3677,6 +3924,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
 function buildLaunchWorkflowChecklistText(payload = {}) {
   const workflowSummary = payload.workflowSummary || payload.manifest?.workflowSummary || {};
   const workflowChecklist = payload.workflowChecklist || payload.manifest?.workflowChecklist || {};
+  const authorizationRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
   const lines = [
     "RockSolid Launch Workflow Checklist",
     `Status: ${String(workflowChecklist.status || "unknown").toUpperCase()} | pass=${workflowChecklist.passItems ?? 0} | review=${workflowChecklist.reviewItems ?? 0} | block=${workflowChecklist.blockItems ?? 0}`,
@@ -3698,6 +3946,39 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
     }
     if (item.bootstrapAction) {
       lines.push(`bootstrap: ${item.bootstrapAction.label || item.bootstrapAction.key || "-"}`);
+    }
+    lines.push("");
+  }
+
+  const inventoryRecommendations = Array.isArray(authorizationRecommendations.inventoryRecommendations)
+    ? authorizationRecommendations.inventoryRecommendations
+    : [];
+  if (inventoryRecommendations.length) {
+    lines.push("Initial Inventory Recommendations:");
+    for (const item of inventoryRecommendations) {
+      lines.push(`- [${String(item.priority || "recommended").toUpperCase()}][${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "inventory"} | target=${item.target || "-"} | current=${item.current || "-"} | next=${item.nextAction || "-"}`);
+    }
+    lines.push("");
+  }
+
+  const firstBatchCardRecommendations = Array.isArray(authorizationRecommendations.firstBatchCardRecommendations)
+    ? authorizationRecommendations.firstBatchCardRecommendations
+    : [];
+  if (firstBatchCardRecommendations.length) {
+    lines.push("First Batch Card Suggestions:");
+    for (const item of firstBatchCardRecommendations) {
+      lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`);
+    }
+    lines.push("");
+  }
+
+  const firstOpsActions = Array.isArray(authorizationRecommendations.firstOpsActions)
+    ? authorizationRecommendations.firstOpsActions
+    : [];
+  if (firstOpsActions.length) {
+    lines.push("First Ops Actions:");
+    for (const item of firstOpsActions) {
+      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`);
     }
     lines.push("");
   }
@@ -13285,7 +13566,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             cardsRedeemed: redeemedCards.length,
             accounts: accountItems.length,
             activeEntitlements: 0
-          }
+          },
+          policies: activePolicies
         });
         return {
           policies: policyItems,

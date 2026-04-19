@@ -492,6 +492,201 @@
         return `${base}_seed_${String(Math.max(1, count + 1)).padStart(2, "0")}`;
       }
 
+      function buildQuickstartInventoryRecommendations({
+        productCode = "",
+        featureConfig = {},
+        policyCount = 0,
+        freshCardCount = 0,
+        accountCount = 0,
+        activeEntitlementCount = 0,
+        recommendedGrantType = "duration"
+      } = {}) {
+        const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+        const registerEnabled = featureConfig.allowRegister !== false;
+        const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+        const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+        const items = [];
+
+        if (!accountLoginEnabled && !cardLoginEnabled) {
+          items.push({
+            key: "login_path",
+            label: "Launch login path",
+            priority: "required",
+            status: "missing",
+            target: "Enable account login or direct-card login",
+            current: "No runtime login path",
+            summary: "Adjust the project authorization preset before launch so end users have at least one sign-in path."
+          });
+        }
+
+        items.push({
+          key: "starter_policy",
+          label: recommendedGrantType === "points" ? "Starter points policy" : "Starter duration policy",
+          priority: "required",
+          status: policyCount > 0 ? "ready" : "missing",
+          target: "At least 1 active starter policy",
+          current: `${policyCount} active`,
+          summary: policyCount > 0
+            ? "Keep one starter policy active for the launch lane."
+            : "Create one active starter policy before issuing cards or onboarding first users."
+        });
+
+        if (cardLoginEnabled || cardRechargeEnabled) {
+          items.push({
+            key: "starter_card_inventory",
+            label: cardLoginEnabled && cardRechargeEnabled
+              ? "Starter card inventory"
+              : cardLoginEnabled
+                ? "Direct-card starter inventory"
+                : "Recharge starter inventory",
+            priority: "required",
+            status: freshCardCount > 0 ? "ready" : "missing",
+            target: cardLoginEnabled && cardRechargeEnabled
+              ? "50-100 fresh cards"
+              : cardLoginEnabled
+                ? "50 fresh cards"
+                : "100 fresh cards",
+            current: `${freshCardCount} fresh`,
+            summary: freshCardCount > 0
+              ? "Keep a starter card buffer available for the first launch window."
+              : "Issue at least one starter card batch before opening login or recharge."
+          });
+        }
+
+        if (accountLoginEnabled) {
+          const closedRegistration = !registerEnabled;
+          items.push({
+            key: "starter_accounts",
+            label: closedRegistration ? "Starter accounts" : "Internal starter accounts",
+            priority: closedRegistration ? "required" : "recommended",
+            status: closedRegistration
+              ? (accountCount > 0 ? "ready" : "missing")
+              : (accountCount > 0 ? "ready" : "recommended"),
+            target: closedRegistration ? "1-3 starter accounts" : "1 internal QA/support account",
+            current: `${accountCount} visible`,
+            summary: accountCount > 0
+              ? "Keep at least one starter account reserved for internal smoke tests and support."
+              : closedRegistration
+                ? "Seed one or more starter accounts before launch, or reopen registration."
+                : "Optionally seed one internal QA/support account before launch."
+          });
+        }
+
+        if (accountLoginEnabled && !cardLoginEnabled && !cardRechargeEnabled && activeEntitlementCount <= 0) {
+          items.push({
+            key: "starter_entitlements",
+            label: "Internal starter entitlements",
+            priority: "recommended",
+            status: "recommended",
+            target: "At least 1 internal active entitlement",
+            current: `${activeEntitlementCount} active`,
+            summary: "Prepare one internal entitlement or a private demo account for smoke testing before launch."
+          });
+        }
+
+        return items;
+      }
+
+      function buildQuickstartCardBatchRecommendations({
+        productCode = "",
+        featureConfig = {},
+        recommendedGrantType = "duration"
+      } = {}) {
+        const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+        const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+        const prefix = starterBatchPrefix(productCode);
+        const items = [];
+        if (cardLoginEnabled) {
+          items.push({
+            key: "direct_card_batch",
+            label: "Direct-card launch batch",
+            count: 50,
+            grantType: recommendedGrantType,
+            prefix: `${prefix}DL`,
+            purpose: "First-sale activations and QA smoke tests",
+            nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales."
+          });
+        }
+        if (cardRechargeEnabled) {
+          items.push({
+            key: "recharge_batch",
+            label: "Recharge starter batch",
+            count: cardLoginEnabled ? 100 : 50,
+            grantType: recommendedGrantType === "points" ? "points" : recommendedGrantType,
+            prefix: `${prefix}RC`,
+            purpose: "Renewal, recharge, and early support top-ups",
+            nextAction: cardLoginEnabled
+              ? "Keep recharge stock separate from direct-login stock so renewals do not consume the initial sales batch."
+              : "Issue one recharge-ready batch before the first renewal or top-up request arrives."
+          });
+        }
+        return items;
+      }
+
+      function buildQuickstartOpsActions(featureConfig = {}) {
+        const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+        const registerEnabled = featureConfig.allowRegister !== false;
+        const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+        const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+        const items = [];
+        if (accountLoginEnabled && !registerEnabled) {
+          items.push({
+            key: "starter_account_handoff",
+            label: "Rotate and hand off starter credentials",
+            timing: "Before launch and at T+0",
+            summary: "Securely hand off seed account credentials to QA or support, then replace temporary passwords once the first sign-in succeeds."
+          });
+        }
+        items.push({
+          key: "runtime_smoke",
+          label: "Verify first real sign-ins",
+          timing: "T+0 to T+30m",
+          summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine."
+        });
+        if (cardLoginEnabled || cardRechargeEnabled) {
+          items.push({
+            key: "card_redemption_watch",
+            label: "Watch first card redemptions",
+            timing: "T+0 to T+2h",
+            summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up."
+          });
+        }
+        if (featureConfig.allowVersionCheck !== false || featureConfig.allowNotices !== false) {
+          items.push({
+            key: "startup_rule_watch",
+            label: "Watch notices and version gates",
+            timing: "T+0 to T+2h",
+            summary: "Confirm launch-day notices, maintenance copy, and version rules are not blocking healthy clients by mistake."
+          });
+        }
+        items.push({
+          key: "session_review",
+          label: "Review early sessions and device state",
+          timing: "T+0 to T+4h",
+          summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users."
+        });
+        return items;
+      }
+
+      function formatQuickstartInventoryRecommendation(item = {}) {
+        return `[${String(item.priority || "recommended").toUpperCase()}][${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "inventory"} | target=${item.target || "-"} | current=${item.current || "-"} | ${item.summary || "-"}`;
+      }
+
+      function formatQuickstartCardRecommendation(item = {}) {
+        return `${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`;
+      }
+
+      function formatQuickstartOpsAction(item = {}) {
+        return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`;
+      }
+
+      function renderQuickstartRecommendationList(title, items = [], formatter) {
+        if (!items.length) {
+          return "";
+        }
+        return `<div class="hint" style="margin-top:12px;"><strong>${esc(title)}</strong><br>${items.map((item, index) => `${index + 1}. ${esc(formatter(item))}`).join("<br>")}</div>`;
+      }
+
       function renderQuickstartActionButtons(actions = []) {
         const uniqueActions = [];
         const seenKeys = new Set();
@@ -533,11 +728,27 @@
         const policyCount = Number(activePolicyCount || metrics.policies || 0);
         const freshCardCount = Number(metrics.cardsFresh ?? productCards.filter((item) => item.usageStatus === "unused").length ?? 0);
         const accountCount = Number(metrics.accounts ?? 0);
+        const activeEntitlementCount = Number(metrics.activeEntitlements ?? 0);
         const registerEnabled = featureConfig.allowRegister !== false;
         const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
         const cardLoginEnabled = featureConfig.allowCardLogin !== false;
         const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
         const recommendedGrantType = recommendStarterGrantType(featureConfig, productPolicies);
+        const inventoryRecommendations = buildQuickstartInventoryRecommendations({
+          productCode,
+          featureConfig,
+          policyCount,
+          freshCardCount,
+          accountCount,
+          activeEntitlementCount,
+          recommendedGrantType
+        });
+        const firstBatchCardRecommendations = buildQuickstartCardBatchRecommendations({
+          productCode,
+          featureConfig,
+          recommendedGrantType
+        });
+        const firstOpsActions = buildQuickstartOpsActions(featureConfig);
         const bootstrapPlan = [];
         const checks = [];
         const actions = [
@@ -655,6 +866,9 @@
           <div class="hint" style="margin-top:6px;">Bootstrap plan: ${esc(bootstrapPlan.length ? bootstrapPlan.join(" -> ") : "Nothing pending.")}</div>
           <div style="margin-top:12px;">${checks.map((item) => tag(`${item.label}: ${item.detail}`, item.tone)).join("")}</div>
           ${renderQuickstartActionButtons(actions)}
+          ${renderQuickstartRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatQuickstartInventoryRecommendation)}
+          ${renderQuickstartRecommendationList("First Batch Card Suggestions", firstBatchCardRecommendations, formatQuickstartCardRecommendation)}
+          ${renderQuickstartRecommendationList("First Ops Actions", firstOpsActions, formatQuickstartOpsAction)}
         `;
       }
 

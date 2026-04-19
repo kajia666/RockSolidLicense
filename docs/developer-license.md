@@ -32,6 +32,18 @@ and it can prefill:
 
 The same quickstart block can now also run a one-click `Launch Bootstrap`. When the current project already has a valid login path, that bootstrap can create the missing starter policy, starter card batch, and starter account in one pass, then return the generated starter-account password in the response so the software author can hand it off securely.
 
+The same quickstart block now also turns launch advice into three concrete groups instead of only showing generic blockers:
+
+- `Initial Inventory Recommendations`
+- `First Batch Card Suggestions`
+- `First Ops Actions`
+
+That helps a software author answer three practical launch questions in one place:
+
+- what must exist before launch
+- what first batch of sellable or recharge cards should be issued
+- what should be checked in the first launch window after users begin signing in
+
 ## Scope
 
 - owners can manage every product they own

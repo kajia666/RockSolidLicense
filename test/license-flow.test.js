@@ -5503,6 +5503,9 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(launchWorkflow.workflowSummary.releaseStatus, "hold");
     assert.equal(launchWorkflow.workflowSummary.startupStatus, "force_update_required");
     assert.equal(launchWorkflow.workflowSummary.clientHardeningProfile, "balanced");
+    assert.equal(launchWorkflow.workflowSummary.authorizationStatus, "block");
+    assert.match(launchWorkflow.workflowSummary.authorizationSummary || "", /policies=0/);
+    assert.match(launchWorkflow.workflowSummary.authorizationModeSummary || "", /account\+register/);
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.recommendedDownloads));
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.actionPlan));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.length >= 1);
@@ -5511,6 +5514,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.workspaceActions));
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "integration"));
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "release"));
+    assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "licenses"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_zip"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_checksums"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
@@ -5518,24 +5522,31 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.handoffChecksumsFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff-sha256\.txt$/);
     assert.equal(launchWorkflow.workflowChecklist.status, "hold");
     assert.ok(launchWorkflow.workflowChecklist.blockItems >= 1);
+    assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "authorization_readiness" && item.workspaceAction?.key === "licenses"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "launch_handoff_package"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.workspaceAction?.key === "integration"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.recommendedDownload?.key === "release_summary"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.recommendedDownload?.key === "launch_handoff_zip"));
+    assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "authorization_readiness" && item.workspaceAction?.key === "licenses"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "integration"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.recommendedDownload?.key === "integration_env"));
     assert.equal(launchWorkflow.releasePackage.manifest.project.code, "RELPKG_ALPHA");
     assert.equal(launchWorkflow.integrationPackage.manifest.project.code, "RELPKG_ALPHA");
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
     assert.match(launchWorkflow.summaryText, /Workflow Status: HOLD/);
+    assert.match(launchWorkflow.summaryText, /Authorization Status: BLOCK/);
+    assert.match(launchWorkflow.summaryText, /Authorization Summary: modes=account\+register/);
     assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
     assert.match(launchWorkflow.summaryText, /Recommended Workspace:/);
     assert.match(launchWorkflow.summaryText, /Action Plan:/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
+    assert.match(launchWorkflow.summaryText, /workspace=Open License Workspace@policy-create/);
     assert.match(launchWorkflow.summaryText, /workspace=Open Integration Workspace@startup/);
     assert.match(launchWorkflow.summaryText, /download=Release summary:/);
     assert.match(launchWorkflow.checklistText, /RockSolid Launch Workflow Checklist/);
+    assert.match(launchWorkflow.checklistText, /\[BLOCK\] Authorization readiness/);
+    assert.match(launchWorkflow.checklistText, /workspace: Open License Workspace \| focus=policy-create/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Startup bootstrap decision/);
     assert.match(launchWorkflow.checklistText, /workspace: Open Integration Workspace \| focus=startup/);
     assert.match(launchWorkflow.checklistText, /download: Recommended handoff zip \| rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip/);
@@ -5548,6 +5559,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchSummaryDownload.contentType || "", /^text\/plain/);
     assert.match(launchSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt"/);
     assert.match(launchSummaryDownload.body, /Workflow Status: HOLD/);
+    assert.match(launchSummaryDownload.body, /Authorization Status: BLOCK/);
     assert.match(launchSummaryDownload.body, /Recommended handoff zip/);
     assert.match(launchSummaryDownload.body, /Combined launch workflow zip/);
 
@@ -5559,6 +5571,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchChecklistDownload.contentType || "", /^text\/plain/);
     assert.match(launchChecklistDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt"/);
     assert.match(launchChecklistDownload.body, /RockSolid Launch Workflow Checklist/);
+    assert.match(launchChecklistDownload.body, /\[BLOCK\] Authorization readiness/);
+    assert.match(launchChecklistDownload.body, /workspace: Open License Workspace \| focus=policy-create/);
     assert.match(launchChecklistDownload.body, /\[BLOCK\] Startup bootstrap decision/);
     assert.match(launchChecklistDownload.body, /workspace: Open Integration Workspace \| focus=startup/);
 
@@ -10022,6 +10036,11 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Checksums/);
     assert.match(html, /Download Zip/);
+    assert.match(html, /route-focus-box/);
+    assert.match(html, /window\.location\.search/);
+    assert.match(html, /requestedAutofocus/);
+    assert.match(html, /Route reason:/);
+    assert.match(html, /Open this page from launch workflow or a routed workspace action/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

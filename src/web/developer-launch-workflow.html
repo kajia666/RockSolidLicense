@@ -1066,6 +1066,17 @@
           });
           return;
         }
+        if (action.key === "licenses") {
+          window.location.href = buildWorkspaceUrl("/developer/licenses", {
+            productId: currentReleaseProductId(target.productCode),
+            productCode: target.productCode,
+            channel: target.channel,
+            autofocus: action.autofocus || "policy-control",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
+          });
+          return;
+        }
         window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,

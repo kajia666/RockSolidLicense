@@ -44,6 +44,7 @@ To reduce repeated clicks, the same detail card now also exposes a `Preview Laun
 
 - overall lane status
 - candidate version
+- authorization readiness
 - release checklist counts
 - startup bootstrap decision
 - hardening profile
@@ -64,6 +65,7 @@ Recommended workspace jumps now also preserve a more specific `autofocus` hint. 
 - project-level blockers can land back on the project detail or feature-config area
 - startup bootstrap, token-key, and hardening issues can land on the integration preview block
 - version-rule or notice blockers can land on the release preview block
+- starter policy or card inventory blockers can land on the developer license workspace
 - handoff review can land on the combined launch workflow block
 
 The same inline launch workflow block now also exposes the top `workspaceActions` as direct buttons, so the project page is no longer limited to one “recommended workspace” jump. Software authors can click the first few routed actions straight from the inline summary.

@@ -2681,6 +2681,13 @@ function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "") 
       autofocus: autofocus || "package"
     };
   }
+  if (key === "licenses") {
+    return {
+      key,
+      label: label || "Open License Workspace",
+      autofocus: autofocus || "policy-control"
+    };
+  }
   return {
     key: "launch",
     label: label || "Stay in Launch Workflow",
@@ -2722,9 +2729,178 @@ function createLaunchWorkflowActionPlanStep({
   };
 }
 
+function mergeLaunchWorkflowReviewStatus(current = "pass", next = "pass") {
+  const severity = {
+    pass: 0,
+    review: 1,
+    block: 2
+  };
+  return (severity[next] ?? 0) > (severity[current] ?? 0) ? next : current;
+}
+
+function buildLaunchWorkflowAuthorizationReadiness({
+  product = {},
+  metrics = {}
+} = {}) {
+  const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+    ? product.featureConfig
+    : {};
+  const policyCount = Number(metrics.policies ?? 0);
+  const freshCardCount = Number(metrics.cardsFresh ?? 0);
+  const redeemedCardCount = Number(metrics.cardsRedeemed ?? 0);
+  const accountCount = Number(metrics.accounts ?? 0);
+  const activeEntitlementCount = Number(metrics.activeEntitlements ?? 0);
+  const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+  const registerEnabled = featureConfig.allowRegister !== false;
+  const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+  const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+  const accountPathReady = accountLoginEnabled && (registerEnabled || accountCount > 0);
+  const cardPathReady = cardLoginEnabled && freshCardCount > 0;
+  const loginModeSummary = [
+    accountLoginEnabled ? (registerEnabled ? "account+register" : "account-only") : null,
+    cardLoginEnabled ? "direct-card" : null
+  ].filter(Boolean).join(" + ") || "no-login-path";
+  const issues = [];
+  const nextActions = [];
+  let status = "pass";
+  let workspaceKey = "licenses";
+  let workspaceAutofocus = "policy-control";
+  let workspaceLabel = "Open License Workspace";
+  let workspaceSeverity = -1;
+  const severity = {
+    pass: 0,
+    review: 1,
+    block: 2
+  };
+
+  const pushIssue = (level, message, nextAction, workspace = null) => {
+    status = mergeLaunchWorkflowReviewStatus(status, level);
+    if (message && !issues.includes(message)) {
+      issues.push(message);
+    }
+    if (nextAction && !nextActions.includes(nextAction)) {
+      nextActions.push(nextAction);
+    }
+    const nextSeverity = severity[level] ?? 0;
+    if (workspace?.key && nextSeverity > workspaceSeverity) {
+      workspaceKey = workspace.key;
+      workspaceAutofocus = workspace.autofocus || workspaceAutofocus;
+      workspaceLabel = workspace.label || workspaceLabel;
+      workspaceSeverity = nextSeverity;
+    }
+  };
+
+  if (!accountLoginEnabled && !cardLoginEnabled) {
+    pushIssue(
+      "block",
+      "Both account login and direct-card login are disabled, so end users currently have no runtime sign-in path.",
+      "Enable account login or direct-card login in the project feature config before launch.",
+      {
+        key: "project",
+        autofocus: "features",
+        label: "Open Project Workspace"
+      }
+    );
+  }
+
+  if (policyCount <= 0) {
+    pushIssue(
+      "block",
+      "No entitlement policies exist for this project yet, so there is nothing to issue, recharge, or renew.",
+      "Create at least one duration or points policy in Developer Licenses before opening sales.",
+      {
+        key: "licenses",
+        autofocus: "policy-create",
+        label: "Open License Workspace"
+      }
+    );
+  }
+
+  if (cardLoginEnabled && freshCardCount <= 0) {
+    pushIssue(
+      accountPathReady ? "review" : "block",
+      "Direct-card login is enabled, but there are no fresh cards available for sale or activation.",
+      "Issue a new card batch for a launch policy before opening direct-card login.",
+      {
+        key: "licenses",
+        autofocus: "cards",
+        label: "Open License Workspace"
+      }
+    );
+  }
+
+  if (cardRechargeEnabled && freshCardCount <= 0) {
+    pushIssue(
+      accountPathReady || cardPathReady ? "review" : "block",
+      "Card recharge is enabled, but there are no fresh cards ready for top-up or renewal workflows.",
+      "Issue a recharge-ready card batch before opening account recharge or renewal.",
+      {
+        key: "licenses",
+        autofocus: "cards",
+        label: "Open License Workspace"
+      }
+    );
+  }
+
+  if (accountLoginEnabled && !registerEnabled && accountCount <= 0) {
+    pushIssue(
+      cardPathReady ? "review" : "block",
+      "Account login is enabled, but registration is disabled and no starter accounts exist in this project.",
+      "Either enable registration, seed starter accounts, or rely on direct-card login for first launch.",
+      {
+        key: "project",
+        autofocus: "features",
+        label: "Open Project Workspace"
+      }
+    );
+  }
+
+  if (!issues.length && activeEntitlementCount <= 0 && freshCardCount <= 0) {
+    pushIssue(
+      "review",
+      "The project has no active entitlements and no fresh card inventory yet, so first-sale operations have not been staged.",
+      "Stage at least one starter policy and one initial card batch before rollout."
+    );
+  }
+
+  if (!nextActions.length) {
+    nextActions.push("Authorization paths, policies, and starter inventory look aligned for initial rollout.");
+  }
+
+  const summary = [
+    `modes=${loginModeSummary}`,
+    `policies=${policyCount}`,
+    `freshCards=${freshCardCount}`,
+    `accounts=${accountCount}`,
+    `activeEntitlements=${activeEntitlementCount}`
+  ].join(" | ");
+
+  return {
+    status,
+    summary,
+    message: issues[0] || "Authorization paths and starter inventory look aligned for this lane.",
+    issues,
+    nextActions,
+    loginModeSummary,
+    inventory: {
+      policies: policyCount,
+      freshCards: freshCardCount,
+      redeemedCards: redeemedCardCount,
+      accounts: accountCount,
+      activeEntitlements: activeEntitlementCount
+    },
+    accountPathReady,
+    cardPathReady,
+    workspaceKey,
+    workspaceAutofocus,
+    workspaceLabel
+  };
+}
+
 function buildLaunchWorkflowChecklistPayload({
   releasePackage,
   integrationPackage,
+  authReadiness = {},
   summaryFileName = "launch-workflow.txt",
   checklistFileName = "launch-workflow-checklist.txt",
   zipFileName = "launch-workflow.zip",
@@ -2774,6 +2950,22 @@ function buildLaunchWorkflowChecklistPayload({
         checklistFileName,
         "Launch workflow checklist"
       )
+    },
+    {
+      key: "authorization_readiness",
+      label: "Authorization readiness",
+      status: authReadiness.status || "review",
+      summary: authReadiness.summary || "Review login paths, starter policies, and sellable card inventory before launch.",
+      artifact: `modes=${authReadiness.loginModeSummary || "-"} | policies=${authReadiness.inventory?.policies ?? 0} | freshCards=${authReadiness.inventory?.freshCards ?? 0} | accounts=${authReadiness.inventory?.accounts ?? 0}`,
+      nextAction: Array.isArray(authReadiness.nextActions) && authReadiness.nextActions[0]
+        ? authReadiness.nextActions[0]
+        : "Review authorization paths, policies, and card inventory before rollout.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+        authReadiness.workspaceKey || "licenses",
+        authReadiness.workspaceAutofocus || "policy-control",
+        authReadiness.workspaceLabel || "Open License Workspace"
+      ),
+      recommendedDownload: null
     },
     {
       key: "startup_bootstrap",
@@ -2859,6 +3051,7 @@ function buildLaunchWorkflowSummaryPayload({
   channel = "stable",
   releasePackage,
   integrationPackage,
+  authReadiness = {},
   workflowChecklist = {},
   fileName = "launch-workflow.json",
   summaryFileName = "launch-workflow.txt",
@@ -2941,6 +3134,11 @@ function buildLaunchWorkflowSummaryPayload({
   if (clientHardening.nextAction) {
     nextActions.push(clientHardening.nextAction);
   }
+  for (const item of Array.isArray(authReadiness.nextActions) ? authReadiness.nextActions.slice(0, 2) : []) {
+    if (!nextActions.includes(item)) {
+      nextActions.push(item);
+    }
+  }
   if (!nextActions.length) {
     nextActions.push("Download the recommended handoff zip and review the launch checklist before rollout.");
   } else if (workflowStatus === "ready") {
@@ -2955,6 +3153,11 @@ function buildLaunchWorkflowSummaryPayload({
   }
   if (startupDecision.ready === false && startupDecision.message) {
     blockers.push(`startup: ${startupDecision.message}`);
+  }
+  if (authReadiness.status === "block") {
+    for (const item of Array.isArray(authReadiness.issues) ? authReadiness.issues.slice(0, 3) : []) {
+      blockers.push(`authorization: ${item}`);
+    }
   }
 
   const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
@@ -3032,6 +3235,16 @@ function buildLaunchWorkflowSummaryPayload({
       autofocus: "hardening"
     });
   }
+  if (authReadiness.status === "block" || authReadiness.status === "review") {
+    pushWorkspaceAction({
+      key: authReadiness.workspaceKey || "licenses",
+      label: authReadiness.workspaceLabel
+        || ((authReadiness.workspaceKey || "licenses") === "project" ? "Open Project Workspace" : "Open License Workspace"),
+      priority: workspaceActions.length ? "secondary" : "primary",
+      reason: authReadiness.message || "Review authorization paths and starter inventory before launch.",
+      autofocus: authReadiness.workspaceAutofocus || "policy-control"
+    });
+  }
   pushWorkspaceAction({
     key: "launch",
     label: "Stay in Launch Workflow",
@@ -3079,6 +3292,48 @@ function buildLaunchWorkflowSummaryPayload({
       recommendedDownload: item.recommendedDownload || null
     }));
   }
+  if (
+    (startupDecision.ready === false || tokenKeyTotal === 0 || clientHardening.profile !== "strict")
+    && !actionPlan.some((item) => item.workspaceAction?.key === "integration")
+  ) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "integration_follow_up",
+      title: "Clear integration-side launch blockers",
+      summary: startupDecision.recommendedAction
+        || startupDecision.message
+        || clientHardening.nextAction
+        || "Review startup bootstrap, token key coverage, and host-side hardening before launch.",
+      status: startupDecision.ready === false ? "block" : "review",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("integration", startupDecision.ready === false ? "startup" : "hardening"),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        startupDecision.ready === false ? "integration_env" : "integration_host_skeleton",
+        startupDecision.ready === false
+          ? (integrationPackage?.snippets?.envFileName || "project.env")
+          : (integrationPackage?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"),
+        startupDecision.ready === false ? "Integration env" : "Host skeleton"
+      )
+    }));
+  }
+  if (
+    (authReadiness.status === "block" || authReadiness.status === "review")
+    && !actionPlan.some((item) => item.workspaceAction?.key === (authReadiness.workspaceKey || "licenses"))
+  ) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "authorization_follow_up",
+      title: "Finish authorization staging",
+      summary: Array.isArray(authReadiness.nextActions) && authReadiness.nextActions[0]
+        ? authReadiness.nextActions[0]
+        : (authReadiness.message || "Review starter policies, accounts, and card inventory before launch."),
+      status: authReadiness.status || "review",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+        authReadiness.workspaceKey || "licenses",
+        authReadiness.workspaceAutofocus || "policy-control",
+        authReadiness.workspaceLabel || "Open License Workspace"
+      )
+    }));
+  }
   if (!actionPlan.length) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_handoff_zip",
@@ -3119,6 +3374,11 @@ function buildLaunchWorkflowSummaryPayload({
     startupReady: startupDecision.ready !== false,
     clientHardeningProfile: clientHardening.profile || "unknown",
     clientHardeningTitle: clientHardening.title || null,
+    authorizationStatus: authReadiness.status || "unknown",
+    authorizationSummary: authReadiness.summary || null,
+    authorizationMessage: authReadiness.message || null,
+    authorizationModeSummary: authReadiness.loginModeSummary || null,
+    authorizationInventory: authReadiness.inventory || {},
     checklistStatus: workflowChecklist.status || "unknown",
     checklistCounts: {
       pass: workflowChecklist.passItems ?? 0,
@@ -3157,6 +3417,8 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     `Candidate Version: ${workflowSummary.candidateVersion || "-"}`,
     `Release Status: ${String(workflowSummary.releaseStatus || "unknown").toUpperCase()}`,
     `Startup Status: ${String(workflowSummary.startupStatus || "unknown").toUpperCase()}`,
+    `Authorization Status: ${String(workflowSummary.authorizationStatus || "unknown").toUpperCase()}`,
+    `Authorization Summary: ${workflowSummary.authorizationSummary || "-"}`,
     `Client Hardening: ${String(workflowSummary.clientHardeningProfile || "unknown").toUpperCase()}`,
     `Token Keys: ${workflowSummary.tokenKeyTotal ?? 0}${workflowSummary.activeKeyId ? ` | active=${workflowSummary.activeKeyId}` : ""}`,
     `Checklist: ${String(workflowChecklist.status || "unknown").toUpperCase()} | pass=${workflowChecklist.passItems ?? 0} | review=${workflowChecklist.reviewItems ?? 0} | block=${workflowChecklist.blockItems ?? 0}`,
@@ -3278,7 +3540,8 @@ function buildLaunchWorkflowPackagePayload({
   product,
   channel = "stable",
   releasePackage,
-  integrationPackage
+  integrationPackage,
+  authReadiness = {}
 }) {
   const normalizedChannel = normalizeChannel(channel);
   const timestampTag = buildExportTimestampTag(generatedAt);
@@ -3291,6 +3554,7 @@ function buildLaunchWorkflowPackagePayload({
   const workflowChecklist = buildLaunchWorkflowChecklistPayload({
     releasePackage,
     integrationPackage,
+    authReadiness,
     summaryFileName,
     checklistFileName,
     zipFileName,
@@ -3302,6 +3566,7 @@ function buildLaunchWorkflowPackagePayload({
     channel: normalizedChannel,
     releasePackage,
     integrationPackage,
+    authReadiness,
     workflowChecklist,
     fileName,
     summaryFileName,
@@ -3328,6 +3593,7 @@ function buildLaunchWorkflowPackagePayload({
         ? product.featureConfig
         : {}
     },
+    authorizationReadiness: authReadiness,
     workflowSummary,
     workflowChecklist,
     snippets: {
@@ -3354,6 +3620,7 @@ function buildLaunchWorkflowPackagePayload({
     handoffZipFileName,
     handoffChecksumsFileName,
     manifest,
+    authorizationReadiness: authReadiness,
     workflowSummary,
     workflowChecklist,
     releasePackage,
@@ -11793,6 +12060,33 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         this.developerIntegrationPackage(token, selector, options)
       ]);
       const project = releasePackage?.manifest?.project || integrationPackage?.manifest?.project || {};
+      const businessMetrics = project?.id
+        ? await queryProductBusinessMetricMaps(
+            db,
+            store,
+            [project.id],
+            releasePackage?.manifest?.generatedAt || integrationPackage?.manifest?.generatedAt || nowIso()
+          )
+        : null;
+      const projectMetricKey = String(project?.id ?? "");
+      const authReadiness = buildLaunchWorkflowAuthorizationReadiness({
+        product: {
+          id: project.id,
+          code: project.code,
+          name: project.name,
+          status: project.status,
+          featureConfig: project.featureConfig && typeof project.featureConfig === "object"
+            ? project.featureConfig
+            : {}
+        },
+        metrics: {
+          policies: businessMetrics?.policyCounts?.get(projectMetricKey) ?? 0,
+          cardsFresh: businessMetrics?.freshCardCounts?.get(projectMetricKey) ?? 0,
+          cardsRedeemed: businessMetrics?.redeemedCardCounts?.get(projectMetricKey) ?? 0,
+          accounts: businessMetrics?.accountCounts?.get(projectMetricKey) ?? 0,
+          activeEntitlements: businessMetrics?.activeEntitlementCounts?.get(projectMetricKey) ?? 0
+        }
+      });
       const payload = buildLaunchWorkflowPackagePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || integrationPackage?.manifest?.generatedAt || nowIso(),
         developer: releasePackage?.manifest?.developer || integrationPackage?.manifest?.developer || null,
@@ -11812,7 +12106,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         },
         channel: releasePackage?.manifest?.release?.channel || selector.channel || "stable",
         releasePackage,
-        integrationPackage
+        integrationPackage,
+        authReadiness
       });
       const session = requireDeveloperSession(db, token);
       auditDeveloperSession(db, session, "product.launch-workflow.export", "product", project.id, {

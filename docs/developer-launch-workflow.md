@@ -5,6 +5,7 @@ The developer launch workflow workspace is available at `/developer/launch-workf
 It is meant to give software authors one combined place to inspect:
 
 - release readiness for one project/channel
+- authorization readiness for one project/channel
 - startup bootstrap decisions
 - client hardening profile
 - recommended workspace routing
@@ -60,6 +61,7 @@ The launch workflow package combines:
 
 - the linked release package
 - the linked integration package
+- authorization-readiness checks for login paths, starter policies, and starter card inventory
 - workflow-level summary text
 - workflow checklist text
 - a curated recommended handoff zip for teammates
@@ -99,6 +101,8 @@ The same page now also keeps the most common lane-specific handoff files one cli
 The same handoff summary can now also render the top `recommendedDownloads` as direct buttons. That keeps the lane-specific handoff zip, launch summary/checklist, release summary, and integration host files one click away from the workflow summary itself.
 
 The checklist section is now actionable too. Each top workflow check can expose its own workspace jump and download shortcut, so release-readiness, startup, hardening, token-key, and handoff tasks can be handled straight from the checklist card instead of only from the summary header.
+
+That same checklist now includes an authorization-readiness check. It verifies whether the current project still needs starter policies, sellable cards, or a first-launch login path, and it can route software authors directly into `/developer/licenses` or back into `/developer/projects` when those are the fastest fixes.
 
 The launch workflow summary itself now also derives an `Action Plan`. It takes the highest-priority blocked or review items, turns them into a short ordered path, and lets the software author jump to the right workspace or download the right file from that path directly.
 

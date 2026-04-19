@@ -2098,6 +2098,17 @@
           });
           return;
         }
+        if (action.key === "licenses") {
+          window.location.href = buildWorkspaceUrl("/developer/licenses", {
+            productId,
+            productCode,
+            channel,
+            autofocus: action.autofocus || "policy-control",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
+          });
+          return;
+        }
         window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           productId,
           productCode,

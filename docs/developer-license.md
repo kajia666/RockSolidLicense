@@ -4,6 +4,14 @@ The developer license workspace is available at `/developer/licenses`.
 
 It is designed for software authors who need to manage policies and card inventory inside their own project scope without opening the admin backoffice.
 
+The same page now also accepts routed query parameters such as `productId`, `productCode`, `channel`, `autofocus`, `routeTitle`, and `routeReason`. That lets `/developer/launch-workflow`, `/developer/projects`, or other routed actions drop a software author directly into:
+
+- starter policy creation
+- policy runtime / unbind controls
+- starter card inventory and card status
+
+without losing the current project context.
+
 ## Scope
 
 - owners can manage every product they own
@@ -97,3 +105,14 @@ That keeps the page and exported inventory inside the current developer scope wh
 - `summary` gives a human-readable project and batch recap for support handoff.
 - `checksums` emits SHA-256 digests for the generated JSON, summary, and CSV files.
 - `zip` bundles JSON, summary, CSV, and `SHA256SUMS.txt` into one delivery archive.
+
+## Routed launch fixes
+
+Launch workflow can now send a software author straight into this page when authorization-readiness detects:
+
+- no starter policies
+- no fresh cards for direct-card login
+- no fresh cards for recharge / renewal
+- no viable first-launch account path
+
+When that happens, the page renders a `Route Focus` card, prefills the routed project code, and can scroll to the relevant policy or card controls so the author can fix the blocker faster.

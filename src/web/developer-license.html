@@ -21,6 +21,7 @@
         </div>
         <div class="stats" id="stats-box"></div>
         <div class="project-list" id="project-list"></div>
+        <div class="hint" id="route-focus-box">Open this page from launch workflow or a routed workspace action to focus starter policies, runtime controls, or card inventory for the current project.</div>
       </section>
 
       <section class="grid">
@@ -126,43 +127,804 @@
     </main>
 
     <script>
-      let token="",actor=null,profile=null,products=[],policies=[],cards=[];const el=(id)=>document.getElementById(id);const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");const setStatus=(m,w=false)=>{const box=el("status-box");box.textContent=m;box.className=`status${w?" warn":""}`};const setOutput=(v)=>{el("output").textContent=typeof v==="string"?v:JSON.stringify(v,null,2)};const fmt=(v)=>{if(!v)return"-";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString("zh-CN",{hour12:false})};const tag=(v,t="")=>`<span class="tag${t?` ${t}`:""}">${esc(v)}</span>`;const q=(params)=>{const s=new URLSearchParams();Object.entries(params).forEach(([k,v])=>{if(v!==null&&v!==undefined&&String(v).trim()!=="")s.set(k,String(v).trim())});const r=s.toString();return r?`?${r}`:""};const csv=(value)=>String(value??"").split(/[,\n]+/).map((item)=>item.trim()).filter(Boolean);const bool=(id)=>el(id).value==="true";
-      function filters(){return{productCode:el("filter-product-code").value.trim(),policyId:el("filter-policy-id").value.trim(),batchCode:el("filter-batch-code").value.trim(),usageStatus:el("filter-usage-status").value,status:el("filter-status").value,search:el("filter-search").value.trim()}}
-      function setMeta(){if(!token||!profile){el("session-meta").textContent="No developer session yet.";return}const actorLabel=actor?.type==="member"?`${actor.username} (${actor.role})`:profile.username;const scopeLabel=actor?.type==="member"?`member scope: ${(actor.productAccess||[]).map((i)=>i.productCode).join(", ")||"no projects"}`:"owner scope";el("session-meta").textContent=`${actorLabel} | ${scopeLabel} | status=${profile.status||"active"}`}
-      async function api(path,options={}){const headers={...(options.headers||{})};if(options.body!==undefined)headers["Content-Type"]="application/json";if(token)headers.Authorization=`Bearer ${token}`;const response=await fetch(path,{method:options.method||"GET",headers,body:options.body!==undefined?JSON.stringify(options.body):undefined});const payload=await response.json().catch(()=>({}));if(!response.ok||payload.ok===false){const error=new Error(payload?.error?.message||`Request failed: ${response.status}`);error.code=payload?.error?.code||"REQUEST_FAILED";throw error}return payload.data}
-      async function apiText(path){const headers={};if(token)headers.Authorization=`Bearer ${token}`;const response=await fetch(path,{headers});const contentType=response.headers.get("content-type")||"";if(!response.ok||contentType.includes("application/json")){const payload=await response.json().catch(()=>({}));const error=new Error(payload?.error?.message||`Request failed: ${response.status}`);error.code=payload?.error?.code||"REQUEST_FAILED";throw error}return response.text()}
-      function downloadBlob(name,blob){const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),0)}
-      function fileNameFromDisposition(value,fallback){const match=String(value||"").match(/filename="?([^";]+)"?/i);return match?.[1]||fallback}
-      async function downloadApiFile(path,fallback,label){const headers={};if(token)headers.Authorization=`Bearer ${token}`;const response=await fetch(path,{headers});if(!response.ok){const payload=await response.json().catch(()=>({}));const error=new Error(payload?.error?.message||`Request failed: ${response.status}`);error.code=payload?.error?.code||"REQUEST_FAILED";throw error}const blob=await response.blob();const fileName=fileNameFromDisposition(response.headers.get("content-disposition"),fallback);downloadBlob(fileName,blob);setStatus(`${label} generated for the current scoped filters.`);setOutput({download:fileName,label,filters:filters()});return{fileName}}
-      function renderStats(){const activePolicies=policies.filter((i)=>i.status==="active").length;const freshCards=cards.filter((i)=>i.usageStatus==="unused").length;const redeemedCards=cards.filter((i)=>i.usageStatus==="used").length;const blockedCards=cards.filter((i)=>i.available===false).length;el("stats-box").innerHTML=`<div class="stat"><strong>${products.length}</strong><span>Scoped Projects</span></div><div class="stat"><strong>${policies.length}</strong><span>Policies</span></div><div class="stat"><strong>${activePolicies}</strong><span>Active Policies</span></div><div class="stat"><strong>${cards.length}</strong><span>Visible Cards</span></div><div class="stat"><strong>${freshCards}</strong><span>Fresh Cards</span></div><div class="stat"><strong>${redeemedCards}</strong><span>Redeemed Cards</span></div><div class="stat"><strong>${blockedCards}</strong><span>Unavailable Cards</span></div>`}
-      function renderProjects(){el("project-list").innerHTML=products.length?products.map((item)=>`<div class="project-pill"><strong>${esc(item.code)}</strong><span>${esc(item.name)}</span></div>`).join(""):`<div class="pill">No scoped projects loaded yet.</div>`}
-      function fillPolicy(item){el("control-policy-id").value=item.id||"";el("runtime-allow-concurrent").value=String(item.allowConcurrentSessions===true);el("runtime-bind-mode").value=item.bindMode||"strict";el("runtime-bind-fields").value=Array.isArray(item.bindFields)?item.bindFields.join(", "):"";el("unbind-allow-client").value=String(item.allowClientUnbind===true);el("unbind-limit").value=String(item.clientUnbindLimit??0);el("unbind-window").value=String(item.clientUnbindWindowDays??30);el("unbind-deduct").value=String(item.clientUnbindDeductDays??0);el("batch-product-code").value=item.productCode||"";el("batch-policy-id").value=item.id||""}
-      function renderPolicies(){const body=el("policy-body");if(!policies.length){body.innerHTML=`<tr><td colspan="5">No scoped policies found.</td></tr>`;return}body.innerHTML=policies.map((item)=>{const grant=item.grantType==="points"?`points ${item.grantPoints}`:`${item.durationDays} days`;return`<tr data-id="${esc(item.id)}"><td><strong>${esc(item.name)}</strong><div class="mono">${esc(item.id)}</div><div>${tag(item.status,item.status==="active"?"ok":"danger")}</div></td><td>${esc(item.productCode)}<div>${esc(item.productName||"")}</div></td><td>${esc(grant)}</td><td>${tag(`maxDevices ${item.maxDevices}`)}${tag(`concurrent ${item.allowConcurrentSessions===true}`)}${tag(item.bindMode)}</td><td>${tag(`allow ${item.allowClientUnbind===true}`)}${tag(`limit ${item.clientUnbindLimit??0}`)}${tag(`window ${item.clientUnbindWindowDays??30}d`)}</td></tr>`}).join("");for(const row of body.querySelectorAll("tr[data-id]")){row.addEventListener("click",()=>{const item=policies.find((p)=>p.id===row.dataset.id);if(item){fillPolicy(item);setOutput(item)}})}}
-      function renderCards(){const body=el("card-body");if(!cards.length){body.innerHTML=`<tr><td colspan="5">No scoped cards found.</td></tr>`;return}body.innerHTML=cards.map((item)=>`<tr data-id="${esc(item.id)}" data-status="${esc(item.controlStatus||"active")}" data-expires-at="${esc(item.expiresAt||"")}" data-notes="${esc(item.notes||"")}"><td><strong>${esc(item.maskedKey||item.cardKey)}</strong><div class="mono">${esc(item.id)}</div><div>${esc(item.cardKey||"")}</div></td><td>${esc(item.productCode||"-")}</td><td>${esc(item.policyName||"-")}<div>${esc(item.grantType||"-")}</div></td><td>${tag(item.displayStatus||item.controlStatus||"unknown",item.available===false?"danger":"ok")}<div>${esc(item.redeemedUsername||"-")}</div></td><td>${esc(item.batchCode||"-")}<div>${esc(fmt(item.issuedAt))}</div></td></tr>`).join("");for(const row of body.querySelectorAll("tr[data-id]")){row.addEventListener("click",()=>{el("card-id").value=row.dataset.id||"";el("card-status").value=row.dataset.status||"active";el("card-expires-at").value=row.dataset.expiresAt||"";el("card-notes").value=row.dataset.notes||"";const item=cards.find((c)=>c.id===row.dataset.id);if(item)setOutput(item)})}}
-      function clear(){token="";actor=null;profile=null;products=[];policies=[];cards=[];setMeta();renderProjects();renderStats();renderPolicies();renderCards()}
-      async function refreshProfile(){const data=await api("/api/developer/me");profile=data.developer;actor=data.actor||null;setMeta()}
-      async function refreshProducts(){const data=await api("/api/developer/products");products=data.items||[];renderProjects();return data}
-      async function refreshPolicies(){const data=await api(`/api/developer/policies${q({productCode:filters().productCode})}`);policies=data.items||[];renderPolicies();return data}
-      async function refreshCards(){const data=await api(`/api/developer/cards${q(filters())}`);cards=data.items||[];renderCards();return data}
-      async function refresh(){if(!token){clear();setStatus("Sign in to manage scoped policies and cards.");setOutput("Waiting for actions...");return}await refreshProfile();const [p1,p2,p3]=await Promise.all([refreshProducts(),refreshPolicies(),refreshCards()]);renderStats();setOutput({products:p1,policies:p2,cards:p3})}
-      async function postAndRefresh(path,body,message){const data=await api(path,{method:"POST",body});await refresh();setStatus(message);setOutput(data)}
-      el("policy-grant-type").addEventListener("change",()=>{const isPoints=el("policy-grant-type").value==="points";el("policy-duration-days").disabled=isPoints;el("policy-grant-points").disabled=!isPoints});
-      el("login-btn").addEventListener("click",async()=>{try{const session=await api("/api/developer/login",{method:"POST",body:{username:el("username").value.trim(),password:el("password").value}});token=session.token;await refresh();setStatus("Developer license workspace loaded.")}catch(error){clear();setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("refresh-btn").addEventListener("click",async()=>{try{await refresh();setStatus("Developer license workspace refreshed.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("logout-btn").addEventListener("click",async()=>{try{if(token)await api("/api/developer/logout",{method:"POST"});clear();setStatus("Developer session closed.");setOutput("Logged out.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("apply-filters-btn").addEventListener("click",async()=>{try{await refresh();setStatus("Filters applied.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("clear-filters-btn").addEventListener("click",async()=>{for(const id of["filter-product-code","filter-policy-id","filter-batch-code","filter-usage-status","filter-status","filter-search"]){el(id).value=""}try{await refresh();setStatus("Filters cleared.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("export-csv-btn").addEventListener("click",async()=>{try{await downloadApiFile(`/api/developer/cards/export/download${q({...filters(),format:"csv"})}`,"developer-cards.csv","CSV export")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("export-json-btn").addEventListener("click",async()=>{try{await downloadApiFile(`/api/developer/cards/export/download${q({...filters(),format:"json"})}`,"developer-cards.json","JSON export")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("export-summary-btn").addEventListener("click",async()=>{try{await downloadApiFile(`/api/developer/cards/export/download${q({...filters(),format:"summary"})}`,"developer-cards-summary.txt","Summary export")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("export-checksums-btn").addEventListener("click",async()=>{try{await downloadApiFile(`/api/developer/cards/export/download${q({...filters(),format:"checksums"})}`,"developer-cards-sha256.txt","Checksums export")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("export-zip-btn").addEventListener("click",async()=>{try{await downloadApiFile(`/api/developer/cards/export/download${q({...filters(),format:"zip"})}`,"developer-cards.zip","Zip export")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("create-policy-btn").addEventListener("click",async()=>{try{const grantType=el("policy-grant-type").value;await postAndRefresh("/api/developer/policies",{productCode:el("policy-product-code").value.trim(),name:el("policy-name").value.trim(),grantType,durationDays:grantType==="points"?0:Number(el("policy-duration-days").value||0),grantPoints:grantType==="points"?Number(el("policy-grant-points").value||0):0,maxDevices:Number(el("policy-max-devices").value||1),allowConcurrentSessions:bool("policy-allow-concurrent"),heartbeatIntervalSeconds:Number(el("policy-heartbeat-interval").value||60),heartbeatTimeoutSeconds:Number(el("policy-heartbeat-timeout").value||180),tokenTtlSeconds:Number(el("policy-token-ttl").value||300),bindMode:el("policy-bind-mode").value,bindFields:csv(el("policy-bind-fields").value),allowClientUnbind:bool("policy-allow-unbind"),clientUnbindLimit:Number(el("policy-unbind-limit").value||0),clientUnbindWindowDays:Number(el("policy-unbind-window").value||30),clientUnbindDeductDays:Number(el("policy-unbind-deduct").value||0)},"Policy created.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("save-runtime-btn").addEventListener("click",async()=>{try{await postAndRefresh(`/api/developer/policies/${encodeURIComponent(el("control-policy-id").value.trim())}/runtime-config`,{allowConcurrentSessions:bool("runtime-allow-concurrent"),bindMode:el("runtime-bind-mode").value,bindFields:csv(el("runtime-bind-fields").value)},"Policy runtime config updated.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("save-unbind-btn").addEventListener("click",async()=>{try{await postAndRefresh(`/api/developer/policies/${encodeURIComponent(el("control-policy-id").value.trim())}/unbind-config`,{allowClientUnbind:bool("unbind-allow-client"),clientUnbindLimit:Number(el("unbind-limit").value||0),clientUnbindWindowDays:Number(el("unbind-window").value||30),clientUnbindDeductDays:Number(el("unbind-deduct").value||0)},"Policy unbind config updated.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("create-batch-btn").addEventListener("click",async()=>{try{await postAndRefresh("/api/developer/cards/batch",{productCode:el("batch-product-code").value.trim(),policyId:el("batch-policy-id").value.trim(),count:Number(el("batch-count").value||1),prefix:el("batch-prefix").value.trim(),expiresAt:el("batch-expires-at").value.trim()||null,notes:el("batch-notes").value.trim()},"Card batch issued.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("save-card-status-btn").addEventListener("click",async()=>{try{await postAndRefresh(`/api/developer/cards/${encodeURIComponent(el("card-id").value.trim())}/status`,{status:el("card-status").value,expiresAt:el("card-expires-at").value.trim()||null,notes:el("card-notes").value.trim()},"Card status updated.")}catch(error){setStatus(`${error.code}: ${error.message}`,true);setOutput({code:error.code,message:error.message})}});
-      el("policy-grant-type").dispatchEvent(new Event("change"));clear();renderProjects();renderStats();renderPolicies();renderCards();setOutput("Waiting for actions...");
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+
+      let token = "";
+      let actor = null;
+      let profile = null;
+      let products = [];
+      let policies = [];
+      let cards = [];
+
+      const el = (id) => document.getElementById(id);
+
+      function esc(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+
+      function fmt(value) {
+        if (!value) {
+          return "-";
+        }
+        const date = new Date(value);
+        return Number.isNaN(date.getTime())
+          ? String(value)
+          : date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function tag(value, tone = "") {
+        return `<span class="tag${tone ? ` ${tone}` : ""}">${esc(value)}</span>`;
+      }
+
+      function q(params) {
+        const search = new URLSearchParams();
+        for (const [key, value] of Object.entries(params || {})) {
+          if (value !== null && value !== undefined && String(value).trim() !== "") {
+            search.set(key, String(value).trim());
+          }
+        }
+        const query = search.toString();
+        return query ? `?${query}` : "";
+      }
+
+      function buildWorkspaceUrl(path, params = {}) {
+        return `${path}${q(params)}`;
+      }
+
+      function csv(value) {
+        return String(value ?? "")
+          .split(/[,\n]+/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+
+      function bool(id) {
+        return el(id).value === "true";
+      }
+
+      function filters() {
+        return {
+          productCode: el("filter-product-code").value.trim(),
+          policyId: el("filter-policy-id").value.trim(),
+          batchCode: el("filter-batch-code").value.trim(),
+          usageStatus: el("filter-usage-status").value,
+          status: el("filter-status").value,
+          search: el("filter-search").value.trim()
+        };
+      }
+
+      function currentRouteProductCode() {
+        return (
+          el("filter-product-code").value.trim()
+          || el("policy-product-code").value.trim()
+          || el("batch-product-code").value.trim()
+          || requestedProductCode
+        ).trim();
+      }
+
+      function findRouteProduct(productCode = currentRouteProductCode()) {
+        const normalizedCode = String(productCode || "").trim().toUpperCase();
+        if (!normalizedCode) {
+          return null;
+        }
+        return products.find((item) => String(item.code || "").trim().toUpperCase() === normalizedCode) || null;
+      }
+
+      function currentLicenseTarget() {
+        const productCode = currentRouteProductCode();
+        const product = findRouteProduct(productCode);
+        return {
+          productId: String(product?.id || requestedProductId || "").trim(),
+          productCode,
+          channel: requestedChannel
+        };
+      }
+
+      function currentLicenseAutofocusTarget() {
+        const target = requestedAutofocus || "filters";
+        if (target === "policy-create") {
+          return "create-policy-btn";
+        }
+        if (target === "policy-control" || target === "runtime" || target === "unbind") {
+          return "save-runtime-btn";
+        }
+        if (target === "cards" || target === "card-batch" || target === "card-inventory") {
+          return "create-batch-btn";
+        }
+        if (target === "card-status") {
+          return "save-card-status-btn";
+        }
+        return "apply-filters-btn";
+      }
+
+      function focusLicenseAutofocusTarget() {
+        const node = el(currentLicenseAutofocusTarget());
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function shouldAutoFocusLicenseWorkspace() {
+        return Boolean(token && requestedProductCode && requestedAutofocus);
+      }
+
+      function currentLicenseMatchesRequestedRoute() {
+        if (!requestedProductCode) {
+          return false;
+        }
+        return currentRouteProductCode().toUpperCase() === requestedProductCode.toUpperCase();
+      }
+
+      function applyRoutePrefill() {
+        if (!requestedProductCode) {
+          return;
+        }
+        el("filter-product-code").value = requestedProductCode;
+        if (!el("policy-product-code").value.trim()) {
+          el("policy-product-code").value = requestedProductCode;
+        }
+        if (!el("batch-product-code").value.trim()) {
+          el("batch-product-code").value = requestedProductCode;
+        }
+      }
+
+      function currentLicenseRouteFocus() {
+        const target = requestedAutofocus || "filters";
+        if (target === "policy-create") {
+          return {
+            title: "Starter policy focus",
+            summary: "Create at least one starter duration or points policy so the launch lane has something to issue, recharge, or renew.",
+            actions: [
+              { key: "fill-route-product", label: "Use Routed Project" },
+              { key: "scroll-target", label: "Jump To Policy Form" },
+              { key: "apply-filters", label: "Refresh Scoped Inventory" },
+              { key: "open-launch", label: "Back To Launch Workflow" }
+            ]
+          };
+        }
+        if (target === "policy-control" || target === "runtime" || target === "unbind") {
+          return {
+            title: "Policy runtime focus",
+            summary: "Review concurrency rules, bind fields, and unbind policy for the starter entitlement plan before launch.",
+            actions: [
+              { key: "fill-route-product", label: "Use Routed Project" },
+              { key: "apply-filters", label: "Load Project Policies" },
+              { key: "scroll-target", label: "Jump To Runtime Controls" },
+              { key: "open-project", label: "Open Project Workspace" },
+              { key: "open-launch", label: "Back To Launch Workflow" }
+            ]
+          };
+        }
+        if (target === "cards" || target === "card-batch" || target === "card-inventory" || target === "card-status") {
+          return {
+            title: "Card inventory focus",
+            summary: "Issue or adjust sellable cards for this project so direct-card login or recharge flows have real starter inventory.",
+            actions: [
+              { key: "fill-route-product", label: "Use Routed Project" },
+              { key: "apply-filters", label: "Load Project Cards" },
+              { key: "scroll-target", label: "Jump To Card Controls" },
+              { key: "open-project", label: "Open Project Workspace" },
+              { key: "open-launch", label: "Back To Launch Workflow" }
+            ]
+          };
+        }
+        return {
+          title: "License workspace focus",
+          summary: "Use this page to review starter policies, card inventory, and scoped exports for the current project before launch.",
+          actions: [
+            { key: "fill-route-product", label: "Use Routed Project" },
+            { key: "apply-filters", label: "Refresh Scoped Inventory" },
+            { key: "scroll-target", label: "Jump To Filters" },
+            { key: "open-project", label: "Open Project Workspace" },
+            { key: "open-launch", label: "Back To Launch Workflow" }
+          ]
+        };
+      }
+
+      function renderLicenseRouteFocus() {
+        const focus = currentLicenseRouteFocus();
+        const target = currentLicenseTarget();
+        const visibleProduct = findRouteProduct(target.productCode);
+        const hasProduct = Boolean(target.productCode);
+        const actions = Array.isArray(focus.actions) ? focus.actions : [];
+        el("route-focus-box").innerHTML = `
+          <div>${tag(focus.title || "License route focus", hasProduct ? "ok" : "")} ${requestedRouteTitle ? tag(`from:${requestedRouteTitle}`, "ok") : ""} ${requestedAutofocus ? tag(`focus:${requestedAutofocus}`) : ""} ${tag(`channel:${target.channel || requestedChannel}`, "ok")}</div>
+          ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
+          <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${visibleProduct?.code || target.productCode}.` : `${focus.summary} Route a project or choose one in filters first.`)}</div>
+          ${actions.length ? `
+            <div class="actions" style="margin-top:12px;">
+              ${actions.map((item) => {
+                const needsProduct = item.key === "open-project" || item.key === "open-launch";
+                const needsSession = item.key === "apply-filters";
+                const disabled = (needsProduct && !hasProduct) || (needsSession && !token);
+                return `<button type="button" class="${item.key === "open-launch" ? "secondary" : ""}" data-license-route-focus-action="${esc(item.key)}" ${disabled ? "disabled" : ""}>${esc(item.label || item.key)}</button>`;
+              }).join("")}
+            </div>
+          ` : ""}
+        `;
+      }
+
+      function setMeta() {
+        if (!token || !profile) {
+          el("session-meta").textContent = "No developer session yet.";
+          return;
+        }
+        const actorLabel = actor?.type === "member" ? `${actor.username} (${actor.role})` : profile.username;
+        const scopeLabel = actor?.type === "member"
+          ? `member scope: ${(actor.productAccess || []).map((item) => item.productCode).join(", ") || "no projects"}`
+          : "owner scope";
+        el("session-meta").textContent = `${actorLabel} | ${scopeLabel} | status=${profile.status || "active"}`;
+      }
+
+      async function api(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (options.body !== undefined) {
+          headers["Content-Type"] = "application/json";
+        }
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers,
+          body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.ok === false) {
+          const error = new Error(payload?.error?.message || `Request failed: ${response.status}`);
+          error.code = payload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        return payload.data;
+      }
+
+      function downloadBlob(name, blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+
+      function fileNameFromDisposition(value, fallback) {
+        const match = String(value || "").match(/filename="?([^";]+)"?/i);
+        return match?.[1] || fallback;
+      }
+
+      async function downloadApiFile(path, fallback, label) {
+        const headers = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        const response = await fetch(path, { headers });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const error = new Error(payload?.error?.message || `Request failed: ${response.status}`);
+          error.code = payload?.error?.code || "REQUEST_FAILED";
+          throw error;
+        }
+        const blob = await response.blob();
+        const fileName = fileNameFromDisposition(response.headers.get("content-disposition"), fallback);
+        downloadBlob(fileName, blob);
+        setStatus(`${label} generated for the current scoped filters.`);
+        setOutput({ download: fileName, label, filters: filters() });
+        return { fileName };
+      }
+
+      function renderStats() {
+        const activePolicies = policies.filter((item) => item.status === "active").length;
+        const freshCards = cards.filter((item) => item.usageStatus === "unused").length;
+        const redeemedCards = cards.filter((item) => item.usageStatus === "used").length;
+        const blockedCards = cards.filter((item) => item.available === false).length;
+        el("stats-box").innerHTML = `
+          <div class="stat"><strong>${products.length}</strong><span>Scoped Projects</span></div>
+          <div class="stat"><strong>${policies.length}</strong><span>Policies</span></div>
+          <div class="stat"><strong>${activePolicies}</strong><span>Active Policies</span></div>
+          <div class="stat"><strong>${cards.length}</strong><span>Visible Cards</span></div>
+          <div class="stat"><strong>${freshCards}</strong><span>Fresh Cards</span></div>
+          <div class="stat"><strong>${redeemedCards}</strong><span>Redeemed Cards</span></div>
+          <div class="stat"><strong>${blockedCards}</strong><span>Unavailable Cards</span></div>
+        `;
+      }
+
+      function renderProjects() {
+        el("project-list").innerHTML = products.length
+          ? products.map((item) => `<div class="project-pill"><strong>${esc(item.code)}</strong><span>${esc(item.name)}</span></div>`).join("")
+          : `<div class="pill">No scoped projects loaded yet.</div>`;
+      }
+
+      function fillPolicy(item) {
+        el("control-policy-id").value = item.id || "";
+        el("runtime-allow-concurrent").value = String(item.allowConcurrentSessions === true);
+        el("runtime-bind-mode").value = item.bindMode || "strict";
+        el("runtime-bind-fields").value = Array.isArray(item.bindFields) ? item.bindFields.join(", ") : "";
+        el("unbind-allow-client").value = String(item.allowClientUnbind === true);
+        el("unbind-limit").value = String(item.clientUnbindLimit ?? 0);
+        el("unbind-window").value = String(item.clientUnbindWindowDays ?? 30);
+        el("unbind-deduct").value = String(item.clientUnbindDeductDays ?? 0);
+        el("batch-product-code").value = item.productCode || "";
+        el("batch-policy-id").value = item.id || "";
+      }
+
+      function fillCard(item) {
+        el("card-id").value = item.id || "";
+        el("card-status").value = item.controlStatus || "active";
+        el("card-expires-at").value = item.expiresAt || "";
+        el("card-notes").value = item.notes || "";
+      }
+
+      function renderPolicies() {
+        const body = el("policy-body");
+        if (!policies.length) {
+          body.innerHTML = `<tr><td colspan="5">No scoped policies found.</td></tr>`;
+          return;
+        }
+        body.innerHTML = policies.map((item) => {
+          const grant = item.grantType === "points"
+            ? `points ${item.grantPoints}`
+            : `${item.durationDays} days`;
+          return `
+            <tr data-id="${esc(item.id)}">
+              <td><strong>${esc(item.name)}</strong><div class="mono">${esc(item.id)}</div><div>${tag(item.status, item.status === "active" ? "ok" : "danger")}</div></td>
+              <td>${esc(item.productCode)}<div>${esc(item.productName || "")}</div></td>
+              <td>${esc(grant)}</td>
+              <td>${tag(`maxDevices ${item.maxDevices}`)}${tag(`concurrent ${item.allowConcurrentSessions === true}`)}${tag(item.bindMode)}</td>
+              <td>${tag(`allow ${item.allowClientUnbind === true}`)}${tag(`limit ${item.clientUnbindLimit ?? 0}`)}${tag(`window ${item.clientUnbindWindowDays ?? 30}d`)}</td>
+            </tr>
+          `;
+        }).join("");
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            const item = policies.find((policy) => policy.id === row.dataset.id);
+            if (item) {
+              fillPolicy(item);
+              setOutput(item);
+            }
+          });
+        }
+      }
+
+      function renderCards() {
+        const body = el("card-body");
+        if (!cards.length) {
+          body.innerHTML = `<tr><td colspan="5">No scoped cards found.</td></tr>`;
+          return;
+        }
+        body.innerHTML = cards.map((item) => `
+          <tr data-id="${esc(item.id)}">
+            <td><strong>${esc(item.maskedKey || item.cardKey)}</strong><div class="mono">${esc(item.id)}</div><div>${esc(item.cardKey || "")}</div></td>
+            <td>${esc(item.productCode || "-")}</td>
+            <td>${esc(item.policyName || "-")}<div>${esc(item.grantType || "-")}</div></td>
+            <td>${tag(item.displayStatus || item.controlStatus || "unknown", item.available === false ? "danger" : "ok")}<div>${esc(item.redeemedUsername || "-")}</div></td>
+            <td>${esc(item.batchCode || "-")}<div>${esc(fmt(item.issuedAt))}</div></td>
+          </tr>
+        `).join("");
+        for (const row of body.querySelectorAll("tr[data-id]")) {
+          row.addEventListener("click", () => {
+            const item = cards.find((card) => card.id === row.dataset.id);
+            if (item) {
+              fillCard(item);
+              setOutput(item);
+            }
+          });
+        }
+      }
+
+      function clear() {
+        token = "";
+        actor = null;
+        profile = null;
+        products = [];
+        policies = [];
+        cards = [];
+        setMeta();
+        renderProjects();
+        renderStats();
+        renderPolicies();
+        renderCards();
+        renderLicenseRouteFocus();
+      }
+
+      async function refreshProfile() {
+        const data = await api("/api/developer/me");
+        profile = data.developer;
+        actor = data.actor || null;
+        setMeta();
+      }
+
+      async function refreshProducts() {
+        const data = await api("/api/developer/products");
+        products = data.items || [];
+        renderProjects();
+        return data;
+      }
+
+      async function refreshPolicies() {
+        const data = await api(`/api/developer/policies${q({ productCode: filters().productCode })}`);
+        policies = data.items || [];
+        renderPolicies();
+        return data;
+      }
+
+      async function refreshCards() {
+        const data = await api(`/api/developer/cards${q(filters())}`);
+        cards = data.items || [];
+        renderCards();
+        return data;
+      }
+
+      async function refresh() {
+        if (!token) {
+          clear();
+          setStatus("Sign in to manage scoped policies and cards.");
+          setOutput("Waiting for actions...");
+          return;
+        }
+        await refreshProfile();
+        const [productData, policyData, cardData] = await Promise.all([
+          refreshProducts(),
+          refreshPolicies(),
+          refreshCards()
+        ]);
+        renderStats();
+        renderLicenseRouteFocus();
+        setOutput({ products: productData, policies: policyData, cards: cardData });
+      }
+
+      async function postAndRefresh(path, body, message) {
+        const data = await api(path, { method: "POST", body });
+        await refresh();
+        setStatus(message);
+        setOutput(data);
+      }
+
+      async function hydrateLicenseAutofocus() {
+        if (!requestedAutofocus) {
+          return;
+        }
+        applyRoutePrefill();
+        if (!shouldAutoFocusLicenseWorkspace()) {
+          renderLicenseRouteFocus();
+          focusLicenseAutofocusTarget();
+          return;
+        }
+        if (!currentLicenseMatchesRequestedRoute()) {
+          return;
+        }
+        const requestedCode = requestedProductCode.toUpperCase();
+        if (
+          (requestedAutofocus === "policy-control" || requestedAutofocus === "runtime" || requestedAutofocus === "unbind")
+          && !el("control-policy-id").value.trim()
+        ) {
+          const policy = policies.find((item) => String(item.productCode || "").toUpperCase() === requestedCode) || policies[0];
+          if (policy) {
+            fillPolicy(policy);
+          }
+        }
+        if (
+          (requestedAutofocus === "cards" || requestedAutofocus === "card-batch" || requestedAutofocus === "card-inventory" || requestedAutofocus === "card-status")
+          && !el("card-id").value.trim()
+        ) {
+          const card = cards.find((item) => String(item.productCode || "").toUpperCase() === requestedCode) || cards[0];
+          if (card) {
+            fillCard(card);
+          }
+        }
+        renderLicenseRouteFocus();
+        focusLicenseAutofocusTarget();
+      }
+
+      function openRoutedProjectWorkspace() {
+        const target = currentLicenseTarget();
+        if (!target.productCode) {
+          throw new Error("Route or filter a project before opening the project workspace.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/projects", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "detail",
+          routeTitle: requestedRouteTitle || currentLicenseRouteFocus().title || "License workspace handoff",
+          routeReason: requestedRouteReason || `Continue ${target.productCode} from the license workspace.`
+        });
+      }
+
+      function openRoutedLaunchWorkspace() {
+        const target = currentLicenseTarget();
+        if (!target.productCode) {
+          throw new Error("Route or filter a project before opening launch workflow.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "handoff",
+          routeTitle: requestedRouteTitle || currentLicenseRouteFocus().title || "License workspace handoff",
+          routeReason: requestedRouteReason || `Review the launch workflow for ${target.productCode} after adjusting license inventory.`
+        });
+      }
+
+      el("policy-grant-type").addEventListener("change", () => {
+        const isPoints = el("policy-grant-type").value === "points";
+        el("policy-duration-days").disabled = isPoints;
+        el("policy-grant-points").disabled = !isPoints;
+      });
+
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const session = await api("/api/developer/login", {
+            method: "POST",
+            body: {
+              username: el("username").value.trim(),
+              password: el("password").value
+            }
+          });
+          token = session.token;
+          applyRoutePrefill();
+          await refresh();
+          await hydrateLicenseAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentLicenseMatchesRequestedRoute()) {
+            setStatus("Developer license workspace loaded.");
+          } else {
+            setStatus(`Developer license workspace focused on ${currentRouteProductCode()}.`);
+          }
+        } catch (error) {
+          clear();
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("refresh-btn").addEventListener("click", async () => {
+        try {
+          applyRoutePrefill();
+          await refresh();
+          await hydrateLicenseAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentLicenseMatchesRequestedRoute()) {
+            setStatus("Developer license workspace refreshed.");
+          } else {
+            setStatus(`Developer license workspace kept in sync for ${currentRouteProductCode()}.`);
+          }
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("logout-btn").addEventListener("click", async () => {
+        try {
+          if (token) {
+            await api("/api/developer/logout", { method: "POST" });
+          }
+          clear();
+          setStatus("Developer session closed.");
+          setOutput("Logged out.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("apply-filters-btn").addEventListener("click", async () => {
+        try {
+          await refresh();
+          setStatus("Filters applied.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("clear-filters-btn").addEventListener("click", async () => {
+        for (const id of ["filter-product-code", "filter-policy-id", "filter-batch-code", "filter-usage-status", "filter-status", "filter-search"]) {
+          el(id).value = "";
+        }
+        try {
+          await refresh();
+          setStatus("Filters cleared.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("export-csv-btn").addEventListener("click", async () => {
+        try {
+          await downloadApiFile(`/api/developer/cards/export/download${q({ ...filters(), format: "csv" })}`, "developer-cards.csv", "CSV export");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("export-json-btn").addEventListener("click", async () => {
+        try {
+          await downloadApiFile(`/api/developer/cards/export/download${q({ ...filters(), format: "json" })}`, "developer-cards.json", "JSON export");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("export-summary-btn").addEventListener("click", async () => {
+        try {
+          await downloadApiFile(`/api/developer/cards/export/download${q({ ...filters(), format: "summary" })}`, "developer-cards-summary.txt", "Summary export");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("export-checksums-btn").addEventListener("click", async () => {
+        try {
+          await downloadApiFile(`/api/developer/cards/export/download${q({ ...filters(), format: "checksums" })}`, "developer-cards-sha256.txt", "Checksums export");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("export-zip-btn").addEventListener("click", async () => {
+        try {
+          await downloadApiFile(`/api/developer/cards/export/download${q({ ...filters(), format: "zip" })}`, "developer-cards.zip", "Zip export");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("create-policy-btn").addEventListener("click", async () => {
+        try {
+          const grantType = el("policy-grant-type").value;
+          await postAndRefresh("/api/developer/policies", {
+            productCode: el("policy-product-code").value.trim(),
+            name: el("policy-name").value.trim(),
+            grantType,
+            durationDays: grantType === "points" ? 0 : Number(el("policy-duration-days").value || 0),
+            grantPoints: grantType === "points" ? Number(el("policy-grant-points").value || 0) : 0,
+            maxDevices: Number(el("policy-max-devices").value || 1),
+            allowConcurrentSessions: bool("policy-allow-concurrent"),
+            heartbeatIntervalSeconds: Number(el("policy-heartbeat-interval").value || 60),
+            heartbeatTimeoutSeconds: Number(el("policy-heartbeat-timeout").value || 180),
+            tokenTtlSeconds: Number(el("policy-token-ttl").value || 300),
+            bindMode: el("policy-bind-mode").value,
+            bindFields: csv(el("policy-bind-fields").value),
+            allowClientUnbind: bool("policy-allow-unbind"),
+            clientUnbindLimit: Number(el("policy-unbind-limit").value || 0),
+            clientUnbindWindowDays: Number(el("policy-unbind-window").value || 30),
+            clientUnbindDeductDays: Number(el("policy-unbind-deduct").value || 0)
+          }, "Policy created.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("save-runtime-btn").addEventListener("click", async () => {
+        try {
+          await postAndRefresh(`/api/developer/policies/${encodeURIComponent(el("control-policy-id").value.trim())}/runtime-config`, {
+            allowConcurrentSessions: bool("runtime-allow-concurrent"),
+            bindMode: el("runtime-bind-mode").value,
+            bindFields: csv(el("runtime-bind-fields").value)
+          }, "Policy runtime config updated.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("save-unbind-btn").addEventListener("click", async () => {
+        try {
+          await postAndRefresh(`/api/developer/policies/${encodeURIComponent(el("control-policy-id").value.trim())}/unbind-config`, {
+            allowClientUnbind: bool("unbind-allow-client"),
+            clientUnbindLimit: Number(el("unbind-limit").value || 0),
+            clientUnbindWindowDays: Number(el("unbind-window").value || 30),
+            clientUnbindDeductDays: Number(el("unbind-deduct").value || 0)
+          }, "Policy unbind config updated.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("create-batch-btn").addEventListener("click", async () => {
+        try {
+          await postAndRefresh("/api/developer/cards/batch", {
+            productCode: el("batch-product-code").value.trim(),
+            policyId: el("batch-policy-id").value.trim(),
+            count: Number(el("batch-count").value || 1),
+            prefix: el("batch-prefix").value.trim(),
+            expiresAt: el("batch-expires-at").value.trim() || null,
+            notes: el("batch-notes").value.trim()
+          }, "Card batch issued.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("save-card-status-btn").addEventListener("click", async () => {
+        try {
+          await postAndRefresh(`/api/developer/cards/${encodeURIComponent(el("card-id").value.trim())}/status`, {
+            status: el("card-status").value,
+            expiresAt: el("card-expires-at").value.trim() || null,
+            notes: el("card-notes").value.trim()
+          }, "Card status updated.");
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
+      el("route-focus-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-license-route-focus-action]");
+        if (!button) {
+          return;
+        }
+        const actionKey = button.dataset.licenseRouteFocusAction || "";
+        try {
+          if (actionKey === "fill-route-product") {
+            applyRoutePrefill();
+            renderLicenseRouteFocus();
+            setStatus(requestedProductCode ? `Routed project preserved: ${requestedProductCode}.` : "No routed project to preserve.");
+            return;
+          }
+          if (actionKey === "apply-filters") {
+            await refresh();
+            setStatus(`Scoped license inventory refreshed for ${currentRouteProductCode() || "current filters"}.`);
+            return;
+          }
+          if (actionKey === "scroll-target") {
+            focusLicenseAutofocusTarget();
+            setStatus(`Focused license section: ${requestedAutofocus || "filters"}.`);
+            return;
+          }
+          if (actionKey === "open-project") {
+            openRoutedProjectWorkspace();
+            return;
+          }
+          if (actionKey === "open-launch") {
+            openRoutedLaunchWorkspace();
+          }
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("policy-grant-type").dispatchEvent(new Event("change"));
+      applyRoutePrefill();
+      clear();
+      renderProjects();
+      renderStats();
+      renderPolicies();
+      renderCards();
+      renderLicenseRouteFocus();
+      setOutput("Waiting for actions...");
     </script>
   </body>
 </html>

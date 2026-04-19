@@ -12,6 +12,8 @@ The selected project detail card now also exposes direct handoff links into:
 
 `/developer/projects` also accepts `productId`, `productCode`, `channel`, and `autofocus` in the query string so the page can reopen with the same project preselected and, after sign-in or refresh, auto-load the matching inline release preview, integration preview, or launch workflow block when the route is carrying a recommended workspace hint.
 
+The same route can also carry `routeTitle` and `routeReason`. When those are present, the project page now renders its own `Route Focus` card, so the original handoff step stays visible even after the user lands back on the project workspace.
+
 The detail card now also shows a lightweight "Delivery quick signals" summary. It is not the same as the full release readiness package, but it helps software authors spot obvious blockers such as:
 
 - inactive project status

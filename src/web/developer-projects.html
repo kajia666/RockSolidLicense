@@ -138,6 +138,7 @@
         <article class="card">
           <h2>Project Detail</h2>
           <div id="detail-box" class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>
+          <div id="detail-route-focus-box" class="hint" style="margin-top:12px;">Open this page from launch workflow, integration, or releases to keep the routed project context visible here too.</div>
           <div class="two" style="margin-top:12px;">
             <label>Release Preview Channel<input id="detail-release-channel" placeholder="stable" /></label>
             <div class="actions" style="align-self:end;"><button class="secondary" id="preview-release-readiness-btn">Preview Release Readiness</button><button class="secondary" id="preview-launch-workflow-btn">Preview Launch Workflow</button><button id="clear-release-preview-btn">Clear Release Preview</button></div>
@@ -300,6 +301,61 @@
           return "detail-launch-workflow";
         }
         return "detail-box";
+      }
+
+      function currentProjectRouteFocus() {
+        const target = requestedAutofocus || "detail";
+        if (target === "release" || target === "package" || target === "versions" || target === "notices") {
+          return {
+            title: "Project release focus",
+            summary: "Review this project's lane configuration, then load the inline release readiness snapshot or jump straight to the release workspace.",
+            actions: [
+              { key: "preview-release", label: "Preview Release Readiness" },
+              { key: "open-release", label: "Open Release Workspace" },
+              { key: "scroll-target", label: "Scroll To Release Preview" }
+            ]
+          };
+        }
+        if (
+          target === "integration"
+          || target === "startup"
+          || target === "hardening"
+          || target === "host-config"
+          || target === "host-skeleton"
+          || target === "cmake"
+          || target === "vs2022"
+          || target === "vs2022-guide"
+        ) {
+          return {
+            title: "Project integration focus",
+            summary: "Keep this project's host setup aligned, then load the inline integration snapshot or jump back into the integration workspace.",
+            actions: [
+              { key: "preview-integration", label: "Preview Integration Snapshot" },
+              { key: "open-integration", label: "Open Integration Workspace" },
+              { key: "scroll-target", label: "Scroll To Integration Preview" }
+            ]
+          };
+        }
+        if (target === "launch" || target === "handoff" || target === "summary" || target === "checklist") {
+          return {
+            title: "Project launch-workflow focus",
+            summary: "Load the combined lane summary here or jump into the dedicated launch workflow workspace with the same project and channel preserved.",
+            actions: [
+              { key: "preview-launch", label: "Preview Launch Workflow" },
+              { key: "open-launch", label: "Open Launch Workspace" },
+              { key: "scroll-target", label: "Scroll To Launch Workflow" }
+            ]
+          };
+        }
+        return {
+          title: "Project profile focus",
+          summary: "Review the selected project profile, feature toggles, and delivery quick signals before moving back into the launch lane.",
+          actions: [
+            { key: "scroll-target", label: "Scroll To Project Detail" },
+            { key: "preview-launch", label: "Preview Launch Workflow" },
+            { key: "open-launch", label: "Open Launch Workspace" }
+          ]
+        };
       }
 
       function focusProjectAutofocusTarget() {
@@ -957,9 +1013,34 @@
         `;
       }
 
+      function renderProjectRouteFocus(product = null) {
+        const box = el("detail-route-focus-box");
+        const focus = currentProjectRouteFocus();
+        const hasProduct = Boolean(product);
+        const actions = Array.isArray(focus.actions) ? focus.actions : [];
+        box.innerHTML = `
+          <div>${tag(focus.title || "Project route focus", hasProduct ? "ok" : "")} ${requestedRouteTitle ? tag(`from:${requestedRouteTitle}`, "ok") : ""} ${requestedAutofocus ? tag(`focus:${requestedAutofocus}`) : ""} ${tag(`channel:${currentReleaseChannel()}`, "ok")}</div>
+          ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
+          <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${product.code}.` : `${focus.summary} Select a visible project first.`)}</div>
+          ${actions.length ? `
+            <div class="actions" style="margin-top:12px;">
+              ${actions.map((item) => `
+                <button
+                  type="button"
+                  class="${item.key === "scroll-target" || item.key.startsWith("open-") ? "secondary" : ""}"
+                  data-project-route-focus-action="${esc(item.key)}"
+                  ${!hasProduct ? "disabled" : ""}
+                >${esc(item.label || item.key || "Action")}</button>
+              `).join("")}
+            </div>
+          ` : ""}
+        `;
+      }
+
       function renderDetail(product = null) {
         if (!product) {
           el("detail-box").innerHTML = '<div class="hint">Select one of your projects to inspect SDK credentials and scoped summary.</div>';
+          renderProjectRouteFocus(null);
           renderReleasePreview(null);
           renderIntegrationPreview(null);
           renderLaunchWorkflow(null);
@@ -991,6 +1072,7 @@
           <div class="hint" style="margin-top:14px;">Current featureConfig</div>
           <div style="margin-top:8px;">${renderFeatureDetails(features)}</div>
         `;
+        renderProjectRouteFocus(product);
         renderReleasePreview(product);
         renderIntegrationPreview(product);
         renderLaunchWorkflow(product);
@@ -1041,6 +1123,42 @@
         el("detail-navigation-hint").textContent = hasProduct
           ? `Open ${product.code} in Developer Launch Workflow, Developer Integration, or Developer Releases with channel ${channel} already selected, or preview release and integration snapshots inline here.`
           : "Select a project to open its launch workflow, integration package, or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.";
+      }
+
+      async function handleProjectRouteFocusAction(actionKey) {
+        if (!el("edit-product-id").value.trim() || !el("edit-product-code").value.trim()) {
+          throw new Error("Select a project before using routed project actions.");
+        }
+        if (actionKey === "scroll-target") {
+          focusProjectAutofocusTarget();
+          setStatus(`Focused project section: ${requestedAutofocus || "detail"}.`);
+          return;
+        }
+        if (actionKey === "preview-release") {
+          await loadInlineReleasePreview({ autoFocus: true });
+          return;
+        }
+        if (actionKey === "preview-integration") {
+          await loadInlineIntegrationPreview({ autoFocus: true });
+          return;
+        }
+        if (actionKey === "preview-launch") {
+          await loadInlineLaunchWorkflow({ autoFocus: true });
+          return;
+        }
+        if (actionKey === "open-integration") {
+          openProjectIntegrationWorkspace();
+          return;
+        }
+        if (actionKey === "open-launch") {
+          openProjectLaunchWorkspace();
+          return;
+        }
+        if (actionKey === "open-release") {
+          openProjectReleaseWorkspace();
+          return;
+        }
+        throw new Error(`Unsupported project route-focus action: ${actionKey}`);
       }
 
       function setSelection(product = null) {
@@ -1649,6 +1767,19 @@
           openProjectReleaseWorkspace();
         } catch (error) {
           setStatus(error.message, true);
+        }
+      });
+
+      el("detail-route-focus-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-project-route-focus-action]");
+        if (!button) {
+          return;
+        }
+        try {
+          await handleProjectRouteFocusAction(button.dataset.projectRouteFocusAction || "");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
       });
 

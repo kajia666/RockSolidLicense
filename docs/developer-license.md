@@ -25,7 +25,10 @@ That quickstart block can also prefill the two most common launch templates:
 - starter duration policy
 - starter points policy
 
-and it can prefill a starter card-batch draft using the current project code and the first active policy in scope.
+and it can prefill:
+
+- a starter card-batch draft using the current project code and the first active policy in scope
+- a starter account draft when account login is enabled but public registration stays closed
 
 ## Scope
 
@@ -70,6 +73,22 @@ Typical creation body:
 - `GET /api/developer/cards/export/download`
 - `POST /api/developer/cards/batch`
 - `POST /api/developer/cards/:cardId/status`
+
+## Account APIs
+
+- `GET /api/developer/accounts`
+- `POST /api/developer/accounts`
+- `POST /api/developer/accounts/:accountId/status`
+
+Typical starter-account body:
+
+```json
+{
+  "productCode": "ALPHA_APP",
+  "username": "alpha_seed_01",
+  "password": "TemporaryPass123!"
+}
+```
 
 Typical batch body:
 
@@ -129,7 +148,8 @@ Launch workflow can now send a software author straight into this page when auth
 - no fresh cards for direct-card login
 - no fresh cards for recharge / renewal
 - no viable first-launch account path
+- account login enabled, registration closed, and no seeded starter account yet
 
-When that happens, the page renders a `Route Focus` card, prefills the routed project code, and can scroll to the relevant policy or card controls so the author can fix the blocker faster.
+When that happens, the page renders a `Route Focus` card, prefills the routed project code, and can scroll to the relevant policy, card, or starter-account controls so the author can fix the blocker faster.
 
 If the blocker is really about the login model itself rather than policy or inventory, the same quickstart block can now send the software author back to `/developer/projects?autofocus=auth-preset` so the project-level authorization preset can be adjusted directly.

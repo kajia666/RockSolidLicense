@@ -5760,6 +5760,116 @@ test("launch workflow routes login-path blockers to project authorization preset
   }
 });
 
+test("launch workflow routes starter-account blockers into developer licenses and clears after seeding", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.seed.owner",
+        password: "LaunchSeedOwner123!",
+        displayName: "Launch Seed Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "SEEDACC_ALPHA",
+        name: "Seed Account Alpha",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: true,
+          allowCardLogin: false,
+          allowCardRecharge: false
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.seed.owner",
+      password: "LaunchSeedOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "SEEDACC_ALPHA",
+        name: "Starter Duration",
+        durationDays: 30,
+        totalPoints: null,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const beforeLaunch = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=SEEDACC_ALPHA&channel=stable",
+      ownerSession.token
+    );
+
+    assert.equal(beforeLaunch.workflowSummary.authorizationStatus, "block");
+    assert.match(beforeLaunch.workflowSummary.authorizationMessage || "", /no starter accounts exist/i);
+
+    const beforeChecklistItem = beforeLaunch.workflowChecklist.items.find((item) => item.key === "authorization_readiness");
+    assert.ok(beforeChecklistItem);
+    assert.equal(beforeChecklistItem.workspaceAction?.key, "licenses");
+    assert.equal(beforeChecklistItem.workspaceAction?.autofocus, "starter-account");
+
+    const beforeActionPlanItem = beforeLaunch.workflowSummary.actionPlan.find((item) => item.key === "authorization_readiness");
+    assert.ok(beforeActionPlanItem);
+    assert.equal(beforeActionPlanItem.workspaceAction?.key, "licenses");
+    assert.equal(beforeActionPlanItem.workspaceAction?.autofocus, "starter-account");
+
+    const seededAccount = await postJson(
+      baseUrl,
+      "/api/developer/accounts",
+      {
+        productCode: "SEEDACC_ALPHA",
+        username: "seedacc_alpha_01",
+        password: "SeedStarter123!"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(seededAccount.productCode, "SEEDACC_ALPHA");
+    assert.equal(seededAccount.username, "seedacc_alpha_01");
+    assert.equal(seededAccount.created, true);
+
+    const accounts = await getJson(
+      baseUrl,
+      "/api/developer/accounts?productCode=SEEDACC_ALPHA",
+      ownerSession.token
+    );
+    assert.ok(accounts.items.some((item) => item.username === "seedacc_alpha_01"));
+
+    const afterLaunch = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=SEEDACC_ALPHA&channel=stable",
+      ownerSession.token
+    );
+
+    assert.notEqual(afterLaunch.workflowSummary.authorizationStatus, "block");
+    assert.doesNotMatch(afterLaunch.workflowSummary.authorizationMessage || "", /no starter accounts exist/i);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -10116,7 +10226,11 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /Launch Authorization Quickstart/);
     assert.match(html, /Load Duration Policy Template/);
     assert.match(html, /Load Points Policy Template/);
+    assert.match(html, /Load Starter Account Template/);
     assert.match(html, /Load Starter Card Batch/);
+    assert.match(html, /Create Starter Account/);
+    assert.match(html, /api\/developer\/accounts/);
+    assert.match(html, /account-product-code/);
     assert.match(html, /launch-quickstart-box/);
     assert.match(html, /route-focus-box/);
     assert.match(html, /window\.location\.search/);
@@ -10126,7 +10240,9 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /renderLaunchQuickstart/);
     assert.match(html, /findProjectMetrics/);
     assert.match(html, /fillStarterPolicyTemplate/);
+    assert.match(html, /fillStarterAccountTemplate/);
     assert.match(html, /fillStarterBatchTemplate/);
+    assert.match(html, /starterAccountUsername/);
     assert.match(html, /openProjectAuthorizationPreset/);
     assert.match(html, /data-launch-quickstart-action/);
   } finally {

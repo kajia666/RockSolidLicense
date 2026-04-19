@@ -109,6 +109,17 @@
         </article>
 
         <article class="card">
+          <h2>Seed Starter Account</h2>
+          <div class="three">
+            <label>Project Code<input id="account-product-code" placeholder="ALPHA_APP" /></label>
+            <label>Username<input id="account-username" placeholder="alpha_seed_01" /></label>
+            <label>Password<input id="account-password" type="password" placeholder="Temporary password" /></label>
+          </div>
+          <div class="hint" id="account-seed-note" style="margin-top:12px;">Use this when account login stays enabled but public registration is closed. The quickstart block can prefill a starter account template for the current project.</div>
+          <div class="actions" style="margin-top:12px;"><button class="secondary" id="create-account-btn">Create Starter Account</button></div>
+        </article>
+
+        <article class="card">
           <h2>Card Controls</h2>
           <div class="three">
             <label>Card ID<input id="card-id" placeholder="Click a card row below" /></label>
@@ -226,6 +237,7 @@
           el("filter-product-code").value.trim()
           || el("policy-product-code").value.trim()
           || el("batch-product-code").value.trim()
+          || el("account-product-code").value.trim()
           || requestedProductCode
         ).trim();
       }
@@ -252,6 +264,9 @@
         const target = requestedAutofocus || "filters";
         if (target === "quickstart" || target === "launch-plan" || target === "authorization-readiness") {
           return "launch-quickstart-box";
+        }
+        if (target === "starter-account" || target === "account-seed" || target === "accounts-seed") {
+          return "create-account-btn";
         }
         if (target === "policy-create") {
           return "create-policy-btn";
@@ -298,6 +313,9 @@
         if (!el("batch-product-code").value.trim()) {
           el("batch-product-code").value = requestedProductCode;
         }
+        if (!el("account-product-code").value.trim()) {
+          el("account-product-code").value = requestedProductCode;
+        }
       }
 
       function currentLicenseRouteFocus() {
@@ -309,6 +327,20 @@
             actions: [
               { key: "fill-route-product", label: "Use Routed Project" },
               { key: "scroll-target", label: "Jump To Quickstart" },
+              { key: "apply-filters", label: "Refresh Scoped Inventory" },
+              { key: "open-project", label: "Open Project Workspace" },
+              { key: "open-launch", label: "Back To Launch Workflow" }
+            ]
+          };
+        }
+        if (target === "starter-account" || target === "account-seed" || target === "accounts-seed") {
+          return {
+            title: "Starter account focus",
+            summary: "Seed one or more starter accounts for this project when account login is enabled but public registration is closed.",
+            actions: [
+              { key: "fill-route-product", label: "Use Routed Project" },
+              { key: "load-starter-account", label: "Prefill Starter Account" },
+              { key: "scroll-target", label: "Jump To Starter Account" },
               { key: "apply-filters", label: "Refresh Scoped Inventory" },
               { key: "open-project", label: "Open Project Workspace" },
               { key: "open-launch", label: "Back To Launch Workflow" }
@@ -379,7 +411,7 @@
           ${actions.length ? `
             <div class="actions" style="margin-top:12px;">
               ${actions.map((item) => {
-                const needsProduct = item.key === "open-project" || item.key === "open-launch";
+                const needsProduct = item.key === "open-project" || item.key === "open-launch" || item.key === "load-starter-account";
                 const needsSession = item.key === "apply-filters";
                 const disabled = (needsProduct && !hasProduct) || (needsSession && !token);
                 return `<button type="button" class="${item.key === "open-launch" ? "secondary" : ""}" data-license-route-focus-action="${esc(item.key)}" ${disabled ? "disabled" : ""}>${esc(item.label || item.key)}</button>`;
@@ -448,6 +480,16 @@
           .slice(0, 10) || "ROCKSOLID";
       }
 
+      function starterAccountUsername(productCode = "", count = 0) {
+        const base = String(productCode || "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .slice(0, 16) || "starter";
+        return `${base}_seed_${String(Math.max(1, count + 1)).padStart(2, "0")}`;
+      }
+
       function renderQuickstartActionButtons(actions = []) {
         const uniqueActions = [];
         const seenKeys = new Set();
@@ -497,6 +539,7 @@
         const actions = [
           { key: "load-duration-policy", label: "Load Duration Policy Template", secondary: true },
           { key: "load-points-policy", label: "Load Points Policy Template", secondary: true },
+          { key: "load-starter-account", label: "Load Starter Account Template", secondary: true },
           { key: "load-card-batch", label: "Load Starter Card Batch", secondary: true },
           { key: "refresh-scope", label: "Refresh Scoped Inventory", secondary: true }
         ];
@@ -560,6 +603,7 @@
             tone: "danger",
             detail: "Account login is enabled, registration is closed, and no starter accounts are visible yet."
           });
+          actions.unshift({ key: "load-starter-account", label: "Prepare Starter Account" });
           actions.unshift({ key: "open-project-auth", label: "Open Project Authorization Preset" });
         } else {
           checks.push({
@@ -797,7 +841,7 @@
 
       async function refreshProducts() {
         const data = await api("/api/developer/products");
-        products = data.items || [];
+        products = Array.isArray(data) ? data : (data.items || []);
         renderProjects();
         return data;
       }
@@ -880,6 +924,12 @@
           if (card) {
             fillCard(card);
           }
+        }
+        if (
+          (requestedAutofocus === "starter-account" || requestedAutofocus === "account-seed" || requestedAutofocus === "accounts-seed")
+          && !el("account-username").value.trim()
+        ) {
+          fillStarterAccountTemplate();
         }
         renderLicenseRouteFocus();
         focusLicenseAutofocusTarget();
@@ -981,6 +1031,20 @@
           : `Prepared a starter card batch for ${productCode}. Create a starter policy first if policy ID is still empty.`
         );
         el("create-batch-btn").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function fillStarterAccountTemplate() {
+        const { productCode, product, metrics } = currentLaunchQuickstartContext();
+        if (!productCode) {
+          throw new Error("Choose a project before preparing a starter account.");
+        }
+        const accountCount = Number(metrics.accounts ?? 0);
+        el("account-product-code").value = productCode;
+        el("account-username").value = starterAccountUsername(productCode, accountCount);
+        el("account-password").value = "";
+        el("account-seed-note").textContent = `Prepared a starter account template for ${product?.name || productCode}. Enter a temporary password, create the account, then hand the credential to your internal test or support flow securely.`;
+        el("create-account-btn").scrollIntoView({ behavior: "smooth", block: "start" });
+        setStatus(`Prepared a starter account template for ${productCode}.`);
       }
 
       el("policy-grant-type").addEventListener("change", () => {
@@ -1182,6 +1246,20 @@
         }
       });
 
+      el("create-account-btn").addEventListener("click", async () => {
+        try {
+          await postAndRefresh("/api/developer/accounts", {
+            productCode: el("account-product-code").value.trim(),
+            username: el("account-username").value.trim(),
+            password: el("account-password").value
+          }, "Starter account created.");
+          el("account-password").value = "";
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code: error.code, message: error.message });
+        }
+      });
+
       el("save-card-status-btn").addEventListener("click", async () => {
         try {
           await postAndRefresh(`/api/developer/cards/${encodeURIComponent(el("card-id").value.trim())}/status`, {
@@ -1227,6 +1305,10 @@
             openProjectAuthorizationPreset();
             return;
           }
+          if (actionKey === "load-starter-account") {
+            fillStarterAccountTemplate();
+            return;
+          }
           if (actionKey === "open-launch") {
             openRoutedLaunchWorkspace();
           }
@@ -1252,6 +1334,10 @@
           }
           if (actionKey === "load-card-batch") {
             fillStarterBatchTemplate();
+            return;
+          }
+          if (actionKey === "load-starter-account") {
+            fillStarterAccountTemplate();
             return;
           }
           if (actionKey === "open-project-auth") {

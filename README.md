@@ -59,7 +59,7 @@
 - 项目页发版快速信号摘要
 - 项目页内联发版 readiness 预览，可按 channel 直接查看候选版本、阻断项、检查清单和下一步动作；项目页也支持同 channel 的 integration snapshot 预览，以及一键 `Preview Launch Workflow` 加载统一的 launch workflow package，在同页查看 workflow blocker / checklist / next steps / recommended workspace，并直接下载 launch `handoff-zip / summary / checklist / checksums / zip`、release `summary / checksums / zip` 以及常用 integration `json / env / host-config / checksums / cpp / cmake / vs2022-guide / vs2022-sln / vs2022 / vs2022-filters / vs2022-props / vs2022-local-props / host-skeleton / zip`
 - 项目页现在可直接按授权预设切换首发登录策略，并在 launch workflow 发现“无登录路径 / 禁止注册但无初始账号”这类阻断时回落到 `auth-preset` 焦点，帮助软件作者更快修正首发授权链
-- 开发者授权中心现在补了 `Launch Authorization Quickstart`，会按项目当前登录模式、策略数、卡密库存、起步账号状态给出首发建议，并能一键预填 starter duration / points policy 和 starter card batch
+- 开发者授权中心现在补了 `Launch Authorization Quickstart`，会按项目当前登录模式、策略数、卡密库存、起步账号状态给出首发建议，并能一键预填 starter duration / points policy、starter card batch 和 starter account；当项目走账号登录但关闭公开注册时，也可以直接在授权中心补首发种子账号
 - 开发者多项目归属
 - 开发者主账号 + 子账号
 - 子账号按项目授权与角色控制
@@ -370,6 +370,7 @@ npm run db:postgres:check
 - `POST /api/developer/cards/batch`
 - `POST /api/developer/cards/:cardId/status`
 - `GET /api/developer/accounts`
+- `POST /api/developer/accounts`
 - `POST /api/developer/accounts/:accountId/status`
 - `GET /api/developer/entitlements`
 - `POST /api/developer/entitlements/:entitlementId/status`

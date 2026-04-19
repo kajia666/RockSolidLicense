@@ -1704,6 +1704,15 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/developer/accounts") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerCreateAccount(getBearerToken(req), body)
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/entitlements") {
         sendJson(res, 200, {
           ok: true,

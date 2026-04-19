@@ -2848,9 +2848,9 @@ function buildLaunchWorkflowAuthorizationReadiness({
       "Account login is enabled, but registration is disabled and no starter accounts exist in this project.",
       "Either enable registration, seed starter accounts, or rely on direct-card login for first launch.",
       {
-        key: "project",
-        autofocus: "auth-preset",
-        label: "Open Project Workspace"
+        key: "licenses",
+        autofocus: "starter-account",
+        label: "Open License Workspace"
       }
     );
   }
@@ -13017,6 +13017,57 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         { ...filters, productIds: listDeveloperAccessibleProductIds(db, session) },
         stateStore
       ));
+    },
+
+    async developerCreateAccount(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage customer accounts under your assigned projects."
+      );
+      requireField(body, "productCode");
+      requireField(body, "username");
+      requireField(body, "password");
+
+      const product = await getStoreActiveProductByCode(readProductCodeInput(body));
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product.id,
+          owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+        },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only manage customer accounts under your assigned projects."
+      );
+
+      const username = String(body.username).trim();
+      const password = String(body.password);
+      if (username.length < 3 || password.length < 8) {
+        throw new AppError(400, "INVALID_ACCOUNT", "Username must be 3+ chars and password 8+ chars.");
+      }
+
+      const timestamp = nowIso();
+      const account = await Promise.resolve(store.accounts.createAccount(product, {
+        username,
+        passwordHash: hashPassword(password)
+      }, timestamp));
+      await syncSqliteAccountRecordShadow(account, product);
+
+      const manageRow = await getStoreAccountById(account.id);
+
+      auditDeveloperSession(db, session, "account.seed", "account", account.id, {
+        productCode: product.code,
+        username
+      });
+
+      return {
+        ...manageRow,
+        created: true
+      };
     },
 
     async developerUpdateAccountStatus(token, accountId, body = {}) {

@@ -2764,7 +2764,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
   const nextActions = [];
   let status = "pass";
   let workspaceKey = "licenses";
-  let workspaceAutofocus = "policy-control";
+  let workspaceAutofocus = "quickstart";
   let workspaceLabel = "Open License Workspace";
   let workspaceSeverity = -1;
   const severity = {

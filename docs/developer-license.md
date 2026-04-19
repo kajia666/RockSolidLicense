@@ -6,11 +6,26 @@ It is designed for software authors who need to manage policies and card invento
 
 The same page now also accepts routed query parameters such as `productId`, `productCode`, `channel`, `autofocus`, `routeTitle`, and `routeReason`. That lets `/developer/launch-workflow`, `/developer/projects`, or other routed actions drop a software author directly into:
 
+- launch authorization quickstart review
 - starter policy creation
 - policy runtime / unbind controls
 - starter card inventory and card status
 
 without losing the current project context.
+
+The page now also includes a `Launch Authorization Quickstart` block. It combines routed project context, scoped dashboard metrics, current feature config, policy inventory, and card inventory into one starter checklist so software authors can see:
+
+- the current launch login mode and hardening posture
+- whether starter policies already exist
+- whether fresh cards are staged for direct-card login or recharge
+- whether account-login launches still need open registration or seeded starter accounts
+
+That quickstart block can also prefill the two most common launch templates:
+
+- starter duration policy
+- starter points policy
+
+and it can prefill a starter card-batch draft using the current project code and the first active policy in scope.
 
 ## Scope
 
@@ -116,3 +131,5 @@ Launch workflow can now send a software author straight into this page when auth
 - no viable first-launch account path
 
 When that happens, the page renders a `Route Focus` card, prefills the routed project code, and can scroll to the relevant policy or card controls so the author can fix the blocker faster.
+
+If the blocker is really about the login model itself rather than policy or inventory, the same quickstart block can now send the software author back to `/developer/projects?autofocus=auth-preset` so the project-level authorization preset can be adjusted directly.

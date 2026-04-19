@@ -47,6 +47,11 @@
           <div class="actions" style="margin-top:12px;"><button class="secondary" id="apply-filters-btn">Apply Filters</button><button id="clear-filters-btn">Clear Filters</button><button class="secondary" id="export-csv-btn">Download CSV</button><button class="secondary" id="export-json-btn">Download JSON</button><button class="secondary" id="export-summary-btn">Download Summary</button><button class="secondary" id="export-checksums-btn">Download Checksums</button><button class="secondary" id="export-zip-btn">Download Zip</button></div>
           <div class="hint">Leave a field blank to query everything you can access inside the current developer scope.</div>
         </article>
+
+        <article class="card">
+          <h2>Launch Authorization Quickstart</h2>
+          <div class="hint" id="launch-quickstart-box">Sign in and route a project here to review starter policy, starter card inventory, and first-launch account readiness in one place.</div>
+        </article>
       </section>
 
       <section class="grid">
@@ -126,6 +131,7 @@
       </section>
     </main>
 
+    <script src="/assets/product-features.js"></script>
     <script>
       const routeParams = new URLSearchParams(window.location.search);
       const requestedProductId = (routeParams.get("productId") || "").trim();
@@ -139,6 +145,7 @@
       let actor = null;
       let profile = null;
       let products = [];
+      let dashboard = { summary: null, projects: [], generatedAt: null };
       let policies = [];
       let cards = [];
 
@@ -243,6 +250,9 @@
 
       function currentLicenseAutofocusTarget() {
         const target = requestedAutofocus || "filters";
+        if (target === "quickstart" || target === "launch-plan" || target === "authorization-readiness") {
+          return "launch-quickstart-box";
+        }
         if (target === "policy-create") {
           return "create-policy-btn";
         }
@@ -292,6 +302,19 @@
 
       function currentLicenseRouteFocus() {
         const target = requestedAutofocus || "filters";
+        if (target === "quickstart" || target === "launch-plan" || target === "authorization-readiness") {
+          return {
+            title: "Launch authorization quickstart focus",
+            summary: "Review the launch-ready login path, starter policies, starter card inventory, and first-launch account access in one quickstart block before drilling into individual controls.",
+            actions: [
+              { key: "fill-route-product", label: "Use Routed Project" },
+              { key: "scroll-target", label: "Jump To Quickstart" },
+              { key: "apply-filters", label: "Refresh Scoped Inventory" },
+              { key: "open-project", label: "Open Project Workspace" },
+              { key: "open-launch", label: "Back To Launch Workflow" }
+            ]
+          };
+        }
         if (target === "policy-create") {
           return {
             title: "Starter policy focus",
@@ -363,6 +386,219 @@
               }).join("")}
             </div>
           ` : ""}
+        `;
+      }
+
+      function findProjectMetrics(productCode = currentRouteProductCode()) {
+        const normalizedCode = String(productCode || "").trim().toUpperCase();
+        if (!normalizedCode) {
+          return {};
+        }
+        return (dashboard.projects || []).find((item) => String(item.code || "").trim().toUpperCase() === normalizedCode)?.metrics || {};
+      }
+
+      function currentLaunchQuickstartContext() {
+        const productCode = currentRouteProductCode();
+        const product = findRouteProduct(productCode);
+        const metrics = findProjectMetrics(productCode);
+        const productPolicies = policies.filter((item) => String(item.productCode || "").trim().toUpperCase() === String(productCode || "").trim().toUpperCase());
+        const productCards = cards.filter((item) => String(item.productCode || "").trim().toUpperCase() === String(productCode || "").trim().toUpperCase());
+        return {
+          productCode,
+          product,
+          metrics,
+          productPolicies,
+          productCards
+        };
+      }
+
+      function currentAuthorizationDescription(featureConfig = {}) {
+        if (window.RSProductFeatures?.describeAuthorizationConfig) {
+          return window.RSProductFeatures.describeAuthorizationConfig(featureConfig);
+        }
+        return {
+          loginLabel: "custom",
+          hardeningLabel: "custom",
+          summary: "custom authorization config"
+        };
+      }
+
+      function currentAuthorizationPreset(featureConfig = {}) {
+        return window.RSProductFeatures?.inferAuthorizationPreset
+          ? window.RSProductFeatures.inferAuthorizationPreset(featureConfig)
+          : null;
+      }
+
+      function recommendStarterGrantType(featureConfig = {}, productPolicies = []) {
+        if (productPolicies.some((item) => item.grantType === "duration")) {
+          return "duration";
+        }
+        if (productPolicies.some((item) => item.grantType === "points")) {
+          return "points";
+        }
+        return featureConfig.allowCardLogin !== false || featureConfig.allowCardRecharge !== false
+          ? "duration"
+          : "duration";
+      }
+
+      function starterBatchPrefix(productCode = "") {
+        return String(productCode || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]+/g, "")
+          .slice(0, 10) || "ROCKSOLID";
+      }
+
+      function renderQuickstartActionButtons(actions = []) {
+        const uniqueActions = [];
+        const seenKeys = new Set();
+        for (const item of actions) {
+          if (!item?.key || seenKeys.has(item.key)) {
+            continue;
+          }
+          seenKeys.add(item.key);
+          uniqueActions.push(item);
+        }
+        if (!uniqueActions.length) {
+          return "";
+        }
+        return `<div class="actions" style="margin-top:12px;">${uniqueActions.map((item) => `
+          <button
+            type="button"
+            class="${item.secondary ? "secondary" : ""}"
+            data-launch-quickstart-action="${esc(item.key)}"
+          >${esc(item.label)}</button>
+        `).join("")}</div>`;
+      }
+
+      function renderLaunchQuickstart() {
+        const box = el("launch-quickstart-box");
+        const { productCode, product, metrics, productPolicies, productCards } = currentLaunchQuickstartContext();
+        if (!token) {
+          box.innerHTML = "Sign in and route a project here to review starter policy, starter card inventory, and first-launch account readiness in one place.";
+          return;
+        }
+        if (!productCode) {
+          box.innerHTML = "Choose a routed project or type a project code in filters to generate a launch authorization quickstart.";
+          return;
+        }
+
+        const featureConfig = product?.featureConfig || {};
+        const authPreset = currentAuthorizationPreset(featureConfig);
+        const authSummary = currentAuthorizationDescription(featureConfig);
+        const policyCount = Number(metrics.policies ?? productPolicies.length ?? 0);
+        const freshCardCount = Number(metrics.cardsFresh ?? productCards.filter((item) => item.usageStatus === "unused").length ?? 0);
+        const accountCount = Number(metrics.accounts ?? 0);
+        const registerEnabled = featureConfig.allowRegister !== false;
+        const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+        const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+        const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+        const recommendedGrantType = recommendStarterGrantType(featureConfig, productPolicies);
+        const checks = [];
+        const actions = [
+          { key: "load-duration-policy", label: "Load Duration Policy Template", secondary: true },
+          { key: "load-points-policy", label: "Load Points Policy Template", secondary: true },
+          { key: "load-card-batch", label: "Load Starter Card Batch", secondary: true },
+          { key: "refresh-scope", label: "Refresh Scoped Inventory", secondary: true }
+        ];
+        let status = "ready";
+        let headline = "Starter authorization looks close to launch-ready.";
+
+        if (!accountLoginEnabled && !cardLoginEnabled) {
+          status = "block";
+          headline = "Launch has no runtime login path yet.";
+          checks.push({
+            label: "Login Path",
+            tone: "danger",
+            detail: "Both account login and direct-card login are disabled. Adjust the project authorization preset before launch."
+          });
+          actions.unshift({ key: "open-project-auth", label: "Open Project Authorization Preset" });
+        }
+
+        if (policyCount <= 0) {
+          status = "block";
+          headline = "Launch is blocked until this project has at least one starter policy.";
+          checks.push({
+            label: "Policies",
+            tone: "danger",
+            detail: "No starter policy exists yet. Create one before issuing cards or opening sales."
+          });
+          actions.unshift({ key: recommendedGrantType === "points" ? "load-points-policy" : "load-duration-policy", label: recommendedGrantType === "points" ? "Prepare Starter Points Policy" : "Prepare Starter Duration Policy" });
+        } else {
+          checks.push({
+            label: "Policies",
+            tone: "ok",
+            detail: `${policyCount} starter polic${policyCount === 1 ? "y" : "ies"} available.`
+          });
+        }
+
+        if ((cardLoginEnabled || cardRechargeEnabled) && freshCardCount <= 0) {
+          status = "block";
+          headline = "Launch still needs fresh card inventory for the configured login or recharge path.";
+          checks.push({
+            label: "Fresh Cards",
+            tone: "danger",
+            detail: "No fresh cards are available for direct-card login or recharge."
+          });
+          actions.unshift({ key: "load-card-batch", label: "Prepare Starter Card Batch" });
+        } else {
+          checks.push({
+            label: "Fresh Cards",
+            tone: freshCardCount > 0 ? "ok" : "",
+            detail: freshCardCount > 0
+              ? `${freshCardCount} fresh cards are already staged.`
+              : "Fresh card inventory is optional for the current login strategy."
+          });
+        }
+
+        if (accountLoginEnabled && !registerEnabled && accountCount <= 0) {
+          status = status === "block" ? "block" : "review";
+          headline = status === "block"
+            ? headline
+            : "First-launch account access still needs attention.";
+          checks.push({
+            label: "Starter Accounts",
+            tone: "danger",
+            detail: "Account login is enabled, registration is closed, and no starter accounts are visible yet."
+          });
+          actions.unshift({ key: "open-project-auth", label: "Open Project Authorization Preset" });
+        } else {
+          checks.push({
+            label: "Starter Accounts",
+            tone: accountLoginEnabled ? "ok" : "",
+            detail: accountLoginEnabled
+              ? (registerEnabled
+                ? "Registration is open, so first-launch account creation is available."
+                : `${accountCount} starter account(s) already exist for closed registration.`)
+              : "Account login is not part of the current launch mode."
+          });
+        }
+
+        if (status === "ready") {
+          checks.push({
+            label: "Launch Mode",
+            tone: "ok",
+            detail: `${authPreset?.label || "Custom"} is aligned: ${authSummary.summary}.`
+          });
+        } else {
+          checks.push({
+            label: "Launch Mode",
+            tone: "",
+            detail: `${authPreset?.label || "Custom"} is active: ${authSummary.summary}.`
+          });
+        }
+
+        box.innerHTML = `
+          <div>
+            ${tag(status === "ready" ? "ready" : status, status === "ready" ? "ok" : "danger")}
+            ${tag(`project:${product?.code || productCode}`, product ? "ok" : "")}
+            ${tag(`mode:${authPreset?.label || authSummary.loginLabel}`, "ok")}
+            ${tag(`hardening:${authSummary.hardeningLabel}`, "ok")}
+            ${tag(`channel:${requestedChannel}`, "ok")}
+          </div>
+          <div class="hint" style="margin-top:10px;">${esc(headline)}</div>
+          <div class="hint" style="margin-top:10px;">Current starter picture: policies=${esc(policyCount)} | freshCards=${esc(freshCardCount)} | accounts=${esc(accountCount)} | recommendedGrant=${esc(recommendedGrantType)}</div>
+          <div style="margin-top:12px;">${checks.map((item) => tag(`${item.label}: ${item.detail}`, item.tone)).join("")}</div>
+          ${renderQuickstartActionButtons(actions)}
         `;
       }
 
@@ -540,6 +776,7 @@
         actor = null;
         profile = null;
         products = [];
+        dashboard = { summary: null, projects: [], generatedAt: null };
         policies = [];
         cards = [];
         setMeta();
@@ -548,6 +785,7 @@
         renderPolicies();
         renderCards();
         renderLicenseRouteFocus();
+        renderLaunchQuickstart();
       }
 
       async function refreshProfile() {
@@ -561,6 +799,12 @@
         const data = await api("/api/developer/products");
         products = data.items || [];
         renderProjects();
+        return data;
+      }
+
+      async function refreshDashboard() {
+        const data = await api("/api/developer/dashboard");
+        dashboard = data || { summary: null, projects: [], generatedAt: null };
         return data;
       }
 
@@ -586,14 +830,16 @@
           return;
         }
         await refreshProfile();
-        const [productData, policyData, cardData] = await Promise.all([
+        const [productData, dashboardData, policyData, cardData] = await Promise.all([
           refreshProducts(),
+          refreshDashboard(),
           refreshPolicies(),
           refreshCards()
         ]);
         renderStats();
         renderLicenseRouteFocus();
-        setOutput({ products: productData, policies: policyData, cards: cardData });
+        renderLaunchQuickstart();
+        setOutput({ products: productData, dashboard: dashboardData, policies: policyData, cards: cardData });
       }
 
       async function postAndRefresh(path, body, message) {
@@ -667,6 +913,74 @@
           routeTitle: requestedRouteTitle || currentLicenseRouteFocus().title || "License workspace handoff",
           routeReason: requestedRouteReason || `Review the launch workflow for ${target.productCode} after adjusting license inventory.`
         });
+      }
+
+      function openProjectAuthorizationPreset() {
+        const target = currentLicenseTarget();
+        if (!target.productCode) {
+          throw new Error("Route or filter a project before opening the project authorization preset.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/projects", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "auth-preset",
+          routeTitle: requestedRouteTitle || "License quickstart handoff",
+          routeReason: requestedRouteReason || `Adjust the project authorization preset for ${target.productCode} before launch.`
+        });
+      }
+
+      function fillStarterPolicyTemplate(grantType = "duration") {
+        const { productCode, product } = currentLaunchQuickstartContext();
+        if (!productCode) {
+          throw new Error("Choose a project before preparing a starter policy template.");
+        }
+        const featureConfig = product?.featureConfig || {};
+        const authPreset = currentAuthorizationPreset(featureConfig);
+        const productLabel = product?.name || productCode;
+        const durationMode = grantType !== "points";
+        el("policy-product-code").value = productCode;
+        el("policy-name").value = durationMode
+          ? `${productLabel} Launch 30 Days`
+          : `${productLabel} Launch 100 Points`;
+        el("policy-grant-type").value = durationMode ? "duration" : "points";
+        el("policy-grant-type").dispatchEvent(new Event("change"));
+        el("policy-duration-days").value = durationMode ? "30" : "0";
+        el("policy-grant-points").value = durationMode ? "0" : "100";
+        el("policy-max-devices").value = "1";
+        el("policy-allow-concurrent").value = "false";
+        el("policy-heartbeat-interval").value = "60";
+        el("policy-heartbeat-timeout").value = "180";
+        el("policy-token-ttl").value = "300";
+        el("policy-bind-mode").value = "strict";
+        el("policy-bind-fields").value = "";
+        el("policy-allow-unbind").value = String(featureConfig.allowClientUnbind === true);
+        el("policy-unbind-limit").value = featureConfig.allowClientUnbind === true ? "1" : "0";
+        el("policy-unbind-window").value = "30";
+        el("policy-unbind-deduct").value = "0";
+        setStatus(`Prepared a ${durationMode ? "duration" : "points"} starter policy template for ${productCode}${authPreset ? ` (${authPreset.label})` : ""}.`);
+        el("create-policy-btn").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function fillStarterBatchTemplate() {
+        const { productCode, product, productPolicies } = currentLaunchQuickstartContext();
+        if (!productCode) {
+          throw new Error("Choose a project before preparing a starter card batch.");
+        }
+        const preferredGrantType = recommendStarterGrantType(product?.featureConfig || {}, productPolicies);
+        const preferredPolicy = productPolicies.find((item) => item.status === "active" && item.grantType === preferredGrantType)
+          || productPolicies.find((item) => item.status === "active")
+          || productPolicies[0];
+        el("batch-product-code").value = productCode;
+        el("batch-policy-id").value = preferredPolicy?.id || "";
+        el("batch-count").value = "50";
+        el("batch-prefix").value = starterBatchPrefix(productCode);
+        el("batch-notes").value = `Launch starter batch | ${currentAuthorizationDescription(product?.featureConfig || {}).summary}`;
+        setStatus(preferredPolicy
+          ? `Prepared a starter card batch for ${productCode} using policy ${preferredPolicy.name}.`
+          : `Prepared a starter card batch for ${productCode}. Create a starter policy first if policy ID is still empty.`
+        );
+        el("create-batch-btn").scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
       el("policy-grant-type").addEventListener("change", () => {
@@ -891,6 +1205,7 @@
           if (actionKey === "fill-route-product") {
             applyRoutePrefill();
             renderLicenseRouteFocus();
+            renderLaunchQuickstart();
             setStatus(requestedProductCode ? `Routed project preserved: ${requestedProductCode}.` : "No routed project to preserve.");
             return;
           }
@@ -906,6 +1221,46 @@
           }
           if (actionKey === "open-project") {
             openRoutedProjectWorkspace();
+            return;
+          }
+          if (actionKey === "open-project-auth") {
+            openProjectAuthorizationPreset();
+            return;
+          }
+          if (actionKey === "open-launch") {
+            openRoutedLaunchWorkspace();
+          }
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      el("launch-quickstart-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-launch-quickstart-action]");
+        if (!button) {
+          return;
+        }
+        const actionKey = button.dataset.launchQuickstartAction || "";
+        try {
+          if (actionKey === "load-duration-policy") {
+            fillStarterPolicyTemplate("duration");
+            return;
+          }
+          if (actionKey === "load-points-policy") {
+            fillStarterPolicyTemplate("points");
+            return;
+          }
+          if (actionKey === "load-card-batch") {
+            fillStarterBatchTemplate();
+            return;
+          }
+          if (actionKey === "open-project-auth") {
+            openProjectAuthorizationPreset();
+            return;
+          }
+          if (actionKey === "refresh-scope") {
+            await refresh();
+            setStatus(`Launch quickstart refreshed for ${currentRouteProductCode() || "current scope"}.`);
             return;
           }
           if (actionKey === "open-launch") {
@@ -924,6 +1279,7 @@
       renderPolicies();
       renderCards();
       renderLicenseRouteFocus();
+      renderLaunchQuickstart();
       setOutput("Waiting for actions...");
     </script>
   </body>

@@ -63,6 +63,8 @@ After `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` completes, 
 - download the matching filtered ops summary without first navigating into the ops page
 - keep the most recent launch initialization result attached to the same routed project instead of re-deriving the next step manually
 
+The quickstart block now also keeps a `Last Quickstart Action` recap above that follow-up section. It summarizes the before/after counts for starter policies, fresh cards, starter accounts, and active entitlements, then lists the newly created starter batches, accounts, or internal entitlements so a software author can confirm what actually changed before moving on to the next launch-day recheck.
+
 ## Scope
 
 - owners can manage every product they own

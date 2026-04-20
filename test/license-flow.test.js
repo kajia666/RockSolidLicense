@@ -10824,6 +10824,9 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /route-focus-box/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /requestedAutofocus/);
+    assert.match(html, /Last Quickstart Action/);
+    assert.match(html, /renderQuickstartResultRecap/);
+    assert.match(html, /renderQuickstartCountTransition\("freshCards"/);
     assert.match(html, /reviewMode/);
     assert.match(html, /Route reason:/);
     assert.match(html, /Open this page from launch workflow or a routed workspace action/);

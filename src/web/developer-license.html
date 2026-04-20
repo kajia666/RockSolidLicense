@@ -801,6 +801,53 @@
         `;
       }
 
+      function renderQuickstartCountTransition(label, beforeValue, afterValue) {
+        if (beforeValue === undefined && afterValue === undefined) {
+          return "";
+        }
+        return tag(`${label}:${beforeValue ?? 0}->${afterValue ?? 0}`, Number(afterValue ?? 0) > Number(beforeValue ?? 0) ? "ok" : "");
+      }
+
+      function renderQuickstartResultRecap(result = null) {
+        if (!result || typeof result !== "object") {
+          return "";
+        }
+        const before = result.before?.counts || {};
+        const after = result.after?.counts || {};
+        const created = result.created && typeof result.created === "object" ? result.created : {};
+        const createdBatchList = Array.isArray(result.createdBatches)
+          ? result.createdBatches
+          : (Array.isArray(created.cardBatches) ? created.cardBatches : []);
+        const transitions = [
+          renderQuickstartCountTransition("policies", before.policies, after.policies),
+          renderQuickstartCountTransition("freshCards", before.freshCards, after.freshCards),
+          renderQuickstartCountTransition("accounts", before.accounts, after.accounts),
+          renderQuickstartCountTransition("activeEntitlements", before.activeEntitlements, after.activeEntitlements)
+        ].filter(Boolean).join("");
+        const createdBits = [
+          created.policy?.name ? tag(`policy:${created.policy.name}`, "ok") : "",
+          created.cardBatch?.batchCode ? tag(`batch:${created.cardBatch.batchCode}`, "ok") : "",
+          createdBatchList.length ? createdBatchList.map((item) => tag(`batch:${item.batchCode || item.label || item.key || "-"}`, "ok")).join("") : "",
+          created.account?.username ? tag(`account:${created.account.username}`, "ok") : "",
+          created.entitlement?.username ? tag(`entitlement:${created.entitlement.username}`, "ok") : ""
+        ].filter(Boolean).join("");
+        const inventoryStates = Array.isArray(result.inventoryStates) ? result.inventoryStates.slice(0, 4) : [];
+        return `
+          <div class="hint" style="margin-top:12px;">
+            <strong>Last Quickstart Action</strong>
+            <div style="margin-top:8px;">
+              ${tag(`after:${result.followUp?.operationLabel || result.followUp?.operation || "launch"}`, "ok")}
+              ${result.productCode ? tag(`project:${result.productCode}`, "ok") : ""}
+              ${result.requestedMode ? tag(`mode:${result.requestedMode}`, "ok") : ""}
+            </div>
+            <div class="hint" style="margin-top:8px;">${esc(result.message || "The latest launch quickstart action is ready for review.")}</div>
+            ${transitions ? `<div style="margin-top:8px;">${transitions}</div>` : ""}
+            ${createdBits ? `<div style="margin-top:8px;">${createdBits}</div>` : ""}
+            ${inventoryStates.length ? `<div class="hint" style="margin-top:8px;">Inventory after action: ${esc(inventoryStates.map((item) => `${item.label || item.key || "batch"} ${item.freshCount ?? 0}/${item.targetCount ?? item.count ?? 0} (${String(item.status || item.inventoryStatus || "-").toUpperCase()})`).join(" | "))}</div>` : ""}
+          </div>
+        `;
+      }
+
       function renderQuickstartActionButtons(actions = []) {
         const uniqueActions = [];
         const seenKeys = new Set();
@@ -1041,6 +1088,7 @@
           ${renderQuickstartRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatQuickstartInventoryRecommendation)}
           ${renderQuickstartRecommendationList("First Batch Card Suggestions", firstBatchCardRecommendations, formatQuickstartCardRecommendation)}
           ${renderQuickstartRecommendationList("First Ops Actions", firstOpsActions, formatQuickstartOpsAction)}
+          ${renderQuickstartResultRecap(quickstartResult)}
           ${renderQuickstartFollowUp(quickstartResult)}
         `;
       }

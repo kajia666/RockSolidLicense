@@ -221,6 +221,7 @@
       let lastExportDownload = null;
       let preparedFocus = null;
       let lastMutation = null;
+      let routeReviewDisplayMode = "all";
       let overviewFocusMap = new Map();
       const AUDIT_PRESETS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
       const routeParams = new URLSearchParams(window.location.search);
@@ -643,6 +644,39 @@
         return bits.join(" | ");
       }
 
+      function routeReviewSectionNode(section) {
+        switch (section) {
+          case "accounts":
+            return "accounts-body";
+          case "entitlements":
+            return "entitlements-body";
+          case "sessions":
+            return "sessions-body";
+          case "devices":
+            return "devices-body";
+          case "audit":
+            return "audit-body";
+          default:
+            return currentOpsAutofocusTarget();
+        }
+      }
+
+      function focusRouteReviewSection(section = "") {
+        const node = el(routeReviewSectionNode(section));
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function routeReviewScopedItems(items = [], matcher) {
+        if (!hasRouteReviewFilters() || routeReviewDisplayMode !== "matched") {
+          return items;
+        }
+        const active = currentRouteReviewFilters();
+        return items.filter((item) => matcher(item, active));
+      }
+
       function buildOpsRouteContext(fallbackTitle = "", fallbackReason = "") {
         return {
           routeTitle: String(requestedRouteTitle || fallbackTitle || currentOpsRouteFocus().title || "Developer Ops").trim(),
@@ -680,6 +714,7 @@
         const box = el("route-review-box");
         const review = collectRouteReview();
         if (!review.active) {
+          routeReviewDisplayMode = "all";
           box.innerHTML = `<div class="hint">Open this page from launch workflow or another routed workspace action to summarize the routed launch-day review here.</div>`;
           return;
         }
@@ -703,18 +738,29 @@
         const highlightedEvents = review.highlightedEvents.length
           ? review.highlightedEvents.map((item) => renderTag(item, true)).join("")
           : '<span class="hint">No routed audit events matched yet.</span>';
+        const reviewButtons = [
+          review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
+          review.matchedEntitlements.length ? `<button type="button" class="secondary" data-route-review-action="review-entitlements">Review Entitlements</button>` : "",
+          review.matchedSessions.length ? `<button type="button" class="secondary" data-route-review-action="review-sessions">Review Sessions</button>` : "",
+          review.matchedDevices.length ? `<button type="button" class="secondary" data-route-review-action="review-devices">Review Devices</button>` : "",
+          review.matchedAuditLogs.length ? `<button type="button" class="secondary" data-route-review-action="review-audit">Review Audit</button>` : ""
+        ].filter(Boolean).join("");
         box.innerHTML = `
           <div><strong>Route Review</strong> ${target.productCode ? renderTag(`project:${target.productCode}`, true) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
           <div class="hint" style="margin-top:8px;">Matching records: ${esc(formatRouteReviewSummary(review))}.</div>
           <div class="audit-meta" style="margin-top:10px;">${filterTags || '<span class="hint">No route filters captured yet.</span>'}</div>
+          <div class="audit-meta" style="margin-top:10px;">${routeReviewDisplayMode === "matched" ? renderTag("view:routed-hits-only", true) : renderTag("view:full-scope", true)}</div>
           <div class="audit-meta" style="margin-top:10px;">${counts}</div>
           <div class="hint" style="margin-top:10px;">Highlighted audit events</div>
           <div class="audit-meta" style="margin-top:8px;">${highlightedEvents}</div>
           <div class="actions" style="margin-top:12px;">
+            <button type="button" class="secondary" data-route-review-action="mode-matched" ${routeReviewDisplayMode === "matched" ? "disabled" : ""}>Show Routed Hits Only</button>
+            <button type="button" class="secondary" data-route-review-action="mode-all" ${routeReviewDisplayMode === "all" ? "disabled" : ""}>Show Full Scope</button>
             <button type="button" class="secondary" data-route-review-action="refresh" ${token ? "" : "disabled"}>Refresh Route Review</button>
             <button type="button" class="secondary" data-route-review-action="download" ${token ? "" : "disabled"}>Download Routed Summary</button>
             <button type="button" data-route-review-action="scroll">Scroll To Focus</button>
           </div>
+          ${reviewButtons ? `<div class="actions" style="margin-top:8px;">${reviewButtons}</div>` : ""}
         `;
       }
 
@@ -733,6 +779,18 @@
       }
 
       async function handleRouteReviewAction(actionKey) {
+        if (actionKey === "mode-matched") {
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          setStatus(`Developer ops narrowed to routed hits only. ${formatRouteReviewSummary()}.`);
+          return;
+        }
+        if (actionKey === "mode-all") {
+          routeReviewDisplayMode = "all";
+          renderAll();
+          setStatus("Developer ops returned to the full scoped view.");
+          return;
+        }
         if (actionKey === "refresh") {
           await refreshOps();
           setStatus(`Route review refreshed. ${formatRouteReviewSummary()}.`);
@@ -745,6 +803,14 @@
         if (actionKey === "scroll") {
           focusOpsAutofocusTarget();
           setStatus(`Route review focus moved to ${requestedAutofocus || "snapshot"}. ${formatRouteReviewSummary()}.`);
+          return;
+        }
+        if (actionKey.startsWith("review-")) {
+          const section = actionKey.replace("review-", "");
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          focusRouteReviewSection(section);
+          setStatus(`Reviewing routed ${section}. ${formatRouteReviewSummary()}.`);
         }
       }
 
@@ -2464,39 +2530,45 @@
 
       function renderAccounts() {
         const body = el("accounts-body");
-        if (!snapshot.accounts.length) {
-          body.innerHTML = `<tr><td colspan="5">No scoped accounts found.</td></tr>`;
+        const items = routeReviewScopedItems(snapshot.accounts, matchesRouteReviewAccount);
+        if (!items.length) {
+          body.innerHTML = `<tr><td colspan="5">${routeReviewDisplayMode === "matched" && hasRouteReviewFilters() ? "No routed accounts matched." : "No scoped accounts found."}</td></tr>`;
           return;
         }
-        body.innerHTML = snapshot.accounts.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewAccount(item) ? "route-hit" : ""}" data-account-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${Number(item.activeEntitlementCount || 0)}</td><td>${Number(item.activeSessionCount || 0)}</td></tr>`).join("");
+        body.innerHTML = items.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewAccount(item) ? "route-hit" : ""}" data-account-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${Number(item.activeEntitlementCount || 0)}</td><td>${Number(item.activeSessionCount || 0)}</td></tr>`).join("");
         bindRows("#accounts-body tr[data-account-id]", (data) => { el("account-id").value = data.accountId || ""; el("account-status").value = data.status || "active"; });
       }
 
       function renderEntitlements() {
         const body = el("entitlements-body");
-        if (!snapshot.entitlements.length) {
-          body.innerHTML = `<tr><td colspan="5">No scoped entitlements found.</td></tr>`;
+        const items = routeReviewScopedItems(snapshot.entitlements, matchesRouteReviewEntitlement);
+        if (!items.length) {
+          body.innerHTML = `<tr><td colspan="5">${routeReviewDisplayMode === "matched" && hasRouteReviewFilters() ? "No routed entitlements matched." : "No scoped entitlements found."}</td></tr>`;
           return;
         }
-        body.innerHTML = snapshot.entitlements.map((item) => { const grant = item.grantType === "points" ? `points ${Number(item.remainingPoints || 0)}/${Number(item.totalPoints || 0)}` : `until ${esc(item.endsAt || "-")}`; return `<tr class="${hasRouteReviewFilters() && matchesRouteReviewEntitlement(item) ? "route-hit" : ""}" data-entitlement-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.productCode)}</span></td><td>${esc(item.policyName)}</td><td>${renderTag(item.lifecycleStatus || item.status)}</td><td>${grant}</td><td>${esc(item.endsAt || "-")}</td></tr>`; }).join("");
+        body.innerHTML = items.map((item) => { const grant = item.grantType === "points" ? `points ${Number(item.remainingPoints || 0)}/${Number(item.totalPoints || 0)}` : `until ${esc(item.endsAt || "-")}`; return `<tr class="${hasRouteReviewFilters() && matchesRouteReviewEntitlement(item) ? "route-hit" : ""}" data-entitlement-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.productCode)}</span></td><td>${esc(item.policyName)}</td><td>${renderTag(item.lifecycleStatus || item.status)}</td><td>${grant}</td><td>${esc(item.endsAt || "-")}</td></tr>`; }).join("");
         bindRows("#entitlements-body tr[data-entitlement-id]", (data) => { el("entitlement-id").value = data.entitlementId || ""; el("entitlement-status").value = data.status || "active"; });
       }
 
       function renderSessions() {
         const body = el("sessions-body");
-        if (!snapshot.sessions.length) {
-          body.innerHTML = `<tr><td colspan="5">No scoped sessions found.</td></tr>`;
+        const items = routeReviewScopedItems(snapshot.sessions, matchesRouteReviewSession);
+        if (!items.length) {
+          body.innerHTML = `<tr><td colspan="5">${routeReviewDisplayMode === "matched" && hasRouteReviewFilters() ? "No routed sessions matched." : "No scoped sessions found."}</td></tr>`;
           return;
         }
-        body.innerHTML = snapshot.sessions.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewSession(item) ? "route-hit" : ""}" data-session-id="${esc(item.id)}"><td><span class="mono">${esc(item.id)}</span><br>${esc(item.fingerprint || "-")}</td><td>${esc(item.username)}</td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.lastHeartbeatAt))}</td></tr>`).join("");
+        body.innerHTML = items.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewSession(item) ? "route-hit" : ""}" data-session-id="${esc(item.id)}"><td><span class="mono">${esc(item.id)}</span><br>${esc(item.fingerprint || "-")}</td><td>${esc(item.username)}</td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.lastHeartbeatAt))}</td></tr>`).join("");
         bindRows("#sessions-body tr[data-session-id]", (data) => { el("session-id").value = data.sessionId || ""; });
       }
 
       function renderDevices() {
         const body = el("devices-body");
-        const items = [...snapshot.bindings.map((item) => ({ kind:"binding", id:item.id, identity:item.fingerprint, projectCode:item.productCode, status:item.status, updatedAt:item.lastBoundAt || item.revokedAt || "-", fingerprint:item.fingerprint })), ...snapshot.blocks.map((item) => ({ kind:"block", id:item.id, identity:item.fingerprint, projectCode:item.productCode, status:item.status, updatedAt:item.updatedAt || item.releasedAt || "-", fingerprint:item.fingerprint }))];
+        const items = routeReviewScopedItems(
+          [...snapshot.bindings.map((item) => ({ kind:"binding", id:item.id, identity:item.fingerprint, projectCode:item.productCode, productCode:item.productCode, status:item.status, updatedAt:item.lastBoundAt || item.revokedAt || "-", fingerprint:item.fingerprint })), ...snapshot.blocks.map((item) => ({ kind:"block", id:item.id, identity:item.fingerprint, projectCode:item.productCode, productCode:item.productCode, status:item.status, updatedAt:item.updatedAt || item.releasedAt || "-", fingerprint:item.fingerprint }))],
+          matchesRouteReviewDevice
+        );
         if (!items.length) {
-          body.innerHTML = `<tr><td colspan="5">No scoped bindings or blocks found.</td></tr>`;
+          body.innerHTML = `<tr><td colspan="5">${routeReviewDisplayMode === "matched" && hasRouteReviewFilters() ? "No routed devices matched." : "No scoped bindings or blocks found."}</td></tr>`;
           return;
         }
         body.innerHTML = items.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewDevice(item) ? "route-hit" : ""}" data-kind="${esc(item.kind)}" data-id="${esc(item.id)}" data-project-code="${esc(item.projectCode)}" data-fingerprint="${esc(item.fingerprint)}"><td><span class="tag ${item.kind === "binding" ? "ok" : "danger"}">${esc(item.kind)}</span></td><td><strong>${esc(item.identity)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.projectCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.updatedAt))}</td></tr>`).join("");
@@ -2505,11 +2577,12 @@
 
       function renderAuditLogs() {
         const body = el("audit-body");
-        if (!snapshot.auditLogs.length) {
-          body.innerHTML = `<tr><td colspan="5">No scoped audit logs found.</td></tr>`;
+        const items = routeReviewScopedItems(snapshot.auditLogs, matchesRouteReviewAudit);
+        if (!items.length) {
+          body.innerHTML = `<tr><td colspan="5">${routeReviewDisplayMode === "matched" && hasRouteReviewFilters() ? "No routed audit logs matched." : "No scoped audit logs found."}</td></tr>`;
           return;
         }
-        body.innerHTML = snapshot.auditLogs.map((item) => {
+        body.innerHTML = items.map((item) => {
           const scopeBits = auditScopeBits(item);
           const detailBits = auditDetailBits(item);
           return `<tr class="${hasRouteReviewFilters() && matchesRouteReviewAudit(item) ? "route-hit" : ""}" data-audit-id="${esc(item.id)}"><td><div class="audit-summary"><strong>${esc(item.eventType)}</strong>${detailBits.length ? `<div class="hint">${esc(detailBits.join(" | "))}</div>` : `<div class="hint">No extra metadata summary.</div>`}</div></td><td>${esc(item.actorType || "-")}<br><span class="mono">${esc(item.actorId || "-")}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${scopeBits.length ? `<div class="audit-meta">${scopeBits.map((value) => `<span class="tag">${esc(value)}</span>`).join("")}</div>` : "-"}${item.metadata?.reason ? `<div class="hint">reason=${esc(item.metadata.reason)}</div>` : ""}</td><td>${esc(formatTime(item.createdAt))}</td></tr>`;
@@ -2562,6 +2635,7 @@
         lastExportDownload = null;
         preparedFocus = null;
         lastMutation = null;
+        routeReviewDisplayMode = "all";
         setMeta();
         renderAll();
       }

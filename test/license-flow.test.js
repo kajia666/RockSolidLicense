@@ -10910,6 +10910,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-route-review-action/);
     assert.match(html, /Matching records:/);
     assert.match(html, /Highlighted audit events/);
+    assert.match(html, /Primary Match/);
+    assert.match(html, /Prepare Primary Match/);
     assert.match(html, /route-hit/);
     assert.match(html, /Show Routed Hits Only/);
     assert.match(html, /Show Full Scope/);
@@ -10917,6 +10919,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Review Accounts/);
     assert.match(html, /Review Sessions/);
     assert.match(html, /routeReviewScopedItems/);
+    assert.match(html, /routeReviewPreparedKey/);
+    assert.match(html, /buildDeveloperFocusFromAudit/);
+    assert.match(html, /buildPrimaryRouteReviewFocus/);
+    assert.match(html, /applyDeveloperFocusItem/);
+    assert.match(html, /preparePrimaryRouteReviewFocus/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

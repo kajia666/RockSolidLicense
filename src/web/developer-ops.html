@@ -222,6 +222,7 @@
       let preparedFocus = null;
       let lastMutation = null;
       let routeReviewDisplayMode = "all";
+      let routeReviewPreparedKey = "";
       let overviewFocusMap = new Map();
       const AUDIT_PRESETS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
       const routeParams = new URLSearchParams(window.location.search);
@@ -618,6 +619,183 @@
         };
       }
 
+      function buildDeveloperAccountFocusItem(item = {}) {
+        return {
+          ...item,
+          accountId: item.accountId || item.id || "",
+          accountStatus: item.accountStatus || item.status || "active"
+        };
+      }
+
+      function buildDeveloperEntitlementFocusItem(item = {}) {
+        return {
+          ...item,
+          entitlementId: item.entitlementId || item.id || ""
+        };
+      }
+
+      function buildDeveloperSessionFocusItem(item = {}) {
+        return {
+          ...item,
+          sessionId: item.sessionId || item.id || ""
+        };
+      }
+
+      function buildDeveloperFocusFromAudit(item = {}) {
+        const metadata = item.metadata || {};
+        const productCode = metadataSingleValue(metadata, ["productCode", "code", "projectCode", "softwareCode"]) || item.productCode || requestedProductCode || "";
+        const username = metadataSingleValue(metadata, ["username", "tokenSubject", "redeemedUsername"]) || item.username || "";
+        const reason = metadataSingleValue(metadata, ["reason", "revokedReason", "releaseReason"]);
+        const fingerprint = metadataSingleValue(metadata, ["deviceFingerprint", "fingerprint"]);
+        if (item.entityType === "account" || metadataSingleValue(metadata, ["accountId"])) {
+          return {
+            kind: "account",
+            item: buildDeveloperAccountFocusItem({
+              productCode,
+              username,
+              reason,
+              fingerprint,
+              accountId: item.entityType === "account" ? item.entityId || metadataSingleValue(metadata, ["accountId"]) : metadataSingleValue(metadata, ["accountId"]),
+              status: metadataSingleValue(metadata, ["status", "previousStatus"])
+            })
+          };
+        }
+        if (item.entityType === "entitlement" || metadataSingleValue(metadata, ["entitlementId"])) {
+          return {
+            kind: "entitlement",
+            item: buildDeveloperEntitlementFocusItem({
+              productCode,
+              username,
+              reason,
+              entitlementId: item.entityType === "entitlement" ? item.entityId || metadataSingleValue(metadata, ["entitlementId"]) : metadataSingleValue(metadata, ["entitlementId"]),
+              status: metadataSingleValue(metadata, ["status", "previousStatus"])
+            })
+          };
+        }
+        if (item.entityType === "session" || metadataSingleValue(metadata, ["sessionId"])) {
+          return {
+            kind: "session",
+            item: buildDeveloperSessionFocusItem({
+              productCode,
+              username,
+              reason,
+              fingerprint,
+              status: metadataSingleValue(metadata, ["status", "previousStatus"]),
+              sessionId: item.entityType === "session" ? item.entityId || metadataSingleValue(metadata, ["sessionId"]) : metadataSingleValue(metadata, ["sessionId"])
+            })
+          };
+        }
+        if (item.entityType === "device_binding" || metadataSingleValue(metadata, ["bindingId"])) {
+          return {
+            kind: "device",
+            item: buildDeveloperDeviceFocusItem({
+              productCode,
+              username,
+              reason,
+              fingerprint,
+              status: metadataSingleValue(metadata, ["status", "previousStatus"]),
+              id: item.entityType === "device_binding" ? item.entityId || metadataSingleValue(metadata, ["bindingId"]) : metadataSingleValue(metadata, ["bindingId"]),
+              bindingId: item.entityType === "device_binding" ? item.entityId || metadataSingleValue(metadata, ["bindingId"]) : metadataSingleValue(metadata, ["bindingId"])
+            }, "binding")
+          };
+        }
+        if (item.entityType === "device_block" || metadataSingleValue(metadata, ["blockId"])) {
+          return {
+            kind: "device",
+            item: buildDeveloperDeviceFocusItem({
+              productCode,
+              username,
+              reason,
+              fingerprint,
+              status: metadataSingleValue(metadata, ["status", "previousStatus"]),
+              id: item.entityType === "device_block" ? item.entityId || metadataSingleValue(metadata, ["blockId"]) : metadataSingleValue(metadata, ["blockId"]),
+              blockId: item.entityType === "device_block" ? item.entityId || metadataSingleValue(metadata, ["blockId"]) : metadataSingleValue(metadata, ["blockId"])
+            }, "block")
+          };
+        }
+        return null;
+      }
+
+      function routeReviewPrimarySections(preferredSection = "") {
+        const normalized = String(preferredSection || "").trim().toLowerCase();
+        if (normalized === "accounts") {
+          return ["accounts", "entitlements", "sessions", "devices", "audit"];
+        }
+        if (normalized === "entitlements") {
+          return ["entitlements", "accounts", "sessions", "devices", "audit"];
+        }
+        if (normalized === "sessions") {
+          return ["sessions", "audit", "accounts", "devices", "entitlements"];
+        }
+        if (normalized === "devices" || normalized === "bindings" || normalized === "blocks") {
+          return ["devices", "sessions", "audit", "accounts", "entitlements"];
+        }
+        if (normalized === "audit") {
+          return ["audit", "sessions", "accounts", "devices", "entitlements"];
+        }
+        return ["accounts", "sessions", "audit", "devices", "entitlements"];
+      }
+
+      function formatRouteReviewPrimaryTitle(primary = null) {
+        if (!primary?.kind) {
+          return "No routed primary match yet.";
+        }
+        return buildPreparedFocusTitle(primary.kind, primary.item || {});
+      }
+
+      function formatRouteReviewPrimarySummary(primary = null) {
+        if (!primary?.kind) {
+          return "No routed primary object is ready yet.";
+        }
+        const base = buildPreparedFocusSummary(primary.kind, primary.item || {});
+        const section = primary.section ? `section=${primary.section}` : "";
+        return [section, base].filter(Boolean).join(" | ");
+      }
+
+      function buildPrimaryRouteReviewFocus(review = collectRouteReview(), preferredSection = "") {
+        const sectionOrder = routeReviewPrimarySections(preferredSection || review.focus || requestedAutofocus || "");
+        for (const section of sectionOrder) {
+          if (section === "accounts" && review.matchedAccounts.length) {
+            return {
+              kind: "account",
+              section,
+              item: buildDeveloperAccountFocusItem(review.matchedAccounts[0])
+            };
+          }
+          if (section === "entitlements" && review.matchedEntitlements.length) {
+            return {
+              kind: "entitlement",
+              section,
+              item: buildDeveloperEntitlementFocusItem(review.matchedEntitlements[0])
+            };
+          }
+          if (section === "sessions" && review.matchedSessions.length) {
+            return {
+              kind: "session",
+              section,
+              item: buildDeveloperSessionFocusItem(review.matchedSessions[0])
+            };
+          }
+          if (section === "devices" && review.matchedDevices.length) {
+            return {
+              kind: "device",
+              section,
+              item: buildDeveloperDeviceFocusItem(review.matchedDevices[0], review.matchedDevices[0]?.kind || "binding")
+            };
+          }
+          if (section === "audit" && review.matchedAuditLogs.length) {
+            const auditFocus = buildDeveloperFocusFromAudit(review.matchedAuditLogs[0]);
+            if (auditFocus?.kind) {
+              return {
+                ...auditFocus,
+                section
+              };
+            }
+          }
+        }
+        return null;
+      }
+
       function formatRouteReviewSummary(review = collectRouteReview()) {
         if (!review.active) {
           return "No routed launch review is active yet.";
@@ -644,6 +822,161 @@
           bits.push(`audit=${review.matchedAuditLogs.length}`);
         }
         return bits.join(" | ");
+      }
+
+      function developerFocusSignature(kind = "", item = {}) {
+        if (kind === "account") {
+          return `account:${item.accountId || item.id || item.username || "-"}`;
+        }
+        if (kind === "entitlement") {
+          return `entitlement:${item.entitlementId || item.id || "-"}`;
+        }
+        if (kind === "session") {
+          return `session:${item.sessionId || item.id || "-"}`;
+        }
+        if (kind === "device") {
+          return `device:${item.bindingId || item.blockId || item.id || item.fingerprint || "-"}`;
+        }
+        return `${kind}:${item.id || item.username || item.fingerprint || "-"}`;
+      }
+
+      async function applyDeveloperFocusItem(kind, item = {}, options = {}) {
+        const settings = {
+          refreshSnapshot: false,
+          focusControls: false,
+          renderOverview: true,
+          statusMessage: "",
+          routePreparedKey: "",
+          ...options
+        };
+        if (kind === "account") {
+          if (item.productCode) {
+            el("filter-product-code").value = item.productCode;
+            el("block-product-code").value = item.productCode;
+          }
+          if (item.username) {
+            el("filter-username").value = item.username;
+          }
+          if (item.accountId || item.id) {
+            el("account-id").value = item.accountId || item.id;
+          }
+          if (item.accountStatus || item.status) {
+            el("account-status").value = item.accountStatus || item.status;
+          }
+          if (item.reason) {
+            el("reason").value = item.reason;
+          }
+        }
+        if (kind === "entitlement") {
+          if (item.productCode) {
+            el("filter-product-code").value = item.productCode;
+            el("block-product-code").value = item.productCode;
+          }
+          if (item.username) {
+            el("filter-username").value = item.username;
+          }
+          if (item.entitlementId || item.id) {
+            el("entitlement-id").value = item.entitlementId || item.id;
+          }
+          if (item.status) {
+            el("entitlement-status").value = item.status;
+          }
+          if (item.reason) {
+            el("reason").value = item.reason;
+          }
+        }
+        if (kind === "session") {
+          if (item.productCode) {
+            el("filter-product-code").value = item.productCode;
+            el("block-product-code").value = item.productCode;
+          }
+          if (item.username) {
+            el("filter-username").value = item.username;
+          }
+          if (item.sessionId || item.id) {
+            const sessionId = item.sessionId || item.id;
+            el("session-id").value = sessionId;
+            el("filter-search").value = sessionId;
+          }
+          if (item.fingerprint) {
+            el("block-fingerprint").value = item.fingerprint;
+          }
+          if (item.reason) {
+            el("reason").value = item.reason;
+          }
+        }
+        if (kind === "device") {
+          if (item.productCode || item.projectCode) {
+            const productCode = item.productCode || item.projectCode;
+            el("filter-product-code").value = productCode;
+            el("block-product-code").value = productCode;
+          }
+          if (item.username) {
+            el("filter-username").value = item.username;
+          }
+          if (item.fingerprint) {
+            el("filter-search").value = item.fingerprint;
+            el("block-fingerprint").value = item.fingerprint;
+          }
+          if (item.bindingId) {
+            el("binding-id").value = item.bindingId;
+          }
+          if (item.blockId) {
+            el("block-id").value = item.blockId;
+          }
+          if (item.reason) {
+            el("reason").value = item.reason;
+          }
+        }
+        if (settings.refreshSnapshot && token) {
+          await refreshOps(false);
+        }
+        const preparedControl = applyRecommendedControl(item.recommendedControl || {});
+        rememberPreparedFocus(kind, item, preparedControl);
+        routeReviewPreparedKey = settings.routePreparedKey || "";
+        if (settings.renderOverview) {
+          renderSnapshotOverview();
+        }
+        if (settings.focusControls || preparedControl) {
+          focusQuickControlsCard();
+        }
+        if (settings.statusMessage) {
+          setStatus(settings.statusMessage);
+        }
+        return { preparedControl };
+      }
+
+      async function preparePrimaryRouteReviewFocus(options = {}) {
+        const review = collectRouteReview();
+        if (!review.active) {
+          return null;
+        }
+        const primary = buildPrimaryRouteReviewFocus(review, options.preferredSection || review.focus || requestedAutofocus || "");
+        if (!primary?.kind) {
+          return null;
+        }
+        const signature = developerFocusSignature(primary.kind, primary.item || {});
+        if (!options.force) {
+          if (routeReviewPreparedKey === signature) {
+            return primary;
+          }
+          if (
+            preparedFocus?.kind === primary.kind
+            && developerFocusMatchesRecord({ kind: primary.kind, item: primary.item || {} }, preparedFocus.item || {})
+          ) {
+            routeReviewPreparedKey = signature;
+            return primary;
+          }
+        }
+        const prepared = await applyDeveloperFocusItem(primary.kind, primary.item || {}, {
+          focusControls: Boolean(options.focusControls),
+          statusMessage: options.announce === false ? "" : `Primary routed focus prepared: ${formatRouteReviewPrimaryTitle(primary)}${primary.section ? ` | ${primary.section}` : ""}${primary.item?.recommendedControl?.label ? ` | ${primary.item.recommendedControl.label}` : ""}.`,
+          routePreparedKey: signature
+        });
+        return {
+          ...primary,
+          preparedControl: prepared.preparedControl || ""
+        };
       }
 
       function routeReviewSectionNode(section) {
@@ -741,7 +1074,12 @@
         const highlightedEvents = review.highlightedEvents.length
           ? review.highlightedEvents.map((item) => renderTag(item, true)).join("")
           : '<span class="hint">No routed audit events matched yet.</span>';
+        const primaryFocus = buildPrimaryRouteReviewFocus(review);
+        const primaryFocusMarkup = primaryFocus?.kind
+          ? `<div class="audit-meta" style="margin-top:8px;">${renderTag(primaryFocus.section || "primary")} ${renderTag(primaryFocus.kind)} ${renderTag(formatRouteReviewPrimaryTitle(primaryFocus))}${primaryFocus.preparedControl ? renderTag(primaryFocus.preparedControl) : ""}</div><div class="hint" style="margin-top:6px;">${esc(formatRouteReviewPrimarySummary(primaryFocus))}</div>`
+          : `<div class="hint" style="margin-top:8px;">No routed primary object is ready yet.</div>`;
         const reviewButtons = [
+          primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="prepare-primary">Prepare Primary Match</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
           review.matchedEntitlements.length ? `<button type="button" class="secondary" data-route-review-action="review-entitlements">Review Entitlements</button>` : "",
           review.matchedSessions.length ? `<button type="button" class="secondary" data-route-review-action="review-sessions">Review Sessions</button>` : "",
@@ -756,6 +1094,8 @@
           <div class="audit-meta" style="margin-top:10px;">${counts}</div>
           <div class="hint" style="margin-top:10px;">Highlighted audit events</div>
           <div class="audit-meta" style="margin-top:8px;">${highlightedEvents}</div>
+          <div class="hint" style="margin-top:10px;">Primary Match</div>
+          ${primaryFocusMarkup}
           <div class="actions" style="margin-top:12px;">
             <button type="button" class="secondary" data-route-review-action="mode-matched" ${routeReviewDisplayMode === "matched" ? "disabled" : ""}>Show Routed Hits Only</button>
             <button type="button" class="secondary" data-route-review-action="mode-all" ${routeReviewDisplayMode === "all" ? "disabled" : ""}>Show Full Scope</button>
@@ -779,13 +1119,17 @@
           return;
         }
         focusOpsAutofocusTarget();
+        if (routeReviewDisplayMode === "matched" || hasRouteReviewFilters()) {
+          await preparePrimaryRouteReviewFocus({ announce: false });
+        }
       }
 
       async function handleRouteReviewAction(actionKey) {
         if (actionKey === "mode-matched") {
           routeReviewDisplayMode = "matched";
           renderAll();
-          setStatus(`Developer ops narrowed to routed hits only. ${formatRouteReviewSummary()}.`);
+          const primary = await preparePrimaryRouteReviewFocus({ announce: false });
+          setStatus(`Developer ops narrowed to routed hits only. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
           return;
         }
         if (actionKey === "mode-all") {
@@ -796,7 +1140,8 @@
         }
         if (actionKey === "refresh") {
           await refreshOps();
-          setStatus(`Route review refreshed. ${formatRouteReviewSummary()}.`);
+          const primary = await preparePrimaryRouteReviewFocus({ announce: false });
+          setStatus(`Route review refreshed. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
           return;
         }
         if (actionKey === "download") {
@@ -808,12 +1153,20 @@
           setStatus(`Route review focus moved to ${requestedAutofocus || "snapshot"}. ${formatRouteReviewSummary()}.`);
           return;
         }
+        if (actionKey === "prepare-primary") {
+          const primary = await preparePrimaryRouteReviewFocus({ force: true, focusControls: true });
+          if (!primary?.kind) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
+          }
+          return;
+        }
         if (actionKey.startsWith("review-")) {
           const section = actionKey.replace("review-", "");
           routeReviewDisplayMode = "matched";
           renderAll();
           focusRouteReviewSection(section);
-          setStatus(`Reviewing routed ${section}. ${formatRouteReviewSummary()}.`);
+          const primary = await preparePrimaryRouteReviewFocus({ force: true, preferredSection: section, announce: false });
+          setStatus(`Reviewing routed ${section}. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
         }
       }
 
@@ -2527,7 +2880,15 @@
 
       function bindRows(selector, handler) {
         for (const row of document.querySelectorAll(selector)) {
-          row.addEventListener("click", () => handler(row.dataset));
+          row.addEventListener("click", () => {
+            const result = handler(row.dataset);
+            if (result && typeof result.then === "function") {
+              result.catch((error) => {
+                setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+                setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+              });
+            }
+          });
         }
       }
 
@@ -2539,7 +2900,12 @@
           return;
         }
         body.innerHTML = items.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewAccount(item) ? "route-hit" : ""}" data-account-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${Number(item.activeEntitlementCount || 0)}</td><td>${Number(item.activeSessionCount || 0)}</td></tr>`).join("");
-        bindRows("#accounts-body tr[data-account-id]", (data) => { el("account-id").value = data.accountId || ""; el("account-status").value = data.status || "active"; });
+        bindRows("#accounts-body tr[data-account-id]", async (data) => {
+          const item = snapshot.accounts.find((entry) => entry.id === data.accountId) || { id: data.accountId, status: data.status, productCode: el("filter-product-code").value.trim() };
+          await applyDeveloperFocusItem("account", buildDeveloperAccountFocusItem(item), {
+            statusMessage: `Account focus prepared: ${item.username || data.accountId}.`
+          });
+        });
       }
 
       function renderEntitlements() {
@@ -2550,7 +2916,12 @@
           return;
         }
         body.innerHTML = items.map((item) => { const grant = item.grantType === "points" ? `points ${Number(item.remainingPoints || 0)}/${Number(item.totalPoints || 0)}` : `until ${esc(item.endsAt || "-")}`; return `<tr class="${hasRouteReviewFilters() && matchesRouteReviewEntitlement(item) ? "route-hit" : ""}" data-entitlement-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.productCode)}</span></td><td>${esc(item.policyName)}</td><td>${renderTag(item.lifecycleStatus || item.status)}</td><td>${grant}</td><td>${esc(item.endsAt || "-")}</td></tr>`; }).join("");
-        bindRows("#entitlements-body tr[data-entitlement-id]", (data) => { el("entitlement-id").value = data.entitlementId || ""; el("entitlement-status").value = data.status || "active"; });
+        bindRows("#entitlements-body tr[data-entitlement-id]", async (data) => {
+          const item = snapshot.entitlements.find((entry) => entry.id === data.entitlementId) || { id: data.entitlementId, status: data.status, productCode: el("filter-product-code").value.trim() };
+          await applyDeveloperFocusItem("entitlement", buildDeveloperEntitlementFocusItem(item), {
+            statusMessage: `Entitlement focus prepared: ${item.policyName || data.entitlementId}.`
+          });
+        });
       }
 
       function renderSessions() {
@@ -2561,7 +2932,12 @@
           return;
         }
         body.innerHTML = items.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewSession(item) ? "route-hit" : ""}" data-session-id="${esc(item.id)}"><td><span class="mono">${esc(item.id)}</span><br>${esc(item.fingerprint || "-")}</td><td>${esc(item.username)}</td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.lastHeartbeatAt))}</td></tr>`).join("");
-        bindRows("#sessions-body tr[data-session-id]", (data) => { el("session-id").value = data.sessionId || ""; });
+        bindRows("#sessions-body tr[data-session-id]", async (data) => {
+          const item = snapshot.sessions.find((entry) => entry.id === data.sessionId) || { id: data.sessionId, productCode: el("filter-product-code").value.trim() };
+          await applyDeveloperFocusItem("session", buildDeveloperSessionFocusItem(item), {
+            statusMessage: `Session focus prepared: ${item.id || data.sessionId}.`
+          });
+        });
       }
 
       function renderDevices() {
@@ -2575,7 +2951,18 @@
           return;
         }
         body.innerHTML = items.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewDevice(item) ? "route-hit" : ""}" data-kind="${esc(item.kind)}" data-id="${esc(item.id)}" data-project-code="${esc(item.projectCode)}" data-fingerprint="${esc(item.fingerprint)}"><td><span class="tag ${item.kind === "binding" ? "ok" : "danger"}">${esc(item.kind)}</span></td><td><strong>${esc(item.identity)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.projectCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.updatedAt))}</td></tr>`).join("");
-        bindRows("#devices-body tr[data-kind]", (data) => { if (data.kind === "binding") { el("binding-id").value = data.id || ""; } if (data.kind === "block") { el("block-id").value = data.id || ""; } el("block-product-code").value = data.projectCode || ""; el("block-fingerprint").value = data.fingerprint || ""; });
+        bindRows("#devices-body tr[data-kind]", async (data) => {
+          const collection = data.kind === "binding" ? snapshot.bindings : snapshot.blocks;
+          const source = collection.find((entry) => entry.id === data.id) || {
+            id: data.id,
+            productCode: data.projectCode,
+            fingerprint: data.fingerprint,
+            kind: data.kind
+          };
+          await applyDeveloperFocusItem("device", buildDeveloperDeviceFocusItem(source, data.kind || "binding"), {
+            statusMessage: `Device focus prepared: ${source.fingerprint || data.fingerprint || data.id}.`
+          });
+        });
       }
 
       function renderAuditLogs() {
@@ -2590,14 +2977,21 @@
           const detailBits = auditDetailBits(item);
           return `<tr class="${hasRouteReviewFilters() && matchesRouteReviewAudit(item) ? "route-hit" : ""}" data-audit-id="${esc(item.id)}"><td><div class="audit-summary"><strong>${esc(item.eventType)}</strong>${detailBits.length ? `<div class="hint">${esc(detailBits.join(" | "))}</div>` : `<div class="hint">No extra metadata summary.</div>`}</div></td><td>${esc(item.actorType || "-")}<br><span class="mono">${esc(item.actorId || "-")}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${scopeBits.length ? `<div class="audit-meta">${scopeBits.map((value) => `<span class="tag">${esc(value)}</span>`).join("")}</div>` : "-"}${item.metadata?.reason ? `<div class="hint">reason=${esc(item.metadata.reason)}</div>` : ""}</td><td>${esc(formatTime(item.createdAt))}</td></tr>`;
         }).join("");
-        bindRows("#audit-body tr[data-audit-id]", (data) => {
+        bindRows("#audit-body tr[data-audit-id]", async (data) => {
           const item = snapshot.auditLogs.find((entry) => entry.id === data.auditId);
           if (!item) {
             return;
           }
           fillFiltersFromAudit(item);
           fillQuickControlsFromAudit(item);
-          setStatus("Audit row copied into filters and quick controls.");
+          const focus = buildDeveloperFocusFromAudit(item);
+          if (!focus?.kind) {
+            setStatus("Audit row copied into filters and quick controls.");
+            return;
+          }
+          await applyDeveloperFocusItem(focus.kind, focus.item || {}, {
+            statusMessage: `Audit row copied into filters and prepared ${focus.kind} focus.`
+          });
         });
       }
 
@@ -2639,6 +3033,7 @@
         preparedFocus = null;
         lastMutation = null;
         routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
+        routeReviewPreparedKey = "";
         setMeta();
         renderAll();
       }

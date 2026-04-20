@@ -11020,6 +11020,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Route reason:/);
     assert.match(html, /Route review action:/);
     assert.match(html, /Route review mode:/);
+    assert.match(html, /Review Primary Match/);
+    assert.match(html, /Download Primary Match Summary/);
     assert.match(html, /Open this page from launch workflow or another routed workspace action/);
     assert.match(html, /handleOpsRouteFocusAction/);
     assert.match(html, /data-ops-route-focus-action/);
@@ -11030,6 +11032,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Route filters:/);
     assert.match(html, /Direct review target:/);
     assert.match(html, /route-review-box/);
+    assert.match(html, /buildRouteReviewPrimaryDownloadDescriptor/);
     assert.match(html, /renderRouteReview/);
     assert.match(html, /handleRouteReviewAction/);
     assert.match(html, /data-route-review-action/);

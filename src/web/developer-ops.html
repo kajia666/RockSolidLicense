@@ -285,6 +285,8 @@
         const normalized = String(value || "").trim().toLowerCase();
         const allowed = new Set([
           "prepare-primary",
+          "review-primary",
+          "download-primary",
           "review-accounts",
           "review-entitlements",
           "review-sessions",
@@ -300,6 +302,12 @@
         const normalized = normalizeRouteReviewActionValue(actionKey);
         if (normalized === "prepare-primary") {
           return "Prepare Primary Match";
+        }
+        if (normalized === "review-primary") {
+          return "Review Primary Match";
+        }
+        if (normalized === "download-primary") {
+          return "Download Primary Match Summary";
         }
         if (normalized === "review-accounts") {
           return "Review Accounts";
@@ -983,6 +991,73 @@
         return [section, base].filter(Boolean).join(" | ");
       }
 
+      function buildRouteReviewPrimaryDownloadDescriptor(primary = buildPrimaryRouteReviewFocus(), review = collectRouteReview()) {
+        if (!primary?.kind) {
+          return null;
+        }
+        const baseFilters = filters();
+        const item = primary.item || {};
+        const descriptor = {
+          label: "Primary match summary",
+          fileName: "developer-ops-primary-summary.txt",
+          params: {
+            ...baseFilters,
+            productCode: item.productCode || item.projectCode || baseFilters.productCode || requestedProductCode || "",
+            username: item.username || baseFilters.username || "",
+            search: baseFilters.search || "",
+            eventType: baseFilters.eventType || "",
+            actorType: baseFilters.actorType || "",
+            entityType: baseFilters.entityType || "",
+            limit: baseFilters.limit || 60
+          }
+        };
+        if (primary.kind === "account") {
+          descriptor.label = "Primary account summary";
+          descriptor.fileName = "developer-ops-primary-account-summary.txt";
+          descriptor.params.search = "";
+        } else if (primary.kind === "entitlement") {
+          descriptor.label = "Primary entitlement summary";
+          descriptor.fileName = "developer-ops-primary-entitlement-summary.txt";
+          descriptor.params.entityType = "entitlement";
+          descriptor.params.search = "";
+        } else if (primary.kind === "session") {
+          descriptor.label = "Primary session summary";
+          descriptor.fileName = "developer-ops-primary-session-summary.txt";
+          descriptor.params.search = item.sessionId || item.id || baseFilters.search || "";
+          descriptor.params.entityType = descriptor.params.entityType || "session";
+        } else if (primary.kind === "device") {
+          descriptor.label = "Primary device summary";
+          descriptor.fileName = "developer-ops-primary-device-summary.txt";
+          descriptor.params.search = item.fingerprint || baseFilters.search || "";
+          descriptor.params.entityType = item.blockId ? "device_block" : (item.bindingId ? "device_binding" : descriptor.params.entityType || "");
+        }
+        if (!descriptor.params.search) {
+          delete descriptor.params.search;
+        }
+        if (!descriptor.params.username) {
+          delete descriptor.params.username;
+        }
+        if (!descriptor.params.entityType) {
+          delete descriptor.params.entityType;
+        }
+        if (!descriptor.params.actorType) {
+          delete descriptor.params.actorType;
+        }
+        if (!descriptor.params.eventType) {
+          delete descriptor.params.eventType;
+        }
+        if (!descriptor.params.productCode) {
+          delete descriptor.params.productCode;
+        }
+        if (!descriptor.params.limit) {
+          descriptor.params.limit = 60;
+        }
+        if (!review?.active && !descriptor.params.productCode) {
+          return null;
+        }
+        return descriptor;
+      }
+
       function buildPrimaryRouteReviewFocus(review = collectRouteReview(), preferredSection = "") {
         const directFocus = buildRequestedRouteFocus();
         if (directFocus?.kind) {
@@ -1320,6 +1395,8 @@
           : `<div class="hint" style="margin-top:8px;">No routed primary object is ready yet.</div>`;
         const reviewButtons = [
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="prepare-primary">Prepare Primary Match</button>` : "",
+          primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-primary">Review Primary Match</button>` : "",
+          primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-primary" ${token ? "" : "disabled"}>Download Primary Match Summary</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
           review.matchedEntitlements.length ? `<button type="button" class="secondary" data-route-review-action="review-entitlements">Review Entitlements</button>` : "",
           review.matchedSessions.length ? `<button type="button" class="secondary" data-route-review-action="review-sessions">Review Sessions</button>` : "",
@@ -1409,6 +1486,32 @@
             throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
           }
           setStatus(`${options.auto ? "Auto-prepared" : "Prepared"} routed primary match. ${formatRouteReviewSummary()}. Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.`);
+          return;
+        }
+        if (normalizedAction === "review-primary") {
+          const review = collectRouteReview();
+          const primary = buildPrimaryRouteReviewFocus(review, review.focus || requestedAutofocus || "");
+          if (!primary?.kind) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
+          }
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          focusRouteReviewSection(primary.section || requestedAutofocus || "");
+          const prepared = await preparePrimaryRouteReviewFocus({
+            force: true,
+            preferredSection: primary.section || requestedAutofocus || "",
+            announce: false,
+            focusControls: true
+          });
+          setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} primary routed match. ${formatRouteReviewSummary()}. Primary match ready: ${formatRouteReviewPrimaryTitle(prepared || primary)}.`);
+          return;
+        }
+        if (normalizedAction === "download-primary") {
+          const descriptor = buildRouteReviewPrimaryDownloadDescriptor();
+          if (!descriptor) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
+          }
+          await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
           return;
         }
         if (normalizedAction.startsWith("review-")) {
@@ -3322,8 +3425,8 @@
         setOutput(data);
       }
 
-      async function handleExportDownload(format, fallbackFileName, label) {
-        const result = await downloadApiFile(`/api/developer/ops/export/download${q({ ...filters(), format })}`, fallbackFileName);
+      async function handleExportDownload(format, fallbackFileName, label, filterOverrides = {}) {
+        const result = await downloadApiFile(`/api/developer/ops/export/download${q({ ...filters(), ...(filterOverrides || {}), format })}`, fallbackFileName);
         lastExportDownload = result;
         renderSnapshotOverview();
         setStatus(`${label} downloaded: ${result.fileName}`);

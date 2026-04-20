@@ -174,3 +174,10 @@ The routed launch follow-up now also renders a `Route Review` block right inside
 That same routed review now also derives a `Primary Match` from the current routed hits. When the lane lands in `/developer/ops`, the page can automatically prepare the first matching account, entitlement, session, device, or audit-derived object into the quick-control area, keep that object inside the existing `Prepared Control` recap, and let the software author explicitly re-run `Prepare Primary Match` when they want to anchor the next follow-up around the most relevant routed object instead of manually choosing a row first. Normal table-row clicks now use the same focus-preparation path, so day-to-day scoped review and launch-day routed review behave more consistently.
 
 Routed launch-review links can now also carry a `routeAction` such as `Review Accounts`, `Review Sessions`, or `Review Audit`. When that action is present, `/developer/ops` does not stop at preserving filters and direct focus ids; it also auto-enters the matching routed review step so the software author lands much closer to the first real post-launch check instead of having to click one more time.
+
+That same `Route Review` block can now also promote the current `Primary Match` into two direct follow-up actions:
+
+- `Review Primary Match`
+- `Download Primary Match Summary`
+
+So when the routed lane already has a clear first account / entitlement / session / device to inspect, the software author can immediately continue review or export a tighter scoped summary around that object instead of reopening the broad routed export first.

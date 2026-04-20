@@ -55,6 +55,8 @@ Those routed target links now also carry the first matched object itself when po
 
 Those same target links now also carry a routed review action such as `Review Accounts`, `Review Sessions`, or `Review Audit`. So the handoff into `/developer/ops` no longer stops at "open the right page"; it can land in the narrower routed review slice and immediately start the matching review step for the current launch lane.
 
+Once the author lands in `/developer/ops`, that routed review can now also surface the current `Primary Match` as a direct follow-up object. That means the next step is no longer limited to "open ops and look around": the author can immediately `Review Primary Match` or download a `Primary Match Summary` centered on the first routed account / entitlement / session / device that deserves attention.
+
 ## Scoped APIs
 
 - `GET /api/developer/launch-review`

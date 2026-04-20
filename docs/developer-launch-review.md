@@ -20,6 +20,14 @@ That makes it useful when a software author wants one follow-up view for:
 - first-wave runtime or redemption review signals
 - one downloadable review package for QA, support, or launch-duty handoff
 
+It now also derives a review-level:
+
+- `recommended workspace`
+- `action plan`
+- `recommended downloads`
+
+So the software author can move from "what happened after bootstrap / first-batch / refill" straight into "what should we open next" without translating the raw launch-workflow and ops summaries by hand.
+
 ## Scoped APIs
 
 - `GET /api/developer/launch-review`

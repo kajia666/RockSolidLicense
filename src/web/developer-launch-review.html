@@ -219,6 +219,7 @@
           <button class="secondary" id="refresh-review-btn">Refresh Review</button>
         </div>
         <div class="actions" style="margin-top: 10px;">
+          <button class="secondary" id="open-review-recommended-btn">Open Recommended Workspace</button>
           <button class="secondary" id="open-review-project-btn">Open Project Workspace</button>
           <button class="secondary" id="open-review-license-btn">Open License Workspace</button>
           <button class="secondary" id="open-review-launch-btn">Open Launch Workflow</button>
@@ -230,6 +231,17 @@
           <button class="secondary" id="download-review-checksums-btn">Download Review Checksums</button>
           <button class="secondary" id="download-review-zip-btn">Download Review Zip</button>
         </div>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Review Actions</h2>
+          <div id="review-actions-box" class="hint">Generate a launch review package to inspect the recommended workspace, action plan, and follow-up downloads here.</div>
+        </article>
+        <article class="card">
+          <h2>Workspace Path</h2>
+          <div id="review-workspace-box" class="hint">Generate a launch review package to inspect the routed workspace path here.</div>
+        </article>
       </section>
 
       <section class="wide">
@@ -317,6 +329,17 @@
       function renderTag(text, strong = false) {
         return `<span class="tag${strong ? " strong" : ""}">${esc(text)}</span>`;
       }
+      function cloneAction(action = null) {
+        if (!action || typeof action !== "object") {
+          return null;
+        }
+        return {
+          ...action,
+          params: action.params && typeof action.params === "object"
+            ? { ...action.params }
+            : action.params
+        };
+      }
       async function api(path, options = {}) {
         const headers = { ...(options.headers || {}) };
         if (token) headers.Authorization = `Bearer ${token}`;
@@ -386,6 +409,21 @@
           reviewMode: el("review-mode").value.trim() || "matched"
         };
       }
+      function currentReviewSummary() {
+        return reviewPackage?.reviewSummary || {};
+      }
+      function currentReviewActionPlan() {
+        return Array.isArray(currentReviewSummary().actionPlan) ? currentReviewSummary().actionPlan : [];
+      }
+      function currentReviewWorkspaceActions() {
+        return Array.isArray(currentReviewSummary().workspaceActions) ? currentReviewSummary().workspaceActions : [];
+      }
+      function currentReviewRecommendedDownloads() {
+        return Array.isArray(currentReviewSummary().recommendedDownloads) ? currentReviewSummary().recommendedDownloads : [];
+      }
+      function currentRecommendedWorkspace() {
+        return currentReviewSummary().recommendedWorkspace || null;
+      }
       function focusAutofocusTarget() {
         const target = requestedAutofocus || "summary";
         const node = (
@@ -452,6 +490,8 @@
       }
       function renderReview() {
         if (!reviewPackage) {
+          el("review-actions-box").innerHTML = '<div class="hint">Generate a launch review package to inspect the recommended workspace, action plan, and follow-up downloads here.</div>';
+          el("review-workspace-box").innerHTML = '<div class="hint">Generate a launch review package to inspect the routed workspace path here.</div>';
           el("review-summary").textContent = "Generate a launch review package to inspect the combined review summary here.";
           el("review-launch-summary").textContent = "Generate a launch review package to inspect launch workflow summary text here.";
           el("review-launch-checklist").textContent = "Generate a launch review package to inspect launch workflow checklist text here.";
@@ -465,10 +505,57 @@
         const workflowChecklist = workflow.workflowChecklist || {};
         const ops = reviewPackage.opsSnapshot || {};
         const overview = ops.overview || {};
+        const reviewSummary = currentReviewSummary();
+        const actionPlan = currentReviewActionPlan();
+        const workspaceActions = currentReviewWorkspaceActions();
+        const recommendedDownloads = currentReviewRecommendedDownloads();
         el("review-summary").textContent = reviewPackage.summaryText || "";
         el("review-launch-summary").textContent = workflow.summaryText || "";
         el("review-launch-checklist").textContent = workflow.checklistText || "";
         el("review-ops-summary").textContent = ops.summaryText || "";
+        el("review-actions-box").innerHTML = `
+          <div>
+            ${renderTag(`review:${String(reviewSummary.status || "unknown").toUpperCase()}`, true)}
+            ${reviewSummary.recommendedWorkspace?.label ? renderTag(`next:${reviewSummary.recommendedWorkspace.label}`, true) : ""}
+          </div>
+          <div class="hint" style="margin-top: 10px;">${esc(reviewSummary.message || "No launch review guidance is available yet.")}</div>
+          ${reviewSummary.recommendedWorkspace?.key ? `
+            <div class="actions" style="margin-top: 12px;">
+              <button type="button" id="review-open-recommended-inline-btn">${esc(reviewSummary.recommendedWorkspace.label || "Open Recommended Workspace")}</button>
+            </div>
+          ` : ""}
+          ${actionPlan.length ? `
+            <div class="hint" style="margin-top: 12px;">Launch Review Action Plan</div>
+            ${actionPlan.map((item, index) => `
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+                <div>${index + 1}. ${esc(`${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}`)}</div>
+                ${(item.workspaceAction || item.recommendedDownload) ? `
+                  <div class="actions" style="margin-top: 8px;">
+                    ${item.workspaceAction ? `<button type="button" class="secondary" data-review-action-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                    ${item.recommendedDownload ? `<button type="button" data-review-action-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                  </div>
+                ` : ""}
+              </div>
+            `).join("")}
+          ` : `<div class="hint" style="margin-top:12px;">No launch review action plan is available yet.</div>`}
+          ${recommendedDownloads.length ? `
+            <div class="hint" style="margin-top: 12px;">Recommended Downloads</div>
+            <div class="actions" style="margin-top: 8px;">
+              ${recommendedDownloads.map((item, index) => `<button type="button" class="${index === 0 ? "" : "secondary"}" data-review-download-index="${index}">${esc(item.label || item.key || "Download")}</button>`).join("")}
+            </div>
+          ` : ""}
+        `;
+        el("review-workspace-box").innerHTML = workspaceActions.length
+          ? workspaceActions.map((item, index) => `
+              <div style="margin-top:${index ? "10px" : "0"};">
+                <div>${renderTag(item.label || item.key || "workspace", index === 0)}</div>
+                <div class="hint" style="margin-top:8px;">${esc(item.reason || "No extra workspace reason available.")}</div>
+                <div class="actions" style="margin-top:8px;">
+                  <button type="button" class="secondary" data-review-workspace-index="${index}">${esc(item.label || item.key || "Open workspace")}</button>
+                </div>
+              </div>
+            `).join("")
+          : '<div class="hint">No routed workspace path is available yet.</div>';
         el("review-meta-box").innerHTML = `
           <div>${renderTag(`workflow:${String(workflowSummary.status || "unknown").toUpperCase()}`, true)} ${renderTag(`checklist:${String(workflowChecklist.status || "unknown").toUpperCase()}`, true)} ${renderTag(`ops:${String(overview.status || "unknown").toUpperCase()}`, true)}</div>
           <div class="hint" style="margin-top: 10px;">${esc(workflowSummary.message || workflowSummary.title || "No launch workflow headline available.")}</div>
@@ -489,6 +576,16 @@
           </div>
           <div class="hint" style="margin-top: 10px;">${esc(overview.headline || "No ops headline available.")}</div>
         `;
+        el("review-open-recommended-inline-btn")?.addEventListener("click", () => {
+          try {
+            openWorkspaceAction(currentRecommendedWorkspace(), {
+              title: reviewSummary.title || "Launch review",
+              summary: reviewSummary.message || ""
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+        });
       }
       async function refreshSession() {
         const data = await api("/api/developer/me");
@@ -547,6 +644,107 @@
           fallbackFileName,
           label
         );
+      }
+      async function downloadReviewRecommendedItem(item) {
+        if (!item?.key) {
+          throw new Error("Generate Launch Review first so the recommended downloads can be resolved.");
+        }
+        const target = currentReviewTarget();
+        if (item.source === "developer-launch-review") {
+          return downloadLaunchReview(
+            item.format || "summary",
+            item.fileName || "developer-launch-review-summary.txt",
+            item.label || "Launch review summary"
+          );
+        }
+        if (item.source === "developer-ops") {
+          return downloadApiFile(
+            `/api/developer/ops/export/download${q({
+              productCode: target.productCode,
+              format: item.format || "summary",
+              reviewMode: target.reviewMode,
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-ops-summary.txt",
+            item.label || "Routed ops summary"
+          );
+        }
+        const fallbackFormats = {
+          launch_handoff_zip: "handoff-zip",
+          launch_handoff_checksums: "handoff-checksums",
+          launch_workflow_zip: "zip",
+          launch_summary: "summary",
+          launch_checklist: "checklist",
+          release_summary: "release-summary",
+          integration_env: "integration-env",
+          integration_host_config: "integration-host-config",
+          integration_host_skeleton: "integration-host-skeleton",
+          integration_cmake: "integration-cmake",
+          integration_vs2022_guide: "integration-vs2022-guide",
+          integration_vs2022_sln: "integration-vs2022-sln",
+          integration_vs2022: "integration-vs2022",
+          integration_vs2022_filters: "integration-vs2022-filters",
+          integration_vs2022_props: "integration-vs2022-props",
+          integration_vs2022_local_props: "integration-vs2022-local-props",
+          integration_cpp: "integration-cpp",
+          integration_checksums: "integration-checksums"
+        };
+        const requestedFormat = String(item.format || fallbackFormats[item.key] || "summary").trim() || "summary";
+        return downloadApiFile(
+          `/api/developer/launch-workflow/download${q({
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            format: requestedFormat
+          })}`,
+          item.fileName || "launch-workflow.txt",
+          item.label || "Launch workflow download"
+        );
+      }
+      function openWorkspaceAction(action, routeContext = {}) {
+        const target = currentReviewTarget();
+        if (!action?.key || !target.productCode) {
+          throw new Error("Generate Launch Review first so the recommended workspace can be resolved.");
+        }
+        const routedTitle = String(routeContext.title || routeContext.routeTitle || action.label || action.key || requestedRouteTitle || "Launch review handoff").trim();
+        const routedReason = String(routeContext.summary || routeContext.routeReason || action.reason || requestedRouteReason || "").trim();
+        const actionParams = action.params && typeof action.params === "object"
+          ? { ...action.params }
+          : {};
+        const routeBits = {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: action.autofocus || "summary",
+          routeTitle: routedTitle,
+          routeReason: routedReason,
+          ...actionParams
+        };
+        if (action.key === "project") {
+          window.location.href = buildWorkspaceUrl("/developer/projects", routeBits);
+          return;
+        }
+        if (action.key === "integration") {
+          window.location.href = buildWorkspaceUrl("/developer/integration", routeBits);
+          return;
+        }
+        if (action.key === "release") {
+          window.location.href = buildWorkspaceUrl("/developer/releases", routeBits);
+          return;
+        }
+        if (action.key === "licenses") {
+          window.location.href = buildWorkspaceUrl("/developer/licenses", routeBits);
+          return;
+        }
+        if (action.key === "ops") {
+          window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
+          return;
+        }
+        if (action.key === "launch") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-workflow", routeBits);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-review", routeBits);
       }
       function openProjectWorkspace() {
         const target = currentReviewTarget();
@@ -695,6 +893,16 @@
           setStatus(error.message, true);
         }
       });
+      el("open-review-recommended-btn").addEventListener("click", () => {
+        try {
+          openWorkspaceAction(currentRecommendedWorkspace(), {
+            title: currentReviewSummary().title || "Launch review",
+            summary: currentReviewSummary().message || ""
+          });
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
       el("open-review-license-btn").addEventListener("click", () => {
         try {
           openLicenseWorkspace();
@@ -746,6 +954,73 @@
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("review-actions-box").addEventListener("click", async (event) => {
+        const workspaceButton = event.target.closest("[data-review-action-workspace-index]");
+        if (workspaceButton) {
+          try {
+            const index = Number(workspaceButton.dataset.reviewActionWorkspaceIndex);
+            const item = currentReviewActionPlan()[index];
+            openWorkspaceAction(item?.workspaceAction, {
+              title: item?.title || item?.key || "Launch review action",
+              summary: item?.summary || ""
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const downloadButton = event.target.closest("[data-review-action-download-index]");
+        if (downloadButton) {
+          try {
+            const index = Number(downloadButton.dataset.reviewActionDownloadIndex);
+            const item = currentReviewActionPlan()[index];
+            const result = await downloadReviewRecommendedItem(item?.recommendedDownload);
+            setOutput({
+              reviewActionDownload: {
+                key: item?.recommendedDownload?.key || null,
+                fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
+        const inlineRecommendedButton = event.target.closest("[data-review-download-index]");
+        if (inlineRecommendedButton) {
+          try {
+            const index = Number(inlineRecommendedButton.dataset.reviewDownloadIndex);
+            const item = currentReviewRecommendedDownloads()[index];
+            const result = await downloadReviewRecommendedItem(item);
+            setOutput({
+              reviewRecommendedDownload: {
+                key: item?.key || null,
+                fileName: result?.fileName || item?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+        }
+      });
+      el("review-workspace-box").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-review-workspace-index]");
+        if (!button) {
+          return;
+        }
+        try {
+          const index = Number(button.dataset.reviewWorkspaceIndex);
+          const item = currentReviewWorkspaceActions()[index];
+          openWorkspaceAction(cloneAction(item), {
+            title: item?.label || item?.key || "Launch review workspace",
+            summary: item?.reason || ""
+          });
+        } catch (error) {
+          setStatus(error.message, true);
         }
       });
     </script>

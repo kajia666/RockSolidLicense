@@ -5735,9 +5735,17 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchReview.launchWorkflow.manifest.project.code, "RELPKG_ALPHA");
       assert.equal(launchReview.opsSnapshot.scope.eventType, "session.login");
       assert.equal(launchReview.opsSnapshot.scope.actorType, "account");
+      assert.ok(launchReview.reviewSummary);
+      assert.ok(Array.isArray(launchReview.reviewSummary.actionPlan));
+      assert.ok(launchReview.reviewSummary.actionPlan.length >= 1);
+      assert.ok(Array.isArray(launchReview.reviewSummary.recommendedDownloads));
+      assert.ok(launchReview.reviewSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
       assert.match(launchReview.summaryText, /RockSolid Developer Launch Review/);
       assert.match(launchReview.summaryText, /RockSolid Launch Workflow Package/);
       assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
+      assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
+      assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(
         baseUrl,
@@ -10042,6 +10050,9 @@ test("developer center page is served from the dedicated route", async () => {
       assert.match(html, /api\/developer\/launch-review/);
       assert.match(html, /api\/developer\/launch-review\/download/);
       assert.match(html, /Generate Launch Review/);
+      assert.match(html, /Review Actions/);
+      assert.match(html, /Workspace Path/);
+      assert.match(html, /Open Recommended Workspace/);
       assert.match(html, /Download Review JSON/);
       assert.match(html, /Download Review Summary/);
       assert.match(html, /Download Review Checksums/);

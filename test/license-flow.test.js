@@ -9876,6 +9876,7 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Run First Batch Setup/);
     assert.match(html, /Run Inventory Refill|run-first-batch-setup-btn/);
     assert.match(html, /Recommended Handoff/);
+    assert.match(html, /Last Launch Action/);
     assert.match(html, /Open Recommended Workspace/);
     assert.match(html, /Download Recommended Handoff Zip/);
     assert.match(html, /Download Handoff Checksums/);
@@ -9909,6 +9910,12 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /runLaunchFirstBatchSetup/);
     assert.match(html, /currentLaunchBootstrapAction/);
     assert.match(html, /currentLaunchFirstBatchSetupAction/);
+    assert.match(html, /currentLastLaunchActionResult/);
+    assert.match(html, /currentLastLaunchFollowUp/);
+    assert.match(html, /renderLastLaunchFollowUp/);
+    assert.match(html, /launch-action-followup-box/);
+    assert.match(html, /data-last-launch-workspace-index/);
+    assert.match(html, /data-last-launch-download-index/);
     assert.match(html, /data-workspace-action-index/);
     assert.match(html, /data-recommended-download-index/);
     assert.match(html, /data-checklist-workspace-index/);
@@ -10430,6 +10437,12 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /runLaunchWorkflowFirstBatchSetup/);
     assert.match(html, /currentLaunchWorkflowBootstrapAction/);
     assert.match(html, /currentLaunchWorkflowFirstBatchSetupAction/);
+    assert.match(html, /currentLastLaunchWorkflowActionResult/);
+    assert.match(html, /currentLastLaunchWorkflowFollowUp/);
+    assert.match(html, /renderProjectLastLaunchFollowUp/);
+    assert.match(html, /detail-last-launch-action/);
+    assert.match(html, /data-launch-last-action-workspace-index/);
+    assert.match(html, /data-launch-last-action-download-index/);
     assert.match(html, /data-launch-download-index/);
     assert.match(html, /data-launch-checklist-workspace-index/);
     assert.match(html, /data-launch-checklist-download-index/);
@@ -10450,6 +10463,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Integration Zip/);
     assert.match(html, /Download Recommended Handoff/);
+    assert.match(html, /Run Launch Bootstrap or First Batch Setup here to keep the next launch-day follow-up visible in the project workspace\./);
     assert.match(html, /Open Recommended Workspace/);
     assert.match(html, /Launch Summary/);
     assert.match(html, /Launch Checklist/);

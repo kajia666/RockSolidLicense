@@ -136,6 +136,8 @@ Those first launch-day ops actions can now also download a filtered ops snapshot
 
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.
 
+The workspace now also keeps a `Last Launch Action` card in-page. After `Run Launch Bootstrap`, `Run First Batch Setup`, or `Run Inventory Refill`, the same page keeps the returned launch-day follow-up visible and lets the software author open the next recommended workspace or download the matching filtered ops summary without relying on the transient status banner alone.
+
 Those routed jumps now also carry the originating step title and reason into the next workspace. So when an action-plan item or checklist item sends someone to Integration or Releases, the target page can explain which workflow step triggered the jump instead of only showing a generic autofocus hint.
 
 Those files now also come from the same `/api/developer/launch-workflow/download` endpoint, so the launch workflow workspace can stay on one unified download route instead of mixing multiple release and integration download APIs. The recommended handoff zip is intentionally smaller than the full workflow zip: it keeps the launch summary/checklist, release summary, host config, CMake consumer, VS2022 consumer files, C++ quickstart, host skeleton, and hardening guide together for handoff, while the full workflow zip still preserves the larger release/integration JSON archive.

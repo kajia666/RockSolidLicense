@@ -91,6 +91,8 @@ If the selected lane already has an active starter policy and only lacks launch 
 
 When the same lane already has launch batches but the remaining fresh inventory is dropping too low, the inline workflow can now expose `Run Inventory Refill` instead. That keeps the project workspace useful after launch day starts, because the software author can top the direct-card or recharge buffer back up from the same inline lane review instead of switching into a separate recovery flow.
 
+The detail card now also keeps a `Last Launch Action` block in-page. After `Run Launch Bootstrap`, `Run First Batch Setup`, or `Run Inventory Refill`, the project workspace keeps the next launch-day follow-up visible and lets the software author open the recommended next workspace or download the matching filtered ops summary without having to rely on the status line alone.
+
 That same inline launch workflow block now also shows the first slice of:
 
 - `Initial Inventory Recommendations`

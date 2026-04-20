@@ -213,6 +213,7 @@
             <button class="secondary" id="launch-run-bootstrap-btn">Run Launch Bootstrap</button>
             <button class="secondary" id="launch-run-first-batch-setup-btn">Run First Batch Setup</button>
           </div>
+          <div id="detail-last-launch-action" class="hint" style="margin-top:12px;">Run Launch Bootstrap or First Batch Setup here to keep the next launch-day follow-up visible in the project workspace.</div>
           <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.</div>
         </article>
       </section>
@@ -244,6 +245,7 @@
       let releasePreview = null;
       let integrationPreview = null;
       let launchWorkflowPreview = null;
+      let lastLaunchWorkflowActionResult = null;
 
       function el(id) {
         return document.getElementById(id);
@@ -984,8 +986,10 @@
 
       function renderLaunchWorkflow(product = null) {
         const box = el("detail-launch-workflow");
+        const followUpBox = el("detail-last-launch-action");
         if (!product) {
           box.textContent = "Preview the same channel for both release readiness and integration snapshot to see one combined launch workflow summary.";
+          followUpBox.textContent = "Run Launch Bootstrap or First Batch Setup here to keep the next launch-day follow-up visible in the project workspace.";
           return;
         }
 
@@ -1009,6 +1013,7 @@
           const firstOpsActions = Array.isArray(authorizationLaunchRecommendations.firstOpsActions)
             ? authorizationLaunchRecommendations.firstOpsActions.slice(0, 3)
             : [];
+          const launchActionResult = currentLastLaunchWorkflowActionResult();
           const checklistCounts = workflowSummary.checklistCounts || {};
           const tags = [
             tag(workflowSummary.title || "Launch workflow", workflowSummary.status === "ready" ? "ok" : workflowSummary.status === "hold" ? "danger" : ""),
@@ -1045,6 +1050,7 @@
             ${checklistItems.length ? `<div class="hint" style="margin-top:12px;">Top workflow checks:<br>${checklistItems.map((item, index) => `${index + 1}. [${esc(String(item.status || "unknown").toUpperCase())}] ${esc(item.label || item.key || "item")} | ${esc(item.summary || "-")}`).join("<br>")}</div>` : ""}
             ${renderProjectChecklistActionCards(checklistItems)}
           `;
+          followUpBox.innerHTML = renderProjectLastLaunchFollowUp(launchActionResult);
           return;
         }
 
@@ -1052,6 +1058,7 @@
         const hasIntegration = integrationPreview && integrationPreview.productCode === product.code && integrationPreview.channel === channel;
         if (!hasRelease || !hasIntegration) {
           box.innerHTML = `Use <code>Preview Launch Workflow</code> for <code>${esc(product.code)}</code> on <code>${esc(channel)}</code> to load both release readiness and integration snapshot together.`;
+          followUpBox.textContent = "Run Launch Bootstrap or First Batch Setup here to keep the next launch-day follow-up visible in the project workspace.";
           return;
         }
 
@@ -1104,6 +1111,7 @@
           <div class="split-line"><span>Recommended Downloads</span><span>release summary + integration env + host config + host skeleton</span></div>
           ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
         `;
+        followUpBox.textContent = "Run Launch Bootstrap or First Batch Setup here to keep the next launch-day follow-up visible in the project workspace.";
       }
 
       function renderProjectRouteFocus(product = null) {
@@ -1357,6 +1365,7 @@
         releasePreview = null;
         integrationPreview = null;
         launchWorkflowPreview = null;
+        lastLaunchWorkflowActionResult = null;
         renderProjects();
         setMeta();
         setSelection(null);
@@ -2119,6 +2128,23 @@
         return launchWorkflowPreview.payload?.workflowSummary?.launchFirstBatchSetupAction || null;
       }
 
+      function currentLastLaunchWorkflowActionResult() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!lastLaunchWorkflowActionResult || !productCode) {
+          return null;
+        }
+        const sameProduct = String(lastLaunchWorkflowActionResult.productCode || "").trim().toUpperCase() === String(productCode || "").trim().toUpperCase();
+        const sameChannel = String(lastLaunchWorkflowActionResult.channel || "stable").trim().toLowerCase() === String(channel || "stable").trim().toLowerCase();
+        return sameProduct && sameChannel
+          ? lastLaunchWorkflowActionResult
+          : null;
+      }
+
+      function currentLastLaunchWorkflowFollowUp() {
+        return currentLastLaunchWorkflowActionResult()?.followUp || null;
+      }
+
       function currentLaunchWorkflowWorkspaceActions() {
         const productCode = el("edit-product-code").value.trim();
         const channel = currentReleaseChannel();
@@ -2311,6 +2337,37 @@
         `;
       }
 
+      function renderProjectLastLaunchFollowUp(result = null) {
+        const followUp = result?.followUp;
+        const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
+        if (!actions.length) {
+          return "Run Launch Bootstrap or First Batch Setup here to keep the next launch-day follow-up visible in the project workspace.";
+        }
+        const operationLabel = result?.operationLabel || followUp.operationLabel || followUp.operation || "launch";
+        const summary = followUp.summary || result?.message || "Review the next launch-day follow-up actions.";
+        return `
+          <div>
+            ${tag(`after:${operationLabel}`, "ok")}
+            ${followUp.primaryAction?.label ? tag(`next:${followUp.primaryAction.label}`, "ok") : ""}
+            ${result?.productCode ? tag(`project:${result.productCode}`, "ok") : ""}
+            ${result?.channel ? tag(`channel:${result.channel}`, "ok") : ""}
+          </div>
+          <div class="hint" style="margin-top:10px;">${esc(result?.message || "Last launch action completed.")}</div>
+          <div class="hint" style="margin-top:8px;">${esc(summary)}</div>
+          ${actions.map((item, index) => `
+            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+              <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
+              ${(item.workspaceAction || item.recommendedDownload) ? `
+                <div class="actions" style="margin-top:8px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-last-action-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-launch-last-action-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                </div>
+              ` : ""}
+            </div>
+          `).join("")}
+        `;
+      }
+
       function buildLaunchWorkspaceRouteContext(action, routeContext = {}) {
         return {
           routeTitle: String(
@@ -2440,6 +2497,16 @@
         });
         await refresh();
         const workflow = await loadInlineLaunchWorkflow();
+        lastLaunchWorkflowActionResult = {
+          productCode,
+          channel: currentReleaseChannel() || "stable",
+          operation: "bootstrap",
+          operationLabel: bootstrap?.followUp?.operationLabel || "Launch Bootstrap",
+          message: bootstrap?.message || `Launch Bootstrap completed for ${productCode}.`,
+          followUp: bootstrap?.followUp || null,
+          result: bootstrap
+        };
+        renderLaunchWorkflow(findVisibleProductById(el("edit-product-id").value.trim()));
         const accountNote = bootstrap?.created?.account?.temporaryPassword
           ? " Temporary starter account password is included in API Output for secure handoff."
           : "";
@@ -2471,6 +2538,16 @@
         });
         await refresh();
         const workflow = await loadInlineLaunchWorkflow();
+        lastLaunchWorkflowActionResult = {
+          productCode,
+          channel: currentReleaseChannel() || "stable",
+          operation: setupOperation,
+          operationLabel: effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup"),
+          message: setup?.message || `${effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup")} completed for ${productCode}.`,
+          followUp: setup?.followUp || null,
+          result: setup
+        };
+        renderLaunchWorkflow(findVisibleProductById(el("edit-product-id").value.trim()));
         const setupLabel = effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup");
         const followUpNote = setup?.followUp?.primaryAction?.label
           ? ` Next: ${setup.followUp.primaryAction.label}.`
@@ -2871,6 +2948,48 @@
           openRecommendedLaunchWorkspace();
         } catch (error) {
           setStatus(error.message, true);
+        }
+      });
+
+      el("detail-last-launch-action").addEventListener("click", async (event) => {
+        const workspaceButton = event.target.closest("[data-launch-last-action-workspace-index]");
+        if (workspaceButton) {
+          try {
+            const index = Number(workspaceButton.dataset.launchLastActionWorkspaceIndex);
+            const item = currentLastLaunchWorkflowFollowUp()?.actions?.[index];
+            openLaunchWorkspaceAction(item?.workspaceAction, {
+              title: item?.label || "Launch follow-up",
+              summary: item?.summary || ""
+            });
+            setOutput({
+              launchLastActionWorkspace: {
+                key: item?.workspaceAction?.key || null,
+                autofocus: item?.workspaceAction?.autofocus || null,
+                label: item?.workspaceAction?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+
+        const downloadButton = event.target.closest("[data-launch-last-action-download-index]");
+        if (downloadButton) {
+          try {
+            const index = Number(downloadButton.dataset.launchLastActionDownloadIndex);
+            const item = currentLastLaunchWorkflowFollowUp()?.actions?.[index];
+            const result = await downloadLaunchRecommendedItem(item?.recommendedDownload);
+            setOutput({
+              launchLastActionDownload: {
+                key: item?.recommendedDownload?.key || null,
+                fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
         }
       });
 

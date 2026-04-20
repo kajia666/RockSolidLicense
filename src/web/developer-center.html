@@ -274,6 +274,8 @@
           |
           <a href="/developer/launch-review">Developer Launch Review</a>
           |
+          <a href="/developer/launch-smoke">Developer Launch Smoke</a>
+          |
           <a href="/developer/projects">Developer Projects</a>
           |
           <a href="/developer/licenses">Developer Licenses</a>
@@ -302,11 +304,12 @@
           <div class="hint" style="margin-top:8px;">1. Create a project and configure feature toggles.</div>
           <div class="hint">2. Download SDK-facing handoff files from Integration.</div>
             <div class="hint">3. Wire the SDK into your own software and protect/build the final client.</div>
-            <div class="hint">4. Use Launch Workflow, Launch Review, and Releases to check startup, launch recheck, notices, version rules, and handoff state.</div>
+            <div class="hint">4. Use Launch Workflow, Launch Smoke, Launch Review, and Releases to check startup, smoke validation, launch recheck, notices, version rules, and handoff state.</div>
             <div class="actions" style="margin-top:12px;">
               <button type="button" class="secondary" onclick="window.location.href='/developer/projects'">Open Project Workspace</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/integration'">Open Integration Center</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/launch-workflow'">Open Launch Workflow</button>
+              <button type="button" class="secondary" onclick="window.location.href='/developer/launch-smoke'">Open Launch Smoke</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/launch-review'">Open Launch Review</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/releases'">Open Release Center</button>
             </div>
@@ -320,7 +323,7 @@
           <div class="hint">2. Launch the client with the embedded SDK.</div>
           <div class="hint">3. Register, log in, or redeem a card key.</div>
           <div class="hint">4. Keep running under token validation, heartbeat, version rules, notices, and policy checks.</div>
-            <div class="hint" style="margin-top:12px;">This is why Integration, Launch Workflow, Launch Review, and Releases are author-side preparation pages rather than customer download pages.</div>
+            <div class="hint" style="margin-top:12px;">This is why Integration, Launch Workflow, Launch Smoke, Launch Review, and Releases are author-side preparation pages rather than customer download pages.</div>
         </article>
       </section>
 
@@ -422,6 +425,7 @@
             <div class="split-line"><span>Client versions</span><span class="mono">GET/POST /api/developer/client-versions</span></div>
             <div class="split-line"><span>Notices</span><span class="mono">GET/POST /api/developer/notices</span></div>
             <div class="split-line"><span>Launch workflow</span><span class="mono">GET /api/developer/launch-workflow</span></div>
+            <div class="split-line"><span>Launch smoke kit</span><span class="mono">GET /api/developer/launch-smoke-kit</span></div>
             <div class="split-line"><span>SDK rotate</span><span class="mono">POST /api/developer/products/:productId/sdk-credentials/rotate</span></div>
           </div>
           <div class="hint" style="margin-top: 14px;">

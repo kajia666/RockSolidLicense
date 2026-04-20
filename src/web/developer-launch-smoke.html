@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Developer Launch Smoke</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef4f1;
+        --panel: #ffffff;
+        --line: #d5e2da;
+        --text: #14201a;
+        --muted: #567164;
+        --accent: #1f6f56;
+        --accent-soft: #dff0e9;
+        --warn: #b96927;
+        --danger: #b03c3c;
+        --shadow: 0 20px 50px rgba(21, 52, 39, 0.10);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(180deg, #f7fbf8 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+      .shell {
+        width: min(1440px, calc(100vw - 32px));
+        margin: 24px auto 56px;
+      }
+      .hero, .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+      }
+      .hero {
+        padding: 28px;
+        margin-bottom: 20px;
+      }
+      .hero h1 { margin: 0; font-size: 32px; }
+      .sub { margin-top: 10px; color: var(--muted); line-height: 1.6; max-width: 980px; }
+      .nav, .pill-row, .actions, .audit-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .nav { margin-top: 12px; color: var(--muted); }
+      .pill, .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #f8fbf9;
+        color: var(--muted);
+      }
+      .tag.strong {
+        border-color: rgba(31,111,86,0.26);
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .wide {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .card { padding: 20px; }
+      .card h2 { margin: 0 0 14px; font-size: 20px; }
+      .three, .two {
+        display: grid;
+        gap: 12px;
+      }
+      .three { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .two { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      input, select, textarea, button {
+        font: inherit;
+      }
+      input, select, textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fbfdfc;
+        color: var(--text);
+      }
+      textarea { min-height: 120px; resize: vertical; }
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 11px 15px;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #edf5f1;
+        color: var(--accent);
+        border: 1px solid rgba(31,111,86,0.18);
+      }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .status, .hint {
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: #f5faf7;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .status.warn {
+        background: #fff4ec;
+        border-color: rgba(185,105,39,0.25);
+        color: var(--warn);
+      }
+      .stack {
+        display: grid;
+        gap: 10px;
+      }
+      .stack-item {
+        border: 1px solid rgba(21, 52, 39, 0.08);
+        border-radius: 16px;
+        padding: 14px;
+        background: rgba(255,255,255,0.78);
+      }
+      pre {
+        margin: 0;
+        min-height: 220px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef7f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      @media (max-width: 1180px) {
+        .wide { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 760px) {
+        .shell { width: min(100vw - 20px, 100%); }
+        .hero { padding: 22px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer Launch Smoke</h1>
+        <p class="sub">
+          Use one workspace to stage the launch smoke request, internal credentials, fresh launch-card candidates,
+          and the first recommended runtime follow-up for one project lane.
+        </p>
+        <div class="nav">
+          <a href="/developer">Developer Center</a>
+          |
+          <a href="/developer/projects">Developer Projects</a>
+          |
+          <a href="/developer/licenses">Developer Licenses</a>
+          |
+          <a href="/developer/launch-workflow">Developer Launch Workflow</a>
+          |
+          <a href="/developer/launch-review">Developer Launch Review</a>
+          |
+          <a href="/developer/ops">Developer Ops</a>
+        </div>
+        <div class="pill-row" style="margin-top: 14px;">
+          <div class="pill">Route: <code>/developer/launch-smoke</code></div>
+          <div class="pill">API: <code>/api/developer/launch-smoke-kit</code></div>
+          <div class="pill">Download: <code>/api/developer/launch-smoke-kit/download</code></div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions" style="margin-top: 12px;">
+            <button id="login-btn">Sign In</button>
+            <button class="secondary" id="refresh-session-btn">Refresh</button>
+            <button class="secondary" id="logout-btn">Sign Out</button>
+          </div>
+          <div class="hint" id="session-meta" style="margin-top: 12px;">No developer session yet.</div>
+          <div class="status" id="status-box" style="margin-top: 12px;">Sign in to generate a launch smoke kit.</div>
+        </article>
+
+        <article class="card">
+          <h2>Route Focus</h2>
+          <div id="route-focus-box" class="hint">Open this page from Launch Workflow, Launch Review, Projects, or Licenses to keep the same lane and smoke filters prefilled here.</div>
+        </article>
+      </section>
+
+      <section class="card" style="margin-bottom: 18px;">
+        <h2>Generate Launch Smoke Kit</h2>
+        <div class="three">
+          <label>Project Code<input id="smoke-product-code" placeholder="ALPHA_APP" /></label>
+          <label>Channel<input id="smoke-channel" value="stable" placeholder="stable" /></label>
+        </div>
+        <div class="actions" style="margin-top: 14px;">
+          <button id="use-route-project-btn">Use Routed Project</button>
+          <button id="generate-smoke-btn">Generate Launch Smoke Kit</button>
+          <button class="secondary" id="refresh-smoke-btn">Refresh Smoke Kit</button>
+        </div>
+        <div class="actions" style="margin-top: 10px;">
+          <button class="secondary" id="open-smoke-recommended-btn">Open Recommended Workspace</button>
+          <button class="secondary" id="open-smoke-project-btn">Open Project Workspace</button>
+          <button class="secondary" id="open-smoke-license-btn">Open License Workspace</button>
+          <button class="secondary" id="open-smoke-launch-btn">Open Launch Workflow</button>
+          <button class="secondary" id="open-smoke-review-btn">Open Launch Review</button>
+          <button class="secondary" id="open-smoke-ops-btn">Open Ops Workspace</button>
+        </div>
+        <div class="actions" style="margin-top: 10px;">
+          <button class="secondary" id="download-smoke-json-btn">Download Smoke JSON</button>
+          <button class="secondary" id="download-smoke-summary-btn">Download Smoke Summary</button>
+          <button class="secondary" id="download-smoke-checksums-btn">Download Smoke Checksums</button>
+          <button class="secondary" id="download-smoke-zip-btn">Download Smoke Zip</button>
+        </div>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Smoke Actions</h2>
+          <div id="smoke-actions-box" class="hint">Generate a launch smoke kit to inspect the recommended workspace, action plan, and smoke downloads here.</div>
+        </article>
+        <article class="card">
+          <h2>Workspace Path</h2>
+          <div id="smoke-workspace-box" class="hint">Generate a launch smoke kit to inspect the routed workspace path here.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Smoke Summary</h2>
+          <pre id="smoke-summary">Generate a launch smoke kit to inspect the smoke summary here.</pre>
+        </article>
+        <article class="card">
+          <h2>Smoke Snapshot</h2>
+          <div id="smoke-meta-box" class="hint">The smoke kit will summarize startup readiness, smoke paths, and candidate runtime follow-up here.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Startup Request</h2>
+          <pre id="smoke-startup-request">Generate a launch smoke kit to inspect the startup request here.</pre>
+        </article>
+        <article class="card">
+          <h2>Smoke Paths</h2>
+          <div id="smoke-paths-box" class="hint">Generate a launch smoke kit to inspect smoke-path readiness here.</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Account Candidates</h2>
+          <div id="smoke-accounts-box" class="hint">Generate a launch smoke kit to inspect starter account candidates here.</div>
+        </article>
+        <article class="card">
+          <h2>Entitlement Candidates</h2>
+          <div id="smoke-entitlements-box" class="hint">Generate a launch smoke kit to inspect starter entitlement candidates here.</div>
+        </article>
+        <article class="card">
+          <h2>Direct-Card Candidates</h2>
+          <div id="smoke-direct-cards-box" class="hint">Generate a launch smoke kit to inspect fresh direct-card candidates here.</div>
+        </article>
+        <article class="card">
+          <h2>Recharge Candidates</h2>
+          <div id="smoke-recharge-cards-box" class="hint">Generate a launch smoke kit to inspect fresh recharge-card candidates here.</div>
+        </article>
+      </section>
+
+      <section class="card" style="margin-top: 18px;">
+        <h2>API Output</h2>
+        <pre id="output">Waiting for actions...</pre>
+      </section>
+    </main>
+
+    <script>
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+
+      let token = "";
+      let profile = null;
+      let actor = null;
+      let smokeKit = null;
+
+      function el(id) { return document.getElementById(id); }
+      function q(params = {}) {
+        const next = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value === undefined || value === null || value === "") return;
+          next.set(key, value);
+        });
+        const text = next.toString();
+        return text ? `?${text}` : "";
+      }
+      function esc(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+      function buildWorkspaceUrl(path, params = {}) {
+        return `${path}${q(params)}`;
+      }
+      function cloneAction(action = null) {
+        if (!action || typeof action !== "object") return null;
+        return {
+          ...action,
+          params: action.params && typeof action.params === "object"
+            ? { ...action.params }
+            : action.params
+        };
+      }
+      function renderTag(text, strong = false) {
+        return `<span class="tag${strong ? " strong" : ""}">${esc(text)}</span>`;
+      }
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+      function setOutput(value) {
+        el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+      async function api(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (token) headers.Authorization = `Bearer ${token}`;
+        if (options.body !== undefined) headers["Content-Type"] = "application/json";
+        const response = await fetch(path, {
+          method: options.method || (options.body !== undefined ? "POST" : "GET"),
+          headers,
+          body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) {
+          const error = new Error(data?.error?.message || `Request failed with ${response.status}`);
+          error.code = data?.error?.code || `HTTP_${response.status}`;
+          throw error;
+        }
+        return data.data;
+      }
+      function downloadBlob(filename, blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      function downloadFileNameFromHeaders(headerValue, fallback) {
+        const raw = String(headerValue || "");
+        const utf8Match = raw.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const plainMatch = raw.match(/filename="([^"]+)"/i) || raw.match(/filename=([^;]+)/i);
+        return plainMatch ? plainMatch[1].trim() : fallback;
+      }
+      async function downloadApiFile(path, fallbackFileName, label) {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(path, { headers });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const error = new Error(payload?.error?.message || `Download failed with ${response.status}`);
+          error.code = payload?.error?.code || `HTTP_${response.status}`;
+          throw error;
+        }
+        const blob = await response.blob();
+        const fileName = downloadFileNameFromHeaders(response.headers.get("content-disposition"), fallbackFileName);
+        downloadBlob(fileName, blob);
+        setStatus(`${label} downloaded: ${fileName}`);
+        return { fileName };
+      }
+      function setMeta() {
+        el("session-meta").textContent = token && profile
+          ? `${profile.username} | role=${actor?.role || "owner"} | scope=${actor?.type || "owner"} | session=${profile.session?.id || "-"}`
+          : "No developer session yet.";
+      }
+      function currentSmokeTarget() {
+        return {
+          productId: requestedProductId,
+          productCode: el("smoke-product-code").value.trim(),
+          channel: el("smoke-channel").value.trim() || "stable"
+        };
+      }
+      function currentSmokeSummary() {
+        return smokeKit?.smokeSummary || {};
+      }
+      function currentActionPlan() {
+        return Array.isArray(currentSmokeSummary().actionPlan) ? currentSmokeSummary().actionPlan : [];
+      }
+      function currentWorkspaceActions() {
+        return Array.isArray(currentSmokeSummary().workspaceActions) ? currentSmokeSummary().workspaceActions : [];
+      }
+      function currentRecommendedDownloads() {
+        return Array.isArray(currentSmokeSummary().recommendedDownloads) ? currentSmokeSummary().recommendedDownloads : [];
+      }
+      function currentRecommendedWorkspace() {
+        return currentSmokeSummary().recommendedWorkspace || null;
+      }
+      function syncRouteFields() {
+        if (requestedProductCode) el("smoke-product-code").value = requestedProductCode;
+        el("smoke-channel").value = requestedChannel;
+      }
+      function renderListBox(items = [], formatter, emptyText) {
+        if (!items.length) {
+          return `<div class="hint">${esc(emptyText)}</div>`;
+        }
+        return `<div class="stack">${items.map((item) => `<div class="stack-item">${formatter(item)}</div>`).join("")}</div>`;
+      }
+      function renderRouteFocus() {
+        const target = currentSmokeTarget();
+        const tags = [
+          target.productCode ? renderTag(`project:${target.productCode}`, true) : "",
+          renderTag(`channel:${target.channel}`, true),
+          requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""
+        ].filter(Boolean).join("");
+        const title = requestedRouteTitle || "Launch smoke handoff";
+        const reason = requestedRouteReason || (target.productCode
+          ? `Continue the internal smoke path for ${target.productCode} on lane ${target.channel}.`
+          : "Open this page from Launch Workflow or Launch Review to keep the same lane prefilled here.");
+        el("route-focus-box").innerHTML = `
+          <div><strong>${esc(title)}</strong></div>
+          <div class="hint" style="margin-top: 10px;">${esc(reason)}</div>
+          <div class="audit-meta" style="margin-top: 10px;">${tags || '<span class="hint">No routed lane captured yet.</span>'}</div>
+          <div class="actions" style="margin-top: 12px;">
+            <button type="button" class="secondary" id="route-focus-refresh-btn" ${token ? "" : "disabled"}>Refresh Launch Smoke</button>
+            <button type="button" class="secondary" id="route-focus-download-btn" ${token ? "" : "disabled"}>Download Smoke Summary</button>
+          </div>
+        `;
+        el("route-focus-refresh-btn")?.addEventListener("click", async () => {
+          try {
+            await generateLaunchSmoke();
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          }
+        });
+        el("route-focus-download-btn")?.addEventListener("click", async () => {
+          try {
+            await downloadLaunchSmoke("summary", "developer-launch-smoke-summary.txt", "Launch smoke summary");
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          }
+        });
+      }
+      function renderSmokeKit() {
+        if (!smokeKit) {
+          el("smoke-actions-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect the recommended workspace, action plan, and smoke downloads here.</div>';
+          el("smoke-workspace-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect the routed workspace path here.</div>';
+          el("smoke-summary").textContent = "Generate a launch smoke kit to inspect the smoke summary here.";
+          el("smoke-startup-request").textContent = "Generate a launch smoke kit to inspect the startup request here.";
+          el("smoke-meta-box").innerHTML = '<div class="hint">The smoke kit will summarize startup readiness, smoke paths, and candidate runtime follow-up here.</div>';
+          el("smoke-paths-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect smoke-path readiness here.</div>';
+          el("smoke-accounts-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect starter account candidates here.</div>';
+          el("smoke-entitlements-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect starter entitlement candidates here.</div>';
+          el("smoke-direct-cards-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect fresh direct-card candidates here.</div>';
+          el("smoke-recharge-cards-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect fresh recharge-card candidates here.</div>';
+          return;
+        }
+        const summary = currentSmokeSummary();
+        const actions = currentActionPlan();
+        const workspaces = currentWorkspaceActions();
+        const downloads = currentRecommendedDownloads();
+        el("smoke-summary").textContent = smokeKit.summaryText || "";
+        el("smoke-startup-request").textContent = JSON.stringify(summary.startupRequest || {}, null, 2);
+        el("smoke-actions-box").innerHTML = `
+          <div>
+            ${renderTag(`smoke:${String(summary.status || "unknown").toUpperCase()}`, true)}
+            ${summary.recommendedWorkspace?.label ? renderTag(`next:${summary.recommendedWorkspace.label}`, true) : ""}
+          </div>
+          <div class="hint" style="margin-top: 10px;">${esc(summary.message || "No smoke guidance is available yet.")}</div>
+          ${actions.length ? `
+            <div class="hint" style="margin-top: 12px;">Smoke Action Plan</div>
+            ${actions.map((item, index) => `
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+                <div>${index + 1}. ${esc(`${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}`)}</div>
+                <div class="actions" style="margin-top: 8px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-smoke-action-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-smoke-action-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          ` : '<div class="hint" style="margin-top:12px;">No smoke action plan is available yet.</div>'}
+          ${downloads.length ? `
+            <div class="hint" style="margin-top: 12px;">Recommended Downloads</div>
+            <div class="actions" style="margin-top: 8px;">
+              ${downloads.map((item, index) => `<button type="button" class="${index === 0 ? "" : "secondary"}" data-smoke-download-index="${index}">${esc(item.label || item.key || "Download")}</button>`).join("")}
+            </div>
+          ` : ""}
+        `;
+        el("smoke-workspace-box").innerHTML = workspaces.length
+          ? workspaces.map((item, index) => `
+              <div style="margin-top:${index ? "10px" : "0"};">
+                <div>${renderTag(item.label || item.key || "workspace", index === 0)}</div>
+                <div class="hint" style="margin-top:8px;">${esc(item.reason || "No extra workspace reason available.")}</div>
+                <div class="actions" style="margin-top:8px;">
+                  <button type="button" class="secondary" data-smoke-workspace-index="${index}">${esc(item.label || item.key || "Open workspace")}</button>
+                </div>
+              </div>
+            `).join("")
+          : '<div class="hint">No routed workspace path is available yet.</div>';
+        el("smoke-meta-box").innerHTML = `
+          <div>${renderTag(`project:${smokeKit.manifest?.project?.code || "-"}`, true)} ${renderTag(`channel:${smokeKit.manifest?.channel || "-"}`, true)} ${renderTag(`paths:${Array.isArray(summary.verificationPaths) ? summary.verificationPaths.length : 0}`)}</div>
+          <div class="hint" style="margin-top:10px;">${esc(summary.title || "No smoke headline available.")}</div>
+          <div class="hint" style="margin-top:10px;">${esc(`Startup decision: ${String(summary.startupDecision?.status || "unknown").toUpperCase()} | ${summary.startupDecision?.message || "-"}`)}</div>
+          <div class="hint" style="margin-top:10px;">${esc(`Hardening: profile=${summary.clientHardening?.profile || "-"} | startup=${summary.clientHardening?.startupBootstrapRequired ? "required" : "recommended"} | localToken=${summary.clientHardening?.localTokenValidationRequired ? "required" : "optional"} | heartbeat=${summary.clientHardening?.heartbeatGateRequired ? "required" : "optional"}`)}</div>
+        `;
+        el("smoke-paths-box").innerHTML = renderListBox(
+          Array.isArray(summary.verificationPaths) ? summary.verificationPaths : [],
+          (item) => `
+            <div>${renderTag(String(item.status || "review").toUpperCase(), String(item.status || "review").toLowerCase() === "pass")} ${renderTag(`ready:${item.ready ? "yes" : "no"}`)} <strong>${esc(item.label || item.key || "path")}</strong></div>
+            <div class="hint" style="margin-top:8px;">${esc(item.summary || "-")}</div>
+          `,
+          "No smoke paths are available yet."
+        );
+        el("smoke-accounts-box").innerHTML = renderListBox(
+          Array.isArray(summary.accountCandidates) ? summary.accountCandidates : [],
+          (item) => `
+            <div>${renderTag(item.username || "-", true)} ${renderTag(`entitlements:${item.activeEntitlementCount ?? 0}`)} ${renderTag(`sessions:${item.activeSessionCount ?? 0}`)}</div>
+            <div class="hint" style="margin-top:8px;">${esc(`${item.suggestedUse || "-"} | latestEnds=${item.latestEntitlementEndsAt || "-"}`)}</div>
+          `,
+          "No internal account candidate is available yet."
+        );
+        el("smoke-entitlements-box").innerHTML = renderListBox(
+          Array.isArray(summary.entitlementCandidates) ? summary.entitlementCandidates : [],
+          (item) => `
+            <div>${renderTag(item.username || "-", true)} ${renderTag(item.policyName || "-")} ${renderTag(String(item.lifecycleStatus || item.status || "-").toUpperCase())}</div>
+            <div class="hint" style="margin-top:8px;">${esc(`${item.grantType || "-"} | ends=${item.endsAt || "-"} | remainingPoints=${item.remainingPoints ?? "-"}`)}</div>
+          `,
+          "No starter entitlement candidate is available yet."
+        );
+        el("smoke-direct-cards-box").innerHTML = renderListBox(
+          Array.isArray(summary.directCardCandidates) ? summary.directCardCandidates : [],
+          (item) => `
+            <div>${renderTag(item.cardKeyMasked || "-", true)} ${renderTag(item.batchCode || "-")} ${renderTag(item.policyName || "-")}</div>
+            <div class="hint" style="margin-top:8px;">${esc(`${item.suggestedUse || "-"} | status=${item.displayStatus || item.usageStatus || "-"} | expires=${item.expiresAt || "-"}`)}</div>
+          `,
+          "No fresh direct-card candidate is available yet."
+        );
+        el("smoke-recharge-cards-box").innerHTML = renderListBox(
+          Array.isArray(summary.rechargeCardCandidates) ? summary.rechargeCardCandidates : [],
+          (item) => `
+            <div>${renderTag(item.cardKeyMasked || "-", true)} ${renderTag(item.batchCode || "-")} ${renderTag(item.policyName || "-")}</div>
+            <div class="hint" style="margin-top:8px;">${esc(`${item.suggestedUse || "-"} | status=${item.displayStatus || item.usageStatus || "-"} | expires=${item.expiresAt || "-"}`)}</div>
+          `,
+          "No fresh recharge-card candidate is available yet."
+        );
+      }
+      async function refreshSession() {
+        if (!token) {
+          profile = null;
+          actor = null;
+          setMeta();
+          return;
+        }
+        const session = await api("/api/developer/profile");
+        profile = session.developer || session;
+        actor = session.actor || null;
+        setMeta();
+      }
+      async function generateLaunchSmoke(options = {}) {
+        const target = currentSmokeTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before generating Launch Smoke Kit.");
+        }
+        const data = await api(`/api/developer/launch-smoke-kit${q({
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel
+        })}`);
+        smokeKit = data;
+        renderSmokeKit();
+        renderRouteFocus();
+        if (!options.autoFocus && requestedAutofocus) {
+          const targetNode = requestedAutofocus === "paths" ? el("smoke-paths-box") : el("smoke-summary");
+          targetNode?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        setStatus(`Launch smoke kit generated for ${data.manifest?.project?.code || target.productCode}.`);
+        return data;
+      }
+      async function downloadLaunchSmoke(format, fallbackFileName, label) {
+        const target = currentSmokeTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before downloading Launch Smoke Kit.");
+        }
+        return downloadApiFile(
+          `/api/developer/launch-smoke-kit/download${q({
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            format
+          })}`,
+          fallbackFileName,
+          label
+        );
+      }
+      async function downloadSmokeRecommendedItem(item) {
+        const target = currentSmokeTarget();
+        if (!item?.source) {
+          throw new Error("Generate Launch Smoke Kit first so the recommended downloads can be resolved.");
+        }
+        if (item.source === "developer-launch-smoke-kit") {
+          return downloadApiFile(
+            `/api/developer/launch-smoke-kit/download${q({
+              productId: target.productId,
+              productCode: target.productCode,
+              channel: target.channel,
+              format: item.format || "summary"
+            })}`,
+            item.fileName || "developer-launch-smoke-kit-summary.txt",
+            item.label || "Launch smoke kit summary"
+          );
+        }
+        if (item.source === "developer-launch-review") {
+          return downloadApiFile(
+            `/api/developer/launch-review/download${q({
+              productId: target.productId,
+              productCode: target.productCode,
+              channel: target.channel,
+              format: item.format || "summary",
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-launch-review-summary.txt",
+            item.label || "Launch review summary"
+          );
+        }
+        if (item.source === "developer-launch-workflow") {
+          return downloadApiFile(
+            `/api/developer/launch-workflow/download${q({
+              productId: target.productId,
+              productCode: target.productCode,
+              channel: target.channel,
+              format: item.format || "summary"
+            })}`,
+            item.fileName || "launch-workflow.txt",
+            item.label || "Launch workflow summary"
+          );
+        }
+        if (item.source === "developer-ops") {
+          return downloadApiFile(
+            `/api/developer/ops/export/download${q({
+              productId: target.productId,
+              productCode: target.productCode,
+              format: item.format || "summary",
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-ops-summary.txt",
+            item.label || "Developer ops summary"
+          );
+        }
+        throw new Error(`Unsupported launch smoke download source: ${item.source}`);
+      }
+      function openWorkspaceAction(action, routeContext = {}) {
+        const target = currentSmokeTarget();
+        if (!action?.key || !target.productCode) {
+          throw new Error("Generate Launch Smoke Kit first so the recommended workspace can be resolved.");
+        }
+        const routedTitle = String(routeContext.title || routeContext.routeTitle || action.label || action.key || requestedRouteTitle || "Launch smoke handoff").trim();
+        const routedReason = String(routeContext.summary || routeContext.routeReason || action.reason || requestedRouteReason || "").trim();
+        const actionParams = action.params && typeof action.params === "object"
+          ? { ...action.params }
+          : {};
+        const routeBits = {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: action.autofocus || "summary",
+          routeTitle: routedTitle,
+          routeReason: routedReason,
+          ...actionParams
+        };
+        if (action.key === "project") {
+          window.location.href = buildWorkspaceUrl("/developer/projects", routeBits);
+          return;
+        }
+        if (action.key === "integration") {
+          window.location.href = buildWorkspaceUrl("/developer/integration", routeBits);
+          return;
+        }
+        if (action.key === "release") {
+          window.location.href = buildWorkspaceUrl("/developer/releases", routeBits);
+          return;
+        }
+        if (action.key === "licenses") {
+          window.location.href = buildWorkspaceUrl("/developer/licenses", routeBits);
+          return;
+        }
+        if (action.key === "ops") {
+          window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
+          return;
+        }
+        if (action.key === "launch") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-workflow", routeBits);
+          return;
+        }
+        if (action.key === "launch-review") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-review", routeBits);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-smoke", routeBits);
+      }
+      function openProjectWorkspace() {
+        const target = currentSmokeTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Developer Projects.");
+        window.location.href = buildWorkspaceUrl("/developer/projects", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "launch",
+          routeTitle: requestedRouteTitle || "Launch smoke handoff",
+          routeReason: requestedRouteReason || `Continue launch smoke validation for ${target.productCode} from the launch smoke workspace.`
+        });
+      }
+      function openLicenseWorkspace() {
+        const target = currentSmokeTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Developer Licenses.");
+        window.location.href = buildWorkspaceUrl("/developer/licenses", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "quickstart",
+          routeTitle: requestedRouteTitle || "Launch smoke handoff",
+          routeReason: requestedRouteReason || `Review launch authorization and starter inventory for ${target.productCode} from the launch smoke workspace.`
+        });
+      }
+      function openLaunchWorkspace() {
+        const target = currentSmokeTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Launch Workflow.");
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "handoff",
+          routeTitle: requestedRouteTitle || "Launch smoke handoff",
+          routeReason: requestedRouteReason || `Continue lane-level launch validation for ${target.productCode} from the launch smoke workspace.`
+        });
+      }
+      function openLaunchReviewWorkspace() {
+        const target = currentSmokeTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Launch Review.");
+        window.location.href = buildWorkspaceUrl("/developer/launch-review", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "summary",
+          routeTitle: requestedRouteTitle || "Launch smoke handoff",
+          routeReason: requestedRouteReason || `Continue launch recheck for ${target.productCode} from the launch smoke workspace.`
+        });
+      }
+      function openOpsWorkspace() {
+        const target = currentSmokeTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Developer Ops.");
+        window.location.href = buildWorkspaceUrl("/developer/ops", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "snapshot",
+          routeTitle: requestedRouteTitle || "Launch smoke handoff",
+          routeReason: requestedRouteReason || `Continue routed launch-day ops review for ${target.productCode} from the launch smoke workspace.`,
+          reviewMode: "matched"
+        });
+      }
+      async function hydrateAutofocus() {
+        if (!requestedAutofocus || !token || !requestedProductCode) return;
+        await generateLaunchSmoke({ autoFocus: true });
+      }
+
+      syncRouteFields();
+      renderRouteFocus();
+      renderSmokeKit();
+      setMeta();
+      setOutput("Waiting for actions...");
+
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await api("/api/developer/login", {
+            method: "POST",
+            body: {
+              username: el("username").value.trim(),
+              password: el("password").value
+            }
+          });
+          token = data.token;
+          profile = data.developer || null;
+          actor = data.actor || null;
+          await refreshSession();
+          renderRouteFocus();
+          setStatus(`Signed in as ${profile?.username || "developer"}.`);
+          await hydrateAutofocus();
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("refresh-session-btn").addEventListener("click", async () => {
+        try {
+          await refreshSession();
+          renderRouteFocus();
+          setStatus(token ? "Developer session refreshed." : "No session to refresh.", !token);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("logout-btn").addEventListener("click", async () => {
+        token = "";
+        profile = null;
+        actor = null;
+        smokeKit = null;
+        setMeta();
+        renderRouteFocus();
+        renderSmokeKit();
+        setStatus("Signed out of the launch smoke workspace.");
+        setOutput("Waiting for actions...");
+      });
+      el("use-route-project-btn").addEventListener("click", () => {
+        syncRouteFields();
+        renderRouteFocus();
+        setStatus(requestedProductCode ? `Routed project restored: ${requestedProductCode}.` : "No routed project is available yet.", !requestedProductCode);
+      });
+      el("generate-smoke-btn").addEventListener("click", async () => {
+        try {
+          const data = await generateLaunchSmoke();
+          setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("refresh-smoke-btn").addEventListener("click", async () => {
+        try {
+          const data = await generateLaunchSmoke();
+          setStatus(`Launch smoke kit refreshed for ${data.manifest?.project?.code || currentSmokeTarget().productCode}.`);
+          setOutput(data);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("open-smoke-recommended-btn").addEventListener("click", () => {
+        try {
+          openWorkspaceAction(currentRecommendedWorkspace(), {
+            title: currentSmokeSummary().title || "Launch smoke",
+            summary: currentSmokeSummary().message || ""
+          });
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+      el("open-smoke-project-btn").addEventListener("click", () => {
+        try { openProjectWorkspace(); } catch (error) { setStatus(error.message, true); }
+      });
+      el("open-smoke-license-btn").addEventListener("click", () => {
+        try { openLicenseWorkspace(); } catch (error) { setStatus(error.message, true); }
+      });
+      el("open-smoke-launch-btn").addEventListener("click", () => {
+        try { openLaunchWorkspace(); } catch (error) { setStatus(error.message, true); }
+      });
+      el("open-smoke-review-btn").addEventListener("click", () => {
+        try { openLaunchReviewWorkspace(); } catch (error) { setStatus(error.message, true); }
+      });
+      el("open-smoke-ops-btn").addEventListener("click", () => {
+        try { openOpsWorkspace(); } catch (error) { setStatus(error.message, true); }
+      });
+      el("download-smoke-json-btn").addEventListener("click", async () => {
+        try { await downloadLaunchSmoke("json", "developer-launch-smoke.json", "Launch smoke JSON"); } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("download-smoke-summary-btn").addEventListener("click", async () => {
+        try { await downloadLaunchSmoke("summary", "developer-launch-smoke-summary.txt", "Launch smoke summary"); } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("download-smoke-checksums-btn").addEventListener("click", async () => {
+        try { await downloadLaunchSmoke("checksums", "developer-launch-smoke-sha256.txt", "Launch smoke checksums"); } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("download-smoke-zip-btn").addEventListener("click", async () => {
+        try { await downloadLaunchSmoke("zip", "developer-launch-smoke.zip", "Launch smoke zip"); } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("smoke-actions-box").addEventListener("click", async (event) => {
+        const workspaceButton = event.target.closest("[data-smoke-action-workspace-index]");
+        if (workspaceButton) {
+          try {
+            const index = Number(workspaceButton.dataset.smokeActionWorkspaceIndex);
+            const item = currentActionPlan()[index];
+            openWorkspaceAction(item?.workspaceAction, {
+              title: item?.title || item?.key || "Launch smoke action",
+              summary: item?.summary || ""
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const downloadButton = event.target.closest("[data-smoke-action-download-index]");
+        if (downloadButton) {
+          try {
+            const index = Number(downloadButton.dataset.smokeActionDownloadIndex);
+            const item = currentActionPlan()[index];
+            const result = await downloadSmokeRecommendedItem(item?.recommendedDownload);
+            setOutput({
+              smokeActionDownload: {
+                key: item?.recommendedDownload?.key || null,
+                fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
+        const inlineRecommendedButton = event.target.closest("[data-smoke-download-index]");
+        if (inlineRecommendedButton) {
+          try {
+            const index = Number(inlineRecommendedButton.dataset.smokeDownloadIndex);
+            const item = currentRecommendedDownloads()[index];
+            const result = await downloadSmokeRecommendedItem(item);
+            setOutput({
+              smokeRecommendedDownload: {
+                key: item?.key || null,
+                fileName: result?.fileName || item?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+        }
+      });
+      el("smoke-workspace-box").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-smoke-workspace-index]");
+        if (!button) return;
+        try {
+          const index = Number(button.dataset.smokeWorkspaceIndex);
+          const item = currentWorkspaceActions()[index];
+          openWorkspaceAction(cloneAction(item), {
+            title: item?.label || item?.key || "Launch smoke workspace",
+            summary: item?.reason || ""
+          });
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+    </script>
+  </body>
+</html>

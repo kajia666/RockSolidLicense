@@ -136,6 +136,8 @@
           |
           <a href="/developer/launch-workflow">Developer Launch Workflow</a>
           |
+          <a href="/developer/launch-smoke">Developer Launch Smoke</a>
+          |
           <a href="/developer/projects">Developer Projects</a>
           |
           <a href="/developer/licenses">Developer Licenses</a>
@@ -1259,6 +1261,18 @@
           }
           if (action.key === "launch-review") {
             window.location.href = buildWorkspaceUrl("/developer/launch-review", {
+              productId: currentReleaseProductId(target.productCode),
+              productCode: target.productCode,
+              channel: target.channel,
+              autofocus: action.autofocus || "summary",
+              routeTitle: routed.routeTitle,
+              routeReason: routed.routeReason,
+              ...actionParams
+            });
+            return;
+          }
+          if (action.key === "launch-smoke") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-smoke", {
               productId: currentReleaseProductId(target.productCode),
               productCode: target.productCode,
               channel: target.channel,

@@ -2820,7 +2820,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Hand the startup request, candidate internal credentials, and smoke-test path to the team running first-wave validation.",
       status: "review",
       priority: "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: launchSmokeKitDownload
     });
   }
@@ -3107,6 +3107,14 @@ function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "", 
     return {
       key,
       label: label || "Open Launch Review",
+      autofocus: autofocus || "summary",
+      ...extras
+    };
+  }
+  if (key === "launch-smoke") {
+    return {
+      key,
+      label: label || "Open Launch Smoke",
       autofocus: autofocus || "summary",
       ...extras
     };
@@ -4165,7 +4173,7 @@ function buildLaunchQuickstartFollowUpPlan({
       label: "Download launch smoke kit",
       timing: "Before internal QA",
       summary: summary || "Download the startup request, candidate internal accounts, fresh launch keys, and smoke-test steps for the current lane.",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: createLaunchSmokeKitDownload()
     });
   };
@@ -7076,16 +7084,17 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
 
   const recommendedWorkspace = blockingPaths.length
     ? createLaunchWorkflowWorkspaceShortcut("licenses", "quickstart", "Open License Workspace")
-    : createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review");
+    : createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke");
   const workspaceActions = [
     recommendedWorkspace,
     createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+    createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
     createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", { reviewMode: "matched" })
   ];
   const recommendedDownloads = [
-    createLaunchWorkflowReviewDownloadShortcut(
-      "Launch review summary",
-      "launch-review.txt",
+    createLaunchWorkflowSmokeKitDownloadShortcut(
+      "Launch smoke kit summary",
+      "launch-smoke-kit.txt",
       "summary",
       { reviewMode: "matched" }
     )
@@ -7098,8 +7107,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       priority: "primary",
       status: verificationPaths.find((item) => item.key === "startup_bootstrap")?.status || "review",
       summary: startupDecision.message || "Use the staged startup request, then confirm the lane is not blocked by version rules or notices.",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
-      recommendedDownload: createLaunchWorkflowReviewDownloadShortcut("Launch review summary", "launch-review.txt", "summary", { reviewMode: "matched" })
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
+      recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", { reviewMode: "matched" })
     },
     readyPaths.length ? {
       key: "launch_smoke_execution",
@@ -7107,7 +7116,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       priority: "primary",
       status: "review",
       summary: `Use one of the ready smoke paths first: ${readyPaths.map((item) => item.label).join(" / ")}.`,
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review")
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
+      recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", { reviewMode: "matched" })
     } : null,
     {
       key: "ops_follow_up",

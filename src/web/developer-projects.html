@@ -2483,6 +2483,18 @@
             });
             return;
           }
+          if (action.key === "launch-smoke") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-smoke", {
+              productId,
+              productCode,
+              channel,
+              autofocus: action.autofocus || "summary",
+              routeTitle: routed.routeTitle,
+              routeReason: routed.routeReason,
+              ...actionParams
+            });
+            return;
+          }
           window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
             productId,
             productCode,

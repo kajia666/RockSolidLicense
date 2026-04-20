@@ -166,6 +166,8 @@
           |
           <a href="/developer/launch-workflow">Developer Launch Workflow</a>
           |
+          <a href="/developer/launch-smoke">Developer Launch Smoke</a>
+          |
           <a href="/developer/ops">Developer Ops</a>
         </div>
         <div class="pill-row" style="margin-top: 14px;">
@@ -933,6 +935,10 @@
         }
         if (action.key === "ops") {
           window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
+          return;
+        }
+        if (action.key === "launch-smoke") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-smoke", routeBits);
           return;
         }
         if (action.key === "launch") {

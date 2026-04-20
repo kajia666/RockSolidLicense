@@ -6113,6 +6113,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     );
     assert.equal(smokeKit.manifest?.project?.code, "BOOT_ALPHA");
     assert.equal(smokeKit.smokeSummary?.startupRequest?.productCode, "BOOT_ALPHA");
+    assert.equal(smokeKit.smokeSummary?.recommendedWorkspace?.key, "launch-smoke");
     assert.ok(Array.isArray(smokeKit.smokeSummary?.accountCandidates));
     assert.ok(smokeKit.smokeSummary.accountCandidates.length >= 1);
     assert.ok(Array.isArray(smokeKit.smokeSummary?.rechargeCardCandidates));
@@ -6121,6 +6122,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.verificationPaths?.some((item) => item.key === "startup_bootstrap"));
     assert.ok(smokeKit.smokeSummary?.verificationPaths?.some((item) => item.key === "account_login"));
     assert.ok(smokeKit.smokeSummary?.verificationPaths?.some((item) => item.key === "recharge_flow"));
+    assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => item.key === "launch-review"));
+    assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => item.key === "ops"));
+    assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.workspaceAction?.key === "launch-smoke"));
+    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
 
     const smokeKitSummaryDownload = await getText(
@@ -9999,13 +10004,17 @@ test("developer center page is served from the dedicated route", async () => {
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Rotate SDK Credentials/);
     assert.match(html, /Developer Launch Workflow/);
+    assert.match(html, /Developer Launch Smoke/);
     assert.match(html, /\/developer\/launch-workflow/);
+    assert.match(html, /\/developer\/launch-smoke/);
     assert.match(html, /api\/developer\/launch-workflow/);
+    assert.match(html, /api\/developer\/launch-smoke-kit/);
     assert.match(html, /Software Author Workflow/);
     assert.match(html, /End User Runtime Flow/);
     assert.match(html, /not the place where end users download the finished protected client/i);
     assert.match(html, /Open Integration Center/);
     assert.match(html, /Open Release Center/);
+    assert.match(html, /Open Launch Smoke/);
     assert.match(html, /window\.RSProductFeatures/);
     assert.match(html, /feature-summary-box/);
   } finally {
@@ -10014,7 +10023,7 @@ test("developer center page is served from the dedicated route", async () => {
   }
 });
 
-  test("developer launch workflow page is served from the dedicated route", async () => {
+test("developer launch workflow page is served from the dedicated route", async () => {
     const { app, baseUrl, tempDir } = await startServer();
 
     try {
@@ -10022,12 +10031,14 @@ test("developer center page is served from the dedicated route", async () => {
     const html = await response.text();
     assert.equal(response.ok, true);
     assert.match(response.headers.get("content-type") || "", /^text\/html/);
-      assert.match(html, /Developer Launch Workflow/);
-      assert.match(html, /api\/developer\/launch-workflow/);
-      assert.match(html, /api\/developer\/launch-workflow\/download/);
-      assert.match(html, /api\/developer\/launch-review\/download/);
-      assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
-      assert.match(html, /\/developer\/launch-review/);
+    assert.match(html, /Developer Launch Workflow/);
+    assert.match(html, /Developer Launch Smoke/);
+    assert.match(html, /api\/developer\/launch-workflow/);
+    assert.match(html, /api\/developer\/launch-workflow\/download/);
+    assert.match(html, /api\/developer\/launch-review\/download/);
+    assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
+    assert.match(html, /\/developer\/launch-review/);
+    assert.match(html, /\/developer\/launch-smoke/);
       assert.match(html, /Generate Launch Workflow/);
     assert.match(html, /Download Launch JSON/);
     assert.match(html, /Download Launch Summary/);
@@ -10111,7 +10122,7 @@ test("developer center page is served from the dedicated route", async () => {
     }
   });
 
-  test("developer launch review page is served from the dedicated route", async () => {
+test("developer launch review page is served from the dedicated route", async () => {
     const { app, baseUrl, tempDir } = await startServer();
 
     try {
@@ -10120,9 +10131,11 @@ test("developer center page is served from the dedicated route", async () => {
       assert.equal(response.ok, true);
       assert.match(response.headers.get("content-type") || "", /^text\/html/);
       assert.match(html, /Developer Launch Review/);
+      assert.match(html, /Developer Launch Smoke/);
       assert.match(html, /api\/developer\/launch-review/);
       assert.match(html, /api\/developer\/launch-review\/download/);
       assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
+      assert.match(html, /\/developer\/launch-smoke/);
       assert.match(html, /Generate Launch Review/);
       assert.match(html, /Review Actions/);
       assert.match(html, /Review Targets/);
@@ -10150,6 +10163,43 @@ test("developer center page is served from the dedicated route", async () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+test("developer launch smoke page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/launch-smoke`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Launch Smoke/);
+    assert.match(html, /api\/developer\/launch-smoke-kit/);
+    assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
+    assert.match(html, /Generate Launch Smoke Kit/);
+    assert.match(html, /Smoke Actions/);
+    assert.match(html, /Workspace Path/);
+    assert.match(html, /Smoke Summary/);
+    assert.match(html, /Startup Request/);
+    assert.match(html, /Smoke Paths/);
+    assert.match(html, /Account Candidates/);
+    assert.match(html, /Direct-Card Candidates/);
+    assert.match(html, /Recharge Candidates/);
+    assert.match(html, /Open Recommended Workspace/);
+    assert.match(html, /Open Launch Workflow/);
+    assert.match(html, /Open Launch Review/);
+    assert.match(html, /Open Ops Workspace/);
+    assert.match(html, /downloadSmokeRecommendedItem/);
+    assert.match(html, /openWorkspaceAction/);
+    assert.match(html, /currentSmokeSummary/);
+    assert.match(html, /currentActionPlan/);
+    assert.match(html, /currentWorkspaceActions/);
+    assert.match(html, /currentRecommendedDownloads/);
+    assert.match(html, /\/developer\/launch-smoke/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
 
 test("developer integration snapshot is scoped to visible projects", async () => {
   const { app, baseUrl, tempDir } = await startServer();

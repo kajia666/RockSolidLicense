@@ -59,8 +59,10 @@ Those recommendation rows can now also carry direct actions. So instead of only 
 
 After `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` completes, the same quickstart block now also keeps a `Next Launch Follow-up` section in view. It reuses the real launch-day ops actions for the current project and turns them into direct buttons, so a software author can immediately:
 
+- review the combined launch workflow again before moving into launch-day ops
+- review starter inventory or refilled inventory inside the license workspace when the lane depends on sellable cards
 - open the exact routed workspace for runtime smoke, card redemption watch, session review, or release checks
-- download the matching filtered ops summary without first navigating into the ops page
+- download the matching launch workflow summary/checklist or filtered ops summary without first navigating into another workspace
 - keep the most recent launch initialization result attached to the same routed project instead of re-deriving the next step manually
 
 The quickstart block now also keeps a `Last Quickstart Action` recap above that follow-up section. It summarizes the before/after counts for starter policies, fresh cards, starter accounts, and active entitlements, then lists the newly created starter batches, accounts, or internal entitlements so a software author can confirm what actually changed before moving on to the next launch-day recheck.

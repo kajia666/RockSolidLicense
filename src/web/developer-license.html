@@ -1167,8 +1167,8 @@
         if (!item?.key) {
           throw new Error("Run launch quickstart actions first so the follow-up summaries can be resolved.");
         }
+        const target = currentLicenseTarget();
         if (item.source === "developer-ops") {
-          const target = currentLicenseTarget();
           const result = await downloadApiFile(
             `/api/developer/ops/export/download${q({
               productCode: target.productCode,
@@ -1176,6 +1176,30 @@
               ...(item.params && typeof item.params === "object" ? item.params : {})
             })}`,
             item.fileName || "developer-ops-summary.txt",
+            item.label || "Launch follow-up summary"
+          );
+          setStatus(`${item.label || "Launch follow-up summary"} downloaded: ${result.fileName}`);
+          return result;
+        }
+        if (
+          item.source === "developer-launch-workflow"
+          || ["launch_summary", "launch_checklist", "launch_workflow_zip", "launch_handoff_zip", "launch_handoff_checksums"].includes(item.key)
+        ) {
+          const fallbackFormats = {
+            launch_summary: "summary",
+            launch_checklist: "checklist",
+            launch_workflow_zip: "zip",
+            launch_handoff_zip: "handoff-zip",
+            launch_handoff_checksums: "handoff-checksums"
+          };
+          const requestedFormat = String(item.format || fallbackFormats[item.key] || "summary").trim() || "summary";
+          const result = await downloadApiFile(
+            `/api/developer/launch-workflow/download${q({
+              productCode: target.productCode,
+              channel: target.channel,
+              format: requestedFormat
+            })}`,
+            item.fileName || "launch-workflow.txt",
             item.label || "Launch follow-up summary"
           );
           setStatus(`${item.label || "Launch follow-up summary"} downloaded: ${result.fileName}`);

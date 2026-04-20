@@ -3620,10 +3620,56 @@ function buildLaunchQuickstartFollowUpPlan({
         metrics,
         policies
       });
+  const firstBatchCardRecommendations = Array.isArray(resolvedRecommendations?.firstBatchCardRecommendations)
+    ? resolvedRecommendations.firstBatchCardRecommendations.filter((item) => item?.key || item?.mode)
+    : [];
   const firstOpsActions = Array.isArray(resolvedRecommendations?.firstOpsActions)
     ? resolvedRecommendations.firstOpsActions.filter((item) => item?.key)
     : [];
   const actionMap = new Map(firstOpsActions.map((item) => [item.key, item]));
+  const hasCardInventoryFlow = firstBatchCardRecommendations.length > 0
+    || featureConfig.allowCardLogin !== false
+    || featureConfig.allowCardRecharge !== false;
+  const preludeActions = [];
+  const pushPreludeAction = (action) => {
+    if (!action?.key || preludeActions.some((item) => item.key === action.key)) {
+      return;
+    }
+    preludeActions.push(action);
+    actionMap.set(action.key, action);
+  };
+  const createLaunchSummaryDownload = (label = "Launch workflow summary", fileName = "launch-workflow.txt", format = "summary") =>
+    createLaunchWorkflowDownloadShortcut("launch_summary", fileName, label, {
+      source: "developer-launch-workflow",
+      format
+    });
+  const createLaunchChecklistDownload = (label = "Launch workflow checklist", fileName = "launch-workflow-checklist.txt", format = "checklist") =>
+    createLaunchWorkflowDownloadShortcut("launch_checklist", fileName, label, {
+      source: "developer-launch-workflow",
+      format
+    });
+  const pushLaunchRecheckAction = (summary) => {
+    pushPreludeAction({
+      key: "launch_recheck",
+      label: "Review launch workflow recheck",
+      timing: "Immediately after setup",
+      summary,
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+      recommendedDownload: createLaunchSummaryDownload()
+    });
+  };
+  const pushInventoryRecheckAction = ({ label, summary, autofocus = "cards", download = "checklist" } = {}) => {
+    pushPreludeAction({
+      key: "inventory_recheck",
+      label: label || "Review starter inventory",
+      timing: "Immediately after setup",
+      summary: summary || "Confirm starter card inventory is visible and fresh before handing the lane to launch-day QA, sales, or support.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", autofocus, "Open License Workspace"),
+      recommendedDownload: download === "summary"
+        ? createLaunchSummaryDownload()
+        : createLaunchChecklistDownload()
+    });
+  };
   const preferredKeys = [];
 
   const pushPreferredKey = (key) => {
@@ -3634,6 +3680,18 @@ function buildLaunchQuickstartFollowUpPlan({
   };
 
   if (normalizedOperation === "bootstrap") {
+    pushLaunchRecheckAction(
+      "Confirm authorization readiness, startup gates, and the combined launch checklist moved to the expected state after bootstrap."
+    );
+    if (hasCardInventoryFlow) {
+      pushInventoryRecheckAction({
+        label: "Review starter inventory",
+        summary: "Confirm the starter card batches are visible with fresh inventory before handing the lane to QA, sales, or support."
+      });
+    }
+    for (const item of preludeActions) {
+      pushPreferredKey(item.key);
+    }
     if (featureConfig.allowAccountLogin !== false && featureConfig.allowRegister === false) {
       pushPreferredKey("starter_account_handoff");
     }
@@ -3642,11 +3700,34 @@ function buildLaunchQuickstartFollowUpPlan({
     pushPreferredKey("startup_rule_watch");
     pushPreferredKey("session_review");
   } else if (normalizedOperation === "first_batch_setup" || normalizedOperation === "restock") {
+    pushInventoryRecheckAction({
+      label: normalizedOperation === "restock" ? "Review refilled launch inventory" : "Review starter inventory",
+      summary: normalizedOperation === "restock"
+        ? "Confirm the refilled launch batches are visible and back inside the recommended fresh-card buffer before the next sales or QA wave."
+        : "Confirm the starter launch batches are visible and ready before the first rollout handoff."
+    });
+    pushLaunchRecheckAction(
+      normalizedOperation === "restock"
+        ? "Confirm launch workflow now shows the lane back inside the recommended inventory buffer."
+        : "Confirm launch workflow now shows starter inventory ready for rollout."
+    );
+    for (const item of preludeActions) {
+      pushPreferredKey(item.key);
+    }
     pushPreferredKey("card_redemption_watch");
     pushPreferredKey("runtime_smoke");
     pushPreferredKey("session_review");
     pushPreferredKey("startup_rule_watch");
   } else {
+    pushLaunchRecheckAction("Recheck the combined launch workflow after this setup step.");
+    if (hasCardInventoryFlow) {
+      pushInventoryRecheckAction({
+        summary: "Confirm launch-day starter inventory still matches the selected lane before moving into runtime follow-up."
+      });
+    }
+    for (const item of preludeActions) {
+      pushPreferredKey(item.key);
+    }
     pushPreferredKey("runtime_smoke");
     pushPreferredKey("session_review");
     pushPreferredKey("card_redemption_watch");

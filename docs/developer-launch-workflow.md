@@ -134,6 +134,8 @@ That same routed ops context now also feeds back into the launch `Action Plan` a
 
 Those first launch-day ops actions can now also download a filtered ops snapshot summary directly from the launch workflow workspace. So a software author can hand a short runtime-smoke, card-redemption, or early-session review summary to QA, support, or launch-duty teammates without first opening `/developer/ops` and exporting it manually.
 
+That post-action follow-up now starts one step earlier too. After `Run Launch Bootstrap`, `Run First Batch Setup`, or `Run Inventory Refill`, the returned follow-up first points the author back to a launch-workflow recheck and, for card-based lanes, can add an explicit inventory recheck in `/developer/licenses` before the runtime ops watch begins.
+
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.
 
 The workspace now also keeps a `Last Launch Action` card in-page. After `Run Launch Bootstrap`, `Run First Batch Setup`, or `Run Inventory Refill`, the same page keeps the returned launch-day follow-up visible and lets the software author open the next recommended workspace or download the matching filtered ops summary without relying on the transient status banner alone.

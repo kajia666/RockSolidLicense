@@ -73,6 +73,8 @@
 - 这块 `Route Review` 现在还能直接切到 `Show Routed Hits Only`，并一键跳去复查 `accounts / entitlements / sessions / devices / audit` 中命中的那一类对象，让首发后的复查链更像一个连续动作，而不是先看摘要再自己手工筛表
 - 现在从 Launch Workflow、项目页内联 launch summary、授权快启跳进开发者运营台时，也会把 `reviewMode=matched` 一起带过去，让首发后的 ops 复查默认就落在更窄的命中视图里
 - 授权快启页现在也会保留 `Last Quickstart Action` 回执，直接总结 bootstrap / 首批发卡 / 补库存前后的 `policies / freshCards / accounts / activeEntitlements` 变化，并列出这次新建出来的 starter batch、starter account 或 internal entitlement，方便软件作者确认这一步到底补上了什么
+- 这条首发 follow-up 现在也不再是一上来就跳 ops 了：跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 之后，系统会先给出 `Review launch workflow recheck`，并在适用时加上 `Review starter inventory / Review refilled launch inventory`，让软件作者先确认 launch lane 和 starter inventory 已经恢复到预期，再进入首轮 runtime / redemption / session 巡检
+- 开发者授权中心里的 `Next Launch Follow-up` 现在也能直接下载 launch workflow summary / checklist，不再只支持 ops 摘要，这样软件作者在授权快启页里做完初始化动作后，可以先拿走 launch 复查材料，再继续点进 launch workflow、license workspace 或 developer ops
 - 上线工作台和项目页现在还会在页面内保留 `Last Launch Action` / follow-up 卡片：跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 之后，不只是状态栏提示一下，还会把下一步推荐工作台和可下载的首轮巡检摘要继续留在当前页面，方便软件作者顺着做完下一步
 - 上面这些首发建议现在也不只是说明文字了，软件作者可以直接从建议旁边跳到授权预设、授权中心、上线工作台、发版工作台、开发者运营台，或者直接运行 `Launch Bootstrap`；首批直登卡/充值卡建议也会按推荐的批次数量和前缀直接预填到发卡表单里，把“看建议 -> 去处理”压成更短的动作链
 - 现在这条“首批发卡建议”还进一步落成了真正可执行动作：既可以继续 `Review Template` 手工确认，也可以直接在授权快启里运行一键首批发卡初始化，把推荐的首批直登卡 / 充值卡库存直接创建出来

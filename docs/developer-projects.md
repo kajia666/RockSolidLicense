@@ -93,6 +93,8 @@ When the same lane already has launch batches but the remaining fresh inventory 
 
 The detail card now also keeps a `Last Launch Action` block in-page. After `Run Launch Bootstrap`, `Run First Batch Setup`, or `Run Inventory Refill`, the project workspace keeps the next launch-day follow-up visible and lets the software author open the recommended next workspace or download the matching filtered ops summary without having to rely on the status line alone.
 
+That follow-up chain now starts with explicit recheck steps too. When a launch action changes authorization or starter inventory, the inline workflow can first surface `Review launch workflow recheck` and, when applicable, `Review starter inventory / Review refilled launch inventory`, before moving the author into launch-day ops review.
+
 That same inline launch workflow block now also shows the first slice of:
 
 - `Initial Inventory Recommendations`

@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/licenses</code></div>
-          <div class="pill">APIs: <code>/api/developer/policies</code>, <code>/api/developer/cards</code>, <code>/api/developer/cards/export</code>, <code>/api/developer/cards/export/download</code></div>
+          <div class="pill">APIs: <code>/api/developer/policies</code>, <code>/api/developer/cards</code>, <code>/api/developer/cards/export</code>, <code>/api/developer/cards/export/download</code>, <code>/api/developer/license-quickstart/bootstrap</code>, <code>/api/developer/license-quickstart/first-batches</code></div>
           <div class="pill">Scoped to assigned projects. Viewer members stay read-only.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -219,6 +219,11 @@
 
       function bool(id) {
         return el(id).value === "true";
+      }
+
+      function isFreshCardStatus(value) {
+        const normalized = String(value || "").trim().toLowerCase();
+        return normalized === "fresh" || normalized === "unused";
       }
 
       function filters() {
@@ -615,8 +620,10 @@
             prefix: `${prefix}DL`,
             purpose: "First-sale activations and QA smoke tests",
             nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales.",
-            actionKey: "load-direct-card-batch",
-            actionLabel: "Prepare Direct-Card Batch"
+            actionKey: "run-direct-card-setup",
+            actionLabel: "Create Direct-Card Batch",
+            secondaryActionKey: "load-direct-card-batch",
+            secondaryActionLabel: "Review Template"
           });
         }
         if (cardRechargeEnabled) {
@@ -630,8 +637,10 @@
             nextAction: cardLoginEnabled
               ? "Keep recharge stock separate from direct-login stock so renewals do not consume the initial sales batch."
               : "Issue one recharge-ready batch before the first renewal or top-up request arrives.",
-            actionKey: "load-recharge-card-batch",
-            actionLabel: "Prepare Recharge Batch"
+            actionKey: "run-recharge-card-setup",
+            actionLabel: "Create Recharge Batch",
+            secondaryActionKey: "load-recharge-card-batch",
+            secondaryActionLabel: "Review Template"
           });
         }
         return items;
@@ -711,7 +720,7 @@
         return `<div class="hint" style="margin-top:12px;"><strong>${esc(title)}</strong><br>${items.map((item, index) => `
           <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
             <div>${index + 1}. ${esc(formatter(item))}</div>
-            ${item.actionKey ? `<div class="actions" style="margin-top:8px;"><button type="button" class="secondary" data-launch-quickstart-action="${esc(item.actionKey)}">${esc(item.actionLabel || item.actionKey)}</button></div>` : ""}
+            ${(item.actionKey || item.secondaryActionKey) ? `<div class="actions" style="margin-top:8px;">${item.actionKey ? `<button type="button" class="secondary" data-launch-quickstart-action="${esc(item.actionKey)}">${esc(item.actionLabel || item.actionKey)}</button>` : ""}${item.secondaryActionKey ? `<button type="button" data-launch-quickstart-action="${esc(item.secondaryActionKey)}">${esc(item.secondaryActionLabel || item.secondaryActionKey)}</button>` : ""}</div>` : ""}
           </div>
         `).join("")}</div>`;
       }
@@ -755,7 +764,7 @@
         const authSummary = currentAuthorizationDescription(featureConfig);
         const activePolicyCount = productPolicies.filter((item) => String(item.status || "active").toLowerCase() === "active").length;
         const policyCount = Number(activePolicyCount || metrics.policies || 0);
-        const freshCardCount = Number(metrics.cardsFresh ?? productCards.filter((item) => item.usageStatus === "unused").length ?? 0);
+        const freshCardCount = Number(metrics.cardsFresh ?? productCards.filter((item) => isFreshCardStatus(item?.usageStatus ?? item?.displayStatus)).length ?? 0);
         const accountCount = Number(metrics.accounts ?? 0);
         const activeEntitlementCount = Number(metrics.activeEntitlements ?? 0);
         const registerEnabled = featureConfig.allowRegister !== false;
@@ -778,6 +787,15 @@
           featureConfig,
           recommendedGrantType
         });
+        const missingFirstBatchRecommendations = firstBatchCardRecommendations.filter((item) =>
+          !productCards.some((card) => {
+            const batchCode = String(card?.batchCode || "").trim().toUpperCase();
+            const status = String(card?.status || "active").trim().toLowerCase();
+            return batchCode.startsWith(String(item.prefix || "").trim().toUpperCase())
+              && status === "active"
+              && isFreshCardStatus(card?.usageStatus ?? card?.displayStatus);
+          })
+        );
         const firstOpsActions = buildQuickstartOpsActions(featureConfig);
         const bootstrapPlan = [];
         const checks = [];
@@ -890,6 +908,15 @@
           actions.unshift({ key: "run-bootstrap", label: "Run Launch Bootstrap" });
         }
 
+        if (missingFirstBatchRecommendations.length) {
+          actions.unshift({
+            key: "run-first-batch-setup",
+            label: missingFirstBatchRecommendations.length > 1
+              ? "Run First Batch Setup"
+              : `Create ${missingFirstBatchRecommendations[0].label}`
+          });
+        }
+
         if (status === "ready") {
           checks.push({
             label: "Launch Mode",
@@ -915,6 +942,7 @@
           <div class="hint" style="margin-top:10px;">${esc(headline)}</div>
           <div class="hint" style="margin-top:10px;">Current starter picture: policies=${esc(policyCount)} | freshCards=${esc(freshCardCount)} | accounts=${esc(accountCount)} | activeEntitlements=${esc(activeEntitlementCount)} | recommendedGrant=${esc(recommendedGrantType)}</div>
           <div class="hint" style="margin-top:6px;">Bootstrap plan: ${esc(bootstrapPlan.length ? bootstrapPlan.join(" -> ") : "Nothing pending.")}</div>
+          <div class="hint" style="margin-top:6px;">Recommended first-batch gaps: ${esc(missingFirstBatchRecommendations.length ? missingFirstBatchRecommendations.map((item) => item.label).join(" + ") : "None.")}</div>
           <div style="margin-top:12px;">${checks.map((item) => tag(`${item.label}: ${item.detail}`, item.tone)).join("")}</div>
           ${renderQuickstartActionButtons(actions)}
           ${renderQuickstartRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatQuickstartInventoryRecommendation)}
@@ -995,7 +1023,7 @@
 
       function renderStats() {
         const activePolicies = policies.filter((item) => item.status === "active").length;
-        const freshCards = cards.filter((item) => item.usageStatus === "unused").length;
+        const freshCards = cards.filter((item) => isFreshCardStatus(item?.usageStatus ?? item?.displayStatus)).length;
         const redeemedCards = cards.filter((item) => item.usageStatus === "used").length;
         const blockedCards = cards.filter((item) => item.available === false).length;
         el("stats-box").innerHTML = `
@@ -1359,6 +1387,25 @@
         setStatus(`Prepared a starter account template for ${productCode}.`);
       }
 
+      async function runLaunchFirstBatchSetup(mode = "recommended") {
+        const { productCode } = currentLaunchQuickstartContext();
+        if (!productCode) {
+          throw new Error("Choose a project before running first-batch setup.");
+        }
+        const data = await api("/api/developer/license-quickstart/first-batches", {
+          method: "POST",
+          body: { productCode, mode }
+        });
+        await refresh();
+        const createdLabels = Array.isArray(data?.createdBatches)
+          ? data.createdBatches.map((item) => item.batchCode).filter(Boolean)
+          : [];
+        setStatus(createdLabels.length
+          ? `First-batch setup created ${createdLabels.join(", ")} for ${productCode}.`
+          : (data?.message || `First-batch setup finished for ${productCode}.`));
+        setOutput(data);
+      }
+
       async function runLaunchQuickstartBootstrap() {
         const { productCode } = currentLaunchQuickstartContext();
         if (!productCode) {
@@ -1699,6 +1746,18 @@
           }
           if (actionKey === "load-card-batch") {
             fillStarterBatchTemplate();
+            return;
+          }
+          if (actionKey === "run-first-batch-setup") {
+            await runLaunchFirstBatchSetup("recommended");
+            return;
+          }
+          if (actionKey === "run-direct-card-setup") {
+            await runLaunchFirstBatchSetup("direct_card");
+            return;
+          }
+          if (actionKey === "run-recharge-card-setup") {
+            await runLaunchFirstBatchSetup("recharge");
             return;
           }
           if (actionKey === "load-direct-card-batch") {

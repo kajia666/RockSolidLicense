@@ -50,6 +50,7 @@ Those recommendation rows can now also carry direct actions. So instead of only 
 
 - open the project authorization preset
 - prefill a starter policy or a recommendation-specific first batch card draft
+- run one-click first-batch setup to create the recommended direct-card / recharge starter batches automatically
 - prefill a starter account
 - jump straight into launch workflow, release workspace, or developer ops for the matching first-launch follow-up
 - run `Launch Bootstrap`
@@ -97,6 +98,7 @@ Typical creation body:
 - `GET /api/developer/cards/export/download`
 - `POST /api/developer/cards/batch`
 - `POST /api/developer/cards/:cardId/status`
+- `POST /api/developer/license-quickstart/first-batches`
 
 ## Account APIs
 
@@ -122,6 +124,21 @@ Typical launch-bootstrap body:
   "productCode": "ALPHA_APP"
 }
 ```
+
+Typical first-batch-setup body:
+
+```json
+{
+  "productCode": "ALPHA_APP",
+  "mode": "recommended"
+}
+```
+
+Supported first-batch setup modes:
+
+- `recommended`
+- `direct_card`
+- `recharge`
 
 Typical batch body:
 

@@ -6088,6 +6088,107 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
   }
 });
 
+test("developer license quickstart first-batch setup can create recommended launch card batches", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.batch.owner",
+        password: "LaunchBatchOwner123!",
+        displayName: "Launch Batch Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "FIRSTBATCH",
+        name: "First Batch App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.batch.owner",
+      password: "LaunchBatchOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "FIRSTBATCH",
+        name: "Starter Duration",
+        durationDays: 30,
+        totalPoints: null,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const setup = await postJson(
+      baseUrl,
+      "/api/developer/license-quickstart/first-batches",
+      {
+        productCode: "FIRSTBATCH",
+        mode: "recommended"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(setup.productCode, "FIRSTBATCH");
+    assert.equal(setup.requestedMode, "recommended");
+    assert.equal(setup.before.counts.freshCards, 0);
+    assert.equal(setup.after.counts.freshCards, 150);
+    assert.equal(setup.createdBatches.length, 2);
+    assert.ok(setup.createdBatches.some((item) => item.mode === "direct_card" && item.prefix === "FIRSTBATCHDL"));
+    assert.ok(setup.createdBatches.some((item) => item.mode === "recharge" && item.prefix === "FIRSTBATCHRC"));
+
+    const cards = await getJson(
+      baseUrl,
+      "/api/developer/cards?productCode=FIRSTBATCH",
+      ownerSession.token
+    );
+    assert.equal(cards.items.filter((item) => ["fresh", "unused"].includes(String(item.usageStatus || item.displayStatus || "").toLowerCase())).length, 150);
+    assert.ok(cards.items.some((item) => /^FIRSTBATCHDL/i.test(item.cardKey)));
+    assert.ok(cards.items.some((item) => /^FIRSTBATCHRC/i.test(item.cardKey)));
+
+    const repeatSetup = await postJson(
+      baseUrl,
+      "/api/developer/license-quickstart/first-batches",
+      {
+        productCode: "FIRSTBATCH",
+        mode: "recommended"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(repeatSetup.createdBatches.length, 0);
+    assert.equal(repeatSetup.skipped.length, 2);
+    assert.equal(repeatSetup.after.counts.freshCards, 150);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -10489,6 +10590,7 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /Create Starter Account/);
     assert.match(html, /api\/developer\/accounts/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
+    assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
     assert.match(html, /account-product-code/);
     assert.match(html, /launch-quickstart-box/);
     assert.match(html, /route-focus-box/);
@@ -10505,8 +10607,12 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /fillStarterPolicyTemplate/);
     assert.match(html, /fillStarterAccountTemplate/);
     assert.match(html, /fillStarterBatchTemplate/);
+    assert.match(html, /runLaunchFirstBatchSetup/);
     assert.match(html, /runLaunchQuickstartBootstrap/);
+    assert.match(html, /run-first-batch-setup/);
     assert.match(html, /run-bootstrap/);
+    assert.match(html, /run-direct-card-setup/);
+    assert.match(html, /run-recharge-card-setup/);
     assert.match(html, /load-direct-card-batch/);
     assert.match(html, /load-recharge-card-batch/);
     assert.match(html, /open-ops-snapshot/);
@@ -10516,6 +10622,7 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /\/developer\/ops/);
     assert.match(html, /\/developer\/releases/);
     assert.match(html, /Bootstrap plan:/);
+    assert.match(html, /Recommended first-batch gaps:/);
     assert.match(html, /activeEntitlements=/);
     assert.match(html, /Initial Inventory Recommendations/);
     assert.match(html, /First Batch Card Suggestions/);

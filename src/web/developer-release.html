@@ -211,6 +211,7 @@
           <div class="actions">
             <button class="secondary" id="download-release-package-json-btn">Download Package JSON</button>
             <button class="secondary" id="download-release-package-summary-btn">Download Summary</button>
+            <button class="secondary" id="download-release-package-checklist-btn">Download Checklist</button>
             <button class="secondary" id="download-release-package-env-btn">Download Env Template</button>
             <button class="secondary" id="download-release-package-host-config-btn">Download Host Config</button>
             <button class="secondary" id="download-release-package-cmake-btn">Download CMake Template</button>
@@ -345,6 +346,11 @@
       <section class="card">
         <h2>Delivery Checklist</h2>
         <div id="delivery-checklist" class="hint">Generate a release package to see the step-by-step handoff checklist.</div>
+      </section>
+
+      <section class="card">
+        <h2>Release Mainline Follow-up</h2>
+        <div id="release-mainline-follow-up" class="hint">Generate a release package to see which workspace, download, and validation step should come next for this lane.</div>
       </section>
 
       <section class="card">
@@ -511,6 +517,20 @@
 
       function currentReleaseRouteFocus() {
         const target = requestedAutofocus || "package";
+        if (target === "mainline" || target === "launch-review" || target === "smoke-kit") {
+          return {
+            title: "Release mainline follow-up focus",
+            summary: "Use the release package as the handoff checkpoint, then move directly into Launch Workflow, Launch Review, or the smoke kit for this lane.",
+            actions: [
+              { key: "refresh-package", label: "Refresh Release Package" },
+              { key: "scroll-target", label: "Scroll To Mainline Follow-up" },
+              { key: "open-launch", label: "Open Launch Workflow" },
+              { key: "open-launch-review", label: "Open Launch Review" },
+              { key: "download-launch-review", label: "Download Launch Review Summary" },
+              { key: "download-smoke-kit", label: "Download Launch Smoke Kit" }
+            ]
+          };
+        }
         if (target === "versions") {
           return {
             title: "Version-rule focus",
@@ -602,6 +622,9 @@
         if (target === "checklist") {
           return "delivery-checklist";
         }
+        if (target === "mainline" || target === "launch-review" || target === "smoke-kit") {
+          return "release-mainline-follow-up";
+        }
         if (target === "host-config") {
           return "release-host-config";
         }
@@ -683,6 +706,103 @@
           || (requestedProductId && requestedProductCode.toUpperCase() === normalized ? requestedProductId : "");
       }
 
+      function currentReleaseMainlineFollowUp() {
+        return releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
+      }
+
+      function buildReleaseWorkspacePath(action = {}) {
+        switch (action.key) {
+          case "project":
+            return "/developer/projects";
+          case "integration":
+            return "/developer/integration";
+          case "launch":
+            return "/developer/launch-workflow";
+          case "launch-review":
+            return "/developer/launch-review";
+          case "licenses":
+            return "/developer/licenses";
+          case "ops":
+            return "/developer/ops";
+          case "release":
+          default:
+            return "/developer/releases";
+        }
+      }
+
+      function openReleaseWorkspaceShortcut(action, fallbackTitle = "Release mainline follow-up", fallbackReason = "") {
+        if (!action || typeof action !== "object") {
+          throw new Error("No release workspace shortcut is available.");
+        }
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before opening a linked workspace.");
+        }
+        const mergedParams = {
+          productId: currentReleaseProductId(target.productCode),
+          productCode: target.productCode,
+          channel: target.channel || requestedChannel,
+          autofocus: action.autofocus || "",
+          routeTitle: requestedRouteTitle || fallbackTitle,
+          routeReason: action.reason || requestedRouteReason || fallbackReason || `Continue ${target.productCode} release follow-up.`
+        };
+        Object.entries(action.params || {}).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && String(value).trim() !== "") {
+            mergedParams[key] = value;
+          }
+        });
+        window.location.href = buildWorkspaceUrl(buildReleaseWorkspacePath(action), mergedParams);
+      }
+
+      function buildReleaseShortcutDownloadRequest(shortcut) {
+        if (!shortcut || typeof shortcut !== "object") {
+          throw new Error("No release download shortcut is available.");
+        }
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before downloading linked release material.");
+        }
+        const params = {
+          productCode: target.productCode,
+          channel: target.channel || requestedChannel
+        };
+        Object.entries(shortcut.params || {}).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && String(value).trim() !== "") {
+            params[key] = value;
+          }
+        });
+        const format = shortcut.format || "summary";
+        if (shortcut.source === "developer-launch-workflow") {
+          return {
+            path: `/api/developer/launch-workflow/download${q({ ...params, format })}`,
+            fileName: shortcut.fileName || "launch-workflow.txt"
+          };
+        }
+        if (shortcut.source === "developer-launch-review") {
+          return {
+            path: `/api/developer/launch-review/download${q({ ...params, format })}`,
+            fileName: shortcut.fileName || "launch-review.txt"
+          };
+        }
+        if (shortcut.source === "developer-launch-smoke-kit") {
+          return {
+            path: `/api/developer/launch-smoke-kit/download${q({ ...params, format })}`,
+            fileName: shortcut.fileName || "launch-smoke-kit.txt"
+          };
+        }
+        return {
+          path: `/api/developer/release-package/download${q({ ...params, format })}`,
+          fileName: shortcut.fileName || "release-package.txt"
+        };
+      }
+
+      async function downloadReleaseShortcut(shortcut, label = "") {
+        const request = buildReleaseShortcutDownloadRequest(shortcut);
+        const result = await downloadApiFile(request.path, request.fileName);
+        setStatus(`${label || shortcut.label || "Release follow-up download"} downloaded: ${result.fileName}`);
+        return result;
+      }
+
       async function downloadCurrentReleaseAsset(format, fallbackFileName, label) {
         if (!releasePackage) {
           throw new Error("Generate a release package before downloading routed release assets.");
@@ -732,7 +852,7 @@
           ${actions.length ? `
             <div class="actions" style="margin-top:12px;">
               ${actions.map((item) => {
-                const disabled = !hasProduct || ((item.key === "refresh-package" || item.key === "open-project" || item.key === "open-launch" || item.key === "open-integration" || item.key === "scroll-target") ? !canRefresh : !canDownload);
+                const disabled = !hasProduct || ((item.key === "refresh-package" || item.key === "open-project" || item.key === "open-launch" || item.key === "open-launch-review" || item.key === "open-integration" || item.key === "scroll-target") ? !canRefresh : !canDownload);
                 return `<button type="button" class="${item.key === "refresh-package" || item.key.startsWith("open-") ? "secondary" : ""}" data-release-route-focus-action="${escapeHtml(item.key)}" ${disabled ? "disabled" : ""}>${escapeHtml(item.label || item.key || "Action")}</button>`;
               }).join("")}
             </div>
@@ -818,7 +938,7 @@
           }
         });
         const hasPackage = Boolean(releasePackage);
-        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-env-btn", "download-release-package-host-config-btn", "download-release-package-cmake-btn", "download-release-package-vs2022-guide-btn", "download-release-package-vs2022-sln-btn", "download-release-package-vs2022-btn", "download-release-package-vs2022-filters-btn", "download-release-package-vs2022-props-btn", "download-release-package-vs2022-local-props-btn", "download-release-package-cpp-btn", "download-release-package-host-skeleton-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
+        ["download-release-package-json-btn", "download-release-package-summary-btn", "download-release-package-checklist-btn", "download-release-package-env-btn", "download-release-package-host-config-btn", "download-release-package-cmake-btn", "download-release-package-vs2022-guide-btn", "download-release-package-vs2022-sln-btn", "download-release-package-vs2022-btn", "download-release-package-vs2022-filters-btn", "download-release-package-vs2022-props-btn", "download-release-package-vs2022-local-props-btn", "download-release-package-cpp-btn", "download-release-package-host-skeleton-btn", "download-release-package-checksums-btn", "download-release-package-zip-btn"].forEach((id) => {
           const node = el(id);
           if (node) {
             node.disabled = readDisabled || !hasPackage;
@@ -858,11 +978,55 @@
         return `<span class="${className}">${escapeHtml(text)}</span>`;
       }
 
+      function renderReleaseMainlineFollowUp() {
+        if (!releasePackage) {
+          el("release-mainline-follow-up").textContent = "Generate a release package to see which workspace, download, and validation step should come next for this lane.";
+          return;
+        }
+        const followUp = currentReleaseMainlineFollowUp();
+        const recommendedWorkspace = followUp.recommendedWorkspace || null;
+        const workspaceActions = Array.isArray(followUp.workspaceActions) ? followUp.workspaceActions : [];
+        const actionPlan = Array.isArray(followUp.actionPlan) ? followUp.actionPlan : [];
+        const recommendedDownloads = Array.isArray(followUp.recommendedDownloads) ? followUp.recommendedDownloads : [];
+        const routeTitle = requestedRouteTitle || followUp.title || "Release mainline follow-up";
+        el("release-mainline-follow-up").innerHTML = `
+          <div style="margin-bottom:10px;">
+            ${renderTag(followUp.title || followUp.status || "follow-up", String(followUp.status || "").toLowerCase() === "ready")}
+            ${renderTag(String(followUp.status || "unknown").toUpperCase(), String(followUp.status || "").toLowerCase() === "ready")}
+            ${recommendedWorkspace ? renderTag(recommendedWorkspace.label || recommendedWorkspace.key || "workspace", true) : ""}
+          </div>
+          <div class="hint">${escapeHtml(followUp.message || "No release mainline follow-up is available yet.")}</div>
+          ${recommendedWorkspace ? `
+            <div class="actions" style="margin-top:12px;">
+              <button type="button" class="secondary" data-release-mainline-open="recommended">Open Recommended Workspace</button>
+            </div>
+            <div class="hint" style="margin-top:8px;">Recommended workspace: ${escapeHtml(recommendedWorkspace.label || recommendedWorkspace.key || "workspace")} | focus=${escapeHtml(recommendedWorkspace.autofocus || "-")}${recommendedWorkspace.reason ? ` | ${escapeHtml(recommendedWorkspace.reason)}` : ""}</div>
+          ` : ""}
+          ${workspaceActions.length ? `
+            <div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "workspace")} | focus=${escapeHtml(item.autofocus || "-")}${item.reason ? ` | ${escapeHtml(item.reason)}` : ""}`).join("<br>")}</div>
+            <div class="actions" style="margin-top:12px;">
+              ${workspaceActions.map((item, index) => `<button type="button" class="secondary" data-release-mainline-open-index="${index}">${escapeHtml(item.label || item.key || "Open Workspace")}</button>`).join("")}
+            </div>
+          ` : ""}
+          ${actionPlan.length ? `
+            <div class="hint" style="margin-top:12px;">Action plan:<br>${actionPlan.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "review").toUpperCase())}] ${escapeHtml(item.title || item.key || "step")} | ${escapeHtml(item.summary || "-")}${item.workspaceAction ? ` | workspace=${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "workspace")}@${escapeHtml(item.workspaceAction.autofocus || "-")}` : ""}${item.recommendedDownload ? ` | download=${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.fileName || "-")}` : ""}`).join("<br>")}</div>
+          ` : ""}
+          ${recommendedDownloads.length ? `
+            <div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>
+            <div class="actions" style="margin-top:12px;">
+              ${recommendedDownloads.map((item, index) => `<button type="button" data-release-mainline-download-index="${index}">${escapeHtml(item.label || item.key || "Download")}</button>`).join("")}
+            </div>
+          ` : ""}
+          <div class="hint" style="margin-top:12px;">Route context: ${escapeHtml(routeTitle)}${requestedRouteReason ? ` | ${escapeHtml(requestedRouteReason)}` : ""}</div>
+        `;
+      }
+
       function renderReleaseReadiness() {
         if (!releasePackage) {
           el("release-readiness").textContent = "Generate a release package to evaluate whether the selected channel looks ready for rollout.";
           el("delivery-summary").textContent = "Generate a release package to see the handoff summary for software authors and release operators.";
           el("delivery-checklist").textContent = "Generate a release package to see the step-by-step handoff checklist.";
+          el("release-mainline-follow-up").textContent = "Generate a release package to see which workspace, download, and validation step should come next for this lane.";
           el("release-summary").textContent = "Generate a release package to preview its summary text here.";
           el("release-host-skeleton").textContent = "Generate a release package to preview the current C++ host skeleton here.";
           el("release-host-config").textContent = "Generate a release package to preview the packaged CMake host config here.";
@@ -935,6 +1099,7 @@
             <div class="hint">${checklistItems.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "unknown").toUpperCase())}] ${escapeHtml(item.label || item.key || "item")} | ${escapeHtml(item.summary || "-")}${item.artifact ? ` | artifact=${escapeHtml(item.artifact)}` : ""}${item.nextAction ? ` | next=${escapeHtml(item.nextAction)}` : ""}`).join("<br>")}</div>
           `
           : "No delivery checklist is available yet.";
+        renderReleaseMainlineFollowUp();
         el("release-summary").textContent = releasePackage.summaryText || "";
         el("release-host-skeleton").textContent = releasePackage.snippets?.hostSkeletonCpp || "";
         el("release-host-config").textContent = releasePackage.snippets?.hostConfigEnv || "";
@@ -1338,6 +1503,18 @@
             el("open-release-launch-btn").click();
             return;
           }
+          if (actionKey === "open-launch-review") {
+            openReleaseWorkspaceShortcut(
+              {
+                key: "launch-review",
+                label: "Open Launch Review",
+                autofocus: "summary"
+              },
+              requestedRouteTitle || currentReleaseRouteFocus().title || "Release workspace handoff",
+              requestedRouteReason || `Review combined launch and runtime follow-up for ${currentReleaseTarget().productCode} after the release check.`
+            );
+            return;
+          }
           if (actionKey === "open-integration") {
             el("open-release-integration-btn").click();
             return;
@@ -1350,11 +1527,73 @@
             "download-host-skeleton": ["host-skeleton", "project-host-skeleton.cpp", "Release package host skeleton"],
             "download-cmake": ["cmake", "CMakeLists.txt", "Release package CMake template"]
           };
+          if (actionKey === "download-launch-review") {
+            await downloadReleaseShortcut(
+              {
+                source: "developer-launch-review",
+                format: "summary",
+                fileName: "launch-review.txt",
+                label: "Launch review summary"
+              },
+              "Launch review summary"
+            );
+            return;
+          }
+          if (actionKey === "download-smoke-kit") {
+            await downloadReleaseShortcut(
+              {
+                source: "developer-launch-smoke-kit",
+                format: "summary",
+                fileName: "launch-smoke-kit.txt",
+                label: "Launch smoke kit summary"
+              },
+              "Launch smoke kit summary"
+            );
+            return;
+          }
           const mapped = downloadMap[actionKey];
           if (!mapped) {
             throw new Error(`Unsupported release route-focus action: ${actionKey}`);
           }
           await downloadCurrentReleaseAsset(mapped[0], mapped[1], mapped[2]);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("release-mainline-follow-up").addEventListener("click", async (event) => {
+        const recommendedButton = event.target.closest("[data-release-mainline-open]");
+        const openButton = event.target.closest("[data-release-mainline-open-index]");
+        const downloadButton = event.target.closest("[data-release-mainline-download-index]");
+        if (!recommendedButton && !openButton && !downloadButton) {
+          return;
+        }
+        try {
+          const followUp = currentReleaseMainlineFollowUp();
+          if (recommendedButton) {
+            openReleaseWorkspaceShortcut(
+              followUp.recommendedWorkspace,
+              followUp.title || "Release mainline follow-up",
+              followUp.message || `Continue ${currentReleaseTarget().productCode} release follow-up.`
+            );
+            return;
+          }
+          if (openButton) {
+            const index = Number(openButton.dataset.releaseMainlineOpenIndex || -1);
+            const action = Array.isArray(followUp.workspaceActions) ? followUp.workspaceActions[index] : null;
+            openReleaseWorkspaceShortcut(
+              action,
+              followUp.title || "Release mainline follow-up",
+              followUp.message || `Continue ${currentReleaseTarget().productCode} release follow-up.`
+            );
+            return;
+          }
+          if (downloadButton) {
+            const index = Number(downloadButton.dataset.releaseMainlineDownloadIndex || -1);
+            const shortcut = Array.isArray(followUp.recommendedDownloads) ? followUp.recommendedDownloads[index] : null;
+            await downloadReleaseShortcut(shortcut, shortcut?.label || "Release follow-up download");
+          }
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
@@ -1391,6 +1630,24 @@
             releasePackage.summaryFileName || "release-package.txt"
           );
           setStatus(`Release package summary downloaded: ${result.fileName}`);
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("download-release-package-checklist-btn").addEventListener("click", async () => {
+        try {
+          if (!releasePackage) {
+            return;
+          }
+          const productCode = el("package-product-code").value.trim();
+          const channel = el("package-channel").value.trim() || "stable";
+          const result = await downloadApiFile(
+            `/api/developer/release-package/download${q({ productCode, channel, format: "checklist" })}`,
+            releasePackage.checklistFileName || "release-package-checklist.txt"
+          );
+          setStatus(`Release package checklist downloaded: ${result.fileName}`);
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });

@@ -5267,8 +5267,17 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(Array.isArray(releasePackage.deliveryChecklist.items));
     assert.ok(releasePackage.deliveryChecklist.items.some((item) => item.key === "client_hardening" && item.status === "review"));
     assert.ok(releasePackage.deliveryChecklist.items.some((item) => item.key === "handoff_artifacts"));
+    assert.equal(releasePackage.mainlineFollowUp.status, "hold");
+    assert.ok(releasePackage.mainlineFollowUp.recommendedWorkspace?.key);
+    assert.ok(Array.isArray(releasePackage.mainlineFollowUp.workspaceActions));
+    assert.ok(releasePackage.mainlineFollowUp.workspaceActions.some((item) => item.key === "release"));
+    assert.ok(Array.isArray(releasePackage.mainlineFollowUp.actionPlan));
+    assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "clear_release_blockers"));
+    assert.ok(Array.isArray(releasePackage.mainlineFollowUp.recommendedDownloads));
+    assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "release_checklist"));
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
+    assert.equal(releasePackage.manifest.release.mainlineFollowUp.status, "hold");
     assert.equal(releasePackage.manifest.integration.project.code, "RELPKG_ALPHA");
     assert.equal(releasePackage.manifest.integration.project.featureConfig.allowCardLogin, false);
     assert.equal(releasePackage.manifest.actor.type, "member");
@@ -5322,6 +5331,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Delivery Summary:/);
     assert.match(releasePackage.summaryText, /Delivery Checklist:/);
     assert.match(releasePackage.summaryText, /Release Checks:/);
+    assert.match(releasePackage.summaryText, /Release Mainline Follow-up:/);
     assert.match(releasePackage.summaryText, /hostConfig=host-config\/rocksolid_host_config\.env/);
     assert.match(releasePackage.summaryText, /cmake=cmake-consumer\/CMakeLists\.txt/);
     assert.match(releasePackage.summaryText, /vs2022Guide=vs2022-consumer\/RELPKG_ALPHA_vs2022_quickstart\.md/);
@@ -5341,6 +5351,18 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseSummaryDownload.body, /Latest Version: 5.4.0/);
     assert.match(releaseSummaryDownload.body, /Blocking Notices: 1/);
     assert.match(releaseSummaryDownload.body, /Release Readiness: HOLD/);
+    assert.match(releaseSummaryDownload.body, /Release Mainline Follow-up:/);
+
+    const releaseChecklistDownload = await getText(
+      baseUrl,
+      "/api/developer/release-package/download?productCode=RELPKG_ALPHA&channel=stable&format=checklist",
+      viewerSession.token
+    );
+    assert.match(releaseChecklistDownload.contentType || "", /^text\/plain/);
+    assert.match(releaseChecklistDownload.contentDisposition || "", /attachment; filename="rocksolid-release-package-RELPKG_ALPHA-stable-.*-checklist\.txt"/);
+    assert.match(releaseChecklistDownload.body, /RockSolid Release Delivery Checklist/);
+    assert.match(releaseChecklistDownload.body, /Checklist Items:/);
+    assert.match(releaseChecklistDownload.body, /Project active/);
 
     const releaseEnvDownload = await getText(
       baseUrl,
@@ -11082,6 +11104,8 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/notices/);
     assert.match(html, /api\/developer\/release-package/);
     assert.match(html, /api\/developer\/release-package\/download/);
+    assert.match(html, /api\/developer\/launch-review\/download/);
+    assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
     assert.match(html, /not the page where end users download the final encrypted client build/i);
     assert.match(html, /Scoped to assigned projects/);
     assert.match(html, /Release Delivery Package/);
@@ -11089,6 +11113,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Release Readiness/);
     assert.match(html, /Delivery Summary/);
     assert.match(html, /Delivery Checklist/);
+    assert.match(html, /Release Mainline Follow-up/);
     assert.match(html, /Package Summary/);
     assert.match(html, /Host Skeleton/);
     assert.match(html, /Host Config/);
@@ -11111,6 +11136,7 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Download Host Skeleton/);
     assert.match(html, /Download Package JSON/);
     assert.match(html, /Download Checksums/);
+    assert.match(html, /Download Checklist/);
     assert.match(html, /Download Zip Archive/);
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Launch Workflow/);

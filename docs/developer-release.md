@@ -131,6 +131,8 @@ The release workspace can now generate a project-scoped release delivery package
 
 The release package `.env` template now also carries the extra demo/runtime keys used by the packaged CMake host consumer example, and the package emits a dedicated `rocksolid_host_config.env` plus a reusable VS2022 `.sln/.vcxproj/.vcxproj.filters`, `RockSolidSDK.props`, `RockSolidSDK.local.props`, and `VS2022 quickstart` handoff set. That keeps release handoff closer to a real executable skeleton instead of stopping at raw SDK credentials.
 
+The release package now also carries a structured `Release Mainline Follow-up`. That follow-up tells the software author which workspace should come next for the current lane, what the short action plan looks like, and which downloads are worth taking immediately. In practice this means the release workspace can now point directly into `Launch Workflow`, `Launch Review`, or `Integration`, and it can hand out a release checklist, launch-review summary, or smoke-kit summary without making the author manually translate readiness status into the next step.
+
 The package route accepts:
 
 - `productId`
@@ -141,7 +143,7 @@ The package route accepts:
 
 The download route accepts the same selectors plus:
 
-- `format=json|summary|env|host-config|cmake|vs2022-guide|vs2022-sln|vs2022|vs2022-filters|vs2022-props|vs2022-local-props|cpp|host-skeleton|checksums|zip`
+- `format=json|summary|checklist|env|host-config|cmake|vs2022-guide|vs2022-sln|vs2022|vs2022-filters|vs2022-props|vs2022-local-props|cpp|host-skeleton|checksums|zip`
 
 Typical uses:
 

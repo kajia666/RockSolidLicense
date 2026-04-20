@@ -1981,11 +1981,25 @@ function buildReleasePackageSummaryText(manifest = {}) {
   const release = manifest.release || {};
   const deliverySummary = release.deliverySummary || {};
   const deliveryChecklist = release.deliveryChecklist || {};
+  const mainlineFollowUp = release.mainlineFollowUp || {};
   const versionManifest = release.versionManifest || {};
   const activeNotices = release.activeNotices || {};
   const readiness = release.readiness || {};
   const clientHardening = release.startupPreview?.clientHardening || manifest.integration?.clientHardening || {};
   const noticeItems = Array.isArray(activeNotices.items) ? activeNotices.items : [];
+  const formatWorkspaceActionParams = (params = null) => {
+    const entries = params && typeof params === "object"
+      ? Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+      : [];
+    return entries.length ? entries.map(([key, value]) => `${key}=${value}`).join(",") : "";
+  };
+  const formatWorkspaceActionText = (action = null) => {
+    if (!action || typeof action !== "object") {
+      return "-";
+    }
+    const paramsText = formatWorkspaceActionParams(action.params);
+    return `${action.label || action.key || "workspace"} | focus=${action.autofocus || "-"}${paramsText ? ` | filters=${paramsText}` : ""}`;
+  };
   const lines = [
     "RockSolid Release Delivery Package",
     `Generated At: ${manifest.generatedAt || ""}`,
@@ -2049,6 +2063,39 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push("");
   }
 
+  if (mainlineFollowUp.title || mainlineFollowUp.message) {
+    lines.push("Release Mainline Follow-up:");
+    lines.push(`- Status: ${String(mainlineFollowUp.status || "unknown").toUpperCase()}`);
+    lines.push(`- Title: ${mainlineFollowUp.title || "-"}`);
+    lines.push(`- Message: ${mainlineFollowUp.message || "-"}`);
+    if (mainlineFollowUp.recommendedWorkspace) {
+      lines.push(`- Recommended Workspace: ${formatWorkspaceActionText(mainlineFollowUp.recommendedWorkspace)}`);
+    }
+    if (Array.isArray(mainlineFollowUp.workspaceActions) && mainlineFollowUp.workspaceActions.length) {
+      lines.push("- Workspace Path:");
+      for (const item of mainlineFollowUp.workspaceActions) {
+        lines.push(`  - ${formatWorkspaceActionText(item)}`);
+      }
+    }
+    if (Array.isArray(mainlineFollowUp.actionPlan) && mainlineFollowUp.actionPlan.length) {
+      lines.push("- Action Plan:");
+      for (const item of mainlineFollowUp.actionPlan) {
+        lines.push(
+          `  - ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
+          + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+          + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.fileName || item.recommendedDownload.label || "-"}` : ""}`
+        );
+      }
+    }
+    if (Array.isArray(mainlineFollowUp.recommendedDownloads) && mainlineFollowUp.recommendedDownloads.length) {
+      lines.push("- Recommended Downloads:");
+      for (const item of mainlineFollowUp.recommendedDownloads) {
+        lines.push(`  - ${item.label || item.key || "download"} | ${item.fileName || "-"}`);
+      }
+    }
+    lines.push("");
+  }
+
   if (noticeItems.length) {
     lines.push("Active Notice Titles:");
     for (const item of noticeItems) {
@@ -2059,6 +2106,40 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push("- none");
   }
 
+  return lines.join("\n");
+}
+
+function buildReleasePackageChecklistText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const release = manifest.release || {};
+  const readiness = release.readiness || {};
+  const deliverySummary = payload.deliverySummary || release.deliverySummary || {};
+  const deliveryChecklist = payload.deliveryChecklist || release.deliveryChecklist || {};
+  const checklistItems = Array.isArray(deliveryChecklist.items) ? deliveryChecklist.items : [];
+  const lines = [
+    "RockSolid Release Delivery Checklist",
+    `Generated At: ${manifest.generatedAt || ""}`,
+    `Project Code: ${project.code || ""}`,
+    `Project Name: ${project.name || ""}`,
+    `Channel: ${release.channel || "stable"}`,
+    `Status: ${String(deliveryChecklist.status || "unknown").toUpperCase()} | pass=${deliveryChecklist.passItems ?? 0} | review=${deliveryChecklist.reviewItems ?? 0} | block=${deliveryChecklist.blockItems ?? 0}`,
+    `Readiness: ${String(readiness.status || "unknown").toUpperCase()} | ${readiness.message || "-"}`,
+    `Delivery Summary: ${deliverySummary.summary || "-"}`,
+    ""
+  ];
+  lines.push("Checklist Items:");
+  if (checklistItems.length) {
+    for (const item of checklistItems) {
+      lines.push(
+        `- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"}`
+        + `${item.artifact ? ` | artifact=${item.artifact}` : ""}`
+        + `${item.nextAction ? ` | next=${item.nextAction}` : ""}`
+      );
+    }
+  } else {
+    lines.push("- No delivery checklist items are available yet.");
+  }
   return lines.join("\n");
 }
 
@@ -2464,6 +2545,306 @@ function buildReleaseReadinessPayload({
   };
 }
 
+function buildReleaseMainlineFollowUpPayload({
+  product,
+  channel = "stable",
+  readiness = {},
+  deliverySummary = {},
+  deliveryChecklist = {},
+  releaseStartupPreview = null,
+  fileName = "release-package.json",
+  summaryFileName = "release-package.txt",
+  checklistFileName = "release-package-checklist.txt"
+}) {
+  const params = {
+    productCode: product?.code || null,
+    channel
+  };
+  const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
+  const findCheck = (key) => checks.find((item) => item?.key === key) || null;
+  const projectStatusCheck = findCheck("project_status");
+  const versionRuleCheck = findCheck("version_rule");
+  const downloadUrlCheck = findCheck("download_url");
+  const startupGateCheck = findCheck("startup_gate");
+  const noticeCheck = findCheck("notices");
+  const runtimeCoverageCheck = findCheck("runtime_coverage");
+  const clientHardeningCheck = findCheck("client_hardening");
+  const tokenKeysCheck = findCheck("token_keys");
+  const startupDecision = releaseStartupPreview?.decision || {};
+  const releaseAutofocus = pickLaunchWorkflowReleaseAutofocus(readiness);
+  const releaseSummaryDownload = createReleasePackageDownloadShortcut({
+    key: "release_summary",
+    fileName: summaryFileName,
+    label: "Release package summary",
+    format: "summary",
+    params
+  });
+  const releaseChecklistDownload = createReleasePackageDownloadShortcut({
+    key: "release_checklist",
+    fileName: checklistFileName,
+    label: "Release delivery checklist",
+    format: "checklist",
+    params
+  });
+  const releaseZipDownload = createReleasePackageDownloadShortcut({
+    key: "release_zip",
+    fileName: `${buildArchiveRootName(fileName, "release-package")}.zip`,
+    label: "Release package zip",
+    format: "zip",
+    params
+  });
+  const launchSummaryDownload = createLaunchWorkflowDownloadShortcut(
+    "launch_summary",
+    "launch-workflow.txt",
+    "Launch workflow summary",
+    {
+      source: "developer-launch-workflow",
+      format: "summary",
+      params: { ...params }
+    }
+  );
+  const launchReviewDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review summary",
+    "launch-review.txt",
+    "summary",
+    params
+  );
+  const launchSmokeKitDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke kit summary",
+    "launch-smoke-kit.txt",
+    "summary",
+    params
+  );
+  const workspaceActions = [];
+  const seenWorkspaceActions = new Set();
+  const pushWorkspaceAction = (action, reason = "") => {
+    if (!action || typeof action !== "object") {
+      return;
+    }
+    const dedupeKey = `${action.key || "workspace"}|${action.autofocus || ""}|${JSON.stringify(action.params || {})}`;
+    if (seenWorkspaceActions.has(dedupeKey)) {
+      return;
+    }
+    seenWorkspaceActions.add(dedupeKey);
+    workspaceActions.push({
+      ...action,
+      reason: action.reason || reason || ""
+    });
+  };
+  const actionPlan = [];
+  const pushActionPlan = ({
+    key = "",
+    title = "",
+    summary = "",
+    status = "review",
+    priority = "secondary",
+    workspaceAction = null,
+    recommendedDownload = null
+  } = {}) => {
+    if (!key) {
+      return;
+    }
+    actionPlan.push({
+      key,
+      title,
+      summary,
+      status,
+      priority,
+      workspaceAction,
+      recommendedDownload
+    });
+  };
+
+  const projectBlocked = projectStatusCheck?.blocking === true;
+  const startupBlocked = startupDecision.ready === false || startupGateCheck?.blocking === true;
+  const blockingNotice = noticeCheck?.blocking === true;
+  const versionNeedsAttention = ["attention", "blocking"].includes(String(versionRuleCheck?.level || "").toLowerCase());
+  const downloadNeedsAttention = ["attention", "blocking"].includes(String(downloadUrlCheck?.level || "").toLowerCase());
+  const noticeNeedsAttention = String(noticeCheck?.level || "").toLowerCase() === "attention";
+  const releaseNeedsAttention = versionNeedsAttention || downloadNeedsAttention || noticeNeedsAttention;
+  const integrationNeedsAttention = startupBlocked
+    || String(runtimeCoverageCheck?.level || "").toLowerCase() === "attention"
+    || String(clientHardeningCheck?.level || "").toLowerCase() === "attention"
+    || String(tokenKeysCheck?.level || "").toLowerCase() === "attention";
+  const normalizedStatus = String(readiness.status || deliveryChecklist.status || "unknown").toLowerCase() || "unknown";
+
+  let recommendedWorkspace = null;
+  if (projectBlocked) {
+    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+      "project",
+      "detail",
+      "Open Project Workspace"
+    );
+  } else if (startupBlocked) {
+    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+      "integration",
+      "startup",
+      "Open Integration Workspace"
+    );
+  } else if (blockingNotice || normalizedStatus === "hold") {
+    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+      "release",
+      releaseAutofocus,
+      "Open Release Workspace"
+    );
+  } else if (integrationNeedsAttention) {
+    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+      "integration",
+      "startup",
+      "Open Integration Workspace"
+    );
+  } else if (releaseNeedsAttention) {
+    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+      "release",
+      releaseAutofocus,
+      "Open Release Workspace"
+    );
+  } else if (String(readiness.status || "").toLowerCase() === "attention") {
+    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+      "launch",
+      "handoff",
+      "Open Launch Workflow"
+    );
+  } else {
+    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+      "launch-review",
+      "summary",
+      "Open Launch Review"
+    );
+  }
+
+  pushWorkspaceAction(
+    recommendedWorkspace,
+    readiness.message || deliverySummary.summary || "Continue the release mainline from the recommended workspace."
+  );
+  pushWorkspaceAction(
+    createLaunchWorkflowWorkspaceShortcut("release", releaseAutofocus, "Open Release Workspace"),
+    "Keep release rules, notices, and packaged artifacts aligned while you work through this lane."
+  );
+  pushWorkspaceAction(
+    createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+    "Use Launch Workflow as the combined handoff view once the release lane is staged."
+  );
+  if (!projectBlocked) {
+    pushWorkspaceAction(
+      createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      "Use Launch Review to recheck launch readiness against first-wave runtime signals."
+    );
+  }
+  if (integrationNeedsAttention || startupBlocked || String(readiness.status || "").toLowerCase() !== "ready") {
+    pushWorkspaceAction(
+      createLaunchWorkflowWorkspaceShortcut("integration", "startup", "Open Integration Workspace"),
+      "Use Integration when startup, hardening, or token verification settings still need work."
+    );
+  }
+
+  let title = "Release lane needs one more pass";
+  let message = readiness.message || deliverySummary.summary || "Use the release workspace to keep this lane aligned before handoff.";
+  if (normalizedStatus === "hold") {
+    title = "Release lane still has blockers";
+    message = readiness.message || "Resolve the blocking release checks before handing this lane to QA, launch duty, or operators.";
+  } else if (normalizedStatus === "ready") {
+    title = "Release lane is ready to move into launch validation";
+    message = "Release readiness looks aligned. Move into Launch Workflow, Launch Review, and smoke validation before the wider rollout.";
+  }
+
+  if (normalizedStatus === "hold") {
+    pushActionPlan({
+      key: "clear_release_blockers",
+      title: projectBlocked
+        ? "Re-activate the project before handoff"
+        : startupBlocked || integrationNeedsAttention
+          ? "Fix startup and integration blockers first"
+          : "Clear blocking release rules in this workspace",
+      summary: message,
+      status: "block",
+      priority: "primary",
+      workspaceAction: recommendedWorkspace,
+      recommendedDownload: releaseChecklistDownload
+    });
+    pushActionPlan({
+      key: "refresh_release_package",
+      title: "Regenerate the release package after fixes",
+      summary: "Refresh the release package so the handoff summary and packaged assets reflect the latest rules, notices, and startup state.",
+      status: "review",
+      priority: "secondary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("release", releaseAutofocus, "Open Release Workspace"),
+      recommendedDownload: releaseSummaryDownload
+    });
+    pushActionPlan({
+      key: "launch_recheck",
+      title: "Recheck the combined launch lane after the release fix",
+      summary: "Once release blockers clear, reopen Launch Workflow before moving into first-wave validation.",
+      status: "review",
+      priority: "secondary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+      recommendedDownload: launchSummaryDownload
+    });
+  } else {
+    if (normalizedStatus === "attention") {
+      pushActionPlan({
+        key: "review_release_attention",
+        title: releaseNeedsAttention
+          ? "Review remaining release attention items"
+          : integrationNeedsAttention
+            ? "Review remaining integration attention items"
+            : "Review the remaining lane attention items",
+        summary: message,
+        status: "review",
+        priority: "primary",
+        workspaceAction: recommendedWorkspace,
+        recommendedDownload: releaseChecklistDownload
+      });
+    }
+    pushActionPlan({
+      key: "launch_handoff",
+      title: "Confirm the combined launch lane before rollout",
+      summary: "Use Launch Workflow to keep release, startup, authorization, and handoff context aligned for this channel.",
+      status: normalizedStatus === "ready" ? "pass" : "review",
+      priority: normalizedStatus === "ready" ? "primary" : "secondary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+      recommendedDownload: launchSummaryDownload
+    });
+    pushActionPlan({
+      key: "launch_review",
+      title: "Run Launch Review for first-wave validation",
+      summary: "Launch Review combines launch readiness with the first scoped ops slice so release duty can recheck the lane before it goes wider.",
+      status: "review",
+      priority: normalizedStatus === "ready" ? "primary" : "secondary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      recommendedDownload: launchReviewDownload
+    });
+    pushActionPlan({
+      key: "launch_smoke_kit",
+      title: "Download the smoke kit for internal QA and launch duty",
+      summary: "Hand the startup request, candidate internal credentials, and smoke-test path to the team running first-wave validation.",
+      status: "review",
+      priority: "secondary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      recommendedDownload: launchSmokeKitDownload
+    });
+  }
+
+  const recommendedDownloads = [
+    releaseSummaryDownload,
+    releaseChecklistDownload,
+    releaseZipDownload
+  ];
+  if (normalizedStatus !== "hold") {
+    recommendedDownloads.push(launchSummaryDownload, launchReviewDownload, launchSmokeKitDownload);
+  }
+
+  return {
+    status: normalizedStatus,
+    title,
+    message,
+    recommendedWorkspace,
+    workspaceActions,
+    actionPlan,
+    recommendedDownloads
+  };
+}
+
 function buildReleasePackagePayload({
   generatedAt = nowIso(),
   developer,
@@ -2503,6 +2884,7 @@ function buildReleasePackagePayload({
   const hardeningFileName = `${product.code}-hardening-guide.txt`;
   const fileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}.txt`;
+  const checklistFileName = `rocksolid-release-package-${product.code}-${normalizedChannel}-${timestampTag}-checklist.txt`;
   const deliverySummary = buildReleaseDeliverySummaryPayload({
     product,
     channel: normalizedChannel,
@@ -2534,6 +2916,17 @@ function buildReleasePackagePayload({
     deliverySummary,
     releaseStartupPreview
   });
+  const mainlineFollowUp = buildReleaseMainlineFollowUpPayload({
+    product,
+    channel: normalizedChannel,
+    readiness,
+    deliverySummary,
+    deliveryChecklist,
+    releaseStartupPreview,
+    fileName,
+    summaryFileName,
+    checklistFileName
+  });
   const manifest = {
     generatedAt,
     developer: developer ?? null,
@@ -2558,6 +2951,7 @@ function buildReleasePackagePayload({
       readiness,
       deliverySummary,
       deliveryChecklist,
+      mainlineFollowUp,
       activeNotices: {
         total: activeNotices.length,
         blockingTotal: blockingNotices.length,
@@ -2584,12 +2978,14 @@ function buildReleasePackagePayload({
     ]
   };
 
-  return {
+  const payload = {
     fileName,
     summaryFileName,
+    checklistFileName,
     manifest,
     deliverySummary,
     deliveryChecklist,
+    mainlineFollowUp,
     snippets: {
       envFileName,
       envTemplate: integrationPackage?.snippets?.envTemplate || "",
@@ -2620,8 +3016,12 @@ function buildReleasePackagePayload({
         clientHardening: releaseStartupPreview?.clientHardening || integrationPackage?.manifest?.clientHardening || {}
       })
     },
-    summaryText: buildReleasePackageSummaryText(manifest)
+    checklistText: "",
+    summaryText: ""
   };
+  payload.checklistText = buildReleasePackageChecklistText(payload);
+  payload.summaryText = buildReleasePackageSummaryText(payload.manifest);
+  return payload;
 }
 
 function normalizeLaunchWorkflowChecklistStatus(status = "unknown") {
@@ -2776,6 +3176,27 @@ function createLaunchWorkflowSmokeKitDownloadShortcut(label = "Launch smoke kit 
     label,
     {
       source: "developer-launch-smoke-kit",
+      format,
+      params: params && typeof params === "object"
+        ? { ...params }
+      : {}
+    }
+  );
+}
+
+function createReleasePackageDownloadShortcut({
+  key = "release_summary",
+  fileName = "release-package.txt",
+  label = "Release package summary",
+  format = "summary",
+  params = null
+} = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    key,
+    fileName,
+    label,
+    {
+      source: "developer-release-package",
       format,
       params: params && typeof params === "object"
         ? { ...params }
@@ -5018,6 +5439,10 @@ function buildReleasePackageFiles(payload) {
       body: payload.summaryText || ""
     },
     {
+      path: payload.checklistFileName || "release-package-checklist.txt",
+      body: payload.checklistText || ""
+    },
+    {
       path: `snippets/${payload.snippets?.envFileName || "project.env"}`,
       body: payload.snippets?.envTemplate || ""
     },
@@ -5355,7 +5780,7 @@ function buildProductSdkCredentialDownloadAsset(payload, format = "json") {
 function buildReleasePackageDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "env", "host-config", "cmake", "vs2022-guide", "vs2022-sln", "vs2022", "vs2022-filters", "vs2022-props", "vs2022-local-props", "cpp", "host-skeleton", "zip", "checksums"],
+    ["json", "summary", "checklist", "env", "host-config", "cmake", "vs2022-guide", "vs2022-sln", "vs2022", "vs2022-filters", "vs2022-props", "vs2022-local-props", "cpp", "host-skeleton", "zip", "checksums"],
     "json",
     "INVALID_RELEASE_PACKAGE_FORMAT",
     "Release package format"
@@ -5380,6 +5805,13 @@ function buildReleasePackageDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "release-package.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "checklist") {
+    return {
+      fileName: payload.checklistFileName || "release-package-checklist.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.checklistText || ""
     };
   }
   if (normalizedFormat === "env") {

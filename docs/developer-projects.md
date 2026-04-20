@@ -97,7 +97,7 @@ So the project workspace is no longer limited to "what is blocked right now". It
 
 Those inline recommendation rows are now actionable as well. So from the project page, a software author can move straight from "what should we stage first" into the matching workspace or bootstrap action without re-reading the same launch summary elsewhere.
 
-That now includes launch-day operations too. If the inline workflow says the next best move is to watch first sign-ins, first card-redemption audit, or early session/device state, the project page can route directly into `/developer/ops` with the current project and the right `snapshot / audit / sessions` focus already preserved.
+That now includes launch-day operations too. If the inline workflow says the next best move is to watch first sign-ins, first card-redemption audit, or early session/device state, the project page can route directly into `/developer/ops` with the current project and the right `snapshot / audit / sessions` focus already preserved. When the launch recommendation already knows the right audit slice, it can also forward scoped filters like `eventType`, `actorType`, or `entityType`.
 
 Those routed clicks now preserve the action title and summary too. When the project page sends someone into Integration or Releases from the inline launch workflow, the target page can show which launch-workflow step triggered the route.
 

@@ -153,6 +153,14 @@ The download route also accepts:
 
 The same workspace now also supports routed launch follow-up. When Launch Workflow or the inline project launch summary sends a software author into `/developer/ops`, the page can preserve `productId`, `productCode`, `channel`, `autofocus`, `routeTitle`, and `routeReason`, then show an `Ops Route Focus` card for `snapshot`, `audit`, `sessions`, `accounts`, `entitlements`, or `devices`.
 
+Those routed links can also prefill scoped ops filters:
+
+- `username`
+- `search`
+- `eventType`
+- `actorType`
+- `entityType`
+
 That routed focus is meant to shorten the first post-launch loop:
 
 - watch first sign-ins and heartbeat state from `snapshot`

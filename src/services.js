@@ -2656,49 +2656,58 @@ function pickLaunchWorkflowReleaseAutofocus(readiness = {}) {
   return "package";
 }
 
-function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "") {
+function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "", params = null) {
   if (!key) {
     return null;
   }
+  const extras = params && typeof params === "object"
+    ? { params: { ...params } }
+    : {};
   if (key === "project") {
     return {
       key,
       label: label || "Open Project Workspace",
-      autofocus: autofocus || "detail"
+      autofocus: autofocus || "detail",
+      ...extras
     };
   }
   if (key === "integration") {
     return {
       key,
       label: label || "Open Integration Workspace",
-      autofocus: autofocus || "package"
+      autofocus: autofocus || "package",
+      ...extras
     };
   }
   if (key === "release") {
     return {
       key,
       label: label || "Open Release Workspace",
-      autofocus: autofocus || "package"
+      autofocus: autofocus || "package",
+      ...extras
     };
   }
   if (key === "licenses") {
     return {
       key,
       label: label || "Open License Workspace",
-      autofocus: autofocus || "policy-control"
+      autofocus: autofocus || "policy-control",
+      ...extras
     };
   }
   if (key === "ops") {
     return {
       key,
       label: label || "Open Ops Workspace",
-      autofocus: autofocus || "snapshot"
+      autofocus: autofocus || "snapshot",
+      ...extras
     };
   }
   return {
     key: "launch",
     label: label || "Stay in Launch Workflow",
-    autofocus: autofocus || "handoff"
+    autofocus: autofocus || "handoff",
+    ...extras
   };
 }
 
@@ -3261,7 +3270,10 @@ function buildLaunchAuthorizationOperationalPlan({
     label: "Verify first real sign-ins",
     timing: "T+0 to T+30m",
     summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine.",
-    workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace")
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", {
+      eventType: "session.login",
+      actorType: "account"
+    })
   });
 
   if (cardLoginEnabled || cardRechargeEnabled) {
@@ -3270,7 +3282,9 @@ function buildLaunchAuthorizationOperationalPlan({
       label: "Watch first card redemptions",
       timing: "T+0 to T+2h",
       summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up.",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "audit", "Open Ops Workspace")
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "audit", "Open Ops Workspace", {
+        entityType: "license_key"
+      })
     });
   }
 
@@ -3289,7 +3303,10 @@ function buildLaunchAuthorizationOperationalPlan({
     label: "Review early sessions and device state",
     timing: "T+0 to T+4h",
     summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users.",
-    workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace")
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
+      eventType: "session.login",
+      actorType: "account"
+    })
   });
 
   return {

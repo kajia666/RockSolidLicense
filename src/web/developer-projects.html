@@ -2308,6 +2308,15 @@
         };
       }
 
+      function buildLaunchWorkspaceActionParams(action) {
+        const params = action?.params && typeof action.params === "object"
+          ? action.params
+          : {};
+        return Object.fromEntries(
+          Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+        );
+      }
+
       function openLaunchWorkspaceAction(action, routeContext = {}) {
         const productId = el("edit-product-id").value.trim();
         const productCode = el("edit-product-code").value.trim();
@@ -2319,6 +2328,7 @@
           throw new Error("Preview Launch Workflow first so the recommended workspace can be resolved.");
         }
         const routed = buildLaunchWorkspaceRouteContext(action, routeContext);
+        const actionParams = buildLaunchWorkspaceActionParams(action);
         if (action.key === "project") {
           window.location.href = buildWorkspaceUrl("/developer/projects", {
             productId,
@@ -2326,7 +2336,8 @@
             channel,
             autofocus: action.autofocus || "detail",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            ...actionParams
           });
           return;
         }
@@ -2337,7 +2348,8 @@
             channel,
             autofocus: action.autofocus || "package",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            ...actionParams
           });
           return;
         }
@@ -2348,7 +2360,8 @@
             channel,
             autofocus: action.autofocus || "package",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            ...actionParams
           });
           return;
         }
@@ -2359,7 +2372,8 @@
             channel,
             autofocus: action.autofocus || "policy-control",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            ...actionParams
           });
           return;
         }
@@ -2370,7 +2384,8 @@
             channel,
             autofocus: action.autofocus || "snapshot",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            ...actionParams
           });
           return;
         }
@@ -2380,7 +2395,8 @@
           channel,
           autofocus: action.autofocus || "handoff",
           routeTitle: routed.routeTitle,
-          routeReason: routed.routeReason
+          routeReason: routed.routeReason,
+          ...actionParams
         });
       }
 

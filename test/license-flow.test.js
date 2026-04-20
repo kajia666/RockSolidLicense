@@ -5521,6 +5521,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.key === "ops"));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.autofocus === "snapshot"));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.autofocus === "sessions"));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.params?.eventType === "session.login"));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.params?.entityType === "license_key"));
     assert.equal(launchWorkflow.workflowSummary.recommendedWorkspace.key, "integration");
     assert.match(launchWorkflow.workflowSummary.recommendedWorkspace.label, /Integration Workspace/);
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.workspaceActions));
@@ -10353,6 +10355,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Open this page from launch workflow or another routed workspace action/);
     assert.match(html, /handleOpsRouteFocusAction/);
     assert.match(html, /data-ops-route-focus-action/);
+    assert.match(html, /requestedEventType/);
+    assert.match(html, /requestedActorType/);
+    assert.match(html, /requestedEntityType/);
+    assert.match(html, /Route filters:/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

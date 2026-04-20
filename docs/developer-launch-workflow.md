@@ -122,7 +122,7 @@ Those recommendation rows are now actionable too. When the current lane knows th
 - run `Launch Bootstrap`
 - or follow a recommended download
 
-The same launch-day operations slice can now also route directly into `/developer/ops`. So first sign-in smoke checks, first card-redemption watch, and early session/device review can drop the software author straight into `snapshot`, `audit`, or `sessions` focus inside the developer ops workspace instead of stopping at summary text.
+The same launch-day operations slice can now also route directly into `/developer/ops`. So first sign-in smoke checks, first card-redemption watch, and early session/device review can drop the software author straight into `snapshot`, `audit`, or `sessions` focus inside the developer ops workspace instead of stopping at summary text. Those jumps can also carry launch-specific audit filters such as `eventType`, `actorType`, or `entityType`, so the first post-launch review opens closer to the real signal that needs watching.
 
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.
 

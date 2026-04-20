@@ -227,6 +227,11 @@
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedUsername = (routeParams.get("username") || "").trim();
+      const requestedSearch = (routeParams.get("search") || "").trim();
+      const requestedEventType = (routeParams.get("eventType") || "").trim();
+      const requestedActorType = (routeParams.get("actorType") || "").trim();
+      const requestedEntityType = (routeParams.get("entityType") || "").trim();
 
       function emptySnapshot() {
         return {
@@ -378,6 +383,21 @@
         if (requestedProductCode && !el("filter-product-code").value.trim()) {
           el("filter-product-code").value = requestedProductCode;
         }
+        if (requestedUsername && !el("filter-username").value.trim()) {
+          el("filter-username").value = requestedUsername;
+        }
+        if (requestedSearch && !el("filter-search").value.trim()) {
+          el("filter-search").value = requestedSearch;
+        }
+        if (requestedEventType && !el("filter-event-type").value.trim()) {
+          el("filter-event-type").value = requestedEventType;
+        }
+        if (requestedActorType && !el("filter-actor-type").value.trim()) {
+          el("filter-actor-type").value = requestedActorType;
+        }
+        if (requestedEntityType && !el("filter-entity-type").value.trim()) {
+          el("filter-entity-type").value = requestedEntityType;
+        }
       }
 
       function buildOpsRouteContext(fallbackTitle = "", fallbackReason = "") {
@@ -397,6 +417,7 @@
           <div>${renderTag(focus.title || "Ops route focus", hasProduct)} ${requestedRouteTitle ? renderTag(`from:${requestedRouteTitle}`, true) : ""} ${requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
           ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project code first.`)}</div>
+          ${(requestedEventType || requestedActorType || requestedEntityType || requestedUsername || requestedSearch) ? `<div class="hint" style="margin-top:10px;">${esc(`Route filters: event=${requestedEventType || "-"} | actor=${requestedActorType || "-"} | entity=${requestedEntityType || "-"} | username=${requestedUsername || "-"} | search=${requestedSearch || "-"}`)}</div>` : ""}
           ${actions.length ? `
             <div class="actions" style="margin-top:12px;">
               ${actions.map((item) => {

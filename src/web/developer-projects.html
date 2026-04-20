@@ -1040,7 +1040,7 @@
             ${blockers.length ? `<div class="hint" style="margin-top:12px;">Workflow blockers:<br>${blockers.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${nextActions.length ? `<div class="hint" style="margin-top:12px;">Workflow next steps:<br>${nextActions.map((item, index) => `${index + 1}. ${esc(item)}`).join("<br>")}</div>` : ""}
             ${renderProjectWorkspaceActionButtons(workspaceActions)}
-            ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "workspace")} | ${esc(String(item.priority || "secondary").toUpperCase())} | focus=${esc(item.autofocus || "-")} | ${esc(item.reason || "-")}`).join("<br>")}</div>` : ""}
+            ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "workspace")} | ${esc(String(item.priority || "secondary").toUpperCase())} | focus=${esc(item.autofocus || "-")}${formatProjectWorkspaceActionRouteBits(item) ? ` | ${esc(formatProjectWorkspaceActionRouteBits(item))}` : ""} | ${esc(item.reason || "-")}`).join("<br>")}</div>` : ""}
             ${checklistItems.length ? `<div class="hint" style="margin-top:12px;">Top workflow checks:<br>${checklistItems.map((item, index) => `${index + 1}. [${esc(String(item.status || "unknown").toUpperCase())}] ${esc(item.label || item.key || "item")} | ${esc(item.summary || "-")}`).join("<br>")}</div>` : ""}
             ${renderProjectChecklistActionCards(checklistItems)}
           `;
@@ -2218,7 +2218,15 @@
       }
 
       function formatProjectOpsAction(item = {}) {
-        return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`;
+        const routeBits = formatProjectWorkspaceActionRouteBits(item.workspaceAction);
+        return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${routeBits ? ` | ${routeBits}` : ""}`;
+      }
+
+      function formatProjectWorkspaceActionRouteBits(action = null) {
+        const params = action?.params && typeof action.params === "object"
+          ? Object.entries(action.params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+          : [];
+        return params.length ? `filters=${params.map(([key, value]) => `${key}=${value}`).join(",")}` : "";
       }
 
       function renderProjectRecommendationList(title, groupKey, items = [], formatter) {
@@ -2275,6 +2283,7 @@
               <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.35);">
                 <div>${tag(String(item.priority || "secondary").toUpperCase(), item.priority === "primary" ? "ok" : "")} ${tag(String(item.status || "unknown").toUpperCase(), item.status === "pass" ? "ok" : item.status === "block" ? "danger" : "")} ${esc(item.title || item.key || "step")}</div>
                 <div class="hint" style="margin-top:8px;">${esc(item.summary || "-")}</div>
+                ${item.workspaceAction && formatProjectWorkspaceActionRouteBits(item.workspaceAction) ? `<div class="hint" style="margin-top:6px;">${esc(formatProjectWorkspaceActionRouteBits(item.workspaceAction))}</div>` : ""}
                 <div class="actions" style="margin-top:10px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-action-plan-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-launch-action-plan-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}

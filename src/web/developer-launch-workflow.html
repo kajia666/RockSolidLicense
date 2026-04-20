@@ -852,7 +852,7 @@
           <div class="split-line"><span>Integration Env</span><span>${escapeHtml(linkedIntegrationSnippets.envFileName || "-")}</span></div>
           <div class="split-line"><span>Host Config</span><span>${escapeHtml(linkedIntegrationSnippets.hostConfigFileName || "-")}</span></div>
           <div class="split-line"><span>Host Skeleton</span><span>${escapeHtml(linkedIntegrationSnippets.hostSkeletonFileName || "-")}</span></div>
-          ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "workspace")} | ${escapeHtml(String(item.priority || "secondary").toUpperCase())} | focus=${escapeHtml(item.autofocus || "-")} | ${escapeHtml(item.reason || "-")}`).join("<br>")}</div>` : ""}
+          ${workspaceActions.length ? `<div class="hint" style="margin-top:12px;">Workspace path:<br>${workspaceActions.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "workspace")} | ${escapeHtml(String(item.priority || "secondary").toUpperCase())} | focus=${escapeHtml(item.autofocus || "-")}${formatWorkspaceActionRouteBits(item) ? ` | ${escapeHtml(formatWorkspaceActionRouteBits(item))}` : ""} | ${escapeHtml(item.reason || "-")}`).join("<br>")}</div>` : ""}
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "Review the current lane before handing it to integration or release teammates.")}</div>
           ${renderRecommendedDownloadButtons(recommendedDownloads)}
           ${recommendedDownloads.length ? `<div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>` : ""}
@@ -1019,7 +1019,15 @@
       }
 
       function formatOpsAction(item = {}) {
-        return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`;
+        const routeBits = formatWorkspaceActionRouteBits(item.workspaceAction);
+        return `${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${routeBits ? ` | ${routeBits}` : ""}`;
+      }
+
+      function formatWorkspaceActionRouteBits(action = null) {
+        const params = action?.params && typeof action.params === "object"
+          ? Object.entries(action.params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+          : [];
+        return params.length ? `filters=${params.map(([key, value]) => `${key}=${value}`).join(",")}` : "";
       }
 
       function renderLaunchRecommendationList(title, groupKey, items = [], formatter) {
@@ -1073,6 +1081,7 @@
               <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.35);">
                 <div>${renderTag(String(item.priority || "secondary").toUpperCase(), item.priority === "primary")} ${renderTag(String(item.status || "unknown").toUpperCase(), item.status === "pass")} ${escapeHtml(item.title || item.key || "step")}</div>
                 <div class="hint" style="margin-top:8px;">${escapeHtml(item.summary || "-")}</div>
+                ${item.workspaceAction && formatWorkspaceActionRouteBits(item.workspaceAction) ? `<div class="hint" style="margin-top:6px;">${escapeHtml(formatWorkspaceActionRouteBits(item.workspaceAction))}</div>` : ""}
                 <div class="actions" style="margin-top:10px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-action-plan-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-action-plan-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}

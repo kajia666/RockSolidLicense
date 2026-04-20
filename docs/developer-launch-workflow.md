@@ -124,6 +124,8 @@ Those recommendation rows are now actionable too. When the current lane knows th
 
 The same launch-day operations slice can now also route directly into `/developer/ops`. So first sign-in smoke checks, first card-redemption watch, and early session/device review can drop the software author straight into `snapshot`, `audit`, or `sessions` focus inside the developer ops workspace instead of stopping at summary text. Those jumps can also carry launch-specific audit filters such as `eventType`, `actorType`, or `entityType`, so the first post-launch review opens closer to the real signal that needs watching.
 
+That same routed ops context now also feeds back into the launch `Action Plan` and exported summary/checklist text. So when a lane is otherwise ready, the handoff package can still say which launch-day runtime signal to watch first, not just which pre-launch blocker to clear.
+
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.
 
 Those routed jumps now also carry the originating step title and reason into the next workspace. So when an action-plan item or checklist item sends someone to Integration or Releases, the target page can explain which workflow step triggered the jump instead of only showing a generic autofocus hint.

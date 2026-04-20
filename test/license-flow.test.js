@@ -5548,6 +5548,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "authorization_readiness" && item.bootstrapAction?.key === "launch_bootstrap"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "integration"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.recommendedDownload?.key === "integration_env"));
+    assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "ops"));
     assert.equal(launchWorkflow.releasePackage.manifest.project.code, "RELPKG_ALPHA");
     assert.equal(launchWorkflow.integrationPackage.manifest.project.code, "RELPKG_ALPHA");
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
@@ -5561,6 +5562,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /First Batch Card Suggestions:/);
     assert.match(launchWorkflow.summaryText, /First Ops Actions:/);
     assert.match(launchWorkflow.summaryText, /Action Plan:/);
+    assert.match(launchWorkflow.summaryText, /workspace=Open Ops Workspace@/);
+    assert.match(launchWorkflow.summaryText, /eventType=session\.login|entityType=license_key/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
     assert.match(launchWorkflow.summaryText, /workspace=Open License Workspace@quickstart/);
@@ -5574,6 +5577,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.checklistText, /Initial Inventory Recommendations:/);
     assert.match(launchWorkflow.checklistText, /First Batch Card Suggestions:/);
     assert.match(launchWorkflow.checklistText, /First Ops Actions:/);
+    assert.match(launchWorkflow.checklistText, /Open Ops Workspace@|workspace: Open .*Workspace \| focus=.*filters=/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Startup bootstrap decision/);
     assert.match(launchWorkflow.checklistText, /workspace: Open Integration Workspace \| focus=startup/);
     assert.match(launchWorkflow.checklistText, /download: Recommended handoff zip \| rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip/);
@@ -9525,6 +9529,8 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /data-recommendation-bootstrap-index/);
     assert.match(html, /renderChecklistItemButtons/);
     assert.match(html, /renderActionPlanCards/);
+    assert.match(html, /formatWorkspaceActionRouteBits/);
+    assert.match(html, /filters=/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /runLaunchBootstrap/);
     assert.match(html, /currentLaunchBootstrapAction/);
@@ -10035,6 +10041,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /renderProjectRecommendationList/);
     assert.match(html, /renderProjectChecklistActionCards/);
     assert.match(html, /renderProjectActionPlanCards/);
+    assert.match(html, /formatProjectWorkspaceActionRouteBits/);
+    assert.match(html, /filters=/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /runLaunchWorkflowBootstrap/);
     assert.match(html, /currentLaunchWorkflowBootstrapAction/);

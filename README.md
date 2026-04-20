@@ -63,6 +63,7 @@
 - 上线工作台和项目页内联 `Launch Workflow` 现在也能直接运行 `Launch Bootstrap`。如果当前 lane 的首发授权缺项可以自动补齐，摘要、action plan、checklist 和主操作区都会给出一键入口，执行后会自动刷新当前 lane，减少先跳到授权页再返回的往返
 - 现在 `Launch Authorization Quickstart`、`Launch Workflow` 和项目页内联 launch summary 还会给出结构化的“首批库存建议 / 首批发卡建议 / 首发后第一轮运营动作”，帮助软件作者把首发准备、首批发卡和上线后前几小时的运营检查连成一条更实操的链路
 - 这条“首发后第一轮运营动作”现在也已经接到了开发者运营台 `/developer/ops`：launch workflow 和项目页里的 `First Ops Actions` 可以直接把软件作者路由到 snapshot / audit / sessions 焦点，方便首发后立刻盯登录、心跳、审计和设备状态；这些路由也可以继续带上更细的 audit filter，比如 `eventType / actorType / entityType`
+- 这些首发后的 ops 动作现在也会进入 `Launch Workflow` 的 `Action Plan` 和导出文本里，所以交付给测试、运营或值守同事时，不只是知道“去哪”，还会知道“应该先看哪类信号”
 - 上面这些首发建议现在也不只是说明文字了，软件作者可以直接从建议旁边跳到授权预设、授权中心、上线工作台，或者直接运行 `Launch Bootstrap`，把“看建议 -> 去处理”压成更短的动作链
 - 开发者多项目归属
 - 开发者主账号 + 子账号

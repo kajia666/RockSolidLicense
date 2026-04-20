@@ -3769,20 +3769,34 @@ function buildLaunchWorkflowSummaryPayload({
       )
     }));
   }
-  if (!actionPlan.length) {
+  const firstOpsActions = Array.isArray(authReadiness.launchRecommendations?.firstOpsActions)
+    ? authReadiness.launchRecommendations.firstOpsActions
+    : [];
+  const primaryOpsAction = firstOpsActions[0] || null;
+  if (primaryOpsAction && !actionPlan.some((item) => item.workspaceAction?.key === "ops")) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_day_ops_watch",
+      title: "Start launch-day operations watch",
+      summary: `${primaryOpsAction.timing || "Post-launch"} | ${primaryOpsAction.summary || "Review first-wave runtime signals in Developer Ops."}`,
+      status: workflowStatus === "ready" ? "pass" : "review",
+      priority: !actionPlan.length && workflowStatus === "ready" ? "primary" : "secondary",
+      workspaceAction: primaryOpsAction.workspaceAction || null
+    }));
+  }
+  if (!actionPlan.length || (workflowStatus === "ready" && !actionPlan.some((item) => item.key === "launch_handoff_zip"))) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_handoff_zip",
       title: "Send the recommended handoff zip",
       summary: "Share the curated handoff package with release, QA, and integration teammates.",
-      status: "pass",
-      priority: "primary",
+      status: workflowStatus === "ready" ? "pass" : "review",
+      priority: actionPlan.length ? "secondary" : "primary",
       recommendedDownload: createLaunchWorkflowDownloadShortcut("launch_handoff_zip", handoffZipFileName, "Recommended handoff zip")
     }));
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_checklist",
       title: "Keep the launch checklist nearby",
       summary: "Use the checklist while doing the final rollout review for this lane.",
-      status: "pass",
+      status: workflowStatus === "ready" ? "pass" : "review",
       priority: "secondary",
       recommendedDownload: createLaunchWorkflowDownloadShortcut("launch_checklist", checklistFileName, "Launch workflow checklist")
     }));
@@ -3848,6 +3862,19 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   const workflowChecklist = payload.workflowChecklist || manifest.workflowChecklist || {};
   const releasePackage = payload.releasePackage || {};
   const integrationPackage = payload.integrationPackage || {};
+  const formatWorkspaceActionParams = (params = null) => {
+    const entries = params && typeof params === "object"
+      ? Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+      : [];
+    return entries.length ? entries.map(([key, value]) => `${key}=${value}`).join(",") : "";
+  };
+  const formatWorkspaceActionText = (action = null) => {
+    if (!action) {
+      return "-";
+    }
+    const paramsText = formatWorkspaceActionParams(action.params);
+    return `${action.label || action.key || "-"}@${action.autofocus || "-"}${paramsText ? `?${paramsText}` : ""}`;
+  };
   const lines = [
     "RockSolid Launch Workflow Package",
     `Generated At: ${manifest.generatedAt || ""}`,
@@ -3924,7 +3951,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   if (firstOpsActions.length) {
     lines.push("First Ops Actions:");
     for (const item of firstOpsActions) {
-      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`);
+      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`);
     }
     lines.push("");
   }
@@ -3934,7 +3961,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("Action Plan:");
     for (const item of actionPlan) {
       lines.push(
-          `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`
+          `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`
       );
     }
     lines.push("");
@@ -3945,7 +3972,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("Workspace Path:");
     for (const item of workspaceActions) {
       lines.push(
-        `- ${item.label || item.key || "workspace"} | ${String(item.priority || "secondary").toUpperCase()} | focus=${item.autofocus || "-"} | reason=${item.reason || "-"}`
+        `- ${item.label || item.key || "workspace"} | ${String(item.priority || "secondary").toUpperCase()} | focus=${item.autofocus || "-"}${formatWorkspaceActionParams(item.params) ? ` | filters=${formatWorkspaceActionParams(item.params)}` : ""} | reason=${item.reason || "-"}`
       );
     }
     lines.push("");
@@ -3975,7 +4002,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   if (checklistItems.length) {
     lines.push("Workflow Checklist:");
     for (const item of checklistItems) {
-      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`);
+      lines.push(`- [${String(item.status || "unknown").toUpperCase()}] ${item.label || item.key || "item"} | ${item.summary || "-"} | artifact=${item.artifact || "-"} | next=${item.nextAction || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`);
     }
     lines.push("");
   }
@@ -3995,6 +4022,12 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
   const workflowSummary = payload.workflowSummary || payload.manifest?.workflowSummary || {};
   const workflowChecklist = payload.workflowChecklist || payload.manifest?.workflowChecklist || {};
   const authorizationRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
+  const formatWorkspaceActionParams = (params = null) => {
+    const entries = params && typeof params === "object"
+      ? Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+      : [];
+    return entries.length ? entries.map(([key, value]) => `${key}=${value}`).join(",") : "";
+  };
   const lines = [
     "RockSolid Launch Workflow Checklist",
     `Status: ${String(workflowChecklist.status || "unknown").toUpperCase()} | pass=${workflowChecklist.passItems ?? 0} | review=${workflowChecklist.reviewItems ?? 0} | block=${workflowChecklist.blockItems ?? 0}`,
@@ -4009,7 +4042,7 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
     lines.push(`artifact: ${item.artifact || "-"}`);
     lines.push(`next: ${item.nextAction || "-"}`);
     if (item.workspaceAction) {
-      lines.push(`workspace: ${item.workspaceAction.label || item.workspaceAction.key || "-"} | focus=${item.workspaceAction.autofocus || "-"}`);
+      lines.push(`workspace: ${item.workspaceAction.label || item.workspaceAction.key || "-"} | focus=${item.workspaceAction.autofocus || "-"}${formatWorkspaceActionParams(item.workspaceAction.params) ? ` | filters=${formatWorkspaceActionParams(item.workspaceAction.params)}` : ""}`);
     }
     if (item.recommendedDownload) {
       lines.push(`download: ${item.recommendedDownload.label || item.recommendedDownload.key || "-"} | ${item.recommendedDownload.fileName || "-"}`);
@@ -4048,7 +4081,7 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
   if (firstOpsActions.length) {
     lines.push("First Ops Actions:");
     for (const item of firstOpsActions) {
-      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}`);
+      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}${formatWorkspaceActionParams(item.workspaceAction.params) ? `?${formatWorkspaceActionParams(item.workspaceAction.params)}` : ""}` : ""}`);
     }
     lines.push("");
   }

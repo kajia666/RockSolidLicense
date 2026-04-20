@@ -2443,7 +2443,10 @@
         const accountNote = bootstrap?.created?.account?.temporaryPassword
           ? " Temporary starter account password is included in API Output for secure handoff."
           : "";
-        setStatus(`${bootstrap?.message || `Launch Bootstrap completed for ${productCode}.`} Launch workflow refreshed.${accountNote}`);
+        const followUpNote = bootstrap?.followUp?.primaryAction?.label
+          ? ` Next: ${bootstrap.followUp.primaryAction.label}.`
+          : (bootstrap?.followUp?.summary ? ` ${bootstrap.followUp.summary}` : "");
+        setStatus(`${bootstrap?.message || `Launch Bootstrap completed for ${productCode}.`} Launch workflow refreshed.${accountNote}${followUpNote}`);
         setOutput({ launchBootstrap: bootstrap, launchWorkflow: workflow });
         return { bootstrap, launchWorkflow: workflow };
       }
@@ -2469,7 +2472,10 @@
         await refresh();
         const workflow = await loadInlineLaunchWorkflow();
         const setupLabel = effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup");
-        setStatus(`${setup?.message || `${setupLabel} completed for ${productCode}.`} Launch workflow refreshed.`);
+        const followUpNote = setup?.followUp?.primaryAction?.label
+          ? ` Next: ${setup.followUp.primaryAction.label}.`
+          : (setup?.followUp?.summary ? ` ${setup.followUp.summary}` : "");
+        setStatus(`${setup?.message || `${setupLabel} completed for ${productCode}.`} Launch workflow refreshed.${followUpNote}`);
         setOutput({ firstBatchSetup: setup, cardInventorySetup: setup, launchWorkflow: workflow });
         return { firstBatchSetup: setup, cardInventorySetup: setup, launchWorkflow: workflow };
       }

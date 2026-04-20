@@ -57,6 +57,12 @@ Those recommendation rows can now also carry direct actions. So instead of only 
 - jump straight into launch workflow, release workspace, or developer ops for the matching first-launch follow-up
 - run `Launch Bootstrap`
 
+After `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` completes, the same quickstart block now also keeps a `Next Launch Follow-up` section in view. It reuses the real launch-day ops actions for the current project and turns them into direct buttons, so a software author can immediately:
+
+- open the exact routed workspace for runtime smoke, card redemption watch, session review, or release checks
+- download the matching filtered ops summary without first navigating into the ops page
+- keep the most recent launch initialization result attached to the same routed project instead of re-deriving the next step manually
+
 ## Scope
 
 - owners can manage every product they own

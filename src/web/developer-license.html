@@ -16,7 +16,7 @@
         <div class="nav"><a href="/developer">Developer Center</a> | <a href="/developer/integration">Developer Integration</a> | <a href="/developer/projects">Developer Projects</a> | <a href="/developer/licenses">Developer Licenses</a> | <a href="/developer/ops">Developer Ops</a> | <a href="/developer/releases">Developer Releases</a> | <a href="/developer/security">Developer Security</a></div>
         <div class="pill-row">
           <div class="pill">Route: <code>/developer/licenses</code></div>
-          <div class="pill">APIs: <code>/api/developer/policies</code>, <code>/api/developer/cards</code>, <code>/api/developer/cards/export</code>, <code>/api/developer/cards/export/download</code>, <code>/api/developer/license-quickstart/bootstrap</code>, <code>/api/developer/license-quickstart/first-batches</code></div>
+          <div class="pill">APIs: <code>/api/developer/policies</code>, <code>/api/developer/cards</code>, <code>/api/developer/cards/export</code>, <code>/api/developer/cards/export/download</code>, <code>/api/developer/license-quickstart/bootstrap</code>, <code>/api/developer/license-quickstart/first-batches</code>, <code>/api/developer/license-quickstart/restock</code></div>
           <div class="pill">Scoped to assigned projects. Viewer members stay read-only.</div>
         </div>
         <div class="stats" id="stats-box"></div>
@@ -159,6 +159,7 @@
       let dashboard = { summary: null, projects: [], generatedAt: null };
       let policies = [];
       let cards = [];
+      let launchQuickstartResult = null;
 
       const el = (id) => document.getElementById(id);
 
@@ -449,6 +450,20 @@
           productPolicies,
           productCards
         };
+      }
+
+      function currentLaunchQuickstartResult() {
+        const { productCode } = currentLaunchQuickstartContext();
+        if (!launchQuickstartResult || !productCode) {
+          return null;
+        }
+        return String(launchQuickstartResult.productCode || "").trim().toUpperCase() === String(productCode || "").trim().toUpperCase()
+          ? launchQuickstartResult
+          : null;
+      }
+
+      function currentLaunchQuickstartFollowUp() {
+        return currentLaunchQuickstartResult()?.followUp || null;
       }
 
       function currentAuthorizationDescription(featureConfig = {}) {
@@ -757,6 +772,35 @@
         `).join("")}</div>`;
       }
 
+      function renderQuickstartFollowUp(result = null) {
+        const followUp = result?.followUp;
+        const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
+        if (!actions.length) {
+          return "";
+        }
+        return `
+          <div class="hint" style="margin-top:12px;">
+            <strong>Next Launch Follow-up</strong>
+            <div style="margin-top:8px;">
+              ${tag(`after:${followUp.operationLabel || followUp.operation || "launch"}`, "ok")}
+              ${followUp.primaryAction?.label ? tag(`next:${followUp.primaryAction.label}`, "ok") : ""}
+            </div>
+            <div class="hint" style="margin-top:8px;">${esc(followUp.summary || "Review the next launch-day follow-up actions.")}</div>
+            ${actions.map((item, index) => `
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+                <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
+                ${(item.workspaceAction || item.recommendedDownload) ? `
+                  <div class="actions" style="margin-top:8px;">
+                    ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-quickstart-followup-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                    ${item.recommendedDownload ? `<button type="button" data-launch-quickstart-followup-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                  </div>
+                ` : ""}
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
       function renderQuickstartActionButtons(actions = []) {
         const uniqueActions = [];
         const seenKeys = new Set();
@@ -978,6 +1022,7 @@
           });
         }
 
+        const quickstartResult = currentLaunchQuickstartResult();
         box.innerHTML = `
           <div>
             ${tag(status === "ready" ? "ready" : status, status === "ready" ? "ok" : "danger")}
@@ -996,6 +1041,7 @@
           ${renderQuickstartRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatQuickstartInventoryRecommendation)}
           ${renderQuickstartRecommendationList("First Batch Card Suggestions", firstBatchCardRecommendations, formatQuickstartCardRecommendation)}
           ${renderQuickstartRecommendationList("First Ops Actions", firstOpsActions, formatQuickstartOpsAction)}
+          ${renderQuickstartFollowUp(quickstartResult)}
         `;
       }
 
@@ -1067,6 +1113,27 @@
         setStatus(`${label} generated for the current scoped filters.`);
         setOutput({ download: fileName, label, filters: filters() });
         return { fileName };
+      }
+
+      async function downloadLaunchQuickstartFollowUpItem(item) {
+        if (!item?.key) {
+          throw new Error("Run launch quickstart actions first so the follow-up summaries can be resolved.");
+        }
+        if (item.source === "developer-ops") {
+          const target = currentLicenseTarget();
+          const result = await downloadApiFile(
+            `/api/developer/ops/export/download${q({
+              productCode: target.productCode,
+              format: item.format || "summary",
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-ops-summary.txt",
+            item.label || "Launch follow-up summary"
+          );
+          setStatus(`${item.label || "Launch follow-up summary"} downloaded: ${result.fileName}`);
+          return result;
+        }
+        throw new Error(`Unsupported launch follow-up download key: ${item.key}`);
       }
 
       function renderStats() {
@@ -1176,6 +1243,7 @@
         dashboard = { summary: null, projects: [], generatedAt: null };
         policies = [];
         cards = [];
+        launchQuickstartResult = null;
         setMeta();
         renderProjects();
         renderStats();
@@ -1349,6 +1417,66 @@
         });
       }
 
+      function openLaunchQuickstartWorkspaceAction(action, routeContext = {}) {
+        const target = currentLicenseTarget();
+        if (!action?.key || !target.productCode) {
+          throw new Error("Run launch quickstart actions first so the follow-up workspace can be resolved.");
+        }
+        const routedTitle = String(
+          routeContext.routeTitle
+          || routeContext.title
+          || action.label
+          || action.key
+          || requestedRouteTitle
+          || "Launch quickstart follow-up"
+        ).trim();
+        const routedReason = String(
+          routeContext.routeReason
+          || routeContext.reason
+          || routeContext.summary
+          || action.summary
+          || requestedRouteReason
+          || ""
+        ).trim();
+        const actionParams = action.params && typeof action.params === "object"
+          ? { ...action.params }
+          : {};
+        const routeBits = {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: action.autofocus || "detail",
+          routeTitle: routedTitle,
+          routeReason: routedReason,
+          ...actionParams
+        };
+
+        if (action.key === "project") {
+          window.location.href = buildWorkspaceUrl("/developer/projects", routeBits);
+          return;
+        }
+        if (action.key === "integration") {
+          window.location.href = buildWorkspaceUrl("/developer/integration", routeBits);
+          return;
+        }
+        if (action.key === "release") {
+          window.location.href = buildWorkspaceUrl("/developer/releases", routeBits);
+          return;
+        }
+        if (action.key === "ops") {
+          window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
+          return;
+        }
+        if (action.key === "licenses") {
+          window.location.href = buildWorkspaceUrl("/developer/licenses", routeBits);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          ...routeBits,
+          autofocus: action.autofocus || "handoff"
+        });
+      }
+
       function openProjectAuthorizationPreset() {
         const target = currentLicenseTarget();
         if (!target.productCode) {
@@ -1444,13 +1572,17 @@
           method: "POST",
           body: { productCode, mode }
         });
+        launchQuickstartResult = data;
         await refresh();
         const createdLabels = Array.isArray(data?.createdBatches)
           ? data.createdBatches.map((item) => item.batchCode).filter(Boolean)
           : [];
-        setStatus(createdLabels.length
+        const followUpNote = data?.followUp?.primaryAction?.label
+          ? ` Next: ${data.followUp.primaryAction.label}.`
+          : (data?.followUp?.summary ? ` ${data.followUp.summary}` : "");
+        setStatus((createdLabels.length
           ? `First-batch setup created ${createdLabels.join(", ")} for ${productCode}.`
-          : (data?.message || `First-batch setup finished for ${productCode}.`));
+          : (data?.message || `First-batch setup finished for ${productCode}.`)) + followUpNote);
         setOutput(data);
       }
 
@@ -1463,13 +1595,17 @@
           method: "POST",
           body: { productCode, mode }
         });
+        launchQuickstartResult = data;
         await refresh();
         const createdLabels = Array.isArray(data?.createdBatches)
           ? data.createdBatches.map((item) => item.batchCode).filter(Boolean)
           : [];
-        setStatus(createdLabels.length
+        const followUpNote = data?.followUp?.primaryAction?.label
+          ? ` Next: ${data.followUp.primaryAction.label}.`
+          : (data?.followUp?.summary ? ` ${data.followUp.summary}` : "");
+        setStatus((createdLabels.length
           ? `Inventory refill created ${createdLabels.join(", ")} for ${productCode}.`
-          : (data?.message || `Inventory refill finished for ${productCode}.`));
+          : (data?.message || `Inventory refill finished for ${productCode}.`)) + followUpNote);
         setOutput(data);
       }
 
@@ -1482,6 +1618,7 @@
           method: "POST",
           body: { productCode }
         });
+        launchQuickstartResult = data;
         if (data?.created?.account) {
           el("account-product-code").value = productCode;
           el("account-username").value = data.created.account.username || "";
@@ -1493,7 +1630,10 @@
         const entitlementNote = createdEntitlement
           ? ` Internal entitlement ${createdEntitlement.username || createdEntitlement.id} is now active through ${createdEntitlement.endsAt || "-"}.`
           : "";
-        setStatus((data?.message || `Launch quickstart bootstrap completed for ${productCode}.`) + entitlementNote);
+        const followUpNote = data?.followUp?.primaryAction?.label
+          ? ` Next: ${data.followUp.primaryAction.label}.`
+          : (data?.followUp?.summary ? ` ${data.followUp.summary}` : "");
+        setStatus((data?.message || `Launch quickstart bootstrap completed for ${productCode}.`) + entitlementNote + followUpNote);
         setOutput(data);
       }
 
@@ -1797,6 +1937,44 @@
       });
 
       el("launch-quickstart-box").addEventListener("click", async (event) => {
+        const followUpWorkspaceButton = event.target.closest("[data-launch-quickstart-followup-workspace-index]");
+        if (followUpWorkspaceButton) {
+          try {
+            const index = Number(followUpWorkspaceButton.dataset.launchQuickstartFollowupWorkspaceIndex);
+            const item = currentLaunchQuickstartFollowUp()?.actions?.[index];
+            openLaunchQuickstartWorkspaceAction(item?.workspaceAction, {
+              title: item?.label || "Launch follow-up",
+              summary: item?.summary || ""
+            });
+            setOutput({
+              launchQuickstartFollowUpWorkspace: {
+                key: item?.workspaceAction?.key || null,
+                autofocus: item?.workspaceAction?.autofocus || null,
+                label: item?.workspaceAction?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const followUpDownloadButton = event.target.closest("[data-launch-quickstart-followup-download-index]");
+        if (followUpDownloadButton) {
+          try {
+            const index = Number(followUpDownloadButton.dataset.launchQuickstartFollowupDownloadIndex);
+            const item = currentLaunchQuickstartFollowUp()?.actions?.[index];
+            const result = await downloadLaunchQuickstartFollowUpItem(item?.recommendedDownload);
+            setOutput({
+              launchQuickstartFollowUpDownload: {
+                key: item?.recommendedDownload?.key || null,
+                fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
         const button = event.target.closest("[data-launch-quickstart-action]");
         if (!button) {
           return;

@@ -5976,6 +5976,13 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(bootstrap.created.account.temporaryPassword || "", /@/);
     assert.equal(bootstrap.before.authorization.status, "block");
     assert.notEqual(bootstrap.after.authorization.status, "block");
+    assert.equal(bootstrap.followUp.operation, "bootstrap");
+    assert.equal(bootstrap.followUp.primaryAction?.key, "starter_account_handoff");
+    assert.ok(Array.isArray(bootstrap.followUp.actions));
+    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
+    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
+    assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "ops_runtime_smoke_summary"));
+    assert.match(bootstrap.followUp.summary, /Next:/);
 
     const policies = await getJson(
       baseUrl,
@@ -6071,6 +6078,10 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
     assert.equal(bootstrap.after.counts.activeEntitlements, 1);
     assert.equal(bootstrap.created.entitlement.username, bootstrap.created.account.username);
     assert.ok(bootstrap.created.entitlement.seedBatchCode);
+    assert.equal(bootstrap.followUp.operation, "bootstrap");
+    assert.equal(bootstrap.followUp.primaryAction?.key, "starter_account_handoff");
+    assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
+    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
 
     const entitlements = await getJson(
       baseUrl,
@@ -6186,6 +6197,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(setup.createdBatches.length, 2);
     assert.ok(setup.createdBatches.some((item) => item.mode === "direct_card" && item.prefix === "FIRSTBATCHDL"));
     assert.ok(setup.createdBatches.some((item) => item.mode === "recharge" && item.prefix === "FIRSTBATCHRC"));
+    assert.equal(setup.followUp.operation, "first_batch_setup");
+    assert.equal(setup.followUp.primaryAction?.key, "card_redemption_watch");
+    assert.ok(setup.followUp.actions.some((item) => item.key === "runtime_smoke"));
+    assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
 
     const cards = await getJson(
       baseUrl,
@@ -6334,6 +6349,10 @@ test("developer launch workflow can restock low launch inventory buffers", async
     assert.equal(restock.createdBatches.length, 2);
     assert.ok(restock.createdBatches.some((item) => item.mode === "direct_card" && item.refillCount === 40));
     assert.ok(restock.createdBatches.some((item) => item.mode === "recharge" && item.refillCount === 80));
+    assert.equal(restock.followUp.operation, "restock");
+    assert.equal(restock.followUp.primaryAction?.key, "card_redemption_watch");
+    assert.ok(restock.followUp.actions.some((item) => item.key === "session_review"));
+    assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
 
     const launchWorkflowAfterRestock = await getJson(
       baseUrl,
@@ -10783,6 +10802,10 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /buildQuickstartCardBatchRecommendations/);
     assert.match(html, /buildQuickstartOpsActions/);
     assert.match(html, /renderQuickstartRecommendationList/);
+    assert.match(html, /Next Launch Follow-up/);
+    assert.match(html, /renderQuickstartFollowUp/);
+    assert.match(html, /downloadLaunchQuickstartFollowUpItem/);
+    assert.match(html, /openLaunchQuickstartWorkspaceAction/);
     assert.match(html, /findProjectMetrics/);
     assert.match(html, /fillStarterPolicyTemplate/);
     assert.match(html, /fillStarterAccountTemplate/);

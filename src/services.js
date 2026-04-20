@@ -3599,6 +3599,112 @@ function buildLaunchAuthorizationOperationalPlan({
   };
 }
 
+function buildLaunchQuickstartFollowUpPlan({
+  product = {},
+  policies = [],
+  metrics = {},
+  launchRecommendations = null,
+  operation = "bootstrap"
+} = {}) {
+  const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+    ? product.featureConfig
+    : {};
+  const normalizedOperation = String(operation || "bootstrap").trim().toLowerCase() || "bootstrap";
+  const resolvedRecommendations = launchRecommendations && typeof launchRecommendations === "object"
+    ? launchRecommendations
+    : buildLaunchAuthorizationOperationalPlan({
+        product,
+        metrics,
+        policies
+      });
+  const firstOpsActions = Array.isArray(resolvedRecommendations?.firstOpsActions)
+    ? resolvedRecommendations.firstOpsActions.filter((item) => item?.key)
+    : [];
+  const actionMap = new Map(firstOpsActions.map((item) => [item.key, item]));
+  const preferredKeys = [];
+
+  const pushPreferredKey = (key) => {
+    if (!key || preferredKeys.includes(key) || !actionMap.has(key)) {
+      return;
+    }
+    preferredKeys.push(key);
+  };
+
+  if (normalizedOperation === "bootstrap") {
+    if (featureConfig.allowAccountLogin !== false && featureConfig.allowRegister === false) {
+      pushPreferredKey("starter_account_handoff");
+    }
+    pushPreferredKey("runtime_smoke");
+    pushPreferredKey("card_redemption_watch");
+    pushPreferredKey("startup_rule_watch");
+    pushPreferredKey("session_review");
+  } else if (normalizedOperation === "first_batch_setup" || normalizedOperation === "restock") {
+    pushPreferredKey("card_redemption_watch");
+    pushPreferredKey("runtime_smoke");
+    pushPreferredKey("session_review");
+    pushPreferredKey("startup_rule_watch");
+  } else {
+    pushPreferredKey("runtime_smoke");
+    pushPreferredKey("session_review");
+    pushPreferredKey("card_redemption_watch");
+    pushPreferredKey("startup_rule_watch");
+  }
+
+  for (const item of firstOpsActions) {
+    pushPreferredKey(item.key);
+  }
+
+  const actions = preferredKeys
+    .map((key, index) => {
+      const item = actionMap.get(key);
+      if (!item) {
+        return null;
+      }
+      return {
+        ...item,
+        priority: index === 0 ? "primary" : "secondary"
+      };
+    })
+    .filter(Boolean);
+
+  const recommendedDownloads = [];
+  const seenDownloadKeys = new Set();
+  for (const item of actions) {
+    const download = item?.recommendedDownload;
+    if (!download?.key || seenDownloadKeys.has(download.key)) {
+      continue;
+    }
+    seenDownloadKeys.add(download.key);
+    recommendedDownloads.push({ ...download });
+  }
+
+  const primaryAction = actions[0] || null;
+  const summaryLead = normalizedOperation === "restock"
+    ? "Launch inventory is back at the recommended buffer."
+    : normalizedOperation === "first_batch_setup"
+      ? "Starter launch inventory is now staged."
+      : "Launch quickstart assets are now staged.";
+  const nextLabels = actions
+    .slice(0, 3)
+    .map((item) => item.label || item.key || "follow-up")
+    .filter(Boolean);
+
+  return {
+    operation: normalizedOperation,
+    operationLabel: normalizedOperation === "restock"
+      ? "Inventory refill"
+      : normalizedOperation === "first_batch_setup"
+        ? "First-batch setup"
+        : "Launch bootstrap",
+    summary: nextLabels.length
+      ? `${summaryLead} Next: ${nextLabels.join(" -> ")}.`
+      : summaryLead,
+    primaryAction,
+    actions,
+    recommendedDownloads
+  };
+}
+
 function buildLaunchWorkflowChecklistPayload({
   releasePackage,
   integrationPackage,
@@ -14047,6 +14153,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const needsBootstrapAccount = needsStarterAccount || (needsStarterEntitlement && before.activeAccounts.length <= 0);
 
       if (!needsPolicy && !needsCards && !needsBootstrapAccount && !needsStarterEntitlement) {
+        const followUp = buildLaunchQuickstartFollowUpPlan({
+          product,
+          policies: before.activePolicies,
+          launchRecommendations: before.authorization?.launchRecommendations,
+          operation: "bootstrap"
+        });
         return {
           productCode,
           productName: product.name,
@@ -14071,6 +14183,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
               activeEntitlements: before.activeEntitlements
             }
           },
+          followUp,
           message: `Launch quickstart is already staged for ${productCode}.`
         };
       }
@@ -14255,6 +14368,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
               policies: rawAfter.activePolicies
             })
           };
+      const followUp = buildLaunchQuickstartFollowUpPlan({
+        product,
+        policies: after.activePolicies,
+        launchRecommendations: after.authorization?.launchRecommendations,
+        operation: "bootstrap"
+      });
 
       auditDeveloperSession(db, session, "license.quickstart.bootstrap", "product", product.id, {
         productCode,
@@ -14306,6 +14425,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             activeEntitlements: after.activeEntitlements
           }
         },
+        followUp,
         message: createdParts.length
           ? `Launch quickstart bootstrap created ${createdParts.join(", ")} for ${productCode}.`
           : `Launch quickstart bootstrap completed for ${productCode}.`
@@ -14445,6 +14565,19 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const after = await collectState();
+      const followUp = buildLaunchQuickstartFollowUpPlan({
+        product,
+        policies: after.activePolicies,
+        metrics: {
+          policies: after.activePolicies.length,
+          cardsFresh: after.freshCards.length,
+          cardsRedeemed: Math.max(0, after.cards.length - after.freshCards.length),
+          accounts: 0,
+          activeEntitlements: 0,
+          cards: after.cards
+        },
+        operation: "first_batch_setup"
+      });
 
       auditDeveloperSession(db, session, "license.quickstart.first_batch_setup", "product", product.id, {
         productCode,
@@ -14482,6 +14615,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             freshCards: after.freshCards.length
           }
         },
+        followUp,
         message: createdBatches.length
           ? `First-batch setup created ${createdBatches.map((item) => item.batchCode).join(", ")} for ${productCode}.`
           : `First-batch setup found no missing recommended card batches for ${productCode}.`
@@ -14623,6 +14757,19 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const after = await collectState();
+      const followUp = buildLaunchQuickstartFollowUpPlan({
+        product,
+        policies: after.activePolicies,
+        metrics: {
+          policies: after.activePolicies.length,
+          cardsFresh: after.freshCards.length,
+          cardsRedeemed: Math.max(0, after.cards.length - after.freshCards.length),
+          accounts: 0,
+          activeEntitlements: 0,
+          cards: after.cards
+        },
+        operation: "restock"
+      });
 
       auditDeveloperSession(db, session, "license.quickstart.restock", "product", product.id, {
         productCode,
@@ -14659,6 +14806,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             freshCards: after.freshCards.length
           }
         },
+        followUp,
         message: createdBatches.length
           ? `Inventory refill created ${createdBatches.map((item) => item.batchCode).join(", ")} for ${productCode}.`
           : `Inventory refill found no low starter batches for ${productCode}.`

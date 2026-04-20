@@ -11,6 +11,7 @@ Use it when the software author or launch-duty teammate needs one place to:
 - see candidate internal accounts, starter entitlements, and fresh launch-card keys
 - run `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` directly when the smoke lane is still missing starter assets
 - keep the latest smoke-action receipt and follow-up steps visible in the same workspace
+- move straight into the most relevant review target, such as accounts, entitlements, card inventory, sessions, or audit
 - jump into the next recommended workspace for runtime follow-up
 - download a smoke-validation handoff as `json / summary / checksums / zip`
 

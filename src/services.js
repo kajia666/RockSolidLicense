@@ -7085,12 +7085,23 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const recommendedWorkspace = blockingPaths.length
     ? createLaunchWorkflowWorkspaceShortcut("licenses", "quickstart", "Open License Workspace")
     : createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke");
-  const workspaceActions = [
-    recommendedWorkspace,
-    createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
-    createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
-    createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", { reviewMode: "matched" })
-  ];
+  const workspaceActions = [];
+  const seenWorkspaceActions = new Set();
+  const pushWorkspaceAction = (action) => {
+    if (!action?.key) {
+      return;
+    }
+    const dedupeKey = `${action.key}|${action.autofocus || ""}|${JSON.stringify(action.params || {})}`;
+    if (seenWorkspaceActions.has(dedupeKey)) {
+      return;
+    }
+    seenWorkspaceActions.add(dedupeKey);
+    workspaceActions.push(action);
+  };
+  pushWorkspaceAction(recommendedWorkspace);
+  pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"));
+  pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"));
+  pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", { reviewMode: "matched" }));
   const recommendedDownloads = [
     createLaunchWorkflowSmokeKitDownloadShortcut(
       "Launch smoke kit summary",
@@ -7101,6 +7112,182 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   ];
   const bootstrapAction = authReadiness.bootstrapAction || null;
   const setupAction = authReadiness.firstBatchSetupAction || null;
+  const createSmokeReviewTarget = ({
+    key,
+    label,
+    summary,
+    count = 0,
+    status = "review",
+    routeActionLabel = "",
+    workspaceAction = null,
+    recommendedDownload = null
+  } = {}) => {
+    if (!key) {
+      return null;
+    }
+    return {
+      key,
+      label: label || key,
+      summary: summary || "-",
+      count: Number.isFinite(Number(count)) ? Number(count) : 0,
+      status: status || "review",
+      routeActionLabel: routeActionLabel || "",
+      workspaceAction: workspaceAction || null,
+      recommendedDownload: recommendedDownload || null
+    };
+  };
+  const reviewTargets = [
+    accountLoginEnabled ? createSmokeReviewTarget({
+      key: "launch_smoke_accounts_review",
+      label: "Review smoke accounts",
+      summary: accountLoginReady
+        ? "Confirm the internal smoke account path is still reserved for launch-day validation before opening wider access."
+        : registerEnabled
+          ? "Register or confirm one internal smoke account before the first validation pass."
+          : "Seed a starter account before account-login smoke validation can continue.",
+      count: accountCandidates.length,
+      status: accountLoginReady ? "pass" : registerEnabled ? "review" : "block",
+      routeActionLabel: "Review Accounts",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", "Open Ops Workspace", {
+        reviewMode: "matched",
+        routeAction: "review-accounts",
+        actorType: "account",
+        username: accountCandidates[0]?.username || ""
+      }),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_smoke_accounts_summary",
+        "developer-ops-accounts-summary.txt",
+        "Accounts summary",
+        {
+          source: "developer-ops",
+          format: "summary",
+          params: {
+            reviewMode: "matched",
+            actorType: "account",
+            username: accountCandidates[0]?.username || "",
+            productCode: project.code || filters.productCode || "",
+            limit: 60
+          }
+        }
+      )
+    }) : null,
+    (entitlementCandidates.length || (accountLoginEnabled && !cardLoginEnabled && !cardRechargeEnabled)) ? createSmokeReviewTarget({
+      key: "launch_smoke_entitlements_review",
+      label: "Review smoke entitlements",
+      summary: entitlementCandidates.length
+        ? "Confirm the smoke entitlement window, grant type, and lifecycle state before handing the lane to QA or support."
+        : "Account-only smoke lanes should still confirm an internal starter entitlement before first validation.",
+      count: entitlementCandidates.length,
+      status: entitlementCandidates.length ? "pass" : "review",
+      routeActionLabel: "Review Entitlements",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", "Open Ops Workspace", {
+        reviewMode: "matched",
+        routeAction: "review-entitlements",
+        username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || ""
+      }),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_smoke_entitlements_summary",
+        "developer-ops-entitlements-summary.txt",
+        "Entitlements summary",
+        {
+          source: "developer-ops",
+          format: "summary",
+          params: {
+            reviewMode: "matched",
+            username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || "",
+            productCode: project.code || filters.productCode || "",
+            limit: 60
+          }
+        }
+      )
+    }) : null,
+    (cardLoginEnabled || cardRechargeEnabled) ? createSmokeReviewTarget({
+      key: "launch_smoke_card_inventory_review",
+      label: "Review launch card inventory",
+      summary: (directCardCandidates.length || rechargeCardCandidates.length)
+        ? "Confirm the fresh direct-card or recharge inventory that will be consumed during the first internal smoke pass."
+        : "Review launch-card inventory before smoke validation so direct-card or recharge paths have real fresh keys staged.",
+      count: directCardCandidates.length + rechargeCardCandidates.length,
+      status: (cardLoginEnabled && !directCardReady) || (cardRechargeEnabled && !rechargeReady) ? "review" : "pass",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
+      recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut(
+        "Launch smoke kit summary",
+        "launch-smoke-kit.txt",
+        "summary",
+        { reviewMode: "matched" }
+      )
+    }) : null,
+    readyPaths.length ? createSmokeReviewTarget({
+      key: "launch_smoke_sessions_review",
+      label: "Review smoke sessions",
+      summary: "After the first smoke login or recharge succeeds, confirm the resulting session and heartbeat state before wider rollout.",
+      count: readyPaths.length,
+      status: startupBlocked ? "review" : "pass",
+      routeActionLabel: "Review Sessions",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
+        reviewMode: "matched",
+        routeAction: "review-sessions",
+        eventType: "session.login",
+        actorType: "account",
+        username: accountCandidates[0]?.username || ""
+      }),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_smoke_sessions_summary",
+        "developer-ops-sessions-summary.txt",
+        "Sessions summary",
+        {
+          source: "developer-ops",
+          format: "summary",
+          params: {
+            reviewMode: "matched",
+            eventType: "session.login",
+            actorType: "account",
+            username: accountCandidates[0]?.username || "",
+            productCode: project.code || filters.productCode || "",
+            limit: 60
+          }
+        }
+      )
+    }) : null,
+    (cardRechargeEnabled || directCardCandidates.length || rechargeCardCandidates.length) ? createSmokeReviewTarget({
+      key: "launch_smoke_audit_review",
+      label: "Review smoke audit trail",
+      summary: "Check the earliest login, redemption, and launch-day audit events so the first smoke pass leaves a clean signal trail.",
+      count: (directCardCandidates.length + rechargeCardCandidates.length) || readyPaths.length,
+      status: blockingPaths.length ? "review" : "pass",
+      routeActionLabel: "Review Audit",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "audit", "Open Ops Workspace", {
+        reviewMode: "matched",
+        routeAction: "review-audit",
+        entityType: (directCardCandidates.length || rechargeCardCandidates.length) ? "license_key" : "",
+        eventType: readyPaths.length ? "session.login" : "",
+        username: accountCandidates[0]?.username || ""
+      }),
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_smoke_audit_summary",
+        "developer-ops-audit-summary.txt",
+        "Audit summary",
+        {
+          source: "developer-ops",
+          format: "summary",
+          params: {
+            reviewMode: "matched",
+            entityType: (directCardCandidates.length || rechargeCardCandidates.length) ? "license_key" : "",
+            eventType: readyPaths.length ? "session.login" : "",
+            username: accountCandidates[0]?.username || "",
+            productCode: project.code || filters.productCode || "",
+            limit: 60
+          }
+        }
+      )
+    }) : null
+  ].filter(Boolean);
+  const visibleReviewTargets = reviewTargets.some((item) => Number(item.count || 0) > 0)
+    ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
+    : reviewTargets.slice(0, 2);
+  for (const item of visibleReviewTargets) {
+    pushWorkspaceAction(item.workspaceAction);
+  }
   const actionPlan = [
     {
       key: "startup_bootstrap_recheck",
@@ -7185,6 +7372,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     rechargeCardCandidates,
     recommendedWorkspace,
     workspaceActions,
+    reviewTargets: visibleReviewTargets,
     actionPlan,
     recommendedDownloads
   };
@@ -7267,6 +7455,16 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     for (const item of smokeSummary.actionPlan) {
       lines.push(
         `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
+      );
+    }
+  }
+
+  if (Array.isArray(smokeSummary.reviewTargets) && smokeSummary.reviewTargets.length) {
+    lines.push("");
+    lines.push("Launch Smoke Review Targets:");
+    for (const item of smokeSummary.reviewTargets) {
+      lines.push(
+        `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
       );
     }
   }

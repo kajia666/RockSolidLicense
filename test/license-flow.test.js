@@ -10177,6 +10177,7 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
     assert.match(html, /Generate Launch Smoke Kit/);
     assert.match(html, /Smoke Actions/);
+    assert.match(html, /Review Targets/);
     assert.match(html, /Workspace Path/);
     assert.match(html, /Smoke Summary/);
     assert.match(html, /Startup Request/);
@@ -10199,8 +10200,11 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /renderLastSmokeFollowUp/);
     assert.match(html, /currentSmokeSummary/);
     assert.match(html, /currentActionPlan/);
+    assert.match(html, /currentSmokeReviewTargets/);
     assert.match(html, /currentWorkspaceActions/);
     assert.match(html, /currentRecommendedDownloads/);
+    assert.match(html, /data-smoke-review-target-workspace-index/);
+    assert.match(html, /data-smoke-review-target-download-index/);
     assert.match(html, /data-smoke-action-bootstrap-index/);
     assert.match(html, /data-smoke-action-setup-index/);
     assert.match(html, /\/developer\/launch-smoke/);

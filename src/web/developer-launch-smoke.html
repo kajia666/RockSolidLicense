@@ -425,6 +425,9 @@
       function currentActionPlan() {
         return Array.isArray(currentSmokeSummary().actionPlan) ? currentSmokeSummary().actionPlan : [];
       }
+      function currentSmokeReviewTargets() {
+        return Array.isArray(currentSmokeSummary().reviewTargets) ? currentSmokeSummary().reviewTargets : [];
+      }
       function currentWorkspaceActions() {
         return Array.isArray(currentSmokeSummary().workspaceActions) ? currentSmokeSummary().workspaceActions : [];
       }
@@ -564,6 +567,7 @@
         }
         const summary = currentSmokeSummary();
         const actions = currentActionPlan();
+        const reviewTargets = currentSmokeReviewTargets();
         const workspaces = currentWorkspaceActions();
         const downloads = currentRecommendedDownloads();
         el("smoke-summary").textContent = smokeKit.summaryText || "";
@@ -574,6 +578,19 @@
             ${summary.recommendedWorkspace?.label ? renderTag(`next:${summary.recommendedWorkspace.label}`, true) : ""}
           </div>
           <div class="hint" style="margin-top: 10px;">${esc(summary.message || "No smoke guidance is available yet.")}</div>
+          ${reviewTargets.length ? `
+            <div class="hint" style="margin-top: 12px;">Review Targets</div>
+            ${reviewTargets.map((item, index) => `
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+                <div>${renderTag(`count:${item.count ?? 0}`, Number(item.count || 0) > 0)} ${renderTag(String(item.status || "review").toUpperCase(), String(item.status || "review").toLowerCase() === "pass")} ${item.routeActionLabel ? renderTag(`route:${item.routeActionLabel}`) : ""} ${esc(item.label || item.key || "target")}</div>
+                <div class="hint" style="margin-top: 8px;">${esc(item.summary || "-")}</div>
+                <div class="actions" style="margin-top: 8px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-smoke-review-target-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-smoke-review-target-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          ` : ""}
           ${actions.length ? `
             <div class="hint" style="margin-top: 12px;">Smoke Action Plan</div>
             ${actions.map((item, index) => `
@@ -1079,6 +1096,45 @@
         }
       });
       el("smoke-actions-box").addEventListener("click", async (event) => {
+        const reviewTargetWorkspaceButton = event.target.closest("[data-smoke-review-target-workspace-index]");
+        if (reviewTargetWorkspaceButton) {
+          try {
+            const index = Number(reviewTargetWorkspaceButton.dataset.smokeReviewTargetWorkspaceIndex);
+            const item = currentSmokeReviewTargets()[index];
+            openWorkspaceAction(item?.workspaceAction, {
+              title: item?.label || item?.key || "Launch smoke target",
+              summary: item?.summary || ""
+            });
+            setOutput({
+              smokeReviewTargetWorkspace: {
+                key: item?.workspaceAction?.key || null,
+                autofocus: item?.workspaceAction?.autofocus || null,
+                label: item?.workspaceAction?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const reviewTargetDownloadButton = event.target.closest("[data-smoke-review-target-download-index]");
+        if (reviewTargetDownloadButton) {
+          try {
+            const index = Number(reviewTargetDownloadButton.dataset.smokeReviewTargetDownloadIndex);
+            const item = currentSmokeReviewTargets()[index];
+            const result = await downloadSmokeRecommendedItem(item?.recommendedDownload);
+            setOutput({
+              smokeReviewTargetDownload: {
+                key: item?.recommendedDownload?.key || null,
+                fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const bootstrapButton = event.target.closest("[data-smoke-action-bootstrap-index]");
         if (bootstrapButton) {
           try {

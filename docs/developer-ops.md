@@ -167,3 +167,5 @@ That routed focus is meant to shorten the first post-launch loop:
 - watch first card-redemption or launch-day anomalies from `audit`
 - review early online sessions and device churn from `sessions` or `devices`
 - jump back to Projects, Launch Workflow, Licenses, or Releases without rebuilding the current lane context by hand
+
+The routed launch follow-up now also renders a `Route Review` block right inside `/developer/ops`. It summarizes the matching routed counts for accounts, entitlements, sessions, devices, and audit logs, keeps the highlighted audit-event list visible, and marks matching rows in the scoped tables with a `route-hit` state so launch-day follow-up is easier to scan without rebuilding filters by hand.

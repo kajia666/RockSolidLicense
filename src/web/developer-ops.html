@@ -68,6 +68,8 @@
       .snapshot-focus-item strong { display:block; }
       .snapshot-focus-meta { color:var(--muted); font-size:12px; line-height:1.6; }
       .snapshot-focus-action { color:var(--ink); font-size:12px; line-height:1.6; margin-top:6px; }
+      .route-review-box { padding:14px; border-radius:16px; border:1px solid rgba(24,31,27,.08); background:rgba(255,255,255,.82); display:grid; gap:8px; }
+      .route-hit td { background:rgba(184,212,191,.18); }
       pre { margin:0; min-height:220px; padding:16px; border-radius:18px; background:#101715; color:#eef7f2; overflow:auto; white-space:pre-wrap; word-break:break-word; }
       @media (max-width:1180px) { .wide { grid-template-columns:1fr; } }
       @media (max-width:760px) { .two,.three { grid-template-columns:1fr; } }
@@ -127,6 +129,7 @@
           </div>
           <div class="hint">Blank filters query everything inside the current developer scope. Clicking an audit row also backfills matching filters and quick-control ids.</div>
           <div class="hint" id="route-focus-box" style="margin-top:12px;">Open this page from launch workflow or another routed workspace action to focus snapshot review, early sessions, audit signals, and device follow-up for the current lane.</div>
+          <div id="route-review-box" class="route-review-box" style="margin-top:12px;">Open this page from launch workflow or another routed workspace action to summarize the routed launch-day review here.</div>
         </article>
 
         <article class="card">
@@ -400,6 +403,246 @@
         }
       }
 
+      function normalizeRouteReviewText(value) {
+        return String(value ?? "").trim().toLowerCase();
+      }
+
+      function routeReviewIncludes(values = [], needle = "") {
+        const normalizedNeedle = normalizeRouteReviewText(needle);
+        if (!normalizedNeedle) {
+          return true;
+        }
+        return values.some((value) => normalizeRouteReviewText(value).includes(normalizedNeedle));
+      }
+
+      function currentRouteReviewFilters() {
+        const active = filters();
+        return {
+          ...active,
+          productCode: active.productCode || requestedProductCode,
+          username: active.username || requestedUsername,
+          search: active.search || requestedSearch,
+          eventType: active.eventType || requestedEventType,
+          actorType: active.actorType || requestedActorType,
+          entityType: active.entityType || requestedEntityType
+        };
+      }
+
+      function hasRouteReviewFilters() {
+        const active = currentRouteReviewFilters();
+        return Boolean(
+          active.productCode
+          || active.username
+          || active.search
+          || active.eventType
+          || active.actorType
+          || active.entityType
+          || requestedAutofocus
+        );
+      }
+
+      function matchesRouteReviewAccount(item = {}, active = currentRouteReviewFilters()) {
+        if (active.productCode && String(item.productCode || "").trim().toUpperCase() !== String(active.productCode || "").trim().toUpperCase()) {
+          return false;
+        }
+        if (active.username && normalizeRouteReviewText(item.username) !== normalizeRouteReviewText(active.username)) {
+          return false;
+        }
+        return routeReviewIncludes(
+          [
+            item.id,
+            item.username,
+            item.productCode,
+            item.status
+          ],
+          active.search
+        );
+      }
+
+      function matchesRouteReviewEntitlement(item = {}, active = currentRouteReviewFilters()) {
+        if (active.productCode && String(item.productCode || "").trim().toUpperCase() !== String(active.productCode || "").trim().toUpperCase()) {
+          return false;
+        }
+        if (active.username && normalizeRouteReviewText(item.username) !== normalizeRouteReviewText(active.username)) {
+          return false;
+        }
+        return routeReviewIncludes(
+          [
+            item.id,
+            item.username,
+            item.productCode,
+            item.policyName,
+            item.status,
+            item.lifecycleStatus
+          ],
+          active.search
+        );
+      }
+
+      function matchesRouteReviewSession(item = {}, active = currentRouteReviewFilters()) {
+        if (active.productCode && String(item.productCode || "").trim().toUpperCase() !== String(active.productCode || "").trim().toUpperCase()) {
+          return false;
+        }
+        if (active.username && normalizeRouteReviewText(item.username) !== normalizeRouteReviewText(active.username)) {
+          return false;
+        }
+        return routeReviewIncludes(
+          [
+            item.id,
+            item.username,
+            item.productCode,
+            item.fingerprint,
+            item.status
+          ],
+          active.search
+        );
+      }
+
+      function matchesRouteReviewDevice(item = {}, active = currentRouteReviewFilters()) {
+        if (active.productCode && String(item.productCode || item.projectCode || "").trim().toUpperCase() !== String(active.productCode || "").trim().toUpperCase()) {
+          return false;
+        }
+        return routeReviewIncludes(
+          [
+            item.id,
+            item.projectCode,
+            item.productCode,
+            item.identity,
+            item.fingerprint,
+            item.status,
+            item.kind
+          ],
+          active.search
+        );
+      }
+
+      function matchesRouteReviewAudit(item = {}, active = currentRouteReviewFilters()) {
+        if (active.productCode) {
+          const productCodes = [
+            item.productCode,
+            item.metadata?.productCode,
+            ...(Array.isArray(item.metadata?.productCodes) ? item.metadata.productCodes : []),
+            item.metadata?.code
+          ].filter(Boolean).map((value) => String(value).trim().toUpperCase());
+          if (!productCodes.includes(String(active.productCode || "").trim().toUpperCase())) {
+            return false;
+          }
+        }
+        if (active.username) {
+          const usernames = [
+            item.username,
+            item.metadata?.username,
+            item.metadata?.accountUsername,
+            item.metadata?.cardKey
+          ];
+          if (!routeReviewIncludes(usernames, active.username)) {
+            return false;
+          }
+        }
+        if (active.eventType && normalizeRouteReviewText(item.eventType) !== normalizeRouteReviewText(active.eventType)) {
+          return false;
+        }
+        if (active.actorType && normalizeRouteReviewText(item.actorType) !== normalizeRouteReviewText(active.actorType)) {
+          return false;
+        }
+        if (active.entityType && normalizeRouteReviewText(item.entityType) !== normalizeRouteReviewText(active.entityType)) {
+          return false;
+        }
+        return routeReviewIncludes(
+          [
+            item.id,
+            item.eventType,
+            item.actorType,
+            item.actorId,
+            item.entityType,
+            item.entityId,
+            item.username,
+            item.metadata?.username,
+            item.metadata?.reason,
+            item.metadata?.fingerprint,
+            item.metadata?.deviceFingerprint,
+            item.metadata?.sessionId,
+            item.metadata?.accountId,
+            item.metadata?.entitlementId,
+            item.metadata?.cardKey,
+            item.metadata?.productCode,
+            item.metadata?.code,
+            JSON.stringify(item.metadata || {})
+          ],
+          active.search
+        );
+      }
+
+      function collectRouteReview() {
+        const active = currentRouteReviewFilters();
+        const focus = requestedAutofocus || "snapshot";
+        const deviceItems = [
+          ...snapshot.bindings.map((item) => ({
+            kind: "binding",
+            id: item.id,
+            identity: item.fingerprint,
+            projectCode: item.productCode,
+            productCode: item.productCode,
+            status: item.status,
+            fingerprint: item.fingerprint
+          })),
+          ...snapshot.blocks.map((item) => ({
+            kind: "block",
+            id: item.id,
+            identity: item.fingerprint,
+            projectCode: item.productCode,
+            productCode: item.productCode,
+            status: item.status,
+            fingerprint: item.fingerprint
+          }))
+        ];
+        const matchedAccounts = snapshot.accounts.filter((item) => matchesRouteReviewAccount(item, active));
+        const matchedEntitlements = snapshot.entitlements.filter((item) => matchesRouteReviewEntitlement(item, active));
+        const matchedSessions = snapshot.sessions.filter((item) => matchesRouteReviewSession(item, active));
+        const matchedDevices = deviceItems.filter((item) => matchesRouteReviewDevice(item, active));
+        const matchedAuditLogs = snapshot.auditLogs.filter((item) => matchesRouteReviewAudit(item, active));
+        const highlightedEvents = [...new Set(matchedAuditLogs.map((item) => item.eventType).filter(Boolean))].slice(0, 3);
+        return {
+          active: hasRouteReviewFilters(),
+          focus,
+          filters: active,
+          matchedAccounts,
+          matchedEntitlements,
+          matchedSessions,
+          matchedDevices,
+          matchedAuditLogs,
+          highlightedEvents
+        };
+      }
+
+      function formatRouteReviewSummary(review = collectRouteReview()) {
+        if (!review.active) {
+          return "No routed launch review is active yet.";
+        }
+        const bits = [];
+        if (review.focus === "accounts") {
+          bits.push(`accounts=${review.matchedAccounts.length}`);
+          bits.push(`entitlements=${review.matchedEntitlements.length}`);
+        } else if (review.focus === "entitlements") {
+          bits.push(`entitlements=${review.matchedEntitlements.length}`);
+          bits.push(`accounts=${review.matchedAccounts.length}`);
+        } else if (review.focus === "sessions") {
+          bits.push(`sessions=${review.matchedSessions.length}`);
+          bits.push(`audit=${review.matchedAuditLogs.length}`);
+        } else if (review.focus === "devices" || review.focus === "blocks" || review.focus === "bindings") {
+          bits.push(`devices=${review.matchedDevices.length}`);
+          bits.push(`audit=${review.matchedAuditLogs.length}`);
+        } else if (review.focus === "audit") {
+          bits.push(`audit=${review.matchedAuditLogs.length}`);
+          bits.push(`sessions=${review.matchedSessions.length}`);
+        } else {
+          bits.push(`accounts=${review.matchedAccounts.length}`);
+          bits.push(`sessions=${review.matchedSessions.length}`);
+          bits.push(`audit=${review.matchedAuditLogs.length}`);
+        }
+        return bits.join(" | ");
+      }
+
       function buildOpsRouteContext(fallbackTitle = "", fallbackReason = "") {
         return {
           routeTitle: String(requestedRouteTitle || fallbackTitle || currentOpsRouteFocus().title || "Developer Ops").trim(),
@@ -433,6 +676,48 @@
         `;
       }
 
+      function renderRouteReview() {
+        const box = el("route-review-box");
+        const review = collectRouteReview();
+        if (!review.active) {
+          box.innerHTML = `<div class="hint">Open this page from launch workflow or another routed workspace action to summarize the routed launch-day review here.</div>`;
+          return;
+        }
+        const target = currentOpsTarget();
+        const filterTags = [
+          requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : "",
+          review.filters.productCode ? renderTag(`project:${review.filters.productCode}`, true) : "",
+          review.filters.username ? renderTag(`username:${review.filters.username}`) : "",
+          review.filters.eventType ? renderTag(`event:${review.filters.eventType}`) : "",
+          review.filters.actorType ? renderTag(`actor:${review.filters.actorType}`) : "",
+          review.filters.entityType ? renderTag(`entity:${review.filters.entityType}`) : "",
+          review.filters.search ? renderTag(`search:${review.filters.search}`) : ""
+        ].filter(Boolean).join("");
+        const counts = [
+          renderTag(`accounts:${review.matchedAccounts.length}`, review.matchedAccounts.length > 0),
+          renderTag(`entitlements:${review.matchedEntitlements.length}`, review.matchedEntitlements.length > 0),
+          renderTag(`sessions:${review.matchedSessions.length}`, review.matchedSessions.length > 0),
+          renderTag(`devices:${review.matchedDevices.length}`, review.matchedDevices.length > 0),
+          renderTag(`audit:${review.matchedAuditLogs.length}`, review.matchedAuditLogs.length > 0)
+        ].join("");
+        const highlightedEvents = review.highlightedEvents.length
+          ? review.highlightedEvents.map((item) => renderTag(item, true)).join("")
+          : '<span class="hint">No routed audit events matched yet.</span>';
+        box.innerHTML = `
+          <div><strong>Route Review</strong> ${target.productCode ? renderTag(`project:${target.productCode}`, true) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
+          <div class="hint" style="margin-top:8px;">Matching records: ${esc(formatRouteReviewSummary(review))}.</div>
+          <div class="audit-meta" style="margin-top:10px;">${filterTags || '<span class="hint">No route filters captured yet.</span>'}</div>
+          <div class="audit-meta" style="margin-top:10px;">${counts}</div>
+          <div class="hint" style="margin-top:10px;">Highlighted audit events</div>
+          <div class="audit-meta" style="margin-top:8px;">${highlightedEvents}</div>
+          <div class="actions" style="margin-top:12px;">
+            <button type="button" class="secondary" data-route-review-action="refresh" ${token ? "" : "disabled"}>Refresh Route Review</button>
+            <button type="button" class="secondary" data-route-review-action="download" ${token ? "" : "disabled"}>Download Routed Summary</button>
+            <button type="button" data-route-review-action="scroll">Scroll To Focus</button>
+          </div>
+        `;
+      }
+
       async function hydrateOpsAutofocus() {
         if (!requestedAutofocus) {
           return;
@@ -447,16 +732,32 @@
         focusOpsAutofocusTarget();
       }
 
+      async function handleRouteReviewAction(actionKey) {
+        if (actionKey === "refresh") {
+          await refreshOps();
+          setStatus(`Route review refreshed. ${formatRouteReviewSummary()}.`);
+          return;
+        }
+        if (actionKey === "download") {
+          await handleExportDownload("summary", "developer-ops-summary.txt", "Routed ops summary");
+          return;
+        }
+        if (actionKey === "scroll") {
+          focusOpsAutofocusTarget();
+          setStatus(`Route review focus moved to ${requestedAutofocus || "snapshot"}. ${formatRouteReviewSummary()}.`);
+        }
+      }
+
       async function handleOpsRouteFocusAction(actionKey) {
         const target = currentOpsTarget();
         if (actionKey === "refresh-snapshot") {
           await refreshOps();
-          setStatus(`Scoped ops snapshot refreshed for ${target.productCode || "current filters"}.`);
+          setStatus(`Scoped ops snapshot refreshed for ${target.productCode || "current filters"}. ${formatRouteReviewSummary()}.`);
           return;
         }
         if (actionKey === "scroll-target") {
           focusOpsAutofocusTarget();
-          setStatus(`Focused ops section: ${requestedAutofocus || "snapshot"}.`);
+          setStatus(`Focused ops section: ${requestedAutofocus || "snapshot"}. ${formatRouteReviewSummary()}.`);
           return;
         }
         if (actionKey === "download-summary") {
@@ -2167,7 +2468,7 @@
           body.innerHTML = `<tr><td colspan="5">No scoped accounts found.</td></tr>`;
           return;
         }
-        body.innerHTML = snapshot.accounts.map((item) => `<tr data-account-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${Number(item.activeEntitlementCount || 0)}</td><td>${Number(item.activeSessionCount || 0)}</td></tr>`).join("");
+        body.innerHTML = snapshot.accounts.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewAccount(item) ? "route-hit" : ""}" data-account-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${Number(item.activeEntitlementCount || 0)}</td><td>${Number(item.activeSessionCount || 0)}</td></tr>`).join("");
         bindRows("#accounts-body tr[data-account-id]", (data) => { el("account-id").value = data.accountId || ""; el("account-status").value = data.status || "active"; });
       }
 
@@ -2177,7 +2478,7 @@
           body.innerHTML = `<tr><td colspan="5">No scoped entitlements found.</td></tr>`;
           return;
         }
-        body.innerHTML = snapshot.entitlements.map((item) => { const grant = item.grantType === "points" ? `points ${Number(item.remainingPoints || 0)}/${Number(item.totalPoints || 0)}` : `until ${esc(item.endsAt || "-")}`; return `<tr data-entitlement-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.productCode)}</span></td><td>${esc(item.policyName)}</td><td>${renderTag(item.lifecycleStatus || item.status)}</td><td>${grant}</td><td>${esc(item.endsAt || "-")}</td></tr>`; }).join("");
+        body.innerHTML = snapshot.entitlements.map((item) => { const grant = item.grantType === "points" ? `points ${Number(item.remainingPoints || 0)}/${Number(item.totalPoints || 0)}` : `until ${esc(item.endsAt || "-")}`; return `<tr class="${hasRouteReviewFilters() && matchesRouteReviewEntitlement(item) ? "route-hit" : ""}" data-entitlement-id="${esc(item.id)}" data-status="${esc(item.status)}"><td><strong>${esc(item.username)}</strong><br><span class="mono">${esc(item.productCode)}</span></td><td>${esc(item.policyName)}</td><td>${renderTag(item.lifecycleStatus || item.status)}</td><td>${grant}</td><td>${esc(item.endsAt || "-")}</td></tr>`; }).join("");
         bindRows("#entitlements-body tr[data-entitlement-id]", (data) => { el("entitlement-id").value = data.entitlementId || ""; el("entitlement-status").value = data.status || "active"; });
       }
 
@@ -2187,7 +2488,7 @@
           body.innerHTML = `<tr><td colspan="5">No scoped sessions found.</td></tr>`;
           return;
         }
-        body.innerHTML = snapshot.sessions.map((item) => `<tr data-session-id="${esc(item.id)}"><td><span class="mono">${esc(item.id)}</span><br>${esc(item.fingerprint || "-")}</td><td>${esc(item.username)}</td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.lastHeartbeatAt))}</td></tr>`).join("");
+        body.innerHTML = snapshot.sessions.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewSession(item) ? "route-hit" : ""}" data-session-id="${esc(item.id)}"><td><span class="mono">${esc(item.id)}</span><br>${esc(item.fingerprint || "-")}</td><td>${esc(item.username)}</td><td>${esc(item.productCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.lastHeartbeatAt))}</td></tr>`).join("");
         bindRows("#sessions-body tr[data-session-id]", (data) => { el("session-id").value = data.sessionId || ""; });
       }
 
@@ -2198,7 +2499,7 @@
           body.innerHTML = `<tr><td colspan="5">No scoped bindings or blocks found.</td></tr>`;
           return;
         }
-        body.innerHTML = items.map((item) => `<tr data-kind="${esc(item.kind)}" data-id="${esc(item.id)}" data-project-code="${esc(item.projectCode)}" data-fingerprint="${esc(item.fingerprint)}"><td><span class="tag ${item.kind === "binding" ? "ok" : "danger"}">${esc(item.kind)}</span></td><td><strong>${esc(item.identity)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.projectCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.updatedAt))}</td></tr>`).join("");
+        body.innerHTML = items.map((item) => `<tr class="${hasRouteReviewFilters() && matchesRouteReviewDevice(item) ? "route-hit" : ""}" data-kind="${esc(item.kind)}" data-id="${esc(item.id)}" data-project-code="${esc(item.projectCode)}" data-fingerprint="${esc(item.fingerprint)}"><td><span class="tag ${item.kind === "binding" ? "ok" : "danger"}">${esc(item.kind)}</span></td><td><strong>${esc(item.identity)}</strong><br><span class="mono">${esc(item.id)}</span></td><td>${esc(item.projectCode)}</td><td>${renderTag(item.status)}</td><td>${esc(formatTime(item.updatedAt))}</td></tr>`).join("");
         bindRows("#devices-body tr[data-kind]", (data) => { if (data.kind === "binding") { el("binding-id").value = data.id || ""; } if (data.kind === "block") { el("block-id").value = data.id || ""; } el("block-product-code").value = data.projectCode || ""; el("block-fingerprint").value = data.fingerprint || ""; });
       }
 
@@ -2211,7 +2512,7 @@
         body.innerHTML = snapshot.auditLogs.map((item) => {
           const scopeBits = auditScopeBits(item);
           const detailBits = auditDetailBits(item);
-          return `<tr data-audit-id="${esc(item.id)}"><td><div class="audit-summary"><strong>${esc(item.eventType)}</strong>${detailBits.length ? `<div class="hint">${esc(detailBits.join(" | "))}</div>` : `<div class="hint">No extra metadata summary.</div>`}</div></td><td>${esc(item.actorType || "-")}<br><span class="mono">${esc(item.actorId || "-")}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${scopeBits.length ? `<div class="audit-meta">${scopeBits.map((value) => `<span class="tag">${esc(value)}</span>`).join("")}</div>` : "-"}${item.metadata?.reason ? `<div class="hint">reason=${esc(item.metadata.reason)}</div>` : ""}</td><td>${esc(formatTime(item.createdAt))}</td></tr>`;
+          return `<tr class="${hasRouteReviewFilters() && matchesRouteReviewAudit(item) ? "route-hit" : ""}" data-audit-id="${esc(item.id)}"><td><div class="audit-summary"><strong>${esc(item.eventType)}</strong>${detailBits.length ? `<div class="hint">${esc(detailBits.join(" | "))}</div>` : `<div class="hint">No extra metadata summary.</div>`}</div></td><td>${esc(item.actorType || "-")}<br><span class="mono">${esc(item.actorId || "-")}</span></td><td>${esc(item.entityType || "-")}<br><span class="mono">${esc(item.entityId || "-")}</span></td><td>${scopeBits.length ? `<div class="audit-meta">${scopeBits.map((value) => `<span class="tag">${esc(value)}</span>`).join("")}</div>` : "-"}${item.metadata?.reason ? `<div class="hint">reason=${esc(item.metadata.reason)}</div>` : ""}</td><td>${esc(formatTime(item.createdAt))}</td></tr>`;
         }).join("");
         bindRows("#audit-body tr[data-audit-id]", (data) => {
           const item = snapshot.auditLogs.find((entry) => entry.id === data.auditId);
@@ -2227,6 +2528,7 @@
       function renderAll() {
         renderStats();
         renderOpsRouteFocus();
+        renderRouteReview();
         renderSnapshotOverview();
         renderAccounts();
         renderEntitlements();
@@ -2293,7 +2595,7 @@
           if (!requestedAutofocus || !requestedProductCode || !currentOpsMatchesRequestedRoute()) {
             setStatus("Developer operations loaded.");
           } else {
-            setStatus(`Developer ops workspace focused on ${requestedProductCode}.`);
+            setStatus(`Developer ops workspace focused on ${requestedProductCode}. Route review: ${formatRouteReviewSummary()}.`);
           }
         } catch (error) {
           clearSession();
@@ -2309,7 +2611,7 @@
           if (!requestedAutofocus || !requestedProductCode || !currentOpsMatchesRequestedRoute()) {
             setStatus("Developer operations refreshed.");
           } else {
-            setStatus(`Developer ops workspace kept in sync for ${requestedProductCode}.`);
+            setStatus(`Developer ops workspace kept in sync for ${requestedProductCode}. Route review: ${formatRouteReviewSummary()}.`);
           }
         } catch (error) {
           setStatus(`${error.code}: ${error.message}`, true);
@@ -2326,6 +2628,18 @@
         }
         try {
           await handleOpsRouteFocusAction(button.dataset.opsRouteFocusAction || "");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+        }
+      });
+      el("route-review-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-route-review-action]");
+        if (!button) {
+          return;
+        }
+        try {
+          await handleRouteReviewAction(button.dataset.routeReviewAction || "");
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
           setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });

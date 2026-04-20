@@ -110,6 +110,8 @@ When the current authorization blockers can be fixed automatically, the same lau
 
 For account-only lanes, that same bootstrap can also seed an internal starter entitlement automatically. This keeps the launch workflow useful even when no sellable card inventory should exist yet, because QA and support still get one real entitlement to test login, token validation, and heartbeat gating before launch day.
 
+When the lane already has an active starter policy but still lacks fresh card inventory, the same launch workflow now also exposes `Run First Batch Setup`. That action creates the recommended launch card inventory directly from the launch workspace, and the `First Batch Card Suggestions` section can expose mode-specific shortcuts such as `Create Direct-Card Batch` or `Create Recharge Batch`. If the lane is still missing a starter policy, the workflow keeps `Launch Bootstrap` as the primary action instead of surfacing a first-batch button that would fail.
+
 Authorization readiness inside the launch workflow now also carries more operational launch guidance, not just pass/review/block state. The workflow summary and exported summary/checklist now include:
 
 - `Initial Inventory Recommendations`

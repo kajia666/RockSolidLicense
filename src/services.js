@@ -2739,6 +2739,23 @@ function createLaunchWorkflowBootstrapAction({
   };
 }
 
+function createLaunchWorkflowSetupAction({
+  key = "launch_first_batch_setup",
+  label = "Run First Batch Setup",
+  summary = "",
+  mode = "recommended"
+} = {}) {
+  if (!key) {
+    return null;
+  }
+  return {
+    key,
+    label: label || "Run First Batch Setup",
+    summary: summary || "",
+    mode: mode || "recommended"
+  };
+}
+
 function createLaunchWorkflowActionPlanStep({
   key,
   title = "",
@@ -2747,7 +2764,8 @@ function createLaunchWorkflowActionPlanStep({
   priority = "secondary",
   workspaceAction = null,
   recommendedDownload = null,
-  bootstrapAction = null
+  bootstrapAction = null,
+  setupAction = null
 } = {}) {
   if (!key) {
     return null;
@@ -2760,7 +2778,8 @@ function createLaunchWorkflowActionPlanStep({
     priority: priority || "secondary",
     workspaceAction: workspaceAction || null,
     recommendedDownload: recommendedDownload || null,
-    bootstrapAction: bootstrapAction || null
+    bootstrapAction: bootstrapAction || null,
+    setupAction: setupAction || null
   };
 }
 
@@ -2928,6 +2947,18 @@ function buildLaunchWorkflowAuthorizationReadiness({
         plan: bootstrapPlan
       })
     : null;
+  const firstBatchSetupEligible = policyCount > 0
+    && freshCardCount <= 0
+    && (cardLoginEnabled || cardRechargeEnabled);
+  const firstBatchSetupSummary = firstBatchSetupEligible
+    ? "Run First Batch Setup to create the recommended launch card inventory automatically before rollout."
+    : null;
+  const firstBatchSetupAction = firstBatchSetupEligible
+    ? createLaunchWorkflowSetupAction({
+        summary: firstBatchSetupSummary,
+        mode: "recommended"
+      })
+    : null;
 
   if (bootstrapEligible) {
     workspaceKey = "licenses";
@@ -2936,6 +2967,9 @@ function buildLaunchWorkflowAuthorizationReadiness({
     if (bootstrapSummary && !nextActions.includes(bootstrapSummary)) {
       nextActions.unshift(bootstrapSummary);
     }
+  }
+  if (firstBatchSetupSummary && !nextActions.includes(firstBatchSetupSummary)) {
+    nextActions.unshift(firstBatchSetupSummary);
   }
 
   if (!nextActions.length) {
@@ -2973,6 +3007,9 @@ function buildLaunchWorkflowAuthorizationReadiness({
     bootstrapSummary,
     bootstrapPlan,
     bootstrapAction,
+    firstBatchSetupEligible,
+    firstBatchSetupSummary,
+    firstBatchSetupAction,
     launchRecommendations
   };
 }
@@ -3064,7 +3101,7 @@ function buildLaunchStarterCardBatchDraft(product = {}, policies = []) {
     || null;
 
   return {
-    policyId: preferredPolicy?.id || "",
+    policyId: preferredPolicy?.policyId ?? preferredPolicy?.id ?? "",
     count: 50,
     prefix: buildLaunchStarterBatchPrefix(product?.code || ""),
     notes: `Launch starter batch | modes=${buildLaunchAuthorizationModeSummary(featureConfig)}`
@@ -3102,7 +3139,7 @@ function buildLaunchRecommendedCardBatchDrafts(product = {}, policies = []) {
       prefix: `${batchPrefix}DL`,
       purpose: "First-sale activations and QA smoke tests",
       nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales.",
-      policyId: policy?.id || "",
+      policyId: policy?.policyId ?? policy?.id ?? "",
       notes: `Direct-card launch batch | modes=${buildLaunchAuthorizationModeSummary(featureConfig)}`
     });
   }
@@ -3121,7 +3158,7 @@ function buildLaunchRecommendedCardBatchDrafts(product = {}, policies = []) {
       nextAction: featureConfig.allowCardLogin !== false
         ? "Keep recharge stock separate from direct-login stock so renewals do not consume the initial sales batch."
         : "Issue one recharge-ready batch before the first renewal or top-up request arrives.",
-      policyId: policy?.id || "",
+      policyId: policy?.policyId ?? policy?.id ?? "",
       notes: `Recharge starter batch | modes=${buildLaunchAuthorizationModeSummary(featureConfig)}`
     });
   }
@@ -3313,7 +3350,15 @@ function buildLaunchAuthorizationOperationalPlan({
       prefix: item.prefix,
       purpose: item.purpose,
       nextAction: item.nextAction,
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace")
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
+      setupAction: item.policyId
+        ? createLaunchWorkflowSetupAction({
+            key: `launch_first_batch_setup_${item.mode}`,
+            label: item.mode === "direct_card" ? "Create Direct-Card Batch" : "Create Recharge Batch",
+            summary: item.nextAction,
+            mode: item.mode
+          })
+        : null
     });
   }
 
@@ -3449,7 +3494,8 @@ function buildLaunchWorkflowChecklistPayload({
         authReadiness.workspaceLabel || "Open License Workspace"
       ),
       recommendedDownload: null,
-      bootstrapAction: authReadiness.bootstrapAction || null
+      bootstrapAction: authReadiness.bootstrapAction || null,
+      setupAction: authReadiness.firstBatchSetupAction || null
     },
     {
       key: "startup_bootstrap",
@@ -3786,7 +3832,8 @@ function buildLaunchWorkflowSummaryPayload({
       priority: index === 0 ? "primary" : "secondary",
       workspaceAction: item.workspaceAction || null,
       recommendedDownload: item.recommendedDownload || null,
-      bootstrapAction: item.bootstrapAction || null
+      bootstrapAction: item.bootstrapAction || null,
+      setupAction: item.setupAction || null
     }));
   }
   if (
@@ -3828,7 +3875,20 @@ function buildLaunchWorkflowSummaryPayload({
         authReadiness.workspaceKey || "licenses",
         authReadiness.workspaceAutofocus || "policy-control",
         authReadiness.workspaceLabel || "Open License Workspace"
-      )
+      ),
+      setupAction: authReadiness.firstBatchSetupAction || null
+    }));
+  }
+  if (authReadiness.firstBatchSetupAction && !actionPlan.some((item) => item.setupAction?.key === authReadiness.firstBatchSetupAction.key)) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "first_batch_setup",
+      title: "Create recommended launch card inventory",
+      summary: authReadiness.firstBatchSetupSummary
+        || "Create the recommended direct-card and recharge starter batches before rollout.",
+      status: authReadiness.firstBatchSetupEligible ? "review" : "pass",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
+      setupAction: authReadiness.firstBatchSetupAction
     }));
   }
   const firstOpsActions = Array.isArray(authReadiness.launchRecommendations?.firstOpsActions)
@@ -3905,6 +3965,8 @@ function buildLaunchWorkflowSummaryPayload({
       activeKeyId: tokenKeySummary.activeKeyId || null,
       launchBootstrapAction: authReadiness.bootstrapAction || null,
       launchBootstrapSummary: authReadiness.bootstrapSummary || null,
+      launchFirstBatchSetupAction: authReadiness.firstBatchSetupAction || null,
+      launchFirstBatchSetupSummary: authReadiness.firstBatchSetupSummary || null,
       recommendedDownloads,
       downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
       recommendedWorkspace,
@@ -3984,6 +4046,14 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("");
   }
 
+  if (workflowSummary.launchFirstBatchSetupAction?.label) {
+    lines.push("First Batch Setup:");
+    lines.push(`- ${workflowSummary.launchFirstBatchSetupAction.label}`);
+    lines.push(`- summary: ${workflowSummary.launchFirstBatchSetupSummary || workflowSummary.launchFirstBatchSetupAction.summary || "-"}`);
+    lines.push(`- mode: ${workflowSummary.launchFirstBatchSetupAction.mode || "recommended"}`);
+    lines.push("");
+  }
+
   const authorizationRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
   const inventoryRecommendations = Array.isArray(authorizationRecommendations.inventoryRecommendations)
     ? authorizationRecommendations.inventoryRecommendations
@@ -4002,9 +4072,9 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   if (firstBatchCardRecommendations.length) {
     lines.push("First Batch Card Suggestions:");
     for (const item of firstBatchCardRecommendations) {
-      lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`);
-    }
-    lines.push("");
+        lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}` : ""}`);
+      }
+      lines.push("");
   }
 
   const firstOpsActions = Array.isArray(authorizationRecommendations.firstOpsActions)
@@ -4023,7 +4093,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("Action Plan:");
     for (const item of actionPlan) {
       lines.push(
-          `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`
+          `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}` : ""}`
       );
     }
     lines.push("");
@@ -4112,6 +4182,9 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
     if (item.bootstrapAction) {
       lines.push(`bootstrap: ${item.bootstrapAction.label || item.bootstrapAction.key || "-"}`);
     }
+    if (item.setupAction) {
+      lines.push(`setup: ${item.setupAction.label || item.setupAction.key || "-"} | mode=${item.setupAction.mode || "recommended"}`);
+    }
     lines.push("");
   }
 
@@ -4132,7 +4205,7 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
   if (firstBatchCardRecommendations.length) {
     lines.push("First Batch Card Suggestions:");
     for (const item of firstBatchCardRecommendations) {
-      lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`);
+      lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}` : ""}`);
     }
     lines.push("");
   }
@@ -12687,6 +12760,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           )
         : null;
       const projectMetricKey = String(project?.id ?? "");
+      const scopedPoliciesPayload = project?.code
+        ? await this.developerListPolicies(token, { productCode: project.code })
+        : [];
+      const activePolicies = Array.isArray(scopedPoliciesPayload)
+        ? scopedPoliciesPayload.filter((item) => normalizeProductStatus(item?.status || "active") === "active")
+        : [];
       const authReadiness = buildLaunchWorkflowAuthorizationReadiness({
         product: {
           id: project.id,
@@ -12703,7 +12782,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           cardsRedeemed: businessMetrics?.redeemedCardCounts?.get(projectMetricKey) ?? 0,
           accounts: businessMetrics?.accountCounts?.get(projectMetricKey) ?? 0,
           activeEntitlements: businessMetrics?.activeEntitlementCounts?.get(projectMetricKey) ?? 0
-        }
+        },
+        policies: activePolicies
       });
       const payload = buildLaunchWorkflowPackagePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || integrationPackage?.manifest?.generatedAt || nowIso(),

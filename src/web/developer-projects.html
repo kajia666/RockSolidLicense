@@ -211,6 +211,7 @@
             <button class="secondary" id="launch-open-integration-btn">Open Integration Workspace</button>
             <button class="secondary" id="launch-open-release-btn">Open Release Workspace</button>
             <button class="secondary" id="launch-run-bootstrap-btn">Run Launch Bootstrap</button>
+            <button class="secondary" id="launch-run-first-batch-setup-btn">Run First Batch Setup</button>
           </div>
           <div class="hint" id="detail-navigation-hint" style="margin-top:12px;">Select a project to open its integration package or release handoff check in the dedicated workspaces, or preview release and integration snapshots inline.</div>
         </article>
@@ -1177,7 +1178,9 @@
       function syncWorkspaceLinks(product = null) {
         const hasProduct = Boolean(product);
         const bootstrapAction = currentLaunchWorkflowBootstrapAction();
+        const firstBatchSetupAction = currentLaunchWorkflowFirstBatchSetupAction();
         el("launch-run-bootstrap-btn").textContent = bootstrapAction?.label || "Run Launch Bootstrap";
+        el("launch-run-first-batch-setup-btn").textContent = firstBatchSetupAction?.label || "Run First Batch Setup";
         el("open-project-integration-btn").disabled = !hasProduct;
         el("open-project-launch-btn").disabled = !hasProduct;
         el("open-project-release-btn").disabled = !hasProduct;
@@ -1186,6 +1189,7 @@
         el("launch-open-integration-btn").disabled = !hasProduct;
         el("launch-open-release-btn").disabled = !hasProduct;
         el("launch-run-bootstrap-btn").disabled = !hasProduct || !token;
+        el("launch-run-first-batch-setup-btn").disabled = !hasProduct || !token || !firstBatchSetupAction;
         el("preview-release-readiness-btn").disabled = !hasProduct;
         el("preview-launch-workflow-btn").disabled = !hasProduct;
         el("clear-release-preview-btn").disabled = !hasProduct && !releasePreview;
@@ -2106,6 +2110,15 @@
         return launchWorkflowPreview.payload?.workflowSummary?.launchBootstrapAction || null;
       }
 
+      function currentLaunchWorkflowFirstBatchSetupAction() {
+        const productCode = el("edit-product-code").value.trim();
+        const channel = currentReleaseChannel();
+        if (!launchWorkflowPreview || launchWorkflowPreview.productCode !== productCode || launchWorkflowPreview.channel !== channel) {
+          return null;
+        }
+        return launchWorkflowPreview.payload?.workflowSummary?.launchFirstBatchSetupAction || null;
+      }
+
       function currentLaunchWorkflowWorkspaceActions() {
         const productCode = el("edit-product-code").value.trim();
         const channel = currentReleaseChannel();
@@ -2239,11 +2252,12 @@
             ${items.map((item, index) => `
               <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
                 <div>${index + 1}. ${esc(formatter(item))}</div>
-                ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction) ? `
+                ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction) ? `
                   <div class="actions" style="margin-top:8px;">
                     ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-recommendation-workspace-group="${esc(groupKey)}" data-launch-recommendation-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                     ${item.recommendedDownload ? `<button type="button" data-launch-recommendation-download-group="${esc(groupKey)}" data-launch-recommendation-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
                     ${item.bootstrapAction ? `<button type="button" class="secondary" data-launch-recommendation-bootstrap-group="${esc(groupKey)}" data-launch-recommendation-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                    ${item.setupAction ? `<button type="button" class="secondary" data-launch-recommendation-setup-group="${esc(groupKey)}" data-launch-recommendation-setup-index="${index}">${esc(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                   </div>
                 ` : ""}
               </div>
@@ -2266,6 +2280,7 @@
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-checklist-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-launch-checklist-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
                   ${item.bootstrapAction ? `<button type="button" class="secondary" data-launch-checklist-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                  ${item.setupAction ? `<button type="button" class="secondary" data-launch-checklist-setup-index="${index}">${esc(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -2288,6 +2303,7 @@
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-launch-action-plan-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-launch-action-plan-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
                   ${item.bootstrapAction ? `<button type="button" class="secondary" data-launch-action-plan-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                  ${item.setupAction ? `<button type="button" class="secondary" data-launch-action-plan-setup-index="${index}">${esc(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -2430,6 +2446,24 @@
         setStatus(`${bootstrap?.message || `Launch Bootstrap completed for ${productCode}.`} Launch workflow refreshed.${accountNote}`);
         setOutput({ launchBootstrap: bootstrap, launchWorkflow: workflow });
         return { bootstrap, launchWorkflow: workflow };
+      }
+
+      async function runLaunchWorkflowFirstBatchSetup(mode = null) {
+        const productCode = el("edit-product-code").value.trim();
+        if (!productCode) {
+          throw new Error("Select a project before running First Batch Setup.");
+        }
+        const setupAction = currentLaunchWorkflowFirstBatchSetupAction();
+        const requestedMode = mode || setupAction?.mode || "recommended";
+        const setup = await api("/api/developer/license-quickstart/first-batches", {
+          method: "POST",
+          body: { productCode, mode: requestedMode }
+        });
+        await refresh();
+        const workflow = await loadInlineLaunchWorkflow();
+        setStatus(`${setup?.message || `First Batch Setup completed for ${productCode}.`} Launch workflow refreshed.`);
+        setOutput({ firstBatchSetup: setup, launchWorkflow: workflow });
+        return { firstBatchSetup: setup, launchWorkflow: workflow };
       }
 
       async function downloadLaunchRecommendedItem(item) {
@@ -2788,6 +2822,15 @@
         }
       });
 
+      el("launch-run-first-batch-setup-btn").addEventListener("click", async () => {
+        try {
+          await runLaunchWorkflowFirstBatchSetup();
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       el("launch-open-recommended-btn").addEventListener("click", () => {
         try {
           openRecommendedLaunchWorkspace();
@@ -2833,6 +2876,28 @@
           }
           return;
         }
+        const recommendationSetupButton = event.target.closest("[data-launch-recommendation-setup-index]");
+        if (recommendationSetupButton) {
+          try {
+            const groupKey = recommendationSetupButton.dataset.launchRecommendationSetupGroup || "";
+            const index = Number(recommendationSetupButton.dataset.launchRecommendationSetupIndex);
+            const item = currentLaunchWorkflowRecommendationItems(groupKey)[index];
+            await runLaunchWorkflowFirstBatchSetup(item?.setupAction?.mode || "recommended");
+            setOutput({
+              launchWorkflowSetup: {
+                group: groupKey,
+                key: item?.setupAction?.key || null,
+                label: item?.setupAction?.label || null,
+                mode: item?.setupAction?.mode || null
+              },
+              launchWorkflow: launchWorkflowPreview?.payload || null
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const recommendationDownloadButton = event.target.closest("[data-launch-recommendation-download-index]");
         if (recommendationDownloadButton) {
           try {
@@ -2863,6 +2928,26 @@
               launchWorkflowBootstrap: {
                 key: item?.bootstrapAction?.key || null,
                 label: item?.bootstrapAction?.label || null
+              },
+              launchWorkflow: launchWorkflowPreview?.payload || null
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
+        const actionPlanSetupButton = event.target.closest("[data-launch-action-plan-setup-index]");
+        if (actionPlanSetupButton) {
+          try {
+            const index = Number(actionPlanSetupButton.dataset.launchActionPlanSetupIndex);
+            const item = currentLaunchWorkflowActionPlan()[index];
+            await runLaunchWorkflowFirstBatchSetup(item?.setupAction?.mode || "recommended");
+            setOutput({
+              launchWorkflowSetup: {
+                key: item?.setupAction?.key || null,
+                label: item?.setupAction?.label || null,
+                mode: item?.setupAction?.mode || null
               },
               launchWorkflow: launchWorkflowPreview?.payload || null
             });
@@ -2933,6 +3018,26 @@
                 launchWorkflowBootstrap: {
                   key: item?.bootstrapAction?.key || null,
                   label: item?.bootstrapAction?.label || null
+                },
+                launchWorkflow: launchWorkflowPreview?.payload || null
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
+          const checklistSetupButton = event.target.closest("[data-launch-checklist-setup-index]");
+          if (checklistSetupButton) {
+            try {
+              const index = Number(checklistSetupButton.dataset.launchChecklistSetupIndex);
+              const item = currentLaunchWorkflowChecklistItems()[index];
+              await runLaunchWorkflowFirstBatchSetup(item?.setupAction?.mode || "recommended");
+              setOutput({
+                launchWorkflowSetup: {
+                  key: item?.setupAction?.key || null,
+                  label: item?.setupAction?.label || null,
+                  mode: item?.setupAction?.mode || null
                 },
                 launchWorkflow: launchWorkflowPreview?.payload || null
               });

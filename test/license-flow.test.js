@@ -5517,6 +5517,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.inventoryRecommendations.some((item) => item.workspaceAction?.key));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.inventoryRecommendations.some((item) => item.bootstrapAction?.key));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstBatchCardRecommendations.some((item) => item.workspaceAction?.key === "licenses"));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstBatchCardRecommendations.every((item) => !item.setupAction));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.key));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.key === "ops"));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.autofocus === "snapshot"));
@@ -5534,18 +5535,22 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_checksums"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
     assert.equal(launchWorkflow.workflowSummary.launchBootstrapAction?.label, "Run Launch Bootstrap");
+    assert.equal(launchWorkflow.workflowSummary.launchFirstBatchSetupAction, null);
     assert.match(launchWorkflow.handoffZipFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip$/);
     assert.match(launchWorkflow.handoffChecksumsFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff-sha256\.txt$/);
     assert.equal(launchWorkflow.workflowChecklist.status, "hold");
     assert.ok(launchWorkflow.workflowChecklist.blockItems >= 1);
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "authorization_readiness" && item.workspaceAction?.key === "licenses"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "authorization_readiness" && item.bootstrapAction?.key === "launch_bootstrap"));
+    assert.ok(launchWorkflow.workflowChecklist.items.every((item) => !(item.key === "authorization_readiness" && item.setupAction?.key === "launch_first_batch_setup")));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.key === "launch_handoff_package"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.workspaceAction?.key === "integration"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.recommendedDownload?.key === "release_summary"));
     assert.ok(launchWorkflow.workflowChecklist.items.some((item) => item.recommendedDownload?.key === "launch_handoff_zip"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "authorization_readiness" && item.workspaceAction?.key === "licenses"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "authorization_readiness" && item.bootstrapAction?.key === "launch_bootstrap"));
+    assert.ok(launchWorkflow.workflowSummary.actionPlan.every((item) => !(item.key === "authorization_readiness" && item.setupAction?.key === "launch_first_batch_setup")));
+    assert.ok(launchWorkflow.workflowSummary.actionPlan.every((item) => item.key !== "first_batch_setup"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "integration"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.recommendedDownload?.key === "integration_env"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "ops"));
@@ -5558,6 +5563,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
     assert.match(launchWorkflow.summaryText, /Recommended Workspace:/);
     assert.match(launchWorkflow.summaryText, /Launch Bootstrap:/);
+    assert.doesNotMatch(launchWorkflow.summaryText, /First Batch Setup:/);
     assert.match(launchWorkflow.summaryText, /Initial Inventory Recommendations:/);
     assert.match(launchWorkflow.summaryText, /First Batch Card Suggestions:/);
     assert.match(launchWorkflow.summaryText, /First Ops Actions:/);
@@ -5568,12 +5574,14 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
     assert.match(launchWorkflow.summaryText, /workspace=Open License Workspace@quickstart/);
     assert.match(launchWorkflow.summaryText, /bootstrap=Run Launch Bootstrap/);
+    assert.doesNotMatch(launchWorkflow.summaryText, /setup=Run First Batch Setup@recommended/);
     assert.match(launchWorkflow.summaryText, /workspace=Open Integration Workspace@startup/);
     assert.match(launchWorkflow.summaryText, /download=Release summary:/);
     assert.match(launchWorkflow.checklistText, /RockSolid Launch Workflow Checklist/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Authorization readiness/);
     assert.match(launchWorkflow.checklistText, /workspace: Open License Workspace \| focus=quickstart/);
     assert.match(launchWorkflow.checklistText, /bootstrap: Run Launch Bootstrap/);
+    assert.doesNotMatch(launchWorkflow.checklistText, /setup: Run First Batch Setup \| mode=recommended/);
     assert.match(launchWorkflow.checklistText, /Initial Inventory Recommendations:/);
     assert.match(launchWorkflow.checklistText, /First Batch Card Suggestions:/);
     assert.match(launchWorkflow.checklistText, /First Ops Actions:/);
@@ -5605,6 +5613,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchChecklistDownload.body, /\[BLOCK\] Authorization readiness/);
     assert.match(launchChecklistDownload.body, /workspace: Open License Workspace \| focus=quickstart/);
     assert.match(launchChecklistDownload.body, /bootstrap: Run Launch Bootstrap/);
+    assert.doesNotMatch(launchChecklistDownload.body, /setup: Run First Batch Setup \| mode=recommended/);
     assert.match(launchChecklistDownload.body, /\[BLOCK\] Startup bootstrap decision/);
     assert.match(launchChecklistDownload.body, /workspace: Open Integration Workspace \| focus=startup/);
 
@@ -6143,6 +6152,19 @@ test("developer license quickstart first-batch setup can create recommended laun
       ownerSession.token
     );
 
+    const launchWorkflowBeforeSetup = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=FIRSTBATCH&channel=stable",
+      ownerSession.token
+    );
+    assert.equal(launchWorkflowBeforeSetup.workflowSummary.launchFirstBatchSetupAction?.label, "Run First Batch Setup");
+    assert.ok(launchWorkflowBeforeSetup.workflowSummary.authorizationLaunchRecommendations.firstBatchCardRecommendations.some((item) => item.setupAction?.key === "launch_first_batch_setup_direct_card"));
+    assert.ok(launchWorkflowBeforeSetup.workflowSummary.authorizationLaunchRecommendations.firstBatchCardRecommendations.some((item) => item.setupAction?.key === "launch_first_batch_setup_recharge"));
+    assert.ok(launchWorkflowBeforeSetup.workflowChecklist.items.some((item) => item.key === "authorization_readiness" && item.setupAction?.key === "launch_first_batch_setup"));
+    assert.ok(launchWorkflowBeforeSetup.workflowSummary.actionPlan.some((item) => item.key === "authorization_readiness" && item.setupAction?.key === "launch_first_batch_setup"));
+    assert.match(launchWorkflowBeforeSetup.summaryText, /First Batch Setup:/);
+    assert.match(launchWorkflowBeforeSetup.summaryText, /setup=Run First Batch Setup@recommended/);
+
     const setup = await postJson(
       baseUrl,
       "/api/developer/license-quickstart/first-batches",
@@ -6183,6 +6205,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(repeatSetup.createdBatches.length, 0);
     assert.equal(repeatSetup.skipped.length, 2);
     assert.equal(repeatSetup.after.counts.freshCards, 150);
+
+    const launchWorkflowAfterSetup = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=FIRSTBATCH&channel=stable",
+      ownerSession.token
+    );
+    assert.equal(launchWorkflowAfterSetup.workflowSummary.launchFirstBatchSetupAction, null);
+    assert.ok(launchWorkflowAfterSetup.workflowSummary.actionPlan.every((item) => item.key !== "first_batch_setup"));
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -9695,6 +9725,7 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Download Launch Checksums/);
     assert.match(html, /Download Launch Zip/);
     assert.match(html, /Run Launch Bootstrap/);
+    assert.match(html, /Run First Batch Setup/);
     assert.match(html, /Recommended Handoff/);
     assert.match(html, /Open Recommended Workspace/);
     assert.match(html, /Download Recommended Handoff Zip/);
@@ -9716,21 +9747,27 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /First Ops Actions/);
     assert.match(html, /data-recommendation-workspace-index/);
     assert.match(html, /data-recommendation-bootstrap-index/);
+    assert.match(html, /data-recommendation-setup-index/);
     assert.match(html, /renderChecklistItemButtons/);
     assert.match(html, /renderActionPlanCards/);
     assert.match(html, /formatWorkspaceActionRouteBits/);
     assert.match(html, /filters=/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
+    assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
     assert.match(html, /runLaunchBootstrap/);
+    assert.match(html, /runLaunchFirstBatchSetup/);
     assert.match(html, /currentLaunchBootstrapAction/);
+    assert.match(html, /currentLaunchFirstBatchSetupAction/);
     assert.match(html, /data-workspace-action-index/);
     assert.match(html, /data-recommended-download-index/);
     assert.match(html, /data-checklist-workspace-index/);
     assert.match(html, /data-checklist-download-index/);
     assert.match(html, /data-checklist-bootstrap-index/);
+    assert.match(html, /data-checklist-setup-index/);
     assert.match(html, /data-action-plan-workspace-index/);
     assert.match(html, /data-action-plan-download-index/);
     assert.match(html, /data-action-plan-bootstrap-index/);
+    assert.match(html, /data-action-plan-setup-index/);
     assert.match(html, /Workspace path:/);
     assert.match(html, /autofocus/);
     assert.match(html, /routeTitle/);
@@ -10217,6 +10254,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /Clear Release Preview/);
     assert.match(html, /Preview Launch Workflow/);
     assert.match(html, /Run Launch Bootstrap/);
+    assert.match(html, /Run First Batch Setup/);
     assert.match(html, /Download Release Summary/);
     assert.match(html, /Download Release Checksums/);
     assert.match(html, /Download Release Zip/);
@@ -10233,15 +10271,20 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /formatProjectWorkspaceActionRouteBits/);
     assert.match(html, /filters=/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
+    assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
     assert.match(html, /runLaunchWorkflowBootstrap/);
+    assert.match(html, /runLaunchWorkflowFirstBatchSetup/);
     assert.match(html, /currentLaunchWorkflowBootstrapAction/);
+    assert.match(html, /currentLaunchWorkflowFirstBatchSetupAction/);
     assert.match(html, /data-launch-download-index/);
     assert.match(html, /data-launch-checklist-workspace-index/);
     assert.match(html, /data-launch-checklist-download-index/);
     assert.match(html, /data-launch-checklist-bootstrap-index/);
+    assert.match(html, /data-launch-checklist-setup-index/);
     assert.match(html, /data-launch-action-plan-workspace-index/);
     assert.match(html, /data-launch-action-plan-download-index/);
     assert.match(html, /data-launch-action-plan-bootstrap-index/);
+    assert.match(html, /data-launch-action-plan-setup-index/);
     assert.match(html, /Download C\+\+ Quickstart/);
     assert.match(html, /Download CMake Template/);
     assert.match(html, /Download VS2022 Quickstart/);
@@ -10262,6 +10305,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /First Batch Card Suggestions/);
     assert.match(html, /First Ops Actions/);
     assert.match(html, /data-launch-recommendation-workspace-index/);
+    assert.match(html, /data-launch-recommendation-setup-index/);
     assert.match(html, /data-launch-recommendation-bootstrap-index/);
     assert.match(html, /Open Launch Workspace/);
     assert.match(html, /Release Summary/);

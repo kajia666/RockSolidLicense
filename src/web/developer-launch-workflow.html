@@ -202,6 +202,7 @@
             <button class="secondary" id="use-filter-project-btn">Use Current Project</button>
             <button id="generate-release-package-btn">Generate Launch Workflow</button>
             <button class="secondary" id="run-launch-bootstrap-btn">Run Launch Bootstrap</button>
+            <button class="secondary" id="run-first-batch-setup-btn">Run First Batch Setup</button>
           </div>
           <div class="actions">
             <button class="secondary" id="open-recommended-workspace-btn">Open Recommended Workspace</button>
@@ -631,8 +632,11 @@
         const target = currentReleaseTarget();
         const hasProduct = Boolean(target.productCode);
         const bootstrapAction = currentLaunchBootstrapAction();
+        const firstBatchSetupAction = currentLaunchFirstBatchSetupAction();
         el("run-launch-bootstrap-btn").textContent = bootstrapAction?.label || "Run Launch Bootstrap";
+        el("run-first-batch-setup-btn").textContent = firstBatchSetupAction?.label || "Run First Batch Setup";
         el("run-launch-bootstrap-btn").disabled = !(hasProduct && token && canReadReleaseWorkspace());
+        el("run-first-batch-setup-btn").disabled = !(hasProduct && token && canReadReleaseWorkspace() && firstBatchSetupAction);
         el("open-recommended-workspace-btn").disabled = !(hasProduct && releasePackage?.workflowSummary?.recommendedWorkspace);
         el("open-release-project-btn").disabled = !hasProduct;
         el("open-release-integration-btn").disabled = !hasProduct;
@@ -694,7 +698,7 @@
             node.disabled = writeDisabled;
           }
         });
-        ["package-product-code", "package-channel", "use-filter-project-btn", "generate-release-package-btn", "run-launch-bootstrap-btn"].forEach((id) => {
+        ["package-product-code", "package-channel", "use-filter-project-btn", "generate-release-package-btn", "run-launch-bootstrap-btn", "run-first-batch-setup-btn"].forEach((id) => {
           const node = el(id);
           if (node) {
             node.disabled = readDisabled;
@@ -932,6 +936,10 @@
         return releasePackage?.workflowSummary?.launchBootstrapAction || null;
       }
 
+      function currentLaunchFirstBatchSetupAction() {
+        return releasePackage?.workflowSummary?.launchFirstBatchSetupAction || null;
+      }
+
       function currentWorkspaceActions() {
         return Array.isArray(releasePackage?.workflowSummary?.workspaceActions)
           ? releasePackage.workflowSummary.workspaceActions
@@ -1040,11 +1048,12 @@
             ${items.map((item, index) => `
               <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
                 <div>${index + 1}. ${escapeHtml(formatter(item))}</div>
-                ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction) ? `
+                ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction) ? `
                   <div class="actions" style="margin-top:8px;">
                     ${item.workspaceAction ? `<button type="button" class="secondary" data-recommendation-workspace-group="${escapeHtml(groupKey)}" data-recommendation-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                     ${item.recommendedDownload ? `<button type="button" data-recommendation-download-group="${escapeHtml(groupKey)}" data-recommendation-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
                     ${item.bootstrapAction ? `<button type="button" class="secondary" data-recommendation-bootstrap-group="${escapeHtml(groupKey)}" data-recommendation-bootstrap-index="${index}">${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                    ${item.setupAction ? `<button type="button" class="secondary" data-recommendation-setup-group="${escapeHtml(groupKey)}" data-recommendation-setup-index="${index}">${escapeHtml(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                   </div>
                 ` : ""}
               </div>
@@ -1066,6 +1075,7 @@
                 ${item.workspaceAction ? `<button type="button" class="secondary" data-checklist-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                 ${item.recommendedDownload ? `<button type="button" data-checklist-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download artifact")}</button>` : ""}
                 ${item.bootstrapAction ? `<button type="button" class="secondary" data-checklist-bootstrap-index="${index}">${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                ${item.setupAction ? `<button type="button" class="secondary" data-checklist-setup-index="${index}">${escapeHtml(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
               </div>
             </div>
           `).join("");
@@ -1086,6 +1096,7 @@
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-action-plan-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-action-plan-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
                   ${item.bootstrapAction ? `<button type="button" class="secondary" data-action-plan-bootstrap-index="${index}">${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                  ${item.setupAction ? `<button type="button" class="secondary" data-action-plan-setup-index="${index}">${escapeHtml(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -1495,6 +1506,26 @@
         return { bootstrap, launchWorkflow: data };
       }
 
+      async function runLaunchFirstBatchSetup(mode = null) {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running First Batch Setup.");
+        }
+        const setupAction = currentLaunchFirstBatchSetupAction();
+        const requestedMode = mode || setupAction?.mode || "recommended";
+        const setup = await api("/api/developer/license-quickstart/first-batches", {
+          method: "POST",
+          body: {
+            productCode: target.productCode,
+            mode: requestedMode
+          }
+        });
+        const data = await generateReleasePackage();
+        setStatus(`${setup?.message || `First Batch Setup completed for ${target.productCode}.`} Launch workflow reloaded.`);
+        setOutput({ firstBatchSetup: setup, launchWorkflow: data });
+        return { firstBatchSetup: setup, launchWorkflow: data };
+      }
+
       async function hydrateLaunchAutofocus() {
         if (!requestedAutofocus) {
           return;
@@ -1624,6 +1655,15 @@
         }
       });
 
+      el("run-first-batch-setup-btn").addEventListener("click", async () => {
+        try {
+          await runLaunchFirstBatchSetup();
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
       el("open-release-project-btn").addEventListener("click", () => {
         const target = currentReleaseTarget();
         if (!target.productCode) {
@@ -1689,6 +1729,28 @@
       });
 
         el("release-readiness").addEventListener("click", async (event) => {
+          const recommendationSetupButton = event.target.closest("[data-recommendation-setup-index]");
+          if (recommendationSetupButton) {
+            try {
+              const groupKey = recommendationSetupButton.dataset.recommendationSetupGroup || "";
+              const index = Number(recommendationSetupButton.dataset.recommendationSetupIndex);
+              const item = currentAuthorizationRecommendationItems(groupKey)[index];
+              await runLaunchFirstBatchSetup(item?.setupAction?.mode || "recommended");
+              setOutput({
+                recommendationSetup: {
+                  group: groupKey,
+                  key: item?.setupAction?.key || null,
+                  label: item?.setupAction?.label || null,
+                  mode: item?.setupAction?.mode || null
+                },
+                launchWorkflow: releasePackage
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
           const recommendationBootstrapButton = event.target.closest("[data-recommendation-bootstrap-index]");
           if (recommendationBootstrapButton) {
             try {
@@ -1749,6 +1811,26 @@
             }
             return;
           }
+          const actionPlanSetupButton = event.target.closest("[data-action-plan-setup-index]");
+          if (actionPlanSetupButton) {
+            try {
+              const index = Number(actionPlanSetupButton.dataset.actionPlanSetupIndex);
+              const item = currentActionPlan()[index];
+              await runLaunchFirstBatchSetup(item?.setupAction?.mode || "recommended");
+              setOutput({
+                actionPlanSetup: {
+                  key: item?.setupAction?.key || null,
+                  label: item?.setupAction?.label || null,
+                  mode: item?.setupAction?.mode || null
+                },
+                launchWorkflow: releasePackage
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
           const actionPlanDownloadButton = event.target.closest("[data-action-plan-download-index]");
           if (!actionPlanDownloadButton) {
             return;
@@ -1781,6 +1863,26 @@
       });
 
         el("delivery-checklist").addEventListener("click", async (event) => {
+          const setupButton = event.target.closest("[data-checklist-setup-index]");
+          if (setupButton) {
+            try {
+              const index = Number(setupButton.dataset.checklistSetupIndex);
+              const item = currentChecklistItems()[index];
+              await runLaunchFirstBatchSetup(item?.setupAction?.mode || "recommended");
+              setOutput({
+                checklistSetup: {
+                  key: item?.setupAction?.key || null,
+                  label: item?.setupAction?.label || null,
+                  mode: item?.setupAction?.mode || null
+                },
+                launchWorkflow: releasePackage
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
           const bootstrapButton = event.target.closest("[data-checklist-bootstrap-index]");
           if (bootstrapButton) {
             try {

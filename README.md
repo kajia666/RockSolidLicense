@@ -62,6 +62,7 @@
 - 开发者授权中心现在补了 `Launch Authorization Quickstart`，会按项目当前登录模式、策略数、卡密库存、起步账号状态给出首发建议，并能一键预填 starter duration / points policy、starter card batch 和 starter account；当项目走账号登录但关闭公开注册时，也可以直接在授权中心补首发种子账号；如果登录路径已经合理，还可以直接运行一键 `Launch Bootstrap`，自动补齐缺的 starter policy / fresh card batch / starter account；对于账号制但不开直登卡/充值卡的 lane，也会自动用内部 seed card 补出一条 starter entitlement，方便首发前先做 QA / 支持 smoke test
 - 开发者授权中心现在还支持一键 `First Batch Setup`：对启用直登卡 / 充值卡的项目，可以直接按推荐方案创建首批 `direct-card` / `recharge` 卡密批次，而不只是把建议预填到表单里；如果推荐前缀下已经有 fresh inventory，也会自动跳过，减少重复发卡
 - 上线工作台和项目页内联 `Launch Workflow` 现在也能直接运行 `Launch Bootstrap`。如果当前 lane 的首发授权缺项可以自动补齐，摘要、action plan、checklist 和主操作区都会给出一键入口，执行后会自动刷新当前 lane，减少先跳到授权页再返回的往返
+- 如果当前 lane 已经有 starter policy、但还没有首批 fresh card inventory，上线工作台和项目页内联 `Launch Workflow` 现在也会直接给出 `Run First Batch Setup`。这会按推荐方案创建首批 `direct-card` / `recharge` 库存；而在还没有 policy 的场景下，工作台会继续优先给 `Launch Bootstrap`，避免把一个暂时不可执行的发卡动作提前亮出来
 - 现在 `Launch Authorization Quickstart`、`Launch Workflow` 和项目页内联 launch summary 还会给出结构化的“首批库存建议 / 首批发卡建议 / 首发后第一轮运营动作”，帮助软件作者把首发准备、首批发卡和上线后前几小时的运营检查连成一条更实操的链路
 - 这条“首发后第一轮运营动作”现在也已经接到了开发者运营台 `/developer/ops`：launch workflow 和项目页里的 `First Ops Actions` 可以直接把软件作者路由到 snapshot / audit / sessions 焦点，方便首发后立刻盯登录、心跳、审计和设备状态；这些路由也可以继续带上更细的 audit filter，比如 `eventType / actorType / entityType`
 - 这些首发后的 ops 动作现在也会进入 `Launch Workflow` 的 `Action Plan` 和导出文本里，所以交付给测试、运营或值守同事时，不只是知道“去哪”，还会知道“应该先看哪类信号”

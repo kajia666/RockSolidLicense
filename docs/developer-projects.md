@@ -87,6 +87,8 @@ That same inline block now also renders the first few `Action Plan` steps. So if
 
 When those authorization blockers are auto-fixable, the same inline launch workflow block now also exposes `Run Launch Bootstrap`. So the project page can create the missing starter policy, starter card batch, or starter account directly, then refresh the same launch lane without forcing the software author to switch into the license workspace first.
 
+If the selected lane already has an active starter policy and only lacks launch inventory, that same inline block can now also expose `Run First Batch Setup`. It lets the software author create the recommended direct-card and recharge starter batches without leaving the project workspace, while still keeping `Launch Bootstrap` as the primary fix when the lane is missing the policy required to issue those cards safely.
+
 That same inline launch workflow block now also shows the first slice of:
 
 - `Initial Inventory Recommendations`

@@ -108,6 +108,8 @@ The launch workflow summary itself now also derives an `Action Plan`. It takes t
 
 When the current authorization blockers can be fixed automatically, the same launch workflow package now also exposes `Run Launch Bootstrap`. That action can create the missing starter policy, starter card batch, or starter account for the routed project, then regenerate the same lane immediately so the software author can verify whether the blocker really cleared.
 
+For account-only lanes, that same bootstrap can also seed an internal starter entitlement automatically. This keeps the launch workflow useful even when no sellable card inventory should exist yet, because QA and support still get one real entitlement to test login, token validation, and heartbeat gating before launch day.
+
 Authorization readiness inside the launch workflow now also carries more operational launch guidance, not just pass/review/block state. The workflow summary and exported summary/checklist now include:
 
 - `Initial Inventory Recommendations`

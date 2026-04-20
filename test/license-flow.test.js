@@ -6000,6 +6000,94 @@ test("developer license quickstart bootstrap can create starter launch assets in
   }
 });
 
+test("developer license quickstart bootstrap can seed an internal starter entitlement for account-only launch lanes", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.entitlement.owner",
+        password: "LaunchEntitlementOwner123!",
+        displayName: "Launch Entitlement Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "BOOT_ACCOUNT_ONLY",
+        name: "Bootstrap Account Only",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: true,
+          allowCardLogin: false,
+          allowCardRecharge: false
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.entitlement.owner",
+      password: "LaunchEntitlementOwner123!"
+    });
+
+    const bootstrap = await postJson(
+      baseUrl,
+      "/api/developer/license-quickstart/bootstrap",
+      { productCode: "BOOT_ACCOUNT_ONLY" },
+      ownerSession.token
+    );
+
+    assert.equal(bootstrap.productCode, "BOOT_ACCOUNT_ONLY");
+    assert.ok(bootstrap.created.policy);
+    assert.ok(bootstrap.created.account);
+    assert.ok(bootstrap.created.entitlement);
+    assert.equal(bootstrap.created.cardBatch, undefined);
+    assert.equal(bootstrap.before.counts.activeEntitlements, 0);
+    assert.equal(bootstrap.after.counts.activeEntitlements, 1);
+    assert.equal(bootstrap.created.entitlement.username, bootstrap.created.account.username);
+    assert.ok(bootstrap.created.entitlement.seedBatchCode);
+
+    const entitlements = await getJson(
+      baseUrl,
+      "/api/developer/entitlements?productCode=BOOT_ACCOUNT_ONLY",
+      ownerSession.token
+    );
+    assert.ok(entitlements.items.some((item) =>
+      item.id === bootstrap.created.entitlement.id
+        && item.username === bootstrap.created.account.username
+        && item.lifecycleStatus === "active"
+    ));
+
+    const launchWorkflow = await getJson(
+      baseUrl,
+      "/api/developer/launch-workflow?productCode=BOOT_ACCOUNT_ONLY&channel=stable",
+      ownerSession.token
+    );
+    assert.notEqual(launchWorkflow.workflowSummary.authorizationStatus, "block");
+    assert.ok(Array.isArray(launchWorkflow.workflowSummary.authorizationLaunchRecommendations?.inventoryRecommendations));
+    assert.ok(
+      !launchWorkflow.workflowSummary.authorizationLaunchRecommendations.inventoryRecommendations.some(
+        (item) => item.key === "starter_entitlements" && item.status === "recommended"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

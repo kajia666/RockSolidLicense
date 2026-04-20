@@ -32,6 +32,8 @@ and it can prefill:
 
 The same quickstart block can now also run a one-click `Launch Bootstrap`. When the current project already has a valid login path, that bootstrap can create the missing starter policy, starter card batch, and starter account in one pass, then return the generated starter-account password in the response so the software author can hand it off securely.
 
+For account-only lanes that do not use direct-card login or recharge, the same bootstrap can now also seed one internal starter entitlement automatically. It does that by staging a private one-card seed batch and redeeming it into the starter account, so QA or support can exercise the real runtime gating path before the first customer arrives.
+
 The same quickstart block now also turns launch advice into three concrete groups instead of only showing generic blockers:
 
 - `Initial Inventory Recommendations`

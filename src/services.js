@@ -3071,6 +3071,21 @@ function buildLaunchStarterCardBatchDraft(product = {}, policies = []) {
   };
 }
 
+function buildLaunchInternalSeedCardBatchDraft(product = {}, policies = []) {
+  const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+    ? product.featureConfig
+    : {};
+  const starterDraft = buildLaunchStarterCardBatchDraft(product, policies);
+  const basePrefix = buildLaunchStarterBatchPrefix(product?.code || "").slice(0, 8) || "ROCKSOLID";
+
+  return {
+    ...starterDraft,
+    count: 1,
+    prefix: `${basePrefix}INT`,
+    notes: `Launch internal entitlement seed | modes=${buildLaunchAuthorizationModeSummary(featureConfig)}`
+  };
+}
+
 function buildLaunchStarterAccountDraft(product = {}, accountCount = 0) {
   return {
     username: buildLaunchStarterAccountUsername(product?.code || "", accountCount),
@@ -13648,10 +13663,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         ? product.featureConfig
         : {};
       const collectState = async () => {
-        const [policies, cardsPayload, accountsPayload] = await Promise.all([
+        const [policies, cardsPayload, accountsPayload, entitlementsPayload] = await Promise.all([
           this.developerListPolicies(token, { productCode }),
           this.developerListCards(token, { productCode }),
-          this.developerListAccounts(token, { productCode })
+          this.developerListAccounts(token, { productCode }),
+          this.developerListEntitlements(token, { productCode })
         ]);
         const policyItems = Array.isArray(policies) ? policies : [];
         const activePolicies = policyItems.filter((item) => normalizeProductStatus(item?.status || "active") === "active");
@@ -13661,6 +13677,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         );
         const redeemedCards = cardItems.filter((item) => item?.usageStatus === "redeemed");
         const accountItems = Array.isArray(accountsPayload?.items) ? accountsPayload.items : [];
+        const activeAccounts = accountItems.filter((item) => String(item?.status || "active").trim().toLowerCase() === "active");
+        const entitlementItems = Array.isArray(entitlementsPayload?.items) ? entitlementsPayload.items : [];
+        const activeEntitlements = entitlementItems.filter((item) =>
+          String(item?.lifecycleStatus || item?.status || "").trim().toLowerCase() === "active"
+        ).length;
         const authorization = buildLaunchWorkflowAuthorizationReadiness({
           product,
           metrics: {
@@ -13668,7 +13689,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             cardsFresh: freshCards.length,
             cardsRedeemed: redeemedCards.length,
             accounts: accountItems.length,
-            activeEntitlements: 0
+            activeEntitlements
           },
           policies: activePolicies
         });
@@ -13678,6 +13699,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           cards: cardItems,
           freshCards,
           accounts: accountItems,
+          activeAccounts,
+          entitlements: entitlementItems,
+          activeEntitlements,
           authorization
         };
       };
@@ -13700,8 +13724,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const needsPolicy = before.activePolicies.length <= 0;
       const needsCards = (cardLoginEnabled || cardRechargeEnabled) && before.freshCards.length <= 0;
       const needsStarterAccount = accountLoginEnabled && !registerEnabled && before.accounts.length <= 0;
+      const needsStarterEntitlement = accountLoginEnabled
+        && !cardLoginEnabled
+        && !cardRechargeEnabled
+        && before.activeEntitlements <= 0;
+      const needsBootstrapAccount = needsStarterAccount || (needsStarterEntitlement && before.activeAccounts.length <= 0);
 
-      if (!needsPolicy && !needsCards && !needsStarterAccount) {
+      if (!needsPolicy && !needsCards && !needsBootstrapAccount && !needsStarterEntitlement) {
         return {
           productCode,
           productName: product.name,
@@ -13713,7 +13742,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             counts: {
               policies: before.activePolicies.length,
               freshCards: before.freshCards.length,
-              accounts: before.accounts.length
+              accounts: before.accounts.length,
+              activeEntitlements: before.activeEntitlements
             }
           },
           after: {
@@ -13721,7 +13751,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             counts: {
               policies: before.activePolicies.length,
               freshCards: before.freshCards.length,
-              accounts: before.accounts.length
+              accounts: before.accounts.length,
+              activeEntitlements: before.activeEntitlements
             }
           },
           message: `Launch quickstart is already staged for ${productCode}.`
@@ -13754,7 +13785,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         });
       }
 
-      if (needsStarterAccount) {
+      if (needsBootstrapAccount) {
         const starterAccountDraft = buildLaunchStarterAccountDraft(product, before.accounts.length);
         const account = await this.developerCreateAccount(token, {
           productCode,
@@ -13767,16 +13798,138 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       }
 
-      const after = await collectState();
+      if (needsStarterEntitlement) {
+        const targetAccountId = created.account?.id
+          ?? before.activeAccounts[0]?.id
+          ?? before.accounts[0]?.id
+          ?? null;
+
+        if (!targetAccountId) {
+          throw new AppError(
+            409,
+            "LAUNCH_BOOTSTRAP_ACCOUNT_REQUIRED",
+            "Launch bootstrap could not find an account to seed the internal starter entitlement."
+          );
+        }
+
+        const targetAccount = await getStoreAccountRecordById(targetAccountId);
+        if (!targetAccount) {
+          throw new AppError(
+            404,
+            "ACCOUNT_NOT_FOUND",
+            "Starter entitlement bootstrap could not load the target account."
+          );
+        }
+
+        const seedBatchDraft = buildLaunchInternalSeedCardBatchDraft(product, effectivePolicies);
+        if (!seedBatchDraft.policyId) {
+          throw new AppError(
+            409,
+            "LAUNCH_BOOTSTRAP_POLICY_REQUIRED",
+            "Create or keep at least one active starter policy before seeding an internal entitlement."
+          );
+        }
+
+        const seedPolicy = await getStorePolicyById(seedBatchDraft.policyId);
+        if (!seedPolicy || seedPolicy.productId !== product.id || normalizeProductStatus(seedPolicy.status || "active") !== "active") {
+          throw new AppError(
+            404,
+            "POLICY_NOT_FOUND",
+            "Launch bootstrap could not find an active policy for the internal entitlement seed."
+          );
+        }
+
+        const seedTimestamp = nowIso();
+        const { seedBatch, activation } = await withTransaction(db, async () => {
+          const seedBatch = await createShadowedCardBatch(product, seedPolicy, seedBatchDraft, seedTimestamp);
+          const seedEntry = Array.isArray(seedBatch?.issued) ? seedBatch.issued[0] : null;
+          const seedCardId = seedEntry?.licenseKeyId ?? seedEntry?.id ?? null;
+
+          if (!seedCardId) {
+            throw new AppError(
+              500,
+              "LAUNCH_BOOTSTRAP_SEED_CARD_MISSING",
+              "Launch bootstrap could not stage the internal entitlement seed card."
+            );
+          }
+
+          const seedCard = await getStoreCardById(seedCardId);
+          if (!seedCard) {
+            throw new AppError(
+              404,
+              "CARD_NOT_FOUND",
+              "Launch bootstrap could not load the internal entitlement seed card."
+            );
+          }
+          const seedActivationCard = {
+            ...seedCard,
+            policyId: seedPolicy.id,
+            policyName: seedPolicy.name,
+            durationDays: seedPolicy.durationDays,
+            grantType: seedPolicy.grantType,
+            grantPoints: seedPolicy.grantPoints
+          };
+
+          const activation = await activateFreshCardEntitlementWithShadow(
+            product,
+            targetAccount,
+            seedActivationCard,
+            seedTimestamp
+          );
+
+          return { seedBatch, activation };
+        });
+
+        created.entitlement = {
+          id: activation.entitlementId,
+          accountId: targetAccount.id,
+          username: targetAccount.username,
+          policyName: activation.policyName,
+          grantType: activation.grantType,
+          startsAt: activation.startsAt,
+          endsAt: activation.endsAt,
+          totalPoints: activation.totalPoints,
+          remainingPoints: activation.remainingPoints,
+          sourceCardKey: activation.cardKey,
+          seedBatchCode: seedBatch.batchCode
+        };
+      }
+
+      const rawAfter = await collectState();
+      const afterActiveEntitlements = Math.max(
+        Number(rawAfter.activeEntitlements ?? 0),
+        Number(before.activeEntitlements ?? 0) + (created.entitlement ? 1 : 0)
+      );
+      const after = afterActiveEntitlements === Number(rawAfter.activeEntitlements ?? 0)
+        ? rawAfter
+        : {
+            ...rawAfter,
+            activeEntitlements: afterActiveEntitlements,
+            authorization: buildLaunchWorkflowAuthorizationReadiness({
+              product,
+              metrics: {
+                policies: rawAfter.activePolicies.length,
+                cardsFresh: rawAfter.freshCards.length,
+                cardsRedeemed: rawAfter.cards.filter((item) => item?.usageStatus === "redeemed").length,
+                accounts: rawAfter.accounts.length,
+                activeEntitlements: afterActiveEntitlements
+              },
+              policies: rawAfter.activePolicies
+            })
+          };
 
       auditDeveloperSession(db, session, "license.quickstart.bootstrap", "product", product.id, {
         productCode,
         createdPolicy: Boolean(created.policy),
         createdCardBatch: Boolean(created.cardBatch),
         createdAccount: Boolean(created.account),
+        createdEntitlement: Boolean(created.entitlement),
         policyId: created.policy?.id ?? null,
         batchCode: created.cardBatch?.batchCode ?? null,
         starterUsername: created.account?.username ?? null,
+        entitlementId: created.entitlement?.id ?? null,
+        entitlementUsername: created.entitlement?.username ?? null,
+        entitlementSeedBatchCode: created.entitlement?.seedBatchCode ?? null,
         beforeStatus: before.authorization.status,
         afterStatus: after.authorization.status
       });
@@ -13784,7 +13937,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const createdParts = [
         created.policy ? `policy:${created.policy.name}` : null,
         created.cardBatch ? `cards:${created.cardBatch.count}` : null,
-        created.account ? `account:${created.account.username}` : null
+        created.account ? `account:${created.account.username}` : null,
+        created.entitlement ? `entitlement:${created.entitlement.username}` : null
       ].filter(Boolean);
 
       return {
@@ -13798,7 +13952,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           counts: {
             policies: before.activePolicies.length,
             freshCards: before.freshCards.length,
-            accounts: before.accounts.length
+            accounts: before.accounts.length,
+            activeEntitlements: before.activeEntitlements
           }
         },
         after: {
@@ -13806,7 +13961,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           counts: {
             policies: after.activePolicies.length,
             freshCards: after.freshCards.length,
-            accounts: after.accounts.length
+            accounts: after.accounts.length,
+            activeEntitlements: after.activeEntitlements
           }
         },
         message: createdParts.length

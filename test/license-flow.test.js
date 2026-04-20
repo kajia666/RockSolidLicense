@@ -10184,16 +10184,25 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /Account Candidates/);
     assert.match(html, /Direct-Card Candidates/);
     assert.match(html, /Recharge Candidates/);
+    assert.match(html, /Last Smoke Action/);
     assert.match(html, /Open Recommended Workspace/);
     assert.match(html, /Open Launch Workflow/);
     assert.match(html, /Open Launch Review/);
     assert.match(html, /Open Ops Workspace/);
+    assert.match(html, /Run Launch Bootstrap/);
+    assert.match(html, /Run First Batch Setup/);
+    assert.match(html, /Run Inventory Refill/);
     assert.match(html, /downloadSmokeRecommendedItem/);
     assert.match(html, /openWorkspaceAction/);
+    assert.match(html, /runLaunchSmokeBootstrap/);
+    assert.match(html, /runLaunchSmokeSetup/);
+    assert.match(html, /renderLastSmokeFollowUp/);
     assert.match(html, /currentSmokeSummary/);
     assert.match(html, /currentActionPlan/);
     assert.match(html, /currentWorkspaceActions/);
     assert.match(html, /currentRecommendedDownloads/);
+    assert.match(html, /data-smoke-action-bootstrap-index/);
+    assert.match(html, /data-smoke-action-setup-index/);
     assert.match(html, /\/developer\/launch-smoke/);
   } finally {
     await app.close();

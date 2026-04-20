@@ -244,6 +244,11 @@
         </article>
       </section>
 
+      <section class="card" style="margin-bottom: 18px;">
+        <h2>Last Smoke Action</h2>
+        <div id="smoke-followup-box" class="hint">Run Launch Bootstrap, Run First Batch Setup, or Run Inventory Refill from this smoke workspace to keep the next follow-up visible here.</div>
+      </section>
+
       <section class="wide">
         <article class="card">
           <h2>Smoke Summary</h2>
@@ -304,6 +309,7 @@
       let profile = null;
       let actor = null;
       let smokeKit = null;
+      let lastSmokeActionResult = null;
 
       function el(id) { return document.getElementById(id); }
       function q(params = {}) {
@@ -428,6 +434,74 @@
       function currentRecommendedWorkspace() {
         return currentSmokeSummary().recommendedWorkspace || null;
       }
+      function currentLastSmokeActionResult() {
+        return lastSmokeActionResult || null;
+      }
+      function currentLastSmokeFollowUp() {
+        return currentLastSmokeActionResult()?.followUp || null;
+      }
+      function renderSmokeCountTransition(label, beforeValue, afterValue) {
+        if (beforeValue === undefined && afterValue === undefined) {
+          return "";
+        }
+        return renderTag(
+          `${label}:${beforeValue ?? 0}->${afterValue ?? 0}`,
+          Number(afterValue ?? 0) > Number(beforeValue ?? 0)
+        );
+      }
+      function renderLastSmokeFollowUp(result = null) {
+        const followUp = result?.followUp;
+        const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
+        if (!actions.length) {
+          return "Run Launch Bootstrap, Run First Batch Setup, or Run Inventory Refill from this smoke workspace to keep the next follow-up visible here.";
+        }
+        const operationLabel = result?.operationLabel || followUp.operationLabel || followUp.operation || "launch";
+        const summary = followUp.summary || result?.message || "Review the next launch smoke follow-up actions.";
+        const before = result?.result?.before?.counts || {};
+        const after = result?.result?.after?.counts || {};
+        const created = result?.result?.created && typeof result.result.created === "object"
+          ? result.result.created
+          : {};
+        const createdBatchList = Array.isArray(result?.result?.createdBatches)
+          ? result.result.createdBatches
+          : (Array.isArray(created.cardBatches) ? created.cardBatches : []);
+        const transitions = [
+          renderSmokeCountTransition("policies", before.policies, after.policies),
+          renderSmokeCountTransition("freshCards", before.freshCards, after.freshCards),
+          renderSmokeCountTransition("accounts", before.accounts, after.accounts),
+          renderSmokeCountTransition("activeEntitlements", before.activeEntitlements, after.activeEntitlements)
+        ].filter(Boolean).join("");
+        const createdBits = [
+          created.policy?.name ? renderTag(`policy:${created.policy.name}`, true) : "",
+          created.cardBatch?.batchCode ? renderTag(`batch:${created.cardBatch.batchCode}`, true) : "",
+          createdBatchList.length ? createdBatchList.map((item) => renderTag(`batch:${item.batchCode || item.label || item.key || "-"}`, true)).join("") : "",
+          created.account?.username ? renderTag(`account:${created.account.username}`, true) : "",
+          created.entitlement?.username ? renderTag(`entitlement:${created.entitlement.username}`, true) : ""
+        ].filter(Boolean).join("");
+        return `
+          <div>
+            ${renderTag(`after:${operationLabel}`, true)}
+            ${followUp.primaryAction?.label ? renderTag(`next:${followUp.primaryAction.label}`, true) : ""}
+            ${result?.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
+            ${result?.channel ? renderTag(`channel:${result.channel}`, true) : ""}
+          </div>
+          <div class="hint" style="margin-top: 10px;">${esc(result?.message || "Last launch smoke action completed.")}</div>
+          <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
+          ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
+          ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
+          ${actions.map((item, index) => `
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(148,163,184,0.28);">
+              <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
+              ${(item.workspaceAction || item.recommendedDownload) ? `
+                <div class="actions" style="margin-top: 8px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-smoke-followup-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-smoke-followup-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                </div>
+              ` : ""}
+            </div>
+          `).join("")}
+        `;
+      }
       function syncRouteFields() {
         if (requestedProductCode) el("smoke-product-code").value = requestedProductCode;
         el("smoke-channel").value = requestedChannel;
@@ -477,6 +551,7 @@
         if (!smokeKit) {
           el("smoke-actions-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect the recommended workspace, action plan, and smoke downloads here.</div>';
           el("smoke-workspace-box").innerHTML = '<div class="hint">Generate a launch smoke kit to inspect the routed workspace path here.</div>';
+          el("smoke-followup-box").innerHTML = "Run Launch Bootstrap, Run First Batch Setup, or Run Inventory Refill from this smoke workspace to keep the next follow-up visible here.";
           el("smoke-summary").textContent = "Generate a launch smoke kit to inspect the smoke summary here.";
           el("smoke-startup-request").textContent = "Generate a launch smoke kit to inspect the startup request here.";
           el("smoke-meta-box").innerHTML = '<div class="hint">The smoke kit will summarize startup readiness, smoke paths, and candidate runtime follow-up here.</div>';
@@ -507,6 +582,8 @@
                 <div class="actions" style="margin-top: 8px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-smoke-action-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                   ${item.recommendedDownload ? `<button type="button" data-smoke-action-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                  ${item.bootstrapAction ? `<button type="button" class="secondary" data-smoke-action-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                  ${item.setupAction ? `<button type="button" class="secondary" data-smoke-action-setup-index="${index}">${esc(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -529,6 +606,7 @@
               </div>
             `).join("")
           : '<div class="hint">No routed workspace path is available yet.</div>';
+        el("smoke-followup-box").innerHTML = renderLastSmokeFollowUp(lastSmokeActionResult);
         el("smoke-meta-box").innerHTML = `
           <div>${renderTag(`project:${smokeKit.manifest?.project?.code || "-"}`, true)} ${renderTag(`channel:${smokeKit.manifest?.channel || "-"}`, true)} ${renderTag(`paths:${Array.isArray(summary.verificationPaths) ? summary.verificationPaths.length : 0}`)}</div>
           <div class="hint" style="margin-top:10px;">${esc(summary.title || "No smoke headline available.")}</div>
@@ -599,6 +677,15 @@
           channel: target.channel
         })}`);
         smokeKit = data;
+        if (
+          lastSmokeActionResult
+          && (
+            lastSmokeActionResult.productCode !== (data.manifest?.project?.code || target.productCode)
+            || lastSmokeActionResult.channel !== (data.manifest?.channel || target.channel)
+          )
+        ) {
+          lastSmokeActionResult = null;
+        }
         renderSmokeKit();
         renderRouteFocus();
         if (!options.autoFocus && requestedAutofocus) {
@@ -623,6 +710,81 @@
           fallbackFileName,
           label
         );
+      }
+      async function runLaunchSmokeBootstrap(action = null) {
+        const target = currentSmokeTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running Launch Bootstrap.");
+        }
+        const bootstrap = await api("/api/developer/license-quickstart/bootstrap", {
+          method: "POST",
+          body: { productCode: target.productCode }
+        });
+        const data = await generateLaunchSmoke();
+        lastSmokeActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation: "bootstrap",
+          operationLabel: action?.label || bootstrap?.followUp?.operationLabel || "Launch Bootstrap",
+          message: bootstrap?.message || `Launch Bootstrap completed for ${target.productCode}.`,
+          followUp: bootstrap?.followUp || null,
+          result: bootstrap
+        };
+        renderSmokeKit();
+        const entitlement = bootstrap?.created?.entitlement;
+        const entitlementNote = entitlement
+          ? ` Internal entitlement ${entitlement.username || entitlement.id} is now active through ${entitlement.endsAt || "-"}.`
+          : "";
+        const accountNote = bootstrap?.created?.account?.temporaryPassword
+          ? " Temporary starter account password is included in API Output for secure handoff."
+          : "";
+        const followUpNote = bootstrap?.followUp?.primaryAction?.label
+          ? ` Next: ${bootstrap.followUp.primaryAction.label}.`
+          : (bootstrap?.followUp?.summary ? ` ${bootstrap.followUp.summary}` : "");
+        setStatus((bootstrap?.message || `Launch Bootstrap completed for ${target.productCode}.`) + entitlementNote + accountNote + followUpNote);
+        setOutput({ launchSmokeBootstrap: bootstrap, launchSmokeKit: data });
+        return { launchSmokeBootstrap: bootstrap, launchSmokeKit: data };
+      }
+      async function runLaunchSmokeSetup(setupAction = null) {
+        const target = currentSmokeTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running First Batch Setup.");
+        }
+        const effectiveSetupAction = setupAction && typeof setupAction === "object" ? setupAction : null;
+        const requestedMode = effectiveSetupAction?.mode || "recommended";
+        const setupOperation = effectiveSetupAction?.operation || "first_batch_setup";
+        const setupEndpoint = setupOperation === "restock"
+          ? "/api/developer/license-quickstart/restock"
+          : "/api/developer/license-quickstart/first-batches";
+        const setup = await api(setupEndpoint, {
+          method: "POST",
+          body: {
+            productCode: target.productCode,
+            mode: requestedMode
+          }
+        });
+        const data = await generateLaunchSmoke();
+        lastSmokeActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation: setupOperation,
+          operationLabel: effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup"),
+          message: setup?.message || `${effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup")} completed for ${target.productCode}.`,
+          followUp: setup?.followUp || null,
+          result: setup
+        };
+        renderSmokeKit();
+        const createdLabels = Array.isArray(setup?.createdBatches)
+          ? setup.createdBatches.map((item) => item.batchCode || item.label || item.key).filter(Boolean)
+          : [];
+        const followUpNote = setup?.followUp?.primaryAction?.label
+          ? ` Next: ${setup.followUp.primaryAction.label}.`
+          : (setup?.followUp?.summary ? ` ${setup.followUp.summary}` : "");
+        setStatus((createdLabels.length
+          ? `${effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup")} created ${createdLabels.join(", ")} for ${target.productCode}.`
+          : (setup?.message || `${effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup")} completed for ${target.productCode}.`)) + followUpNote);
+        setOutput({ launchSmokeSetup: setup, launchSmokeKit: data });
+        return { launchSmokeSetup: setup, launchSmokeKit: data };
       }
       async function downloadSmokeRecommendedItem(item) {
         const target = currentSmokeTarget();
@@ -917,6 +1079,46 @@
         }
       });
       el("smoke-actions-box").addEventListener("click", async (event) => {
+        const bootstrapButton = event.target.closest("[data-smoke-action-bootstrap-index]");
+        if (bootstrapButton) {
+          try {
+            const index = Number(bootstrapButton.dataset.smokeActionBootstrapIndex);
+            const item = currentActionPlan()[index];
+            await runLaunchSmokeBootstrap(item?.bootstrapAction || null);
+            setOutput({
+              smokeActionBootstrap: {
+                key: item?.bootstrapAction?.key || null,
+                label: item?.bootstrapAction?.label || null
+              },
+              launchSmokeKit: smokeKit
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
+        const setupButton = event.target.closest("[data-smoke-action-setup-index]");
+        if (setupButton) {
+          try {
+            const index = Number(setupButton.dataset.smokeActionSetupIndex);
+            const item = currentActionPlan()[index];
+            await runLaunchSmokeSetup(item?.setupAction || null);
+            setOutput({
+              smokeActionSetup: {
+                key: item?.setupAction?.key || null,
+                label: item?.setupAction?.label || null,
+                mode: item?.setupAction?.mode || null,
+                operation: item?.setupAction?.operation || null
+              },
+              launchSmokeKit: smokeKit
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const workspaceButton = event.target.closest("[data-smoke-action-workspace-index]");
         if (workspaceButton) {
           try {
@@ -964,6 +1166,45 @@
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+        }
+      });
+      el("smoke-followup-box").addEventListener("click", async (event) => {
+        const followUpWorkspaceButton = event.target.closest("[data-smoke-followup-workspace-index]");
+        if (followUpWorkspaceButton) {
+          try {
+            const index = Number(followUpWorkspaceButton.dataset.smokeFollowupWorkspaceIndex);
+            const item = currentLastSmokeFollowUp()?.actions?.[index];
+            openWorkspaceAction(item?.workspaceAction, {
+              title: item?.label || "Launch smoke follow-up",
+              summary: item?.summary || ""
+            });
+            setOutput({
+              smokeFollowUpWorkspace: {
+                key: item?.workspaceAction?.key || null,
+                autofocus: item?.workspaceAction?.autofocus || null,
+                label: item?.workspaceAction?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const followUpDownloadButton = event.target.closest("[data-smoke-followup-download-index]");
+        if (followUpDownloadButton) {
+          try {
+            const index = Number(followUpDownloadButton.dataset.smokeFollowupDownloadIndex);
+            const item = currentLastSmokeFollowUp()?.actions?.[index];
+            const result = await downloadSmokeRecommendedItem(item?.recommendedDownload);
+            setOutput({
+              smokeFollowUpDownload: {
+                key: item?.recommendedDownload?.key || null,
+                fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
           }
         }
       });

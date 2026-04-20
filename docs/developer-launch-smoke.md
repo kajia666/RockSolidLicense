@@ -9,6 +9,8 @@ Use it when the software author or launch-duty teammate needs one place to:
 - inspect the staged startup bootstrap request
 - review which login or recharge smoke paths are actually ready
 - see candidate internal accounts, starter entitlements, and fresh launch-card keys
+- run `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` directly when the smoke lane is still missing starter assets
+- keep the latest smoke-action receipt and follow-up steps visible in the same workspace
 - jump into the next recommended workspace for runtime follow-up
 - download a smoke-validation handoff as `json / summary / checksums / zip`
 

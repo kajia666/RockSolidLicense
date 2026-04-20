@@ -7099,7 +7099,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       { reviewMode: "matched" }
     )
   ];
-
+  const bootstrapAction = authReadiness.bootstrapAction || null;
+  const setupAction = authReadiness.firstBatchSetupAction || null;
   const actionPlan = [
     {
       key: "startup_bootstrap_recheck",
@@ -7110,6 +7111,27 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", { reviewMode: "matched" })
     },
+    bootstrapAction ? {
+      key: "launch_smoke_bootstrap",
+      title: "Seed the missing launch smoke prerequisites",
+      priority: readyPaths.length ? "secondary" : "primary",
+      status: "review",
+      summary: authReadiness.bootstrapSummary || "Run Launch Bootstrap so the smoke lane has the starter policy, account, or internal entitlement it still needs.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "quickstart", "Open License Workspace"),
+      bootstrapAction
+    } : null,
+    setupAction ? {
+      key: setupAction.operation === "restock" ? "launch_smoke_inventory_refill" : "launch_smoke_first_batch_setup",
+      title: setupAction.operation === "restock" ? "Refill launch smoke inventory" : "Create launch smoke inventory",
+      priority: readyPaths.length || bootstrapAction ? "secondary" : "primary",
+      status: "review",
+      summary: authReadiness.firstBatchSetupSummary
+        || (setupAction.operation === "restock"
+          ? "Top the current launch card buffer back up before running internal smoke tests."
+          : "Create the recommended launch card inventory before running internal smoke tests."),
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
+      setupAction
+    } : null,
     readyPaths.length ? {
       key: "launch_smoke_execution",
       title: "Run the first internal smoke path",
@@ -7172,6 +7194,12 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
   const smokeSummary = payload.smokeSummary || {};
+  const formatWorkspaceActionText = (action = null) => {
+    if (!action || typeof action !== "object") {
+      return "-";
+    }
+    return `${action.label || action.key || "workspace"}${action.autofocus ? `@${action.autofocus}` : ""}`;
+  };
   const lines = [
     "RockSolid Developer Launch Smoke Kit",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -7237,7 +7265,9 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     lines.push("");
     lines.push("Launch Smoke Action Plan:");
     for (const item of smokeSummary.actionPlan) {
-      lines.push(`- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}`);
+      lines.push(
+        `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
+      );
     }
   }
 

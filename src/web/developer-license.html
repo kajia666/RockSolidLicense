@@ -588,9 +588,9 @@
             status: "recommended",
             target: "At least 1 internal active entitlement",
             current: `${activeEntitlementCount} active`,
-            summary: "Prepare one internal entitlement or a private demo account for smoke testing before launch.",
-            actionKey: "open-launch",
-            actionLabel: "Open Launch Workflow"
+            summary: "Run Launch Bootstrap to seed one internal entitlement for QA or support smoke testing before launch.",
+            actionKey: "run-bootstrap",
+            actionLabel: "Run Launch Bootstrap"
           });
         }
 
@@ -615,8 +615,8 @@
             prefix: `${prefix}DL`,
             purpose: "First-sale activations and QA smoke tests",
             nextAction: "Issue one fresh batch and reserve a few keys for QA before opening public sales.",
-            actionKey: "load-card-batch",
-            actionLabel: "Prepare Suggested Batch"
+            actionKey: "load-direct-card-batch",
+            actionLabel: "Prepare Direct-Card Batch"
           });
         }
         if (cardRechargeEnabled) {
@@ -630,7 +630,7 @@
             nextAction: cardLoginEnabled
               ? "Keep recharge stock separate from direct-login stock so renewals do not consume the initial sales batch."
               : "Issue one recharge-ready batch before the first renewal or top-up request arrives.",
-            actionKey: "load-card-batch",
+            actionKey: "load-recharge-card-batch",
             actionLabel: "Prepare Recharge Batch"
           });
         }
@@ -658,8 +658,8 @@
           label: "Verify first real sign-ins",
           timing: "T+0 to T+30m",
           summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine.",
-          actionKey: "open-launch",
-          actionLabel: "Open Launch Workflow"
+          actionKey: "open-ops-snapshot",
+          actionLabel: "Open Ops Snapshot"
         });
         if (cardLoginEnabled || cardRechargeEnabled) {
           items.push({
@@ -667,8 +667,8 @@
             label: "Watch first card redemptions",
             timing: "T+0 to T+2h",
             summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up.",
-            actionKey: "refresh-scope",
-            actionLabel: "Refresh Inventory"
+            actionKey: "open-ops-audit",
+            actionLabel: "Open Card Audit"
           });
         }
         if (featureConfig.allowVersionCheck !== false || featureConfig.allowNotices !== false) {
@@ -677,8 +677,8 @@
             label: "Watch notices and version gates",
             timing: "T+0 to T+2h",
             summary: "Confirm launch-day notices, maintenance copy, and version rules are not blocking healthy clients by mistake.",
-            actionKey: "open-launch",
-            actionLabel: "Open Launch Workflow"
+            actionKey: "open-release-versions",
+            actionLabel: "Open Release Workspace"
           });
         }
         items.push({
@@ -686,8 +686,8 @@
           label: "Review early sessions and device state",
           timing: "T+0 to T+4h",
           summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users.",
-          actionKey: "open-launch",
-          actionLabel: "Open Launch Workflow"
+          actionKey: "open-ops-sessions",
+          actionLabel: "Open Sessions Review"
         });
         return items;
       }
@@ -763,6 +763,7 @@
         const cardLoginEnabled = featureConfig.allowCardLogin !== false;
         const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
         const recommendedGrantType = recommendStarterGrantType(featureConfig, productPolicies);
+        const needsStarterEntitlement = accountLoginEnabled && !cardLoginEnabled && !cardRechargeEnabled && activeEntitlementCount <= 0;
         const inventoryRecommendations = buildQuickstartInventoryRecommendations({
           productCode,
           featureConfig,
@@ -864,7 +865,28 @@
           });
         }
 
-        if ((accountLoginEnabled || cardLoginEnabled) && bootstrapPlan.length) {
+        if (needsStarterEntitlement) {
+          status = status === "block" ? "block" : "review";
+          headline = status === "block"
+            ? headline
+            : "Launch still needs one internal entitlement for account-only smoke tests.";
+          bootstrapPlan.push("seed internal entitlement");
+          checks.push({
+            label: "Starter Entitlements",
+            tone: "danger",
+            detail: "Account-only launch is ready to sign in, but QA and support still need one internal entitlement to verify runtime gating."
+          });
+        } else if (accountLoginEnabled && !cardLoginEnabled && !cardRechargeEnabled) {
+          checks.push({
+            label: "Starter Entitlements",
+            tone: activeEntitlementCount > 0 ? "ok" : "",
+            detail: activeEntitlementCount > 0
+              ? `${activeEntitlementCount} internal entitlement(s) are already active for smoke tests.`
+              : "Internal starter entitlements are optional outside account-only launch lanes."
+          });
+        }
+
+        if ((accountLoginEnabled || cardLoginEnabled || cardRechargeEnabled) && bootstrapPlan.length) {
           actions.unshift({ key: "run-bootstrap", label: "Run Launch Bootstrap" });
         }
 
@@ -891,7 +913,7 @@
             ${tag(`channel:${requestedChannel}`, "ok")}
           </div>
           <div class="hint" style="margin-top:10px;">${esc(headline)}</div>
-          <div class="hint" style="margin-top:10px;">Current starter picture: policies=${esc(policyCount)} | freshCards=${esc(freshCardCount)} | accounts=${esc(accountCount)} | recommendedGrant=${esc(recommendedGrantType)}</div>
+          <div class="hint" style="margin-top:10px;">Current starter picture: policies=${esc(policyCount)} | freshCards=${esc(freshCardCount)} | accounts=${esc(accountCount)} | activeEntitlements=${esc(activeEntitlementCount)} | recommendedGrant=${esc(recommendedGrantType)}</div>
           <div class="hint" style="margin-top:6px;">Bootstrap plan: ${esc(bootstrapPlan.length ? bootstrapPlan.join(" -> ") : "Nothing pending.")}</div>
           <div style="margin-top:12px;">${checks.map((item) => tag(`${item.label}: ${item.detail}`, item.tone)).join("")}</div>
           ${renderQuickstartActionButtons(actions)}
@@ -1220,6 +1242,37 @@
         });
       }
 
+      function openRoutedReleaseWorkspace(autofocus = "versions", routeReason = "") {
+        const target = currentLicenseTarget();
+        if (!target.productCode) {
+          throw new Error("Route or filter a project before opening the release workspace.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/releases", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus,
+          routeTitle: requestedRouteTitle || currentLicenseRouteFocus().title || "License workspace handoff",
+          routeReason: routeReason || requestedRouteReason || `Review the release lane for ${target.productCode} after adjusting launch authorization.`
+        });
+      }
+
+      function openRoutedOpsWorkspace(autofocus = "snapshot", params = {}, routeReason = "") {
+        const target = currentLicenseTarget();
+        if (!target.productCode) {
+          throw new Error("Route or filter a project before opening developer ops.");
+        }
+        window.location.href = buildWorkspaceUrl("/developer/ops", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus,
+          routeTitle: requestedRouteTitle || currentLicenseRouteFocus().title || "License workspace handoff",
+          routeReason: routeReason || requestedRouteReason || `Review launch-day runtime signals for ${target.productCode}.`,
+          ...params
+        });
+      }
+
       function openProjectAuthorizationPreset() {
         const target = currentLicenseTarget();
         if (!target.productCode) {
@@ -1267,23 +1320,27 @@
         el("create-policy-btn").scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
-      function fillStarterBatchTemplate() {
+      function fillStarterBatchTemplate(options = {}) {
         const { productCode, product, productPolicies } = currentLaunchQuickstartContext();
         if (!productCode) {
           throw new Error("Choose a project before preparing a starter card batch.");
         }
-        const preferredGrantType = recommendStarterGrantType(product?.featureConfig || {}, productPolicies);
+        const preferredGrantType = options.grantType || recommendStarterGrantType(product?.featureConfig || {}, productPolicies);
         const preferredPolicy = productPolicies.find((item) => item.status === "active" && item.grantType === preferredGrantType)
           || productPolicies.find((item) => item.status === "active")
           || productPolicies[0];
+        const count = Number(options.count ?? 50);
+        const prefix = String(options.prefix || starterBatchPrefix(productCode)).trim();
+        const noteLabel = String(options.noteLabel || "Launch starter batch").trim();
+        const statusLabel = String(options.statusLabel || "starter card batch").trim();
         el("batch-product-code").value = productCode;
         el("batch-policy-id").value = preferredPolicy?.id || "";
-        el("batch-count").value = "50";
-        el("batch-prefix").value = starterBatchPrefix(productCode);
-        el("batch-notes").value = `Launch starter batch | ${currentAuthorizationDescription(product?.featureConfig || {}).summary}`;
+        el("batch-count").value = String(Number.isFinite(count) && count > 0 ? count : 50);
+        el("batch-prefix").value = prefix || starterBatchPrefix(productCode);
+        el("batch-notes").value = `${noteLabel} | ${currentAuthorizationDescription(product?.featureConfig || {}).summary}`;
         setStatus(preferredPolicy
-          ? `Prepared a starter card batch for ${productCode} using policy ${preferredPolicy.name}.`
-          : `Prepared a starter card batch for ${productCode}. Create a starter policy first if policy ID is still empty.`
+          ? `Prepared the ${statusLabel} for ${productCode} using policy ${preferredPolicy.name}.`
+          : `Prepared the ${statusLabel} for ${productCode}. Create a starter policy first if policy ID is still empty.`
         );
         el("create-batch-btn").scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -1318,7 +1375,11 @@
           el("account-seed-note").textContent = `Starter account created for ${productCode}. The temporary password is shown in this form and in API Output. Hand it off securely before replacing it.`;
         }
         await refresh();
-        setStatus(data?.message || `Launch quickstart bootstrap completed for ${productCode}.`);
+        const createdEntitlement = data?.created?.entitlement;
+        const entitlementNote = createdEntitlement
+          ? ` Internal entitlement ${createdEntitlement.username || createdEntitlement.id} is now active through ${createdEntitlement.endsAt || "-"}.`
+          : "";
+        setStatus((data?.message || `Launch quickstart bootstrap completed for ${productCode}.`) + entitlementNote);
         setOutput(data);
       }
 
@@ -1590,6 +1651,31 @@
           }
           if (actionKey === "open-launch") {
             openRoutedLaunchWorkspace();
+            return;
+          }
+          if (actionKey === "open-release-versions") {
+            openRoutedReleaseWorkspace("versions", `Review version rules and notices for ${currentRouteProductCode() || "the current project"} during launch follow-up.`);
+            return;
+          }
+          if (actionKey === "open-ops-snapshot") {
+            openRoutedOpsWorkspace("snapshot", {
+              eventType: "session.login",
+              actorType: "account"
+            }, `Review first successful sign-ins and heartbeat smoke tests for ${currentRouteProductCode() || "the current project"}.`);
+            return;
+          }
+          if (actionKey === "open-ops-audit") {
+            openRoutedOpsWorkspace("audit", {
+              entityType: "license_key"
+            }, `Review card redemption and recharge signals for ${currentRouteProductCode() || "the current project"}.`);
+            return;
+          }
+          if (actionKey === "open-ops-sessions") {
+            openRoutedOpsWorkspace("sessions", {
+              eventType: "session.login",
+              actorType: "account"
+            }, `Review early launch sessions and device state for ${currentRouteProductCode() || "the current project"}.`);
+            return;
           }
         } catch (error) {
           setStatus(error.message, true);
@@ -1615,6 +1701,30 @@
             fillStarterBatchTemplate();
             return;
           }
+          if (actionKey === "load-direct-card-batch") {
+            const { productCode } = currentLaunchQuickstartContext();
+            fillStarterBatchTemplate({
+              count: 50,
+              prefix: `${starterBatchPrefix(productCode)}DL`,
+              noteLabel: "Direct-card launch batch",
+              statusLabel: "direct-card launch batch"
+            });
+            return;
+          }
+          if (actionKey === "load-recharge-card-batch") {
+            const { productCode, product, productPolicies } = currentLaunchQuickstartContext();
+            const featureConfig = product?.featureConfig || {};
+            const grantType = recommendStarterGrantType(featureConfig, productPolicies);
+            const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+            fillStarterBatchTemplate({
+              count: cardLoginEnabled ? 100 : 50,
+              prefix: `${starterBatchPrefix(productCode)}RC`,
+              grantType: grantType === "points" ? "points" : grantType,
+              noteLabel: "Recharge starter batch",
+              statusLabel: "recharge starter batch"
+            });
+            return;
+          }
           if (actionKey === "load-starter-account") {
             fillStarterAccountTemplate();
             return;
@@ -1634,6 +1744,31 @@
           }
           if (actionKey === "open-launch") {
             openRoutedLaunchWorkspace();
+            return;
+          }
+          if (actionKey === "open-release-versions") {
+            openRoutedReleaseWorkspace("versions", `Review version rules and notices for ${currentRouteProductCode() || "the current project"} during launch follow-up.`);
+            return;
+          }
+          if (actionKey === "open-ops-snapshot") {
+            openRoutedOpsWorkspace("snapshot", {
+              eventType: "session.login",
+              actorType: "account"
+            }, `Review first successful sign-ins and heartbeat smoke tests for ${currentRouteProductCode() || "the current project"}.`);
+            return;
+          }
+          if (actionKey === "open-ops-audit") {
+            openRoutedOpsWorkspace("audit", {
+              entityType: "license_key"
+            }, `Review card redemption and recharge signals for ${currentRouteProductCode() || "the current project"}.`);
+            return;
+          }
+          if (actionKey === "open-ops-sessions") {
+            openRoutedOpsWorkspace("sessions", {
+              eventType: "session.login",
+              actorType: "account"
+            }, `Review early launch sessions and device state for ${currentRouteProductCode() || "the current project"}.`);
+            return;
           }
         } catch (error) {
           setStatus(error.message, true);

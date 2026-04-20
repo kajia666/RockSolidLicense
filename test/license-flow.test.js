@@ -10507,7 +10507,16 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /fillStarterBatchTemplate/);
     assert.match(html, /runLaunchQuickstartBootstrap/);
     assert.match(html, /run-bootstrap/);
+    assert.match(html, /load-direct-card-batch/);
+    assert.match(html, /load-recharge-card-batch/);
+    assert.match(html, /open-ops-snapshot/);
+    assert.match(html, /open-ops-audit/);
+    assert.match(html, /open-ops-sessions/);
+    assert.match(html, /open-release-versions/);
+    assert.match(html, /\/developer\/ops/);
+    assert.match(html, /\/developer\/releases/);
     assert.match(html, /Bootstrap plan:/);
+    assert.match(html, /activeEntitlements=/);
     assert.match(html, /Initial Inventory Recommendations/);
     assert.match(html, /First Batch Card Suggestions/);
     assert.match(html, /First Ops Actions/);

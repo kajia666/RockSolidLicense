@@ -49,9 +49,9 @@ That helps a software author answer three practical launch questions in one plac
 Those recommendation rows can now also carry direct actions. So instead of only reading the suggestion, a software author can immediately:
 
 - open the project authorization preset
-- prefill a starter policy or starter card batch
+- prefill a starter policy or a recommendation-specific first batch card draft
 - prefill a starter account
-- jump back into launch workflow
+- jump straight into launch workflow, release workspace, or developer ops for the matching first-launch follow-up
 - run `Launch Bootstrap`
 
 ## Scope

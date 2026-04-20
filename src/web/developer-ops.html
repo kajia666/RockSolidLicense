@@ -287,6 +287,11 @@
           "prepare-primary",
           "review-primary",
           "download-primary",
+          "download-accounts",
+          "download-entitlements",
+          "download-sessions",
+          "download-devices",
+          "download-audit",
           "review-accounts",
           "review-entitlements",
           "review-sessions",
@@ -308,6 +313,21 @@
         }
         if (normalized === "download-primary") {
           return "Download Primary Match Summary";
+        }
+        if (normalized === "download-accounts") {
+          return "Download Accounts Summary";
+        }
+        if (normalized === "download-entitlements") {
+          return "Download Entitlements Summary";
+        }
+        if (normalized === "download-sessions") {
+          return "Download Sessions Summary";
+        }
+        if (normalized === "download-devices") {
+          return "Download Devices Summary";
+        }
+        if (normalized === "download-audit") {
+          return "Download Audit Summary";
         }
         if (normalized === "review-accounts") {
           return "Review Accounts";
@@ -1058,6 +1078,98 @@
         return descriptor;
       }
 
+      function routeReviewSectionPrimaryItem(review = collectRouteReview(), section = "") {
+        const normalized = String(section || "").trim().toLowerCase();
+        if (normalized === "accounts") {
+          return Array.isArray(review?.matchedAccounts) && review.matchedAccounts.length ? review.matchedAccounts[0] : null;
+        }
+        if (normalized === "entitlements") {
+          return Array.isArray(review?.matchedEntitlements) && review.matchedEntitlements.length ? review.matchedEntitlements[0] : null;
+        }
+        if (normalized === "sessions") {
+          return Array.isArray(review?.matchedSessions) && review.matchedSessions.length ? review.matchedSessions[0] : null;
+        }
+        if (normalized === "devices") {
+          return Array.isArray(review?.matchedDevices) && review.matchedDevices.length ? review.matchedDevices[0] : null;
+        }
+        if (normalized === "audit") {
+          return Array.isArray(review?.matchedAuditLogs) && review.matchedAuditLogs.length ? review.matchedAuditLogs[0] : null;
+        }
+        return null;
+      }
+
+      function buildRouteReviewSectionDownloadDescriptor(section = "", review = collectRouteReview()) {
+        const normalized = String(section || "").trim().toLowerCase();
+        if (!normalized) {
+          return null;
+        }
+        const baseFilters = filters();
+        const target = currentOpsTarget();
+        const item = routeReviewSectionPrimaryItem(review, normalized) || {};
+        const descriptor = {
+          label: "Routed section summary",
+          fileName: "developer-ops-routed-summary.txt",
+          params: {
+            productCode: item.productCode || item.projectCode || baseFilters.productCode || target.productCode || requestedProductCode || "",
+            username: item.username || baseFilters.username || "",
+            search: "",
+            eventType: "",
+            actorType: "",
+            entityType: "",
+            limit: baseFilters.limit || 60
+          }
+        };
+        if (normalized === "accounts") {
+          descriptor.label = "Accounts summary";
+          descriptor.fileName = "developer-ops-accounts-summary.txt";
+        } else if (normalized === "entitlements") {
+          descriptor.label = "Entitlements summary";
+          descriptor.fileName = "developer-ops-entitlements-summary.txt";
+          descriptor.params.entityType = "entitlement";
+        } else if (normalized === "sessions") {
+          descriptor.label = "Sessions summary";
+          descriptor.fileName = "developer-ops-sessions-summary.txt";
+          descriptor.params.search = item.sessionId || item.id || item.fingerprint || "";
+          descriptor.params.entityType = "session";
+          if (String(baseFilters.eventType || "").trim()) {
+            descriptor.params.eventType = baseFilters.eventType;
+          }
+        } else if (normalized === "devices") {
+          descriptor.label = "Devices summary";
+          descriptor.fileName = "developer-ops-devices-summary.txt";
+          descriptor.params.search = item.fingerprint || "";
+          descriptor.params.entityType = item.kind === "block" || item.blockId ? "device_block" : "device_binding";
+        } else if (normalized === "audit") {
+          descriptor.label = "Audit summary";
+          descriptor.fileName = "developer-ops-audit-summary.txt";
+          descriptor.params.eventType = item.eventType || baseFilters.eventType || "";
+          descriptor.params.actorType = item.actorType || baseFilters.actorType || "";
+          descriptor.params.entityType = item.entityType || baseFilters.entityType || "";
+          descriptor.params.username = baseFilters.username || "";
+        } else {
+          return null;
+        }
+        if (!descriptor.params.productCode) {
+          delete descriptor.params.productCode;
+        }
+        if (!descriptor.params.username) {
+          delete descriptor.params.username;
+        }
+        if (!descriptor.params.search) {
+          delete descriptor.params.search;
+        }
+        if (!descriptor.params.eventType) {
+          delete descriptor.params.eventType;
+        }
+        if (!descriptor.params.actorType) {
+          delete descriptor.params.actorType;
+        }
+        if (!descriptor.params.entityType) {
+          delete descriptor.params.entityType;
+        }
+        return descriptor;
+      }
+
       function buildPrimaryRouteReviewFocus(review = collectRouteReview(), preferredSection = "") {
         const directFocus = buildRequestedRouteFocus();
         if (directFocus?.kind) {
@@ -1398,10 +1510,16 @@
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-primary">Review Primary Match</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-primary" ${token ? "" : "disabled"}>Download Primary Match Summary</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
+          review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="download-accounts" ${token ? "" : "disabled"}>Download Accounts Summary</button>` : "",
           review.matchedEntitlements.length ? `<button type="button" class="secondary" data-route-review-action="review-entitlements">Review Entitlements</button>` : "",
+          review.matchedEntitlements.length ? `<button type="button" class="secondary" data-route-review-action="download-entitlements" ${token ? "" : "disabled"}>Download Entitlements Summary</button>` : "",
           review.matchedSessions.length ? `<button type="button" class="secondary" data-route-review-action="review-sessions">Review Sessions</button>` : "",
+          review.matchedSessions.length ? `<button type="button" class="secondary" data-route-review-action="download-sessions" ${token ? "" : "disabled"}>Download Sessions Summary</button>` : "",
           review.matchedDevices.length ? `<button type="button" class="secondary" data-route-review-action="review-devices">Review Devices</button>` : "",
+          review.matchedDevices.length ? `<button type="button" class="secondary" data-route-review-action="download-devices" ${token ? "" : "disabled"}>Download Devices Summary</button>` : "",
           review.matchedAuditLogs.length ? `<button type="button" class="secondary" data-route-review-action="review-audit">Review Audit</button>` : ""
+          ,
+          review.matchedAuditLogs.length ? `<button type="button" class="secondary" data-route-review-action="download-audit" ${token ? "" : "disabled"}>Download Audit Summary</button>` : ""
         ].filter(Boolean).join("");
         box.innerHTML = `
           <div><strong>Route Review</strong> ${target.productCode ? renderTag(`project:${target.productCode}`, true) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
@@ -1510,6 +1628,15 @@
           const descriptor = buildRouteReviewPrimaryDownloadDescriptor();
           if (!descriptor) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
+          }
+          await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
+          return;
+        }
+        if (normalizedAction.startsWith("download-")) {
+          const section = normalizedAction.replace("download-", "");
+          const descriptor = buildRouteReviewSectionDownloadDescriptor(section);
+          if (!descriptor) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: `No routed ${section} matches are available yet.` };
           }
           await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
           return;

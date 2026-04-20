@@ -181,3 +181,13 @@ That same `Route Review` block can now also promote the current `Primary Match` 
 - `Download Primary Match Summary`
 
 So when the routed lane already has a clear first account / entitlement / session / device to inspect, the software author can immediately continue review or export a tighter scoped summary around that object instead of reopening the broad routed export first.
+
+That same block can now also export section-level summaries directly:
+
+- `Download Accounts Summary`
+- `Download Entitlements Summary`
+- `Download Sessions Summary`
+- `Download Devices Summary`
+- `Download Audit Summary`
+
+So when the routed lane already tells the author which slice matters most, `/developer/ops` can hand off a narrower summary for that slice without first asking the author to rebuild the same scoped filters manually.

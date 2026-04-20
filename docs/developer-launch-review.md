@@ -57,6 +57,8 @@ Those same target links now also carry a routed review action such as `Review Ac
 
 Once the author lands in `/developer/ops`, that routed review can now also surface the current `Primary Match` as a direct follow-up object. That means the next step is no longer limited to "open ops and look around": the author can immediately `Review Primary Match` or download a `Primary Match Summary` centered on the first routed account / entitlement / session / device that deserves attention.
 
+The same handoff now also supports section-level ops exports once the author lands in `/developer/ops`, so a launch-review follow-up can quickly narrow into `Accounts / Entitlements / Sessions / Devices / Audit` and export the exact slice that needs review or handoff.
+
 ## Scoped APIs
 
 - `GET /api/developer/launch-review`

@@ -1532,8 +1532,15 @@
           throw new Error("Enter a project code before running First Batch Setup.");
         }
         const setupAction = currentLaunchFirstBatchSetupAction();
-        const requestedMode = mode || setupAction?.mode || "recommended";
-        const setup = await api("/api/developer/license-quickstart/first-batches", {
+        const requestedMode = typeof mode === "string" && mode
+          ? mode
+          : (mode && typeof mode === "object" ? mode.mode : null) || setupAction?.mode || "recommended";
+        const effectiveSetupAction = mode && typeof mode === "object" ? mode : setupAction;
+        const setupOperation = effectiveSetupAction?.operation || "first_batch_setup";
+        const setupEndpoint = setupOperation === "restock"
+          ? "/api/developer/license-quickstart/restock"
+          : "/api/developer/license-quickstart/first-batches";
+        const setup = await api(setupEndpoint, {
           method: "POST",
           body: {
             productCode: target.productCode,
@@ -1541,9 +1548,10 @@
           }
         });
         const data = await generateReleasePackage();
-        setStatus(`${setup?.message || `First Batch Setup completed for ${target.productCode}.`} Launch workflow reloaded.`);
-        setOutput({ firstBatchSetup: setup, launchWorkflow: data });
-        return { firstBatchSetup: setup, launchWorkflow: data };
+        const setupLabel = effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup");
+        setStatus(`${setup?.message || `${setupLabel} completed for ${target.productCode}.`} Launch workflow reloaded.`);
+        setOutput({ firstBatchSetup: setup, cardInventorySetup: setup, launchWorkflow: data });
+        return { firstBatchSetup: setup, cardInventorySetup: setup, launchWorkflow: data };
       }
 
       async function hydrateLaunchAutofocus() {
@@ -1755,7 +1763,7 @@
               const groupKey = recommendationSetupButton.dataset.recommendationSetupGroup || "";
               const index = Number(recommendationSetupButton.dataset.recommendationSetupIndex);
               const item = currentAuthorizationRecommendationItems(groupKey)[index];
-              await runLaunchFirstBatchSetup(item?.setupAction?.mode || "recommended");
+              await runLaunchFirstBatchSetup(item?.setupAction || item?.setupAction?.mode || "recommended");
               setOutput({
                 recommendationSetup: {
                   group: groupKey,
@@ -1836,7 +1844,7 @@
             try {
               const index = Number(actionPlanSetupButton.dataset.actionPlanSetupIndex);
               const item = currentActionPlan()[index];
-              await runLaunchFirstBatchSetup(item?.setupAction?.mode || "recommended");
+              await runLaunchFirstBatchSetup(item?.setupAction || item?.setupAction?.mode || "recommended");
               setOutput({
                 actionPlanSetup: {
                   key: item?.setupAction?.key || null,
@@ -1888,7 +1896,7 @@
             try {
               const index = Number(setupButton.dataset.checklistSetupIndex);
               const item = currentChecklistItems()[index];
-              await runLaunchFirstBatchSetup(item?.setupAction?.mode || "recommended");
+              await runLaunchFirstBatchSetup(item?.setupAction || item?.setupAction?.mode || "recommended");
               setOutput({
                 checklistSetup: {
                   key: item?.setupAction?.key || null,

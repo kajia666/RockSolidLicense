@@ -34,6 +34,8 @@ The same quickstart block can now also run a one-click `Launch Bootstrap`. When 
 
 For account-only lanes that do not use direct-card login or recharge, the same bootstrap can now also seed one internal starter entitlement automatically. It does that by staging a private one-card seed batch and redeeming it into the starter account, so QA or support can exercise the real runtime gating path before the first customer arrives.
 
+When the first recommended card batches already exist but the fresh inventory falls below the launch buffer, the same quickstart block now exposes `Run Inventory Refill`, `Refill Direct-Card Batch`, or `Refill Recharge Batch`. Those actions top the matching launch prefixes back up toward their recommended starter counts instead of rerunning the full first-batch flow.
+
 The same quickstart block now also turns launch advice into three concrete groups instead of only showing generic blockers:
 
 - `Initial Inventory Recommendations`

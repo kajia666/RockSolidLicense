@@ -1132,6 +1132,15 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/developer/license-quickstart/restock") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerRestockLicenseQuickstartBatches(getBearerToken(req), body)
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/integration") {
         const data = await services.developerIntegration(getBearerToken(req));
         if (data?.transport?.http) {

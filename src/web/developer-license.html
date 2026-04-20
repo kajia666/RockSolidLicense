@@ -605,7 +605,8 @@
       function buildQuickstartCardBatchRecommendations({
         productCode = "",
         featureConfig = {},
-        recommendedGrantType = "duration"
+        recommendedGrantType = "duration",
+        productCards = []
       } = {}) {
         const cardLoginEnabled = featureConfig.allowCardLogin !== false;
         const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
@@ -643,7 +644,38 @@
             secondaryActionLabel: "Review Template"
           });
         }
-        return items;
+        return items.map((item) => {
+          const freshCount = (Array.isArray(productCards) ? productCards : []).filter((card) => {
+            const batchCode = String(card?.batchCode || "").trim().toUpperCase();
+            const cardKey = String(card?.cardKey || card?.maskedKey || "").trim().toUpperCase();
+            const status = String(card?.status || "active").trim().toLowerCase();
+            const prefixCode = String(item.prefix || "").trim().toUpperCase();
+            return status === "active"
+              && isFreshCardStatus(card?.usageStatus ?? card?.displayStatus)
+              && (batchCode.startsWith(prefixCode) || cardKey.startsWith(prefixCode));
+          }).length;
+          const targetCount = Number(item.count ?? 0);
+          const refillThreshold = Math.max(5, Math.ceil(targetCount * 0.4));
+          const inventoryStatus = freshCount <= 0
+            ? "missing"
+            : freshCount < refillThreshold
+              ? "low"
+              : "ready";
+          return {
+            ...item,
+            currentFresh: freshCount,
+            targetCount,
+            refillThreshold,
+            inventoryStatus,
+            refillCount: inventoryStatus === "low" ? Math.max(1, targetCount - freshCount) : 0,
+            actionKey: inventoryStatus === "low"
+              ? (item.key === "direct_card_batch" ? "run-refill-direct-card" : "run-refill-recharge")
+              : item.actionKey,
+            actionLabel: inventoryStatus === "low"
+              ? (item.key === "direct_card_batch" ? "Refill Direct-Card Batch" : "Refill Recharge Batch")
+              : item.actionLabel
+          };
+        });
       }
 
       function buildQuickstartOpsActions(featureConfig = {}) {
@@ -706,7 +738,7 @@
       }
 
       function formatQuickstartCardRecommendation(item = {}) {
-        return `${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`;
+        return `${item.label || item.key || "batch"} | target=${item.targetCount ?? item.count ?? 0} | current=${item.currentFresh ?? 0} | status=${String(item.inventoryStatus || "ready").toUpperCase()} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`;
       }
 
       function formatQuickstartOpsAction(item = {}) {
@@ -785,17 +817,11 @@
         const firstBatchCardRecommendations = buildQuickstartCardBatchRecommendations({
           productCode,
           featureConfig,
-          recommendedGrantType
+          recommendedGrantType,
+          productCards
         });
-        const missingFirstBatchRecommendations = firstBatchCardRecommendations.filter((item) =>
-          !productCards.some((card) => {
-            const batchCode = String(card?.batchCode || "").trim().toUpperCase();
-            const status = String(card?.status || "active").trim().toLowerCase();
-            return batchCode.startsWith(String(item.prefix || "").trim().toUpperCase())
-              && status === "active"
-              && isFreshCardStatus(card?.usageStatus ?? card?.displayStatus);
-          })
-        );
+        const missingFirstBatchRecommendations = firstBatchCardRecommendations.filter((item) => item.inventoryStatus === "missing");
+        const lowInventoryRecommendations = firstBatchCardRecommendations.filter((item) => item.inventoryStatus === "low");
         const firstOpsActions = buildQuickstartOpsActions(featureConfig);
         const bootstrapPlan = [];
         const checks = [];
@@ -838,16 +864,28 @@
           });
         }
 
-        if ((cardLoginEnabled || cardRechargeEnabled) && freshCardCount <= 0) {
+        if ((cardLoginEnabled || cardRechargeEnabled) && missingFirstBatchRecommendations.length) {
           status = "block";
           headline = "Launch still needs fresh card inventory for the configured login or recharge path.";
           bootstrapPlan.push("issue starter card batch");
           checks.push({
             label: "Fresh Cards",
             tone: "danger",
-            detail: "No fresh cards are available for direct-card login or recharge."
+            detail: missingFirstBatchRecommendations.length > 1
+              ? `Missing launch inventory for ${missingFirstBatchRecommendations.map((item) => item.label).join(" + ")}.`
+              : `Missing launch inventory for ${missingFirstBatchRecommendations[0]?.label || "the current launch mode"}.`
           });
           actions.unshift({ key: "load-card-batch", label: "Prepare Starter Card Batch" });
+        } else if ((cardLoginEnabled || cardRechargeEnabled) && lowInventoryRecommendations.length) {
+          status = status === "block" ? "block" : "review";
+          headline = status === "block"
+            ? headline
+            : "Starter card inventory is live, but the launch buffer is running low.";
+          checks.push({
+            label: "Fresh Cards",
+            tone: "danger",
+            detail: `${lowInventoryRecommendations.map((item) => `${item.label} ${item.currentFresh}/${item.targetCount}`).join(" + ")}.`
+          });
         } else {
           checks.push({
             label: "Fresh Cards",
@@ -917,6 +955,15 @@
           });
         }
 
+        if (lowInventoryRecommendations.length) {
+          actions.unshift({
+            key: "run-inventory-refill",
+            label: lowInventoryRecommendations.length > 1
+              ? "Run Inventory Refill"
+              : `Refill ${lowInventoryRecommendations[0].label}`
+          });
+        }
+
         if (status === "ready") {
           checks.push({
             label: "Launch Mode",
@@ -943,6 +990,7 @@
           <div class="hint" style="margin-top:10px;">Current starter picture: policies=${esc(policyCount)} | freshCards=${esc(freshCardCount)} | accounts=${esc(accountCount)} | activeEntitlements=${esc(activeEntitlementCount)} | recommendedGrant=${esc(recommendedGrantType)}</div>
           <div class="hint" style="margin-top:6px;">Bootstrap plan: ${esc(bootstrapPlan.length ? bootstrapPlan.join(" -> ") : "Nothing pending.")}</div>
           <div class="hint" style="margin-top:6px;">Recommended first-batch gaps: ${esc(missingFirstBatchRecommendations.length ? missingFirstBatchRecommendations.map((item) => item.label).join(" + ") : "None.")}</div>
+          <div class="hint" style="margin-top:6px;">Low inventory warnings: ${esc(lowInventoryRecommendations.length ? lowInventoryRecommendations.map((item) => `${item.label} ${item.currentFresh}/${item.targetCount}`).join(" + ") : "None.")}</div>
           <div style="margin-top:12px;">${checks.map((item) => tag(`${item.label}: ${item.detail}`, item.tone)).join("")}</div>
           ${renderQuickstartActionButtons(actions)}
           ${renderQuickstartRecommendationList("Initial Inventory Recommendations", inventoryRecommendations, formatQuickstartInventoryRecommendation)}
@@ -1406,6 +1454,25 @@
         setOutput(data);
       }
 
+      async function runLaunchInventoryRefill(mode = "recommended") {
+        const { productCode } = currentLaunchQuickstartContext();
+        if (!productCode) {
+          throw new Error("Choose a project before running inventory refill.");
+        }
+        const data = await api("/api/developer/license-quickstart/restock", {
+          method: "POST",
+          body: { productCode, mode }
+        });
+        await refresh();
+        const createdLabels = Array.isArray(data?.createdBatches)
+          ? data.createdBatches.map((item) => item.batchCode).filter(Boolean)
+          : [];
+        setStatus(createdLabels.length
+          ? `Inventory refill created ${createdLabels.join(", ")} for ${productCode}.`
+          : (data?.message || `Inventory refill finished for ${productCode}.`));
+        setOutput(data);
+      }
+
       async function runLaunchQuickstartBootstrap() {
         const { productCode } = currentLaunchQuickstartContext();
         if (!productCode) {
@@ -1752,12 +1819,24 @@
             await runLaunchFirstBatchSetup("recommended");
             return;
           }
+          if (actionKey === "run-inventory-refill") {
+            await runLaunchInventoryRefill("recommended");
+            return;
+          }
           if (actionKey === "run-direct-card-setup") {
             await runLaunchFirstBatchSetup("direct_card");
             return;
           }
+          if (actionKey === "run-refill-direct-card") {
+            await runLaunchInventoryRefill("direct_card");
+            return;
+          }
           if (actionKey === "run-recharge-card-setup") {
             await runLaunchFirstBatchSetup("recharge");
+            return;
+          }
+          if (actionKey === "run-refill-recharge") {
+            await runLaunchInventoryRefill("recharge");
             return;
           }
           if (actionKey === "load-direct-card-batch") {

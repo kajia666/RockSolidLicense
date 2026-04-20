@@ -2767,7 +2767,8 @@ function createLaunchWorkflowSetupAction({
   key = "launch_first_batch_setup",
   label = "Run First Batch Setup",
   summary = "",
-  mode = "recommended"
+  mode = "recommended",
+  operation = "first_batch_setup"
 } = {}) {
   if (!key) {
     return null;
@@ -2776,7 +2777,8 @@ function createLaunchWorkflowSetupAction({
     key,
     label: label || "Run First Batch Setup",
     summary: summary || "",
-    mode: mode || "recommended"
+    mode: mode || "recommended",
+    operation: operation || "first_batch_setup"
   };
 }
 
@@ -2845,10 +2847,16 @@ function buildLaunchWorkflowAuthorizationReadiness({
       policies: policyCount,
       cardsFresh: freshCardCount,
       accounts: accountCount,
-      activeEntitlements: activeEntitlementCount
+      activeEntitlements: activeEntitlementCount,
+      cards: Array.isArray(metrics.cards) ? metrics.cards : []
     },
     policies
   });
+  const cardInventoryStates = Array.isArray(launchRecommendations.cardInventoryStates)
+    ? launchRecommendations.cardInventoryStates
+    : [];
+  const missingCardInventoryStates = cardInventoryStates.filter((item) => item.inventoryStatus === "missing");
+  const lowCardInventoryStates = cardInventoryStates.filter((item) => item.inventoryStatus === "low");
   const issues = [];
   const nextActions = [];
   const bootstrapPlan = [];
@@ -2907,7 +2915,18 @@ function buildLaunchWorkflowAuthorizationReadiness({
     );
   }
 
-  if (cardLoginEnabled && freshCardCount <= 0) {
+  const missingDirectCardInventory = cardLoginEnabled && (
+    cardInventoryStates.length
+      ? missingCardInventoryStates.some((item) => item.mode === "direct_card")
+      : freshCardCount <= 0
+  );
+  const missingRechargeInventory = cardRechargeEnabled && (
+    cardInventoryStates.length
+      ? missingCardInventoryStates.some((item) => item.mode === "recharge")
+      : freshCardCount <= 0
+  );
+
+  if (missingDirectCardInventory) {
     if (!bootstrapPlan.includes("starter card batch")) {
       bootstrapPlan.push("starter card batch");
     }
@@ -2923,7 +2942,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
     );
   }
 
-  if (cardRechargeEnabled && freshCardCount <= 0) {
+  if (missingRechargeInventory) {
     if (!bootstrapPlan.includes("starter card batch")) {
       bootstrapPlan.push("starter card batch");
     }
@@ -2931,6 +2950,19 @@ function buildLaunchWorkflowAuthorizationReadiness({
       accountPathReady || cardPathReady ? "review" : "block",
       "Card recharge is enabled, but there are no fresh cards ready for top-up or renewal workflows.",
       "Issue a recharge-ready card batch before opening account recharge or renewal.",
+      {
+        key: "licenses",
+        autofocus: "cards",
+        label: "Open License Workspace"
+      }
+    );
+  }
+
+  if (lowCardInventoryStates.length > 0) {
+    pushIssue(
+      "review",
+      `Starter inventory is already live, but the launch buffer is low for ${lowCardInventoryStates.map((item) => item.label).join(" + ")}.`,
+      "Run Inventory Refill to top the launch buffer back up before the first sales wave consumes the remaining fresh cards.",
       {
         key: "licenses",
         autofocus: "cards",
@@ -2972,17 +3004,33 @@ function buildLaunchWorkflowAuthorizationReadiness({
       })
     : null;
   const firstBatchSetupEligible = policyCount > 0
-    && freshCardCount <= 0
+    && (cardInventoryStates.length
+      ? missingCardInventoryStates.length > 0
+      : freshCardCount <= 0)
     && (cardLoginEnabled || cardRechargeEnabled);
+  const inventoryRefillEligible = policyCount > 0
+    && !firstBatchSetupEligible
+    && lowCardInventoryStates.length > 0;
   const firstBatchSetupSummary = firstBatchSetupEligible
     ? "Run First Batch Setup to create the recommended launch card inventory automatically before rollout."
-    : null;
+    : inventoryRefillEligible
+      ? `Run Inventory Refill to top the launch buffer back up for ${lowCardInventoryStates.map((item) => item.label).join(" + ")}.`
+      : null;
   const firstBatchSetupAction = firstBatchSetupEligible
     ? createLaunchWorkflowSetupAction({
         summary: firstBatchSetupSummary,
-        mode: "recommended"
+        mode: "recommended",
+        operation: "first_batch_setup"
       })
-    : null;
+    : inventoryRefillEligible
+      ? createLaunchWorkflowSetupAction({
+          key: "launch_inventory_refill",
+          label: "Run Inventory Refill",
+          summary: firstBatchSetupSummary,
+          mode: "recommended",
+          operation: "restock"
+        })
+      : null;
 
   if (bootstrapEligible) {
     workspaceKey = "licenses";
@@ -3032,6 +3080,7 @@ function buildLaunchWorkflowAuthorizationReadiness({
     bootstrapPlan,
     bootstrapAction,
     firstBatchSetupEligible,
+    inventoryRefillEligible,
     firstBatchSetupSummary,
     firstBatchSetupAction,
     launchRecommendations
@@ -3190,6 +3239,48 @@ function buildLaunchRecommendedCardBatchDrafts(product = {}, policies = []) {
   return drafts;
 }
 
+function countFreshCardsMatchingLaunchDraft(cards = [], draft = {}) {
+  const prefix = String(draft?.prefix || "").trim().toUpperCase();
+  if (!prefix) {
+    return 0;
+  }
+  const cardItems = Array.isArray(cards) ? cards : [];
+  return cardItems.filter((item) => {
+    if (normalizeCardControlStatus(item?.status || "active") !== "active") {
+      return false;
+    }
+    if (!isFreshCardInventoryStatus(item?.usageStatus ?? item?.displayStatus)) {
+      return false;
+    }
+    const batchCode = String(item?.batchCode || "").trim().toUpperCase();
+    const cardKey = String(item?.cardKey || item?.maskedKey || "").trim().toUpperCase();
+    return batchCode.startsWith(prefix) || cardKey.startsWith(prefix);
+  }).length;
+}
+
+function buildLaunchRecommendedCardInventoryStates(product = {}, policies = [], cards = []) {
+  return buildLaunchRecommendedCardBatchDrafts(product, policies).map((draft) => {
+    const targetCount = Math.max(1, Number(draft?.count ?? 0) || 0);
+    const freshCount = countFreshCardsMatchingLaunchDraft(cards, draft);
+    const refillThreshold = Math.max(5, Math.ceil(targetCount * 0.4));
+    const inventoryStatus = freshCount <= 0
+      ? "missing"
+      : freshCount < refillThreshold
+        ? "low"
+        : "ready";
+    return {
+      ...draft,
+      targetCount,
+      freshCount,
+      refillThreshold,
+      inventoryStatus,
+      refillCount: inventoryStatus === "low"
+        ? Math.max(1, targetCount - freshCount)
+        : 0
+    };
+  });
+}
+
 function isFreshCardInventoryStatus(value = "") {
   const normalized = String(value ?? "").trim().toLowerCase();
   return normalized === "fresh" || normalized === "unused";
@@ -3234,6 +3325,11 @@ function buildLaunchAuthorizationOperationalPlan({
   const cardLoginEnabled = featureConfig.allowCardLogin !== false;
   const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
   const preferredGrantType = recommendLaunchStarterGrantType(featureConfig, Array.isArray(policies) ? policies : []);
+  const cardInventoryStates = Array.isArray(metrics.cards)
+    ? buildLaunchRecommendedCardInventoryStates(product, policies, metrics.cards)
+    : [];
+  const missingCardInventoryStates = cardInventoryStates.filter((item) => item.inventoryStatus === "missing");
+  const lowCardInventoryStates = cardInventoryStates.filter((item) => item.inventoryStatus === "low");
   const inventoryRecommendations = [];
   const firstBatchCardRecommendations = [];
   const firstOpsActions = [];
@@ -3287,6 +3383,32 @@ function buildLaunchAuthorizationOperationalPlan({
       : cardLoginEnabled
         ? "50 fresh cards"
         : "100 fresh cards";
+    const starterInventoryStatus = missingCardInventoryStates.length
+      ? "missing"
+      : lowCardInventoryStates.length
+        ? "low"
+        : freshCardCount > 0
+          ? "ready"
+          : "missing";
+    const starterInventoryCurrent = cardInventoryStates.length
+      ? `${freshCardCount} fresh | ${cardInventoryStates.map((item) => `${item.mode}:${item.freshCount}/${item.targetCount}`).join(" | ")}`
+      : `${freshCardCount} fresh`;
+    const starterInventorySummary = missingCardInventoryStates.length
+      ? (cardInventoryStates.length > 1
+          ? `At least one recommended launch batch is still missing fresh inventory (${missingCardInventoryStates.map((item) => item.label).join(" + ")}).`
+          : "The recommended launch card batch is still missing fresh inventory.")
+      : lowCardInventoryStates.length
+        ? `Starter card inventory exists, but the launch buffer is running low for ${lowCardInventoryStates.map((item) => item.label).join(" + ")}.`
+        : cardLoginEnabled && cardRechargeEnabled
+          ? "This lane has fresh cards staged for both first-sale activation and recharge top-ups."
+          : cardLoginEnabled
+            ? "Direct-card login has sellable fresh cards staged for the first launch window."
+            : "Recharge flows have fresh cards staged before the first renewal or top-up request arrives.";
+    const starterInventoryNextAction = missingCardInventoryStates.length
+      ? "Issue at least one starter card batch for each missing launch mode before opening login or recharge."
+      : lowCardInventoryStates.length
+        ? "Run inventory refill before the current launch buffer runs dry."
+        : "Keep a starter card buffer available for the first launch window.";
     pushInventoryRecommendation({
       key: "starter_card_inventory",
       label: cardLoginEnabled && cardRechargeEnabled
@@ -3295,24 +3417,27 @@ function buildLaunchAuthorizationOperationalPlan({
           ? "Direct-card starter inventory"
           : "Recharge starter inventory",
       priority: "required",
-      status: freshCardCount > 0 ? "ready" : "missing",
+      status: starterInventoryStatus,
       target: targetCount,
-      current: `${freshCardCount} fresh`,
-      summary: cardLoginEnabled && cardRechargeEnabled
-        ? "This lane needs enough fresh cards for both first-sale activation and recharge top-ups."
-        : cardLoginEnabled
-          ? "Direct-card login needs sellable fresh cards before the first customer arrives."
-          : "Recharge flows need fresh cards staged before rollout so renewals can succeed on day one.",
-      nextAction: freshCardCount > 0
-        ? "Keep a starter card buffer available for the first launch window."
-        : "Issue at least one starter card batch before opening login or recharge.",
+      current: starterInventoryCurrent,
+      summary: starterInventorySummary,
+      nextAction: starterInventoryNextAction,
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
       bootstrapAction: freshCardCount > 0
         ? null
         : createLaunchWorkflowBootstrapAction({
             summary: "Issue starter launch cards automatically for this lane.",
             plan: ["starter card batch"]
+          }),
+      setupAction: policyCount > 0 && (missingCardInventoryStates.length || lowCardInventoryStates.length)
+        ? createLaunchWorkflowSetupAction({
+            key: missingCardInventoryStates.length ? "launch_first_batch_setup" : "launch_inventory_refill",
+            label: missingCardInventoryStates.length ? "Run First Batch Setup" : "Run Inventory Refill",
+            summary: starterInventoryNextAction,
+            mode: "recommended",
+            operation: missingCardInventoryStates.length ? "first_batch_setup" : "restock"
           })
+        : null
     });
   }
 
@@ -3365,22 +3490,36 @@ function buildLaunchAuthorizationOperationalPlan({
     });
   }
 
-  for (const item of buildLaunchRecommendedCardBatchDrafts(product, policies)) {
+  for (const item of (cardInventoryStates.length ? cardInventoryStates : buildLaunchRecommendedCardInventoryStates(product, policies, []))) {
     firstBatchCardRecommendations.push({
       key: item.key,
+      mode: item.mode,
       label: item.label,
       grantType: item.grantType,
       count: item.count,
       prefix: item.prefix,
+      inventoryStatus: item.inventoryStatus || "ready",
+      currentFresh: item.freshCount ?? 0,
+      targetCount: item.targetCount ?? item.count ?? 0,
+      refillCount: item.refillCount ?? 0,
       purpose: item.purpose,
-      nextAction: item.nextAction,
+      nextAction: item.inventoryStatus === "low"
+        ? `Keep ${item.label.toLowerCase()} near ${item.targetCount} fresh cards; refill ${item.refillCount} more now.`
+        : item.nextAction,
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
-      setupAction: item.policyId
+      setupAction: item.policyId && item.inventoryStatus !== "ready"
         ? createLaunchWorkflowSetupAction({
-            key: `launch_first_batch_setup_${item.mode}`,
-            label: item.mode === "direct_card" ? "Create Direct-Card Batch" : "Create Recharge Batch",
-            summary: item.nextAction,
-            mode: item.mode
+            key: item.inventoryStatus === "low"
+              ? `launch_inventory_refill_${item.mode}`
+              : `launch_first_batch_setup_${item.mode}`,
+            label: item.inventoryStatus === "low"
+              ? (item.mode === "direct_card" ? "Refill Direct-Card Batch" : "Refill Recharge Batch")
+              : (item.mode === "direct_card" ? "Create Direct-Card Batch" : "Create Recharge Batch"),
+            summary: item.inventoryStatus === "low"
+              ? `Top ${item.label.toLowerCase()} back up by ${item.refillCount} fresh cards before the current launch buffer runs dry.`
+              : item.nextAction,
+            mode: item.mode,
+            operation: item.inventoryStatus === "low" ? "restock" : "first_batch_setup"
           })
         : null
     });
@@ -3455,7 +3594,8 @@ function buildLaunchAuthorizationOperationalPlan({
   return {
     inventoryRecommendations,
     firstBatchCardRecommendations,
-    firstOpsActions
+    firstOpsActions,
+    cardInventoryStates
   };
 }
 
@@ -3916,15 +4056,19 @@ function buildLaunchWorkflowSummaryPayload({
     }));
   }
   if (authReadiness.firstBatchSetupAction && !actionPlan.some((item) => item.setupAction?.key === authReadiness.firstBatchSetupAction.key)) {
+    const inventorySetupAction = authReadiness.firstBatchSetupAction;
+    const inventorySetupIsRestock = inventorySetupAction?.operation === "restock";
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "first_batch_setup",
-      title: "Create recommended launch card inventory",
+      title: inventorySetupIsRestock ? "Refill launch card inventory" : "Create recommended launch card inventory",
       summary: authReadiness.firstBatchSetupSummary
-        || "Create the recommended direct-card and recharge starter batches before rollout.",
-      status: authReadiness.firstBatchSetupEligible ? "review" : "pass",
+        || (inventorySetupIsRestock
+          ? "Top the current launch buffer back up before early sales consume the remaining fresh cards."
+          : "Create the recommended direct-card and recharge starter batches before rollout."),
+      status: (authReadiness.firstBatchSetupEligible || authReadiness.inventoryRefillEligible) ? "review" : "pass",
       priority: actionPlan.length ? "secondary" : "primary",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace"),
-      setupAction: authReadiness.firstBatchSetupAction
+      setupAction: inventorySetupAction
     }));
   }
   const firstOpsActions = Array.isArray(authReadiness.launchRecommendations?.firstOpsActions)
@@ -4084,10 +4228,11 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   }
 
   if (workflowSummary.launchFirstBatchSetupAction?.label) {
-    lines.push("First Batch Setup:");
+    lines.push("Card Inventory Setup:");
     lines.push(`- ${workflowSummary.launchFirstBatchSetupAction.label}`);
     lines.push(`- summary: ${workflowSummary.launchFirstBatchSetupSummary || workflowSummary.launchFirstBatchSetupAction.summary || "-"}`);
     lines.push(`- mode: ${workflowSummary.launchFirstBatchSetupAction.mode || "recommended"}`);
+    lines.push(`- operation: ${workflowSummary.launchFirstBatchSetupAction.operation || "first_batch_setup"}`);
     lines.push("");
   }
 
@@ -4109,7 +4254,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   if (firstBatchCardRecommendations.length) {
     lines.push("First Batch Card Suggestions:");
     for (const item of firstBatchCardRecommendations) {
-        lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}` : ""}`);
+        lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | current=${item.currentFresh ?? 0} | target=${item.targetCount ?? item.count ?? 0} | status=${String(item.inventoryStatus || "ready").toUpperCase()} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`);
       }
       lines.push("");
   }
@@ -4130,7 +4275,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     lines.push("Action Plan:");
     for (const item of actionPlan) {
       lines.push(
-          `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}` : ""}`
+          `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
       );
     }
     lines.push("");
@@ -4220,7 +4365,7 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
       lines.push(`bootstrap: ${item.bootstrapAction.label || item.bootstrapAction.key || "-"}`);
     }
     if (item.setupAction) {
-      lines.push(`setup: ${item.setupAction.label || item.setupAction.key || "-"} | mode=${item.setupAction.mode || "recommended"}`);
+      lines.push(`setup: ${item.setupAction.label || item.setupAction.key || "-"} | mode=${item.setupAction.mode || "recommended"} | operation=${item.setupAction.operation || "first_batch_setup"}`);
     }
     lines.push("");
   }
@@ -4242,7 +4387,7 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
   if (firstBatchCardRecommendations.length) {
     lines.push("First Batch Card Suggestions:");
     for (const item of firstBatchCardRecommendations) {
-      lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}` : ""}`);
+      lines.push(`- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | current=${item.currentFresh ?? 0} | target=${item.targetCount ?? item.count ?? 0} | status=${String(item.inventoryStatus || "ready").toUpperCase()} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`);
     }
     lines.push("");
   }
@@ -12800,9 +12945,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const scopedPoliciesPayload = project?.code
         ? await this.developerListPolicies(token, { productCode: project.code })
         : [];
+      const scopedCardsPayload = project?.code
+        ? await this.developerListCards(token, { productCode: project.code })
+        : { items: [] };
       const activePolicies = Array.isArray(scopedPoliciesPayload)
         ? scopedPoliciesPayload.filter((item) => normalizeProductStatus(item?.status || "active") === "active")
         : [];
+      const scopedCards = Array.isArray(scopedCardsPayload?.items) ? scopedCardsPayload.items : [];
       const authReadiness = buildLaunchWorkflowAuthorizationReadiness({
         product: {
           id: project.id,
@@ -12818,7 +12967,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           cardsFresh: businessMetrics?.freshCardCounts?.get(projectMetricKey) ?? 0,
           cardsRedeemed: businessMetrics?.redeemedCardCounts?.get(projectMetricKey) ?? 0,
           accounts: businessMetrics?.accountCounts?.get(projectMetricKey) ?? 0,
-          activeEntitlements: businessMetrics?.activeEntitlementCounts?.get(projectMetricKey) ?? 0
+          activeEntitlements: businessMetrics?.activeEntitlementCounts?.get(projectMetricKey) ?? 0,
+          cards: scopedCards
         },
         policies: activePolicies
       });
@@ -13854,7 +14004,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             cardsFresh: freshCards.length,
             cardsRedeemed: redeemedCards.length,
             accounts: accountItems.length,
-            activeEntitlements
+            activeEntitlements,
+            cards: cardItems
           },
           policies: activePolicies
         });
@@ -13936,18 +14087,39 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       if (needsCards) {
-        const cardBatchDraft = buildLaunchStarterCardBatchDraft(product, effectivePolicies);
-        if (!cardBatchDraft.policyId) {
+        const cardBatchDrafts = buildLaunchRecommendedCardInventoryStates(product, effectivePolicies, before.cards)
+          .filter((item) => item.inventoryStatus === "missing");
+        if (!cardBatchDrafts.length) {
           throw new AppError(
             409,
-            "LAUNCH_BOOTSTRAP_POLICY_REQUIRED",
-            "Create or keep at least one active starter policy before issuing bootstrap card inventory."
+            "LAUNCH_BOOTSTRAP_CARD_BATCH_NOT_APPLICABLE",
+            "Launch bootstrap could not find a missing starter card batch for this lane."
           );
         }
-        created.cardBatch = await this.developerCreateCardBatch(token, {
-          productCode,
-          ...cardBatchDraft
-        });
+        created.cardBatches = [];
+        for (const cardBatchDraft of cardBatchDrafts) {
+          if (!cardBatchDraft.policyId) {
+            throw new AppError(
+              409,
+              "LAUNCH_BOOTSTRAP_POLICY_REQUIRED",
+              "Create or keep at least one active starter policy before issuing bootstrap card inventory."
+            );
+          }
+          const createdBatch = await this.developerCreateCardBatch(token, {
+            productCode,
+            policyId: cardBatchDraft.policyId,
+            count: cardBatchDraft.count,
+            prefix: cardBatchDraft.prefix,
+            notes: cardBatchDraft.notes
+          });
+          created.cardBatches.push({
+            ...createdBatch,
+            mode: cardBatchDraft.mode,
+            label: cardBatchDraft.label,
+            prefix: cardBatchDraft.prefix
+          });
+        }
+        created.cardBatch = created.cardBatches[0] || null;
       }
 
       if (needsBootstrapAccount) {
@@ -14077,7 +14249,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
                 cardsFresh: rawAfter.freshCards.length,
                 cardsRedeemed: rawAfter.cards.filter((item) => item?.usageStatus === "redeemed").length,
                 accounts: rawAfter.accounts.length,
-                activeEntitlements: afterActiveEntitlements
+                activeEntitlements: afterActiveEntitlements,
+                cards: rawAfter.cards
               },
               policies: rawAfter.activePolicies
             })
@@ -14087,6 +14260,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         productCode,
         createdPolicy: Boolean(created.policy),
         createdCardBatch: Boolean(created.cardBatch),
+        createdCardBatches: Array.isArray(created.cardBatches) ? created.cardBatches.map((item) => item.batchCode) : [],
         createdAccount: Boolean(created.account),
         createdEntitlement: Boolean(created.entitlement),
         policyId: created.policy?.id ?? null,
@@ -14101,7 +14275,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       const createdParts = [
         created.policy ? `policy:${created.policy.name}` : null,
-        created.cardBatch ? `cards:${created.cardBatch.count}` : null,
+        Array.isArray(created.cardBatches) && created.cardBatches.length
+          ? `cards:${created.cardBatches.reduce((sum, item) => sum + Number(item?.count ?? 0), 0)}`
+          : (created.cardBatch ? `cards:${created.cardBatch.count}` : null),
         created.account ? `account:${created.account.username}` : null,
         created.entitlement ? `entitlement:${created.entitlement.username}` : null
       ].filter(Boolean);
@@ -14209,12 +14385,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         );
       }
 
-      const recommendedDrafts = buildLaunchRecommendedCardBatchDrafts(product, before.activePolicies);
-      const drafts = requestedMode === "recommended"
-        ? recommendedDrafts
-        : recommendedDrafts.filter((item) => item.mode === requestedMode);
+      const recommendedStates = buildLaunchRecommendedCardInventoryStates(product, before.activePolicies, before.cards);
+      const requestedStates = requestedMode === "recommended"
+        ? recommendedStates
+        : recommendedStates.filter((item) => item.mode === requestedMode);
+      const drafts = requestedStates.filter((item) => item.inventoryStatus === "missing");
 
-      if (!drafts.length) {
+      if (!requestedStates.length) {
         throw new AppError(
           409,
           "FIRST_BATCH_SETUP_NOT_APPLICABLE",
@@ -14224,20 +14401,21 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         );
       }
 
+      if (!drafts.length) {
+        const lowInventoryStates = requestedStates.filter((item) => item.inventoryStatus === "low");
+        throw new AppError(
+          409,
+          "FIRST_BATCH_SETUP_NOT_NEEDED",
+          lowInventoryStates.length
+            ? `Starter inventory already exists for ${lowInventoryStates.map((item) => item.label).join(" + ")}. Use inventory refill when the launch buffer runs low.`
+            : `First-batch setup found no missing recommended card batches for ${productCode}.`
+        );
+      }
+
       const createdBatches = [];
       const skipped = [];
 
       for (const draft of drafts) {
-        const hasFreshMatchingInventory = before.freshCards.some((item) => {
-          const cardKey = String(item?.cardKey || item?.maskedKey || "").trim().toUpperCase();
-          return cardKey.startsWith(String(draft.prefix || "").trim().toUpperCase());
-        });
-
-        if (hasFreshMatchingInventory) {
-          skipped.push(`${draft.label} already has fresh inventory under prefix ${draft.prefix}.`);
-          continue;
-        }
-
         if (!draft.policyId) {
           throw new AppError(
             409,
@@ -14284,6 +14462,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         requestedMode,
         createdBatches,
         skipped,
+        inventoryStates: recommendedStates.map((item) => ({
+          key: item.key,
+          mode: item.mode,
+          label: item.label,
+          status: item.inventoryStatus,
+          freshCount: item.freshCount,
+          targetCount: item.targetCount
+        })),
         before: {
           counts: {
             policies: before.activePolicies.length,
@@ -14299,6 +14485,183 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         message: createdBatches.length
           ? `First-batch setup created ${createdBatches.map((item) => item.batchCode).join(", ")} for ${productCode}.`
           : `First-batch setup found no missing recommended card batches for ${productCode}.`
+      };
+    },
+
+    async developerRestockLicenseQuickstartBatches(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "cards.write",
+        "DEVELOPER_CARD_FORBIDDEN",
+        "You can only manage cards under your assigned projects."
+      );
+      requireField(body, "productCode");
+
+      const productCode = readProductCodeInput(body);
+      const product = await getStoreActiveProductByCode(productCode);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product.id,
+          owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+        },
+        "cards.write",
+        "DEVELOPER_PRODUCT_FORBIDDEN",
+        "You can only manage products owned by your developer account."
+      );
+
+      const featureConfig = product?.featureConfig && typeof product.featureConfig === "object"
+        ? product.featureConfig
+        : {};
+      if (featureConfig.allowCardLogin === false && featureConfig.allowCardRecharge === false) {
+        throw new AppError(
+          409,
+          "INVENTORY_REFILL_NOT_APPLICABLE",
+          "This launch lane does not use direct-card login or recharge inventory."
+        );
+      }
+
+      const requestedMode = String(body.mode || "recommended").trim().toLowerCase();
+      if (!["recommended", "direct_card", "recharge"].includes(requestedMode)) {
+        throw new AppError(
+          400,
+          "INVALID_RESTOCK_MODE",
+          "mode must be recommended, direct_card, or recharge."
+        );
+      }
+
+      const collectState = async () => {
+        const [policiesPayload, cardsPayload] = await Promise.all([
+          this.developerListPolicies(token, { productCode }),
+          this.developerListCards(token, { productCode })
+        ]);
+        const policyItems = Array.isArray(policiesPayload) ? policiesPayload : [];
+        const activePolicies = policyItems.filter((item) => normalizeProductStatus(item?.status || "active") === "active");
+        const cardItems = Array.isArray(cardsPayload?.items) ? cardsPayload.items : [];
+        const freshCards = cardItems.filter((item) =>
+          normalizeCardControlStatus(item?.status || "active") === "active"
+            && isFreshCardInventoryStatus(item?.usageStatus ?? item?.displayStatus)
+        );
+        return {
+          policies: policyItems,
+          activePolicies,
+          cards: cardItems,
+          freshCards
+        };
+      };
+
+      const before = await collectState();
+      if (before.activePolicies.length <= 0) {
+        throw new AppError(
+          409,
+          "INVENTORY_REFILL_POLICY_REQUIRED",
+          "Create or bootstrap at least one active starter policy before running inventory refill."
+        );
+      }
+
+      const recommendedStates = buildLaunchRecommendedCardInventoryStates(product, before.activePolicies, before.cards);
+      const requestedStates = requestedMode === "recommended"
+        ? recommendedStates
+        : recommendedStates.filter((item) => item.mode === requestedMode);
+      const drafts = requestedStates.filter((item) => item.inventoryStatus === "low");
+
+      if (!requestedStates.length) {
+        throw new AppError(
+          409,
+          "INVENTORY_REFILL_NOT_APPLICABLE",
+          requestedMode === "direct_card"
+            ? "Direct-card starter inventory is not enabled for this project."
+            : "Recharge starter inventory is not enabled for this project."
+        );
+      }
+
+      if (!drafts.length) {
+        const missingStates = requestedStates.filter((item) => item.inventoryStatus === "missing");
+        throw new AppError(
+          409,
+          "INVENTORY_REFILL_NOT_NEEDED",
+          missingStates.length
+            ? `Starter inventory is still missing for ${missingStates.map((item) => item.label).join(" + ")}. Run First Batch Setup before inventory refill.`
+            : `Starter inventory already has enough fresh cards for ${productCode}.`
+        );
+      }
+
+      const createdBatches = [];
+      for (const draft of drafts) {
+        if (!draft.policyId) {
+          throw new AppError(
+            409,
+            "INVENTORY_REFILL_POLICY_REQUIRED",
+            `Launch quickstart could not find an active policy for ${draft.label.toLowerCase()}.`
+          );
+        }
+
+        const refillCount = Math.max(1, Number(draft.refillCount ?? 0) || 0);
+        const createdBatch = await this.developerCreateCardBatch(token, {
+          productCode,
+          policyId: draft.policyId,
+          count: refillCount,
+          prefix: draft.prefix,
+          notes: `${draft.notes} | inventory refill ${draft.freshCount}->${draft.targetCount}`
+        });
+
+        createdBatches.push({
+          key: draft.key,
+          mode: draft.mode,
+          label: draft.label,
+          grantType: draft.grantType,
+          count: createdBatch.count,
+          batchCode: createdBatch.batchCode,
+          prefix: draft.prefix,
+          purpose: draft.purpose,
+          refillCount,
+          beforeFresh: draft.freshCount,
+          targetCount: draft.targetCount
+        });
+      }
+
+      const after = await collectState();
+
+      auditDeveloperSession(db, session, "license.quickstart.restock", "product", product.id, {
+        productCode,
+        requestedMode,
+        createdBatchCodes: createdBatches.map((item) => item.batchCode),
+        beforeFreshCards: before.freshCards.length,
+        afterFreshCards: after.freshCards.length
+      });
+
+      return {
+        productCode,
+        productName: product.name,
+        modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
+        requestedMode,
+        createdBatches,
+        inventoryStates: recommendedStates.map((item) => ({
+          key: item.key,
+          mode: item.mode,
+          label: item.label,
+          status: item.inventoryStatus,
+          freshCount: item.freshCount,
+          targetCount: item.targetCount,
+          refillCount: item.refillCount
+        })),
+        before: {
+          counts: {
+            policies: before.activePolicies.length,
+            freshCards: before.freshCards.length
+          }
+        },
+        after: {
+          counts: {
+            policies: after.activePolicies.length,
+            freshCards: after.freshCards.length
+          }
+        },
+        message: createdBatches.length
+          ? `Inventory refill created ${createdBatches.map((item) => item.batchCode).join(", ")} for ${productCode}.`
+          : `Inventory refill found no low starter batches for ${productCode}.`
       };
     },
 

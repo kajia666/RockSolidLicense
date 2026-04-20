@@ -51,6 +51,8 @@ The review page also promotes routed launch-day targets such as:
 
 Each target can route directly into the matching scoped `Developer Ops` section with the same review filters preserved.
 
+Those routed target links now also carry the first matched object itself when possible. So when launch review says "Review matched accounts" or "Review matched sessions", `/developer/ops` can open with a direct review target already prepared instead of only dropping the author into a broad section and asking them to find the first object again.
+
 ## Scoped APIs
 
 - `GET /api/developer/launch-review`

@@ -238,6 +238,16 @@
       const requestedEventType = (routeParams.get("eventType") || "").trim();
       const requestedActorType = (routeParams.get("actorType") || "").trim();
       const requestedEntityType = (routeParams.get("entityType") || "").trim();
+      const requestedFocusKind = (routeParams.get("focusKind") || "").trim().toLowerCase();
+      const requestedFocusAccountId = (routeParams.get("focusAccountId") || "").trim();
+      const requestedFocusEntitlementId = (routeParams.get("focusEntitlementId") || "").trim();
+      const requestedFocusSessionId = (routeParams.get("focusSessionId") || "").trim();
+      const requestedFocusBindingId = (routeParams.get("focusBindingId") || "").trim();
+      const requestedFocusBlockId = (routeParams.get("focusBlockId") || "").trim();
+      const requestedFocusFingerprint = (routeParams.get("focusFingerprint") || "").trim();
+      const requestedFocusUsername = (routeParams.get("focusUsername") || "").trim();
+      const requestedFocusReason = (routeParams.get("focusReason") || "").trim();
+      const requestedFocusProductCode = (routeParams.get("focusProductCode") || "").trim();
       routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
 
       function emptySnapshot() {
@@ -620,25 +630,103 @@
       }
 
       function buildDeveloperAccountFocusItem(item = {}) {
-        return {
+        const next = {
           ...item,
           accountId: item.accountId || item.id || "",
           accountStatus: item.accountStatus || item.status || "active"
         };
+        if (!next.recommendedControl) {
+          next.recommendedControl = buildDeveloperAccountRecommendedControl(next);
+        }
+        return next;
       }
 
       function buildDeveloperEntitlementFocusItem(item = {}) {
-        return {
+        const next = {
           ...item,
           entitlementId: item.entitlementId || item.id || ""
         };
+        if (!next.recommendedControl) {
+          next.recommendedControl = buildDeveloperEntitlementRecommendedControl(next);
+        }
+        return next;
       }
 
       function buildDeveloperSessionFocusItem(item = {}) {
-        return {
+        const next = {
           ...item,
           sessionId: item.sessionId || item.id || ""
         };
+        if (!next.recommendedControl) {
+          next.recommendedControl = buildDeveloperSessionRecommendedControl(next);
+        }
+        return next;
+      }
+
+      function buildDeveloperAccountRecommendedControl(item = {}) {
+        const accountId = item.accountId || item.id || "";
+        const status = String(item.accountStatus || item.status || "").trim().toLowerCase();
+        if (accountId && status === "disabled") {
+          return {
+            type: "account_status",
+            label: "Prepare account re-enable",
+            accountId,
+            targetStatus: "active"
+          };
+        }
+        return null;
+      }
+
+      function buildDeveloperEntitlementRecommendedControl(item = {}) {
+        const entitlementId = item.entitlementId || item.id || "";
+        const lifecycleStatus = String(item.lifecycleStatus || item.status || "").trim().toLowerCase();
+        if (entitlementId && lifecycleStatus === "frozen") {
+          return {
+            type: "entitlement_status",
+            label: "Prepare entitlement resume",
+            entitlementId,
+            targetStatus: "active"
+          };
+        }
+        if (entitlementId && lifecycleStatus === "expired") {
+          return {
+            type: "extend_entitlement",
+            label: "Prepare 7-day extension",
+            entitlementId,
+            days: 7
+          };
+        }
+        if (
+          entitlementId
+          && Number(item.totalPoints || 0) > 0
+          && Number(item.remainingPoints || 0) <= 0
+        ) {
+          return {
+            type: "adjust_points",
+            label: "Prepare point top-up",
+            entitlementId,
+            mode: "add",
+            points: 1
+          };
+        }
+        return null;
+      }
+
+      function buildDeveloperSessionRecommendedControl(item = {}) {
+        const sessionId = item.sessionId || item.id || "";
+        if (!sessionId) {
+          return null;
+        }
+        const status = String(item.status || "").trim().toLowerCase();
+        if (status === "active") {
+          return {
+            type: "revoke_session",
+            label: "Prepare session review",
+            sessionId,
+            reason: item.reason || item.revokedReason || "launch_review_follow_up"
+          };
+        }
+        return null;
       }
 
       function buildDeveloperFocusFromAudit(item = {}) {
@@ -716,6 +804,111 @@
         return null;
       }
 
+      function buildRequestedRouteFocus() {
+        const focusProductCode = requestedFocusProductCode || requestedProductCode || "";
+        const focusUsername = requestedFocusUsername || requestedUsername || "";
+        const focusReason = requestedFocusReason || "";
+        const focusFingerprint = requestedFocusFingerprint || "";
+        if (requestedFocusKind === "account") {
+          const matched = snapshot.accounts.find((item) =>
+            (requestedFocusAccountId && String(item.id || item.accountId || "") === requestedFocusAccountId)
+            || (
+              focusUsername
+              && String(item.username || "").trim().toLowerCase() === focusUsername.trim().toLowerCase()
+              && (!focusProductCode || String(item.productCode || "").trim().toUpperCase() === focusProductCode.trim().toUpperCase())
+            )
+          );
+          return {
+            kind: "account",
+            section: "accounts",
+            item: buildDeveloperAccountFocusItem(matched || {
+              productCode: focusProductCode,
+              username: focusUsername,
+              reason: focusReason,
+              fingerprint: focusFingerprint,
+              accountId: requestedFocusAccountId || ""
+            })
+          };
+        }
+        if (requestedFocusKind === "entitlement") {
+          const matched = snapshot.entitlements.find((item) =>
+            (requestedFocusEntitlementId && String(item.id || item.entitlementId || "") === requestedFocusEntitlementId)
+            || (
+              focusUsername
+              && String(item.username || "").trim().toLowerCase() === focusUsername.trim().toLowerCase()
+              && (!focusProductCode || String(item.productCode || "").trim().toUpperCase() === focusProductCode.trim().toUpperCase())
+            )
+          );
+          return {
+            kind: "entitlement",
+            section: "entitlements",
+            item: buildDeveloperEntitlementFocusItem(matched || {
+              productCode: focusProductCode,
+              username: focusUsername,
+              reason: focusReason,
+              entitlementId: requestedFocusEntitlementId || ""
+            })
+          };
+        }
+        if (requestedFocusKind === "session") {
+          const matched = snapshot.sessions.find((item) =>
+            (requestedFocusSessionId && String(item.id || item.sessionId || "") === requestedFocusSessionId)
+            || (
+              focusUsername
+              && String(item.username || "").trim().toLowerCase() === focusUsername.trim().toLowerCase()
+              && (!focusProductCode || String(item.productCode || "").trim().toUpperCase() === focusProductCode.trim().toUpperCase())
+            )
+          );
+          return {
+            kind: "session",
+            section: "sessions",
+            item: buildDeveloperSessionFocusItem(matched || {
+              productCode: focusProductCode,
+              username: focusUsername,
+              reason: focusReason,
+              fingerprint: focusFingerprint,
+              sessionId: requestedFocusSessionId || ""
+            })
+          };
+        }
+        if (requestedFocusKind === "device") {
+          const matchedBlock = snapshot.blocks.find((item) =>
+            (requestedFocusBlockId && String(item.id || item.blockId || "") === requestedFocusBlockId)
+            || (focusFingerprint && String(item.fingerprint || "").trim() === focusFingerprint)
+          );
+          if (matchedBlock) {
+            return {
+              kind: "device",
+              section: "devices",
+              item: buildDeveloperDeviceFocusItem({
+                ...matchedBlock,
+                productCode: matchedBlock.productCode || focusProductCode,
+                username: matchedBlock.username || focusUsername,
+                reason: matchedBlock.reason || focusReason,
+                blockId: matchedBlock.id || matchedBlock.blockId || requestedFocusBlockId || ""
+              }, "block")
+            };
+          }
+          const matchedBinding = snapshot.bindings.find((item) =>
+            (requestedFocusBindingId && String(item.id || item.bindingId || "") === requestedFocusBindingId)
+            || (focusFingerprint && String(item.fingerprint || "").trim() === focusFingerprint)
+          );
+          return {
+            kind: "device",
+            section: "devices",
+            item: buildDeveloperDeviceFocusItem(matchedBinding || {
+              productCode: focusProductCode,
+              username: focusUsername,
+              reason: focusReason,
+              fingerprint: focusFingerprint,
+              bindingId: requestedFocusBindingId || "",
+              blockId: requestedFocusBlockId || ""
+            }, matchedBinding ? "binding" : (requestedFocusBlockId ? "block" : "binding"))
+          };
+        }
+        return null;
+      }
+
       function routeReviewPrimarySections(preferredSection = "") {
         const normalized = String(preferredSection || "").trim().toLowerCase();
         if (normalized === "accounts") {
@@ -753,6 +946,10 @@
       }
 
       function buildPrimaryRouteReviewFocus(review = collectRouteReview(), preferredSection = "") {
+        const directFocus = buildRequestedRouteFocus();
+        if (directFocus?.kind) {
+          return directFocus;
+        }
         const sectionOrder = routeReviewPrimarySections(preferredSection || review.focus || requestedAutofocus || "");
         for (const section of sectionOrder) {
           if (section === "accounts" && review.matchedAccounts.length) {
@@ -970,7 +1167,7 @@
         }
         const prepared = await applyDeveloperFocusItem(primary.kind, primary.item || {}, {
           focusControls: Boolean(options.focusControls),
-          statusMessage: options.announce === false ? "" : `Primary routed focus prepared: ${formatRouteReviewPrimaryTitle(primary)}${primary.section ? ` | ${primary.section}` : ""}${primary.item?.recommendedControl?.label ? ` | ${primary.item.recommendedControl.label}` : ""}.`,
+          statusMessage: options.announce === false ? "" : `${requestedFocusKind ? "Direct routed focus prepared" : "Primary routed focus prepared"}: ${formatRouteReviewPrimaryTitle(primary)}${primary.section ? ` | ${primary.section}` : ""}${primary.item?.recommendedControl?.label ? ` | ${primary.item.recommendedControl.label}` : ""}.`,
           routePreparedKey: signature
         });
         return {
@@ -1025,9 +1222,11 @@
         const target = currentOpsTarget();
         const hasProduct = Boolean(target.productCode);
         const actions = Array.isArray(focus.actions) ? focus.actions : [];
+        const directFocus = buildRequestedRouteFocus();
         box.innerHTML = `
           <div>${renderTag(focus.title || "Ops route focus", hasProduct)} ${requestedRouteTitle ? renderTag(`from:${requestedRouteTitle}`, true) : ""} ${requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
           ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
+          ${directFocus?.kind ? `<div class="hint" style="margin-top:8px;">${esc(`Direct review target: ${formatRouteReviewPrimaryTitle(directFocus)} | ${formatRouteReviewPrimarySummary(directFocus)}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project code first.`)}</div>
           ${(requestedEventType || requestedActorType || requestedEntityType || requestedUsername || requestedSearch) ? `<div class="hint" style="margin-top:10px;">${esc(`Route filters: event=${requestedEventType || "-"} | actor=${requestedActorType || "-"} | entity=${requestedEntityType || "-"} | username=${requestedUsername || "-"} | search=${requestedSearch || "-"}`)}</div>` : ""}
           ${requestedReviewMode ? `<div class="hint" style="margin-top:10px;">${esc(`Route review mode: ${requestedReviewMode}`)}</div>` : ""}
@@ -1603,7 +1802,7 @@
       }
 
       function buildDeveloperDeviceFocusItem(item = {}, shape = "binding") {
-        return {
+        const next = {
           ...item,
           kind: item.kind || shape,
           productCode: item.productCode || item.projectCode || "",
@@ -1611,6 +1810,26 @@
           bindingId: item.bindingId || (shape === "binding" ? item.id || "" : ""),
           blockId: item.blockId || (shape === "block" ? item.id || "" : "")
         };
+        if (!next.recommendedControl) {
+          next.recommendedControl = buildDeveloperDeviceRecommendedControl(next);
+        }
+        return next;
+      }
+
+      function buildDeveloperDeviceRecommendedControl(item = {}) {
+        const status = String(item.status || "").trim().toLowerCase();
+        const kind = String(item.kind || "").trim().toLowerCase();
+        if ((item.blockId || item.id) && kind === "block" && status === "active") {
+          return {
+            type: "unblock_device",
+            label: "Prepare device unblock review",
+            blockId: item.blockId || item.id || "",
+            productCode: item.productCode || item.projectCode || "",
+            fingerprint: item.fingerprint || "",
+            reason: item.reason || "launch_review_unblock"
+          };
+        }
+        return null;
       }
 
       function inferDeveloperActionFocus() {

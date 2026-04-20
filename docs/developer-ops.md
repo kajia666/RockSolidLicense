@@ -26,6 +26,7 @@ This page is intended for day-to-day authorization operations:
 - use common audit presets and click an audit row to backfill matching filters and quick-control ids
 - review focus account, session, and device detail lists directly from the snapshot overview, including severity, next-action hints, and a recommended action queue, and click them back into the active filters or quick controls
 - use the `Escalate First` slice inside the scoped snapshot overview to jump straight into `Open Control` or `Load Full Context` for the highest-priority queue items
+- routed launch-review follow-up can now carry a direct review target into `/developer/ops`, so the workspace can prepare the first matched account, entitlement, session, or device in quick controls instead of only landing on a broad section
 - the scoped snapshot now also keeps a `Prepared Control` recap after focus or escalation actions, so developers can reapply the same focus or jump back to the prepared quick-control target without rebuilding context by hand
 - after a scoped quick-control action succeeds, the overview now also renders a `Last Action Result` recap with mitigation and follow-up guidance, so the developer can tell whether the current focus is resolved or still needs attention
 - that recap no longer depends only on snapshot-origin focus clicks; it now also attempts to infer the active scoped target from the quick-control form itself, so table-driven operations can still produce a useful result recap

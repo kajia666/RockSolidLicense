@@ -5718,6 +5718,125 @@ function buildDeveloperLaunchReviewSummaryPayload({
   opsSnapshot = null,
   filters = {}
 } = {}) {
+  const compactFocusParams = (params = {}) => Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+  );
+  const buildAuditFocusParams = (item = {}) => {
+    const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const productCode = metadata.productCode || metadata.code || metadata.projectCode || metadata.softwareCode || null;
+    const username = metadata.username || metadata.accountUsername || metadata.redeemedUsername || null;
+    const reason = metadata.reason || metadata.revokedReason || metadata.releaseReason || null;
+    const fingerprint = metadata.deviceFingerprint || metadata.fingerprint || null;
+    if (item.entityType === "account" || metadata.accountId) {
+      return compactFocusParams({
+        focusKind: "account",
+        focusAccountId: item.entityType === "account" ? (item.entityId || metadata.accountId || null) : (metadata.accountId || null),
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (item.entityType === "entitlement" || metadata.entitlementId) {
+      return compactFocusParams({
+        focusKind: "entitlement",
+        focusEntitlementId: item.entityType === "entitlement" ? (item.entityId || metadata.entitlementId || null) : (metadata.entitlementId || null),
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    if (item.entityType === "session" || metadata.sessionId) {
+      return compactFocusParams({
+        focusKind: "session",
+        focusSessionId: item.entityType === "session" ? (item.entityId || metadata.sessionId || null) : (metadata.sessionId || null),
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (item.entityType === "device_binding" || metadata.bindingId) {
+      return compactFocusParams({
+        focusKind: "device",
+        focusBindingId: item.entityType === "device_binding" ? (item.entityId || metadata.bindingId || null) : (metadata.bindingId || null),
+        focusFingerprint: fingerprint,
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    if (item.entityType === "device_block" || metadata.blockId) {
+      return compactFocusParams({
+        focusKind: "device",
+        focusBlockId: item.entityType === "device_block" ? (item.entityId || metadata.blockId || null) : (metadata.blockId || null),
+        focusFingerprint: fingerprint,
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    return compactFocusParams({
+      focusKind: "audit",
+      focusUsername: username,
+      focusReason: reason,
+      focusFingerprint: fingerprint,
+      focusProductCode: productCode
+    });
+  };
+  const buildReviewTargetFocusParams = (kind, item = {}) => {
+    if (!item || typeof item !== "object") {
+      return {};
+    }
+    const productCode = item.productCode || item.projectCode || null;
+    const username = item.username || null;
+    const reason = item.reason || item.revokedReason || null;
+    const fingerprint = item.fingerprint || null;
+    if (kind === "account") {
+      return compactFocusParams({
+        focusKind: "account",
+        focusAccountId: item.accountId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "entitlement") {
+      return compactFocusParams({
+        focusKind: "entitlement",
+        focusEntitlementId: item.entitlementId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "session") {
+      return compactFocusParams({
+        focusKind: "session",
+        focusSessionId: item.sessionId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "device") {
+      return compactFocusParams({
+        focusKind: "device",
+        focusBindingId: item.bindingId || (item.kind === "binding" ? item.id || null : null),
+        focusBlockId: item.blockId || (item.kind === "block" ? item.id || null : null),
+        focusFingerprint: fingerprint,
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "audit") {
+      return buildAuditFocusParams(item);
+    }
+    return {};
+  };
   const workflowSummary = launchWorkflow?.workflowSummary || {};
   const workflowChecklist = launchWorkflow?.workflowChecklist || {};
   const opsOverview = opsSnapshot?.overview || {};
@@ -5797,7 +5916,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
     summary,
     count = 0,
     status = "review",
-    fileName = "developer-ops-summary.txt"
+    fileName = "developer-ops-summary.txt",
+    focusParams = null
   } = {}) => {
     if (!key || !autofocus) {
       return null;
@@ -5813,7 +5933,10 @@ function buildDeveloperLaunchReviewSummaryPayload({
         "ops",
         autofocus,
         label || "Open Ops Workspace",
-        matchedOpsParams
+        {
+          ...matchedOpsParams,
+          ...(focusParams && typeof focusParams === "object" ? focusParams : {})
+        }
       ),
       recommendedDownload: createReviewTargetDownload(
         `${key}_summary`,
@@ -5929,7 +6052,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
       label: "Review matched accounts",
       summary: "Inspect routed starter accounts and related entitlement state before widening launch access.",
       count: reviewTargetCounts.accounts,
-      fileName: "developer-ops-accounts-summary.txt"
+      fileName: "developer-ops-accounts-summary.txt",
+      focusParams: buildReviewTargetFocusParams(
+        "account",
+        Array.isArray(opsSnapshot?.accounts) && opsSnapshot.accounts.length
+          ? opsSnapshot.accounts[0]
+          : { productCode: filters.productCode || null }
+      )
     }),
     entitlements: () => createReviewTarget({
       key: "ops_entitlements_review",
@@ -5937,7 +6066,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
       label: "Review matched entitlements",
       summary: "Confirm starter entitlements, lifecycle state, and grant windows for the routed launch lane.",
       count: reviewTargetCounts.entitlements,
-      fileName: "developer-ops-entitlements-summary.txt"
+      fileName: "developer-ops-entitlements-summary.txt",
+      focusParams: buildReviewTargetFocusParams(
+        "entitlement",
+        Array.isArray(opsSnapshot?.entitlements) && opsSnapshot.entitlements.length
+          ? opsSnapshot.entitlements[0]
+          : { productCode: filters.productCode || null }
+      )
     }),
     sessions: () => createReviewTarget({
       key: "ops_sessions_review",
@@ -5946,7 +6081,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
       summary: "Check first sign-ins, heartbeat churn, and routed session health before the next launch wave.",
       count: reviewTargetCounts.sessions,
       status: queueHasUrgent ? "review" : "pass",
-      fileName: "developer-ops-sessions-summary.txt"
+      fileName: "developer-ops-sessions-summary.txt",
+      focusParams: buildReviewTargetFocusParams(
+        "session",
+        Array.isArray(opsSnapshot?.sessions) && opsSnapshot.sessions.length
+          ? opsSnapshot.sessions[0]
+          : { productCode: filters.productCode || null }
+      )
     }),
     devices: () => createReviewTarget({
       key: "ops_devices_review",
@@ -5954,7 +6095,15 @@ function buildDeveloperLaunchReviewSummaryPayload({
       label: "Review matched devices",
       summary: "Inspect routed bindings and device blocks so first-wave users are not accidentally locked out.",
       count: reviewTargetCounts.devices,
-      fileName: "developer-ops-devices-summary.txt"
+      fileName: "developer-ops-devices-summary.txt",
+      focusParams: buildReviewTargetFocusParams(
+        "device",
+        Array.isArray(opsSnapshot?.blocks) && opsSnapshot.blocks.length
+          ? { ...opsSnapshot.blocks[0], kind: "block", blockId: opsSnapshot.blocks[0]?.id || null }
+          : Array.isArray(opsSnapshot?.bindings) && opsSnapshot.bindings.length
+            ? { ...opsSnapshot.bindings[0], kind: "binding", bindingId: opsSnapshot.bindings[0]?.id || null }
+            : { productCode: filters.productCode || null }
+      )
     }),
     audit: () => createReviewTarget({
       key: "ops_audit_review",
@@ -5963,7 +6112,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
       summary: "Review routed audit events for launch-day redemptions, revocations, and other early warning signals.",
       count: reviewTargetCounts.audit,
       status: queueHasUrgent ? "review" : "pass",
-      fileName: "developer-ops-audit-summary.txt"
+      fileName: "developer-ops-audit-summary.txt",
+      focusParams: buildReviewTargetFocusParams(
+        "audit",
+        Array.isArray(opsSnapshot?.auditLogs) && opsSnapshot.auditLogs.length
+          ? opsSnapshot.auditLogs[0]
+          : { productCode: filters.productCode || null }
+      )
     })
   };
   const reviewTargets = preferredTargetOrder

@@ -5741,6 +5741,14 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
       assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.focusKind));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => {
+        const params = item.workspaceAction?.params || {};
+        return Boolean(
+          params.focusKind
+          && (params.focusAccountId || params.focusEntitlementId || params.focusSessionId || params.focusBindingId || params.focusBlockId || params.focusUsername || params.focusFingerprint || params.focusProductCode)
+        );
+      }));
       assert.ok(Array.isArray(launchReview.reviewSummary.recommendedDownloads));
       assert.ok(launchReview.reviewSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
@@ -10940,7 +10948,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /requestedEventType/);
     assert.match(html, /requestedActorType/);
     assert.match(html, /requestedEntityType/);
+    assert.match(html, /requestedFocusKind/);
     assert.match(html, /Route filters:/);
+    assert.match(html, /Direct review target:/);
     assert.match(html, /route-review-box/);
     assert.match(html, /renderRouteReview/);
     assert.match(html, /handleRouteReviewAction/);

@@ -230,6 +230,7 @@
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedRouteAction = normalizeRouteReviewActionValue((routeParams.get("routeAction") || "").trim().toLowerCase());
       const requestedReviewMode = (routeParams.get("reviewMode") || "").trim().toLowerCase();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
@@ -248,7 +249,7 @@
       const requestedFocusUsername = (routeParams.get("focusUsername") || "").trim();
       const requestedFocusReason = (routeParams.get("focusReason") || "").trim();
       const requestedFocusProductCode = (routeParams.get("focusProductCode") || "").trim();
-      routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
+      routeReviewDisplayMode = (requestedReviewMode === "matched" || requestedRouteAction) ? "matched" : "all";
 
       function emptySnapshot() {
         return {
@@ -280,6 +281,43 @@
       const q = (params) => { const s = new URLSearchParams(); Object.entries(params).forEach(([k, v]) => { if (v !== null && v !== undefined && String(v).trim() !== "") s.set(k, String(v).trim()); }); const r = s.toString(); return r ? `?${r}` : ""; };
       const buildWorkspaceUrl = (path, params = {}) => `${path}${q(params)}`;
       const cloneValue = (value) => value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : null;
+      function normalizeRouteReviewActionValue(value = "") {
+        const normalized = String(value || "").trim().toLowerCase();
+        const allowed = new Set([
+          "prepare-primary",
+          "review-accounts",
+          "review-entitlements",
+          "review-sessions",
+          "review-devices",
+          "review-audit"
+        ]);
+        return allowed.has(normalized) ? normalized : "";
+      }
+      function currentRequestedRouteReviewAction() {
+        return requestedRouteAction;
+      }
+      function formatRouteReviewActionLabel(actionKey = "") {
+        const normalized = normalizeRouteReviewActionValue(actionKey);
+        if (normalized === "prepare-primary") {
+          return "Prepare Primary Match";
+        }
+        if (normalized === "review-accounts") {
+          return "Review Accounts";
+        }
+        if (normalized === "review-entitlements") {
+          return "Review Entitlements";
+        }
+        if (normalized === "review-sessions") {
+          return "Review Sessions";
+        }
+        if (normalized === "review-devices") {
+          return "Review Devices";
+        }
+        if (normalized === "review-audit") {
+          return "Review Audit";
+        }
+        return "";
+      }
 
       function currentOpsTarget() {
         return {
@@ -386,7 +424,7 @@
       }
 
       function shouldAutoFocusOpsWorkspace() {
-        return Boolean(token && requestedProductCode && requestedAutofocus);
+        return Boolean(token && requestedProductCode && (requestedAutofocus || currentRequestedRouteReviewAction()));
       }
 
       function currentOpsMatchesRequestedRoute() {
@@ -1223,10 +1261,12 @@
         const hasProduct = Boolean(target.productCode);
         const actions = Array.isArray(focus.actions) ? focus.actions : [];
         const directFocus = buildRequestedRouteFocus();
+        const routeActionLabel = formatRouteReviewActionLabel(currentRequestedRouteReviewAction());
         box.innerHTML = `
           <div>${renderTag(focus.title || "Ops route focus", hasProduct)} ${requestedRouteTitle ? renderTag(`from:${requestedRouteTitle}`, true) : ""} ${requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
           ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
           ${directFocus?.kind ? `<div class="hint" style="margin-top:8px;">${esc(`Direct review target: ${formatRouteReviewPrimaryTitle(directFocus)} | ${formatRouteReviewPrimarySummary(directFocus)}`)}</div>` : ""}
+          ${routeActionLabel ? `<div class="hint" style="margin-top:8px;">${esc(`Route review action: ${routeActionLabel}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project code first.`)}</div>
           ${(requestedEventType || requestedActorType || requestedEntityType || requestedUsername || requestedSearch) ? `<div class="hint" style="margin-top:10px;">${esc(`Route filters: event=${requestedEventType || "-"} | actor=${requestedActorType || "-"} | entity=${requestedEntityType || "-"} | username=${requestedUsername || "-"} | search=${requestedSearch || "-"}`)}</div>` : ""}
           ${requestedReviewMode ? `<div class="hint" style="margin-top:10px;">${esc(`Route review mode: ${requestedReviewMode}`)}</div>` : ""}
@@ -1249,13 +1289,14 @@
         const box = el("route-review-box");
         const review = collectRouteReview();
         if (!review.active) {
-          routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
+          routeReviewDisplayMode = (requestedReviewMode === "matched" || currentRequestedRouteReviewAction()) ? "matched" : "all";
           box.innerHTML = `<div class="hint">Open this page from launch workflow or another routed workspace action to summarize the routed launch-day review here.</div>`;
           return;
         }
         const target = currentOpsTarget();
         const filterTags = [
           requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : "",
+          currentRequestedRouteReviewAction() ? renderTag(`action:${formatRouteReviewActionLabel(currentRequestedRouteReviewAction())}`) : "",
           review.filters.productCode ? renderTag(`project:${review.filters.productCode}`, true) : "",
           review.filters.username ? renderTag(`username:${review.filters.username}`) : "",
           review.filters.eventType ? renderTag(`event:${review.filters.eventType}`) : "",
@@ -1307,65 +1348,77 @@
       }
 
       async function hydrateOpsAutofocus() {
-        if (!requestedAutofocus) {
+        const routeAction = currentRequestedRouteReviewAction();
+        if (!requestedAutofocus && !routeAction) {
           return;
         }
         if (!shouldAutoFocusOpsWorkspace()) {
-          focusOpsAutofocusTarget();
+          if (requestedAutofocus) {
+            focusOpsAutofocusTarget();
+          }
           return;
         }
         if (!currentOpsMatchesRequestedRoute()) {
           return;
         }
-        focusOpsAutofocusTarget();
+        if (requestedAutofocus) {
+          focusOpsAutofocusTarget();
+        }
+        if (routeAction) {
+          await handleRouteReviewAction(routeAction, { auto: true });
+          return;
+        }
         if (routeReviewDisplayMode === "matched" || hasRouteReviewFilters()) {
           await preparePrimaryRouteReviewFocus({ announce: false });
         }
       }
 
-      async function handleRouteReviewAction(actionKey) {
-        if (actionKey === "mode-matched") {
+      async function handleRouteReviewAction(actionKey, options = {}) {
+        const normalizedAction = normalizeRouteReviewActionValue(actionKey) || String(actionKey || "").trim().toLowerCase();
+        if (normalizedAction === "mode-matched") {
           routeReviewDisplayMode = "matched";
           renderAll();
           const primary = await preparePrimaryRouteReviewFocus({ announce: false });
           setStatus(`Developer ops narrowed to routed hits only. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
           return;
         }
-        if (actionKey === "mode-all") {
+        if (normalizedAction === "mode-all") {
           routeReviewDisplayMode = "all";
           renderAll();
           setStatus("Developer ops returned to the full scoped view.");
           return;
         }
-        if (actionKey === "refresh") {
+        if (normalizedAction === "refresh") {
           await refreshOps();
           const primary = await preparePrimaryRouteReviewFocus({ announce: false });
           setStatus(`Route review refreshed. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
           return;
         }
-        if (actionKey === "download") {
+        if (normalizedAction === "download") {
           await handleExportDownload("summary", "developer-ops-summary.txt", "Routed ops summary");
           return;
         }
-        if (actionKey === "scroll") {
+        if (normalizedAction === "scroll") {
           focusOpsAutofocusTarget();
           setStatus(`Route review focus moved to ${requestedAutofocus || "snapshot"}. ${formatRouteReviewSummary()}.`);
           return;
         }
-        if (actionKey === "prepare-primary") {
+        if (normalizedAction === "prepare-primary") {
           const primary = await preparePrimaryRouteReviewFocus({ force: true, focusControls: true });
           if (!primary?.kind) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
           }
+          setStatus(`${options.auto ? "Auto-prepared" : "Prepared"} routed primary match. ${formatRouteReviewSummary()}. Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.`);
           return;
         }
-        if (actionKey.startsWith("review-")) {
-          const section = actionKey.replace("review-", "");
+        if (normalizedAction.startsWith("review-")) {
+          const section = normalizedAction.replace("review-", "");
           routeReviewDisplayMode = "matched";
           renderAll();
           focusRouteReviewSection(section);
           const primary = await preparePrimaryRouteReviewFocus({ force: true, preferredSection: section, announce: false });
-          setStatus(`Reviewing routed ${section}. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
+          const routeLabel = formatRouteReviewActionLabel(normalizedAction) || `Review ${section}`;
+          setStatus(`${options.auto ? "Auto-opened" : "Reviewing"} routed ${routeLabel.toLowerCase()}. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
         }
       }
 
@@ -3251,7 +3304,7 @@
         lastExportDownload = null;
         preparedFocus = null;
         lastMutation = null;
-        routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
+        routeReviewDisplayMode = (requestedReviewMode === "matched" || currentRequestedRouteReviewAction()) ? "matched" : "all";
         routeReviewPreparedKey = "";
         setMeta();
         renderAll();

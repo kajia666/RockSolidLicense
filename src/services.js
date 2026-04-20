@@ -4024,6 +4024,7 @@ function buildLaunchAuthorizationOperationalPlan({
     summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine.",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", {
       reviewMode: "matched",
+      routeAction: "review-sessions",
       eventType: "session.login",
       actorType: "account"
     })
@@ -4041,6 +4042,7 @@ function buildLaunchAuthorizationOperationalPlan({
       summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up.",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "audit", "Open Ops Workspace", {
         reviewMode: "matched",
+        routeAction: "review-audit",
         entityType: "license_key"
       })
     };
@@ -4067,6 +4069,7 @@ function buildLaunchAuthorizationOperationalPlan({
     summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users.",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
       reviewMode: "matched",
+      routeAction: "review-sessions",
       eventType: "session.login",
       actorType: "account"
     })
@@ -6106,6 +6109,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     for (const item of reviewSummary.reviewTargets) {
       lines.push(
         `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
+        + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
         + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
       );
@@ -6341,6 +6345,47 @@ function buildDeveloperLaunchReviewSummaryPayload({
       params: { ...matchedOpsParams }
     }
   );
+  const buildReviewTargetRouteAction = (autofocus = "") => {
+    const normalized = String(autofocus || "").trim().toLowerCase();
+    if (normalized === "accounts") {
+      return "review-accounts";
+    }
+    if (normalized === "entitlements") {
+      return "review-entitlements";
+    }
+    if (normalized === "sessions") {
+      return "review-sessions";
+    }
+    if (normalized === "devices" || normalized === "bindings" || normalized === "blocks") {
+      return "review-devices";
+    }
+    if (normalized === "audit") {
+      return "review-audit";
+    }
+    return "prepare-primary";
+  };
+  const buildReviewTargetRouteActionLabel = (routeAction = "") => {
+    const normalized = String(routeAction || "").trim().toLowerCase();
+    if (normalized === "review-accounts") {
+      return "Review Accounts";
+    }
+    if (normalized === "review-entitlements") {
+      return "Review Entitlements";
+    }
+    if (normalized === "review-sessions") {
+      return "Review Sessions";
+    }
+    if (normalized === "review-devices") {
+      return "Review Devices";
+    }
+    if (normalized === "review-audit") {
+      return "Review Audit";
+    }
+    if (normalized === "prepare-primary") {
+      return "Prepare Primary Match";
+    }
+    return "";
+  };
   const createReviewTarget = ({
     key,
     autofocus,
@@ -6349,11 +6394,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
     count = 0,
     status = "review",
     fileName = "developer-ops-summary.txt",
-    focusParams = null
+    focusParams = null,
+    routeAction = ""
   } = {}) => {
     if (!key || !autofocus) {
       return null;
     }
+    const resolvedRouteAction = routeAction || buildReviewTargetRouteAction(autofocus);
     return {
       key,
       autofocus,
@@ -6361,13 +6408,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
       count: Number(count || 0),
       status: status || "review",
       summary: summary || "-",
+      routeAction: resolvedRouteAction,
+      routeActionLabel: buildReviewTargetRouteActionLabel(resolvedRouteAction),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut(
         "ops",
         autofocus,
         label || "Open Ops Workspace",
         {
           ...matchedOpsParams,
-          ...(focusParams && typeof focusParams === "object" ? focusParams : {})
+          ...(focusParams && typeof focusParams === "object" ? focusParams : {}),
+          ...(resolvedRouteAction ? { routeAction: resolvedRouteAction } : {})
         }
       ),
       recommendedDownload: createReviewTargetDownload(
@@ -7067,6 +7117,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       summary: "After a successful smoke login or recharge, confirm the resulting session and audit signal inside Developer Ops.",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
         reviewMode: "matched",
+        routeAction: "review-sessions",
         eventType: "session.login",
         actorType: "account"
       })

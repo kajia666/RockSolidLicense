@@ -53,6 +53,8 @@ Each target can route directly into the matching scoped `Developer Ops` section 
 
 Those routed target links now also carry the first matched object itself when possible. So when launch review says "Review matched accounts" or "Review matched sessions", `/developer/ops` can open with a direct review target already prepared instead of only dropping the author into a broad section and asking them to find the first object again.
 
+Those same target links now also carry a routed review action such as `Review Accounts`, `Review Sessions`, or `Review Audit`. So the handoff into `/developer/ops` no longer stops at "open the right page"; it can land in the narrower routed review slice and immediately start the matching review step for the current launch lane.
+
 ## Scoped APIs
 
 - `GET /api/developer/launch-review`

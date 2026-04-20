@@ -5763,6 +5763,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
       assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.focusKind));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => {
         const params = item.workspaceAction?.params || {};
@@ -5779,6 +5782,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
       assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
       assert.match(launchReview.summaryText, /Launch Review Focus Targets:/);
+      assert.match(launchReview.summaryText, /action=Review /);
       assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(
@@ -10961,8 +10965,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /route-focus-box/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /requestedAutofocus/);
+    assert.match(html, /requestedRouteAction/);
     assert.match(html, /requestedReviewMode/);
     assert.match(html, /Route reason:/);
+    assert.match(html, /Route review action:/);
     assert.match(html, /Route review mode:/);
     assert.match(html, /Open this page from launch workflow or another routed workspace action/);
     assert.match(html, /handleOpsRouteFocusAction/);

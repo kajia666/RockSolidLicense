@@ -607,7 +607,7 @@
             <div class="hint" style="margin-top: 12px;">Review Targets</div>
             ${reviewTargets.map((item, index) => `
               <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
-                <div>${renderTag(`count:${item.count ?? 0}`, Number(item.count || 0) > 0)} ${renderTag(String(item.status || "review").toUpperCase(), String(item.status || "review").toLowerCase() === "pass")} ${esc(item.label || item.key || "target")}</div>
+                <div>${renderTag(`count:${item.count ?? 0}`, Number(item.count || 0) > 0)} ${renderTag(String(item.status || "review").toUpperCase(), String(item.status || "review").toLowerCase() === "pass")} ${item.routeActionLabel ? renderTag(`route:${item.routeActionLabel}`) : ""} ${esc(item.label || item.key || "target")}</div>
                 <div class="hint" style="margin-top: 8px;">${esc(item.summary || "-")}</div>
                 <div class="actions" style="margin-top: 8px;">
                   ${item.workspaceAction ? `<button type="button" class="secondary" data-review-target-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}

@@ -83,6 +83,7 @@
 - 这条 `Launch Review` 现在还会直接给出推荐工作台、复查动作计划和推荐下载，不只是把 launch 和 ops 放在同一页里，软件作者也能更快知道下一步该开哪个工作台、拿哪份摘要
 - `Launch Review` 现在还可以直接运行 `Launch Bootstrap / First Batch Setup / Inventory Refill`，并在页内保留 `Last Review Action` 回执，所以软件作者在复查页里就能直接修正 starter policy、首批库存或补库存动作，再顺着做下一步 launch recheck
 - `Launch Review` 现在还会把复查目标细化成 `accounts / entitlements / sessions / devices / audit` 级别的 routed review targets，软件作者可以直接从复查页跳到最贴合的 `Developer Ops` 区块，而不只是泛化地“去 ops 看看”
+- 这批 `Launch Review` 复查目标现在还会继续带 `routeAction` 进 `Developer Ops`，比如 `Review Sessions / Review Accounts / Review Audit`，所以从复查页跳到运营台时，不再只是到对的页面，而是更接近直接落到当前该做的那一步
 - 开发者发版中心现在也补上了结构化的 `Release Mainline Follow-up`。生成 release package 后，发版页会直接告诉软件作者下一步更该去 `Release / Launch Workflow / Launch Review / Integration` 哪个工作台，并把 `Release checklist / Launch review summary / Launch smoke kit summary` 这些更贴近主链的下载一起挂出来；release package 也正式支持单独下载 `checklist`
 - 上面这些首发建议现在也不只是说明文字了，软件作者可以直接从建议旁边跳到授权预设、授权中心、上线工作台、发版工作台、开发者运营台，或者直接运行 `Launch Bootstrap`；首批直登卡/充值卡建议也会按推荐的批次数量和前缀直接预填到发卡表单里，把“看建议 -> 去处理”压成更短的动作链
 - 现在这条“首批发卡建议”还进一步落成了真正可执行动作：既可以继续 `Review Template` 手工确认，也可以直接在授权快启里运行一键首批发卡初始化，把推荐的首批直登卡 / 充值卡库存直接创建出来

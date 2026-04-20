@@ -5713,19 +5713,49 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchZipDownload.contentType || "", /^application\/zip/);
     assert.match(launchZipDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.zip"/);
     assert.equal(launchZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
-    const launchZipText = launchZipDownload.body.toString("latin1");
-    assert.match(launchZipText, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.json/);
-    assert.match(launchZipText, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt/);
-    assert.match(launchZipText, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
-    assert.match(launchZipText, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
-    assert.match(launchZipText, /integration\/host-config\/rocksolid_host_config\.env/);
-    assert.match(launchZipText, /integration\/host-skeleton\/RELPKG_ALPHA-host-skeleton\.cpp/);
-    assert.match(launchZipText, /SHA256SUMS\.txt/);
+      const launchZipText = launchZipDownload.body.toString("latin1");
+      assert.match(launchZipText, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.json/);
+      assert.match(launchZipText, /rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt/);
+      assert.match(launchZipText, /release\/rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
+      assert.match(launchZipText, /integration\/rocksolid-integration-RELPKG_ALPHA\.json/);
+      assert.match(launchZipText, /integration\/host-config\/rocksolid_host_config\.env/);
+      assert.match(launchZipText, /integration\/host-skeleton\/RELPKG_ALPHA-host-skeleton\.cpp/);
+      assert.match(launchZipText, /SHA256SUMS\.txt/);
 
-    const forbidden = await getJsonExpectError(
-      baseUrl,
-      "/api/developer/release-package?productCode=RELPKG_BETA&channel=stable",
-      viewerSession.token
+      const launchReview = await getJson(
+        baseUrl,
+        "/api/developer/launch-review?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched",
+        viewerSession.token
+      );
+      assert.match(launchReview.fileName, /^rocksolid-developer-launch-review-RELPKG_ALPHA-stable-/);
+      assert.equal(launchReview.manifest.project.code, "RELPKG_ALPHA");
+      assert.equal(launchReview.filters.eventType, "session.login");
+      assert.equal(launchReview.filters.actorType, "account");
+      assert.equal(launchReview.filters.reviewMode, "matched");
+      assert.equal(launchReview.launchWorkflow.manifest.project.code, "RELPKG_ALPHA");
+      assert.equal(launchReview.opsSnapshot.scope.eventType, "session.login");
+      assert.equal(launchReview.opsSnapshot.scope.actorType, "account");
+      assert.match(launchReview.summaryText, /RockSolid Developer Launch Review/);
+      assert.match(launchReview.summaryText, /RockSolid Launch Workflow Package/);
+      assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
+
+      const launchReviewSummaryDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-review/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=summary",
+        viewerSession.token
+      );
+      assert.match(launchReviewSummaryDownload.contentType || "", /^text\/plain/);
+      assert.match(launchReviewSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-review-RELPKG_ALPHA-stable-.*-summary\.txt"/);
+      assert.match(launchReviewSummaryDownload.body, /RockSolid Developer Launch Review/);
+      assert.match(launchReviewSummaryDownload.body, /Ops Event Filter: session\.login/);
+      assert.match(launchReviewSummaryDownload.body, /Ops Actor Filter: account/);
+      assert.match(launchReviewSummaryDownload.body, /Launch Workflow Summary:/);
+      assert.match(launchReviewSummaryDownload.body, /Ops Snapshot Summary:/);
+
+      const forbidden = await getJsonExpectError(
+        baseUrl,
+        "/api/developer/release-package?productCode=RELPKG_BETA&channel=stable",
+        viewerSession.token
     );
     assert.equal(forbidden.status, 403);
     assert.equal(forbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
@@ -5979,15 +6009,19 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.equal(bootstrap.followUp.operation, "bootstrap");
     assert.equal(bootstrap.followUp.primaryAction?.key, "launch_recheck");
     assert.ok(Array.isArray(bootstrap.followUp.actions));
-    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_recheck"));
-    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "inventory_recheck"));
-    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "starter_account_handoff"));
-    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
-    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
-    assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_summary"));
-    assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
-    assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "ops_runtime_smoke_summary"));
-    assert.match(bootstrap.followUp.summary, /Next:/);
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "inventory_recheck"));
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "starter_account_handoff"));
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "ops_runtime_smoke_summary"));
+      assert.equal(
+        bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
+        "developer-launch-review"
+      );
+      assert.match(bootstrap.followUp.summary, /Next:/);
 
     const policies = await getJson(
       baseUrl,
@@ -6083,13 +6117,17 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
     assert.equal(bootstrap.after.counts.activeEntitlements, 1);
     assert.equal(bootstrap.created.entitlement.username, bootstrap.created.account.username);
     assert.ok(bootstrap.created.entitlement.seedBatchCode);
-    assert.equal(bootstrap.followUp.operation, "bootstrap");
-    assert.equal(bootstrap.followUp.primaryAction?.key, "launch_recheck");
-    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_recheck"));
-    assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "inventory_recheck"));
-    assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_summary"));
-    assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
-    assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
+      assert.equal(bootstrap.followUp.operation, "bootstrap");
+      assert.equal(bootstrap.followUp.primaryAction?.key, "launch_recheck");
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "inventory_recheck"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
+      assert.equal(
+        bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
+        "developer-launch-review"
+      );
 
     const entitlements = await getJson(
       baseUrl,
@@ -6206,13 +6244,17 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.ok(setup.createdBatches.some((item) => item.mode === "direct_card" && item.prefix === "FIRSTBATCHDL"));
     assert.ok(setup.createdBatches.some((item) => item.mode === "recharge" && item.prefix === "FIRSTBATCHRC"));
     assert.equal(setup.followUp.operation, "first_batch_setup");
-    assert.equal(setup.followUp.primaryAction?.key, "inventory_recheck");
-    assert.ok(setup.followUp.actions.some((item) => item.key === "inventory_recheck"));
-    assert.ok(setup.followUp.actions.some((item) => item.key === "launch_recheck"));
-    assert.ok(setup.followUp.actions.some((item) => item.key === "runtime_smoke"));
-    assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_summary"));
-    assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
-    assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
+      assert.equal(setup.followUp.primaryAction?.key, "inventory_recheck");
+      assert.ok(setup.followUp.actions.some((item) => item.key === "inventory_recheck"));
+      assert.ok(setup.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(setup.followUp.actions.some((item) => item.key === "runtime_smoke"));
+      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
+      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
+      assert.equal(
+        setup.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
+        "developer-launch-review"
+      );
 
     const cards = await getJson(
       baseUrl,
@@ -6362,13 +6404,17 @@ test("developer launch workflow can restock low launch inventory buffers", async
     assert.ok(restock.createdBatches.some((item) => item.mode === "direct_card" && item.refillCount === 40));
     assert.ok(restock.createdBatches.some((item) => item.mode === "recharge" && item.refillCount === 80));
     assert.equal(restock.followUp.operation, "restock");
-    assert.equal(restock.followUp.primaryAction?.key, "inventory_recheck");
-    assert.ok(restock.followUp.actions.some((item) => item.key === "inventory_recheck"));
-    assert.ok(restock.followUp.actions.some((item) => item.key === "launch_recheck"));
-    assert.ok(restock.followUp.actions.some((item) => item.key === "session_review"));
-    assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_summary"));
-    assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
-    assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
+      assert.equal(restock.followUp.primaryAction?.key, "inventory_recheck");
+      assert.ok(restock.followUp.actions.some((item) => item.key === "inventory_recheck"));
+      assert.ok(restock.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(restock.followUp.actions.some((item) => item.key === "session_review"));
+      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
+      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
+      assert.equal(
+        restock.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
+        "developer-launch-review"
+      );
 
     const launchWorkflowAfterRestock = await getJson(
       baseUrl,
@@ -9879,10 +9925,11 @@ test("developer launch workflow page is served from the dedicated route", async 
     const html = await response.text();
     assert.equal(response.ok, true);
     assert.match(response.headers.get("content-type") || "", /^text\/html/);
-    assert.match(html, /Developer Launch Workflow/);
-    assert.match(html, /api\/developer\/launch-workflow/);
-    assert.match(html, /api\/developer\/launch-workflow\/download/);
-    assert.match(html, /Generate Launch Workflow/);
+      assert.match(html, /Developer Launch Workflow/);
+      assert.match(html, /api\/developer\/launch-workflow/);
+      assert.match(html, /api\/developer\/launch-workflow\/download/);
+      assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /Generate Launch Workflow/);
     assert.match(html, /Download Launch JSON/);
     assert.match(html, /Download Launch Summary/);
     assert.match(html, /Download Launch Checklist/);
@@ -10403,9 +10450,10 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /products\/feature-config\/batch/);
     assert.match(html, /sdk-credentials\/rotate\/batch/);
     assert.match(html, /sdk-credentials\/export/);
-    assert.match(html, /integration-packages\/export/);
-    assert.match(html, /integration-packages\/export\/download/);
-    assert.match(html, /products\/:productId\/profile/);
+      assert.match(html, /integration-packages\/export/);
+      assert.match(html, /integration-packages\/export\/download/);
+      assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
     assert.match(html, /Create Project/);
@@ -10817,9 +10865,10 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/policies/);
     assert.match(html, /api\/developer\/cards/);
     assert.match(html, /api\/developer\/dashboard/);
-    assert.match(html, /api\/developer\/cards\/export/);
-    assert.match(html, /api\/developer\/cards\/export\/download/);
-    assert.match(html, /\/assets\/product-features\.js/);
+      assert.match(html, /api\/developer\/cards\/export/);
+      assert.match(html, /api\/developer\/cards\/export\/download/);
+      assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Issue Card Batch/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Checksums/);

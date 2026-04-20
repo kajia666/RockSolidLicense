@@ -2746,6 +2746,21 @@ function createLaunchWorkflowOpsDownloadShortcut(action, {
   );
 }
 
+function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summary", fileName = "launch-review.txt", format = "summary", params = null) {
+  return createLaunchWorkflowDownloadShortcut(
+    "launch_review_summary",
+    fileName,
+    label,
+    {
+      source: "developer-launch-review",
+      format,
+      params: params && typeof params === "object"
+        ? { ...params }
+        : {}
+    }
+  );
+}
+
 function createLaunchWorkflowBootstrapAction({
   key = "launch_bootstrap",
   label = "Run Launch Bootstrap",
@@ -3738,16 +3753,35 @@ function buildLaunchQuickstartFollowUpPlan({
     pushPreferredKey(item.key);
   }
 
+  const preferredOpsAction = firstOpsActions.find((item) => item?.workspaceAction?.key === "ops") || null;
+  const launchReviewDownload = createLaunchWorkflowReviewDownloadShortcut(
+    normalizedOperation === "restock"
+      ? "Launch refill review summary"
+      : normalizedOperation === "first_batch_setup"
+        ? "Launch inventory review summary"
+        : "Launch review summary",
+    normalizedOperation === "restock"
+      ? "launch-review-restock.txt"
+      : normalizedOperation === "first_batch_setup"
+        ? "launch-review-inventory.txt"
+        : "launch-review.txt",
+    "summary",
+    preferredOpsAction?.workspaceAction?.params
+  );
   const actions = preferredKeys
     .map((key, index) => {
       const item = actionMap.get(key);
       if (!item) {
         return null;
       }
-      return {
+      const nextItem = {
         ...item,
         priority: index === 0 ? "primary" : "secondary"
       };
+      if (key === "launch_recheck") {
+        nextItem.recommendedDownload = launchReviewDownload;
+      }
+      return nextItem;
     })
     .filter(Boolean);
 
@@ -5484,6 +5518,179 @@ function buildLaunchWorkflowPackageDownloadAsset(payload, format = "json") {
 
   return {
     fileName: payload.fileName || "launch-workflow.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
+function buildDeveloperLaunchReviewSummaryText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const launchWorkflow = payload.launchWorkflow || {};
+  const workflowSummary = launchWorkflow.workflowSummary || {};
+  const workflowChecklist = launchWorkflow.workflowChecklist || {};
+  const opsSnapshot = payload.opsSnapshot || {};
+  const opsOverview = opsSnapshot.overview || {};
+  const lines = [
+    "RockSolid Developer Launch Review",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Review Mode: ${filters.reviewMode || "-"}`,
+    `Ops Event Filter: ${filters.eventType || "-"}`,
+    `Ops Actor Filter: ${filters.actorType || "-"}`,
+    `Ops Entity Filter: ${filters.entityType || "-"}`,
+    "",
+    `Launch Workflow Status: ${String(workflowSummary.status || "unknown").toUpperCase()}`,
+    `Launch Workflow Title: ${workflowSummary.title || "-"}`,
+    `Launch Workflow Message: ${workflowSummary.message || "-"}`,
+    `Launch Checklist: ${String(workflowChecklist.status || "unknown").toUpperCase()} | pass=${workflowChecklist.passItems ?? 0} | review=${workflowChecklist.reviewItems ?? 0} | block=${workflowChecklist.blockItems ?? 0}`,
+    "",
+    `Ops Snapshot Status: ${String(opsOverview.status || "unknown").toUpperCase()}`,
+    `Ops Snapshot Headline: ${opsOverview.headline || "-"}`,
+    `Ops Snapshot Projects: ${opsSnapshot.summary?.projects ?? 0}`,
+    `Ops Snapshot Accounts: ${opsSnapshot.summary?.accounts ?? 0}`,
+    `Ops Snapshot Entitlements: ${opsSnapshot.summary?.entitlements ?? 0}`,
+    `Ops Snapshot Sessions: ${opsSnapshot.summary?.sessions ?? 0}`,
+    `Ops Snapshot Audit Logs: ${opsSnapshot.summary?.auditLogs ?? 0}`
+  ];
+
+  if (launchWorkflow.summaryText) {
+    lines.push("");
+    lines.push("Launch Workflow Summary:");
+    lines.push(launchWorkflow.summaryText);
+  }
+
+  if (opsSnapshot.summaryText) {
+    lines.push("");
+    lines.push("Ops Snapshot Summary:");
+    lines.push(opsSnapshot.summaryText);
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchReviewPayload({
+  generatedAt = nowIso(),
+  launchWorkflow = null,
+  opsSnapshot = null,
+  filters = {}
+} = {}) {
+  const manifest = launchWorkflow?.manifest || {};
+  const project = manifest.project || {};
+  const channel = manifest.channel || filters.channel || "stable";
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const scopeTag = sanitizeExportNameSegment(project.code || filters.productCode || "launch-review", "launch-review");
+  const fileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}.json`;
+  const summaryFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
+  const payload = {
+    generatedAt,
+    fileName,
+    summaryFileName,
+    manifest: {
+      generatedAt,
+      channel,
+      project: {
+        id: project.id || null,
+        code: project.code || filters.productCode || null,
+        name: project.name || ""
+      }
+    },
+    filters: {
+      productCode: project.code || filters.productCode || null,
+      channel,
+      username: filters.username || null,
+      search: filters.search || null,
+      eventType: filters.eventType || null,
+      actorType: filters.actorType || null,
+      entityType: filters.entityType || null,
+      reviewMode: filters.reviewMode || null
+    },
+    launchWorkflow,
+    opsSnapshot,
+    notes: [
+      "This review package combines the current launch workflow lane with the scoped developer ops follow-up snapshot.",
+      "Use it right after launch bootstrap, first-batch setup, or inventory refill when you need one file to recheck launch readiness and first-wave runtime signals."
+    ]
+  };
+  payload.summaryText = buildDeveloperLaunchReviewSummaryText(payload);
+  return payload;
+}
+
+function buildDeveloperLaunchReviewFiles(payload = {}) {
+  const files = [
+    {
+      path: payload.fileName || "developer-launch-review.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: payload.summaryFileName || "developer-launch-review-summary.txt",
+      body: payload.summaryText || ""
+    }
+  ];
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `launch/${payload.launchWorkflow?.summaryFileName || "launch-workflow.txt"}`,
+    payload.launchWorkflow?.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `launch/${payload.launchWorkflow?.checklistFileName || "launch-workflow-checklist.txt"}`,
+    payload.launchWorkflow?.checklistText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `ops/${payload.opsSnapshot?.summaryFileName || "developer-ops-summary.txt"}`,
+    payload.opsSnapshot?.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `ops/${payload.opsSnapshot?.fileName || "developer-ops.json"}`,
+    payload.opsSnapshot ? JSON.stringify(payload.opsSnapshot, null, 2) : ""
+  );
+  return files;
+}
+
+function buildDeveloperLaunchReviewZipEntries(payload = {}) {
+  const root = buildArchiveRootName(payload.fileName, "developer-launch-review");
+  return buildZipEntriesFromFiles(root, buildDeveloperLaunchReviewFiles(payload));
+}
+
+function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "checksums", "zip"],
+    "json",
+    "INVALID_DEVELOPER_LAUNCH_REVIEW_FORMAT",
+    "Developer launch review format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "developer-launch-review")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildDeveloperLaunchReviewZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "developer-launch-review"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildDeveloperLaunchReviewFiles(payload))
+    };
+  }
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "developer-launch-review-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "developer-launch-review.json",
     contentType: "application/json; charset=utf-8",
     body: JSON.stringify(payload, null, 2)
   };
@@ -13196,12 +13403,53 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return payload;
     },
 
+    async developerLaunchReviewPackage(token, selector = {}, options = {}) {
+      const launchWorkflow = await this.developerLaunchWorkflowPackage(token, selector, options);
+      const project = launchWorkflow?.manifest?.project || {};
+      const channel = launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
+      const opsSnapshot = await this.developerExportOpsSnapshot(token, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        username: selector.username,
+        search: selector.search,
+        eventType: selector.eventType,
+        actorType: selector.actorType,
+        entityType: selector.entityType,
+        limit: selector.limit
+      });
+      const payload = buildDeveloperLaunchReviewPayload({
+        generatedAt: launchWorkflow?.manifest?.generatedAt || opsSnapshot?.generatedAt || nowIso(),
+        launchWorkflow,
+        opsSnapshot,
+        filters: {
+          productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+          channel,
+          username: selector.username || null,
+          search: selector.search || null,
+          eventType: selector.eventType || null,
+          actorType: selector.actorType || null,
+          entityType: selector.entityType || null,
+          reviewMode: selector.reviewMode || null
+        }
+      });
+      const session = requireDeveloperSession(db, token);
+      auditDeveloperSession(db, session, "product.launch-review.export", "product", project.id, {
+        code: project.code,
+        channel,
+        fileName: payload.fileName
+      });
+      return payload;
+    },
+
     releasePackageDownloadAsset(payload, format = "json") {
       return buildReleasePackageDownloadAsset(payload, format);
     },
 
     launchWorkflowPackageDownloadAsset(payload, format = "json") {
       return buildLaunchWorkflowPackageDownloadAsset(payload, format);
+    },
+
+    launchReviewDownloadAsset(payload, format = "json") {
+      return buildDeveloperLaunchReviewDownloadAsset(payload, format);
     },
 
     integrationPackageExportDownloadAsset(payload, format = "json") {

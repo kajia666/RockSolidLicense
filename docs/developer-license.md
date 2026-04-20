@@ -65,6 +65,8 @@ After `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` completes, 
 - download the matching launch workflow summary/checklist or filtered ops summary without first navigating into another workspace
 - keep the most recent launch initialization result attached to the same routed project instead of re-deriving the next step manually
 
+That same follow-up block can now also download a combined `launch review summary`. It merges the current launch-workflow recheck with the filtered developer-ops snapshot for the routed lane, so QA, support, or launch-duty teammates can review launch readiness and first-wave runtime signals from one handoff file.
+
 The quickstart block now also keeps a `Last Quickstart Action` recap above that follow-up section. It summarizes the before/after counts for starter policies, fresh cards, starter accounts, and active entitlements, then lists the newly created starter batches, accounts, or internal entitlements so a software author can confirm what actually changed before moving on to the next launch-day recheck.
 
 ## Scope

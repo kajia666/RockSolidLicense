@@ -2557,11 +2557,11 @@
         return { firstBatchSetup: setup, cardInventorySetup: setup, launchWorkflow: workflow };
       }
 
-      async function downloadLaunchOpsAsset(item) {
-        const productCode = el("edit-product-code").value.trim();
-        if (!productCode) {
-          throw new Error("Select a project before downloading launch ops assets.");
-        }
+        async function downloadLaunchOpsAsset(item) {
+          const productCode = el("edit-product-code").value.trim();
+          if (!productCode) {
+            throw new Error("Select a project before downloading launch ops assets.");
+          }
         const result = await downloadUrlFile(
           "/api/developer/ops/export/download",
           {
@@ -2571,22 +2571,46 @@
           },
           item?.fileName || "developer-ops-summary.txt"
         );
-        setStatus(`${item?.label || "Ops snapshot summary"} downloaded: ${result.fileName}`);
-        return result;
-      }
+          setStatus(`${item?.label || "Ops snapshot summary"} downloaded: ${result.fileName}`);
+          return result;
+        }
 
-      async function downloadLaunchRecommendedItem(item) {
-        if (!item?.key) {
-          throw new Error("Preview Launch Workflow first so the recommended downloads can be resolved.");
+        async function downloadLaunchReviewAsset(item) {
+          const productCode = el("edit-product-code").value.trim();
+          const channel = currentReleaseChannel();
+          if (!productCode) {
+            throw new Error("Select a project before downloading launch review assets.");
+          }
+          const result = await downloadUrlFile(
+            "/api/developer/launch-review/download",
+            {
+              productCode,
+              channel,
+              format: item?.format || "summary",
+              reviewMode: "matched",
+              ...(item?.params && typeof item.params === "object" ? item.params : {})
+            },
+            item?.fileName || "developer-launch-review-summary.txt"
+          );
+          setStatus(`${item?.label || "Launch review summary"} downloaded: ${result.fileName}`);
+          return result;
         }
-        if (item.source === "developer-ops") {
-          return downloadLaunchOpsAsset(item);
-        }
-        switch (item.key) {
-          case "launch_handoff_zip":
-            return downloadLaunchWorkflowAsset(
-              "handoff-zip",
-              item.fileName || launchWorkflowPreview?.payload?.handoffZipFileName || "launch-workflow-handoff.zip",
+
+        async function downloadLaunchRecommendedItem(item) {
+          if (!item?.key) {
+            throw new Error("Preview Launch Workflow first so the recommended downloads can be resolved.");
+          }
+          if (item.source === "developer-ops") {
+            return downloadLaunchOpsAsset(item);
+          }
+          if (item.source === "developer-launch-review") {
+            return downloadLaunchReviewAsset(item);
+          }
+          switch (item.key) {
+            case "launch_handoff_zip":
+              return downloadLaunchWorkflowAsset(
+                "handoff-zip",
+                item.fileName || launchWorkflowPreview?.payload?.handoffZipFileName || "launch-workflow-handoff.zip",
               item.label || "Launch workflow handoff"
             );
           case "launch_handoff_checksums":

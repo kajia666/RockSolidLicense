@@ -95,6 +95,8 @@ The detail card now also keeps a `Last Launch Action` block in-page. After `Run 
 
 That follow-up chain now starts with explicit recheck steps too. When a launch action changes authorization or starter inventory, the inline workflow can first surface `Review launch workflow recheck` and, when applicable, `Review starter inventory / Review refilled launch inventory`, before moving the author into launch-day ops review.
 
+That same inline follow-up can now also download a combined `launch review` summary. It merges the current launch-workflow lane with the routed developer-ops snapshot filters, so a project owner can hand one review file to QA, support, or launch-duty teammates right from the project workspace.
+
 That same inline launch workflow block now also shows the first slice of:
 
 - `Initial Inventory Recommendations`

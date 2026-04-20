@@ -244,6 +244,11 @@
         </article>
       </section>
 
+      <section class="card" style="margin-bottom: 18px;">
+        <h2>Last Review Action</h2>
+        <div id="review-followup-box" class="hint">Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this review to keep the next follow-up visible here.</div>
+      </section>
+
       <section class="wide">
         <article class="card">
           <h2>Review Summary</h2>
@@ -296,6 +301,7 @@
       let profile = null;
       let actor = null;
       let reviewPackage = null;
+      let lastReviewActionResult = null;
 
       function el(id) { return document.getElementById(id); }
       function q(params = {}) {
@@ -424,6 +430,74 @@
       function currentRecommendedWorkspace() {
         return currentReviewSummary().recommendedWorkspace || null;
       }
+      function currentLastReviewActionResult() {
+        return lastReviewActionResult || null;
+      }
+      function currentLastReviewFollowUp() {
+        return currentLastReviewActionResult()?.followUp || null;
+      }
+      function renderReviewCountTransition(label, beforeValue, afterValue) {
+        if (beforeValue === undefined && afterValue === undefined) {
+          return "";
+        }
+        return renderTag(
+          `${label}:${beforeValue ?? 0}->${afterValue ?? 0}`,
+          Number(afterValue ?? 0) > Number(beforeValue ?? 0)
+        );
+      }
+      function renderLastReviewFollowUp(result = null) {
+        const followUp = result?.followUp;
+        const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
+        if (!actions.length) {
+          return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this review to keep the next follow-up visible here.";
+        }
+        const operationLabel = result?.operationLabel || followUp.operationLabel || followUp.operation || "launch";
+        const summary = followUp.summary || result?.message || "Review the next launch-day follow-up actions.";
+        const before = result?.result?.before?.counts || {};
+        const after = result?.result?.after?.counts || {};
+        const created = result?.result?.created && typeof result.result.created === "object"
+          ? result.result.created
+          : {};
+        const createdBatchList = Array.isArray(result?.result?.createdBatches)
+          ? result.result.createdBatches
+          : (Array.isArray(created.cardBatches) ? created.cardBatches : []);
+        const transitions = [
+          renderReviewCountTransition("policies", before.policies, after.policies),
+          renderReviewCountTransition("freshCards", before.freshCards, after.freshCards),
+          renderReviewCountTransition("accounts", before.accounts, after.accounts),
+          renderReviewCountTransition("activeEntitlements", before.activeEntitlements, after.activeEntitlements)
+        ].filter(Boolean).join("");
+        const createdBits = [
+          created.policy?.name ? renderTag(`policy:${created.policy.name}`, true) : "",
+          created.cardBatch?.batchCode ? renderTag(`batch:${created.cardBatch.batchCode}`, true) : "",
+          createdBatchList.length ? createdBatchList.map((item) => renderTag(`batch:${item.batchCode || item.label || item.key || "-"}`, true)).join("") : "",
+          created.account?.username ? renderTag(`account:${created.account.username}`, true) : "",
+          created.entitlement?.username ? renderTag(`entitlement:${created.entitlement.username}`, true) : ""
+        ].filter(Boolean).join("");
+        return `
+          <div>
+            ${renderTag(`after:${operationLabel}`, true)}
+            ${followUp.primaryAction?.label ? renderTag(`next:${followUp.primaryAction.label}`, true) : ""}
+            ${result?.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
+            ${result?.channel ? renderTag(`channel:${result.channel}`, true) : ""}
+          </div>
+          <div class="hint" style="margin-top: 10px;">${esc(result?.message || "Last launch review action completed.")}</div>
+          <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
+          ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
+          ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
+          ${actions.map((item, index) => `
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(148,163,184,0.28);">
+              <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
+              ${(item.workspaceAction || item.recommendedDownload) ? `
+                <div class="actions" style="margin-top: 8px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-review-followup-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-review-followup-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                </div>
+              ` : ""}
+            </div>
+          `).join("")}
+        `;
+      }
       function focusAutofocusTarget() {
         const target = requestedAutofocus || "summary";
         const node = (
@@ -492,6 +566,7 @@
         if (!reviewPackage) {
           el("review-actions-box").innerHTML = '<div class="hint">Generate a launch review package to inspect the recommended workspace, action plan, and follow-up downloads here.</div>';
           el("review-workspace-box").innerHTML = '<div class="hint">Generate a launch review package to inspect the routed workspace path here.</div>';
+          el("review-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this review to keep the next follow-up visible here.';
           el("review-summary").textContent = "Generate a launch review package to inspect the combined review summary here.";
           el("review-launch-summary").textContent = "Generate a launch review package to inspect launch workflow summary text here.";
           el("review-launch-checklist").textContent = "Generate a launch review package to inspect launch workflow checklist text here.";
@@ -529,10 +604,12 @@
             ${actionPlan.map((item, index) => `
               <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
                 <div>${index + 1}. ${esc(`${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}`)}</div>
-                ${(item.workspaceAction || item.recommendedDownload) ? `
+                ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction) ? `
                   <div class="actions" style="margin-top: 8px;">
                     ${item.workspaceAction ? `<button type="button" class="secondary" data-review-action-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
                     ${item.recommendedDownload ? `<button type="button" data-review-action-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                    ${item.bootstrapAction ? `<button type="button" class="secondary" data-review-action-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                    ${item.setupAction ? `<button type="button" class="secondary" data-review-action-setup-index="${index}">${esc(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                   </div>
                 ` : ""}
               </div>
@@ -556,6 +633,7 @@
               </div>
             `).join("")
           : '<div class="hint">No routed workspace path is available yet.</div>';
+        el("review-followup-box").innerHTML = renderLastReviewFollowUp(lastReviewActionResult);
         el("review-meta-box").innerHTML = `
           <div>${renderTag(`workflow:${String(workflowSummary.status || "unknown").toUpperCase()}`, true)} ${renderTag(`checklist:${String(workflowChecklist.status || "unknown").toUpperCase()}`, true)} ${renderTag(`ops:${String(overview.status || "unknown").toUpperCase()}`, true)}</div>
           <div class="hint" style="margin-top: 10px;">${esc(workflowSummary.message || workflowSummary.title || "No launch workflow headline available.")}</div>
@@ -615,12 +693,99 @@
           limit: target.limit,
           reviewMode: target.reviewMode
         })}`);
+        const nextProductCode = String(data?.manifest?.project?.code || target.productCode || "").trim().toUpperCase();
+        const nextChannel = String(data?.manifest?.channel || target.channel || "stable").trim().toLowerCase();
+        if (
+          lastReviewActionResult
+          && (
+            String(lastReviewActionResult.productCode || "").trim().toUpperCase() !== nextProductCode
+            || String(lastReviewActionResult.channel || "stable").trim().toLowerCase() !== nextChannel
+          )
+        ) {
+          lastReviewActionResult = null;
+        }
         reviewPackage = data;
         renderReview();
         if (options.autoFocus) focusAutofocusTarget();
         setStatus(`Launch review generated for ${data.manifest?.project?.code || target.productCode}.`);
         setOutput(data);
         return data;
+      }
+      async function runLaunchReviewBootstrap(action = null) {
+        const target = currentReviewTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running Launch Bootstrap.");
+        }
+        const bootstrap = await api("/api/developer/license-quickstart/bootstrap", {
+          method: "POST",
+          body: { productCode: target.productCode }
+        });
+        const data = await generateLaunchReview();
+        lastReviewActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation: "bootstrap",
+          operationLabel: action?.label || bootstrap?.followUp?.operationLabel || "Launch Bootstrap",
+          message: bootstrap?.message || `Launch Bootstrap completed for ${target.productCode}.`,
+          followUp: bootstrap?.followUp || null,
+          result: bootstrap
+        };
+        renderReview();
+        const entitlement = bootstrap?.created?.entitlement;
+        const entitlementNote = entitlement
+          ? ` Internal entitlement ${entitlement.username || entitlement.id} is now active through ${entitlement.endsAt || "-"}.`
+          : "";
+        const accountNote = bootstrap?.created?.account?.temporaryPassword
+          ? " Temporary starter account password is included in API Output for secure handoff."
+          : "";
+        const followUpNote = bootstrap?.followUp?.primaryAction?.label
+          ? ` Next: ${bootstrap.followUp.primaryAction.label}.`
+          : (bootstrap?.followUp?.summary ? ` ${bootstrap.followUp.summary}` : "");
+        setStatus(`${bootstrap?.message || `Launch Bootstrap completed for ${target.productCode}.`} Launch review reloaded.${entitlementNote}${accountNote}${followUpNote}`);
+        setOutput({ launchReviewBootstrap: bootstrap, launchReview: data });
+        return { launchReviewBootstrap: bootstrap, launchReview: data };
+      }
+      async function runLaunchReviewSetup(setupAction = null) {
+        const target = currentReviewTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running First Batch Setup.");
+        }
+        const effectiveSetupAction = setupAction && typeof setupAction === "object" ? setupAction : null;
+        const requestedMode = effectiveSetupAction?.mode || "recommended";
+        const setupOperation = effectiveSetupAction?.operation || "first_batch_setup";
+        const setupEndpoint = setupOperation === "restock"
+          ? "/api/developer/license-quickstart/restock"
+          : "/api/developer/license-quickstart/first-batches";
+        const setup = await api(setupEndpoint, {
+          method: "POST",
+          body: {
+            productCode: target.productCode,
+            mode: requestedMode
+          }
+        });
+        const data = await generateLaunchReview();
+        lastReviewActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation: setupOperation,
+          operationLabel: effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup"),
+          message: setup?.message || `${effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup")} completed for ${target.productCode}.`,
+          followUp: setup?.followUp || null,
+          result: setup
+        };
+        renderReview();
+        const createdLabels = Array.isArray(setup?.createdBatches)
+          ? setup.createdBatches.map((item) => item.batchCode).filter(Boolean)
+          : [];
+        const setupLabel = effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup");
+        const followUpNote = setup?.followUp?.primaryAction?.label
+          ? ` Next: ${setup.followUp.primaryAction.label}.`
+          : (setup?.followUp?.summary ? ` ${setup.followUp.summary}` : "");
+        setStatus((createdLabels.length
+          ? `${setupLabel} created ${createdLabels.join(", ")} for ${target.productCode}.`
+          : (setup?.message || `${setupLabel} completed for ${target.productCode}.`)) + ` Launch review reloaded.${followUpNote}`);
+        setOutput({ launchReviewSetup: setup, launchReview: data });
+        return { launchReviewSetup: setup, launchReview: data };
       }
       async function downloadLaunchReview(format, fallbackFileName, label) {
         const target = currentReviewTarget();
@@ -855,6 +1020,7 @@
           profile = null;
           actor = null;
           reviewPackage = null;
+          lastReviewActionResult = null;
           el("session-meta").textContent = "No developer session yet.";
           renderReview();
           renderRouteFocus();
@@ -957,6 +1123,46 @@
         }
       });
       el("review-actions-box").addEventListener("click", async (event) => {
+        const bootstrapButton = event.target.closest("[data-review-action-bootstrap-index]");
+        if (bootstrapButton) {
+          try {
+            const index = Number(bootstrapButton.dataset.reviewActionBootstrapIndex);
+            const item = currentReviewActionPlan()[index];
+            await runLaunchReviewBootstrap(item?.bootstrapAction || null);
+            setOutput({
+              reviewActionBootstrap: {
+                key: item?.bootstrapAction?.key || null,
+                label: item?.bootstrapAction?.label || null
+              },
+              launchReview: reviewPackage
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
+        const setupButton = event.target.closest("[data-review-action-setup-index]");
+        if (setupButton) {
+          try {
+            const index = Number(setupButton.dataset.reviewActionSetupIndex);
+            const item = currentReviewActionPlan()[index];
+            await runLaunchReviewSetup(item?.setupAction || null);
+            setOutput({
+              reviewActionSetup: {
+                key: item?.setupAction?.key || null,
+                label: item?.setupAction?.label || null,
+                mode: item?.setupAction?.mode || null,
+                operation: item?.setupAction?.operation || null
+              },
+              launchReview: reviewPackage
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const workspaceButton = event.target.closest("[data-review-action-workspace-index]");
         if (workspaceButton) {
           try {
@@ -1005,6 +1211,47 @@
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
           }
+        }
+      });
+      el("review-followup-box").addEventListener("click", async (event) => {
+        const workspaceButton = event.target.closest("[data-review-followup-workspace-index]");
+        if (workspaceButton) {
+          try {
+            const index = Number(workspaceButton.dataset.reviewFollowupWorkspaceIndex);
+            const item = currentLastReviewFollowUp()?.actions?.[index];
+            openWorkspaceAction(item?.workspaceAction, {
+              title: item?.label || "Launch review follow-up",
+              summary: item?.summary || ""
+            });
+            setOutput({
+              reviewFollowUpWorkspace: {
+                key: item?.workspaceAction?.key || null,
+                autofocus: item?.workspaceAction?.autofocus || null,
+                label: item?.workspaceAction?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const downloadButton = event.target.closest("[data-review-followup-download-index]");
+        if (!downloadButton) {
+          return;
+        }
+        try {
+          const index = Number(downloadButton.dataset.reviewFollowupDownloadIndex);
+          const item = currentLastReviewFollowUp()?.actions?.[index];
+          const result = await downloadReviewRecommendedItem(item?.recommendedDownload);
+          setOutput({
+            reviewFollowUpDownload: {
+              key: item?.recommendedDownload?.key || null,
+              fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+            }
+          });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
         }
       });
       el("review-workspace-box").addEventListener("click", (event) => {

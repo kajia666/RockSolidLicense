@@ -28,6 +28,18 @@ It now also derives a review-level:
 
 So the software author can move from "what happened after bootstrap / first-batch / refill" straight into "what should we open next" without translating the raw launch-workflow and ops summaries by hand.
 
+It now also supports running lane-fix actions directly from the review action plan:
+
+- `Launch Bootstrap`
+- `First Batch Setup`
+- `Inventory Refill`
+
+After running one of those actions, the page keeps a `Last Review Action` recap in place so the author can:
+
+- confirm what changed in starter policy / card / account / entitlement counts
+- review any newly created starter batch, starter account, or internal entitlement
+- keep following the next launch-day recheck without leaving the review workspace
+
 ## Scoped APIs
 
 - `GET /api/developer/launch-review`

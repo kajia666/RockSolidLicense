@@ -10052,6 +10052,7 @@ test("developer center page is served from the dedicated route", async () => {
       assert.match(html, /Generate Launch Review/);
       assert.match(html, /Review Actions/);
       assert.match(html, /Workspace Path/);
+      assert.match(html, /Last Review Action/);
       assert.match(html, /Open Recommended Workspace/);
       assert.match(html, /Download Review JSON/);
       assert.match(html, /Download Review Summary/);
@@ -10060,6 +10061,12 @@ test("developer center page is served from the dedicated route", async () => {
       assert.match(html, /Open Launch Workflow/);
       assert.match(html, /Open Ops Workspace/);
       assert.match(html, /Open License Workspace/);
+      assert.match(html, /review-followup-box/);
+      assert.match(html, /renderLastReviewFollowUp/);
+      assert.match(html, /runLaunchReviewBootstrap/);
+      assert.match(html, /runLaunchReviewSetup/);
+      assert.match(html, /data-review-action-bootstrap-index/);
+      assert.match(html, /data-review-action-setup-index/);
     } finally {
       await app.close();
       fs.rmSync(tempDir, { recursive: true, force: true });

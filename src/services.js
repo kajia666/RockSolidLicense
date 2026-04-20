@@ -2711,15 +2711,39 @@ function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "", 
   };
 }
 
-function createLaunchWorkflowDownloadShortcut(key, fileName = "", label = "") {
+function createLaunchWorkflowDownloadShortcut(key, fileName = "", label = "", extra = null) {
   if (!key) {
     return null;
   }
   return {
     key,
     fileName: fileName || "",
-    label: label || key
+    label: label || key,
+    ...(extra && typeof extra === "object" ? extra : {})
   };
+}
+
+function createLaunchWorkflowOpsDownloadShortcut(action, {
+  key = "",
+  label = "",
+  fileName = "developer-ops-summary.txt",
+  format = "summary"
+} = {}) {
+  if (!action?.workspaceAction || action.workspaceAction.key !== "ops") {
+    return null;
+  }
+  return createLaunchWorkflowDownloadShortcut(
+    key || `ops_${action.key || "snapshot"}_${format}`,
+    fileName,
+    label || "Ops snapshot summary",
+    {
+      source: "developer-ops",
+      format,
+      params: action.workspaceAction.params && typeof action.workspaceAction.params === "object"
+        ? { ...action.workspaceAction.params }
+        : {}
+    }
+  );
 }
 
 function createLaunchWorkflowBootstrapAction({
@@ -3372,7 +3396,7 @@ function buildLaunchAuthorizationOperationalPlan({
     });
   }
 
-  firstOpsActions.push({
+  const runtimeSmokeAction = {
     key: "runtime_smoke",
     label: "Verify first real sign-ins",
     timing: "T+0 to T+30m",
@@ -3381,10 +3405,14 @@ function buildLaunchAuthorizationOperationalPlan({
       eventType: "session.login",
       actorType: "account"
     })
+  };
+  runtimeSmokeAction.recommendedDownload = createLaunchWorkflowOpsDownloadShortcut(runtimeSmokeAction, {
+    label: "Runtime smoke summary"
   });
+  firstOpsActions.push(runtimeSmokeAction);
 
   if (cardLoginEnabled || cardRechargeEnabled) {
-    firstOpsActions.push({
+    const cardRedemptionWatchAction = {
       key: "card_redemption_watch",
       label: "Watch first card redemptions",
       timing: "T+0 to T+2h",
@@ -3392,7 +3420,11 @@ function buildLaunchAuthorizationOperationalPlan({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "audit", "Open Ops Workspace", {
         entityType: "license_key"
       })
+    };
+    cardRedemptionWatchAction.recommendedDownload = createLaunchWorkflowOpsDownloadShortcut(cardRedemptionWatchAction, {
+      label: "Card redemption summary"
     });
+    firstOpsActions.push(cardRedemptionWatchAction);
   }
 
   if (featureConfig.allowVersionCheck !== false || featureConfig.allowNotices !== false) {
@@ -3405,7 +3437,7 @@ function buildLaunchAuthorizationOperationalPlan({
     });
   }
 
-  firstOpsActions.push({
+  const sessionReviewAction = {
     key: "session_review",
     label: "Review early sessions and device state",
     timing: "T+0 to T+4h",
@@ -3414,7 +3446,11 @@ function buildLaunchAuthorizationOperationalPlan({
       eventType: "session.login",
       actorType: "account"
     })
+  };
+  sessionReviewAction.recommendedDownload = createLaunchWorkflowOpsDownloadShortcut(sessionReviewAction, {
+    label: "Early session summary"
   });
+  firstOpsActions.push(sessionReviewAction);
 
   return {
     inventoryRecommendations,
@@ -3902,7 +3938,8 @@ function buildLaunchWorkflowSummaryPayload({
       summary: `${primaryOpsAction.timing || "Post-launch"} | ${primaryOpsAction.summary || "Review first-wave runtime signals in Developer Ops."}`,
       status: workflowStatus === "ready" ? "pass" : "review",
       priority: !actionPlan.length && workflowStatus === "ready" ? "primary" : "secondary",
-      workspaceAction: primaryOpsAction.workspaceAction || null
+      workspaceAction: primaryOpsAction.workspaceAction || null,
+      recommendedDownload: primaryOpsAction.recommendedDownload || null
     }));
   }
   if (!actionPlan.length || (workflowStatus === "ready" && !actionPlan.some((item) => item.key === "launch_handoff_zip"))) {
@@ -4083,7 +4120,7 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   if (firstOpsActions.length) {
     lines.push("First Ops Actions:");
     for (const item of firstOpsActions) {
-      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`);
+      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}`);
     }
     lines.push("");
   }
@@ -4216,7 +4253,7 @@ function buildLaunchWorkflowChecklistText(payload = {}) {
   if (firstOpsActions.length) {
     lines.push("First Ops Actions:");
     for (const item of firstOpsActions) {
-      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}${formatWorkspaceActionParams(item.workspaceAction.params) ? `?${formatWorkspaceActionParams(item.workspaceAction.params)}` : ""}` : ""}`);
+      lines.push(`- ${item.label || item.key || "ops"} | timing=${item.timing || "-"} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"}${formatWorkspaceActionParams(item.workspaceAction.params) ? `?${formatWorkspaceActionParams(item.workspaceAction.params)}` : ""}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}`);
     }
     lines.push("");
   }

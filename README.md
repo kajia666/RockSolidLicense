@@ -65,6 +65,7 @@
 - 如果当前 lane 已经有 starter policy、但还没有首批 fresh card inventory，上线工作台和项目页内联 `Launch Workflow` 现在也会直接给出 `Run First Batch Setup`。这会按推荐方案创建首批 `direct-card` / `recharge` 库存；而在还没有 policy 的场景下，工作台会继续优先给 `Launch Bootstrap`，避免把一个暂时不可执行的发卡动作提前亮出来
 - 现在 `Launch Authorization Quickstart`、`Launch Workflow` 和项目页内联 launch summary 还会给出结构化的“首批库存建议 / 首批发卡建议 / 首发后第一轮运营动作”，帮助软件作者把首发准备、首批发卡和上线后前几小时的运营检查连成一条更实操的链路
 - 这条“首发后第一轮运营动作”现在也已经接到了开发者运营台 `/developer/ops`：launch workflow 和项目页里的 `First Ops Actions` 可以直接把软件作者路由到 snapshot / audit / sessions 焦点，方便首发后立刻盯登录、心跳、审计和设备状态；这些路由也可以继续带上更细的 audit filter，比如 `eventType / actorType / entityType`
+- 现在这条首发后的 ops 巡检也不只靠跳页了：`Launch Workflow` 和项目页内联 launch block 里的 `First Ops Actions`、相关 `Action Plan` 现在可以直接下载带过滤条件的 ops snapshot summary，方便把首轮巡检结果直接发给测试、客服或值守同事复核
 - 这些首发后的 ops 动作现在也会进入 `Launch Workflow` 的 `Action Plan` 和导出文本里，所以交付给测试、运营或值守同事时，不只是知道“去哪”，还会知道“应该先看哪类信号”
 - 上面这些首发建议现在也不只是说明文字了，软件作者可以直接从建议旁边跳到授权预设、授权中心、上线工作台、发版工作台、开发者运营台，或者直接运行 `Launch Bootstrap`；首批直登卡/充值卡建议也会按推荐的批次数量和前缀直接预填到发卡表单里，把“看建议 -> 去处理”压成更短的动作链
 - 现在这条“首批发卡建议”还进一步落成了真正可执行动作：既可以继续 `Review Template` 手工确认，也可以直接在授权快启里运行一键首批发卡初始化，把推荐的首批直登卡 / 充值卡库存直接创建出来

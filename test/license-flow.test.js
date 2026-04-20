@@ -5524,6 +5524,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.autofocus === "sessions"));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.params?.eventType === "session.login"));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.params?.entityType === "license_key"));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.recommendedDownload?.source === "developer-ops"));
     assert.equal(launchWorkflow.workflowSummary.recommendedWorkspace.key, "integration");
     assert.match(launchWorkflow.workflowSummary.recommendedWorkspace.label, /Integration Workspace/);
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.workspaceActions));
@@ -5554,6 +5555,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "integration"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.recommendedDownload?.key === "integration_env"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "ops"));
+    assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "launch_day_ops_watch" && item.recommendedDownload?.source === "developer-ops"));
     assert.equal(launchWorkflow.releasePackage.manifest.project.code, "RELPKG_ALPHA");
     assert.equal(launchWorkflow.integrationPackage.manifest.project.code, "RELPKG_ALPHA");
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
@@ -5569,6 +5571,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /First Ops Actions:/);
     assert.match(launchWorkflow.summaryText, /Action Plan:/);
     assert.match(launchWorkflow.summaryText, /workspace=Open Ops Workspace@/);
+    assert.match(launchWorkflow.summaryText, /download=Runtime smoke summary:developer-ops-summary\.txt|download=Card redemption summary:developer-ops-summary\.txt|download=Early session summary:developer-ops-summary\.txt/);
     assert.match(launchWorkflow.summaryText, /eventType=session\.login|entityType=license_key/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
@@ -5585,6 +5588,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.checklistText, /Initial Inventory Recommendations:/);
     assert.match(launchWorkflow.checklistText, /First Batch Card Suggestions:/);
     assert.match(launchWorkflow.checklistText, /First Ops Actions:/);
+    assert.match(launchWorkflow.checklistText, /download=Runtime smoke summary:developer-ops-summary\.txt|download=Card redemption summary:developer-ops-summary\.txt|download=Early session summary:developer-ops-summary\.txt/);
     assert.match(launchWorkflow.checklistText, /Open Ops Workspace@|workspace: Open .*Workspace \| focus=.*filters=/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Startup bootstrap decision/);
     assert.match(launchWorkflow.checklistText, /workspace: Open Integration Workspace \| focus=startup/);
@@ -9754,6 +9758,7 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /filters=/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
+    assert.match(html, /api\/developer\/ops\/export\/download/);
     assert.match(html, /runLaunchBootstrap/);
     assert.match(html, /runLaunchFirstBatchSetup/);
     assert.match(html, /currentLaunchBootstrapAction/);
@@ -10272,6 +10277,7 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /filters=/);
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
+    assert.match(html, /api\/developer\/ops\/export\/download/);
     assert.match(html, /runLaunchWorkflowBootstrap/);
     assert.match(html, /runLaunchWorkflowFirstBatchSetup/);
     assert.match(html, /currentLaunchWorkflowBootstrapAction/);

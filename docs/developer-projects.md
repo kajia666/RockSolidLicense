@@ -101,6 +101,8 @@ Those inline recommendation rows are now actionable as well. So from the project
 
 That now includes launch-day operations too. If the inline workflow says the next best move is to watch first sign-ins, first card-redemption audit, or early session/device state, the project page can route directly into `/developer/ops` with the current project and the right `snapshot / audit / sessions` focus already preserved. When the launch recommendation already knows the right audit slice, it can also forward scoped filters like `eventType`, `actorType`, or `entityType`.
 
+Those same inline launch-day ops actions can now also download a filtered ops snapshot summary directly from the project workspace. So the first-wave runtime review can be handed off as a file, not only as a routed page jump.
+
 Those routed clicks now preserve the action title and summary too. When the project page sends someone into Integration or Releases from the inline launch workflow, the target page can show which launch-workflow step triggered the route.
 
 The same combined package is also available over:

@@ -2459,22 +2459,34 @@
           });
           return;
         }
-        if (action.key === "ops") {
-          window.location.href = buildWorkspaceUrl("/developer/ops", {
-            productId,
-            productCode,
-            channel,
+          if (action.key === "ops") {
+            window.location.href = buildWorkspaceUrl("/developer/ops", {
+              productId,
+              productCode,
+              channel,
             autofocus: action.autofocus || "snapshot",
             routeTitle: routed.routeTitle,
             routeReason: routed.routeReason,
             ...actionParams
-          });
-          return;
-        }
-        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
-          productId,
-          productCode,
-          channel,
+            });
+            return;
+          }
+          if (action.key === "launch-review") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-review", {
+              productId,
+              productCode,
+              channel,
+              autofocus: action.autofocus || "summary",
+              routeTitle: routed.routeTitle,
+              routeReason: routed.routeReason,
+              ...actionParams
+            });
+            return;
+          }
+          window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+            productId,
+            productCode,
+            channel,
           autofocus: action.autofocus || "handoff",
           routeTitle: routed.routeTitle,
           routeReason: routed.routeReason,

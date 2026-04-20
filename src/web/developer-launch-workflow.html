@@ -1245,22 +1245,34 @@
           });
           return;
         }
-        if (action.key === "ops") {
-          window.location.href = buildWorkspaceUrl("/developer/ops", {
-            productId: currentReleaseProductId(target.productCode),
-            productCode: target.productCode,
-            channel: target.channel,
+          if (action.key === "ops") {
+            window.location.href = buildWorkspaceUrl("/developer/ops", {
+              productId: currentReleaseProductId(target.productCode),
+              productCode: target.productCode,
+              channel: target.channel,
             autofocus: action.autofocus || "snapshot",
             routeTitle: routed.routeTitle,
             routeReason: routed.routeReason,
             ...actionParams
-          });
-          return;
-        }
-        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
-          productId: currentReleaseProductId(target.productCode),
-          productCode: target.productCode,
-          channel: target.channel,
+            });
+            return;
+          }
+          if (action.key === "launch-review") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-review", {
+              productId: currentReleaseProductId(target.productCode),
+              productCode: target.productCode,
+              channel: target.channel,
+              autofocus: action.autofocus || "summary",
+              routeTitle: routed.routeTitle,
+              routeReason: routed.routeReason,
+              ...actionParams
+            });
+            return;
+          }
+          window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+            productId: currentReleaseProductId(target.productCode),
+            productCode: target.productCode,
+            channel: target.channel,
           autofocus: action.autofocus || "handoff",
           routeTitle: routed.routeTitle,
           routeReason: routed.routeReason,

@@ -97,6 +97,8 @@ That follow-up chain now starts with explicit recheck steps too. When a launch a
 
 That same inline follow-up can now also download a combined `launch review` summary. It merges the current launch-workflow lane with the routed developer-ops snapshot filters, so a project owner can hand one review file to QA, support, or launch-duty teammates right from the project workspace.
 
+The same inline follow-up can now also route into `/developer/launch-review`, so the project owner can keep the same lane, review filters, and first-wave runtime scope together in one dedicated review workspace after launch initialization.
+
 That same inline launch workflow block now also shows the first slice of:
 
 - `Initial Inventory Recommendations`

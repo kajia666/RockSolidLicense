@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Developer Launch Review</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef4f1;
+        --panel: #ffffff;
+        --line: #d5e2da;
+        --text: #14201a;
+        --muted: #567164;
+        --accent: #1f6f56;
+        --accent-soft: #dff0e9;
+        --warn: #b96927;
+        --danger: #b03c3c;
+        --shadow: 0 20px 50px rgba(21, 52, 39, 0.10);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(180deg, #f7fbf8 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+      .shell {
+        width: min(1440px, calc(100vw - 32px));
+        margin: 24px auto 56px;
+      }
+      .hero, .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+      }
+      .hero {
+        padding: 28px;
+        margin-bottom: 20px;
+      }
+      .hero h1 { margin: 0; font-size: 32px; }
+      .sub { margin-top: 10px; color: var(--muted); line-height: 1.6; max-width: 980px; }
+      .nav, .pill-row, .actions, .audit-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .nav { margin-top: 12px; color: var(--muted); }
+      .pill, .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #f8fbf9;
+        color: var(--muted);
+      }
+      .tag.strong {
+        border-color: rgba(31,111,86,0.26);
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .wide {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .card { padding: 20px; }
+      .card h2 { margin: 0 0 14px; font-size: 20px; }
+      .three, .two {
+        display: grid;
+        gap: 12px;
+      }
+      .three { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .two { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      input, select, textarea, button {
+        font: inherit;
+      }
+      input, select, textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fbfdfc;
+        color: var(--text);
+      }
+      textarea { min-height: 120px; resize: vertical; }
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 11px 15px;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #edf5f1;
+        color: var(--accent);
+        border: 1px solid rgba(31,111,86,0.18);
+      }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .status, .hint {
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: #f5faf7;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .status.warn {
+        background: #fff4ec;
+        border-color: rgba(185,105,39,0.25);
+        color: var(--warn);
+      }
+      pre {
+        margin: 0;
+        min-height: 220px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef7f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      @media (max-width: 1180px) {
+        .wide { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 760px) {
+        .shell { width: min(100vw - 20px, 100%); }
+        .hero { padding: 22px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer Launch Review</h1>
+        <p class="sub">
+          Recheck one launch lane and its first-wave runtime signals in one place. This workspace combines
+          the current launch workflow lane with a filtered developer-ops snapshot so software authors can
+          review startup readiness, starter inventory, and early runtime follow-up without bouncing between pages.
+        </p>
+        <div class="nav">
+          <a href="/developer">Developer Center</a>
+          |
+          <a href="/developer/projects">Developer Projects</a>
+          |
+          <a href="/developer/licenses">Developer Licenses</a>
+          |
+          <a href="/developer/launch-workflow">Developer Launch Workflow</a>
+          |
+          <a href="/developer/ops">Developer Ops</a>
+        </div>
+        <div class="pill-row" style="margin-top: 14px;">
+          <div class="pill">Route: <code>/developer/launch-review</code></div>
+          <div class="pill">API: <code>/api/developer/launch-review</code></div>
+          <div class="pill">Download: <code>/api/developer/launch-review/download</code></div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions" style="margin-top: 12px;">
+            <button id="login-btn">Sign In</button>
+            <button class="secondary" id="refresh-session-btn">Refresh</button>
+            <button class="secondary" id="logout-btn">Sign Out</button>
+          </div>
+          <div class="hint" id="session-meta" style="margin-top: 12px;">No developer session yet.</div>
+          <div class="status" id="status-box" style="margin-top: 12px;">Sign in to generate a launch review package.</div>
+        </article>
+
+        <article class="card">
+          <h2>Route Focus</h2>
+          <div id="route-focus-box" class="hint">Open this page from Launch Workflow, Projects, or Licenses to keep the same lane and review filters prefilled here.</div>
+        </article>
+      </section>
+
+      <section class="card" style="margin-bottom: 18px;">
+        <h2>Generate Launch Review</h2>
+        <div class="three">
+          <label>Project Code<input id="review-product-code" placeholder="ALPHA_APP" /></label>
+          <label>Channel<input id="review-channel" value="stable" placeholder="stable" /></label>
+          <label>Review Mode
+            <select id="review-mode">
+              <option value="matched">matched</option>
+              <option value="all">all</option>
+            </select>
+          </label>
+          <label>Username Filter<input id="review-username" placeholder="starter.user" /></label>
+          <label>Search Filter<input id="review-search" placeholder="fingerprint / batch / username" /></label>
+          <label>Event Type<input id="review-event-type" placeholder="session.login" /></label>
+          <label>Actor Type<input id="review-actor-type" placeholder="account" /></label>
+          <label>Entity Type<input id="review-entity-type" placeholder="license_key" /></label>
+          <label>Limit<input id="review-limit" type="number" min="1" max="200" value="60" /></label>
+        </div>
+        <div class="actions" style="margin-top: 14px;">
+          <button id="use-route-project-btn">Use Routed Project</button>
+          <button id="generate-review-btn">Generate Launch Review</button>
+          <button class="secondary" id="refresh-review-btn">Refresh Review</button>
+        </div>
+        <div class="actions" style="margin-top: 10px;">
+          <button class="secondary" id="open-review-project-btn">Open Project Workspace</button>
+          <button class="secondary" id="open-review-license-btn">Open License Workspace</button>
+          <button class="secondary" id="open-review-launch-btn">Open Launch Workflow</button>
+          <button class="secondary" id="open-review-ops-btn">Open Ops Workspace</button>
+        </div>
+        <div class="actions" style="margin-top: 10px;">
+          <button class="secondary" id="download-review-json-btn">Download Review JSON</button>
+          <button class="secondary" id="download-review-summary-btn">Download Review Summary</button>
+          <button class="secondary" id="download-review-checksums-btn">Download Review Checksums</button>
+          <button class="secondary" id="download-review-zip-btn">Download Review Zip</button>
+        </div>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Review Summary</h2>
+          <pre id="review-summary">Generate a launch review package to inspect the combined review summary here.</pre>
+        </article>
+        <article class="card">
+          <h2>Review Snapshot</h2>
+          <div id="review-meta-box" class="hint">The combined review snapshot will summarize launch workflow status, checklist counts, and routed ops scope here.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Launch Workflow Summary</h2>
+          <pre id="review-launch-summary">Generate a launch review package to inspect launch workflow summary text here.</pre>
+        </article>
+        <article class="card">
+          <h2>Launch Workflow Checklist</h2>
+          <pre id="review-launch-checklist">Generate a launch review package to inspect launch workflow checklist text here.</pre>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Developer Ops Summary</h2>
+        <pre id="review-ops-summary">Generate a launch review package to inspect the filtered developer ops summary here.</pre>
+      </section>
+
+      <section class="card" style="margin-top: 18px;">
+        <h2>API Output</h2>
+        <pre id="output">Waiting for actions...</pre>
+      </section>
+    </main>
+
+    <script>
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedUsername = (routeParams.get("username") || "").trim();
+      const requestedSearch = (routeParams.get("search") || "").trim();
+      const requestedEventType = (routeParams.get("eventType") || "").trim();
+      const requestedActorType = (routeParams.get("actorType") || "").trim();
+      const requestedEntityType = (routeParams.get("entityType") || "").trim();
+      const requestedReviewMode = (routeParams.get("reviewMode") || "").trim().toLowerCase() || "matched";
+
+      let token = "";
+      let profile = null;
+      let actor = null;
+      let reviewPackage = null;
+
+      function el(id) { return document.getElementById(id); }
+      function q(params = {}) {
+        const next = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value === undefined || value === null || value === "") return;
+          next.set(key, value);
+        });
+        const text = next.toString();
+        return text ? `?${text}` : "";
+      }
+      function esc(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+      function buildWorkspaceUrl(path, params = {}) {
+        return `${path}${q(params)}`;
+      }
+      function setStatus(message, warn = false) {
+        const box = el("status-box");
+        box.textContent = message;
+        box.className = `status${warn ? " warn" : ""}`;
+      }
+      function setOutput(value) {
+        el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+      function renderTag(text, strong = false) {
+        return `<span class="tag${strong ? " strong" : ""}">${esc(text)}</span>`;
+      }
+      async function api(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (token) headers.Authorization = `Bearer ${token}`;
+        if (options.body !== undefined) headers["Content-Type"] = "application/json";
+        const response = await fetch(path, {
+          method: options.method || (options.body !== undefined ? "POST" : "GET"),
+          headers,
+          body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) {
+          const error = new Error(data?.error?.message || `Request failed with ${response.status}`);
+          error.code = data?.error?.code || `HTTP_${response.status}`;
+          throw error;
+        }
+        return data.data;
+      }
+      function downloadBlob(filename, blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      function downloadFileNameFromHeaders(headerValue, fallback) {
+        const raw = String(headerValue || "");
+        const utf8Match = raw.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const plainMatch = raw.match(/filename="([^"]+)"/i) || raw.match(/filename=([^;]+)/i);
+        return plainMatch ? plainMatch[1].trim() : fallback;
+      }
+      async function downloadApiFile(path, fallbackFileName, label) {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(path, { headers });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const error = new Error(payload?.error?.message || `Download failed with ${response.status}`);
+          error.code = payload?.error?.code || `HTTP_${response.status}`;
+          throw error;
+        }
+        const blob = await response.blob();
+        const fileName = downloadFileNameFromHeaders(response.headers.get("content-disposition"), fallbackFileName);
+        downloadBlob(fileName, blob);
+        setStatus(`${label} downloaded: ${fileName}`);
+        return { fileName };
+      }
+      function currentReviewTarget() {
+        return {
+          productId: requestedProductId,
+          productCode: el("review-product-code").value.trim(),
+          channel: el("review-channel").value.trim() || "stable",
+          username: el("review-username").value.trim(),
+          search: el("review-search").value.trim(),
+          eventType: el("review-event-type").value.trim(),
+          actorType: el("review-actor-type").value.trim(),
+          entityType: el("review-entity-type").value.trim(),
+          limit: el("review-limit").value.trim(),
+          reviewMode: el("review-mode").value.trim() || "matched"
+        };
+      }
+      function focusAutofocusTarget() {
+        const target = requestedAutofocus || "summary";
+        const node = (
+          target === "launch" ? el("review-launch-summary")
+            : target === "checklist" ? el("review-launch-checklist")
+            : target === "ops" ? el("review-ops-summary")
+            : el("review-summary")
+        );
+        node?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      function syncRouteFields() {
+        if (requestedProductCode) el("review-product-code").value = requestedProductCode;
+        el("review-channel").value = requestedChannel;
+        el("review-username").value = requestedUsername;
+        el("review-search").value = requestedSearch;
+        el("review-event-type").value = requestedEventType;
+        el("review-actor-type").value = requestedActorType;
+        el("review-entity-type").value = requestedEntityType;
+        el("review-mode").value = requestedReviewMode === "all" ? "all" : "matched";
+      }
+      function renderRouteFocus() {
+        const title = requestedRouteTitle || "Launch review handoff";
+        const reason = requestedRouteReason || (requestedProductCode
+          ? `Recheck ${requestedProductCode} on lane ${requestedChannel} after launch initialization or early launch-day follow-up.`
+          : "Open this page from Launch Workflow, Projects, or Licenses to preserve the selected lane and review filters.");
+        const target = currentReviewTarget();
+        const tags = [
+          target.productCode ? renderTag(`project:${target.productCode}`, true) : "",
+          renderTag(`channel:${target.channel}`, true),
+          target.reviewMode ? renderTag(`review:${target.reviewMode}`, true) : "",
+          target.eventType ? renderTag(`event:${target.eventType}`) : "",
+          target.actorType ? renderTag(`actor:${target.actorType}`) : "",
+          target.entityType ? renderTag(`entity:${target.entityType}`) : "",
+          target.username ? renderTag(`username:${target.username}`) : ""
+        ].filter(Boolean).join("");
+        el("route-focus-box").innerHTML = `
+          <div><strong>${esc(title)}</strong></div>
+          <div class="hint" style="margin-top: 10px;">${esc(reason)}</div>
+          <div class="audit-meta" style="margin-top: 10px;">${tags || '<span class="hint">No routed filters captured yet.</span>'}</div>
+          <div class="actions" style="margin-top: 12px;">
+            <button type="button" class="secondary" id="route-focus-refresh-btn" ${token ? "" : "disabled"}>Refresh Launch Review</button>
+            <button type="button" class="secondary" id="route-focus-download-btn" ${token ? "" : "disabled"}>Download Review Summary</button>
+            <button type="button" id="route-focus-scroll-btn">Scroll To Summary</button>
+          </div>
+        `;
+        el("route-focus-refresh-btn")?.addEventListener("click", async () => {
+          try {
+            await generateLaunchReview();
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          }
+        });
+        el("route-focus-download-btn")?.addEventListener("click", async () => {
+          try {
+            await downloadLaunchReview("summary", "developer-launch-review-summary.txt", "Launch review summary");
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          }
+        });
+        el("route-focus-scroll-btn")?.addEventListener("click", () => {
+          focusAutofocusTarget();
+          setStatus("Launch review focus moved to the selected summary section.");
+        });
+      }
+      function renderReview() {
+        if (!reviewPackage) {
+          el("review-summary").textContent = "Generate a launch review package to inspect the combined review summary here.";
+          el("review-launch-summary").textContent = "Generate a launch review package to inspect launch workflow summary text here.";
+          el("review-launch-checklist").textContent = "Generate a launch review package to inspect launch workflow checklist text here.";
+          el("review-ops-summary").textContent = "Generate a launch review package to inspect the filtered developer ops summary here.";
+          el("review-meta-box").innerHTML = '<div class="hint">The combined review snapshot will summarize launch workflow status, checklist counts, and routed ops scope here.</div>';
+          return;
+        }
+        const filters = reviewPackage.filters || {};
+        const workflow = reviewPackage.launchWorkflow || {};
+        const workflowSummary = workflow.workflowSummary || {};
+        const workflowChecklist = workflow.workflowChecklist || {};
+        const ops = reviewPackage.opsSnapshot || {};
+        const overview = ops.overview || {};
+        el("review-summary").textContent = reviewPackage.summaryText || "";
+        el("review-launch-summary").textContent = workflow.summaryText || "";
+        el("review-launch-checklist").textContent = workflow.checklistText || "";
+        el("review-ops-summary").textContent = ops.summaryText || "";
+        el("review-meta-box").innerHTML = `
+          <div>${renderTag(`workflow:${String(workflowSummary.status || "unknown").toUpperCase()}`, true)} ${renderTag(`checklist:${String(workflowChecklist.status || "unknown").toUpperCase()}`, true)} ${renderTag(`ops:${String(overview.status || "unknown").toUpperCase()}`, true)}</div>
+          <div class="hint" style="margin-top: 10px;">${esc(workflowSummary.message || workflowSummary.title || "No launch workflow headline available.")}</div>
+          <div class="audit-meta" style="margin-top: 10px;">
+            ${renderTag(`project:${reviewPackage.manifest?.project?.code || filters.productCode || "-"}`, true)}
+            ${renderTag(`channel:${reviewPackage.manifest?.channel || filters.channel || "-"}`, true)}
+            ${renderTag(`review:${filters.reviewMode || "-"}`)}
+            ${filters.eventType ? renderTag(`event:${filters.eventType}`) : ""}
+            ${filters.actorType ? renderTag(`actor:${filters.actorType}`) : ""}
+            ${filters.entityType ? renderTag(`entity:${filters.entityType}`) : ""}
+          </div>
+          <div class="audit-meta" style="margin-top: 10px;">
+            ${renderTag(`projects:${ops.summary?.projects ?? 0}`)}
+            ${renderTag(`accounts:${ops.summary?.accounts ?? 0}`)}
+            ${renderTag(`entitlements:${ops.summary?.entitlements ?? 0}`)}
+            ${renderTag(`sessions:${ops.summary?.sessions ?? 0}`)}
+            ${renderTag(`audit:${ops.summary?.auditLogs ?? 0}`)}
+          </div>
+          <div class="hint" style="margin-top: 10px;">${esc(overview.headline || "No ops headline available.")}</div>
+        `;
+      }
+      async function refreshSession() {
+        const data = await api("/api/developer/me");
+        profile = data.developer || null;
+        actor = data.actor || null;
+        const actorLabel = actor?.type === "member"
+          ? `${actor.username} (${actor.role})`
+          : profile?.username || "unknown";
+        el("session-meta").textContent = actorLabel
+          ? `${actorLabel} | route=${requestedProductCode || currentReviewTarget().productCode || "-"} | lane=${currentReviewTarget().channel}`
+          : "No developer session yet.";
+      }
+      async function generateLaunchReview(options = {}) {
+        const target = currentReviewTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before generating Launch Review.");
+        }
+        const data = await api(`/api/developer/launch-review${q({
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          username: target.username,
+          search: target.search,
+          eventType: target.eventType,
+          actorType: target.actorType,
+          entityType: target.entityType,
+          limit: target.limit,
+          reviewMode: target.reviewMode
+        })}`);
+        reviewPackage = data;
+        renderReview();
+        if (options.autoFocus) focusAutofocusTarget();
+        setStatus(`Launch review generated for ${data.manifest?.project?.code || target.productCode}.`);
+        setOutput(data);
+        return data;
+      }
+      async function downloadLaunchReview(format, fallbackFileName, label) {
+        const target = currentReviewTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before downloading Launch Review.");
+        }
+        return downloadApiFile(
+          `/api/developer/launch-review/download${q({
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            username: target.username,
+            search: target.search,
+            eventType: target.eventType,
+            actorType: target.actorType,
+            entityType: target.entityType,
+            limit: target.limit,
+            reviewMode: target.reviewMode,
+            format
+          })}`,
+          fallbackFileName,
+          label
+        );
+      }
+      function openProjectWorkspace() {
+        const target = currentReviewTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Developer Projects.");
+        window.location.href = buildWorkspaceUrl("/developer/projects", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "launch",
+          routeTitle: requestedRouteTitle || "Launch review handoff",
+          routeReason: requestedRouteReason || `Continue launch review follow-up for ${target.productCode} from the launch review workspace.`
+        });
+      }
+      function openLicenseWorkspace() {
+        const target = currentReviewTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Developer Licenses.");
+        window.location.href = buildWorkspaceUrl("/developer/licenses", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "quickstart",
+          routeTitle: requestedRouteTitle || "Launch review handoff",
+          routeReason: requestedRouteReason || `Review launch authorization and starter inventory for ${target.productCode} from the launch review workspace.`
+        });
+      }
+      function openLaunchWorkflowWorkspace() {
+        const target = currentReviewTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Launch Workflow.");
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "summary",
+          routeTitle: requestedRouteTitle || "Launch review handoff",
+          routeReason: requestedRouteReason || `Continue lane-level launch recheck for ${target.productCode} from the launch review workspace.`
+        });
+      }
+      function openOpsWorkspace() {
+        const target = currentReviewTarget();
+        if (!target.productCode) throw new Error("Enter a project code before opening Developer Ops.");
+        window.location.href = buildWorkspaceUrl("/developer/ops", {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: "snapshot",
+          routeTitle: requestedRouteTitle || "Launch review handoff",
+          routeReason: requestedRouteReason || `Continue routed launch-day ops review for ${target.productCode} from the launch review workspace.`,
+          username: target.username,
+          search: target.search,
+          eventType: target.eventType,
+          actorType: target.actorType,
+          entityType: target.entityType,
+          reviewMode: target.reviewMode
+        });
+      }
+      async function hydrateAutofocus() {
+        if (!requestedAutofocus || !token || !requestedProductCode) return;
+        await generateLaunchReview({ autoFocus: true });
+      }
+
+      syncRouteFields();
+      renderRouteFocus();
+      renderReview();
+      setOutput("Waiting for actions...");
+
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await api("/api/developer/login", {
+            method: "POST",
+            body: {
+              username: el("username").value.trim(),
+              password: el("password").value
+            }
+          });
+          token = data.token;
+          profile = data.developer || null;
+          actor = data.actor || null;
+          await refreshSession();
+          renderRouteFocus();
+          await hydrateAutofocus();
+          setStatus(`Signed in as ${profile?.username || actor?.username || "developer"}.`);
+          setOutput(data);
+        } catch (error) {
+          token = "";
+          profile = null;
+          actor = null;
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("refresh-session-btn").addEventListener("click", async () => {
+        try {
+          if (!token) throw new Error("Sign in before refreshing the launch review workspace.");
+          await refreshSession();
+          renderRouteFocus();
+          setStatus("Developer session refreshed.");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("logout-btn").addEventListener("click", async () => {
+        try {
+          if (token) {
+            await api("/api/developer/logout", { method: "POST" });
+          }
+          token = "";
+          profile = null;
+          actor = null;
+          reviewPackage = null;
+          el("session-meta").textContent = "No developer session yet.";
+          renderReview();
+          renderRouteFocus();
+          setStatus("Developer session closed.");
+          setOutput("Logged out.");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("use-route-project-btn").addEventListener("click", () => {
+        syncRouteFields();
+        renderRouteFocus();
+        setStatus(requestedProductCode ? `Routed lane reapplied for ${requestedProductCode}.` : "No routed project was supplied.");
+      });
+      el("generate-review-btn").addEventListener("click", async () => {
+        try {
+          await generateLaunchReview({ autoFocus: true });
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("refresh-review-btn").addEventListener("click", async () => {
+        try {
+          await generateLaunchReview();
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("open-review-project-btn").addEventListener("click", () => {
+        try {
+          openProjectWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+      el("open-review-license-btn").addEventListener("click", () => {
+        try {
+          openLicenseWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+      el("open-review-launch-btn").addEventListener("click", () => {
+        try {
+          openLaunchWorkflowWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+      el("open-review-ops-btn").addEventListener("click", () => {
+        try {
+          openOpsWorkspace();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+      el("download-review-json-btn").addEventListener("click", async () => {
+        try {
+          await downloadLaunchReview("json", "developer-launch-review.json", "Launch review JSON");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("download-review-summary-btn").addEventListener("click", async () => {
+        try {
+          await downloadLaunchReview("summary", "developer-launch-review-summary.txt", "Launch review summary");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("download-review-checksums-btn").addEventListener("click", async () => {
+        try {
+          await downloadLaunchReview("checksums", "developer-launch-review-sha256.txt", "Launch review checksums");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+      el("download-review-zip-btn").addEventListener("click", async () => {
+        try {
+          await downloadLaunchReview("zip", "developer-launch-review.zip", "Launch review zip");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+    </script>
+  </body>
+</html>

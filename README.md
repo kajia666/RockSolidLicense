@@ -77,6 +77,7 @@
 - 开发者授权中心里的 `Next Launch Follow-up` 现在也能直接下载 launch workflow summary / checklist，不再只支持 ops 摘要，这样软件作者在授权快启页里做完初始化动作后，可以先拿走 launch 复查材料，再继续点进 launch workflow、license workspace 或 developer ops
 - 现在这条 follow-up 还多了一份合并的 `launch review summary`：它会把当前 lane 的 launch workflow 复查结果和带过滤条件的 developer ops snapshot 收进一份文件里，适合在跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 后，直接发给 QA、客服或值守同事做首轮复查
 - 上线工作台和项目页现在还会在页面内保留 `Last Launch Action` / follow-up 卡片：跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 之后，不只是状态栏提示一下，还会把下一步推荐工作台和可下载的首轮巡检摘要继续留在当前页面，方便软件作者顺着做完下一步
+- 现在还新增了独立的 `/developer/launch-review` 工作台，把当前 lane 的 launch workflow 和带过滤条件的 developer ops snapshot 合并到一个复查页里，适合在跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 后，直接做首轮复查或交给 QA / 客服 / 值守同事
 - 上面这些首发建议现在也不只是说明文字了，软件作者可以直接从建议旁边跳到授权预设、授权中心、上线工作台、发版工作台、开发者运营台，或者直接运行 `Launch Bootstrap`；首批直登卡/充值卡建议也会按推荐的批次数量和前缀直接预填到发卡表单里，把“看建议 -> 去处理”压成更短的动作链
 - 现在这条“首批发卡建议”还进一步落成了真正可执行动作：既可以继续 `Review Template` 手工确认，也可以直接在授权快启里运行一键首批发卡初始化，把推荐的首批直登卡 / 充值卡库存直接创建出来
 - 开发者多项目归属

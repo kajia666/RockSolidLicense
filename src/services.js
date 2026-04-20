@@ -2703,6 +2703,14 @@ function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "", 
       ...extras
     };
   }
+  if (key === "launch-review") {
+    return {
+      key,
+      label: label || "Open Launch Review",
+      autofocus: autofocus || "summary",
+      ...extras
+    };
+  }
   return {
     key: "launch",
     label: label || "Stay in Launch Workflow",
@@ -3774,15 +3782,21 @@ function buildLaunchQuickstartFollowUpPlan({
       if (!item) {
         return null;
       }
-      const nextItem = {
-        ...item,
-        priority: index === 0 ? "primary" : "secondary"
-      };
-      if (key === "launch_recheck") {
-        nextItem.recommendedDownload = launchReviewDownload;
-      }
-      return nextItem;
-    })
+        const nextItem = {
+          ...item,
+          priority: index === 0 ? "primary" : "secondary"
+        };
+        if (key === "launch_recheck") {
+          nextItem.workspaceAction = createLaunchWorkflowWorkspaceShortcut(
+            "launch-review",
+            "summary",
+            "Open Launch Review",
+            preferredOpsAction?.workspaceAction?.params
+          );
+          nextItem.recommendedDownload = launchReviewDownload;
+        }
+        return nextItem;
+      })
     .filter(Boolean);
 
   const recommendedDownloads = [];

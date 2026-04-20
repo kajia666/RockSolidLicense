@@ -1551,14 +1551,21 @@
           window.location.href = buildWorkspaceUrl("/developer/releases", routeBits);
           return;
         }
-        if (action.key === "ops") {
-          window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
-          return;
-        }
-        if (action.key === "licenses") {
-          window.location.href = buildWorkspaceUrl("/developer/licenses", routeBits);
-          return;
-        }
+          if (action.key === "ops") {
+            window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
+            return;
+          }
+          if (action.key === "launch-review") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-review", {
+              ...routeBits,
+              autofocus: action.autofocus || "summary"
+            });
+            return;
+          }
+          if (action.key === "licenses") {
+            window.location.href = buildWorkspaceUrl("/developer/licenses", routeBits);
+            return;
+          }
         window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           ...routeBits,
           autofocus: action.autofocus || "handoff"

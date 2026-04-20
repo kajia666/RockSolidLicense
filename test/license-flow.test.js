@@ -6018,6 +6018,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "ops_runtime_smoke_summary"));
       assert.equal(
+        bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.workspaceAction?.key,
+        "launch-review"
+      );
+      assert.equal(
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-review"
       );
@@ -6124,6 +6128,10 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
+      assert.equal(
+        bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.workspaceAction?.key,
+        "launch-review"
+      );
       assert.equal(
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-review"
@@ -6251,6 +6259,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
+      assert.equal(
+        setup.followUp.actions.find((item) => item.key === "launch_recheck")?.workspaceAction?.key,
+        "launch-review"
+      );
       assert.equal(
         setup.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-review"
@@ -6411,6 +6423,10 @@ test("developer launch workflow can restock low launch inventory buffers", async
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
+      assert.equal(
+        restock.followUp.actions.find((item) => item.key === "launch_recheck")?.workspaceAction?.key,
+        "launch-review"
+      );
       assert.equal(
         restock.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-review"
@@ -9888,10 +9904,11 @@ test("developer center page is served from the dedicated route", async () => {
   try {
     const response = await fetch(`${baseUrl}/developer`);
     const html = await response.text();
-    assert.equal(response.ok, true);
-    assert.match(response.headers.get("content-type") || "", /^text\/html/);
-    assert.match(html, /Developer Project Center/);
-    assert.match(html, /api\/developer\/dashboard/);
+      assert.equal(response.ok, true);
+      assert.match(response.headers.get("content-type") || "", /^text\/html/);
+      assert.match(html, /Developer Project Center/);
+      assert.match(html, /Developer Launch Review/);
+      assert.match(html, /api\/developer\/dashboard/);
     assert.match(html, /api\/developer\/products/);
     assert.match(html, /api\/developer\/policies/);
     assert.match(html, /api\/developer\/profile/);
@@ -9917,11 +9934,11 @@ test("developer center page is served from the dedicated route", async () => {
   }
 });
 
-test("developer launch workflow page is served from the dedicated route", async () => {
-  const { app, baseUrl, tempDir } = await startServer();
+  test("developer launch workflow page is served from the dedicated route", async () => {
+    const { app, baseUrl, tempDir } = await startServer();
 
-  try {
-    const response = await fetch(`${baseUrl}/developer/launch-workflow`);
+    try {
+      const response = await fetch(`${baseUrl}/developer/launch-workflow`);
     const html = await response.text();
     assert.equal(response.ok, true);
     assert.match(response.headers.get("content-type") || "", /^text\/html/);
@@ -9929,6 +9946,7 @@ test("developer launch workflow page is served from the dedicated route", async 
       assert.match(html, /api\/developer\/launch-workflow/);
       assert.match(html, /api\/developer\/launch-workflow\/download/);
       assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /Generate Launch Workflow/);
     assert.match(html, /Download Launch JSON/);
     assert.match(html, /Download Launch Summary/);
@@ -10009,8 +10027,33 @@ test("developer launch workflow page is served from the dedicated route", async 
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
-  }
-});
+    }
+  });
+
+  test("developer launch review page is served from the dedicated route", async () => {
+    const { app, baseUrl, tempDir } = await startServer();
+
+    try {
+      const response = await fetch(`${baseUrl}/developer/launch-review`);
+      const html = await response.text();
+      assert.equal(response.ok, true);
+      assert.match(response.headers.get("content-type") || "", /^text\/html/);
+      assert.match(html, /Developer Launch Review/);
+      assert.match(html, /api\/developer\/launch-review/);
+      assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /Generate Launch Review/);
+      assert.match(html, /Download Review JSON/);
+      assert.match(html, /Download Review Summary/);
+      assert.match(html, /Download Review Checksums/);
+      assert.match(html, /Download Review Zip/);
+      assert.match(html, /Open Launch Workflow/);
+      assert.match(html, /Open Ops Workspace/);
+      assert.match(html, /Open License Workspace/);
+    } finally {
+      await app.close();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 
 test("developer integration snapshot is scoped to visible projects", async () => {
   const { app, baseUrl, tempDir } = await startServer();
@@ -10453,6 +10496,7 @@ test("developer projects page is served from the dedicated route", async () => {
       assert.match(html, /integration-packages\/export/);
       assert.match(html, /integration-packages\/export\/download/);
       assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /sdk-credentials\/rotate/);
@@ -10868,6 +10912,7 @@ test("developer license page is served from the dedicated route", async () => {
       assert.match(html, /api\/developer\/cards\/export/);
       assert.match(html, /api\/developer\/cards\/export\/download/);
       assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Issue Card Batch/);
     assert.match(html, /Download Summary/);

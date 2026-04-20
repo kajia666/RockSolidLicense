@@ -77,6 +77,7 @@
 - 这条首发 follow-up 现在也不再是一上来就跳 ops 了：跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 之后，系统会先给出 `Review launch workflow recheck`，并在适用时加上 `Review starter inventory / Review refilled launch inventory`，让软件作者先确认 launch lane 和 starter inventory 已经恢复到预期，再进入首轮 runtime / redemption / session 巡检
 - 开发者授权中心里的 `Next Launch Follow-up` 现在也能直接下载 launch workflow summary / checklist，不再只支持 ops 摘要，这样软件作者在授权快启页里做完初始化动作后，可以先拿走 launch 复查材料，再继续点进 launch workflow、license workspace 或 developer ops
 - 现在这条 follow-up 还多了一份合并的 `launch review summary`：它会把当前 lane 的 launch workflow 复查结果和带过滤条件的 developer ops snapshot 收进一份文件里，适合在跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 后，直接发给 QA、客服或值守同事做首轮复查
+- 现在这条首发初始化链还会产出一份 `launch smoke kit`：它会把当前 lane 的 startup bootstrap 请求、内部账号候选、starter entitlement 候选、fresh 直登卡/充值卡候选，以及首轮 smoke-test 路径收成一份可下载摘要，方便 QA、客服或值守同事在首发前后直接照着跑内部验证
 - 上线工作台和项目页现在还会在页面内保留 `Last Launch Action` / follow-up 卡片：跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 之后，不只是状态栏提示一下，还会把下一步推荐工作台和可下载的首轮巡检摘要继续留在当前页面，方便软件作者顺着做完下一步
 - 现在还新增了独立的 `/developer/launch-review` 工作台，把当前 lane 的 launch workflow 和带过滤条件的 developer ops snapshot 合并到一个复查页里，适合在跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 后，直接做首轮复查或交给 QA / 客服 / 值守同事
 - 这条 `Launch Review` 现在还会直接给出推荐工作台、复查动作计划和推荐下载，不只是把 launch 和 ops 放在同一页里，软件作者也能更快知道下一步该开哪个工作台、拿哪份摘要

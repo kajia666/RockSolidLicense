@@ -65,6 +65,8 @@ Supported download formats:
 
 The summary and zip outputs merge the current launch-workflow lane with the routed developer-ops review scope, so the author does not need to export launch and ops follow-up separately.
 
+The surrounding launch initialization flow can also hand off a separate `launch smoke kit` summary from `GET /api/developer/launch-smoke-kit/download`. That file is intentionally lighter than full launch review output: it focuses on startup bootstrap inputs, candidate internal accounts or entitlements, fresh launch-card candidates, and the first smoke-test path that QA, support, or launch-duty teammates can run before or right after launch.
+
 ## Typical use
 
 Use `/developer/launch-review` when the software author wants to:

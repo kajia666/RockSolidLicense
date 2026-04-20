@@ -67,6 +67,16 @@ After `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` completes, 
 
 That same follow-up block can now also download a combined `launch review summary`. It merges the current launch-workflow recheck with the filtered developer-ops snapshot for the routed lane, so QA, support, or launch-duty teammates can review launch readiness and first-wave runtime signals from one handoff file.
 
+The same follow-up chain can now also download a `launch smoke kit` summary. That file packages:
+
+- the current startup bootstrap request and startup decision
+- internal account candidates
+- starter entitlement candidates
+- fresh direct-card and recharge-card candidates
+- a short smoke-test path for startup, account login, direct-card login, recharge, and heartbeat validation
+
+so QA, support, or launch-duty teammates can run an internal first-pass validation without rebuilding the launch lane by hand.
+
 When the software author wants to continue the same review in-page, the same quickstart follow-up can now route into `/developer/launch-review`, keeping launch workflow recheck and first-wave runtime follow-up together in one workspace after authorization initialization or refill.
 
 The quickstart block now also keeps a `Last Quickstart Action` recap above that follow-up section. It summarizes the before/after counts for starter policies, fresh cards, starter accounts, and active entitlements, then lists the newly created starter batches, accounts, or internal entitlements so a software author can confirm what actually changed before moving on to the next launch-day recheck.

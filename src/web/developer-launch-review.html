@@ -851,6 +851,19 @@
             item.label || "Routed ops summary"
           );
         }
+        if (item.source === "developer-launch-smoke-kit") {
+          return downloadApiFile(
+            `/api/developer/launch-smoke-kit/download${q({
+              productId: target.productId,
+              productCode: target.productCode,
+              channel: target.channel,
+              format: item.format || "summary",
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-launch-smoke-kit-summary.txt",
+            item.label || "Launch smoke kit summary"
+          );
+        }
         const fallbackFormats = {
           launch_handoff_zip: "handoff-zip",
           launch_handoff_checksums: "handoff-checksums",

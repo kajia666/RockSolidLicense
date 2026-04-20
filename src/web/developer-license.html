@@ -1196,6 +1196,20 @@
           setStatus(`${item.label || "Launch review summary"} downloaded: ${result.fileName}`);
           return result;
         }
+        if (item.source === "developer-launch-smoke-kit") {
+          const result = await downloadApiFile(
+            `/api/developer/launch-smoke-kit/download${q({
+              productCode: target.productCode,
+              channel: target.channel,
+              format: item.format || "summary",
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-launch-smoke-kit-summary.txt",
+            item.label || "Launch smoke kit summary"
+          );
+          setStatus(`${item.label || "Launch smoke kit summary"} downloaded: ${result.fileName}`);
+          return result;
+        }
         if (
           item.source === "developer-launch-workflow"
           || ["launch_summary", "launch_checklist", "launch_workflow_zip", "launch_handoff_zip", "launch_handoff_checksums"].includes(item.key)

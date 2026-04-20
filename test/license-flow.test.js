@@ -6022,11 +6022,13 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.equal(bootstrap.followUp.primaryAction?.key, "launch_recheck");
     assert.ok(Array.isArray(bootstrap.followUp.actions));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_smoke_kit"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "inventory_recheck"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "starter_account_handoff"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "ops_runtime_smoke_summary"));
       assert.equal(
@@ -6069,6 +6071,32 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no starter accounts exist/i);
     assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no fresh cards/i);
     assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no entitlement policies/i);
+
+    const smokeKit = await getJson(
+      baseUrl,
+      "/api/developer/launch-smoke-kit?productCode=BOOT_ALPHA&channel=stable",
+      ownerSession.token
+    );
+    assert.equal(smokeKit.manifest?.project?.code, "BOOT_ALPHA");
+    assert.equal(smokeKit.smokeSummary?.startupRequest?.productCode, "BOOT_ALPHA");
+    assert.ok(Array.isArray(smokeKit.smokeSummary?.accountCandidates));
+    assert.ok(smokeKit.smokeSummary.accountCandidates.length >= 1);
+    assert.ok(Array.isArray(smokeKit.smokeSummary?.rechargeCardCandidates));
+    assert.ok(smokeKit.smokeSummary.rechargeCardCandidates.length >= 1);
+    assert.equal(smokeKit.smokeSummary?.directCardCandidates?.length || 0, 0);
+    assert.ok(smokeKit.smokeSummary?.verificationPaths?.some((item) => item.key === "startup_bootstrap"));
+    assert.ok(smokeKit.smokeSummary?.verificationPaths?.some((item) => item.key === "account_login"));
+    assert.ok(smokeKit.smokeSummary?.verificationPaths?.some((item) => item.key === "recharge_flow"));
+    assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
+
+    const smokeKitSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=BOOT_ALPHA&channel=stable&format=summary",
+      ownerSession.token
+    );
+    assert.equal(smokeKitSummaryDownload.status, 200);
+    assert.match(smokeKitSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-smoke-kit-BOOT_ALPHA-stable-.*-summary\.txt"/);
+    assert.match(smokeKitSummaryDownload.body, /Launch Smoke Paths:/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6136,8 +6164,10 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
       assert.equal(bootstrap.followUp.operation, "bootstrap");
       assert.equal(bootstrap.followUp.primaryAction?.key, "launch_recheck");
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_smoke_kit"));
       assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "inventory_recheck"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
       assert.equal(
@@ -6267,8 +6297,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.equal(setup.followUp.primaryAction?.key, "inventory_recheck");
       assert.ok(setup.followUp.actions.some((item) => item.key === "inventory_recheck"));
       assert.ok(setup.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(setup.followUp.actions.some((item) => item.key === "launch_smoke_kit"));
       assert.ok(setup.followUp.actions.some((item) => item.key === "runtime_smoke"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
       assert.equal(
@@ -6431,8 +6463,10 @@ test("developer launch workflow can restock low launch inventory buffers", async
       assert.equal(restock.followUp.primaryAction?.key, "inventory_recheck");
       assert.ok(restock.followUp.actions.some((item) => item.key === "inventory_recheck"));
       assert.ok(restock.followUp.actions.some((item) => item.key === "launch_recheck"));
+      assert.ok(restock.followUp.actions.some((item) => item.key === "launch_smoke_kit"));
       assert.ok(restock.followUp.actions.some((item) => item.key === "session_review"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
       assert.equal(
@@ -9958,6 +9992,7 @@ test("developer center page is served from the dedicated route", async () => {
       assert.match(html, /api\/developer\/launch-workflow/);
       assert.match(html, /api\/developer\/launch-workflow\/download/);
       assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
       assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /Generate Launch Workflow/);
     assert.match(html, /Download Launch JSON/);
@@ -10053,6 +10088,7 @@ test("developer center page is served from the dedicated route", async () => {
       assert.match(html, /Developer Launch Review/);
       assert.match(html, /api\/developer\/launch-review/);
       assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
       assert.match(html, /Generate Launch Review/);
       assert.match(html, /Review Actions/);
       assert.match(html, /Review Targets/);
@@ -10522,6 +10558,7 @@ test("developer projects page is served from the dedicated route", async () => {
       assert.match(html, /integration-packages\/export/);
       assert.match(html, /integration-packages\/export\/download/);
       assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
       assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
@@ -10945,6 +10982,7 @@ test("developer license page is served from the dedicated route", async () => {
       assert.match(html, /api\/developer\/cards\/export/);
       assert.match(html, /api\/developer\/cards\/export\/download/);
       assert.match(html, /api\/developer\/launch-review\/download/);
+      assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
       assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Issue Card Batch/);

@@ -1359,13 +1359,25 @@
           if (!item?.key) {
             throw new Error("Generate a launch workflow package before downloading recommended files.");
           }
-          if (item.source === "developer-ops") {
-            return downloadLaunchOpsAsset(item);
-          }
-          if (item.source === "developer-launch-review") {
-            return downloadLaunchReviewAsset(item);
-          }
-          switch (item.key) {
+        if (item.source === "developer-ops") {
+          return downloadLaunchOpsAsset(item);
+        }
+        if (item.source === "developer-launch-review") {
+          return downloadLaunchReviewAsset(item);
+        }
+        if (item.source === "developer-launch-smoke-kit") {
+          return downloadApiFile(
+            `/api/developer/launch-smoke-kit/download${q({
+              productCode: currentWorkflowTarget()?.productCode,
+              channel: currentWorkflowTarget()?.channel,
+              format: item.format || "summary",
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-launch-smoke-kit-summary.txt",
+            item.label || "Launch smoke kit summary"
+          );
+        }
+        switch (item.key) {
             case "launch_handoff_zip":
               return downloadRecommendedHandoffAsset(
                 "handoff-zip",

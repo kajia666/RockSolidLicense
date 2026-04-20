@@ -138,6 +138,8 @@ That post-action follow-up now starts one step earlier too. After `Run Launch Bo
 
 The same follow-up chain can now also download a combined `launch review` summary from `GET /api/developer/launch-review/download`. That file merges the current launch-workflow lane with the routed developer-ops snapshot filters, so QA, support, or launch-duty teammates can review launch readiness and first-wave runtime signals from one handoff file.
 
+The same follow-up chain now also exposes a `launch smoke kit` download from `GET /api/developer/launch-smoke-kit/download`. That summary packages the current startup bootstrap request, internal account / entitlement candidates, fresh direct-card or recharge-card candidates, and a short smoke-test path so QA, support, or launch-duty teammates can validate the lane without manually rebuilding a starter checklist.
+
 When the software author wants to keep working in-page instead of only downloading a file, the same `launch_recheck` follow-up can now route into `/developer/launch-review`. That workspace keeps the launch lane and routed ops scope together in one review screen.
 
 The `Recommended Workspace` area is now actionable as well. Besides the single “open recommended workspace” button, the page can render the top workspace-path actions directly as buttons, so a software author can jump straight to the most relevant project, integration, or release section for the current lane.

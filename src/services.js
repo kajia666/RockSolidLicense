@@ -2764,6 +2764,21 @@ function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summa
       format,
       params: params && typeof params === "object"
         ? { ...params }
+      : {}
+    }
+  );
+}
+
+function createLaunchWorkflowSmokeKitDownloadShortcut(label = "Launch smoke kit summary", fileName = "launch-smoke-kit.txt", format = "summary", params = null) {
+  return createLaunchWorkflowDownloadShortcut(
+    "launch_smoke_kit_summary",
+    fileName,
+    label,
+    {
+      source: "developer-launch-smoke-kit",
+      format,
+      params: params && typeof params === "object"
+        ? { ...params }
         : {}
     }
   );
@@ -3281,6 +3296,29 @@ function countFreshCardsMatchingLaunchDraft(cards = [], draft = {}) {
   }).length;
 }
 
+function collectFreshCardsMatchingLaunchDraft(cards = [], draft = {}, limit = 0) {
+  const prefix = String(draft?.prefix || "").trim().toUpperCase();
+  if (!prefix) {
+    return [];
+  }
+  const cardItems = Array.isArray(cards) ? cards : [];
+  const matches = cardItems.filter((item) => {
+    if (normalizeCardControlStatus(item?.status || "active") !== "active") {
+      return false;
+    }
+    if (!isFreshCardInventoryStatus(item?.usageStatus ?? item?.displayStatus)) {
+      return false;
+    }
+    const batchCode = String(item?.batchCode || "").trim().toUpperCase();
+    const cardKey = String(item?.cardKey || item?.maskedKey || "").trim().toUpperCase();
+    return batchCode.startsWith(prefix) || cardKey.startsWith(prefix);
+  });
+  if (Number(limit || 0) > 0) {
+    return matches.slice(0, Number(limit));
+  }
+  return matches;
+}
+
 function buildLaunchRecommendedCardInventoryStates(product = {}, policies = [], cards = []) {
   return buildLaunchRecommendedCardBatchDrafts(product, policies).map((draft) => {
     const targetCount = Math.max(1, Number(draft?.count ?? 0) || 0);
@@ -3671,6 +3709,10 @@ function buildLaunchQuickstartFollowUpPlan({
       source: "developer-launch-workflow",
       format
     });
+  const createLaunchSmokeKitDownload = (label = "Launch smoke kit summary", fileName = "launch-smoke-kit.txt", format = "summary") =>
+    createLaunchWorkflowSmokeKitDownloadShortcut(label, fileName, format, {
+      productCode: product?.code || null
+    });
   const pushLaunchRecheckAction = (summary) => {
     pushPreludeAction({
       key: "launch_recheck",
@@ -3693,6 +3735,16 @@ function buildLaunchQuickstartFollowUpPlan({
         : createLaunchChecklistDownload()
     });
   };
+  const pushSmokeKitAction = (summary) => {
+    pushPreludeAction({
+      key: "launch_smoke_kit",
+      label: "Download launch smoke kit",
+      timing: "Before internal QA",
+      summary: summary || "Download the startup request, candidate internal accounts, fresh launch keys, and smoke-test steps for the current lane.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      recommendedDownload: createLaunchSmokeKitDownload()
+    });
+  };
   const preferredKeys = [];
 
   const pushPreferredKey = (key) => {
@@ -3705,6 +3757,9 @@ function buildLaunchQuickstartFollowUpPlan({
   if (normalizedOperation === "bootstrap") {
     pushLaunchRecheckAction(
       "Confirm authorization readiness, startup gates, and the combined launch checklist moved to the expected state after bootstrap."
+    );
+    pushSmokeKitAction(
+      "Download the current startup request and starter validation material before the first internal smoke run."
     );
     if (hasCardInventoryFlow) {
       pushInventoryRecheckAction({
@@ -3734,6 +3789,11 @@ function buildLaunchQuickstartFollowUpPlan({
         ? "Confirm launch workflow now shows the lane back inside the recommended inventory buffer."
         : "Confirm launch workflow now shows starter inventory ready for rollout."
     );
+    pushSmokeKitAction(
+      normalizedOperation === "restock"
+        ? "Download the refreshed startup request and launch validation material before the next sales or QA wave."
+        : "Download the startup request and the newly staged launch validation material before the first smoke run."
+    );
     for (const item of preludeActions) {
       pushPreferredKey(item.key);
     }
@@ -3743,6 +3803,7 @@ function buildLaunchQuickstartFollowUpPlan({
     pushPreferredKey("startup_rule_watch");
   } else {
     pushLaunchRecheckAction("Recheck the combined launch workflow after this setup step.");
+    pushSmokeKitAction();
     if (hasCardInventoryFlow) {
       pushInventoryRecheckAction({
         summary: "Confirm launch-day starter inventory still matches the selected lane before moving into runtime follow-up."
@@ -6166,6 +6227,491 @@ function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
 
   return {
     fileName: payload.fileName || "developer-launch-review.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
+function buildLaunchSmokeAccountCandidates(accounts = [], limit = 3) {
+  const items = Array.isArray(accounts) ? accounts : [];
+  const scoreAccount = (item = {}) => {
+    const username = String(item?.username || "").trim().toLowerCase();
+    let score = 0;
+    if (username.includes("seed") || username.includes("starter")) {
+      score += 50;
+    }
+    if (username.includes("qa") || username.includes("test")) {
+      score += 30;
+    }
+    if (username.includes("support") || username.includes("ops") || username.includes("demo")) {
+      score += 20;
+    }
+    score += Math.min(20, Number(item?.activeEntitlementCount || 0) * 10);
+    score += Math.min(10, Number(item?.activeSessionCount || 0) * 2);
+    return score;
+  };
+  return items
+    .filter((item) => String(item?.status || "active").trim().toLowerCase() === "active")
+    .sort((left, right) => {
+      const scoreDelta = scoreAccount(right) - scoreAccount(left);
+      if (scoreDelta !== 0) {
+        return scoreDelta;
+      }
+      return String(left?.username || "").localeCompare(String(right?.username || ""));
+    })
+    .slice(0, Math.max(1, Number(limit || 0) || 3))
+    .map((item) => ({
+      accountId: item.id,
+      username: item.username,
+      status: item.status,
+      activeEntitlementCount: Number(item.activeEntitlementCount || 0),
+      activeSessionCount: Number(item.activeSessionCount || 0),
+      latestEntitlementEndsAt: item.latestEntitlementEndsAt || null,
+      suggestedUse: scoreAccount(item) >= 50
+        ? "Starter / internal smoke account"
+        : Number(item.activeEntitlementCount || 0) > 0
+          ? "Account-login smoke path"
+          : "Reusable internal account"
+    }));
+}
+
+function buildLaunchSmokeEntitlementCandidates(entitlements = [], accountCandidates = [], limit = 3) {
+  const accountUsernames = new Set(
+    (Array.isArray(accountCandidates) ? accountCandidates : [])
+      .map((item) => String(item?.username || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const items = Array.isArray(entitlements) ? entitlements : [];
+  return items
+    .filter((item) => String(item?.lifecycleStatus || item?.status || "").trim().toLowerCase() === "active")
+    .sort((left, right) => {
+      const leftMatch = accountUsernames.has(String(left?.username || "").trim().toLowerCase()) ? 1 : 0;
+      const rightMatch = accountUsernames.has(String(right?.username || "").trim().toLowerCase()) ? 1 : 0;
+      if (leftMatch !== rightMatch) {
+        return rightMatch - leftMatch;
+      }
+      return String(left?.username || "").localeCompare(String(right?.username || ""));
+    })
+    .slice(0, Math.max(1, Number(limit || 0) || 3))
+    .map((item) => ({
+      entitlementId: item.id,
+      username: item.username,
+      policyName: item.policyName,
+      grantType: item.grantType,
+      endsAt: item.endsAt || null,
+      remainingPoints: Number(item.remainingPoints || 0),
+      sourceCardKeyMasked: item.sourceCardKeyMasked || (item.sourceCardKey ? maskCardKey(item.sourceCardKey) : null)
+    }));
+}
+
+function buildLaunchSmokeCardCandidates(cards = [], cardInventoryStates = [], mode = "", limit = 3) {
+  const states = (Array.isArray(cardInventoryStates) ? cardInventoryStates : [])
+    .filter((item) => String(item?.mode || "").trim().toLowerCase() === String(mode || "").trim().toLowerCase());
+  const seenKeys = new Set();
+  const candidates = [];
+  for (const state of states) {
+    for (const item of collectFreshCardsMatchingLaunchDraft(cards, state, Math.max(3, Number(limit || 0) * 2 || 6))) {
+      const cardKey = String(item?.cardKey || "").trim();
+      if (!cardKey || seenKeys.has(cardKey)) {
+        continue;
+      }
+      seenKeys.add(cardKey);
+      candidates.push({
+        cardKey,
+        cardKeyMasked: maskCardKey(cardKey),
+        batchCode: item.batchCode || "",
+        policyName: item.policyName || "",
+        grantType: item.grantType || state.grantType || "",
+        usageStatus: item.usageStatus || item.displayStatus || "",
+        displayStatus: item.displayStatus || item.usageStatus || "",
+        expiresAt: item.expiresAt || null,
+        mode: state.mode,
+        label: state.label || state.mode || mode,
+        prefix: state.prefix || "",
+        purpose: state.purpose || "",
+        suggestedUse: state.mode === "direct_card"
+          ? "Direct-card smoke login"
+          : "Recharge / renewal smoke flow"
+      });
+      if (candidates.length >= Math.max(1, Number(limit || 0) || 3)) {
+        return candidates;
+      }
+    }
+  }
+  return candidates;
+}
+
+function buildDeveloperLaunchSmokeKitSummaryPayload({
+  launchWorkflow = null,
+  accounts = [],
+  entitlements = [],
+  cards = [],
+  filters = {}
+} = {}) {
+  const manifest = launchWorkflow?.manifest || {};
+  const project = manifest.project || {};
+  const featureConfig = project?.featureConfig && typeof project.featureConfig === "object"
+    ? project.featureConfig
+    : {};
+  const authReadiness = launchWorkflow?.authorizationReadiness || manifest.authorizationReadiness || {};
+  const launchRecommendations = authReadiness.launchRecommendations && typeof authReadiness.launchRecommendations === "object"
+    ? authReadiness.launchRecommendations
+    : {};
+  const cardInventoryStates = Array.isArray(launchRecommendations.cardInventoryStates)
+    ? launchRecommendations.cardInventoryStates
+    : [];
+  const integrationPackage = launchWorkflow?.integrationPackage || {};
+  const startupPreview = integrationPackage?.manifest?.startupPreview || {};
+  const startupDecision = startupPreview.decision || {};
+  const startupRequest = startupPreview.request || integrationPackage?.manifest?.startupDefaults || {
+    productCode: project.code || filters.productCode || null,
+    clientVersion: "1.0.0",
+    channel: manifest.channel || filters.channel || "stable",
+    includeTokenKeys: true
+  };
+  const tokenKeySummary = startupPreview.tokenKeySummary || {};
+  const clientHardening = startupPreview.clientHardening || integrationPackage?.manifest?.clientHardening || {};
+
+  const accountCandidates = buildLaunchSmokeAccountCandidates(accounts, 3);
+  const entitlementCandidates = buildLaunchSmokeEntitlementCandidates(entitlements, accountCandidates, 3);
+  const directCardCandidates = buildLaunchSmokeCardCandidates(cards, cardInventoryStates, "direct_card", 3);
+  const rechargeCardCandidates = buildLaunchSmokeCardCandidates(cards, cardInventoryStates, "recharge", 3);
+
+  const accountLoginEnabled = featureConfig.allowAccountLogin !== false;
+  const registerEnabled = featureConfig.allowRegister !== false;
+  const cardLoginEnabled = featureConfig.allowCardLogin !== false;
+  const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
+  const startupBlocked = String(startupDecision.status || "").trim().toLowerCase() === "hold";
+
+  const accountLoginReady = accountLoginEnabled && (registerEnabled || accountCandidates.length > 0);
+  const directCardReady = cardLoginEnabled && directCardCandidates.length > 0;
+  const rechargeReady = cardRechargeEnabled && (registerEnabled || accountCandidates.length > 0) && rechargeCardCandidates.length > 0;
+
+  const verificationPaths = [
+    {
+      key: "startup_bootstrap",
+      label: "Startup bootstrap",
+      ready: !startupBlocked,
+      status: startupBlocked ? "block" : String(startupDecision.status || "").trim().toLowerCase() === "ready" ? "pass" : "review",
+      summary: startupDecision.message || "Use the current startup request before login or recharge UI is shown."
+    },
+    accountLoginEnabled ? {
+      key: "account_login",
+      label: "Account login smoke",
+      ready: accountLoginReady,
+      status: accountLoginReady ? "pass" : registerEnabled ? "review" : "block",
+      summary: accountLoginReady
+        ? "At least one internal account path is available for smoke testing."
+        : registerEnabled
+          ? "Account login is enabled, but you still need a registered internal account before smoke testing."
+          : "Account login is enabled, but closed registration still needs at least one starter account."
+    } : null,
+    cardLoginEnabled ? {
+      key: "direct_card_login",
+      label: "Direct-card login smoke",
+      ready: directCardReady,
+      status: directCardReady ? "pass" : "block",
+      summary: directCardReady
+        ? "Fresh direct-card inventory is available for first-login smoke tests."
+        : "Direct-card login is enabled, but no fresh direct-card keys are staged yet."
+    } : null,
+    cardRechargeEnabled ? {
+      key: "recharge_flow",
+      label: "Recharge flow smoke",
+      ready: rechargeReady,
+      status: rechargeReady ? "pass" : accountLoginEnabled && !registerEnabled ? "block" : "review",
+      summary: rechargeReady
+        ? "Recharge inventory and an internal account path are both ready for top-up / renewal smoke tests."
+        : "Recharge flow still needs both fresh recharge keys and an internal account path."
+    } : null,
+    {
+      key: "heartbeat_follow_up",
+      label: "Heartbeat follow-up",
+      ready: !startupBlocked,
+      status: startupBlocked ? "review" : "pass",
+      summary: "After any login or recharge smoke test, confirm a heartbeat succeeds and the session appears in Launch Review / Developer Ops."
+    }
+  ].filter(Boolean);
+
+  const blockingPaths = verificationPaths.filter((item) => item.status === "block");
+  const readyPaths = verificationPaths.filter((item) => item.ready && item.status !== "block");
+  const reviewPaths = verificationPaths.filter((item) => item.status === "review");
+
+  const recommendedWorkspace = blockingPaths.length
+    ? createLaunchWorkflowWorkspaceShortcut("licenses", "quickstart", "Open License Workspace")
+    : createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review");
+  const workspaceActions = [
+    recommendedWorkspace,
+    createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+    createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", { reviewMode: "matched" })
+  ];
+  const recommendedDownloads = [
+    createLaunchWorkflowReviewDownloadShortcut(
+      "Launch review summary",
+      "launch-review.txt",
+      "summary",
+      { reviewMode: "matched" }
+    )
+  ];
+
+  const actionPlan = [
+    {
+      key: "startup_bootstrap_recheck",
+      title: "Verify the startup bootstrap request",
+      priority: "primary",
+      status: verificationPaths.find((item) => item.key === "startup_bootstrap")?.status || "review",
+      summary: startupDecision.message || "Use the staged startup request, then confirm the lane is not blocked by version rules or notices.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      recommendedDownload: createLaunchWorkflowReviewDownloadShortcut("Launch review summary", "launch-review.txt", "summary", { reviewMode: "matched" })
+    },
+    readyPaths.length ? {
+      key: "launch_smoke_execution",
+      title: "Run the first internal smoke path",
+      priority: "primary",
+      status: "review",
+      summary: `Use one of the ready smoke paths first: ${readyPaths.map((item) => item.label).join(" / ")}.`,
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review")
+    } : null,
+    {
+      key: "ops_follow_up",
+      title: "Recheck sessions and audit after smoke login",
+      priority: "secondary",
+      status: "review",
+      summary: "After a successful smoke login or recharge, confirm the resulting session and audit signal inside Developer Ops.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
+        reviewMode: "matched",
+        eventType: "session.login",
+        actorType: "account"
+      })
+    }
+  ].filter(Boolean);
+
+  const status = startupBlocked || !readyPaths.length
+    ? "block"
+    : blockingPaths.length || reviewPaths.length
+      ? "review"
+      : "ready";
+
+  return {
+    status,
+    title: status === "block"
+      ? "Launch smoke kit still has blockers"
+      : status === "review"
+        ? "Launch smoke kit needs one more setup pass"
+        : "Launch smoke kit is ready",
+    message: status === "block"
+      ? "Clear the remaining launch blockers before handing this lane to QA, support, or launch-duty smoke testing."
+      : status === "review"
+        ? "The lane is close, but one or more smoke paths still need review before first-wave validation."
+        : "The lane has a usable startup request and at least one internal smoke path ready for first-wave validation.",
+    startupRequest,
+    startupDecision,
+    tokenKeySummary,
+    clientHardening,
+    verificationPaths,
+    accountCandidates,
+    entitlementCandidates,
+    directCardCandidates,
+    rechargeCardCandidates,
+    recommendedWorkspace,
+    workspaceActions,
+    actionPlan,
+    recommendedDownloads
+  };
+}
+
+function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const smokeSummary = payload.smokeSummary || {};
+  const lines = [
+    "RockSolid Developer Launch Smoke Kit",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || "-"}`,
+    "",
+    `Smoke Status: ${String(smokeSummary.status || "unknown").toUpperCase()}`,
+    `Smoke Title: ${smokeSummary.title || "-"}`,
+    `Smoke Message: ${smokeSummary.message || "-"}`,
+    "",
+    "Startup Request:",
+    `- productCode: ${smokeSummary.startupRequest?.productCode || project.code || "-"}`,
+    `- clientVersion: ${smokeSummary.startupRequest?.clientVersion || "-"}`,
+    `- channel: ${smokeSummary.startupRequest?.channel || manifest.channel || "-"}`,
+    `- includeTokenKeys: ${smokeSummary.startupRequest?.includeTokenKeys === false ? "false" : "true"}`,
+    `- startupDecision: ${String(smokeSummary.startupDecision?.status || "unknown").toUpperCase()} | ${smokeSummary.startupDecision?.message || "-"}`,
+    `- tokenKeys: active=${smokeSummary.tokenKeySummary?.activeKeyId || "-"} | total=${smokeSummary.tokenKeySummary?.totalKeys ?? 0}`,
+    `- hardening: profile=${smokeSummary.clientHardening?.profile || "-"} | startup=${smokeSummary.clientHardening?.startupBootstrapRequired ? "required" : "recommended"} | localToken=${smokeSummary.clientHardening?.localTokenValidationRequired ? "required" : "optional"} | heartbeat=${smokeSummary.clientHardening?.heartbeatGateRequired ? "required" : "optional"}`
+  ];
+
+  if (Array.isArray(smokeSummary.verificationPaths) && smokeSummary.verificationPaths.length) {
+    lines.push("");
+    lines.push("Launch Smoke Paths:");
+    for (const item of smokeSummary.verificationPaths) {
+      lines.push(`- [${String(item.status || "review").toUpperCase()}] ${item.label || item.key || "path"} | ready=${item.ready ? "yes" : "no"} | ${item.summary || "-"}`);
+    }
+  }
+
+  if (Array.isArray(smokeSummary.accountCandidates) && smokeSummary.accountCandidates.length) {
+    lines.push("");
+    lines.push("Account Candidates:");
+    for (const item of smokeSummary.accountCandidates) {
+      lines.push(`- ${item.username || "-"} | entitlements=${item.activeEntitlementCount ?? 0} | sessions=${item.activeSessionCount ?? 0} | suggestedUse=${item.suggestedUse || "-"} | ends=${item.latestEntitlementEndsAt || "-"}`);
+    }
+  }
+
+  if (Array.isArray(smokeSummary.entitlementCandidates) && smokeSummary.entitlementCandidates.length) {
+    lines.push("");
+    lines.push("Entitlement Candidates:");
+    for (const item of smokeSummary.entitlementCandidates) {
+      lines.push(`- ${item.username || "-"} | policy=${item.policyName || "-"} | grant=${item.grantType || "-"} | ends=${item.endsAt || "-"} | source=${item.sourceCardKeyMasked || "-"}`);
+    }
+  }
+
+  if (Array.isArray(smokeSummary.directCardCandidates) && smokeSummary.directCardCandidates.length) {
+    lines.push("");
+    lines.push("Direct-Card Candidates:");
+    for (const item of smokeSummary.directCardCandidates) {
+      lines.push(`- ${item.cardKey || "-"} | batch=${item.batchCode || "-"} | policy=${item.policyName || "-"} | purpose=${item.purpose || "-"} | suggestedUse=${item.suggestedUse || "-"}`);
+    }
+  }
+
+  if (Array.isArray(smokeSummary.rechargeCardCandidates) && smokeSummary.rechargeCardCandidates.length) {
+    lines.push("");
+    lines.push("Recharge Candidates:");
+    for (const item of smokeSummary.rechargeCardCandidates) {
+      lines.push(`- ${item.cardKey || "-"} | batch=${item.batchCode || "-"} | policy=${item.policyName || "-"} | purpose=${item.purpose || "-"} | suggestedUse=${item.suggestedUse || "-"}`);
+    }
+  }
+
+  if (Array.isArray(smokeSummary.actionPlan) && smokeSummary.actionPlan.length) {
+    lines.push("");
+    lines.push("Launch Smoke Action Plan:");
+    for (const item of smokeSummary.actionPlan) {
+      lines.push(`- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}`);
+    }
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchSmokeKitPayload({
+  generatedAt = nowIso(),
+  launchWorkflow = null,
+  accounts = [],
+  entitlements = [],
+  cards = [],
+  filters = {}
+} = {}) {
+  const manifest = launchWorkflow?.manifest || {};
+  const project = manifest.project || {};
+  const channel = manifest.channel || filters.channel || "stable";
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const scopeTag = sanitizeExportNameSegment(project.code || filters.productCode || "launch-smoke-kit", "launch-smoke-kit");
+  const fileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}.json`;
+  const summaryFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
+  const payload = {
+    generatedAt,
+    fileName,
+    summaryFileName,
+    manifest: {
+      generatedAt,
+      channel,
+      project: {
+        id: project.id || null,
+        code: project.code || filters.productCode || null,
+        name: project.name || ""
+      }
+    },
+    filters: {
+      productCode: project.code || filters.productCode || null,
+      channel
+    },
+    launchWorkflow,
+    smokeSummary: buildDeveloperLaunchSmokeKitSummaryPayload({
+      launchWorkflow,
+      accounts,
+      entitlements,
+      cards,
+      filters
+    }),
+    notes: [
+      "This smoke kit is meant for internal QA, support, or launch-duty validation after launch bootstrap, first-batch setup, or inventory refill.",
+      "Treat any account credentials or fresh card keys in this package as internal validation material and rotate or consume them according to your launch process."
+    ]
+  };
+  payload.summaryText = buildDeveloperLaunchSmokeKitSummaryText(payload);
+  return payload;
+}
+
+function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
+  const files = [
+    {
+      path: payload.fileName || "developer-launch-smoke-kit.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: payload.summaryFileName || "developer-launch-smoke-kit-summary.txt",
+      body: payload.summaryText || ""
+    }
+  ];
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `launch/${payload.launchWorkflow?.summaryFileName || "launch-workflow.txt"}`,
+    payload.launchWorkflow?.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `launch/${payload.launchWorkflow?.checklistFileName || "launch-workflow-checklist.txt"}`,
+    payload.launchWorkflow?.checklistText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `integration/${payload.launchWorkflow?.integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env"}`,
+    payload.launchWorkflow?.integrationPackage?.snippets?.hostConfigEnv || ""
+  );
+  return files;
+}
+
+function buildDeveloperLaunchSmokeKitZipEntries(payload = {}) {
+  const root = buildArchiveRootName(payload.fileName, "developer-launch-smoke-kit");
+  return buildZipEntriesFromFiles(root, buildDeveloperLaunchSmokeKitFiles(payload));
+}
+
+function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "checksums", "zip"],
+    "json",
+    "INVALID_DEVELOPER_LAUNCH_SMOKE_KIT_FORMAT",
+    "Developer launch smoke kit format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "developer-launch-smoke-kit")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildDeveloperLaunchSmokeKitZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "developer-launch-smoke-kit"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildDeveloperLaunchSmokeKitFiles(payload))
+    };
+  }
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "developer-launch-smoke-kit-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "developer-launch-smoke-kit.json",
     contentType: "application/json; charset=utf-8",
     body: JSON.stringify(payload, null, 2)
   };
@@ -13915,6 +14461,35 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return payload;
     },
 
+    async developerLaunchSmokeKit(token, selector = {}, options = {}) {
+      const launchWorkflow = await this.developerLaunchWorkflowPackage(token, selector, options);
+      const project = launchWorkflow?.manifest?.project || {};
+      const channel = launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
+      const [accountsPayload, entitlementsPayload, cardsPayload] = await Promise.all([
+        this.developerListAccounts(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null }),
+        this.developerListEntitlements(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null }),
+        this.developerListCards(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null })
+      ]);
+      const payload = buildDeveloperLaunchSmokeKitPayload({
+        generatedAt: launchWorkflow?.manifest?.generatedAt || nowIso(),
+        launchWorkflow,
+        accounts: Array.isArray(accountsPayload?.items) ? accountsPayload.items : [],
+        entitlements: Array.isArray(entitlementsPayload?.items) ? entitlementsPayload.items : [],
+        cards: Array.isArray(cardsPayload?.items) ? cardsPayload.items : [],
+        filters: {
+          productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+          channel
+        }
+      });
+      const session = requireDeveloperSession(db, token);
+      auditDeveloperSession(db, session, "product.launch-smoke-kit.export", "product", project.id, {
+        code: project.code,
+        channel,
+        fileName: payload.fileName
+      });
+      return payload;
+    },
+
     releasePackageDownloadAsset(payload, format = "json") {
       return buildReleasePackageDownloadAsset(payload, format);
     },
@@ -13925,6 +14500,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     launchReviewDownloadAsset(payload, format = "json") {
       return buildDeveloperLaunchReviewDownloadAsset(payload, format);
+    },
+
+    launchSmokeKitDownloadAsset(payload, format = "json") {
+      return buildDeveloperLaunchSmokeKitDownloadAsset(payload, format);
     },
 
     integrationPackageExportDownloadAsset(payload, format = "json") {

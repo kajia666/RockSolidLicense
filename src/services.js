@@ -3541,6 +3541,7 @@ function buildLaunchAuthorizationOperationalPlan({
     timing: "T+0 to T+30m",
     summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine.",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", {
+      reviewMode: "matched",
       eventType: "session.login",
       actorType: "account"
     })
@@ -3557,6 +3558,7 @@ function buildLaunchAuthorizationOperationalPlan({
       timing: "T+0 to T+2h",
       summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up.",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "audit", "Open Ops Workspace", {
+        reviewMode: "matched",
         entityType: "license_key"
       })
     };
@@ -3582,6 +3584,7 @@ function buildLaunchAuthorizationOperationalPlan({
     timing: "T+0 to T+4h",
     summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users.",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
+      reviewMode: "matched",
       eventType: "session.login",
       actorType: "account"
     })
@@ -4066,7 +4069,10 @@ function buildLaunchWorkflowSummaryPayload({
       label: opsWorkspaceAction.label || "Open Ops Workspace",
       priority: workspaceActions.length ? "secondary" : "primary",
       reason: "Use Developer Ops to watch first sign-ins, early sessions, device state, and scoped audit signals after rollout.",
-      autofocus: opsWorkspaceAction.autofocus || "snapshot"
+      autofocus: opsWorkspaceAction.autofocus || "snapshot",
+      params: opsWorkspaceAction.params && typeof opsWorkspaceAction.params === "object"
+        ? { ...opsWorkspaceAction.params }
+        : {}
     });
   }
   pushWorkspaceAction({

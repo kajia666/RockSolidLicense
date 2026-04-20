@@ -10760,7 +10760,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /route-focus-box/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /requestedAutofocus/);
+    assert.match(html, /requestedReviewMode/);
     assert.match(html, /Route reason:/);
+    assert.match(html, /Route review mode:/);
     assert.match(html, /Open this page from launch workflow or another routed workspace action/);
     assert.match(html, /handleOpsRouteFocusAction/);
     assert.match(html, /data-ops-route-focus-action/);
@@ -10822,6 +10824,7 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /route-focus-box/);
     assert.match(html, /window\.location\.search/);
     assert.match(html, /requestedAutofocus/);
+    assert.match(html, /reviewMode/);
     assert.match(html, /Route reason:/);
     assert.match(html, /Open this page from launch workflow or a routed workspace action/);
     assert.match(html, /renderLaunchQuickstart/);

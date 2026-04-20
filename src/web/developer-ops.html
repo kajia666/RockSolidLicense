@@ -229,6 +229,7 @@
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedReviewMode = (routeParams.get("reviewMode") || "").trim().toLowerCase();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
       const requestedUsername = (routeParams.get("username") || "").trim();
@@ -236,6 +237,7 @@
       const requestedEventType = (routeParams.get("eventType") || "").trim();
       const requestedActorType = (routeParams.get("actorType") || "").trim();
       const requestedEntityType = (routeParams.get("entityType") || "").trim();
+      routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
 
       function emptySnapshot() {
         return {
@@ -695,6 +697,7 @@
           ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project code first.`)}</div>
           ${(requestedEventType || requestedActorType || requestedEntityType || requestedUsername || requestedSearch) ? `<div class="hint" style="margin-top:10px;">${esc(`Route filters: event=${requestedEventType || "-"} | actor=${requestedActorType || "-"} | entity=${requestedEntityType || "-"} | username=${requestedUsername || "-"} | search=${requestedSearch || "-"}`)}</div>` : ""}
+          ${requestedReviewMode ? `<div class="hint" style="margin-top:10px;">${esc(`Route review mode: ${requestedReviewMode}`)}</div>` : ""}
           ${actions.length ? `
             <div class="actions" style="margin-top:12px;">
               ${actions.map((item) => {
@@ -714,7 +717,7 @@
         const box = el("route-review-box");
         const review = collectRouteReview();
         if (!review.active) {
-          routeReviewDisplayMode = "all";
+          routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
           box.innerHTML = `<div class="hint">Open this page from launch workflow or another routed workspace action to summarize the routed launch-day review here.</div>`;
           return;
         }
@@ -2635,7 +2638,7 @@
         lastExportDownload = null;
         preparedFocus = null;
         lastMutation = null;
-        routeReviewDisplayMode = "all";
+        routeReviewDisplayMode = requestedReviewMode === "matched" ? "matched" : "all";
         setMeta();
         renderAll();
       }

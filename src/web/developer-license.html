@@ -1413,6 +1413,7 @@
           autofocus,
           routeTitle: requestedRouteTitle || currentLicenseRouteFocus().title || "License workspace handoff",
           routeReason: routeReason || requestedRouteReason || `Review launch-day runtime signals for ${target.productCode}.`,
+          reviewMode: "matched",
           ...params
         });
       }

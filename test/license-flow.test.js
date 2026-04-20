@@ -6125,8 +6125,15 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => item.key === "launch-review"));
     assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => item.key === "ops"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.workspaceAction?.key === "launch-smoke"));
+    assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
+    assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => item.workspaceAction?.key === "ops" || item.workspaceAction?.key === "licenses"));
+    assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
+      const params = item.workspaceAction?.params || {};
+      return params.focusKind && params.routeAction === "review-primary";
+    }));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
+    assert.match(smokeKit.summaryText || "", /Launch Smoke Review Targets:/);
 
     const smokeKitSummaryDownload = await getText(
       baseUrl,

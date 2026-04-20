@@ -7112,6 +7112,64 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   ];
   const bootstrapAction = authReadiness.bootstrapAction || null;
   const setupAction = authReadiness.firstBatchSetupAction || null;
+  const compactSmokeFocusParams = (params = {}) => Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+  );
+  const buildSmokeReviewFocusParams = (kind, item = {}) => {
+    if (!item || typeof item !== "object") {
+      return {};
+    }
+    const productCode = item.productCode || item.projectCode || project.code || filters.productCode || null;
+    const username = item.username || null;
+    const reason = item.reason || item.revokedReason || item.suggestedUse || null;
+    const fingerprint = item.fingerprint || null;
+    if (kind === "account") {
+      return compactSmokeFocusParams({
+        focusKind: "account",
+        focusAccountId: item.accountId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "entitlement") {
+      return compactSmokeFocusParams({
+        focusKind: "entitlement",
+        focusEntitlementId: item.entitlementId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "session") {
+      return compactSmokeFocusParams({
+        focusKind: "session",
+        focusSessionId: item.sessionId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "device") {
+      return compactSmokeFocusParams({
+        focusKind: "device",
+        focusBindingId: item.bindingId || (item.kind === "binding" ? item.id || null : null),
+        focusBlockId: item.blockId || (item.kind === "block" ? item.id || null : null),
+        focusFingerprint: fingerprint,
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    return compactSmokeFocusParams({
+      focusProductCode: productCode,
+      focusUsername: username,
+      focusReason: reason,
+      focusFingerprint: fingerprint
+    });
+  };
   const createSmokeReviewTarget = ({
     key,
     label,
@@ -7150,9 +7208,12 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       routeActionLabel: "Review Accounts",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", "Open Ops Workspace", {
         reviewMode: "matched",
-        routeAction: "review-accounts",
+        routeAction: "review-primary",
         actorType: "account",
-        username: accountCandidates[0]?.username || ""
+        username: accountCandidates[0]?.username || "",
+        ...buildSmokeReviewFocusParams("account", accountCandidates[0] || {
+          productCode: project.code || filters.productCode || null
+        })
       }),
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "launch_smoke_accounts_summary",
@@ -7182,8 +7243,12 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       routeActionLabel: "Review Entitlements",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", "Open Ops Workspace", {
         reviewMode: "matched",
-        routeAction: "review-entitlements",
-        username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || ""
+        routeAction: "review-primary",
+        username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || "",
+        ...buildSmokeReviewFocusParams("entitlement", entitlementCandidates[0] || {
+          productCode: project.code || filters.productCode || null,
+          username: accountCandidates[0]?.username || null
+        })
       }),
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "launch_smoke_entitlements_summary",
@@ -7226,10 +7291,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       routeActionLabel: "Review Sessions",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
         reviewMode: "matched",
-        routeAction: "review-sessions",
+        routeAction: "review-primary",
         eventType: "session.login",
         actorType: "account",
-        username: accountCandidates[0]?.username || ""
+        username: accountCandidates[0]?.username || "",
+        ...buildSmokeReviewFocusParams("session", {
+          productCode: project.code || filters.productCode || null,
+          username: accountCandidates[0]?.username || null,
+          suggestedUse: "Launch smoke session review"
+        })
       }),
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "launch_smoke_sessions_summary",

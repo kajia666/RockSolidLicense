@@ -126,6 +126,7 @@
             <button type="button" class="secondary" data-audit-event="entitlement.extend" data-audit-entity="entitlement">Entitlement Extend</button>
           </div>
           <div class="hint">Blank filters query everything inside the current developer scope. Clicking an audit row also backfills matching filters and quick-control ids.</div>
+          <div class="hint" id="route-focus-box" style="margin-top:12px;">Open this page from launch workflow or another routed workspace action to focus snapshot review, early sessions, audit signals, and device follow-up for the current lane.</div>
         </article>
 
         <article class="card">
@@ -219,6 +220,13 @@
       let lastMutation = null;
       let overviewFocusMap = new Map();
       const AUDIT_PRESETS = Array.from(document.querySelectorAll("#audit-preset-bar [data-audit-event]"));
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
+      const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
 
       function emptySnapshot() {
         return {
@@ -248,7 +256,242 @@
       const setOutput = (value) => { el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2); };
       const setMeta = () => { el("session-meta").textContent = token && profile ? `${profile.username} | role=${actor?.role || "owner"} | scope=${actor?.type || "owner"} | session=${profile.session?.id || "-"}` : "No developer session yet."; };
       const q = (params) => { const s = new URLSearchParams(); Object.entries(params).forEach(([k, v]) => { if (v !== null && v !== undefined && String(v).trim() !== "") s.set(k, String(v).trim()); }); const r = s.toString(); return r ? `?${r}` : ""; };
+      const buildWorkspaceUrl = (path, params = {}) => `${path}${q(params)}`;
       const cloneValue = (value) => value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : null;
+
+      function currentOpsTarget() {
+        return {
+          productId: requestedProductId,
+          productCode: el("filter-product-code").value.trim() || requestedProductCode,
+          channel: requestedChannel
+        };
+      }
+
+      function currentOpsRouteFocus() {
+        const target = requestedAutofocus || "snapshot";
+        if (target === "accounts") {
+          return {
+            title: "Account follow-up focus",
+            summary: "Review early customer accounts and entitlement state for the routed lane, then jump back into license controls if starter access still needs work.",
+            actions: [
+              { key: "refresh-snapshot", label: "Refresh Snapshot" },
+              { key: "scroll-target", label: "Scroll To Accounts" },
+              { key: "open-licenses", label: "Open License Workspace" }
+            ]
+          };
+        }
+        if (target === "entitlements") {
+          return {
+            title: "Entitlement follow-up focus",
+            summary: "Inspect starter entitlements, extension state, and freeze/resume follow-up for the routed lane.",
+            actions: [
+              { key: "refresh-snapshot", label: "Refresh Snapshot" },
+              { key: "scroll-target", label: "Scroll To Entitlements" },
+              { key: "open-licenses", label: "Open License Workspace" }
+            ]
+          };
+        }
+        if (target === "sessions") {
+          return {
+            title: "Session review focus",
+            summary: "Check first sign-ins, heartbeat churn, and session revocations for the routed launch lane.",
+            actions: [
+              { key: "refresh-snapshot", label: "Refresh Snapshot" },
+              { key: "scroll-target", label: "Scroll To Sessions" },
+              { key: "open-launch", label: "Open Launch Workflow" }
+            ]
+          };
+        }
+        if (target === "devices" || target === "blocks" || target === "bindings") {
+          return {
+            title: "Device-state focus",
+            summary: "Review early bindings and device blocks so first-wave users are not accidentally locked out.",
+            actions: [
+              { key: "refresh-snapshot", label: "Refresh Snapshot" },
+              { key: "scroll-target", label: "Scroll To Devices" },
+              { key: "open-launch", label: "Open Launch Workflow" }
+            ]
+          };
+        }
+        if (target === "audit") {
+          return {
+            title: "Audit watch focus",
+            summary: "Use scoped audit logs to watch first redemptions, revocations, and other launch-day signals for the routed lane.",
+            actions: [
+              { key: "refresh-snapshot", label: "Refresh Snapshot" },
+              { key: "scroll-target", label: "Scroll To Audit Logs" },
+              { key: "download-summary", label: "Download Ops Summary" }
+            ]
+          };
+        }
+        return {
+          title: "Ops snapshot focus",
+          summary: "Use the scoped snapshot to confirm first sign-ins, early queue signals, and post-launch follow-up for the routed lane.",
+          actions: [
+            { key: "refresh-snapshot", label: "Refresh Snapshot" },
+            { key: "scroll-target", label: "Scroll To Snapshot" },
+            { key: "open-launch", label: "Open Launch Workflow" }
+          ]
+        };
+      }
+
+      function currentOpsAutofocusTarget() {
+        const target = requestedAutofocus || "snapshot";
+        if (target === "accounts") {
+          return "accounts-body";
+        }
+        if (target === "entitlements") {
+          return "entitlements-body";
+        }
+        if (target === "sessions") {
+          return "sessions-body";
+        }
+        if (target === "devices" || target === "blocks" || target === "bindings") {
+          return "devices-body";
+        }
+        if (target === "audit") {
+          return "audit-body";
+        }
+        return "snapshot-overview-status";
+      }
+
+      function focusOpsAutofocusTarget() {
+        const node = el(currentOpsAutofocusTarget());
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function shouldAutoFocusOpsWorkspace() {
+        return Boolean(token && requestedProductCode && requestedAutofocus);
+      }
+
+      function currentOpsMatchesRequestedRoute() {
+        if (!requestedProductCode) {
+          return false;
+        }
+        return String(el("filter-product-code").value || "").trim().toUpperCase() === requestedProductCode.toUpperCase();
+      }
+
+      function applyRoutePrefill() {
+        if (requestedProductCode && !el("filter-product-code").value.trim()) {
+          el("filter-product-code").value = requestedProductCode;
+        }
+      }
+
+      function buildOpsRouteContext(fallbackTitle = "", fallbackReason = "") {
+        return {
+          routeTitle: String(requestedRouteTitle || fallbackTitle || currentOpsRouteFocus().title || "Developer Ops").trim(),
+          routeReason: String(requestedRouteReason || fallbackReason || currentOpsRouteFocus().summary || "").trim()
+        };
+      }
+
+      function renderOpsRouteFocus() {
+        const box = el("route-focus-box");
+        const focus = currentOpsRouteFocus();
+        const target = currentOpsTarget();
+        const hasProduct = Boolean(target.productCode);
+        const actions = Array.isArray(focus.actions) ? focus.actions : [];
+        box.innerHTML = `
+          <div>${renderTag(focus.title || "Ops route focus", hasProduct)} ${requestedRouteTitle ? renderTag(`from:${requestedRouteTitle}`, true) : ""} ${requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
+          ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
+          <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project code first.`)}</div>
+          ${actions.length ? `
+            <div class="actions" style="margin-top:12px;">
+              ${actions.map((item) => {
+                const disabled = (
+                  (item.key === "refresh-snapshot" || item.key === "download-summary") ? !token
+                    : item.key === "scroll-target" ? false
+                    : !hasProduct
+                );
+                return `<button type="button" class="${item.key === "refresh-snapshot" || item.key.startsWith("open-") ? "secondary" : ""}" data-ops-route-focus-action="${esc(item.key)}" ${disabled ? "disabled" : ""}>${esc(item.label || item.key || "Action")}</button>`;
+              }).join("")}
+            </div>
+          ` : ""}
+        `;
+      }
+
+      async function hydrateOpsAutofocus() {
+        if (!requestedAutofocus) {
+          return;
+        }
+        if (!shouldAutoFocusOpsWorkspace()) {
+          focusOpsAutofocusTarget();
+          return;
+        }
+        if (!currentOpsMatchesRequestedRoute()) {
+          return;
+        }
+        focusOpsAutofocusTarget();
+      }
+
+      async function handleOpsRouteFocusAction(actionKey) {
+        const target = currentOpsTarget();
+        if (actionKey === "refresh-snapshot") {
+          await refreshOps();
+          setStatus(`Scoped ops snapshot refreshed for ${target.productCode || "current filters"}.`);
+          return;
+        }
+        if (actionKey === "scroll-target") {
+          focusOpsAutofocusTarget();
+          setStatus(`Focused ops section: ${requestedAutofocus || "snapshot"}.`);
+          return;
+        }
+        if (actionKey === "download-summary") {
+          await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary");
+          return;
+        }
+        if (!target.productCode) {
+          throw new Error("Route a project code before opening another workspace from Developer Ops.");
+        }
+        const routed = buildOpsRouteContext(currentOpsRouteFocus().title, currentOpsRouteFocus().summary);
+        if (actionKey === "open-project") {
+          window.location.href = buildWorkspaceUrl("/developer/projects", {
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            autofocus: "detail",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
+          });
+          return;
+        }
+        if (actionKey === "open-launch") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            autofocus: "handoff",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
+          });
+          return;
+        }
+        if (actionKey === "open-licenses") {
+          window.location.href = buildWorkspaceUrl("/developer/licenses", {
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            autofocus: "quickstart",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
+          });
+          return;
+        }
+        if (actionKey === "open-release") {
+          window.location.href = buildWorkspaceUrl("/developer/releases", {
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            autofocus: "summary",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
+          });
+          return;
+        }
+        throw new Error(`Unsupported ops route-focus action: ${actionKey}`);
+      }
 
       function formatTime(value) {
         if (!value) return "-";
@@ -1962,6 +2205,7 @@
 
       function renderAll() {
         renderStats();
+        renderOpsRouteFocus();
         renderSnapshotOverview();
         renderAccounts();
         renderEntitlements();
@@ -2018,11 +2262,54 @@
         setStatus(`${label} downloaded: ${result.fileName}`);
       }
 
-      el("login-btn").addEventListener("click", async () => { try { const data = await api("/api/developer/login", { method:"POST", body:{ username:el("username").value.trim(), password:el("password").value } }); token = data.token; await refreshProfile(); await refreshOps(); setStatus("Developer operations loaded."); } catch (error) { clearSession(); setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
-      el("refresh-btn").addEventListener("click", async () => { try { await refreshProfile(); await refreshOps(); setStatus("Developer operations refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("login-btn").addEventListener("click", async () => {
+        try {
+          const data = await api("/api/developer/login", { method:"POST", body:{ username:el("username").value.trim(), password:el("password").value } });
+          token = data.token;
+          await refreshProfile();
+          await refreshOps();
+          await hydrateOpsAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentOpsMatchesRequestedRoute()) {
+            setStatus("Developer operations loaded.");
+          } else {
+            setStatus(`Developer ops workspace focused on ${requestedProductCode}.`);
+          }
+        } catch (error) {
+          clearSession();
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code:error.code, message:error.message });
+        }
+      });
+      el("refresh-btn").addEventListener("click", async () => {
+        try {
+          await refreshProfile();
+          await refreshOps();
+          await hydrateOpsAutofocus();
+          if (!requestedAutofocus || !requestedProductCode || !currentOpsMatchesRequestedRoute()) {
+            setStatus("Developer operations refreshed.");
+          } else {
+            setStatus(`Developer ops workspace kept in sync for ${requestedProductCode}.`);
+          }
+        } catch (error) {
+          setStatus(`${error.code}: ${error.message}`, true);
+          setOutput({ code:error.code, message:error.message });
+        }
+      });
       el("logout-btn").addEventListener("click", async () => { try { if (token) await api("/api/developer/logout", { method:"POST" }); clearSession(); setStatus("Developer session closed."); setOutput("Logged out."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("apply-filters-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Filters applied."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("clear-filters-btn").addEventListener("click", async () => { ["filter-product-code","filter-username","filter-search","filter-event-type","filter-actor-type","filter-entity-type"].forEach((id) => { el(id).value = ""; }); el("filter-limit").value = "60"; try { await refreshOps(); setStatus("Filters cleared."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("route-focus-box").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-ops-route-focus-action]");
+        if (!button) {
+          return;
+        }
+        try {
+          await handleOpsRouteFocusAction(button.dataset.opsRouteFocusAction || "");
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+        }
+      });
       AUDIT_PRESETS.forEach((button) => {
         button.addEventListener("click", async () => {
           el("filter-event-type").value = button.dataset.auditEvent || "";
@@ -2052,7 +2339,10 @@
       el("release-binding-btn").addEventListener("click", async () => { try { await act(`/api/developer/device-bindings/${encodeURIComponent(el("binding-id").value.trim())}/release`, { reason: el("reason").value.trim() || "developer_binding_released" }, "Binding released."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("block-device-btn").addEventListener("click", async () => { try { await act("/api/developer/device-blocks", { projectCode: el("block-product-code").value.trim(), deviceFingerprint: el("block-fingerprint").value.trim(), reason: el("reason").value.trim() || "developer_blocked" }, "Device block saved."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("unblock-device-btn").addEventListener("click", async () => { try { await act(`/api/developer/device-blocks/${encodeURIComponent(el("block-id").value.trim())}/unblock`, { reason: el("reason").value.trim() || "developer_unblocked" }, "Device block released."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
-      clearSession(); setStatus("Sign in to load developer authorization operations."); setOutput("Waiting for actions...");
+      applyRoutePrefill();
+      clearSession();
+      setStatus("Sign in to load developer authorization operations.");
+      setOutput("Waiting for actions...");
     </script>
   </body>
 </html>

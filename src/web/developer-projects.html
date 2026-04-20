@@ -2363,6 +2363,17 @@
           });
           return;
         }
+        if (action.key === "ops") {
+          window.location.href = buildWorkspaceUrl("/developer/ops", {
+            productId,
+            productCode,
+            channel,
+            autofocus: action.autofocus || "snapshot",
+            routeTitle: routed.routeTitle,
+            routeReason: routed.routeReason
+          });
+          return;
+        }
         window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
           productId,
           productCode,

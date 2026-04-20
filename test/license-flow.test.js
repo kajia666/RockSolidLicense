@@ -5518,12 +5518,16 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.inventoryRecommendations.some((item) => item.bootstrapAction?.key));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstBatchCardRecommendations.some((item) => item.workspaceAction?.key === "licenses"));
     assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.key));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.key === "ops"));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.autofocus === "snapshot"));
+    assert.ok(launchWorkflow.workflowSummary.authorizationLaunchRecommendations.firstOpsActions.some((item) => item.workspaceAction?.autofocus === "sessions"));
     assert.equal(launchWorkflow.workflowSummary.recommendedWorkspace.key, "integration");
     assert.match(launchWorkflow.workflowSummary.recommendedWorkspace.label, /Integration Workspace/);
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.workspaceActions));
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "integration"));
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "release"));
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "licenses"));
+    assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "ops"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_zip"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_checksums"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
@@ -10342,6 +10346,13 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /next=/);
     assert.match(html, /Session Login/);
     assert.match(html, /license_key/);
+    assert.match(html, /route-focus-box/);
+    assert.match(html, /window\.location\.search/);
+    assert.match(html, /requestedAutofocus/);
+    assert.match(html, /Route reason:/);
+    assert.match(html, /Open this page from launch workflow or another routed workspace action/);
+    assert.match(html, /handleOpsRouteFocusAction/);
+    assert.match(html, /data-ops-route-focus-action/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

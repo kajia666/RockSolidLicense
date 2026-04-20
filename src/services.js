@@ -2688,6 +2688,13 @@ function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "") 
       autofocus: autofocus || "policy-control"
     };
   }
+  if (key === "ops") {
+    return {
+      key,
+      label: label || "Open Ops Workspace",
+      autofocus: autofocus || "snapshot"
+    };
+  }
   return {
     key: "launch",
     label: label || "Stay in Launch Workflow",
@@ -3254,7 +3261,7 @@ function buildLaunchAuthorizationOperationalPlan({
     label: "Verify first real sign-ins",
     timing: "T+0 to T+30m",
     summary: "Confirm startup bootstrap, login success, local token validation, and first heartbeat on at least one internal machine.",
-    workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Stay in Launch Workflow")
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace")
   });
 
   if (cardLoginEnabled || cardRechargeEnabled) {
@@ -3263,7 +3270,7 @@ function buildLaunchAuthorizationOperationalPlan({
       label: "Watch first card redemptions",
       timing: "T+0 to T+2h",
       summary: "Monitor fresh-card consumption, failed redemptions, and whether the first batch needs refill, freeze, or support follow-up.",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("licenses", "cards", "Open License Workspace")
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "audit", "Open Ops Workspace")
     });
   }
 
@@ -3282,7 +3289,7 @@ function buildLaunchAuthorizationOperationalPlan({
     label: "Review early sessions and device state",
     timing: "T+0 to T+4h",
     summary: "Check online sessions, heartbeat churn, device binds, and early blocks so false positives do not hurt the first wave of users.",
-    workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Stay in Launch Workflow")
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace")
   });
 
   return {
@@ -3641,6 +3648,18 @@ function buildLaunchWorkflowSummaryPayload({
       priority: workspaceActions.length ? "secondary" : "primary",
       reason: authReadiness.message || "Review authorization paths and starter inventory before launch.",
       autofocus: authReadiness.workspaceAutofocus || "policy-control"
+    });
+  }
+  const opsWorkspaceAction = Array.isArray(authReadiness.launchRecommendations?.firstOpsActions)
+    ? authReadiness.launchRecommendations.firstOpsActions.find((item) => item?.workspaceAction?.key === "ops")?.workspaceAction
+    : null;
+  if (opsWorkspaceAction) {
+    pushWorkspaceAction({
+      key: "ops",
+      label: opsWorkspaceAction.label || "Open Ops Workspace",
+      priority: workspaceActions.length ? "secondary" : "primary",
+      reason: "Use Developer Ops to watch first sign-ins, early sessions, device state, and scoped audit signals after rollout.",
+      autofocus: opsWorkspaceAction.autofocus || "snapshot"
     });
   }
   pushWorkspaceAction({

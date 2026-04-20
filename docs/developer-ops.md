@@ -150,3 +150,12 @@ The download route also accepts:
 - that mutation recap now also tracks `Escalate First` entry/exit and priority changes, then exposes them as recap tags and mitigation guidance for scoped follow-up
 - the recap now also keeps a lightweight per-object context card and `Snapshot hits` tag list, which makes scoped troubleshooting easier during repeated follow-up passes
 - focus items in the `/developer/ops` overview can backfill username, reason, fingerprint, and quick-control ids so the next action starts from the right scoped target
+
+The same workspace now also supports routed launch follow-up. When Launch Workflow or the inline project launch summary sends a software author into `/developer/ops`, the page can preserve `productId`, `productCode`, `channel`, `autofocus`, `routeTitle`, and `routeReason`, then show an `Ops Route Focus` card for `snapshot`, `audit`, `sessions`, `accounts`, `entitlements`, or `devices`.
+
+That routed focus is meant to shorten the first post-launch loop:
+
+- watch first sign-ins and heartbeat state from `snapshot`
+- watch first card-redemption or launch-day anomalies from `audit`
+- review early online sessions and device churn from `sessions` or `devices`
+- jump back to Projects, Launch Workflow, Licenses, or Releases without rebuilding the current lane context by hand

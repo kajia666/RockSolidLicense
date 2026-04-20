@@ -24,6 +24,7 @@ It now also derives a review-level:
 
 - `recommended workspace`
 - `action plan`
+- `review targets`
 - `recommended downloads`
 
 So the software author can move from "what happened after bootstrap / first-batch / refill" straight into "what should we open next" without translating the raw launch-workflow and ops summaries by hand.
@@ -39,6 +40,16 @@ After running one of those actions, the page keeps a `Last Review Action` recap 
 - confirm what changed in starter policy / card / account / entitlement counts
 - review any newly created starter batch, starter account, or internal entitlement
 - keep following the next launch-day recheck without leaving the review workspace
+
+The review page also promotes routed launch-day targets such as:
+
+- matched accounts
+- matched entitlements
+- matched sessions
+- matched devices
+- matched audit logs
+
+Each target can route directly into the matching scoped `Developer Ops` section with the same review filters preserved.
 
 ## Scoped APIs
 

@@ -5738,6 +5738,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary);
       assert.ok(Array.isArray(launchReview.reviewSummary.actionPlan));
       assert.ok(launchReview.reviewSummary.actionPlan.length >= 1);
+      assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
+      assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(Array.isArray(launchReview.reviewSummary.recommendedDownloads));
       assert.ok(launchReview.reviewSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
@@ -5745,6 +5748,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /RockSolid Launch Workflow Package/);
       assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
       assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
+      assert.match(launchReview.summaryText, /Launch Review Focus Targets:/);
       assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(
@@ -10051,6 +10055,7 @@ test("developer center page is served from the dedicated route", async () => {
       assert.match(html, /api\/developer\/launch-review\/download/);
       assert.match(html, /Generate Launch Review/);
       assert.match(html, /Review Actions/);
+      assert.match(html, /Review Targets/);
       assert.match(html, /Workspace Path/);
       assert.match(html, /Last Review Action/);
       assert.match(html, /Open Recommended Workspace/);
@@ -10063,8 +10068,11 @@ test("developer center page is served from the dedicated route", async () => {
       assert.match(html, /Open License Workspace/);
       assert.match(html, /review-followup-box/);
       assert.match(html, /renderLastReviewFollowUp/);
+      assert.match(html, /currentReviewTargets/);
       assert.match(html, /runLaunchReviewBootstrap/);
       assert.match(html, /runLaunchReviewSetup/);
+      assert.match(html, /data-review-target-workspace-index/);
+      assert.match(html, /data-review-target-download-index/);
       assert.match(html, /data-review-action-bootstrap-index/);
       assert.match(html, /data-review-action-setup-index/);
     } finally {

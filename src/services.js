@@ -5607,6 +5607,17 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       );
     }
   }
+  if (Array.isArray(reviewSummary.reviewTargets) && reviewSummary.reviewTargets.length) {
+    lines.push("");
+    lines.push("Launch Review Focus Targets:");
+    for (const item of reviewSummary.reviewTargets) {
+      lines.push(
+        `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
+        + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+        + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+      );
+    }
+  }
   if (Array.isArray(reviewSummary.workspaceActions) && reviewSummary.workspaceActions.length) {
     lines.push("");
     lines.push("Launch Review Workspace Path:");
@@ -5704,6 +5715,52 @@ function buildDeveloperLaunchReviewSummaryPayload({
       params: { ...scopedOpsParams }
     }
   );
+  const matchedOpsParams = {
+    ...scopedOpsParams,
+    reviewMode: "matched"
+  };
+  const createReviewTargetDownload = (key, label, fileName) => createLaunchWorkflowDownloadShortcut(
+    key,
+    fileName,
+    label,
+    {
+      source: "developer-ops",
+      format: "summary",
+      params: { ...matchedOpsParams }
+    }
+  );
+  const createReviewTarget = ({
+    key,
+    autofocus,
+    label,
+    summary,
+    count = 0,
+    status = "review",
+    fileName = "developer-ops-summary.txt"
+  } = {}) => {
+    if (!key || !autofocus) {
+      return null;
+    }
+    return {
+      key,
+      autofocus,
+      label: label || key,
+      count: Number(count || 0),
+      status: status || "review",
+      summary: summary || "-",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+        "ops",
+        autofocus,
+        label || "Open Ops Workspace",
+        matchedOpsParams
+      ),
+      recommendedDownload: createReviewTargetDownload(
+        `${key}_summary`,
+        `${label || key} summary`,
+        fileName
+      )
+    };
+  };
 
   const workspaceActions = [];
   const workspaceActionIds = new Set();
@@ -5758,6 +5815,105 @@ function buildDeveloperLaunchReviewSummaryPayload({
     || Number(workflowChecklist.reviewItems || 0) > 0;
   const queueHasUrgent = Number(opsOverview?.queueSummary?.critical || 0) > 0
     || Number(opsOverview?.queueSummary?.high || 0) > 0;
+  const reviewTargetCounts = {
+    accounts: Array.isArray(opsSnapshot?.accounts) ? opsSnapshot.accounts.length : 0,
+    entitlements: Array.isArray(opsSnapshot?.entitlements) ? opsSnapshot.entitlements.length : 0,
+    sessions: Array.isArray(opsSnapshot?.sessions) ? opsSnapshot.sessions.length : 0,
+    devices: (Array.isArray(opsSnapshot?.bindings) ? opsSnapshot.bindings.length : 0) + (Array.isArray(opsSnapshot?.blocks) ? opsSnapshot.blocks.length : 0),
+    audit: Array.isArray(opsSnapshot?.auditLogs) ? opsSnapshot.auditLogs.length : 0
+  };
+  const preferredTargetOrder = [];
+  const pushPreferredTargetKey = (key) => {
+    if (!key || preferredTargetOrder.includes(key)) {
+      return;
+    }
+    preferredTargetOrder.push(key);
+  };
+  if (String(filters.username || "").trim()) {
+    pushPreferredTargetKey("accounts");
+    pushPreferredTargetKey("entitlements");
+    pushPreferredTargetKey("sessions");
+  }
+  if (String(filters.eventType || "").trim().toLowerCase().startsWith("session.")) {
+    pushPreferredTargetKey("sessions");
+    pushPreferredTargetKey("audit");
+  }
+  const entityType = String(filters.entityType || "").trim().toLowerCase();
+  if (entityType === "entitlement") {
+    pushPreferredTargetKey("entitlements");
+    pushPreferredTargetKey("accounts");
+  }
+  if (entityType === "session") {
+    pushPreferredTargetKey("sessions");
+    pushPreferredTargetKey("audit");
+  }
+  if (entityType === "device_binding" || entityType === "device_block") {
+    pushPreferredTargetKey("devices");
+    pushPreferredTargetKey("audit");
+  }
+  if (entityType === "license_key") {
+    pushPreferredTargetKey("audit");
+    pushPreferredTargetKey("entitlements");
+  }
+  if (String(filters.actorType || "").trim().toLowerCase() === "account") {
+    pushPreferredTargetKey("accounts");
+    pushPreferredTargetKey("sessions");
+  }
+  ["accounts", "entitlements", "sessions", "devices", "audit"].forEach(pushPreferredTargetKey);
+
+  const reviewTargetBuilders = {
+    accounts: () => createReviewTarget({
+      key: "ops_accounts_review",
+      autofocus: "accounts",
+      label: "Review matched accounts",
+      summary: "Inspect routed starter accounts and related entitlement state before widening launch access.",
+      count: reviewTargetCounts.accounts,
+      fileName: "developer-ops-accounts-summary.txt"
+    }),
+    entitlements: () => createReviewTarget({
+      key: "ops_entitlements_review",
+      autofocus: "entitlements",
+      label: "Review matched entitlements",
+      summary: "Confirm starter entitlements, lifecycle state, and grant windows for the routed launch lane.",
+      count: reviewTargetCounts.entitlements,
+      fileName: "developer-ops-entitlements-summary.txt"
+    }),
+    sessions: () => createReviewTarget({
+      key: "ops_sessions_review",
+      autofocus: "sessions",
+      label: "Review matched sessions",
+      summary: "Check first sign-ins, heartbeat churn, and routed session health before the next launch wave.",
+      count: reviewTargetCounts.sessions,
+      status: queueHasUrgent ? "review" : "pass",
+      fileName: "developer-ops-sessions-summary.txt"
+    }),
+    devices: () => createReviewTarget({
+      key: "ops_devices_review",
+      autofocus: "devices",
+      label: "Review matched devices",
+      summary: "Inspect routed bindings and device blocks so first-wave users are not accidentally locked out.",
+      count: reviewTargetCounts.devices,
+      fileName: "developer-ops-devices-summary.txt"
+    }),
+    audit: () => createReviewTarget({
+      key: "ops_audit_review",
+      autofocus: "audit",
+      label: "Review matched audit logs",
+      summary: "Review routed audit events for launch-day redemptions, revocations, and other early warning signals.",
+      count: reviewTargetCounts.audit,
+      status: queueHasUrgent ? "review" : "pass",
+      fileName: "developer-ops-audit-summary.txt"
+    })
+  };
+  const reviewTargets = preferredTargetOrder
+    .map((key) => reviewTargetBuilders[key]?.())
+    .filter(Boolean);
+  const visibleReviewTargets = reviewTargets.some((item) => Number(item.count || 0) > 0)
+    ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
+    : reviewTargets.slice(0, 2);
+  for (const item of visibleReviewTargets) {
+    pushWorkspaceAction(item.workspaceAction, item.summary || "");
+  }
 
   pushActionPlan(createLaunchWorkflowActionPlanStep({
     key: "launch_review_summary",
@@ -5786,6 +5942,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
       recommendedDownload: item.recommendedDownload || null,
       bootstrapAction: item.bootstrapAction || null,
       setupAction: item.setupAction || null
+    }));
+  }
+
+  for (const item of visibleReviewTargets.slice(0, 3)) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: item.key,
+      title: item.label || item.key || "Review routed ops scope",
+      summary: item.summary || "-",
+      status: item.status || "review",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction: item.workspaceAction || null,
+      recommendedDownload: item.recommendedDownload || null
     }));
   }
 
@@ -5841,7 +6009,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
     pushRecommendedDownload(item);
   }
 
+  const preferredReviewTarget = visibleReviewTargets[0] || null;
   const recommendedWorkspace = (actionPlan.find((item) => item.priority === "primary" && item.workspaceAction)?.workspaceAction)
+    || (!workflowNeedsReview && preferredReviewTarget?.workspaceAction ? preferredReviewTarget.workspaceAction : null)
     || workflowSummary.recommendedWorkspace
     || opsWorkspaceAction
     || stayAction;
@@ -5858,16 +6028,17 @@ function buildDeveloperLaunchReviewSummaryPayload({
       : reviewStatus === "review"
         ? "Launch review still needs attention"
         : "Launch review is ready for handoff",
-    message: workflowNeedsReview
+      message: workflowNeedsReview
       ? (workflowSummary.message || "Clear launch blockers and recheck the scoped runtime slice before rollout.")
       : queueHasUrgent
         ? "Launch lane looks staged, but routed runtime signals still need another look."
         : (opsOverview.headline || "Launch lane and routed runtime scope both look ready for handoff."),
     recommendedWorkspace,
     workspaceActions,
-    actionPlan,
-    recommendedDownloads,
-    nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
+      reviewTargets: visibleReviewTargets,
+      actionPlan,
+      recommendedDownloads,
+      nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
   };
 }
 

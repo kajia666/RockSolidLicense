@@ -2958,6 +2958,14 @@
         };
       }
 
+      function countRouteReviewMatches(review = collectRouteReview()) {
+        return Number(review?.matchedAccounts?.length || 0)
+          + Number(review?.matchedEntitlements?.length || 0)
+          + Number(review?.matchedSessions?.length || 0)
+          + Number(review?.matchedDevices?.length || 0)
+          + Number(review?.matchedAuditLogs?.length || 0);
+      }
+
       function tuneDeveloperFollowUpPlan(plan = {}, comparison = {}, hasDirectControl = false) {
         const outcomeLabel = String(comparison?.outcomeLabel || "").trim();
         const escalationOutcomeLabel = String(comparison?.escalationOutcomeLabel || "").trim();
@@ -3049,6 +3057,7 @@
         const impactBits = buildDeveloperFollowUpImpactBits(focus);
         const impactSummary = impactBits.length ? `Impact: ${impactBits.join(", ")}.` : "";
         const routeContinuation = buildDeveloperRouteReviewContinuation(focus);
+        const routeReview = collectRouteReview();
         if (severityRank === 0 && queuePosition === null) {
           if (routeContinuation?.nextFocus?.kind) {
             const nextTitle = formatRouteReviewPrimaryTitle(routeContinuation.nextFocus);
@@ -3062,6 +3071,19 @@
               primaryLabel: "Continue Routed Review",
               secondaryAction: routeContinuation.nextControlLabel ? "control_next" : "download_next",
               secondaryLabel: routeContinuation.nextControlLabel ? "Open Next Control" : "Download Next Match Summary"
+            }, comparison, hasDirectControl);
+          }
+          if (routeReview.active) {
+            return tuneDeveloperFollowUpPlan({
+              priority: "clear",
+              label: "Close Out",
+              tone: "ok",
+              impactBits,
+              hint: `No active scoped signal remains for this object. ${impactSummary ? `${impactSummary} ` : ""}No additional routed match remains, so you can complete this routed review pass now.`,
+              primaryAction: "complete_route_review",
+              primaryLabel: "Complete Routed Review",
+              secondaryAction: "download_route_review",
+              secondaryLabel: "Download Routed Summary"
             }, comparison, hasDirectControl);
           }
           return tuneDeveloperFollowUpPlan({
@@ -3511,6 +3533,29 @@
             throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match summary is available for follow-up review." };
           }
           await handleExportDownload("summary", continuation.nextDownload.fileName, continuation.nextDownload.label, continuation.nextDownload.params);
+          return;
+        }
+        if (action === "complete_route_review") {
+          await refreshOps();
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          const review = collectRouteReview();
+          const totalMatches = countRouteReviewMatches(review);
+          if (totalMatches > 0) {
+            const primary = buildPrimaryRouteReviewFocus(review, review.focus || requestedAutofocus || "");
+            setStatus(`Routed review rechecked. ${formatRouteReviewSummary(review)}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
+            return;
+          }
+          setStatus(`Routed review complete. ${formatRouteReviewSummary(review)} No additional matched objects remain.`);
+          setOutput({
+            mutationAction: action,
+            routedReviewComplete: true,
+            matchedCount: totalMatches
+          });
+          return;
+        }
+        if (action === "download_route_review") {
+          await handleExportDownload("summary", "developer-ops-summary.txt", "Routed ops summary");
         }
       }
 

@@ -1683,6 +1683,17 @@
             announce: false,
             focusControls: true
           });
+          const preparedLabel = prepared?.preparedControl || prepared?.item?.recommendedControl?.label || "";
+          if (preparedLabel) {
+            setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} primary routed match. ${formatRouteReviewSummary()}. Primary control ready while reviewing: ${preparedLabel}.`);
+            setOutput({
+              routeReviewAction: normalizedAction,
+              focusKind: prepared?.kind || primary.kind,
+              focusItem: prepared?.item || primary.item,
+              preparedControl: preparedLabel
+            });
+            return;
+          }
           setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} primary routed match. ${formatRouteReviewSummary()}. Primary match ready: ${formatRouteReviewPrimaryTitle(prepared || primary)}.`);
           return;
         }
@@ -1708,8 +1719,19 @@
           routeReviewDisplayMode = "matched";
           renderAll();
           focusRouteReviewSection(section);
-          const primary = await preparePrimaryRouteReviewFocus({ force: true, preferredSection: section, announce: false });
+          const primary = await preparePrimaryRouteReviewFocus({ force: true, preferredSection: section, announce: false, focusControls: true });
           const routeLabel = formatRouteReviewActionLabel(normalizedAction) || `Review ${section}`;
+          const preparedLabel = primary?.preparedControl || primary?.item?.recommendedControl?.label || "";
+          if (preparedLabel) {
+            setStatus(`${options.auto ? "Auto-opened" : "Reviewing"} routed ${routeLabel.toLowerCase()}. ${formatRouteReviewSummary()}. Primary control ready while reviewing: ${preparedLabel}.`);
+            setOutput({
+              routeReviewAction: normalizedAction,
+              focusKind: primary?.kind || "",
+              focusItem: primary?.item || {},
+              preparedControl: preparedLabel
+            });
+            return;
+          }
           setStatus(`${options.auto ? "Auto-opened" : "Reviewing"} routed ${routeLabel.toLowerCase()}. ${formatRouteReviewSummary()}.${primary?.kind ? ` Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.` : ""}`);
         }
       }

@@ -6764,6 +6764,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
           || null
       }
     : rawPrimaryReviewTarget;
+  if (primaryReviewTarget?.workspaceAction) {
+    pushWorkspaceAction(primaryReviewTarget.workspaceAction, primaryReviewTarget.summary || "");
+  }
   for (const item of visibleReviewTargets) {
     pushWorkspaceAction(item.workspaceAction, item.summary || "");
   }
@@ -7519,6 +7522,9 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
           || null
       }
     : rawPrimaryReviewTarget;
+  if (primaryReviewTarget?.workspaceAction) {
+    pushWorkspaceAction(primaryReviewTarget.workspaceAction);
+  }
   if (primaryReviewTarget?.recommendedDownload?.key) {
     recommendedDownloads.push({
       ...primaryReviewTarget.recommendedDownload,

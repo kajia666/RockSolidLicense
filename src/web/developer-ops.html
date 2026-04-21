@@ -3160,6 +3160,43 @@
         };
       }
 
+      function buildDeveloperRouteReviewRecap(successMessage, focus = null, preparedControl = "") {
+        const snapshotHits = collectDeveloperSnapshotHits(focus);
+        const comparison = compareDeveloperMutationSignals(snapshotHits, snapshotHits);
+        const clonedItem = cloneValue(focus?.item) || null;
+        return {
+          timestamp: new Date().toISOString(),
+          successMessage,
+          focusKind: focus?.kind || "",
+          status: snapshotHits.length ? "attention" : "ok",
+          title: focus?.kind ? buildPreparedFocusTitle(focus.kind, clonedItem || {}) : "",
+          summary: focus?.kind ? buildPreparedFocusSummary(focus.kind, clonedItem || {}) : "",
+          focusItem: clonedItem,
+          recommendedControl: cloneValue(focus?.recommendedControl || focus?.item?.recommendedControl) || null,
+          preparedControl: preparedControl || focus?.recommendedControl?.label || focus?.item?.recommendedControl?.label || "",
+          severity: focusSeverityClass(focus?.item?.severity),
+          actionHint: focus?.item?.actionHint || focus?.item?.nextAction || "",
+          trendLabel: "Route Continued",
+          trendTone: "ok",
+          escalationLabel: "",
+          escalationTone: "",
+          outcomeLabel: comparison.outcomeLabel,
+          outcomeTone: comparison.outcomeTone,
+          outcomeHint: comparison.outcomeHint,
+          escalationOutcomeLabel: comparison.escalationOutcomeLabel,
+          escalationOutcomeTone: comparison.escalationOutcomeTone,
+          escalationOutcomeHint: comparison.escalationOutcomeHint,
+          headline: "Next routed review ready.",
+          detail: snapshotHits.length
+            ? `The next routed object is loaded and ready for review. signals=${snapshotHits.length}`
+            : "The next routed object is loaded and no active scoped signal remains.",
+          before: comparison.before,
+          after: comparison.after,
+          followUp: buildDeveloperFollowUp(comparison, focus),
+          snapshotHits
+        };
+      }
+
       function renderDeveloperMutationRecap() {
         if (!lastMutation) {
           return "";
@@ -3408,6 +3445,16 @@
             routePreparedKey: signature
           });
           const preparedLabel = prepared?.preparedControl || continuation.nextControlLabel || "";
+          lastMutation = buildDeveloperRouteReviewRecap(
+            "Continued routed review with the next matched object.",
+            {
+              kind: continuation.nextFocus.kind,
+              item: continuation.nextFocus.item || {},
+              recommendedControl: continuation.nextFocus.item?.recommendedControl || {}
+            },
+            preparedLabel
+          );
+          renderSnapshotOverview();
           if (preparedLabel) {
             setStatus(`Continuing routed review with the next match. ${formatRouteReviewSummary(continuation.review)}. Next control ready: ${preparedLabel}.`);
             setOutput({
@@ -3436,6 +3483,16 @@
             routePreparedKey: signature
           });
           const preparedLabel = prepared?.preparedControl || continuation.nextControlLabel || "";
+          lastMutation = buildDeveloperRouteReviewRecap(
+            "Opened the next routed control for follow-up review.",
+            {
+              kind: continuation.nextFocus.kind,
+              item: continuation.nextFocus.item || {},
+              recommendedControl: continuation.nextFocus.item?.recommendedControl || {}
+            },
+            preparedLabel
+          );
+          renderSnapshotOverview();
           if (!preparedLabel) {
             setStatus(`Continuing routed review with the next match. ${formatRouteReviewSummary(continuation.review)}. No direct control was suggested, so the next match is ready for review: ${formatRouteReviewPrimaryTitle(continuation.nextFocus)}.`);
             return;

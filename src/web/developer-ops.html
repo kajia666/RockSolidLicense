@@ -285,6 +285,7 @@
         const normalized = String(value || "").trim().toLowerCase();
         const allowed = new Set([
           "prepare-primary",
+          "control-primary",
           "review-primary",
           "download-primary",
           "download-accounts",
@@ -307,6 +308,9 @@
         const normalized = normalizeRouteReviewActionValue(actionKey);
         if (normalized === "prepare-primary") {
           return "Prepare Primary Match";
+        }
+        if (normalized === "control-primary") {
+          return "Open Primary Control";
         }
         if (normalized === "review-primary") {
           return "Review Primary Match";
@@ -1507,6 +1511,7 @@
           : `<div class="hint" style="margin-top:8px;">No routed primary object is ready yet.</div>`;
         const reviewButtons = [
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="prepare-primary">Prepare Primary Match</button>` : "",
+          primaryFocus?.item?.recommendedControl?.label ? `<button type="button" class="secondary" data-route-review-action="control-primary">Open Primary Control</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-primary">Review Primary Match</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-primary" ${token ? "" : "disabled"}>Download Primary Match Summary</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
@@ -1604,6 +1609,35 @@
             throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
           }
           setStatus(`${options.auto ? "Auto-prepared" : "Prepared"} routed primary match. ${formatRouteReviewSummary()}. Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.`);
+          return;
+        }
+        if (normalizedAction === "control-primary") {
+          const review = collectRouteReview();
+          const primary = buildPrimaryRouteReviewFocus(review, review.focus || requestedAutofocus || "");
+          if (!primary?.kind) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
+          }
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          focusRouteReviewSection(primary.section || requestedAutofocus || "");
+          const prepared = await preparePrimaryRouteReviewFocus({
+            force: true,
+            preferredSection: primary.section || requestedAutofocus || "",
+            announce: false,
+            focusControls: true
+          });
+          const preparedLabel = prepared?.preparedControl || prepared?.item?.recommendedControl?.label || "";
+          if (!preparedLabel) {
+            setStatus(`${options.auto ? "Auto-opened" : "Opened"} routed primary match. ${formatRouteReviewSummary()}. No direct control was suggested, so the primary match is ready for review: ${formatRouteReviewPrimaryTitle(prepared || primary)}.`);
+            return;
+          }
+          setStatus(`${options.auto ? "Auto-opened" : "Opened"} primary routed control. ${formatRouteReviewSummary()}. Primary control ready: ${preparedLabel}.`);
+          setOutput({
+            routeReviewAction: "control-primary",
+            focusKind: prepared?.kind || primary.kind,
+            focusItem: prepared?.item || primary.item,
+            preparedControl: preparedLabel
+          });
           return;
         }
         if (normalizedAction === "review-primary") {

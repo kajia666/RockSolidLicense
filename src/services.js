@@ -6751,7 +6751,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
           ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
             ? rawPrimaryReviewTarget.workspaceAction.params
             : {}),
-          routeAction: "review-primary"
+          routeAction: "control-primary"
         }
       }
     : null;
@@ -7527,7 +7527,13 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         ...rawPrimaryReviewTarget,
         workspaceAction: {
           ...rawPrimaryReviewTarget.workspaceAction,
-          label: "Review Primary Match in Ops"
+          label: "Review Primary Match in Ops",
+          params: {
+            ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
+              ? rawPrimaryReviewTarget.workspaceAction.params
+              : {}),
+            routeAction: "control-primary"
+          }
         },
         recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(rawPrimaryReviewTarget.workspaceAction)
           || rawPrimaryReviewTarget.recommendedDownload

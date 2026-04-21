@@ -90,6 +90,7 @@
 - 现在这两个 `Primary Review Target` 的窄摘要也正式并进了 `Launch Review / Launch Smoke` 的顶层推荐下载里，所以到页后不必先展开目标区块找按钮，直接就能把当前最关键对象的复查摘要拿走
 - 同时，这两个 `Primary Review Target` 现在也会提前出现在 `Launch Review / Launch Smoke` 顶层的工作台动作里，所以到页后不需要先往下滚到目标区块，最上面就能直接点进主复查对象
 - 它们现在也已经正式并进 `Launch Review / Launch Smoke` 的动作计划里，所以这一步不只是“一个重点目标”，而是更像系统已经帮软件作者把“先看这个对象”排进了当前流程
+- 现在这两个 `Primary Review Target` 在落到 `/developer/ops` 时，也会默认走更直接的 `Open Primary Control` 路线；如果当前对象已经有推荐处理动作，就会直接把主控制入口准备好，没有的话也会自然回退到主复查对象本身，继续减少 `Launch Review / Launch Smoke -> Developer Ops` 之间的手工判断
 - 上线工作台和项目页现在还会在页面内保留 `Last Launch Action` / follow-up 卡片：跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 之后，不只是状态栏提示一下，还会把下一步推荐工作台和可下载的首轮巡检摘要继续留在当前页面，方便软件作者顺着做完下一步
 - 现在还新增了独立的 `/developer/launch-review` 工作台，把当前 lane 的 launch workflow 和带过滤条件的 developer ops snapshot 合并到一个复查页里，适合在跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 后，直接做首轮复查或交给 QA / 客服 / 值守同事
 - 这条 `Launch Review` 现在还会直接给出推荐工作台、复查动作计划和推荐下载，不只是把 launch 和 ops 放在同一页里，软件作者也能更快知道下一步该开哪个工作台、拿哪份摘要

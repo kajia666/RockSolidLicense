@@ -178,9 +178,10 @@ Routed launch-review links can now also carry a `routeAction` such as `Review Ac
 That same `Route Review` block can now also promote the current `Primary Match` into two direct follow-up actions:
 
 - `Review Primary Match`
+- `Open Primary Control`
 - `Download Primary Match Summary`
 
-So when the routed lane already has a clear first account / entitlement / session / device to inspect, the software author can immediately continue review or export a tighter scoped summary around that object instead of reopening the broad routed export first.
+So when the routed lane already has a clear first account / entitlement / session / device to inspect, the software author can immediately continue review, jump straight into the suggested quick-control action when one exists, or export a tighter scoped summary around that object instead of reopening the broad routed export first. The same control-first route is now also used by the primary launch-review / launch-smoke handoff, so `/developer/ops` lands closer to the first real remediation step when the routed object already carries a suggested action.
 
 That same block can now also export section-level summaries directly:
 

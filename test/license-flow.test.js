@@ -5769,7 +5769,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.primaryReviewTarget);
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.key, "ops");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.label, "Review Primary Match in Ops");
-      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.params?.routeAction, "review-primary");
+      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.params?.routeAction, "control-primary");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
       assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));
@@ -6145,7 +6145,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.key, "ops");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.label, "Review Primary Match in Ops");
-    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.params?.routeAction, "review-primary");
+    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.params?.routeAction, "control-primary");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));
@@ -11070,6 +11070,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Route review action:/);
     assert.match(html, /Route review mode:/);
     assert.match(html, /Review Primary Match/);
+    assert.match(html, /Open Primary Control/);
     assert.match(html, /Download Primary Match Summary/);
     assert.match(html, /Download Accounts Summary/);
     assert.match(html, /Download Sessions Summary/);

@@ -3280,6 +3280,45 @@ function createLaunchWorkflowPrimaryOpsDownloadShortcut(workspaceAction, {
   );
 }
 
+function createLaunchWorkflowRemainingOpsDownloadShortcut(workspaceAction, {
+  key = "ops_remaining_summary",
+  label = "Remaining matches summary",
+  fileName = "developer-ops-remaining-summary.txt",
+  format = "route-review-remaining"
+} = {}) {
+  if (!workspaceAction || workspaceAction.key !== "ops") {
+    return null;
+  }
+  const rawParams = workspaceAction.params && typeof workspaceAction.params === "object"
+    ? workspaceAction.params
+    : {};
+  const params = {
+    reviewMode: rawParams.reviewMode || "matched",
+    productCode: rawParams.focusProductCode || rawParams.productCode || "",
+    username: rawParams.focusUsername || rawParams.username || "",
+    search: rawParams.search || "",
+    eventType: rawParams.eventType || "",
+    actorType: rawParams.actorType || "",
+    entityType: rawParams.entityType || "",
+    limit: rawParams.limit || 60
+  };
+  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+    if (!params[field]) {
+      delete params[field];
+    }
+  }
+  return createLaunchWorkflowDownloadShortcut(
+    key,
+    fileName,
+    label,
+    {
+      source: "developer-ops",
+      format,
+      params
+    }
+  );
+}
+
 function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summary", fileName = "launch-review.txt", format = "summary", params = null) {
   return createLaunchWorkflowDownloadShortcut(
     "launch_review_summary",
@@ -7027,6 +7066,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
   if (primaryReviewTarget?.recommendedDownload) {
     pushRecommendedDownload(primaryReviewTarget.recommendedDownload);
   }
+  if (primaryReviewTarget?.workspaceAction?.key === "ops") {
+    pushRecommendedDownload(createLaunchWorkflowRemainingOpsDownloadShortcut(primaryReviewTarget.workspaceAction));
+  }
   pushRecommendedDownload(workflowSummaryDownload);
   pushRecommendedDownload(workflowChecklistDownload);
   pushRecommendedDownload(opsSummaryDownload);
@@ -7715,6 +7757,17 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       params: primaryReviewTarget.recommendedDownload.params && typeof primaryReviewTarget.recommendedDownload.params === "object"
         ? { ...primaryReviewTarget.recommendedDownload.params }
         : primaryReviewTarget.recommendedDownload.params
+    });
+  }
+  const remainingReviewDownload = primaryReviewTarget?.workspaceAction?.key === "ops"
+    ? createLaunchWorkflowRemainingOpsDownloadShortcut(primaryReviewTarget.workspaceAction)
+    : null;
+  if (remainingReviewDownload?.key) {
+    recommendedDownloads.push({
+      ...remainingReviewDownload,
+      params: remainingReviewDownload.params && typeof remainingReviewDownload.params === "object"
+        ? { ...remainingReviewDownload.params }
+        : remainingReviewDownload.params
     });
   }
   for (const item of visibleReviewTargets) {

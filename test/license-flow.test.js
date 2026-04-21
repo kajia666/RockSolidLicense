@@ -5802,6 +5802,7 @@ test("developer release package export bundles integration, versions, and notice
         /^Primary (account|entitlement|session|device) summary$/i
       );
       assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.fileName || "")));
+      assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.fileName === "developer-ops-remaining-summary.txt"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
@@ -6226,6 +6227,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
         && /^Open (Account|Entitlement|Session|Device) Control$/.test(item.routeActionLabel || "");
     }));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
+    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-remaining-summary.txt"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Primary Review Target:/);
     assert.match(smokeKit.summaryText || "", /action=Open (Account|Entitlement|Session|Device) Control/);

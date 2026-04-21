@@ -2084,6 +2084,8 @@ function buildReleasePackageSummaryText(manifest = {}) {
           `  - ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
           + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
           + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.fileName || item.recommendedDownload.label || "-"}` : ""}`
+          + `${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}`
+          + `${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
         );
       }
     }
@@ -2551,6 +2553,7 @@ function buildReleaseMainlineFollowUpPayload({
   readiness = {},
   deliverySummary = {},
   deliveryChecklist = {},
+  authReadiness = {},
   releaseStartupPreview = null,
   fileName = "release-package.json",
   summaryFileName = "release-package.txt",
@@ -2639,7 +2642,9 @@ function buildReleaseMainlineFollowUpPayload({
     status = "review",
     priority = "secondary",
     workspaceAction = null,
-    recommendedDownload = null
+    recommendedDownload = null,
+    bootstrapAction = null,
+    setupAction = null
   } = {}) => {
     if (!key) {
       return;
@@ -2651,7 +2656,9 @@ function buildReleaseMainlineFollowUpPayload({
       status,
       priority,
       workspaceAction,
-      recommendedDownload
+      recommendedDownload,
+      bootstrapAction,
+      setupAction
     });
   };
 
@@ -2666,7 +2673,16 @@ function buildReleaseMainlineFollowUpPayload({
     || String(runtimeCoverageCheck?.level || "").toLowerCase() === "attention"
     || String(clientHardeningCheck?.level || "").toLowerCase() === "attention"
     || String(tokenKeysCheck?.level || "").toLowerCase() === "attention";
+  const authorizationNeedsAttention = authReadiness.status === "block" || authReadiness.status === "review";
   const normalizedStatus = String(readiness.status || deliveryChecklist.status || "unknown").toLowerCase() || "unknown";
+  const authorizationWorkspaceAction = authorizationNeedsAttention
+    ? createLaunchWorkflowWorkspaceShortcut(
+        authReadiness.workspaceKey || "licenses",
+        authReadiness.workspaceAutofocus || "policy-control",
+        authReadiness.workspaceLabel
+          || ((authReadiness.workspaceKey || "licenses") === "project" ? "Open Project Workspace" : "Open License Workspace")
+      )
+    : null;
 
   let recommendedWorkspace = null;
   if (projectBlocked) {
@@ -2737,6 +2753,12 @@ function buildReleaseMainlineFollowUpPayload({
       "Use Integration when startup, hardening, or token verification settings still need work."
     );
   }
+  if (authorizationWorkspaceAction) {
+    pushWorkspaceAction(
+      authorizationWorkspaceAction,
+      authReadiness.message || "Use the license workspace to finish starter policies, accounts, and launch inventory."
+    );
+  }
 
   let title = "Release lane needs one more pass";
   let message = readiness.message || deliverySummary.summary || "Use the release workspace to keep this lane aligned before handoff.";
@@ -2780,6 +2802,22 @@ function buildReleaseMainlineFollowUpPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
       recommendedDownload: launchSummaryDownload
     });
+    if (authorizationNeedsAttention) {
+      pushActionPlan({
+        key: "authorization_follow_up",
+        title: "Finish launch authorization staging",
+        summary: authReadiness.bootstrapSummary
+          || authReadiness.firstBatchSetupSummary
+          || (Array.isArray(authReadiness.nextActions) && authReadiness.nextActions[0])
+          || authReadiness.message
+          || "Stage starter policies, accounts, and launch inventory before rollout.",
+        status: authReadiness.status || "review",
+        priority: "secondary",
+        workspaceAction: authorizationWorkspaceAction,
+        bootstrapAction: authReadiness.bootstrapAction || null,
+        setupAction: authReadiness.firstBatchSetupAction || null
+      });
+    }
   } else {
     if (normalizedStatus === "attention") {
       pushActionPlan({
@@ -2794,6 +2832,22 @@ function buildReleaseMainlineFollowUpPayload({
         priority: "primary",
         workspaceAction: recommendedWorkspace,
         recommendedDownload: releaseChecklistDownload
+      });
+    }
+    if (authorizationNeedsAttention) {
+      pushActionPlan({
+        key: "authorization_follow_up",
+        title: "Finish launch authorization staging",
+        summary: authReadiness.bootstrapSummary
+          || authReadiness.firstBatchSetupSummary
+          || (Array.isArray(authReadiness.nextActions) && authReadiness.nextActions[0])
+          || authReadiness.message
+          || "Stage starter policies, accounts, and launch inventory before rollout.",
+        status: authReadiness.status || "review",
+        priority: normalizedStatus === "ready" ? "primary" : "secondary",
+        workspaceAction: authorizationWorkspaceAction,
+        bootstrapAction: authReadiness.bootstrapAction || null,
+        setupAction: authReadiness.firstBatchSetupAction || null
       });
     }
     pushActionPlan({
@@ -2854,6 +2908,7 @@ function buildReleasePackagePayload({
   versionManifest,
   activeNoticeRows = [],
   integrationPackage,
+  authReadiness = {},
   releaseStartupPreview = null
 }) {
   const normalizedChannel = normalizeChannel(channel);
@@ -2922,6 +2977,7 @@ function buildReleasePackagePayload({
     readiness,
     deliverySummary,
     deliveryChecklist,
+    authReadiness,
     releaseStartupPreview,
     fileName,
     summaryFileName,
@@ -2951,6 +3007,7 @@ function buildReleasePackagePayload({
       readiness,
       deliverySummary,
       deliveryChecklist,
+      authorizationReadiness: authReadiness,
       mainlineFollowUp,
       activeNotices: {
         total: activeNotices.length,
@@ -2959,6 +3016,7 @@ function buildReleasePackagePayload({
       }
     },
     integration: integrationPackage?.manifest ?? null,
+    authorizationReadiness: authReadiness,
     snippets: {
       envFileName,
       hostConfigFileName,
@@ -15316,6 +15374,40 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           includeTokenKeys: true
         }
       );
+      const businessMetrics = product?.id
+        ? await queryProductBusinessMetricMaps(db, store, [product.id], generatedAt)
+        : null;
+      const productMetricKey = String(product?.id ?? "");
+      const scopedPoliciesPayload = product?.code
+        ? await this.developerListPolicies(token, { productCode: product.code })
+        : [];
+      const scopedCardsPayload = product?.code
+        ? await this.developerListCards(token, { productCode: product.code })
+        : { items: [] };
+      const activePolicies = Array.isArray(scopedPoliciesPayload)
+        ? scopedPoliciesPayload.filter((item) => normalizeProductStatus(item?.status || "active") === "active")
+        : [];
+      const scopedCards = Array.isArray(scopedCardsPayload?.items) ? scopedCardsPayload.items : [];
+      const authReadiness = buildLaunchWorkflowAuthorizationReadiness({
+        product: {
+          id: product.id,
+          code: product.code,
+          name: product.name,
+          status: product.status,
+          featureConfig: product.featureConfig && typeof product.featureConfig === "object"
+            ? product.featureConfig
+            : {}
+        },
+        metrics: {
+          policies: businessMetrics?.policyCounts?.get(productMetricKey) ?? 0,
+          cardsFresh: businessMetrics?.freshCardCounts?.get(productMetricKey) ?? 0,
+          cardsRedeemed: businessMetrics?.redeemedCardCounts?.get(productMetricKey) ?? 0,
+          accounts: businessMetrics?.accountCounts?.get(productMetricKey) ?? 0,
+          activeEntitlements: businessMetrics?.activeEntitlementCounts?.get(productMetricKey) ?? 0,
+          cards: scopedCards
+        },
+        policies: activePolicies
+      });
       const payload = buildReleasePackagePayload({
         generatedAt,
         developer,
@@ -15325,6 +15417,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         versionManifest,
         activeNoticeRows,
         integrationPackage,
+        authReadiness,
         releaseStartupPreview
       });
       auditDeveloperSession(db, session, "product.release-package.export", "product", product.id, {

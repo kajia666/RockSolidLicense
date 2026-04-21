@@ -133,6 +133,8 @@ The release package `.env` template now also carries the extra demo/runtime keys
 
 The release package now also carries a structured `Release Mainline Follow-up`. That follow-up tells the software author which workspace should come next for the current lane, what the short action plan looks like, and which downloads are worth taking immediately. In practice this means the release workspace can now point directly into `Launch Workflow`, `Launch Review`, or `Integration`, and it can hand out a release checklist, launch-review summary, or smoke-kit summary without making the author manually translate readiness status into the next step.
 
+The release workspace now executes that follow-up more directly too. When the lane still lacks starter policy, starter account, or first-wave launch inventory, `Release Mainline Follow-up` can surface `Run Launch Bootstrap`, `Run First Batch Setup`, or `Run Inventory Refill` inline, and the page keeps the result in a `Last Mainline Action` card so release duty can immediately see what changed and what the next follow-up should be.
+
 The package route accepts:
 
 - `productId`

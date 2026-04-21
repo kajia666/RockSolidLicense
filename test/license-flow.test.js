@@ -11185,6 +11185,75 @@ test("developer license page is served from the dedicated route", async () => {
   }
 });
 
+test("developer release package mainline follow-up carries launch authorization actions", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "release.mainline.owner",
+        password: "ReleaseMainlineOwner123!",
+        displayName: "Release Mainline Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "RELMAIN_ALPHA",
+        name: "Release Mainline Alpha",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "release.mainline.owner",
+      password: "ReleaseMainlineOwner123!"
+    });
+
+    const firstReleasePackage = await getJson(
+      baseUrl,
+      "/api/developer/release-package?productCode=RELMAIN_ALPHA&channel=stable",
+      ownerSession.token
+    );
+
+    assert.ok(
+      firstReleasePackage.mainlineFollowUp.actionPlan.some((item) => item.bootstrapAction?.key === "launch_bootstrap")
+    );
+    assert.match(firstReleasePackage.summaryText, /\| bootstrap=Run Launch Bootstrap/);
+
+    await postJson(
+      baseUrl,
+      "/api/developer/license-quickstart/bootstrap",
+      { productCode: "RELMAIN_ALPHA" },
+      ownerSession.token
+    );
+
+    const secondReleasePackage = await getJson(
+      baseUrl,
+      "/api/developer/release-package?productCode=RELMAIN_ALPHA&channel=stable",
+      ownerSession.token
+    );
+
+    assert.ok(
+      secondReleasePackage.mainlineFollowUp.actionPlan.some((item) => item.setupAction?.operation === "first_batch_setup")
+    );
+    assert.match(secondReleasePackage.summaryText, /\| setup=Run First Batch Setup@recommended:first_batch_setup/);
+  } finally {
+    await stopServer(app, tempDir);
+  }
+});
+
 test("developer release page is served from the dedicated route", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -11205,11 +11274,12 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /Release Delivery Package/);
     assert.match(html, /Generate Release Package/);
     assert.match(html, /Release Readiness/);
-    assert.match(html, /Delivery Summary/);
-    assert.match(html, /Delivery Checklist/);
-    assert.match(html, /Release Mainline Follow-up/);
-    assert.match(html, /Package Summary/);
-    assert.match(html, /Host Skeleton/);
+      assert.match(html, /Delivery Summary/);
+      assert.match(html, /Delivery Checklist/);
+      assert.match(html, /Release Mainline Follow-up/);
+      assert.match(html, /Last Mainline Action/);
+      assert.match(html, /Package Summary/);
+      assert.match(html, /Host Skeleton/);
     assert.match(html, /Host Config/);
     assert.match(html, /CMake Consumer/);
     assert.match(html, /VS2022 Solution/);

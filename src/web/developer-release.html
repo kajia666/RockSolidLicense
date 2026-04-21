@@ -354,6 +354,11 @@
       </section>
 
       <section class="card">
+        <h2>Last Mainline Action</h2>
+        <div id="release-mainline-action-box" class="hint">Run Launch Bootstrap, First Batch Setup, or Inventory Refill from the release mainline follow-up to keep the latest result and next step visible here.</div>
+      </section>
+
+      <section class="card">
         <h2>Package Summary</h2>
         <pre id="release-summary">Generate a release package to preview its summary text here.</pre>
       </section>
@@ -472,6 +477,7 @@
       let projects = [];
       let snapshot = { versions: [], notices: [] };
       let releasePackage = null;
+      let lastReleaseMainlineActionResult = null;
 
       function el(id) { return document.getElementById(id); }
 
@@ -710,6 +716,16 @@
         return releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
       }
 
+      function currentLastReleaseMainlineActionResult() {
+        const target = currentReleaseTarget();
+        if (!lastReleaseMainlineActionResult || !target.productCode) {
+          return null;
+        }
+        const sameProduct = String(lastReleaseMainlineActionResult.productCode || "").trim().toUpperCase() === String(target.productCode || "").trim().toUpperCase();
+        const sameChannel = String(lastReleaseMainlineActionResult.channel || "stable").trim().toLowerCase() === String(target.channel || "stable").trim().toLowerCase();
+        return sameProduct && sameChannel ? lastReleaseMainlineActionResult : null;
+      }
+
       function buildReleaseWorkspacePath(action = {}) {
         switch (action.key) {
           case "project":
@@ -792,6 +808,12 @@
             fileName: shortcut.fileName || "launch-smoke-kit.txt"
           };
         }
+        if (shortcut.source === "developer-ops") {
+          return {
+            path: `/api/developer/ops/export/download${q({ ...params, format })}`,
+            fileName: shortcut.fileName || "developer-ops-summary.txt"
+          };
+        }
         return {
           path: `/api/developer/release-package/download${q({ ...params, format })}`,
           fileName: shortcut.fileName || "release-package.txt"
@@ -816,6 +838,81 @@
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
         return result;
+      }
+
+      async function runReleaseMainlineBootstrap(bootstrapAction = null) {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running Launch Bootstrap.");
+        }
+        const bootstrap = await api("/api/developer/license-quickstart/bootstrap", {
+          method: "POST",
+          body: { productCode: target.productCode }
+        });
+        const data = await generateReleasePackage();
+        lastReleaseMainlineActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation: "bootstrap",
+          operationLabel: bootstrapAction?.label || "Launch Bootstrap",
+          message: bootstrap?.message || `${bootstrapAction?.label || "Launch Bootstrap"} completed for ${target.productCode}.`,
+          followUp: bootstrap?.followUp || null,
+          result: bootstrap
+        };
+        renderReleaseReadiness();
+        const entitlementNote = bootstrap?.created?.entitlement?.id
+          ? ` Internal entitlement ${bootstrap.created.entitlement.id} is now active.`
+          : "";
+        const followUpNote = bootstrap?.followUp?.primaryAction?.label
+          ? ` Next: ${bootstrap.followUp.primaryAction.label}.`
+          : (bootstrap?.followUp?.summary ? ` ${bootstrap.followUp.summary}` : "");
+        setStatus((bootstrap?.message || `${bootstrapAction?.label || "Launch Bootstrap"} completed for ${target.productCode}.`) + entitlementNote + followUpNote);
+        setOutput({ releaseMainlineBootstrap: bootstrap, releasePackage: data });
+        return { releaseMainlineBootstrap: bootstrap, releasePackage: data };
+      }
+
+      async function runReleaseMainlineSetup(setupAction = null) {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running First Batch Setup.");
+        }
+        const effectiveSetupAction = setupAction && typeof setupAction === "object" ? setupAction : null;
+        const requestedMode = effectiveSetupAction?.mode || "recommended";
+        const setupOperation = effectiveSetupAction?.operation || "first_batch_setup";
+        const setupEndpoint = setupOperation === "restock"
+          ? "/api/developer/license-quickstart/restock"
+          : "/api/developer/license-quickstart/first-batches";
+        const setup = await api(setupEndpoint, {
+          method: "POST",
+          body: {
+            productCode: target.productCode,
+            mode: requestedMode
+          }
+        });
+        const data = await generateReleasePackage();
+        const setupLabel = effectiveSetupAction?.label || (setupOperation === "restock" ? "Inventory Refill" : "First Batch Setup");
+        lastReleaseMainlineActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation: setupOperation,
+          operationLabel: setupLabel,
+          requestedMode,
+          message: setup?.message || `${setupLabel} completed for ${target.productCode}.`,
+          followUp: setup?.followUp || null,
+          result: setup
+        };
+        renderReleaseReadiness();
+        const createdLabels = Array.isArray(setup?.createdBatches)
+          ? setup.createdBatches.map((item) => item.batchCode || item.label || item.key).filter(Boolean)
+          : [];
+        const followUpNote = setup?.followUp?.primaryAction?.label
+          ? ` Next: ${setup.followUp.primaryAction.label}.`
+          : (setup?.followUp?.summary ? ` ${setup.followUp.summary}` : "");
+        setStatus((createdLabels.length
+          ? `${setupLabel} created ${createdLabels.join(", ")} for ${target.productCode}.`
+          : (setup?.message || `${setupLabel} completed for ${target.productCode}.`)) + followUpNote);
+        setOutput({ releaseMainlineSetup: setup, releasePackage: data });
+        return { releaseMainlineSetup: setup, releasePackage: data };
       }
 
       function applyRoutePrefill() {
@@ -980,6 +1077,76 @@
         return `<span class="${className}">${escapeHtml(text)}</span>`;
       }
 
+      function renderReleaseMainlineActionFollowUp(result = null) {
+        const followUp = result?.followUp;
+        const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
+        if (!actions.length) {
+          return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from the release mainline follow-up to keep the latest result and next step visible here.";
+        }
+        return `
+          <div class="hint" style="margin-top:12px;">
+            <strong>Next Mainline Follow-up</strong>
+            <div style="margin-top:8px;">
+              ${renderTag(`after:${followUp.operationLabel || followUp.operation || "launch"}`, true)}
+              ${followUp.primaryAction?.label ? renderTag(`next:${followUp.primaryAction.label}`, true) : ""}
+            </div>
+            <div class="hint" style="margin-top:8px;">${escapeHtml(followUp.summary || "Review the next release mainline follow-up actions.")}</div>
+            ${actions.map((item, index) => `
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+                <div>${index + 1}. ${escapeHtml(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
+                ${(item.workspaceAction || item.recommendedDownload) ? `
+                  <div class="actions" style="margin-top:8px;">
+                    ${item.workspaceAction ? `<button type="button" class="secondary" data-release-mainline-followup-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                    ${item.recommendedDownload ? `<button type="button" data-release-mainline-followup-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                  </div>
+                ` : ""}
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderLastReleaseMainlineAction() {
+        const result = currentLastReleaseMainlineActionResult();
+        if (!result) {
+          el("release-mainline-action-box").innerHTML = "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from the release mainline follow-up to keep the latest result and next step visible here.";
+          return;
+        }
+        const before = result?.result?.before?.counts || {};
+        const after = result?.result?.after?.counts || {};
+        const created = result?.result?.created && typeof result.result.created === "object"
+          ? result.result.created
+          : {};
+        const transitions = [
+          `policies ${before.policies ?? 0} -> ${after.policies ?? 0}`,
+          `freshCards ${before.freshCards ?? 0} -> ${after.freshCards ?? 0}`,
+          `accounts ${before.accounts ?? 0} -> ${after.accounts ?? 0}`,
+          `activeEntitlements ${before.activeEntitlements ?? 0} -> ${after.activeEntitlements ?? 0}`
+        ].join(" | ");
+        const createdBits = [
+          created.policy?.name ? `policy=${created.policy.name}` : "",
+          created.account?.username ? `account=${created.account.username}` : "",
+          created.entitlement?.id ? `entitlement=${created.entitlement.id}` : "",
+          Array.isArray(created.batches) && created.batches.length
+            ? `batches=${created.batches.map((item) => item.batchCode || item.label || item.key).filter(Boolean).join(", ")}`
+            : ""
+        ].filter(Boolean).join(" | ");
+        el("release-mainline-action-box").innerHTML = `
+          <div class="hint" style="margin-top:12px;">
+            <strong>Last Mainline Action</strong>
+            <div style="margin-top:8px;">
+              ${renderTag(`after:${result.operationLabel || result.operation || "launch"}`, true)}
+              ${result.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
+              ${result.requestedMode ? renderTag(`mode:${result.requestedMode}`, true) : ""}
+            </div>
+            <div class="hint" style="margin-top:8px;">${escapeHtml(result.message || "The latest release mainline action is ready for review.")}</div>
+            <div style="margin-top:8px;">${escapeHtml(transitions)}</div>
+            ${createdBits ? `<div style="margin-top:8px;">${escapeHtml(createdBits)}</div>` : ""}
+          </div>
+          ${renderReleaseMainlineActionFollowUp(result)}
+        `;
+      }
+
       function renderReleaseMainlineFollowUp() {
         if (!releasePackage) {
           el("release-mainline-follow-up").textContent = "Generate a release package to see which workspace, download, and validation step should come next for this lane.";
@@ -1011,7 +1178,20 @@
             </div>
           ` : ""}
           ${actionPlan.length ? `
-            <div class="hint" style="margin-top:12px;">Action plan:<br>${actionPlan.map((item, index) => `${index + 1}. [${escapeHtml(String(item.status || "review").toUpperCase())}] ${escapeHtml(item.title || item.key || "step")} | ${escapeHtml(item.summary || "-")}${item.workspaceAction ? ` | workspace=${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "workspace")}@${escapeHtml(item.workspaceAction.autofocus || "-")}` : ""}${item.recommendedDownload ? ` | download=${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.fileName || "-")}` : ""}`).join("<br>")}</div>
+            <div class="hint" style="margin-top:12px;">Action plan:</div>
+            ${actionPlan.map((item, index) => `
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+                <div>${index + 1}. [${escapeHtml(String(item.status || "review").toUpperCase())}] ${escapeHtml(item.title || item.key || "step")} | ${escapeHtml(item.summary || "-")}${item.workspaceAction ? ` | workspace=${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "workspace")}@${escapeHtml(item.workspaceAction.autofocus || "-")}` : ""}${item.recommendedDownload ? ` | download=${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.fileName || "-")}` : ""}${item.bootstrapAction ? ` | bootstrap=${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}` : ""}${item.setupAction ? ` | setup=${escapeHtml(item.setupAction.label || item.setupAction.key || "Run setup")}@${escapeHtml(item.setupAction.mode || "recommended")}:${escapeHtml(item.setupAction.operation || "first_batch_setup")}` : ""}</div>
+                ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction) ? `
+                  <div class="actions" style="margin-top:8px;">
+                    ${item.workspaceAction ? `<button type="button" class="secondary" data-release-mainline-action-workspace-index="${index}">${escapeHtml(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                    ${item.recommendedDownload ? `<button type="button" data-release-mainline-action-download-index="${index}">${escapeHtml(item.recommendedDownload.label || item.recommendedDownload.key || "Download file")}</button>` : ""}
+                    ${item.bootstrapAction ? `<button type="button" class="secondary" data-release-mainline-action-bootstrap-index="${index}">${escapeHtml(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                    ${item.setupAction ? `<button type="button" class="secondary" data-release-mainline-action-setup-index="${index}">${escapeHtml(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
+                  </div>
+                ` : ""}
+              </div>
+            `).join("")}
           ` : ""}
           ${recommendedDownloads.length ? `
             <div class="hint" style="margin-top:12px;">Recommended downloads:<br>${recommendedDownloads.map((item, index) => `${index + 1}. ${escapeHtml(item.label || item.key || "download")} | ${escapeHtml(item.fileName || "-")}`).join("<br>")}</div>
@@ -1029,6 +1209,7 @@
           el("delivery-summary").textContent = "Generate a release package to see the handoff summary for software authors and release operators.";
           el("delivery-checklist").textContent = "Generate a release package to see the step-by-step handoff checklist.";
           el("release-mainline-follow-up").textContent = "Generate a release package to see which workspace, download, and validation step should come next for this lane.";
+          el("release-mainline-action-box").textContent = "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from the release mainline follow-up to keep the latest result and next step visible here.";
           el("release-summary").textContent = "Generate a release package to preview its summary text here.";
           el("release-host-skeleton").textContent = "Generate a release package to preview the current C++ host skeleton here.";
           el("release-host-config").textContent = "Generate a release package to preview the packaged CMake host config here.";
@@ -1102,6 +1283,7 @@
           `
           : "No delivery checklist is available yet.";
         renderReleaseMainlineFollowUp();
+        renderLastReleaseMainlineAction();
         el("release-summary").textContent = releasePackage.summaryText || "";
         el("release-host-skeleton").textContent = releasePackage.snippets?.hostSkeletonCpp || "";
         el("release-host-config").textContent = releasePackage.snippets?.hostConfigEnv || "";
@@ -1568,11 +1750,16 @@
         const recommendedButton = event.target.closest("[data-release-mainline-open]");
         const openButton = event.target.closest("[data-release-mainline-open-index]");
         const downloadButton = event.target.closest("[data-release-mainline-download-index]");
-        if (!recommendedButton && !openButton && !downloadButton) {
+        const actionWorkspaceButton = event.target.closest("[data-release-mainline-action-workspace-index]");
+        const actionDownloadButton = event.target.closest("[data-release-mainline-action-download-index]");
+        const actionBootstrapButton = event.target.closest("[data-release-mainline-action-bootstrap-index]");
+        const actionSetupButton = event.target.closest("[data-release-mainline-action-setup-index]");
+        if (!recommendedButton && !openButton && !downloadButton && !actionWorkspaceButton && !actionDownloadButton && !actionBootstrapButton && !actionSetupButton) {
           return;
         }
         try {
           const followUp = currentReleaseMainlineFollowUp();
+          const actionPlan = Array.isArray(followUp.actionPlan) ? followUp.actionPlan : [];
           if (recommendedButton) {
             openReleaseWorkspaceShortcut(
               followUp.recommendedWorkspace,
@@ -1595,6 +1782,80 @@
             const index = Number(downloadButton.dataset.releaseMainlineDownloadIndex || -1);
             const shortcut = Array.isArray(followUp.recommendedDownloads) ? followUp.recommendedDownloads[index] : null;
             await downloadReleaseShortcut(shortcut, shortcut?.label || "Release follow-up download");
+            return;
+          }
+          if (actionWorkspaceButton) {
+            const index = Number(actionWorkspaceButton.dataset.releaseMainlineActionWorkspaceIndex || -1);
+            const item = actionPlan[index];
+            openReleaseWorkspaceShortcut(
+              item?.workspaceAction || null,
+              followUp.title || "Release mainline follow-up",
+              item?.summary || followUp.message || `Continue ${currentReleaseTarget().productCode} release follow-up.`
+            );
+            return;
+          }
+          if (actionDownloadButton) {
+            const index = Number(actionDownloadButton.dataset.releaseMainlineActionDownloadIndex || -1);
+            const item = actionPlan[index];
+            await downloadReleaseShortcut(item?.recommendedDownload || null, item?.recommendedDownload?.label || "Release mainline action download");
+            return;
+          }
+          if (actionBootstrapButton) {
+            const index = Number(actionBootstrapButton.dataset.releaseMainlineActionBootstrapIndex || -1);
+            const item = actionPlan[index];
+            await runReleaseMainlineBootstrap(item?.bootstrapAction || null);
+            setOutput({
+              releaseMainlineActionBootstrap: {
+                key: item?.bootstrapAction?.key || null,
+                label: item?.bootstrapAction?.label || null
+              },
+              releasePackage
+            });
+            return;
+          }
+          if (actionSetupButton) {
+            const index = Number(actionSetupButton.dataset.releaseMainlineActionSetupIndex || -1);
+            const item = actionPlan[index];
+            await runReleaseMainlineSetup(item?.setupAction || null);
+            setOutput({
+              releaseMainlineActionSetup: {
+                key: item?.setupAction?.key || null,
+                label: item?.setupAction?.label || null,
+                mode: item?.setupAction?.mode || null,
+                operation: item?.setupAction?.operation || null
+              },
+              releasePackage
+            });
+          }
+        } catch (error) {
+          setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+          setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+        }
+      });
+
+      el("release-mainline-action-box").addEventListener("click", async (event) => {
+        const workspaceButton = event.target.closest("[data-release-mainline-followup-workspace-index]");
+        const downloadButton = event.target.closest("[data-release-mainline-followup-download-index]");
+        if (!workspaceButton && !downloadButton) {
+          return;
+        }
+        try {
+          const result = currentLastReleaseMainlineActionResult();
+          const actions = Array.isArray(result?.followUp?.actions) ? result.followUp.actions : [];
+          if (workspaceButton) {
+            const index = Number(workspaceButton.dataset.releaseMainlineFollowupWorkspaceIndex || -1);
+            const item = actions[index];
+            openReleaseWorkspaceShortcut(
+              item?.workspaceAction || null,
+              result?.followUp?.primaryAction?.label || "Release mainline follow-up",
+              item?.summary || result?.followUp?.summary || `Continue ${currentReleaseTarget().productCode} release follow-up.`
+            );
+            return;
+          }
+          if (downloadButton) {
+            const index = Number(downloadButton.dataset.releaseMainlineFollowupDownloadIndex || -1);
+            const item = actions[index];
+            await downloadReleaseShortcut(item?.recommendedDownload || null, item?.recommendedDownload?.label || "Release mainline follow-up download");
           }
         } catch (error) {
           setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);

@@ -536,6 +536,38 @@
         return values.some((value) => normalizeRouteReviewText(value).includes(normalizedNeedle));
       }
 
+      function buildRouteReviewMatchId(kind = "", item = {}) {
+        const normalizedKind = String(kind || "").trim().toLowerCase();
+        if (normalizedKind === "account") {
+          return String(item.accountId || item.id || item.username || "").trim();
+        }
+        if (normalizedKind === "entitlement") {
+          return String(item.entitlementId || item.id || "").trim();
+        }
+        if (normalizedKind === "session") {
+          return String(item.sessionId || item.id || "").trim();
+        }
+        if (normalizedKind === "device") {
+          return String(item.bindingId || item.blockId || item.id || item.fingerprint || "").trim();
+        }
+        if (normalizedKind === "audit") {
+          return String(item.id || item.entityId || "").trim();
+        }
+        return "";
+      }
+
+      function buildRouteReviewMatchedIdSet(values = []) {
+        return new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean));
+      }
+
+      function filterRouteReviewMatches(kind = "", items = [], matcher = () => false, matchedIds = []) {
+        const matchedIdSet = buildRouteReviewMatchedIdSet(matchedIds);
+        if (matchedIdSet.size) {
+          return items.filter((item) => matchedIdSet.has(buildRouteReviewMatchId(kind, item)));
+        }
+        return items.filter((item) => matcher(item));
+      }
+
       function currentRouteReviewFilters() {
         const active = filters();
         return {
@@ -704,6 +736,7 @@
           ...snapshot.bindings.map((item) => ({
             kind: "binding",
             id: item.id,
+            bindingId: item.bindingId || item.id,
             identity: item.fingerprint,
             projectCode: item.productCode,
             productCode: item.productCode,
@@ -713,6 +746,7 @@
           ...snapshot.blocks.map((item) => ({
             kind: "block",
             id: item.id,
+            blockId: item.blockId || item.id,
             identity: item.fingerprint,
             projectCode: item.productCode,
             productCode: item.productCode,
@@ -720,11 +754,14 @@
             fingerprint: item.fingerprint
           }))
         ];
-        const matchedAccounts = snapshot.accounts.filter((item) => matchesRouteReviewAccount(item, active));
-        const matchedEntitlements = snapshot.entitlements.filter((item) => matchesRouteReviewEntitlement(item, active));
-        const matchedSessions = snapshot.sessions.filter((item) => matchesRouteReviewSession(item, active));
-        const matchedDevices = deviceItems.filter((item) => matchesRouteReviewDevice(item, active));
-        const matchedAuditLogs = snapshot.auditLogs.filter((item) => matchesRouteReviewAudit(item, active));
+        const serverMatchedIds = serverRouteReview?.matchedIds && typeof serverRouteReview.matchedIds === "object"
+          ? serverRouteReview.matchedIds
+          : {};
+        const matchedAccounts = filterRouteReviewMatches("account", snapshot.accounts, (item) => matchesRouteReviewAccount(item, active), serverMatchedIds.accounts);
+        const matchedEntitlements = filterRouteReviewMatches("entitlement", snapshot.entitlements, (item) => matchesRouteReviewEntitlement(item, active), serverMatchedIds.entitlements);
+        const matchedSessions = filterRouteReviewMatches("session", snapshot.sessions, (item) => matchesRouteReviewSession(item, active), serverMatchedIds.sessions);
+        const matchedDevices = filterRouteReviewMatches("device", deviceItems, (item) => matchesRouteReviewDevice(item, active), serverMatchedIds.devices);
+        const matchedAuditLogs = filterRouteReviewMatches("audit", snapshot.auditLogs, (item) => matchesRouteReviewAudit(item, active), serverMatchedIds.audit);
         const highlightedEvents = [...new Set(matchedAuditLogs.map((item) => item.eventType).filter(Boolean))].slice(0, 3);
         return {
           active: hasRouteReviewFilters(),

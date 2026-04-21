@@ -9552,6 +9552,42 @@ function buildDeveloperOpsRouteReviewEntry(kind = "", section = "", item = {}) {
   };
 }
 
+function buildDeveloperOpsRouteReviewMatchId(kind = "", item = {}) {
+  const normalizedKind = String(kind || "").trim().toLowerCase();
+  if (normalizedKind === "account") {
+    return String(item.accountId || item.id || item.username || "").trim();
+  }
+  if (normalizedKind === "entitlement") {
+    return String(item.entitlementId || item.id || "").trim();
+  }
+  if (normalizedKind === "session") {
+    return String(item.sessionId || item.id || "").trim();
+  }
+  if (normalizedKind === "device") {
+    return String(item.bindingId || item.blockId || item.id || item.fingerprint || "").trim();
+  }
+  if (normalizedKind === "audit") {
+    return String(item.id || item.entityId || "").trim();
+  }
+  return "";
+}
+
+function buildDeveloperOpsRouteReviewMatchedIds({
+  accounts = [],
+  entitlements = [],
+  sessions = [],
+  devices = [],
+  auditLogs = []
+} = {}) {
+  return {
+    accounts: accounts.map((item) => buildDeveloperOpsRouteReviewMatchId("account", item)).filter(Boolean),
+    entitlements: entitlements.map((item) => buildDeveloperOpsRouteReviewMatchId("entitlement", item)).filter(Boolean),
+    sessions: sessions.map((item) => buildDeveloperOpsRouteReviewMatchId("session", item)).filter(Boolean),
+    devices: devices.map((item) => buildDeveloperOpsRouteReviewMatchId("device", item)).filter(Boolean),
+    audit: auditLogs.map((item) => buildDeveloperOpsRouteReviewMatchId("audit", item)).filter(Boolean)
+  };
+}
+
 function buildDeveloperOpsRouteReviewPayload({
   filters = {},
   accounts = [],
@@ -9591,6 +9627,13 @@ function buildDeveloperOpsRouteReviewPayload({
   const matchedSessions = sessions.filter((item) => matchesDeveloperOpsRouteReviewSession(item, filters));
   const matchedDevices = deviceItems.filter((item) => matchesDeveloperOpsRouteReviewDevice(item, filters));
   const matchedAuditLogs = auditLogs.filter((item) => matchesDeveloperOpsRouteReviewAudit(item, filters));
+  const matchedIds = buildDeveloperOpsRouteReviewMatchedIds({
+    accounts: matchedAccounts,
+    entitlements: matchedEntitlements,
+    sessions: matchedSessions,
+    devices: matchedDevices,
+    auditLogs: matchedAuditLogs
+  });
   const highlightedEvents = [...new Set(matchedAuditLogs.map((item) => item?.eventType).filter(Boolean))].slice(0, 3);
   const queue = [];
   for (const section of buildDeveloperOpsRouteReviewSectionOrder(focus)) {
@@ -9650,6 +9693,7 @@ function buildDeveloperOpsRouteReviewPayload({
       devices: matchedDevices.length,
       audit: matchedAuditLogs.length
     },
+    matchedIds,
     highlightedEvents,
     primaryMatch: queue[0] || null,
     nextMatch: queue[1] || null,

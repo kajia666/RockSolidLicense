@@ -7725,6 +7725,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.routeReview?.downloads?.primary?.fileName || "", /developer-ops-primary-session-summary\.txt/);
     assert.equal(exportSnapshot.routeReview?.downloads?.remaining?.format, "route-review-remaining");
     assert.equal(exportSnapshot.routeReview?.downloads?.remaining?.fileName, "developer-ops-remaining-summary.txt");
+    assert.deepEqual(exportSnapshot.routeReview?.matchedIds?.sessions, [exportSnapshot.routeReview?.primaryMatch?.item?.sessionId]);
+    assert.deepEqual(exportSnapshot.routeReview?.matchedIds?.audit, [exportSnapshot.routeReview?.nextMatch?.item?.id]);
     assert.equal(exportSnapshot.routeReview?.continuation?.remainingCount, 1);
     assert.equal(exportSnapshot.routeReview?.continuation?.primaryAction, "review_next");
     assert.equal(exportSnapshot.routeReview?.continuation?.secondaryAction, "download_next");

@@ -71,6 +71,7 @@
 - 这些首发后的 ops 动作现在也会进入 `Launch Workflow` 的 `Action Plan` 和导出文本里，所以交付给测试、运营或值守同事时，不只是知道“去哪”，还会知道“应该先看哪类信号”
 - 开发者运营台现在还会把这类 routed 首发 follow-up 继续收成 `Route Review`：页面会直接总结当前路由命中的账号、授权、会话、设备、审计数量，保留高亮审计事件，并在对应表格里用高亮行标出命中的 scoped 记录，减少首发巡检时的人工筛选
 - 这块 `Route Review` 现在还会吃一份服务端生成的 routed review payload，直接把当前 `focus / primaryMatch / nextMatch` 一起下发到 `/developer/ops` 和导出摘要里，减少 Launch Review、Launch Smoke、Developer Ops 三边各自猜“当前最该先看谁”的偏差
+- 现在这份服务端 routed review payload 还会继续下发过滤后的 `remainingMatches`、`continuation` 和对象化下载描述，所以“下一个对象 / 剩余队列 / 继续复查”这条链已经更统一地回到后台/API 主线上，而不是再主要靠前端自己重排和拼参数
 - 现在 `/api/developer/ops/export/download` 也能直接下发服务端选中的 `route-review-primary / route-review-next / route-review-remaining` 摘要，所以 Launch Review、Launch Smoke 和后续 handoff 可以更稳定地围绕“当前主复查对象 / 下一个对象 / 剩余复查队列”交接，而不是继续靠前端自己重组过滤条件
 - 这块 `Route Review` 现在还能直接切到 `Show Routed Hits Only`，并一键跳去复查 `accounts / entitlements / sessions / devices / audit` 中命中的那一类对象，让首发后的复查链更像一个连续动作，而不是先看摘要再自己手工筛表
 - 现在这块 routed review 还会自动抽出一个 `Primary Match`，把首个命中的账号 / 授权 / 会话 / 设备 / 审计衍生对象直接预填进 quick controls，并保留到 `Prepared Control` 回执里；开发者运营台里的表格点击也统一走这条 focus-preparation 逻辑，所以从 `Launch Review` 跳进来后的复查会更像“已经帮你选好当前最该看的对象”

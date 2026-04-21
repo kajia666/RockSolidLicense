@@ -9308,6 +9308,124 @@ function buildDeveloperOpsRouteReviewSectionOrder(preferredSection = "") {
   return ["accounts", "sessions", "audit", "devices", "entitlements"];
 }
 
+function normalizeDeveloperOpsRouteReviewText(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function developerOpsRouteReviewIncludes(values = [], needle = "") {
+  const normalizedNeedle = normalizeDeveloperOpsRouteReviewText(needle);
+  if (!normalizedNeedle) {
+    return true;
+  }
+  return values.some((value) => normalizeDeveloperOpsRouteReviewText(value).includes(normalizedNeedle));
+}
+
+function matchesDeveloperOpsRouteReviewAccount(item = {}, filters = {}) {
+  if (filters.productCode && String(item.productCode || "").trim().toUpperCase() !== String(filters.productCode || "").trim().toUpperCase()) {
+    return false;
+  }
+  if (filters.username && normalizeDeveloperOpsRouteReviewText(item.username) !== normalizeDeveloperOpsRouteReviewText(filters.username)) {
+    return false;
+  }
+  return developerOpsRouteReviewIncludes(
+    [item.id, item.username, item.productCode, item.status],
+    filters.search
+  );
+}
+
+function matchesDeveloperOpsRouteReviewEntitlement(item = {}, filters = {}) {
+  if (filters.productCode && String(item.productCode || "").trim().toUpperCase() !== String(filters.productCode || "").trim().toUpperCase()) {
+    return false;
+  }
+  if (filters.username && normalizeDeveloperOpsRouteReviewText(item.username) !== normalizeDeveloperOpsRouteReviewText(filters.username)) {
+    return false;
+  }
+  return developerOpsRouteReviewIncludes(
+    [item.id, item.username, item.productCode, item.policyName, item.status, item.lifecycleStatus],
+    filters.search
+  );
+}
+
+function matchesDeveloperOpsRouteReviewSession(item = {}, filters = {}) {
+  if (filters.productCode && String(item.productCode || "").trim().toUpperCase() !== String(filters.productCode || "").trim().toUpperCase()) {
+    return false;
+  }
+  if (filters.username && normalizeDeveloperOpsRouteReviewText(item.username) !== normalizeDeveloperOpsRouteReviewText(filters.username)) {
+    return false;
+  }
+  return developerOpsRouteReviewIncludes(
+    [item.id, item.username, item.productCode, item.fingerprint, item.status],
+    filters.search
+  );
+}
+
+function matchesDeveloperOpsRouteReviewDevice(item = {}, filters = {}) {
+  if (filters.productCode && String(item.productCode || item.projectCode || "").trim().toUpperCase() !== String(filters.productCode || "").trim().toUpperCase()) {
+    return false;
+  }
+  return developerOpsRouteReviewIncludes(
+    [item.id, item.projectCode, item.productCode, item.identity, item.fingerprint, item.status, item.kind],
+    filters.search
+  );
+}
+
+function matchesDeveloperOpsRouteReviewAudit(item = {}, filters = {}) {
+  if (filters.productCode) {
+    const productCodes = [
+      item.productCode,
+      item.metadata?.productCode,
+      ...(Array.isArray(item.metadata?.productCodes) ? item.metadata.productCodes : []),
+      item.metadata?.code
+    ].filter(Boolean).map((value) => String(value).trim().toUpperCase());
+    if (!productCodes.includes(String(filters.productCode || "").trim().toUpperCase())) {
+      return false;
+    }
+  }
+  if (filters.username) {
+    const usernames = [
+      item.username,
+      item.metadata?.username,
+      item.metadata?.accountUsername,
+      item.metadata?.cardKey
+    ];
+    if (!developerOpsRouteReviewIncludes(usernames, filters.username)) {
+      return false;
+    }
+  }
+  if (filters.eventType && normalizeDeveloperOpsRouteReviewText(item.eventType) !== normalizeDeveloperOpsRouteReviewText(filters.eventType)) {
+    return false;
+  }
+  if (filters.actorType && normalizeDeveloperOpsRouteReviewText(item.actorType) !== normalizeDeveloperOpsRouteReviewText(filters.actorType)) {
+    return false;
+  }
+  if (filters.entityType && normalizeDeveloperOpsRouteReviewText(item.entityType) !== normalizeDeveloperOpsRouteReviewText(filters.entityType)) {
+    return false;
+  }
+  return developerOpsRouteReviewIncludes(
+    [
+      item.id,
+      item.eventType,
+      item.actorType,
+      item.actorId,
+      item.entityType,
+      item.entityId,
+      item.username,
+      item.metadata?.username,
+      item.metadata?.reason,
+      item.metadata?.fingerprint,
+      item.metadata?.deviceFingerprint,
+      item.metadata?.sessionId,
+      item.metadata?.accountId,
+      item.metadata?.entitlementId,
+      item.metadata?.cardKey,
+      item.metadata?.productCode,
+      item.metadata?.code,
+      JSON.stringify(item.metadata || {})
+    ],
+    filters.search
+  );
+}
+
 function buildDeveloperOpsRouteReviewAccountItem(item = {}) {
   const next = {
     ...item,
@@ -9468,11 +9586,16 @@ function buildDeveloperOpsRouteReviewPayload({
     ...blocks.map((item) => ({ ...item, kind: "block", blockId: item.blockId || item.id || "" })),
     ...bindings.map((item) => ({ ...item, kind: "binding", bindingId: item.bindingId || item.id || "" }))
   ];
-  const highlightedEvents = [...new Set(auditLogs.map((item) => item?.eventType).filter(Boolean))].slice(0, 3);
+  const matchedAccounts = accounts.filter((item) => matchesDeveloperOpsRouteReviewAccount(item, filters));
+  const matchedEntitlements = entitlements.filter((item) => matchesDeveloperOpsRouteReviewEntitlement(item, filters));
+  const matchedSessions = sessions.filter((item) => matchesDeveloperOpsRouteReviewSession(item, filters));
+  const matchedDevices = deviceItems.filter((item) => matchesDeveloperOpsRouteReviewDevice(item, filters));
+  const matchedAuditLogs = auditLogs.filter((item) => matchesDeveloperOpsRouteReviewAudit(item, filters));
+  const highlightedEvents = [...new Set(matchedAuditLogs.map((item) => item?.eventType).filter(Boolean))].slice(0, 3);
   const queue = [];
   for (const section of buildDeveloperOpsRouteReviewSectionOrder(focus)) {
     if (section === "accounts") {
-      accounts.forEach((item) => {
+      matchedAccounts.forEach((item) => {
         const entry = buildDeveloperOpsRouteReviewEntry("account", section, item);
         if (entry) {
           queue.push(entry);
@@ -9481,7 +9604,7 @@ function buildDeveloperOpsRouteReviewPayload({
       continue;
     }
     if (section === "entitlements") {
-      entitlements.forEach((item) => {
+      matchedEntitlements.forEach((item) => {
         const entry = buildDeveloperOpsRouteReviewEntry("entitlement", section, item);
         if (entry) {
           queue.push(entry);
@@ -9490,7 +9613,7 @@ function buildDeveloperOpsRouteReviewPayload({
       continue;
     }
     if (section === "sessions") {
-      sessions.forEach((item) => {
+      matchedSessions.forEach((item) => {
         const entry = buildDeveloperOpsRouteReviewEntry("session", section, item);
         if (entry) {
           queue.push(entry);
@@ -9499,7 +9622,7 @@ function buildDeveloperOpsRouteReviewPayload({
       continue;
     }
     if (section === "devices") {
-      deviceItems.forEach((item) => {
+      matchedDevices.forEach((item) => {
         const entry = buildDeveloperOpsRouteReviewEntry("device", section, item);
         if (entry) {
           queue.push(entry);
@@ -9508,7 +9631,7 @@ function buildDeveloperOpsRouteReviewPayload({
       continue;
     }
     if (section === "audit") {
-      auditLogs.forEach((item) => {
+      matchedAuditLogs.forEach((item) => {
         const entry = buildDeveloperOpsRouteReviewEntry("audit", section, item);
         if (entry) {
           queue.push(entry);
@@ -9521,11 +9644,11 @@ function buildDeveloperOpsRouteReviewPayload({
     active: true,
     focus,
     matchedCounts: {
-      accounts: accounts.length,
-      entitlements: entitlements.length,
-      sessions: sessions.length,
-      devices: deviceItems.length,
-      audit: auditLogs.length
+      accounts: matchedAccounts.length,
+      entitlements: matchedEntitlements.length,
+      sessions: matchedSessions.length,
+      devices: matchedDevices.length,
+      audit: matchedAuditLogs.length
     },
     highlightedEvents,
     primaryMatch: queue[0] || null,
@@ -10388,6 +10511,7 @@ function buildDeveloperOpsSnapshotPayload({
     auditLogs: normalizedAuditLogs
   });
   routeReview.downloads = buildDeveloperOpsRouteReviewDownloads(scope, routeReview);
+  routeReview.continuation = buildDeveloperOpsRouteReviewContinuation(routeReview);
 
   const payload = {
     generatedAt,
@@ -10688,6 +10812,41 @@ function buildDeveloperOpsRouteReviewDownloads(scope = {}, routeReview = {}) {
     primary: buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope, routeReview, "primary"),
     next: buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope, routeReview, "next"),
     remaining: buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope)
+  };
+}
+
+function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
+  const nextMatch = routeReview.nextMatch && typeof routeReview.nextMatch === "object" ? routeReview.nextMatch : null;
+  const queuedRemainingCount = Array.isArray(routeReview.remainingMatches)
+    ? routeReview.remainingMatches.length
+    : Math.max(Number(routeReview.totalMatches || 0) - 1, 0);
+  const remainingCount = nextMatch ? 1 : 0;
+  const nextControlLabel = nextMatch?.recommendedControl?.label || "";
+  if (nextMatch) {
+    return {
+      remainingCount,
+      queuedRemainingCount,
+      nextTitle: nextMatch.title || "",
+      nextControlLabel,
+      primaryAction: "review_next",
+      primaryLabel: "Continue Routed Review",
+      secondaryAction: nextControlLabel ? "control_next" : "download_next",
+      secondaryLabel: nextControlLabel ? "Open Next Control" : "Download Next Match Summary",
+      nextDownload: routeReview.downloads?.next || null,
+      remainingDownload: routeReview.downloads?.remaining || null
+    };
+  }
+  return {
+    remainingCount: 0,
+    queuedRemainingCount,
+    nextTitle: "",
+    nextControlLabel: "",
+    primaryAction: "complete_route_review",
+    primaryLabel: "Complete Routed Review",
+    secondaryAction: "download_route_review",
+    secondaryLabel: "Download Routed Summary",
+    nextDownload: null,
+    remainingDownload: routeReview.downloads?.remaining || null
   };
 }
 

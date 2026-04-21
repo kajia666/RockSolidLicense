@@ -3048,16 +3048,31 @@
         if (!review.active) {
           return null;
         }
+        const serverContinuation = review.serverRouteReview?.continuation && typeof review.serverRouteReview.continuation === "object"
+          ? review.serverRouteReview.continuation
+          : null;
         const preferredSection = review.focus || requestedAutofocus || "";
         const nextFocus = buildNextRouteReviewFocus(review, preferredSection, focus);
-        if (!nextFocus?.kind) {
+        if (!nextFocus?.kind && !serverContinuation) {
           return null;
         }
+        const nextControlLabel = nextFocus?.item?.recommendedControl?.label || serverContinuation?.nextControlLabel || "";
+        const nextDownload = serverContinuation?.nextDownload || (nextFocus?.kind ? buildRouteReviewNextDownloadDescriptor(nextFocus, review) : null);
         return {
           review,
           nextFocus,
-          nextControlLabel: nextFocus.item?.recommendedControl?.label || "",
-          nextDownload: buildRouteReviewNextDownloadDescriptor(nextFocus, review)
+          remainingCount: Number.isFinite(Number(serverContinuation?.remainingCount))
+            ? Number(serverContinuation.remainingCount)
+            : Math.max(countRouteReviewMatches(review) - 1, 0),
+          nextControlLabel,
+          nextDownload,
+          remainingDownload: serverContinuation?.remainingDownload || review.serverRouteReview?.downloads?.remaining || null,
+          primaryAction: serverContinuation?.primaryAction || (nextFocus?.kind ? "review_next" : "complete_route_review"),
+          primaryLabel: serverContinuation?.primaryLabel || (nextFocus?.kind ? "Continue Routed Review" : "Complete Routed Review"),
+          secondaryAction: serverContinuation?.secondaryAction || (nextFocus?.kind ? (nextControlLabel ? "control_next" : "download_next") : "download_route_review"),
+          secondaryLabel: serverContinuation?.secondaryLabel || (nextFocus?.kind
+            ? (nextControlLabel ? "Open Next Control" : "Download Next Match Summary")
+            : "Download Routed Summary")
         };
       }
 
@@ -3162,7 +3177,7 @@
         const routeContinuation = buildDeveloperRouteReviewContinuation(focus);
         const routeReview = collectRouteReview();
         if (severityRank === 0 && queuePosition === null) {
-          if (routeContinuation?.nextFocus?.kind) {
+          if (routeContinuation?.primaryAction === "review_next" && routeContinuation?.nextFocus?.kind) {
             const nextTitle = formatRouteReviewPrimaryTitle(routeContinuation.nextFocus);
             return tuneDeveloperFollowUpPlan({
               priority: "clear",
@@ -3170,23 +3185,23 @@
               tone: "ok",
               impactBits,
               hint: `No active scoped signal remains for this object. ${impactSummary ? `${impactSummary} ` : ""}Continue routed review with ${nextTitle}.${routeContinuation.nextControlLabel ? ` Next control: ${routeContinuation.nextControlLabel}.` : ""}`,
-              primaryAction: "review_next",
-              primaryLabel: "Continue Routed Review",
-              secondaryAction: routeContinuation.nextControlLabel ? "control_next" : "download_next",
-              secondaryLabel: routeContinuation.nextControlLabel ? "Open Next Control" : "Download Next Match Summary"
+              primaryAction: routeContinuation.primaryAction || "review_next",
+              primaryLabel: routeContinuation.primaryLabel || "Continue Routed Review",
+              secondaryAction: routeContinuation.secondaryAction || (routeContinuation.nextControlLabel ? "control_next" : "download_next"),
+              secondaryLabel: routeContinuation.secondaryLabel || (routeContinuation.nextControlLabel ? "Open Next Control" : "Download Next Match Summary")
             }, comparison, hasDirectControl);
           }
-          if (routeReview.active) {
+          if (routeReview.active || routeContinuation?.primaryAction === "complete_route_review") {
             return tuneDeveloperFollowUpPlan({
               priority: "clear",
               label: "Close Out",
               tone: "ok",
               impactBits,
               hint: `No active scoped signal remains for this object. ${impactSummary ? `${impactSummary} ` : ""}No additional routed match remains, so you can complete this routed review pass now.`,
-              primaryAction: "complete_route_review",
-              primaryLabel: "Complete Routed Review",
-              secondaryAction: "download_route_review",
-              secondaryLabel: "Download Routed Summary"
+              primaryAction: routeContinuation?.primaryAction || "complete_route_review",
+              primaryLabel: routeContinuation?.primaryLabel || "Complete Routed Review",
+              secondaryAction: routeContinuation?.secondaryAction || "download_route_review",
+              secondaryLabel: routeContinuation?.secondaryLabel || "Download Routed Summary"
             }, comparison, hasDirectControl);
           }
           return tuneDeveloperFollowUpPlan({

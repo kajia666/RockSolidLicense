@@ -7725,6 +7725,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.routeReview?.downloads?.primary?.fileName || "", /developer-ops-primary-session-summary\.txt/);
     assert.equal(exportSnapshot.routeReview?.downloads?.remaining?.format, "route-review-remaining");
     assert.equal(exportSnapshot.routeReview?.downloads?.remaining?.fileName, "developer-ops-remaining-summary.txt");
+    assert.equal(exportSnapshot.routeReview?.continuation?.remainingCount, 1);
+    assert.equal(exportSnapshot.routeReview?.continuation?.primaryAction, "review_next");
+    assert.equal(exportSnapshot.routeReview?.continuation?.secondaryAction, "download_next");
+    assert.equal(exportSnapshot.routeReview?.continuation?.nextDownload?.format, "route-review-next");
     assert.ok(Array.isArray(exportSnapshot.routeReview?.remainingMatches));
     assert.equal(exportSnapshot.routeReview?.remainingMatches?.[0]?.kind, "audit");
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);

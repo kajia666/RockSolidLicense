@@ -9114,6 +9114,17 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     bootstrapAction: item.gate?.primaryAction?.bootstrapAction || null,
     setupAction: item.gate?.primaryAction?.setupAction || null
   }));
+  if (continuation) {
+    actionPlan.push(createLaunchWorkflowActionPlanStep({
+      key: "launch_mainline_route_continuation",
+      title: continuation.title,
+      summary: continuation.summary,
+      status: continuation.status,
+      priority: "secondary",
+      workspaceAction: continuation.workspaceAction,
+      recommendedDownload: continuation.recommendedDownload || null
+    }));
+  }
   const recommendedDownloads = [];
   const recommendedDownloadKeys = new Set();
   const pushRecommendedDownload = (item) => {
@@ -9130,6 +9141,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     pushRecommendedDownload(item.gate?.recommendedDownload || null);
     pushRecommendedDownload(item.summaryDownload || null);
   }
+  pushRecommendedDownload(continuation?.recommendedDownload || null);
   const overallGate = buildLaunchMainlineGatePayload({
     status: preferredStage?.gate?.status || "ready",
     headline: preferredStage?.gate?.headline || "Launch mainline overview",

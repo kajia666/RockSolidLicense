@@ -5924,6 +5924,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchMainline.mainlineSummary.continuation?.workspaceAction?.key, "ops");
       assert.match(launchMainline.mainlineSummary.continuation?.workspaceAction?.params?.routeAction || "", /^(review_next|complete_route_review)$/);
       assert.match(launchMainline.mainlineSummary.continuation?.recommendedDownload?.format || "", /^(route-review-next|summary)$/);
+      assert.ok(launchMainline.mainlineSummary.actionPlan.some((item) => item.key === "launch_mainline_route_continuation" && item.workspaceAction?.key === "ops"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === launchMainline.mainlineSummary.continuation?.recommendedDownload?.key));
       assert.equal(
         launchMainline.mainlineSummary.primaryAction?.key,
         launchMainline.mainlineSummary.overallGate?.primaryAction?.key

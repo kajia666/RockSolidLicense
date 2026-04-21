@@ -6746,6 +6746,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const primaryReviewWorkspaceAction = rawPrimaryReviewTarget?.workspaceAction
     ? {
         ...rawPrimaryReviewTarget.workspaceAction,
+        label: "Review Primary Match in Ops",
         params: {
           ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
             ? rawPrimaryReviewTarget.workspaceAction.params
@@ -7506,6 +7507,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const primaryReviewTarget = rawPrimaryReviewTarget?.workspaceAction?.key === "ops"
     ? {
         ...rawPrimaryReviewTarget,
+        workspaceAction: {
+          ...rawPrimaryReviewTarget.workspaceAction,
+          label: "Review Primary Match in Ops"
+        },
         recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(rawPrimaryReviewTarget.workspaceAction)
           || rawPrimaryReviewTarget.recommendedDownload
           || null

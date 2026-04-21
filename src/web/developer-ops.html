@@ -1980,6 +1980,75 @@
         if (!type) {
           return "";
         }
+        if (type === "focus_account") {
+          if (control.productCode) {
+            el("filter-product-code").value = control.productCode;
+            el("block-product-code").value = control.productCode;
+          }
+          if (control.username) {
+            el("filter-username").value = control.username;
+          }
+          if (control.accountId) {
+            el("account-id").value = control.accountId;
+          }
+          return control.label || "Account focus prepared";
+        }
+        if (type === "focus_entitlement") {
+          if (control.productCode) {
+            el("filter-product-code").value = control.productCode;
+            el("block-product-code").value = control.productCode;
+          }
+          if (control.username) {
+            el("filter-username").value = control.username;
+          }
+          if (control.entitlementId) {
+            el("entitlement-id").value = control.entitlementId;
+          }
+          return control.label || "Entitlement focus prepared";
+        }
+        if (type === "focus_session") {
+          if (control.productCode) {
+            el("filter-product-code").value = control.productCode;
+            el("block-product-code").value = control.productCode;
+          }
+          if (control.username) {
+            el("filter-username").value = control.username;
+          }
+          if (control.sessionId) {
+            el("session-id").value = control.sessionId;
+            el("filter-search").value = control.sessionId;
+          }
+          if (control.fingerprint) {
+            el("block-fingerprint").value = control.fingerprint;
+          }
+          if (control.reason) {
+            el("reason").value = control.reason;
+          }
+          return control.label || "Session focus prepared";
+        }
+        if (type === "focus_device") {
+          if (control.productCode) {
+            el("filter-product-code").value = control.productCode;
+            el("block-product-code").value = control.productCode;
+          }
+          if (control.username) {
+            el("filter-username").value = control.username;
+          }
+          if (control.bindingId) {
+            el("binding-id").value = control.bindingId;
+          }
+          if (control.blockId) {
+            el("block-id").value = control.blockId;
+          }
+          if (control.fingerprint) {
+            el("filter-search").value = control.fingerprint;
+            el("block-fingerprint").value = control.fingerprint;
+          }
+          if (control.reason) {
+            el("reason").value = control.reason;
+          }
+          return control.label || "Device focus prepared";
+        }
         if (type === "account_status") {
           if (control.accountId) {
             el("account-id").value = control.accountId;

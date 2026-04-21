@@ -11142,6 +11142,14 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Route review mode:/);
     assert.match(html, /Review Primary Match/);
     assert.match(html, /Open Primary Control/);
+    assert.match(html, /focus_account/);
+    assert.match(html, /focus_entitlement/);
+    assert.match(html, /focus_session/);
+    assert.match(html, /focus_device/);
+    assert.match(html, /Account focus prepared/);
+    assert.match(html, /Entitlement focus prepared/);
+    assert.match(html, /Session focus prepared/);
+    assert.match(html, /Device focus prepared/);
     assert.match(html, /Download Primary Match Summary/);
     assert.match(html, /Primary account summary/);
     assert.match(html, /Primary entitlement summary/);

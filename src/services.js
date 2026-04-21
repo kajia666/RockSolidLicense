@@ -3319,6 +3319,65 @@ function createLaunchWorkflowRemainingOpsDownloadShortcut(workspaceAction, {
   );
 }
 
+function createLaunchWorkflowOpsRouteActionShortcut(workspaceAction, routeAction = "", label = "") {
+  if (!workspaceAction || workspaceAction.key !== "ops") {
+    return null;
+  }
+  const normalizedAction = String(routeAction || "").trim();
+  if (!normalizedAction || normalizedAction.startsWith("download_")) {
+    return null;
+  }
+  const rawParams = workspaceAction.params && typeof workspaceAction.params === "object"
+    ? workspaceAction.params
+    : {};
+  return createLaunchWorkflowWorkspaceShortcut(
+    "ops",
+    workspaceAction.autofocus || "snapshot",
+    label || workspaceAction.label || "Open Ops Workspace",
+    {
+      ...rawParams,
+      routeAction: normalizedAction
+    }
+  );
+}
+
+function createLaunchWorkflowOpsContinuationDownloadShortcut(workspaceAction, continuation = null) {
+  if (!workspaceAction || workspaceAction.key !== "ops" || !continuation || typeof continuation !== "object") {
+    return null;
+  }
+  if (continuation.nextDownload?.fileName) {
+    return createLaunchWorkflowDownloadShortcut(
+      "ops_route_next_summary",
+      continuation.nextDownload.fileName,
+      continuation.nextDownload.label || continuation.secondaryLabel || "Download Next Match Summary",
+      {
+        source: "developer-ops",
+        format: continuation.nextDownload.format || "route-review-next",
+        params: continuation.nextDownload.params && typeof continuation.nextDownload.params === "object"
+          ? { ...continuation.nextDownload.params }
+          : {}
+      }
+    );
+  }
+  const secondaryAction = String(continuation.secondaryAction || "").trim();
+  if (secondaryAction === "download_route_review") {
+    const rawParams = workspaceAction.params && typeof workspaceAction.params === "object"
+      ? workspaceAction.params
+      : {};
+    return createLaunchWorkflowDownloadShortcut(
+      "ops_route_review_summary",
+      "developer-ops-summary.txt",
+      continuation.secondaryLabel || "Download Routed Summary",
+      {
+        source: "developer-ops",
+        format: "summary",
+        params: { ...rawParams }
+      }
+    );
+  }
+  return null;
+}
+
 function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summary", fileName = "launch-review.txt", format = "summary", params = null) {
   return createLaunchWorkflowDownloadShortcut(
     "launch_review_summary",
@@ -6956,8 +7015,33 @@ function buildDeveloperLaunchReviewSummaryPayload({
           || null
       }
     : rawPrimaryReviewTarget;
+  const primaryRouteContinuation = primaryReviewTarget?.workspaceAction?.key === "ops"
+    && opsSnapshot?.routeReview?.continuation
+    && typeof opsSnapshot.routeReview.continuation === "object"
+    ? opsSnapshot.routeReview.continuation
+    : null;
+  const primaryContinuationWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
+    primaryReviewTarget?.workspaceAction,
+    primaryRouteContinuation?.primaryAction,
+    primaryRouteContinuation?.primaryLabel
+  );
+  const primaryContinuationSecondaryWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
+    primaryReviewTarget?.workspaceAction,
+    primaryRouteContinuation?.secondaryAction,
+    primaryRouteContinuation?.secondaryLabel
+  );
+  const primaryContinuationDownload = createLaunchWorkflowOpsContinuationDownloadShortcut(
+    primaryReviewTarget?.workspaceAction,
+    primaryRouteContinuation
+  );
   if (primaryReviewTarget?.workspaceAction) {
     pushWorkspaceAction(primaryReviewTarget.workspaceAction, primaryReviewTarget.summary || "");
+  }
+  if (primaryContinuationWorkspaceAction) {
+    pushWorkspaceAction(primaryContinuationWorkspaceAction, primaryRouteContinuation?.nextTitle || primaryReviewTarget?.summary || "");
+  }
+  if (primaryContinuationSecondaryWorkspaceAction) {
+    pushWorkspaceAction(primaryContinuationSecondaryWorkspaceAction, primaryRouteContinuation?.nextTitle || primaryReviewTarget?.summary || "");
   }
   for (const item of visibleReviewTargets) {
     pushWorkspaceAction(item.workspaceAction, item.summary || "");
@@ -7006,6 +7090,21 @@ function buildDeveloperLaunchReviewSummaryPayload({
       priority: actionPlan.length ? "secondary" : "primary",
       workspaceAction: primaryReviewTarget.workspaceAction,
       recommendedDownload: primaryReviewTarget.recommendedDownload || null
+    }));
+  }
+
+  if (primaryContinuationWorkspaceAction) {
+    const continuationSummary = primaryRouteContinuation?.nextTitle
+      ? `Continue routed review with ${primaryRouteContinuation.nextTitle}.${primaryRouteContinuation.nextControlLabel ? ` Next control: ${primaryRouteContinuation.nextControlLabel}.` : ""}`
+      : "Continue the routed review from the next matched runtime object.";
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_route_continuation",
+      title: primaryContinuationWorkspaceAction.label || "Continue Routed Review",
+      summary: continuationSummary,
+      status: "review",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction: primaryContinuationWorkspaceAction,
+      recommendedDownload: primaryContinuationDownload || null
     }));
   }
 
@@ -7080,6 +7179,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(reviewDownload);
   if (primaryReviewTarget?.recommendedDownload) {
     pushRecommendedDownload(primaryReviewTarget.recommendedDownload);
+  }
+  if (primaryContinuationDownload) {
+    pushRecommendedDownload(primaryContinuationDownload);
   }
   if (primaryReviewTarget?.workspaceAction?.key === "ops") {
     pushRecommendedDownload(createLaunchWorkflowRemainingOpsDownloadShortcut(primaryReviewTarget.workspaceAction));
@@ -7368,6 +7470,7 @@ function buildLaunchSmokeCardCandidates(cards = [], cardInventoryStates = [], mo
 
 function buildDeveloperLaunchSmokeKitSummaryPayload({
   launchWorkflow = null,
+  opsSnapshot = null,
   accounts = [],
   entitlements = [],
   cards = [],
@@ -7763,15 +7866,48 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
           || null
       }
     : rawPrimaryReviewTarget;
+  const primaryRouteContinuation = primaryReviewTarget?.workspaceAction?.key === "ops"
+    && opsSnapshot?.routeReview?.continuation
+    && typeof opsSnapshot.routeReview.continuation === "object"
+    ? opsSnapshot.routeReview.continuation
+    : null;
+  const primaryContinuationWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
+    primaryReviewTarget?.workspaceAction,
+    primaryRouteContinuation?.primaryAction,
+    primaryRouteContinuation?.primaryLabel
+  );
+  const primaryContinuationSecondaryWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
+    primaryReviewTarget?.workspaceAction,
+    primaryRouteContinuation?.secondaryAction,
+    primaryRouteContinuation?.secondaryLabel
+  );
+  const primaryContinuationDownload = createLaunchWorkflowOpsContinuationDownloadShortcut(
+    primaryReviewTarget?.workspaceAction,
+    primaryRouteContinuation
+  );
   if (primaryReviewTarget?.workspaceAction) {
     pushWorkspaceAction(primaryReviewTarget.workspaceAction);
+  }
+  if (primaryContinuationWorkspaceAction) {
+    pushWorkspaceAction(primaryContinuationWorkspaceAction);
+  }
+  if (primaryContinuationSecondaryWorkspaceAction) {
+    pushWorkspaceAction(primaryContinuationSecondaryWorkspaceAction);
   }
   if (primaryReviewTarget?.recommendedDownload?.key) {
     recommendedDownloads.push({
       ...primaryReviewTarget.recommendedDownload,
       params: primaryReviewTarget.recommendedDownload.params && typeof primaryReviewTarget.recommendedDownload.params === "object"
         ? { ...primaryReviewTarget.recommendedDownload.params }
-        : primaryReviewTarget.recommendedDownload.params
+      : primaryReviewTarget.recommendedDownload.params
+    });
+  }
+  if (primaryContinuationDownload?.key) {
+    recommendedDownloads.push({
+      ...primaryContinuationDownload,
+      params: primaryContinuationDownload.params && typeof primaryContinuationDownload.params === "object"
+        ? { ...primaryContinuationDownload.params }
+        : primaryContinuationDownload.params
     });
   }
   const remainingReviewDownload = primaryReviewTarget?.workspaceAction?.key === "ops"
@@ -7842,6 +7978,17 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       )} after setup so first-wave follow-up starts with the most important match.`,
       workspaceAction: primaryReviewTarget.workspaceAction,
       recommendedDownload: primaryReviewTarget.recommendedDownload || null
+    } : null,
+    primaryContinuationWorkspaceAction ? {
+      key: "launch_smoke_route_continuation",
+      title: primaryContinuationWorkspaceAction.label || "Continue Routed Review",
+      priority: "secondary",
+      status: "review",
+      summary: primaryRouteContinuation?.nextTitle
+        ? `Continue routed smoke review with ${primaryRouteContinuation.nextTitle}.${primaryRouteContinuation.nextControlLabel ? ` Next control: ${primaryRouteContinuation.nextControlLabel}.` : ""}`
+        : "Continue the routed smoke review from the next matched runtime object.",
+      workspaceAction: primaryContinuationWorkspaceAction,
+      recommendedDownload: primaryContinuationDownload || null
     } : null,
     remainingReviewDownload ? {
       key: "launch_smoke_remaining_queue",
@@ -8022,6 +8169,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
 function buildDeveloperLaunchSmokeKitPayload({
   generatedAt = nowIso(),
   launchWorkflow = null,
+  opsSnapshot = null,
   accounts = [],
   entitlements = [],
   cards = [],
@@ -8052,8 +8200,10 @@ function buildDeveloperLaunchSmokeKitPayload({
       channel
     },
     launchWorkflow,
+    opsSnapshot,
     smokeSummary: buildDeveloperLaunchSmokeKitSummaryPayload({
       launchWorkflow,
+      opsSnapshot,
       accounts,
       entitlements,
       cards,
@@ -16952,14 +17102,24 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const launchWorkflow = await this.developerLaunchWorkflowPackage(token, selector, options);
       const project = launchWorkflow?.manifest?.project || {};
       const channel = launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
-      const [accountsPayload, entitlementsPayload, cardsPayload] = await Promise.all([
+      const [accountsPayload, entitlementsPayload, cardsPayload, opsSnapshot] = await Promise.all([
         this.developerListAccounts(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null }),
         this.developerListEntitlements(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null }),
-        this.developerListCards(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null })
+        this.developerListCards(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null }),
+        this.developerExportOpsSnapshot(token, {
+          productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+          username: selector.username,
+          search: selector.search,
+          eventType: selector.eventType,
+          actorType: selector.actorType,
+          entityType: selector.entityType,
+          limit: selector.limit
+        })
       ]);
       const payload = buildDeveloperLaunchSmokeKitPayload({
         generatedAt: launchWorkflow?.manifest?.generatedAt || nowIso(),
         launchWorkflow,
+        opsSnapshot,
         accounts: Array.isArray(accountsPayload?.items) ? accountsPayload.items : [],
         entitlements: Array.isArray(entitlementsPayload?.items) ? entitlementsPayload.items : [],
         cards: Array.isArray(cardsPayload?.items) ? cardsPayload.items : [],

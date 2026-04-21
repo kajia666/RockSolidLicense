@@ -5773,6 +5773,12 @@ test("developer release package export bundles integration, versions, and notice
         && item.recommendedDownload?.fileName === "developer-ops-remaining-summary.txt"
       ));
       assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
+        item.key === "launch_review_route_continuation"
+        && item.workspaceAction?.key === "ops"
+        && /^(review_next|complete_route_review)$/.test(item.workspaceAction?.params?.routeAction || "")
+        && /^(route-review-next|summary)$/.test(item.recommendedDownload?.format || "")
+      ));
+      assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
         /^ops_/.test(item.key || "")
         && /^Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)$/i.test(item.title || "")
       ));
@@ -6197,6 +6203,12 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
       item.key === "launch_smoke_remaining_queue"
       && item.recommendedDownload?.fileName === "developer-ops-remaining-summary.txt"
+    ));
+    assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
+      item.key === "launch_smoke_route_continuation"
+      && item.workspaceAction?.key === "ops"
+      && /^(review_next|complete_route_review)$/.test(item.workspaceAction?.params?.routeAction || "")
+      && /^(route-review-next|summary)$/.test(item.recommendedDownload?.format || "")
     ));
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);

@@ -9588,6 +9588,32 @@ function buildDeveloperOpsRouteReviewMatchedIds({
   };
 }
 
+function buildDeveloperOpsRouteReviewSections(routeReview = {}) {
+  const queue = Array.isArray(routeReview.queue) ? routeReview.queue : [];
+  const matchedCounts = routeReview.matchedCounts && typeof routeReview.matchedCounts === "object"
+    ? routeReview.matchedCounts
+    : {};
+  const sections = {};
+  const sectionMap = {
+    accounts: "accounts",
+    entitlements: "entitlements",
+    sessions: "sessions",
+    devices: "devices",
+    audit: "audit"
+  };
+  for (const [section, countKey] of Object.entries(sectionMap)) {
+    const primaryMatch = queue.find((item) => String(item?.section || "").trim().toLowerCase() === section) || null;
+    if (!primaryMatch && Number(matchedCounts[countKey] || 0) <= 0) {
+      continue;
+    }
+    sections[section] = {
+      count: Number(matchedCounts[countKey] || 0),
+      primaryMatch
+    };
+  }
+  return sections;
+}
+
 function buildDeveloperOpsRouteReviewPayload({
   filters = {},
   accounts = [],
@@ -9694,6 +9720,16 @@ function buildDeveloperOpsRouteReviewPayload({
       audit: matchedAuditLogs.length
     },
     matchedIds,
+    sections: buildDeveloperOpsRouteReviewSections({
+      queue,
+      matchedCounts: {
+        accounts: matchedAccounts.length,
+        entitlements: matchedEntitlements.length,
+        sessions: matchedSessions.length,
+        devices: matchedDevices.length,
+        audit: matchedAuditLogs.length
+      }
+    }),
     highlightedEvents,
     primaryMatch: queue[0] || null,
     nextMatch: queue[1] || null,

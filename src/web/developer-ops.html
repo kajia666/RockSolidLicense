@@ -1293,6 +1293,10 @@
 
       function routeReviewSectionPrimaryItem(review = collectRouteReview(), section = "") {
         const normalized = String(section || "").trim().toLowerCase();
+        const serverPrimary = normalizeServerRouteReviewFocus(review.serverRouteReview?.sections?.[normalized]?.primaryMatch);
+        if (serverPrimary?.kind) {
+          return serverPrimary.item || null;
+        }
         if (normalized === "accounts") {
           return Array.isArray(review?.matchedAccounts) && review.matchedAccounts.length ? review.matchedAccounts[0] : null;
         }

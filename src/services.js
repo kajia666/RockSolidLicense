@@ -3220,6 +3220,62 @@ function createLaunchWorkflowOpsDownloadShortcut(action, {
   );
 }
 
+function createLaunchWorkflowPrimaryOpsDownloadShortcut(workspaceAction, {
+  key = "ops_primary_summary",
+  label = "Primary match summary",
+  fileName = "developer-ops-primary-summary.txt",
+  format = "summary"
+} = {}) {
+  if (!workspaceAction || workspaceAction.key !== "ops") {
+    return null;
+  }
+  const rawParams = workspaceAction.params && typeof workspaceAction.params === "object"
+    ? workspaceAction.params
+    : {};
+  const focusKind = String(rawParams.focusKind || "").trim().toLowerCase();
+  if (!focusKind) {
+    return null;
+  }
+  const params = {
+    reviewMode: rawParams.reviewMode || "matched",
+    productCode: rawParams.focusProductCode || rawParams.productCode || "",
+    username: rawParams.focusUsername || rawParams.username || "",
+    search: rawParams.search || "",
+    eventType: rawParams.eventType || "",
+    actorType: rawParams.actorType || "",
+    entityType: rawParams.entityType || "",
+    limit: rawParams.limit || 60
+  };
+  if (focusKind === "account") {
+    params.search = "";
+  } else if (focusKind === "entitlement") {
+    params.entityType = "entitlement";
+    params.search = "";
+  } else if (focusKind === "session") {
+    params.entityType = params.entityType || "session";
+    params.search = params.search || rawParams.focusSessionId || "";
+  } else if (focusKind === "device") {
+    params.entityType = params.entityType
+      || (rawParams.focusBlockId ? "device_block" : (rawParams.focusBindingId ? "device_binding" : ""));
+    params.search = params.search || rawParams.focusFingerprint || "";
+  }
+  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+    if (!params[field]) {
+      delete params[field];
+    }
+  }
+  return createLaunchWorkflowDownloadShortcut(
+    key,
+    fileName,
+    label,
+    {
+      source: "developer-ops",
+      format,
+      params
+    }
+  );
+}
+
 function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summary", fileName = "launch-review.txt", format = "summary", params = null) {
   return createLaunchWorkflowDownloadShortcut(
     "launch_review_summary",
@@ -6687,18 +6743,24 @@ function buildDeveloperLaunchReviewSummaryPayload({
     ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
     : reviewTargets.slice(0, 2);
   const rawPrimaryReviewTarget = visibleReviewTargets.find((item) => item?.workspaceAction) || visibleReviewTargets[0] || null;
-  const primaryReviewTarget = rawPrimaryReviewTarget?.workspaceAction
+  const primaryReviewWorkspaceAction = rawPrimaryReviewTarget?.workspaceAction
+    ? {
+        ...rawPrimaryReviewTarget.workspaceAction,
+        params: {
+          ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
+            ? rawPrimaryReviewTarget.workspaceAction.params
+            : {}),
+          routeAction: "review-primary"
+        }
+      }
+    : null;
+  const primaryReviewTarget = primaryReviewWorkspaceAction
     ? {
         ...rawPrimaryReviewTarget,
-        workspaceAction: {
-          ...rawPrimaryReviewTarget.workspaceAction,
-          params: {
-            ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
-              ? rawPrimaryReviewTarget.workspaceAction.params
-              : {}),
-            routeAction: "review-primary"
-          }
-        }
+        workspaceAction: primaryReviewWorkspaceAction,
+        recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(primaryReviewWorkspaceAction)
+          || rawPrimaryReviewTarget.recommendedDownload
+          || null
       }
     : rawPrimaryReviewTarget;
   for (const item of visibleReviewTargets) {
@@ -7440,7 +7502,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const visibleReviewTargets = reviewTargets.some((item) => Number(item.count || 0) > 0)
     ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
     : reviewTargets.slice(0, 2);
-  const primaryReviewTarget = visibleReviewTargets.find((item) => item?.workspaceAction) || visibleReviewTargets[0] || null;
+  const rawPrimaryReviewTarget = visibleReviewTargets.find((item) => item?.workspaceAction) || visibleReviewTargets[0] || null;
+  const primaryReviewTarget = rawPrimaryReviewTarget?.workspaceAction?.key === "ops"
+    ? {
+        ...rawPrimaryReviewTarget,
+        recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(rawPrimaryReviewTarget.workspaceAction)
+          || rawPrimaryReviewTarget.recommendedDownload
+          || null
+      }
+    : rawPrimaryReviewTarget;
   for (const item of visibleReviewTargets) {
     pushWorkspaceAction(item.workspaceAction);
   }

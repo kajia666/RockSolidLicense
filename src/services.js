@@ -8927,6 +8927,24 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   );
   const opsPrimaryDownload = createOpsMainlineDownload(opsRouteReview.downloads?.primary || null);
   const opsRemainingDownload = createOpsMainlineDownload(opsRouteReview.downloads?.remaining || null);
+  const opsContinuationWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
+    opsPrimaryWorkspaceAction,
+    opsRouteReview.continuation?.primaryAction,
+    opsRouteReview.continuation?.primaryLabel
+  );
+  const opsContinuationDownload = createLaunchWorkflowOpsContinuationDownloadShortcut(
+    opsPrimaryWorkspaceAction,
+    opsRouteReview.continuation
+  );
+  const continuation = opsContinuationWorkspaceAction ? {
+    status: "review",
+    title: opsContinuationWorkspaceAction.label || "Continue Routed Review",
+    summary: opsRouteReview.continuation?.nextTitle
+      ? `Continue routed ops review with ${opsRouteReview.continuation.nextTitle}.${opsRouteReview.continuation.nextControlLabel ? ` Next control: ${opsRouteReview.continuation.nextControlLabel}.` : ""}`
+      : "Continue the routed Developer Ops review from the next matched object.",
+    workspaceAction: opsContinuationWorkspaceAction,
+    recommendedDownload: opsContinuationDownload || opsSummaryDownload
+  } : null;
   const opsActionPlan = [];
   if (opsRouteReview.primaryMatch) {
     opsActionPlan.push(createLaunchWorkflowActionPlanStep({
@@ -8951,6 +8969,17 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       priority: "primary",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params),
       recommendedDownload: opsSummaryDownload
+    }));
+  }
+  if (continuation) {
+    opsActionPlan.push(createLaunchWorkflowActionPlanStep({
+      key: "ops_route_continuation",
+      title: continuation.title,
+      summary: continuation.summary,
+      status: continuation.status,
+      priority: opsActionPlan.length ? "secondary" : "primary",
+      workspaceAction: continuation.workspaceAction,
+      recommendedDownload: continuation.recommendedDownload || null
     }));
   }
   if (opsRemainingDownload && Number(opsRouteReview.totalMatches || 0) > 1) {
@@ -9119,6 +9148,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     reviewGate,
     smokeGate,
     opsGate,
+    continuation,
     stages,
     workspaceActions,
     primaryAction: overallGate.primaryAction || preferredStage?.gate?.primaryAction || null,
@@ -9159,6 +9189,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
   lines.push(`Mainline Recommended Download: ${mainlineSummary.recommendedDownload?.label || mainlineSummary.recommendedDownload?.key || "-"}`);
+  if (mainlineSummary.continuation) {
+    lines.push("Mainline Continuation:");
+    lines.push(`- title: ${mainlineSummary.continuation.title || "-"}`);
+    lines.push(`- summary: ${mainlineSummary.continuation.summary || "-"}`);
+    lines.push(`- workspace: ${formatWorkspaceActionText(mainlineSummary.continuation.workspaceAction)}`);
+    lines.push(`- recommendedDownload: ${mainlineSummary.continuation.recommendedDownload?.label || mainlineSummary.continuation.recommendedDownload?.key || "-"}`);
+  }
   lines.push("");
   lines.push("Stage Gates:");
   const stageRows = [

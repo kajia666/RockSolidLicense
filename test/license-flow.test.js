@@ -5920,6 +5920,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.workspaceActions.some((item) => item.key === "ops"));
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "release" && item.workspaceAction?.key));
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "ops" && item.recommendedDownload?.key));
+      assert.ok(launchMainline.mainlineSummary.continuation);
+      assert.equal(launchMainline.mainlineSummary.continuation?.workspaceAction?.key, "ops");
+      assert.match(launchMainline.mainlineSummary.continuation?.workspaceAction?.params?.routeAction || "", /^(review_next|complete_route_review)$/);
+      assert.match(launchMainline.mainlineSummary.continuation?.recommendedDownload?.format || "", /^(route-review-next|summary)$/);
       assert.equal(
         launchMainline.mainlineSummary.primaryAction?.key,
         launchMainline.mainlineSummary.overallGate?.primaryAction?.key
@@ -5943,6 +5947,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
       assert.match(launchMainline.summaryText, /Mainline Recommended Download:/);
+      assert.match(launchMainline.summaryText, /Mainline Continuation:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
       assert.match(launchMainline.summaryText, /Ops:/);
 

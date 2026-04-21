@@ -10758,6 +10758,7 @@ function buildDeveloperOpsSnapshotPayload({
   if (primaryContinuationKey && routeReview.continuations?.[primaryContinuationKey]) {
     routeReview.continuation = routeReview.continuations[primaryContinuationKey];
   }
+  routeReview.actions = buildDeveloperOpsRouteReviewActions(routeReview);
 
   const payload = {
     generatedAt,
@@ -11169,6 +11170,82 @@ function buildDeveloperOpsRouteReviewDownloads(scope = {}, routeReview = {}) {
     remaining: buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope),
     sections: buildDeveloperOpsRouteReviewSectionDownloads(scope, routeReview)
   };
+}
+
+function buildDeveloperOpsRouteReviewActions(routeReview = {}) {
+  if (!routeReview || typeof routeReview !== "object") {
+    return [];
+  }
+  const actions = [];
+  const matchedCounts = routeReview.matchedCounts && typeof routeReview.matchedCounts === "object"
+    ? routeReview.matchedCounts
+    : {};
+  const downloads = routeReview.downloads && typeof routeReview.downloads === "object"
+    ? routeReview.downloads
+    : {};
+  const primaryMatch = routeReview.primaryMatch && typeof routeReview.primaryMatch === "object"
+    ? routeReview.primaryMatch
+    : null;
+  const nextMatch = routeReview.nextMatch && typeof routeReview.nextMatch === "object"
+    ? routeReview.nextMatch
+    : null;
+  const pushAction = (action = "", label = "", extra = {}) => {
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!normalizedAction || actions.some((item) => item.action === normalizedAction)) {
+      return;
+    }
+    actions.push({
+      action: normalizedAction,
+      label: String(label || normalizedAction).trim() || normalizedAction,
+      ...extra
+    });
+  };
+
+  if (primaryMatch) {
+    pushAction("prepare-primary", "Prepare Primary Match");
+    if (primaryMatch.recommendedControl?.label) {
+      const controlAction = String(primaryMatch.routeAction || "").trim().toLowerCase().startsWith("control-")
+        ? String(primaryMatch.routeAction).trim().toLowerCase()
+        : "control-primary";
+      pushAction(controlAction, primaryMatch.routeActionLabel || "Open Primary Control");
+    }
+    pushAction("review-primary", "Review Primary Match");
+  }
+
+  if (nextMatch?.recommendedControl?.label) {
+    pushAction("control-next", "Open Next Control");
+  }
+  if (nextMatch) {
+    pushAction("review-next", "Review Next Match");
+  }
+  if (downloads.next?.fileName && nextMatch) {
+    pushAction("download-next", "Download Next Match Summary", { requiresToken: true });
+  }
+  if (downloads.remaining?.fileName) {
+    pushAction("download-remaining", "Download Remaining Queue Summary", { requiresToken: true });
+  }
+  if (downloads.primary?.fileName && primaryMatch) {
+    pushAction("download-primary", "Download Primary Match Summary", { requiresToken: true });
+  }
+
+  const sectionDefinitions = [
+    ["accounts", "accounts", "Accounts"],
+    ["entitlements", "entitlements", "Entitlements"],
+    ["sessions", "sessions", "Sessions"],
+    ["devices", "devices", "Devices"],
+    ["audit", "audit", "Audit"]
+  ];
+  for (const [section, countKey, label] of sectionDefinitions) {
+    if (Number(matchedCounts[countKey] || 0) <= 0) {
+      continue;
+    }
+    pushAction(`review-${section}`, `Review ${label}`);
+    if (downloads.sections?.[section]?.fileName) {
+      pushAction(`download-${section}`, `Download ${label} Summary`, { requiresToken: true });
+    }
+  }
+
+  return actions;
 }
 
 function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {

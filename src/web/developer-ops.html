@@ -295,6 +295,7 @@
           "review-next",
           "download-primary",
           "download-next",
+          "download-remaining",
           "download-accounts",
           "download-entitlements",
           "download-sessions",
@@ -354,6 +355,9 @@
         }
         if (normalized === "download-next") {
           return "Download Next Match Summary";
+        }
+        if (normalized === "download-remaining") {
+          return "Download Remaining Queue Summary";
         }
         if (normalized === "download-accounts") {
           return "Download Accounts Summary";
@@ -1824,7 +1828,21 @@
         const nextFocusMarkup = nextFocus?.kind
           ? `<div class="audit-meta" style="margin-top:8px;">${renderTag(nextFocus.section || "next")} ${renderTag(nextFocus.kind)} ${renderTag(formatRouteReviewPrimaryTitle(nextFocus))}${nextFocus.item?.recommendedControl?.label ? renderTag(nextFocus.item.recommendedControl.label) : ""}</div><div class="hint" style="margin-top:6px;">${esc(formatRouteReviewPrimarySummary(nextFocus))}</div>`
           : `<div class="hint" style="margin-top:8px;">No additional routed match is queued right now.</div>`;
-        const reviewButtons = [
+        const serverActions = Array.isArray(review.serverRouteReview?.actions)
+          ? review.serverRouteReview.actions
+              .filter((item) => item?.action)
+              .map((item) => {
+                const action = normalizeRouteReviewActionValue(item.action) || String(item.action || "").trim().toLowerCase();
+                if (!action) {
+                  return "";
+                }
+                const disabled = Boolean(item.requiresToken) && !token;
+                const label = item.label || formatRouteReviewActionLabel(action) || action;
+                return `<button type="button" class="secondary" data-route-review-action="${esc(action)}" ${disabled ? "disabled" : ""}>${esc(label)}</button>`;
+              })
+              .filter(Boolean)
+          : [];
+        const reviewButtons = (serverActions.length ? serverActions : [
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="prepare-primary">Prepare Primary Match</button>` : "",
           primaryFocus?.item?.recommendedControl?.label ? `<button type="button" class="secondary" data-route-review-action="control-primary">Open Primary Control</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-primary">Review Primary Match</button>` : "",
@@ -1841,10 +1859,9 @@
           review.matchedSessions.length ? `<button type="button" class="secondary" data-route-review-action="download-sessions" ${token ? "" : "disabled"}>Download Sessions Summary</button>` : "",
           review.matchedDevices.length ? `<button type="button" class="secondary" data-route-review-action="review-devices">Review Devices</button>` : "",
           review.matchedDevices.length ? `<button type="button" class="secondary" data-route-review-action="download-devices" ${token ? "" : "disabled"}>Download Devices Summary</button>` : "",
-          review.matchedAuditLogs.length ? `<button type="button" class="secondary" data-route-review-action="review-audit">Review Audit</button>` : ""
-          ,
+          review.matchedAuditLogs.length ? `<button type="button" class="secondary" data-route-review-action="review-audit">Review Audit</button>` : "",
           review.matchedAuditLogs.length ? `<button type="button" class="secondary" data-route-review-action="download-audit" ${token ? "" : "disabled"}>Download Audit Summary</button>` : ""
-        ].filter(Boolean).join("");
+        ].filter(Boolean)).join("");
         box.innerHTML = `
           <div><strong>Route Review</strong> ${target.productCode ? renderTag(`project:${target.productCode}`, true) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
           <div class="hint" style="margin-top:8px;">Matching records: ${esc(formatRouteReviewSummary(review))}.</div>

@@ -7751,6 +7751,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.continuations?.[primaryContinuationKey]?.nextMatch?.kind, "audit");
     assert.equal(exportSnapshot.routeReview?.continuations?.[primaryContinuationKey]?.nextDownload?.format, "route-review-next");
     assert.match(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.primaryAction || "", /^(review_next|complete_route_review)$/);
+    assert.ok(Array.isArray(exportSnapshot.routeReview?.actions));
+    assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-primary" && item.label === "Review Primary Match"));
+    assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-next" && item.label === "Review Next Match"));
+    assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-remaining" && item.label === "Download Remaining Queue Summary"));
     assert.ok(Array.isArray(exportSnapshot.routeReview?.remainingMatches));
     assert.equal(exportSnapshot.routeReview?.remainingMatches?.[0]?.kind, "audit");
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
@@ -11264,6 +11268,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /buildRouteReviewPrimaryDownloadDescriptor/);
     assert.match(html, /buildRouteReviewSectionDownloadDescriptor/);
     assert.match(html, /serverRouteReview\?\.continuations/);
+    assert.match(html, /serverRouteReview\?\.actions/);
     assert.match(html, /renderRouteReview/);
     assert.match(html, /handleRouteReviewAction/);
     assert.match(html, /data-route-review-action/);

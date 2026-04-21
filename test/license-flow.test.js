@@ -5885,6 +5885,41 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Launch Workflow Summary:/);
       assert.match(launchReviewSummaryDownload.body, /Ops Snapshot Summary:/);
 
+      const launchMainline = await getJson(
+        baseUrl,
+        "/api/developer/launch-mainline?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched",
+        viewerSession.token
+      );
+      assert.match(launchMainline.fileName, /^rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-/);
+      assert.equal(launchMainline.manifest.project.code, "RELPKG_ALPHA");
+      assert.ok(launchMainline.mainlineSummary);
+      assert.equal(launchMainline.mainlineSummary.overallGate?.status, "hold");
+      assert.equal(launchMainline.mainlineSummary.releaseGate?.status, "hold");
+      assert.equal(launchMainline.mainlineSummary.workflowGate?.status, "hold");
+      assert.ok(["hold", "attention", "ready"].includes(launchMainline.mainlineSummary.reviewGate?.status));
+      assert.ok(["hold", "attention", "ready"].includes(launchMainline.mainlineSummary.smokeGate?.status));
+      assert.ok(launchMainline.mainlineSummary.overallGate?.recommendedWorkspace?.key);
+      assert.ok(Array.isArray(launchMainline.mainlineSummary.actionPlan));
+      assert.ok(launchMainline.mainlineSummary.actionPlan.some((item) => item.key === "release_mainline"));
+      assert.ok(Array.isArray(launchMainline.mainlineSummary.recommendedDownloads));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "release_summary"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_summary"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
+      assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
+      assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
+      assert.match(launchMainline.summaryText, /Stage Gates:/);
+
+      const launchMainlineSummaryDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=summary",
+        viewerSession.token
+      );
+      assert.match(launchMainlineSummaryDownload.contentType || "", /^text\/plain/);
+      assert.match(launchMainlineSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-summary\.txt"/);
+      assert.match(launchMainlineSummaryDownload.body, /RockSolid Developer Launch Mainline/);
+      assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
+
       const forbidden = await getJsonExpectError(
         baseUrl,
         "/api/developer/release-package?productCode=RELPKG_BETA&channel=stable",

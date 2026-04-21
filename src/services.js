@@ -8435,6 +8435,367 @@ function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
   };
 }
 
+function buildDeveloperLaunchMainlineSummaryPayload({
+  releasePackage = null,
+  launchWorkflow = null,
+  launchReview = null,
+  launchSmoke = null,
+  filters = {}
+} = {}) {
+  const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
+  const workflowSummary = launchWorkflow?.workflowSummary || {};
+  const reviewSummary = launchReview?.reviewSummary || {};
+  const smokeSummary = launchSmoke?.smokeSummary || {};
+  const releaseGate = releaseFollowUp.mainlineGate || null;
+  const workflowGate = workflowSummary.mainlineGate || null;
+  const reviewGate = reviewSummary.mainlineGate || null;
+  const smokeGate = smokeSummary.mainlineGate || null;
+  const params = {
+    productCode: releasePackage?.manifest?.project?.code
+      || launchWorkflow?.manifest?.project?.code
+      || launchReview?.manifest?.project?.code
+      || launchSmoke?.manifest?.project?.code
+      || filters.productCode
+      || null,
+    channel: releasePackage?.manifest?.release?.channel
+      || launchWorkflow?.manifest?.channel
+      || launchReview?.manifest?.channel
+      || launchSmoke?.manifest?.channel
+      || filters.channel
+      || "stable",
+    ...(filters.eventType ? { eventType: filters.eventType } : {}),
+    ...(filters.actorType ? { actorType: filters.actorType } : {}),
+    ...(filters.entityType ? { entityType: filters.entityType } : {}),
+    ...(filters.reviewMode ? { reviewMode: filters.reviewMode } : {}),
+    ...(filters.username ? { username: filters.username } : {}),
+    ...(filters.search ? { search: filters.search } : {})
+  };
+  const stageDefinitions = [
+    {
+      key: "release",
+      label: "Release Mainline",
+      gate: releaseGate,
+      summaryDownload: createReleasePackageDownloadShortcut({
+        key: "release_summary",
+        fileName: releasePackage?.summaryFileName || "release-package.txt",
+        label: "Release package summary",
+        format: "summary",
+        params
+      })
+    },
+    {
+      key: "workflow",
+      label: "Launch Workflow",
+      gate: workflowGate,
+      summaryDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_summary",
+        launchWorkflow?.summaryFileName || "launch-workflow.txt",
+        "Launch workflow summary",
+        {
+          source: "developer-launch-workflow",
+          format: "summary",
+          params
+        }
+      )
+    },
+    {
+      key: "review",
+      label: "Launch Review",
+      gate: reviewGate,
+      summaryDownload: createLaunchWorkflowReviewDownloadShortcut(
+        "Launch review summary",
+        launchReview?.summaryFileName || "launch-review.txt",
+        "summary",
+        params
+      )
+    },
+    {
+      key: "smoke",
+      label: "Launch Smoke",
+      gate: smokeGate,
+      summaryDownload: createLaunchWorkflowSmokeKitDownloadShortcut(
+        "Launch smoke kit summary",
+        launchSmoke?.summaryFileName || "launch-smoke-kit.txt",
+        "summary",
+        params
+      )
+    }
+  ];
+  const gateRank = (status = "unknown") => {
+    const normalized = normalizeLaunchMainlineGateStatus(status);
+    if (normalized === "hold") {
+      return 2;
+    }
+    if (normalized === "attention") {
+      return 1;
+    }
+    return 0;
+  };
+  const mapGateStatusToStepStatus = (status = "unknown") => {
+    const normalized = normalizeLaunchMainlineGateStatus(status);
+    if (normalized === "hold") {
+      return "block";
+    }
+    if (normalized === "attention") {
+      return "review";
+    }
+    return "pass";
+  };
+  const activeStages = stageDefinitions.filter((item) => item.gate);
+  const preferredStage = activeStages
+    .slice()
+    .sort((left, right) => gateRank(right.gate?.status) - gateRank(left.gate?.status))[0]
+    || null;
+  const actionPlan = activeStages.map((item, index) => createLaunchWorkflowActionPlanStep({
+    key: `${item.key}_mainline`,
+    title: item.gate?.primaryAction?.title || `${item.label}: ${item.gate?.headline || item.gate?.summary || "Review this stage"}`,
+    summary: item.gate?.summary || item.gate?.headline || "-",
+    status: mapGateStatusToStepStatus(item.gate?.status),
+    priority: item.key === preferredStage?.key || (!preferredStage && index === 0) ? "primary" : "secondary",
+    workspaceAction: item.gate?.primaryAction?.workspaceAction || item.gate?.recommendedWorkspace || null,
+    recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null,
+    bootstrapAction: item.gate?.primaryAction?.bootstrapAction || null,
+    setupAction: item.gate?.primaryAction?.setupAction || null
+  }));
+  const recommendedDownloads = [];
+  const recommendedDownloadKeys = new Set();
+  const pushRecommendedDownload = (item) => {
+    if (!item?.key || recommendedDownloadKeys.has(item.key)) {
+      return;
+    }
+    recommendedDownloadKeys.add(item.key);
+    recommendedDownloads.push(item);
+  };
+  for (const item of activeStages) {
+    pushRecommendedDownload(item.gate?.recommendedDownload || null);
+    pushRecommendedDownload(item.summaryDownload || null);
+  }
+  const overallGate = buildLaunchMainlineGatePayload({
+    status: preferredStage?.gate?.status || "ready",
+    headline: preferredStage?.gate?.headline || "Launch mainline overview",
+    summary: preferredStage?.gate?.summary
+      || "Review release, workflow, review, and smoke stages together before first-wave rollout.",
+    blockingCount: activeStages.reduce((sum, item) => sum + Number(item.gate?.blockingCount || 0), 0),
+    attentionCount: activeStages.reduce((sum, item) => sum + Number(item.gate?.attentionCount || 0), 0),
+    recommendedWorkspace: preferredStage?.gate?.recommendedWorkspace || null,
+    actionPlan,
+    recommendedDownloads
+  });
+  return {
+    overallGate,
+    releaseGate,
+    workflowGate,
+    reviewGate,
+    smokeGate,
+    recommendedWorkspace: overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null,
+    actionPlan,
+    recommendedDownloads,
+    nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
+  };
+}
+
+function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const mainlineSummary = payload.mainlineSummary || {};
+  const formatWorkspaceActionParams = (params = null) => {
+    const entries = params && typeof params === "object"
+      ? Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+      : [];
+    return entries.length ? entries.map(([key, value]) => `${key}=${value}`).join(",") : "";
+  };
+  const formatWorkspaceActionText = (action = null) => {
+    if (!action) {
+      return "-";
+    }
+    const paramsText = formatWorkspaceActionParams(action.params);
+    return `${action.label || action.key || "-"}@${action.autofocus || "-"}${paramsText ? `?${paramsText}` : ""}`;
+  };
+  const lines = [
+    "RockSolid Developer Launch Mainline",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
+  lines.push("");
+  lines.push("Stage Gates:");
+  const stageRows = [
+    ["Release", mainlineSummary.releaseGate],
+    ["Workflow", mainlineSummary.workflowGate],
+    ["Review", mainlineSummary.reviewGate],
+    ["Smoke", mainlineSummary.smokeGate]
+  ];
+  for (const [label, gate] of stageRows) {
+    lines.push(`- ${label}: ${String(gate?.status || "unknown").toUpperCase()} | ${gate?.headline || "-"} | workspace=${formatWorkspaceActionText(gate?.recommendedWorkspace)}`);
+  }
+  if (Array.isArray(mainlineSummary.actionPlan) && mainlineSummary.actionPlan.length) {
+    lines.push("");
+    lines.push("Mainline Action Plan:");
+    for (const item of mainlineSummary.actionPlan) {
+      lines.push(
+        `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
+        + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+        + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+      );
+    }
+  }
+  if (Array.isArray(mainlineSummary.recommendedDownloads) && mainlineSummary.recommendedDownloads.length) {
+    lines.push("");
+    lines.push("Mainline Recommended Downloads:");
+    for (const item of mainlineSummary.recommendedDownloads) {
+      lines.push(`- ${item.label || item.key || "download"} | ${item.fileName || "-"}`);
+    }
+  }
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchMainlinePayload({
+  generatedAt = nowIso(),
+  releasePackage = null,
+  launchWorkflow = null,
+  launchReview = null,
+  launchSmoke = null,
+  filters = {}
+} = {}) {
+  const project = releasePackage?.manifest?.project
+    || launchWorkflow?.manifest?.project
+    || launchReview?.manifest?.project
+    || launchSmoke?.manifest?.project
+    || {};
+  const channel = releasePackage?.manifest?.release?.channel
+    || launchWorkflow?.manifest?.channel
+    || launchReview?.manifest?.channel
+    || launchSmoke?.manifest?.channel
+    || filters.channel
+    || "stable";
+  const timestampTag = buildExportTimestampTag(generatedAt);
+  const scopeTag = sanitizeExportNameSegment(project.code || filters.productCode || "launch-mainline", "launch-mainline");
+  const fileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}.json`;
+  const summaryFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
+  const payload = {
+    generatedAt,
+    fileName,
+    summaryFileName,
+    manifest: {
+      generatedAt,
+      channel,
+      project: {
+        id: project.id || null,
+        code: project.code || filters.productCode || null,
+        name: project.name || ""
+      }
+    },
+    filters: {
+      productCode: project.code || filters.productCode || null,
+      channel,
+      username: filters.username || null,
+      search: filters.search || null,
+      eventType: filters.eventType || null,
+      actorType: filters.actorType || null,
+      entityType: filters.entityType || null,
+      reviewMode: filters.reviewMode || null
+    },
+    releasePackage,
+    launchWorkflow,
+    launchReview,
+    launchSmoke,
+    notes: [
+      "This package aggregates release, workflow, review, and smoke gates into one service-driven launch mainline summary.",
+      "Use it when release duty, QA, support, or launch ops need one handoff artifact for the current rollout lane."
+    ]
+  };
+  payload.mainlineSummary = buildDeveloperLaunchMainlineSummaryPayload({
+    releasePackage,
+    launchWorkflow,
+    launchReview,
+    launchSmoke,
+    filters: payload.filters
+  });
+  payload.summaryText = buildDeveloperLaunchMainlineSummaryText(payload);
+  return payload;
+}
+
+function buildDeveloperLaunchMainlineFiles(payload = {}) {
+  const files = [
+    {
+      path: payload.fileName || "developer-launch-mainline.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: payload.summaryFileName || "developer-launch-mainline-summary.txt",
+      body: payload.summaryText || ""
+    }
+  ];
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `release/${payload.releasePackage?.summaryFileName || "release-package.txt"}`,
+    payload.releasePackage?.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `launch/${payload.launchWorkflow?.summaryFileName || "launch-workflow.txt"}`,
+    payload.launchWorkflow?.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `review/${payload.launchReview?.summaryFileName || "launch-review-summary.txt"}`,
+    payload.launchReview?.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `smoke/${payload.launchSmoke?.summaryFileName || "launch-smoke-summary.txt"}`,
+    payload.launchSmoke?.summaryText || ""
+  );
+  return files;
+}
+
+function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
+  const root = buildArchiveRootName(payload.fileName, "developer-launch-mainline");
+  return buildZipEntriesFromFiles(root, buildDeveloperLaunchMainlineFiles(payload));
+}
+
+function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "checksums", "zip"],
+    "json",
+    "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
+    "Developer launch mainline format"
+  );
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${buildArchiveRootName(payload.fileName, "developer-launch-mainline")}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildDeveloperLaunchMainlineZipEntries(payload))
+    };
+  }
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: buildChecksumFileName(payload.fileName, "developer-launch-mainline"),
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildDeveloperLaunchMainlineFiles(payload))
+    };
+  }
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: payload.summaryFileName || "developer-launch-mainline-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.summaryText || ""
+    };
+  }
+
+  return {
+    fileName: payload.fileName || "developer-launch-mainline.json",
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
 function buildIntegrationPackageExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
@@ -17421,6 +17782,39 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return payload;
     },
 
+    async developerLaunchMainlinePackage(token, selector = {}, options = {}) {
+      const releasePackage = await this.developerReleasePackage(token, selector, options);
+      const launchWorkflow = await this.developerLaunchWorkflowPackage(token, selector, options);
+      const launchReview = await this.developerLaunchReviewPackage(token, selector, options);
+      const launchSmoke = await this.developerLaunchSmokeKit(token, selector, options);
+      const project = releasePackage?.manifest?.project || launchWorkflow?.manifest?.project || {};
+      const channel = releasePackage?.manifest?.release?.channel || launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
+      const payload = buildDeveloperLaunchMainlinePayload({
+        generatedAt: releasePackage?.manifest?.generatedAt || launchWorkflow?.manifest?.generatedAt || nowIso(),
+        releasePackage,
+        launchWorkflow,
+        launchReview,
+        launchSmoke,
+        filters: {
+          productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+          channel,
+          username: selector.username || null,
+          search: selector.search || null,
+          eventType: selector.eventType || null,
+          actorType: selector.actorType || null,
+          entityType: selector.entityType || null,
+          reviewMode: selector.reviewMode || null
+        }
+      });
+      const session = requireDeveloperSession(db, token);
+      auditDeveloperSession(db, session, "product.launch-mainline.export", "product", project.id, {
+        code: project.code,
+        channel,
+        fileName: payload.fileName
+      });
+      return payload;
+    },
+
     releasePackageDownloadAsset(payload, format = "json") {
       return buildReleasePackageDownloadAsset(payload, format);
     },
@@ -17435,6 +17829,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     launchSmokeKitDownloadAsset(payload, format = "json") {
       return buildDeveloperLaunchSmokeKitDownloadAsset(payload, format);
+    },
+
+    launchMainlineDownloadAsset(payload, format = "json") {
+      return buildDeveloperLaunchMainlineDownloadAsset(payload, format);
     },
 
     integrationPackageExportDownloadAsset(payload, format = "json") {

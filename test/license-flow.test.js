@@ -5915,6 +5915,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.primaryAction?.key);
       assert.ok(launchMainline.mainlineSummary.recommendedDownload?.key);
       assert.ok(Array.isArray(launchMainline.mainlineSummary.stages));
+      assert.ok(Array.isArray(launchMainline.mainlineSummary.workspaceActions));
+      assert.ok(launchMainline.mainlineSummary.workspaceActions.some((item) => item.key === "release"));
+      assert.ok(launchMainline.mainlineSummary.workspaceActions.some((item) => item.key === "ops"));
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "release" && item.workspaceAction?.key));
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "ops" && item.recommendedDownload?.key));
       assert.equal(

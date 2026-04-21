@@ -440,16 +440,11 @@
         };
       }
 
-      function workspaceActionMap() {
-        const summary = currentMainline?.mainlineSummary || {};
-        const gates = {
-          release: summary.releaseGate?.recommendedWorkspace || null,
-          workflow: summary.workflowGate?.recommendedWorkspace || null,
-          review: summary.reviewGate?.recommendedWorkspace || null,
-          smoke: summary.smokeGate?.recommendedWorkspace || null,
-          ops: summary.opsGate?.recommendedWorkspace || null
-        };
-        return gates;
+      function workspaceActionByKey(key = "") {
+        const items = Array.isArray(currentMainline?.mainlineSummary?.workspaceActions)
+          ? currentMainline.mainlineSummary.workspaceActions
+          : [];
+        return items.find((item) => item.key === key) || null;
       }
 
       function openWorkspaceAction(action) {
@@ -841,23 +836,23 @@
         setOutput({ error: error.message });
       }));
       el("open-release-btn").addEventListener("click", () => {
-        const action = workspaceActionMap().release || { key: "release", label: "Open Release Workspace", autofocus: "summary" };
+        const action = workspaceActionByKey("release") || { key: "release", label: "Open Release Workspace", autofocus: "summary" };
         openWorkspaceAction(action);
       });
       el("open-workflow-btn").addEventListener("click", () => {
-        const action = workspaceActionMap().workflow || { key: "launch", label: "Open Workflow Workspace", autofocus: "handoff" };
+        const action = workspaceActionByKey("launch") || { key: "launch", label: "Open Workflow Workspace", autofocus: "handoff" };
         openWorkspaceAction(action);
       });
       el("open-review-btn").addEventListener("click", () => {
-        const action = workspaceActionMap().review || { key: "launch-review", label: "Open Review Workspace", autofocus: "summary" };
+        const action = workspaceActionByKey("launch-review") || { key: "launch-review", label: "Open Review Workspace", autofocus: "summary" };
         openWorkspaceAction(action);
       });
       el("open-smoke-btn").addEventListener("click", () => {
-        const action = workspaceActionMap().smoke || { key: "launch-smoke", label: "Open Smoke Workspace", autofocus: "summary" };
+        const action = workspaceActionByKey("launch-smoke") || { key: "launch-smoke", label: "Open Smoke Workspace", autofocus: "summary" };
         openWorkspaceAction(action);
       });
       el("open-ops-btn").addEventListener("click", () => {
-        const action = workspaceActionMap().ops || { key: "ops", label: "Open Ops Workspace", autofocus: "snapshot" };
+        const action = workspaceActionByKey("ops") || { key: "ops", label: "Open Ops Workspace", autofocus: "snapshot" };
         openWorkspaceAction(action);
       });
 

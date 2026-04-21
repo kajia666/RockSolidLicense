@@ -8966,6 +8966,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       workspaceAction: item.gate?.recommendedWorkspace || null,
       recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null
     }));
+  const workspaceActions = [
+    createLaunchWorkflowWorkspaceShortcut("release", "summary", "Open Release Workspace", params),
+    createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Workflow Workspace", params),
+    createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Review Workspace", params),
+    createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Smoke Workspace", params),
+    createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params)
+  ];
   const gateRank = (status = "unknown") => {
     const normalized = normalizeLaunchMainlineGateStatus(status);
     if (normalized === "hold") {
@@ -9037,6 +9044,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     smokeGate,
     opsGate,
     stages,
+    workspaceActions,
     primaryAction: overallGate.primaryAction || preferredStage?.gate?.primaryAction || null,
     recommendedDownload: overallGate.recommendedDownload || preferredStage?.gate?.recommendedDownload || null,
     recommendedWorkspace: overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null,

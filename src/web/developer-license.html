@@ -1583,6 +1583,13 @@
             window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
             return;
           }
+          if (action.key === "launch-mainline") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+              ...routeBits,
+              autofocus: action.autofocus || "summary"
+            });
+            return;
+          }
           if (action.key === "launch-review") {
             window.location.href = buildWorkspaceUrl("/developer/launch-review", {
               ...routeBits,

@@ -2471,6 +2471,18 @@
             });
             return;
           }
+          if (action.key === "launch-mainline") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+              productId,
+              productCode,
+              channel,
+              autofocus: action.autofocus || "summary",
+              routeTitle: routed.routeTitle,
+              routeReason: routed.routeReason,
+              ...actionParams
+            });
+            return;
+          }
           if (action.key === "launch-review") {
             window.location.href = buildWorkspaceUrl("/developer/launch-review", {
               productId,

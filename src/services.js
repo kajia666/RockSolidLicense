@@ -2843,6 +2843,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Use the aggregated launch-mainline handoff to recheck release, workflow, review, and smoke together after the blocker pass.",
       status: "review",
       priority: "secondary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
       recommendedDownload: launchMainlineDownload
     });
   } else {
@@ -2910,6 +2911,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned for this lane.",
       status: normalizedStatus === "ready" ? "pass" : "review",
       priority: "secondary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
       recommendedDownload: launchMainlineDownload
     });
   }
@@ -3215,6 +3217,14 @@ function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "", 
     return {
       key,
       label: label || "Open Launch Review",
+      autofocus: autofocus || "summary",
+      ...extras
+    };
+  }
+  if (key === "launch-mainline") {
+    return {
+      key,
+      label: label || "Open Launch Mainline",
       autofocus: autofocus || "summary",
       ...extras
     };
@@ -3722,7 +3732,10 @@ function buildLaunchMainlineGatePayload({
     readyForRollout: normalizedStatus === "ready" && numericBlockingCount === 0,
     recommendedWorkspace: recommendedWorkspace || null,
     primaryAction: primaryAction || null,
-    recommendedDownload: recommendedDownload || null
+    recommendedDownload: recommendedDownload || null,
+    recommendedDownloads: Array.isArray(recommendedDownloads)
+      ? recommendedDownloads.filter((item) => item?.key)
+      : []
   };
 }
 
@@ -5398,6 +5411,7 @@ function buildLaunchWorkflowSummaryPayload({
     summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned for this lane.",
     status: workflowStatus === "hold" ? "block" : workflowStatus === "attention" ? "review" : "pass",
     priority: "secondary",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
     recommendedDownload: launchMainlineDownload
   }));
 
@@ -7346,6 +7360,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke in one recheck loop.",
     status: workflowBlocked ? "block" : workflowNeedsReview || queueHasUrgent ? "review" : "pass",
     priority: "secondary",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
     recommendedDownload: mainlineSummaryDownload
   }));
 
@@ -8315,6 +8330,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       priority: "secondary",
       status: startupBlocked || !readyPaths.length ? "block" : blockingPaths.length || reviewPaths.length ? "review" : "pass",
       summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned while smoke validation runs.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
       recommendedDownload: launchMainlineSummaryDownload
     },
     primaryReviewTarget?.workspaceAction ? {
@@ -8987,6 +9003,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     recommendedDownloads.push(item);
   };
   for (const item of activeStages) {
+    for (const download of Array.isArray(item.gate?.recommendedDownloads) ? item.gate.recommendedDownloads : []) {
+      pushRecommendedDownload(download);
+    }
     pushRecommendedDownload(item.gate?.recommendedDownload || null);
     pushRecommendedDownload(item.summaryDownload || null);
   }
@@ -11825,9 +11844,13 @@ function buildDeveloperOpsRouteReviewMatchDescriptor(payload = {}, target = "pri
   const normalizedTarget = String(target || "primary").trim().toLowerCase() === "next" ? "next" : "primary";
   const routeReview = payload.routeReview && typeof payload.routeReview === "object" ? payload.routeReview : {};
   const match = normalizedTarget === "next" ? routeReview.nextMatch : routeReview.primaryMatch;
+  const key = normalizedTarget === "next" ? "route_review_next" : "route_review_primary";
+  const format = normalizedTarget === "next" ? "route-review-next" : "route-review-primary";
   if (!match || typeof match !== "object") {
     return {
       target: normalizedTarget,
+      key,
+      format,
       title: normalizedTarget === "next" ? "Route Review Next Match" : "Route Review Primary Match",
       label: normalizedTarget === "next" ? "Next route review summary" : "Primary route review summary",
       fileName: normalizedTarget === "next"
@@ -11839,6 +11862,8 @@ function buildDeveloperOpsRouteReviewMatchDescriptor(payload = {}, target = "pri
   const kind = String(match.kind || "match").trim().toLowerCase() || "match";
   return {
     target: normalizedTarget,
+    key,
+    format,
     title: normalizedTarget === "next" ? "Route Review Next Match" : "Route Review Primary Match",
     label: normalizedTarget === "next" ? "Next route review summary" : "Primary route review summary",
     fileName: `developer-ops-${normalizedTarget}-${kind}-summary.txt`,
@@ -11947,6 +11972,15 @@ function buildDeveloperOpsRouteReviewBaseDownloadParams(scope = {}) {
 function buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope = {}, routeReview = {}, target = "primary") {
   const descriptor = buildDeveloperOpsRouteReviewMatchDescriptor({ routeReview }, target);
   const match = descriptor.match;
+  if (!match) {
+    return {
+      key: descriptor.key,
+      label: descriptor.label,
+      fileName: descriptor.fileName,
+      format: descriptor.format,
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    };
+  }
   return buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope, match, target, descriptor);
 }
 

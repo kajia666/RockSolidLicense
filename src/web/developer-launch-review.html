@@ -965,6 +965,10 @@
           window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
           return;
         }
+        if (action.key === "launch-mainline") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", routeBits);
+          return;
+        }
         if (action.key === "launch-smoke") {
           window.location.href = buildWorkspaceUrl("/developer/launch-smoke", routeBits);
           return;

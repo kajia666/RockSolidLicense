@@ -5920,6 +5920,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_summary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "route_review_primary"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "route_review_remaining"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "ops_summary"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
@@ -10400,6 +10402,39 @@ test("developer launch workflow page is served from the dedicated route", async 
     fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+test("developer launch mainline page is served from the dedicated route", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/developer/launch-mainline`);
+    const html = await response.text();
+    assert.equal(response.ok, true);
+    assert.match(response.headers.get("content-type") || "", /^text\/html/);
+    assert.match(html, /Developer Launch Mainline/);
+    assert.match(html, /api\/developer\/launch-mainline/);
+    assert.match(html, /api\/developer\/launch-mainline\/download/);
+    assert.match(html, /Generate Launch Mainline/);
+    assert.match(html, /Launch Mainline Overview/);
+    assert.match(html, /Download Mainline JSON/);
+    assert.match(html, /Download Mainline Summary/);
+    assert.match(html, /Download Mainline Checksums/);
+    assert.match(html, /Download Mainline Zip/);
+    assert.match(html, /Release Mainline/);
+    assert.match(html, /Launch Workflow/);
+    assert.match(html, /Launch Review/);
+    assert.match(html, /Launch Smoke/);
+    assert.match(html, /Developer Ops/);
+    assert.match(html, /Open Release Workspace/);
+    assert.match(html, /Open Workflow Workspace/);
+    assert.match(html, /Open Review Workspace/);
+    assert.match(html, /Open Smoke Workspace/);
+    assert.match(html, /Open Ops Workspace/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
 
 test("developer launch review page is served from the dedicated route", async () => {
     const { app, baseUrl, tempDir } = await startServer();

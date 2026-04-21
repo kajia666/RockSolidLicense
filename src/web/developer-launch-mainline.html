@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Developer Launch Mainline</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef4f1;
+        --panel: #ffffff;
+        --line: #d5e2da;
+        --text: #14201a;
+        --muted: #567164;
+        --accent: #1f6f56;
+        --accent-soft: #dff0e9;
+        --warn: #b96927;
+        --danger: #b03c3c;
+        --shadow: 0 20px 50px rgba(21, 52, 39, 0.10);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(180deg, #f7fbf8 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+      .shell {
+        width: min(1440px, calc(100vw - 32px));
+        margin: 24px auto 56px;
+      }
+      .hero, .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+      }
+      .hero {
+        padding: 28px;
+        margin-bottom: 20px;
+      }
+      .hero h1 { margin: 0; font-size: 32px; }
+      .sub { margin-top: 10px; color: var(--muted); line-height: 1.6; max-width: 980px; }
+      .nav, .pill-row, .actions, .audit-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .nav { margin-top: 12px; color: var(--muted); }
+      .nav a { color: var(--accent); text-decoration: none; }
+      .pill, .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #f8fbf9;
+        color: var(--muted);
+      }
+      .tag.strong {
+        border-color: rgba(31,111,86,0.26);
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .tag.warn {
+        border-color: rgba(185,105,39,0.28);
+        background: rgba(185,105,39,0.10);
+        color: var(--warn);
+      }
+      .tag.danger {
+        border-color: rgba(176,60,60,0.28);
+        background: rgba(176,60,60,0.10);
+        color: var(--danger);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .wide {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .card { padding: 20px; }
+      .card h2 { margin: 0 0 14px; font-size: 20px; }
+      .three, .two {
+        display: grid;
+        gap: 12px;
+      }
+      .three { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .two { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      input, select, textarea, button { font: inherit; }
+      input, select, textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fbfdfc;
+        color: var(--text);
+      }
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 11px 15px;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #edf5f1;
+        color: var(--accent);
+        border: 1px solid rgba(31,111,86,0.18);
+      }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .status, .hint {
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: #f5faf7;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .status.warn {
+        background: #fff4ec;
+        border-color: rgba(185,105,39,0.25);
+        color: var(--warn);
+      }
+      .status.danger {
+        background: #fff1f1;
+        border-color: rgba(176,60,60,0.25);
+        color: var(--danger);
+      }
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+      .item {
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: #fbfdfc;
+        display: grid;
+        gap: 8px;
+      }
+      .item-head {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .item-title {
+        font-weight: 600;
+      }
+      pre {
+        margin: 0;
+        min-height: 220px;
+        padding: 16px;
+        border-radius: 18px;
+        background: #101715;
+        color: #eef7f2;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      @media (max-width: 1180px) {
+        .wide { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 760px) {
+        .shell { width: min(100vw - 20px, 100%); }
+        .hero { padding: 22px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>Developer Launch Mainline</h1>
+        <p class="sub">
+          Keep the entire launch path in one place. This workspace aggregates release, launch workflow,
+          launch review, launch smoke, and developer ops into one API-driven mainline view so software authors
+          can decide whether a lane is ready, what still needs attention, and which workspace to open next.
+        </p>
+        <div class="nav">
+          <a href="/developer">Developer Center</a>
+          |
+          <a href="/developer/projects">Developer Projects</a>
+          |
+          <a href="/developer/launch-workflow">Developer Launch Workflow</a>
+          |
+          <a href="/developer/launch-review">Developer Launch Review</a>
+          |
+          <a href="/developer/launch-smoke">Developer Launch Smoke</a>
+          |
+          <a href="/developer/ops">Developer Ops</a>
+          |
+          <a href="/developer/releases">Developer Releases</a>
+        </div>
+        <div class="pill-row" style="margin-top: 14px;">
+          <div class="pill">Route: <code>/developer/launch-mainline</code></div>
+          <div class="pill">API: <code>/api/developer/launch-mainline</code></div>
+          <div class="pill">Download: <code>/api/developer/launch-mainline/download</code></div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Developer Session</h2>
+          <label>Username<input id="username" placeholder="developer.username" /></label>
+          <label>Password<input id="password" type="password" placeholder="Password" /></label>
+          <div class="actions" style="margin-top: 12px;">
+            <button id="login-btn">Sign In</button>
+            <button class="secondary" id="refresh-session-btn">Refresh</button>
+            <button class="secondary" id="logout-btn">Sign Out</button>
+          </div>
+          <div class="hint" id="session-meta" style="margin-top: 12px;">No developer session yet.</div>
+          <div class="status" id="status-box" style="margin-top: 12px;">Sign in to generate a launch mainline package.</div>
+        </article>
+
+        <article class="card">
+          <h2>Route Focus</h2>
+          <div id="route-focus-box" class="hint">Open this page from release, launch workflow, launch review, launch smoke, or ops to keep the same lane and route context here.</div>
+        </article>
+      </section>
+
+      <section class="card" style="margin-bottom: 18px;">
+        <h2>Generate Launch Mainline</h2>
+        <div class="three">
+          <label>Project Code<input id="mainline-product-code" placeholder="ALPHA_APP" /></label>
+          <label>Channel<input id="mainline-channel" value="stable" placeholder="stable" /></label>
+          <label>Review Mode
+            <select id="mainline-review-mode">
+              <option value="matched">matched</option>
+              <option value="all">all</option>
+            </select>
+          </label>
+          <label>Username Filter<input id="mainline-username" placeholder="starter.user" /></label>
+          <label>Search Filter<input id="mainline-search" placeholder="fingerprint / batch / username" /></label>
+          <label>Event Type<input id="mainline-event-type" placeholder="session.login" /></label>
+          <label>Actor Type<input id="mainline-actor-type" placeholder="account" /></label>
+          <label>Entity Type<input id="mainline-entity-type" placeholder="license_key" /></label>
+          <label>Limit<input id="mainline-limit" type="number" min="1" max="200" value="60" /></label>
+        </div>
+        <div class="actions" style="margin-top: 14px;">
+          <button id="use-route-project-btn">Use Routed Project</button>
+          <button id="generate-mainline-btn">Generate Launch Mainline</button>
+          <button class="secondary" id="refresh-mainline-btn">Refresh Mainline</button>
+        </div>
+        <div class="actions" style="margin-top: 10px;">
+          <button class="secondary" id="open-release-btn">Open Release Workspace</button>
+          <button class="secondary" id="open-workflow-btn">Open Workflow Workspace</button>
+          <button class="secondary" id="open-review-btn">Open Review Workspace</button>
+          <button class="secondary" id="open-smoke-btn">Open Smoke Workspace</button>
+          <button class="secondary" id="open-ops-btn">Open Ops Workspace</button>
+        </div>
+        <div class="actions" style="margin-top: 10px;">
+          <button class="secondary" id="download-mainline-json-btn">Download Mainline JSON</button>
+          <button class="secondary" id="download-mainline-summary-btn">Download Mainline Summary</button>
+          <button class="secondary" id="download-mainline-checksums-btn">Download Mainline Checksums</button>
+          <button class="secondary" id="download-mainline-zip-btn">Download Mainline Zip</button>
+        </div>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Launch Mainline Overview</h2>
+          <div id="mainline-overview-box" class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>
+        </article>
+        <article class="card">
+          <h2>Workspace Path</h2>
+          <div id="mainline-workspace-box" class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Mainline Action Plan</h2>
+          <div id="mainline-actions-box" class="hint">Generate a launch mainline package to inspect the server-side action plan here.</div>
+        </article>
+        <article class="card">
+          <h2>Recommended Downloads</h2>
+          <div id="mainline-downloads-box" class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>
+        </article>
+      </section>
+
+      <section class="card" style="margin-bottom: 18px;">
+        <h2>Stage Gates</h2>
+        <div id="stage-gates-box" class="hint">Generate a launch mainline package to compare Release Mainline, Launch Workflow, Launch Review, Launch Smoke, and Developer Ops together.</div>
+      </section>
+
+      <section class="wide">
+        <article class="card">
+          <h2>Launch Mainline Summary</h2>
+          <pre id="mainline-summary">Generate a launch mainline package to inspect the aggregated summary here.</pre>
+        </article>
+        <article class="card">
+          <h2>API Output</h2>
+          <pre id="output">Waiting for actions...</pre>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      let token = "";
+      let profile = null;
+      let currentMainline = null;
+      const routeParams = new URLSearchParams(window.location.search);
+      const requestedProductId = (routeParams.get("productId") || "").trim();
+      const requestedProductCode = (routeParams.get("productCode") || "").trim();
+      const requestedChannel = (routeParams.get("channel") || "stable").trim() || "stable";
+      const requestedReviewMode = (routeParams.get("reviewMode") || "matched").trim().toLowerCase() || "matched";
+      const requestedUsername = (routeParams.get("username") || "").trim();
+      const requestedSearch = (routeParams.get("search") || "").trim();
+      const requestedEventType = (routeParams.get("eventType") || "").trim();
+      const requestedActorType = (routeParams.get("actorType") || "").trim();
+      const requestedEntityType = (routeParams.get("entityType") || "").trim();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+
+      function el(id) {
+        return document.getElementById(id);
+      }
+
+      function q(params = {}) {
+        const search = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value === null || value === undefined) {
+            return;
+          }
+          const text = String(value).trim();
+          if (!text) {
+            return;
+          }
+          search.set(key, text);
+        });
+        const query = search.toString();
+        return query ? `?${query}` : "";
+      }
+
+      function esc(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function renderTag(value, strong = false) {
+        return `<span class="tag ${strong ? "strong" : ""}">${esc(value)}</span>`;
+      }
+
+      function buildWorkspaceUrl(path, params = {}) {
+        return `${path}${q(params)}`;
+      }
+
+      function setStatus(message, level = "") {
+        const node = el("status-box");
+        node.className = `status${level ? ` ${level}` : ""}`;
+        node.textContent = message;
+      }
+
+      function setOutput(value) {
+        el("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers: {
+            "content-type": "application/json",
+            ...(token ? { authorization: `Bearer ${token}` } : {})
+          },
+          body: options.body ? JSON.stringify(options.body) : undefined
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `Request failed: ${response.status}`);
+        }
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          return response.json();
+        }
+        return response.text();
+      }
+
+      async function downloadApiFile(path, fallbackFileName, label) {
+        const response = await fetch(path, {
+          headers: token ? { authorization: `Bearer ${token}` } : {}
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `Download failed: ${response.status}`);
+        }
+        const blob = await response.blob();
+        const href = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const disposition = response.headers.get("content-disposition") || "";
+        const fileNameMatch = disposition.match(/filename=\"([^\"]+)\"/i);
+        anchor.href = href;
+        anchor.download = fileNameMatch?.[1] || fallbackFileName || "download.txt";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(href);
+        setStatus(`${label || anchor.download} download ready.`);
+        return anchor.download;
+      }
+
+      function currentMainlineTarget() {
+        return {
+          productId: requestedProductId || "",
+          productCode: el("mainline-product-code").value.trim(),
+          channel: el("mainline-channel").value.trim() || "stable",
+          username: el("mainline-username").value.trim(),
+          search: el("mainline-search").value.trim(),
+          eventType: el("mainline-event-type").value.trim(),
+          actorType: el("mainline-actor-type").value.trim(),
+          entityType: el("mainline-entity-type").value.trim(),
+          limit: el("mainline-limit").value.trim() || "60",
+          reviewMode: el("mainline-review-mode").value.trim() || "matched"
+        };
+      }
+
+      function currentRouteContext() {
+        return {
+          routeTitle: requestedRouteTitle || "Launch mainline handoff",
+          routeReason: requestedRouteReason || "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops."
+        };
+      }
+
+      function workspaceActionMap() {
+        const summary = currentMainline?.mainlineSummary || {};
+        const gates = {
+          release: summary.releaseGate?.recommendedWorkspace || null,
+          workflow: summary.workflowGate?.recommendedWorkspace || null,
+          review: summary.reviewGate?.recommendedWorkspace || null,
+          smoke: summary.smokeGate?.recommendedWorkspace || null,
+          ops: summary.opsGate?.recommendedWorkspace || null
+        };
+        return gates;
+      }
+
+      function openWorkspaceAction(action) {
+        if (!action?.key) {
+          throw new Error("Generate Launch Mainline first so the workspace action can be resolved.");
+        }
+        const target = currentMainlineTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before opening another workspace.");
+        }
+        const routeBits = {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          autofocus: action.autofocus || "summary",
+          routeTitle: currentRouteContext().routeTitle,
+          routeReason: currentRouteContext().routeReason,
+          ...(action.params && typeof action.params === "object" ? action.params : {})
+        };
+        if (action.key === "project") {
+          window.location.href = buildWorkspaceUrl("/developer/projects", routeBits);
+          return;
+        }
+        if (action.key === "integration") {
+          window.location.href = buildWorkspaceUrl("/developer/integration", routeBits);
+          return;
+        }
+        if (action.key === "release") {
+          window.location.href = buildWorkspaceUrl("/developer/releases", routeBits);
+          return;
+        }
+        if (action.key === "licenses") {
+          window.location.href = buildWorkspaceUrl("/developer/licenses", routeBits);
+          return;
+        }
+        if (action.key === "ops") {
+          window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
+          return;
+        }
+        if (action.key === "launch-review") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-review", routeBits);
+          return;
+        }
+        if (action.key === "launch-smoke") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-smoke", routeBits);
+          return;
+        }
+        if (action.key === "launch-mainline") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", routeBits);
+          return;
+        }
+        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
+          ...routeBits,
+          autofocus: action.autofocus || "handoff"
+        });
+      }
+
+      async function downloadLaunchMainline(format, fallbackFileName, label) {
+        const target = currentMainlineTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before downloading Launch Mainline.");
+        }
+        return downloadApiFile(
+          `/api/developer/launch-mainline/download${q({
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            username: target.username,
+            search: target.search,
+            eventType: target.eventType,
+            actorType: target.actorType,
+            entityType: target.entityType,
+            limit: target.limit,
+            reviewMode: target.reviewMode,
+            format
+          })}`,
+          fallbackFileName,
+          label
+        );
+      }
+
+      async function downloadMainlineRecommendedItem(item) {
+        if (!item?.source) {
+          throw new Error("Generate Launch Mainline first so the recommended download can be resolved.");
+        }
+        const target = currentMainlineTarget();
+        const params = {
+          productId: target.productId,
+          productCode: target.productCode,
+          channel: target.channel,
+          username: target.username,
+          search: target.search,
+          eventType: target.eventType,
+          actorType: target.actorType,
+          entityType: target.entityType,
+          limit: target.limit,
+          reviewMode: target.reviewMode,
+          ...(item.params && typeof item.params === "object" ? item.params : {})
+        };
+        if (item.source === "developer-launch-mainline") {
+          return downloadApiFile(
+            `/api/developer/launch-mainline/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "developer-launch-mainline-summary.txt",
+            item.label || "Launch mainline summary"
+          );
+        }
+        if (item.source === "developer-launch-review") {
+          return downloadApiFile(
+            `/api/developer/launch-review/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "launch-review.txt",
+            item.label || "Launch review summary"
+          );
+        }
+        if (item.source === "developer-launch-smoke-kit") {
+          return downloadApiFile(
+            `/api/developer/launch-smoke-kit/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "launch-smoke-kit.txt",
+            item.label || "Launch smoke kit summary"
+          );
+        }
+        if (item.source === "developer-launch-workflow") {
+          return downloadApiFile(
+            `/api/developer/launch-workflow/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "launch-workflow.txt",
+            item.label || "Launch workflow summary"
+          );
+        }
+        if (item.source === "developer-ops") {
+          return downloadApiFile(
+            `/api/developer/ops/export/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "developer-ops-summary.txt",
+            item.label || "Developer ops summary"
+          );
+        }
+        if (item.source === "developer-release-package") {
+          return downloadApiFile(
+            `/api/developer/release-package/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "release-package.txt",
+            item.label || "Release package summary"
+          );
+        }
+        return downloadLaunchMainline(item.format || "summary", item.fileName || "developer-launch-mainline-summary.txt", item.label || "Launch mainline summary");
+      }
+
+      function renderWorkspacePath(action = null) {
+        if (!action?.key) {
+          return '<div class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>';
+        }
+        const bits = [
+          renderTag(`key:${action.key}`, true),
+          renderTag(`autofocus:${action.autofocus || "summary"}`)
+        ];
+        const params = action.params && typeof action.params === "object"
+          ? Object.entries(action.params)
+              .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+              .map(([key, value]) => renderTag(`${key}:${value}`))
+              .join("")
+          : "";
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(action.label || action.key)}</div>
+              <div class="audit-meta">${bits.join("")}</div>
+            </div>
+            <div class="hint">${esc(currentRouteContext().routeReason)}</div>
+            <div class="audit-meta">${params || '<span class="hint">No extra params.</span>'}</div>
+          </div>
+        `;
+      }
+
+      function renderDownloadButtons(items = []) {
+        if (!items.length) {
+          return '<div class="hint">No recommended downloads yet.</div>';
+        }
+        return `
+          <div class="list">
+            ${items.map((item, index) => `
+              <div class="item">
+                <div class="item-head">
+                  <div class="item-title">${esc(item.label || item.key || "Download")}</div>
+                  <div class="audit-meta">
+                    ${renderTag(item.key || "download", true)}
+                    ${item.source ? renderTag(item.source) : ""}
+                    ${item.format ? renderTag(item.format) : ""}
+                  </div>
+                </div>
+                <div class="hint">${esc(item.fileName || "download.txt")}</div>
+                <div class="actions">
+                  <button type="button" class="secondary" data-mainline-download-index="${index}">Download</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderActionPlan(items = []) {
+        if (!items.length) {
+          return '<div class="hint">No mainline action plan yet.</div>';
+        }
+        return `
+          <div class="list">
+            ${items.map((item, index) => `
+              <div class="item">
+                <div class="item-head">
+                  <div class="item-title">${esc(item.title || item.key || "Step")}</div>
+                  <div class="audit-meta">
+                    ${renderTag(item.priority || "secondary", true)}
+                    ${renderTag(item.status || "review")}
+                  </div>
+                </div>
+                <div class="hint">${esc(item.summary || "-")}</div>
+                <div class="actions">
+                  ${item.workspaceAction?.key ? `<button type="button" class="secondary" data-mainline-action-workspace-index="${index}">${esc(item.workspaceAction.label || "Open Workspace")}</button>` : ""}
+                  ${item.recommendedDownload?.key ? `<button type="button" class="secondary" data-mainline-action-download-index="${index}">${esc(item.recommendedDownload.label || "Download Summary")}</button>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderStageGates(summary = {}) {
+        const stages = [
+          ["Release Mainline", summary.releaseGate],
+          ["Launch Workflow", summary.workflowGate],
+          ["Launch Review", summary.reviewGate],
+          ["Launch Smoke", summary.smokeGate],
+          ["Developer Ops", summary.opsGate]
+        ].filter(([, gate]) => gate);
+        if (!stages.length) {
+          return '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
+        }
+        return `
+          <div class="list">
+            ${stages.map(([label, gate]) => `
+              <div class="item">
+                <div class="item-head">
+                  <div class="item-title">${esc(label)}</div>
+                  <div class="audit-meta">
+                    ${renderTag(String(gate.status || "unknown").toUpperCase(), true)}
+                    ${Number(gate.blockingCount || 0) ? renderTag(`block:${gate.blockingCount}`, true) : ""}
+                    ${Number(gate.attentionCount || 0) ? renderTag(`attention:${gate.attentionCount}`) : ""}
+                  </div>
+                </div>
+                <div class="hint">${esc(gate.headline || gate.summary || "-")}</div>
+                <div class="actions">
+                  ${gate.recommendedWorkspace?.key ? `<button type="button" class="secondary" data-stage-workspace-key="${esc(gate.recommendedWorkspace.key)}">${esc(gate.recommendedWorkspace.label || "Open Workspace")}</button>` : ""}
+                  ${gate.recommendedDownload?.key ? `<button type="button" class="secondary" data-stage-download-key="${esc(gate.recommendedDownload.key)}">Download</button>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function mainlineDownloadByKey(key = "") {
+        const items = Array.isArray(currentMainline?.mainlineSummary?.recommendedDownloads)
+          ? currentMainline.mainlineSummary.recommendedDownloads
+          : [];
+        return items.find((item) => item.key === key) || null;
+      }
+
+      function stageWorkspaceByKey(key = "") {
+        const map = workspaceActionMap();
+        if (key === "release") return map.release;
+        if (key === "launch") return map.workflow;
+        if (key === "launch-review") return map.review;
+        if (key === "launch-smoke") return map.smoke;
+        if (key === "ops") return map.ops;
+        return null;
+      }
+
+      function renderMainline() {
+        const summary = currentMainline?.mainlineSummary || {};
+        const overallGate = summary.overallGate || null;
+        el("mainline-overview-box").innerHTML = overallGate
+          ? `
+            <div class="item">
+              <div class="item-head">
+                <div class="item-title">${esc(overallGate.headline || "Launch mainline overview")}</div>
+                <div class="audit-meta">
+                  ${renderTag(String(overallGate.status || "unknown").toUpperCase(), true)}
+                  ${Number(overallGate.blockingCount || 0) ? renderTag(`block:${overallGate.blockingCount}`, true) : ""}
+                  ${Number(overallGate.attentionCount || 0) ? renderTag(`attention:${overallGate.attentionCount}`) : ""}
+                </div>
+              </div>
+              <div class="hint">${esc(overallGate.summary || "-")}</div>
+            </div>
+          `
+          : '<div class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>';
+        el("mainline-workspace-box").innerHTML = renderWorkspacePath(summary.recommendedWorkspace || overallGate?.recommendedWorkspace || null);
+        el("mainline-actions-box").innerHTML = renderActionPlan(summary.actionPlan || []);
+        el("mainline-downloads-box").innerHTML = renderDownloadButtons(summary.recommendedDownloads || []);
+        el("stage-gates-box").innerHTML = renderStageGates(summary);
+        el("mainline-summary").textContent = currentMainline?.summaryText || "No launch mainline summary yet.";
+      }
+
+      async function generateLaunchMainline() {
+        const target = currentMainlineTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before generating Launch Mainline.");
+        }
+        const data = await api(`/api/developer/launch-mainline${q(target)}`);
+        currentMainline = data;
+        renderMainline();
+        setOutput({ launchMainline: data });
+        const overallGate = data?.mainlineSummary?.overallGate;
+        const tone = overallGate?.status === "hold" ? "danger" : overallGate?.status === "attention" ? "warn" : "";
+        setStatus(`Launch Mainline generated for ${target.productCode}. ${overallGate?.headline || "Unified handoff ready."}`, tone);
+        return data;
+      }
+
+      async function handleLogin() {
+        const response = await api("/api/developer/login", {
+          method: "POST",
+          body: {
+            username: el("username").value.trim(),
+            password: el("password").value
+          }
+        });
+        token = response.token;
+        profile = response.developer || null;
+        el("session-meta").textContent = profile
+          ? `${profile.username} signed in.`
+          : "Developer session ready.";
+        setOutput({ login: response });
+        if (requestedProductCode) {
+          await generateLaunchMainline();
+          return;
+        }
+        setStatus("Developer session ready. Generate Launch Mainline to inspect the unified handoff.");
+      }
+
+      function handleLogout() {
+        token = "";
+        profile = null;
+        currentMainline = null;
+        el("session-meta").textContent = "No developer session yet.";
+        el("mainline-summary").textContent = "Generate a launch mainline package to inspect the aggregated summary here.";
+        el("mainline-overview-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>';
+        el("mainline-workspace-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>';
+        el("mainline-actions-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the server-side action plan here.</div>';
+        el("mainline-downloads-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>';
+        el("stage-gates-box").innerHTML = '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
+        setOutput("Waiting for actions...");
+        setStatus("Signed out. Sign in to generate a launch mainline package.");
+      }
+
+      function hydrateRouteFocus() {
+        el("mainline-product-code").value = requestedProductCode;
+        el("mainline-channel").value = requestedChannel;
+        el("mainline-review-mode").value = requestedReviewMode === "all" ? "all" : "matched";
+        el("mainline-username").value = requestedUsername;
+        el("mainline-search").value = requestedSearch;
+        el("mainline-event-type").value = requestedEventType;
+        el("mainline-actor-type").value = requestedActorType;
+        el("mainline-entity-type").value = requestedEntityType;
+        el("route-focus-box").innerHTML = requestedProductCode
+          ? `<strong>${esc(requestedRouteTitle || "Launch mainline route focus")}</strong><div class="hint" style="margin-top:8px;">${esc(requestedRouteReason || `Continue the unified launch mainline handoff for ${requestedProductCode}.`)}</div>`
+          : "Open this page from release, launch workflow, launch review, launch smoke, or ops to keep the same lane and route context here.";
+      }
+
+      el("login-btn").addEventListener("click", () => handleLogin().catch((error) => {
+        setStatus(error.message, "danger");
+        setOutput({ error: error.message });
+      }));
+      el("refresh-session-btn").addEventListener("click", () => {
+        if (!token) {
+          setStatus("Sign in first.", "warn");
+          return;
+        }
+        generateLaunchMainline().catch((error) => {
+          setStatus(error.message, "danger");
+          setOutput({ error: error.message });
+        });
+      });
+      el("logout-btn").addEventListener("click", handleLogout);
+      el("use-route-project-btn").addEventListener("click", () => {
+        el("mainline-product-code").value = requestedProductCode;
+        el("mainline-channel").value = requestedChannel;
+        el("mainline-review-mode").value = requestedReviewMode === "all" ? "all" : "matched";
+        el("mainline-username").value = requestedUsername;
+        el("mainline-search").value = requestedSearch;
+        el("mainline-event-type").value = requestedEventType;
+        el("mainline-actor-type").value = requestedActorType;
+        el("mainline-entity-type").value = requestedEntityType;
+        setStatus(requestedProductCode ? `Loaded routed project ${requestedProductCode}.` : "No routed project was provided.", requestedProductCode ? "" : "warn");
+      });
+      el("generate-mainline-btn").addEventListener("click", () => generateLaunchMainline().catch((error) => {
+        setStatus(error.message, "danger");
+        setOutput({ error: error.message });
+      }));
+      el("refresh-mainline-btn").addEventListener("click", () => generateLaunchMainline().catch((error) => {
+        setStatus(error.message, "danger");
+        setOutput({ error: error.message });
+      }));
+      el("download-mainline-json-btn").addEventListener("click", () => downloadLaunchMainline("json", "developer-launch-mainline.json", "Launch Mainline JSON").catch((error) => {
+        setStatus(error.message, "danger");
+        setOutput({ error: error.message });
+      }));
+      el("download-mainline-summary-btn").addEventListener("click", () => downloadLaunchMainline("summary", "developer-launch-mainline-summary.txt", "Launch Mainline Summary").catch((error) => {
+        setStatus(error.message, "danger");
+        setOutput({ error: error.message });
+      }));
+      el("download-mainline-checksums-btn").addEventListener("click", () => downloadLaunchMainline("checksums", "developer-launch-mainline-sha256.txt", "Launch Mainline Checksums").catch((error) => {
+        setStatus(error.message, "danger");
+        setOutput({ error: error.message });
+      }));
+      el("download-mainline-zip-btn").addEventListener("click", () => downloadLaunchMainline("zip", "developer-launch-mainline.zip", "Launch Mainline Zip").catch((error) => {
+        setStatus(error.message, "danger");
+        setOutput({ error: error.message });
+      }));
+      el("open-release-btn").addEventListener("click", () => {
+        const action = workspaceActionMap().release || { key: "release", label: "Open Release Workspace", autofocus: "summary" };
+        openWorkspaceAction(action);
+      });
+      el("open-workflow-btn").addEventListener("click", () => {
+        const action = workspaceActionMap().workflow || { key: "launch", label: "Open Workflow Workspace", autofocus: "handoff" };
+        openWorkspaceAction(action);
+      });
+      el("open-review-btn").addEventListener("click", () => {
+        const action = workspaceActionMap().review || { key: "launch-review", label: "Open Review Workspace", autofocus: "summary" };
+        openWorkspaceAction(action);
+      });
+      el("open-smoke-btn").addEventListener("click", () => {
+        const action = workspaceActionMap().smoke || { key: "launch-smoke", label: "Open Smoke Workspace", autofocus: "summary" };
+        openWorkspaceAction(action);
+      });
+      el("open-ops-btn").addEventListener("click", () => {
+        const action = workspaceActionMap().ops || { key: "ops", label: "Open Ops Workspace", autofocus: "snapshot" };
+        openWorkspaceAction(action);
+      });
+
+      document.addEventListener("click", async (event) => {
+        const actionWorkspaceButton = event.target.closest("[data-mainline-action-workspace-index]");
+        if (actionWorkspaceButton) {
+          const index = Number(actionWorkspaceButton.dataset.mainlineActionWorkspaceIndex || -1);
+          const item = currentMainline?.mainlineSummary?.actionPlan?.[index];
+          if (!item?.workspaceAction) {
+            return;
+          }
+          openWorkspaceAction(item.workspaceAction);
+          return;
+        }
+        const actionDownloadButton = event.target.closest("[data-mainline-action-download-index]");
+        if (actionDownloadButton) {
+          const index = Number(actionDownloadButton.dataset.mainlineActionDownloadIndex || -1);
+          const item = currentMainline?.mainlineSummary?.actionPlan?.[index];
+          if (!item?.recommendedDownload) {
+            return;
+          }
+          await downloadMainlineRecommendedItem(item.recommendedDownload).catch((error) => {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          });
+          return;
+        }
+        const recommendedDownloadButton = event.target.closest("[data-mainline-download-index]");
+        if (recommendedDownloadButton) {
+          const index = Number(recommendedDownloadButton.dataset.mainlineDownloadIndex || -1);
+          const item = currentMainline?.mainlineSummary?.recommendedDownloads?.[index];
+          if (!item) {
+            return;
+          }
+          await downloadMainlineRecommendedItem(item).catch((error) => {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          });
+          return;
+        }
+        const stageWorkspaceButton = event.target.closest("[data-stage-workspace-key]");
+        if (stageWorkspaceButton) {
+          const key = stageWorkspaceButton.dataset.stageWorkspaceKey || "";
+          const action = stageWorkspaceByKey(key);
+          if (action) {
+            openWorkspaceAction(action);
+          }
+          return;
+        }
+        const stageDownloadButton = event.target.closest("[data-stage-download-key]");
+        if (stageDownloadButton) {
+          const key = stageDownloadButton.dataset.stageDownloadKey || "";
+          const item = mainlineDownloadByKey(key);
+          if (item) {
+            await downloadMainlineRecommendedItem(item).catch((error) => {
+              setStatus(error.message, "danger");
+              setOutput({ error: error.message });
+            });
+          }
+        }
+      });
+
+      hydrateRouteFocus();
+      if (requestedProductCode) {
+        setStatus(`Routed project ${requestedProductCode} is ready. Sign in to generate Launch Mainline.`);
+      }
+    </script>
+  </body>
+</html>

@@ -16,6 +16,7 @@ const adminHtml = fs.readFileSync(path.join(currentDir, "web", "console.html"), 
 const productCenterHtml = fs.readFileSync(path.join(currentDir, "web", "product-center-v2.html"), "utf8");
 const developerCenterHtml = fs.readFileSync(path.join(currentDir, "web", "developer-center.html"), "utf8");
 const developerIntegrationHtml = fs.readFileSync(path.join(currentDir, "web", "developer-integration.html"), "utf8");
+const developerLaunchMainlineHtml = fs.readFileSync(path.join(currentDir, "web", "developer-launch-mainline.html"), "utf8");
 const developerLaunchWorkflowHtml = fs.readFileSync(path.join(currentDir, "web", "developer-launch-workflow.html"), "utf8");
 const developerLaunchReviewHtml = fs.readFileSync(path.join(currentDir, "web", "developer-launch-review.html"), "utf8");
 const developerLaunchSmokeHtml = fs.readFileSync(path.join(currentDir, "web", "developer-launch-smoke.html"), "utf8");
@@ -112,6 +113,11 @@ export function createApp(overrides = {}) {
 
       if (req.method === "GET" && url.pathname === "/developer/launch-workflow") {
         sendHtml(res, 200, developerLaunchWorkflowHtml);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/developer/launch-mainline") {
+        sendHtml(res, 200, developerLaunchMainlineHtml);
         return;
       }
 

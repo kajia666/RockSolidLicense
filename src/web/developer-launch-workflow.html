@@ -1259,6 +1259,18 @@
             });
             return;
           }
+          if (action.key === "launch-mainline") {
+            window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+              productId: currentReleaseProductId(target.productCode),
+              productCode: target.productCode,
+              channel: target.channel,
+              autofocus: action.autofocus || "summary",
+              routeTitle: routed.routeTitle,
+              routeReason: routed.routeReason,
+              ...actionParams
+            });
+            return;
+          }
           if (action.key === "launch-review") {
             window.location.href = buildWorkspaceUrl("/developer/launch-review", {
               productId: currentReleaseProductId(target.productCode),

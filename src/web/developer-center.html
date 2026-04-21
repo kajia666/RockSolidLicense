@@ -272,6 +272,8 @@
           |
           <a href="/developer/launch-workflow">Developer Launch Workflow</a>
           |
+          <a href="/developer/launch-mainline">Developer Launch Mainline</a>
+          |
           <a href="/developer/launch-review">Developer Launch Review</a>
           |
           <a href="/developer/launch-smoke">Developer Launch Smoke</a>
@@ -290,7 +292,7 @@
           <div class="pill">Route: <code>/developer</code></div>
           <div class="pill">Each product is one software title or one project</div>
           <div class="pill">You only see projects owned by your developer account</div>
-          <div class="pill">APIs: <code>/api/developer/policies</code> | <code>/cards</code> | <code>/client-versions</code> | <code>/notices</code> | <code>/launch-workflow</code></div>
+          <div class="pill">APIs: <code>/api/developer/policies</code> | <code>/cards</code> | <code>/client-versions</code> | <code>/notices</code> | <code>/launch-workflow</code> | <code>/launch-mainline</code></div>
         </div>
         <div class="stats" id="stats-box"></div>
         <div class="pill-row" id="feature-summary-box"></div>
@@ -309,6 +311,7 @@
               <button type="button" class="secondary" onclick="window.location.href='/developer/projects'">Open Project Workspace</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/integration'">Open Integration Center</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/launch-workflow'">Open Launch Workflow</button>
+              <button type="button" class="secondary" onclick="window.location.href='/developer/launch-mainline'">Open Launch Mainline</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/launch-smoke'">Open Launch Smoke</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/launch-review'">Open Launch Review</button>
               <button type="button" class="secondary" onclick="window.location.href='/developer/releases'">Open Release Center</button>
@@ -425,6 +428,7 @@
             <div class="split-line"><span>Client versions</span><span class="mono">GET/POST /api/developer/client-versions</span></div>
             <div class="split-line"><span>Notices</span><span class="mono">GET/POST /api/developer/notices</span></div>
             <div class="split-line"><span>Launch workflow</span><span class="mono">GET /api/developer/launch-workflow</span></div>
+            <div class="split-line"><span>Launch mainline</span><span class="mono">GET /api/developer/launch-mainline</span></div>
             <div class="split-line"><span>Launch smoke kit</span><span class="mono">GET /api/developer/launch-smoke-kit</span></div>
             <div class="split-line"><span>SDK rotate</span><span class="mono">POST /api/developer/products/:productId/sdk-credentials/rotate</span></div>
           </div>

@@ -286,6 +286,10 @@
         const allowed = new Set([
           "prepare-primary",
           "control-primary",
+          "control-account",
+          "control-entitlement",
+          "control-session",
+          "control-device",
           "review-primary",
           "download-primary",
           "download-accounts",
@@ -304,13 +308,33 @@
       function currentRequestedRouteReviewAction() {
         return requestedRouteAction;
       }
+      function formatControlRouteReviewActionLabel(actionKey = "") {
+        const normalized = String(actionKey || "").trim().toLowerCase();
+        if (normalized === "control-account") {
+          return "Open Account Control";
+        }
+        if (normalized === "control-entitlement") {
+          return "Open Entitlement Control";
+        }
+        if (normalized === "control-session") {
+          return "Open Session Control";
+        }
+        if (normalized === "control-device") {
+          return "Open Device Control";
+        }
+        return "Open Primary Control";
+      }
       function formatRouteReviewActionLabel(actionKey = "") {
         const normalized = normalizeRouteReviewActionValue(actionKey);
         if (normalized === "prepare-primary") {
           return "Prepare Primary Match";
         }
-        if (normalized === "control-primary") {
-          return "Open Primary Control";
+        if (normalized === "control-primary"
+          || normalized === "control-account"
+          || normalized === "control-entitlement"
+          || normalized === "control-session"
+          || normalized === "control-device") {
+          return formatControlRouteReviewActionLabel(normalized);
         }
         if (normalized === "review-primary") {
           return "Review Primary Match";
@@ -1611,7 +1635,11 @@
           setStatus(`${options.auto ? "Auto-prepared" : "Prepared"} routed primary match. ${formatRouteReviewSummary()}. Primary match ready: ${formatRouteReviewPrimaryTitle(primary)}.`);
           return;
         }
-        if (normalizedAction === "control-primary") {
+        if (normalizedAction === "control-primary"
+          || normalizedAction === "control-account"
+          || normalizedAction === "control-entitlement"
+          || normalizedAction === "control-session"
+          || normalizedAction === "control-device") {
           const review = collectRouteReview();
           const primary = buildPrimaryRouteReviewFocus(review, review.focus || requestedAutofocus || "");
           if (!primary?.kind) {
@@ -1633,7 +1661,7 @@
           }
           setStatus(`${options.auto ? "Auto-opened" : "Opened"} primary routed control. ${formatRouteReviewSummary()}. Primary control ready: ${preparedLabel}.`);
           setOutput({
-            routeReviewAction: "control-primary",
+            routeReviewAction: normalizedAction,
             focusKind: prepared?.kind || primary.kind,
             focusItem: prepared?.item || primary.item,
             preparedControl: preparedLabel

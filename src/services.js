@@ -3323,6 +3323,23 @@ function buildFocusKindControlLabel(focusKind = "", suffix = "") {
   return `Open Primary Control${suffix}`;
 }
 
+function buildFocusKindControlRouteAction(focusKind = "") {
+  const normalized = String(focusKind || "").trim().toLowerCase();
+  if (normalized === "account") {
+    return "control-account";
+  }
+  if (normalized === "entitlement") {
+    return "control-entitlement";
+  }
+  if (normalized === "session") {
+    return "control-session";
+  }
+  if (normalized === "device") {
+    return "control-device";
+  }
+  return "control-primary";
+}
+
 function createReleasePackageDownloadShortcut({
   key = "release_summary",
   fileName = "release-package.txt",
@@ -6516,7 +6533,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
   };
   const buildReviewTargetRouteActionLabel = (routeAction = "", focusKind = "") => {
     const normalized = String(routeAction || "").trim().toLowerCase();
-    if (normalized === "control-primary") {
+    if (normalized === "control-primary"
+      || normalized === "control-account"
+      || normalized === "control-entitlement"
+      || normalized === "control-session"
+      || normalized === "control-device") {
       return buildFocusKindControlLabel(focusKind);
     }
     if (normalized === "review-accounts") {
@@ -6553,7 +6574,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     if (!key || !autofocus) {
       return null;
     }
-    const resolvedRouteAction = routeAction || (focusParams?.focusKind ? "control-primary" : buildReviewTargetRouteAction(autofocus));
+    const resolvedRouteAction = routeAction || (focusParams?.focusKind ? buildFocusKindControlRouteAction(focusParams.focusKind) : buildReviewTargetRouteAction(autofocus));
     const controlLabel = buildFocusKindControlLabel(focusParams?.focusKind, " in Ops");
     return {
       key,
@@ -6567,7 +6588,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut(
         "ops",
         autofocus,
-        resolvedRouteAction === "control-primary" ? controlLabel : (label || "Open Ops Workspace"),
+        /^control-/.test(String(resolvedRouteAction || "").trim().toLowerCase()) ? controlLabel : (label || "Open Ops Workspace"),
         {
           ...matchedOpsParams,
           ...(focusParams && typeof focusParams === "object" ? focusParams : {}),
@@ -6772,14 +6793,14 @@ function buildDeveloperLaunchReviewSummaryPayload({
           ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
             ? rawPrimaryReviewTarget.workspaceAction.params
             : {}),
-          routeAction: "control-primary"
+          routeAction: buildFocusKindControlRouteAction(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind)
         }
       }
     : null;
   const primaryReviewTarget = primaryReviewWorkspaceAction
     ? {
         ...rawPrimaryReviewTarget,
-        routeActionLabel: buildFocusKindControlLabel(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind),
+      routeActionLabel: buildFocusKindControlLabel(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind),
         workspaceAction: primaryReviewWorkspaceAction,
         recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(primaryReviewWorkspaceAction)
           || rawPrimaryReviewTarget.recommendedDownload
@@ -7396,7 +7417,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       routeActionLabel: buildFocusKindControlLabel("account"),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", buildFocusKindControlLabel("account", " in Ops"), {
         reviewMode: "matched",
-        routeAction: "control-primary",
+        routeAction: buildFocusKindControlRouteAction("account"),
         actorType: "account",
         username: accountCandidates[0]?.username || "",
         ...buildSmokeReviewFocusParams("account", accountCandidates[0] || {
@@ -7431,7 +7452,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       routeActionLabel: buildFocusKindControlLabel("entitlement"),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", buildFocusKindControlLabel("entitlement", " in Ops"), {
         reviewMode: "matched",
-        routeAction: "control-primary",
+        routeAction: buildFocusKindControlRouteAction("entitlement"),
         username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || "",
         ...buildSmokeReviewFocusParams("entitlement", entitlementCandidates[0] || {
           productCode: project.code || filters.productCode || null,
@@ -7479,7 +7500,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       routeActionLabel: buildFocusKindControlLabel("session"),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", buildFocusKindControlLabel("session", " in Ops"), {
         reviewMode: "matched",
-        routeAction: "control-primary",
+        routeAction: buildFocusKindControlRouteAction("session"),
         eventType: "session.login",
         actorType: "account",
         username: accountCandidates[0]?.username || "",
@@ -7555,7 +7576,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
             ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
               ? rawPrimaryReviewTarget.workspaceAction.params
               : {}),
-            routeAction: "control-primary"
+            routeAction: buildFocusKindControlRouteAction(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind)
           }
         },
         recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(rawPrimaryReviewTarget.workspaceAction)

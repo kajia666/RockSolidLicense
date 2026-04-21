@@ -5772,7 +5772,10 @@ test("developer release package export bundles integration, versions, and notice
         launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.label || "",
         /^Open (Account|Entitlement|Session|Device) Control in Ops$/
       );
-      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.params?.routeAction, "control-primary");
+      assert.match(
+        launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.params?.routeAction || "",
+        /^control-(account|entitlement|session|device)$/
+      );
       assert.match(
         launchReview.reviewSummary.primaryReviewTarget?.routeActionLabel || "",
         /^Open (Account|Entitlement|Session|Device) Control$/
@@ -5784,9 +5787,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.routeAction));
-      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.routeAction === "control-primary"));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => /^control-(account|entitlement|session|device)$/.test(item.workspaceAction?.params?.routeAction || "")));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) =>
-        item.workspaceAction?.params?.routeAction === "control-primary"
+        /^control-(account|entitlement|session|device)$/.test(item.workspaceAction?.params?.routeAction || "")
         && /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
         && /^Open (Account|Entitlement|Session|Device) Control$/.test(item.routeActionLabel || "")
       ));
@@ -6161,7 +6164,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
       smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.label || "",
       /^Open (Account|Entitlement|Session|Device) Control in Ops$/
     );
-    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.params?.routeAction, "control-primary");
+    assert.match(
+      smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.params?.routeAction || "",
+      /^control-(account|entitlement|session|device)$/
+    );
     assert.match(
       smokeKit.smokeSummary?.primaryReviewTarget?.routeActionLabel || "",
       /^Open (Account|Entitlement|Session|Device) Control$/
@@ -6173,11 +6179,11 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => item.workspaceAction?.key === "ops" || item.workspaceAction?.key === "licenses"));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
       const params = item.workspaceAction?.params || {};
-      return params.focusKind && params.routeAction === "control-primary";
+      return params.focusKind && /^control-(account|entitlement|session|device)$/.test(params.routeAction || "");
     }));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
       const params = item.workspaceAction?.params || {};
-      return params.focusKind && params.routeAction === "control-primary"
+      return params.focusKind && /^control-(account|entitlement|session|device)$/.test(params.routeAction || "")
         && /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
         && /^Open (Account|Entitlement|Session|Device) Control$/.test(item.routeActionLabel || "");
     }));

@@ -3224,7 +3224,7 @@ function createLaunchWorkflowPrimaryOpsDownloadShortcut(workspaceAction, {
   key = "ops_primary_summary",
   label = "Primary match summary",
   fileName = "developer-ops-primary-summary.txt",
-  format = "summary"
+  format = "route-review-primary"
 } = {}) {
   if (!workspaceAction || workspaceAction.key !== "ops") {
     return null;
@@ -10423,10 +10423,74 @@ function buildDeveloperOpsExportZipEntries(payload) {
   return buildZipEntriesFromFiles(root, buildDeveloperOpsExportFiles(payload));
 }
 
+function buildDeveloperOpsRouteReviewMatchDescriptor(payload = {}, target = "primary") {
+  const normalizedTarget = String(target || "primary").trim().toLowerCase() === "next" ? "next" : "primary";
+  const routeReview = payload.routeReview && typeof payload.routeReview === "object" ? payload.routeReview : {};
+  const match = normalizedTarget === "next" ? routeReview.nextMatch : routeReview.primaryMatch;
+  if (!match || typeof match !== "object") {
+    return {
+      target: normalizedTarget,
+      title: normalizedTarget === "next" ? "Route Review Next Match" : "Route Review Primary Match",
+      label: normalizedTarget === "next" ? "Next route review summary" : "Primary route review summary",
+      fileName: normalizedTarget === "next"
+        ? "developer-ops-next-summary.txt"
+        : "developer-ops-primary-summary.txt",
+      match: null
+    };
+  }
+  const kind = String(match.kind || "match").trim().toLowerCase() || "match";
+  return {
+    target: normalizedTarget,
+    title: normalizedTarget === "next" ? "Route Review Next Match" : "Route Review Primary Match",
+    label: normalizedTarget === "next" ? "Next route review summary" : "Primary route review summary",
+    fileName: `developer-ops-${normalizedTarget}-${kind}-summary.txt`,
+    match
+  };
+}
+
+function buildDeveloperOpsRouteReviewMatchSummaryText(payload = {}, target = "primary") {
+  const descriptor = buildDeveloperOpsRouteReviewMatchDescriptor(payload, target);
+  const scope = payload.scope || {};
+  const routeReview = payload.routeReview || {};
+  const match = descriptor.match;
+  const lines = [
+    "RockSolid Developer Ops Route Review Summary",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Developer: ${payload.developer?.username || "-"}`,
+    `Actor: ${payload.actor?.username || "-"}`,
+    `Actor Role: ${payload.actor?.role || "-"}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Username Filter: ${scope.username || "-"}`,
+    `Search Filter: ${scope.search || "-"}`,
+    `Audit Event Filter: ${scope.eventType || "-"}`,
+    `Audit Actor Filter: ${scope.actorType || "-"}`,
+    `Audit Entity Filter: ${scope.entityType || "-"}`,
+    `Audit Limit: ${scope.auditLimit ?? 0}`,
+    `Route Review Focus: ${routeReview.focus || "-"}`,
+    `Route Review Counts: accounts:${routeReview.matchedCounts?.accounts ?? 0} | entitlements:${routeReview.matchedCounts?.entitlements ?? 0} | sessions:${routeReview.matchedCounts?.sessions ?? 0} | devices:${routeReview.matchedCounts?.devices ?? 0} | audit:${routeReview.matchedCounts?.audit ?? 0}`
+  ];
+  if (Array.isArray(routeReview.highlightedEvents) && routeReview.highlightedEvents.length) {
+    lines.push(`Route Review Events: ${routeReview.highlightedEvents.join(", ")}`);
+  }
+  lines.push("");
+  lines.push(`${descriptor.title}:`);
+  if (!match) {
+    lines.push("- none");
+    return lines.join("\n");
+  }
+  lines.push(`- ${match.title || "-"}`);
+  lines.push(`- kind=${match.kind || "-"}`);
+  lines.push(`- section=${match.section || "-"}`);
+  lines.push(`- summary=${match.summary || "-"}`);
+  lines.push(`- action=${match.routeActionLabel || match.routeAction || "-"}`);
+  lines.push(`- control=${match.recommendedControl?.label || "-"}`);
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums"],
+    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -10453,6 +10517,16 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-ops-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+
+  if (normalizedFormat === "route-review-primary" || normalizedFormat === "route-review-next") {
+    const target = normalizedFormat === "route-review-next" ? "next" : "primary";
+    const descriptor = buildDeveloperOpsRouteReviewMatchDescriptor(payload, target);
+    return {
+      fileName: descriptor.fileName,
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsRouteReviewMatchSummaryText(payload, target)
     };
   }
 

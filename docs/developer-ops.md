@@ -35,6 +35,7 @@ This page is intended for day-to-day authorization operations:
 - the same recap now also shows whether the object stayed inside or left `Escalate First`, which makes it easier to tell if a scoped high-priority item is truly de-escalated after an action
 - the result recap now also keeps the current focus title/summary and matching snapshot-hit tags, so developers can see which scoped object was just handled without bouncing back to the tables
 - export a scoped troubleshooting snapshot as JSON, summary text, checksums, or zip
+- export the server-selected route-review `primary` or `next` match summary directly from the backend, so launch-day review pages can hand off the first two review objects without rebuilding filters on the client
 
 ## Developer APIs
 
@@ -114,6 +115,7 @@ This page is intended for day-to-day authorization operations:
 The download route also accepts:
 
 - `format=json|summary|checksums|zip`
+- `format=route-review-primary|route-review-next`
 
 ## Role behavior
 

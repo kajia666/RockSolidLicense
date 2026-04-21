@@ -7746,6 +7746,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(summaryDownload.body, /RockSolid Developer Ops Snapshot/);
     assert.match(summaryDownload.body, /Project Filter: EXPORT_ALPHA/);
 
+    const primaryRouteReviewDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=route-review-primary",
+      operatorSession.token
+    );
+    assert.equal(primaryRouteReviewDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(primaryRouteReviewDownload.contentDisposition || "", /developer-ops-primary-session-summary\.txt/);
+    assert.match(primaryRouteReviewDownload.body, /Route Review Primary Match/);
+    assert.match(primaryRouteReviewDownload.body, /action=Open Session Control/);
+
+    const nextRouteReviewDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=route-review-next",
+      operatorSession.token
+    );
+    assert.equal(nextRouteReviewDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(nextRouteReviewDownload.contentDisposition || "", /developer-ops-next-audit-summary\.txt/);
+    assert.match(nextRouteReviewDownload.body, /Route Review Next Match/);
+    assert.match(nextRouteReviewDownload.body, /action=Review Audit/);
+
     const checksumsDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=checksums",

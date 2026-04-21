@@ -10851,11 +10851,106 @@ function buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope = {}) {
   };
 }
 
+function findDeveloperOpsRouteReviewSectionMatch(routeReview = {}, section = "") {
+  const normalizedSection = String(section || "").trim().toLowerCase();
+  if (!normalizedSection) {
+    return null;
+  }
+  const queue = Array.isArray(routeReview.queue) ? routeReview.queue : [];
+  return queue.find((item) => String(item?.section || "").trim().toLowerCase() === normalizedSection) || null;
+}
+
+function buildDeveloperOpsRouteReviewSectionDownloadDescriptor(scope = {}, routeReview = {}, section = "") {
+  const normalizedSection = String(section || "").trim().toLowerCase();
+  if (!normalizedSection) {
+    return null;
+  }
+  const item = findDeveloperOpsRouteReviewSectionMatch(routeReview, normalizedSection)?.item || {};
+  const params = {
+    ...buildDeveloperOpsRouteReviewBaseDownloadParams(scope),
+    productCode: item.productCode || item.projectCode || scope.productCode || "",
+    username: item.username || scope.username || "",
+    search: "",
+    eventType: "",
+    actorType: "",
+    entityType: "",
+    limit: scope.auditLimit || 60
+  };
+  const descriptor = {
+    key: `route_review_section_${normalizedSection}`,
+    label: "Routed section summary",
+    fileName: "developer-ops-routed-summary.txt",
+    format: "summary",
+    params
+  };
+  if (normalizedSection === "accounts") {
+    descriptor.label = "Accounts summary";
+    descriptor.fileName = "developer-ops-accounts-summary.txt";
+  } else if (normalizedSection === "entitlements") {
+    descriptor.label = "Entitlements summary";
+    descriptor.fileName = "developer-ops-entitlements-summary.txt";
+    descriptor.params.entityType = "entitlement";
+  } else if (normalizedSection === "sessions") {
+    descriptor.label = "Sessions summary";
+    descriptor.fileName = "developer-ops-sessions-summary.txt";
+    descriptor.params.search = item.sessionId || item.id || item.fingerprint || "";
+    descriptor.params.entityType = "session";
+    if (scope.eventType) {
+      descriptor.params.eventType = scope.eventType;
+    }
+  } else if (normalizedSection === "devices") {
+    descriptor.label = "Devices summary";
+    descriptor.fileName = "developer-ops-devices-summary.txt";
+    descriptor.params.search = item.fingerprint || "";
+    descriptor.params.entityType = item.kind === "block" || item.blockId ? "device_block" : "device_binding";
+  } else if (normalizedSection === "audit") {
+    descriptor.label = "Audit summary";
+    descriptor.fileName = "developer-ops-audit-summary.txt";
+    descriptor.params.eventType = item.eventType || scope.eventType || "";
+    descriptor.params.actorType = item.actorType || scope.actorType || "";
+    descriptor.params.entityType = item.entityType || scope.entityType || "";
+    descriptor.params.username = scope.username || "";
+  } else {
+    return null;
+  }
+  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+    if (!descriptor.params[field]) {
+      delete descriptor.params[field];
+    }
+  }
+  return descriptor;
+}
+
+function buildDeveloperOpsRouteReviewSectionDownloads(scope = {}, routeReview = {}) {
+  const downloads = {};
+  const matchedCounts = routeReview.matchedCounts && typeof routeReview.matchedCounts === "object"
+    ? routeReview.matchedCounts
+    : {};
+  const sections = [
+    ["accounts", "accounts"],
+    ["entitlements", "entitlements"],
+    ["sessions", "sessions"],
+    ["devices", "devices"],
+    ["audit", "audit"]
+  ];
+  for (const [section, countKey] of sections) {
+    if (Number(matchedCounts[countKey] || 0) <= 0) {
+      continue;
+    }
+    const descriptor = buildDeveloperOpsRouteReviewSectionDownloadDescriptor(scope, routeReview, section);
+    if (descriptor) {
+      downloads[section] = descriptor;
+    }
+  }
+  return downloads;
+}
+
 function buildDeveloperOpsRouteReviewDownloads(scope = {}, routeReview = {}) {
   return {
     primary: buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope, routeReview, "primary"),
     next: buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope, routeReview, "next"),
-    remaining: buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope)
+    remaining: buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope),
+    sections: buildDeveloperOpsRouteReviewSectionDownloads(scope, routeReview)
   };
 }
 

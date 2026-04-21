@@ -1316,6 +1316,16 @@
         if (!normalized) {
           return null;
         }
+        const serverDescriptor = review.serverRouteReview?.downloads?.sections?.[normalized];
+        if (serverDescriptor?.fileName) {
+          return {
+            label: serverDescriptor.label || "Routed section summary",
+            fileName: serverDescriptor.fileName,
+            params: serverDescriptor.params && typeof serverDescriptor.params === "object"
+              ? { ...serverDescriptor.params }
+              : {}
+          };
+        }
         const baseFilters = filters();
         const target = currentOpsTarget();
         const item = routeReviewSectionPrimaryItem(review, normalized) || {};

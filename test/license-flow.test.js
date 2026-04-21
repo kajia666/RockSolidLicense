@@ -5282,6 +5282,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(Array.isArray(releasePackage.mainlineFollowUp.recommendedDownloads));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "release_checklist"));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
+    assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
+    assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
     assert.equal(releasePackage.manifest.release.mainlineFollowUp.status, "hold");
@@ -5575,6 +5577,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_checksums"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
+    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
+    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.equal(launchWorkflow.workflowSummary.launchBootstrapAction?.label, "Run Launch Bootstrap");
     assert.equal(launchWorkflow.workflowSummary.launchFirstBatchSetupAction, null);
     assert.match(launchWorkflow.handoffZipFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip$/);
@@ -5839,6 +5843,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.fileName || "")));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.fileName === "developer-ops-remaining-summary.txt"));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
+    assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
+    assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
@@ -6316,6 +6322,8 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-remaining-summary.txt"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
+    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
+    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
     assert.match(smokeKit.summaryText || "", /Launch Mainline Gate:/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Primary Review Target:/);

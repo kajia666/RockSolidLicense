@@ -2619,6 +2619,18 @@ function buildReleaseMainlineFollowUpPayload({
     "summary",
     params
   );
+  const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline checksums",
+    "launch-mainline-sha256.txt",
+    "checksums",
+    params
+  );
+  const launchMainlineZipDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline zip",
+    "launch-mainline.zip",
+    "zip",
+    params
+  );
   const launchSmokeKitDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
     "Launch smoke kit summary",
     "launch-smoke-kit.txt",
@@ -2890,7 +2902,9 @@ function buildReleaseMainlineFollowUpPayload({
     releaseSummaryDownload,
     releaseChecklistDownload,
     releaseZipDownload,
-    launchMainlineDownload
+    launchMainlineDownload,
+    launchMainlineChecksumsDownload,
+    launchMainlineZipDownload
   ];
   if (normalizedStatus !== "hold") {
     recommendedDownloads.push(launchSummaryDownload, launchReviewDownload, launchSmokeKitDownload);
@@ -5000,6 +5014,24 @@ function buildLaunchWorkflowSummaryPayload({
         productCode: releasePackage?.manifest?.project?.code || null,
         channel
       }
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch mainline checksums",
+      "launch-mainline-sha256.txt",
+      "checksums",
+      {
+        productCode: releasePackage?.manifest?.project?.code || null,
+        channel
+      }
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch mainline zip",
+      "launch-mainline.zip",
+      "zip",
+      {
+        productCode: releasePackage?.manifest?.project?.code || null,
+        channel
+      }
     )
   ];
   const nextActions = [];
@@ -6816,6 +6848,26 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline checksums",
+    "launch-mainline-sha256.txt",
+    "checksums",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineZipDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline zip",
+    "launch-mainline.zip",
+    "zip",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const matchedOpsParams = {
     ...scopedOpsParams,
     reviewMode: "matched"
@@ -7337,6 +7389,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
     pushRecommendedDownload(handoffDownload);
   }
   pushRecommendedDownload(mainlineSummaryDownload);
+  pushRecommendedDownload(mainlineChecksumsDownload);
+  pushRecommendedDownload(mainlineZipDownload);
   for (const item of Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 3) : []) {
     pushRecommendedDownload(item);
   }
@@ -7764,6 +7818,26 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       "Launch mainline summary",
       "launch-mainline-summary.txt",
       "summary",
+      {
+        productCode: project.code || filters.productCode || null,
+        channel: manifest.channel || filters.channel || "stable",
+        reviewMode: "matched"
+      }
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch mainline checksums",
+      "launch-mainline-sha256.txt",
+      "checksums",
+      {
+        productCode: project.code || filters.productCode || null,
+        channel: manifest.channel || filters.channel || "stable",
+        reviewMode: "matched"
+      }
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch mainline zip",
+      "launch-mainline.zip",
+      "zip",
       {
         productCode: project.code || filters.productCode || null,
         channel: manifest.channel || filters.channel || "stable",

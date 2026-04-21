@@ -673,54 +673,31 @@
       }
 
       function renderStageGates(summary = {}) {
-        const stages = [
-          ["Release Mainline", summary.releaseGate],
-          ["Launch Workflow", summary.workflowGate],
-          ["Launch Review", summary.reviewGate],
-          ["Launch Smoke", summary.smokeGate],
-          ["Developer Ops", summary.opsGate]
-        ].filter(([, gate]) => gate);
+        const stages = Array.isArray(summary.stages) ? summary.stages : [];
         if (!stages.length) {
           return '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
         }
         return `
           <div class="list">
-            ${stages.map(([label, gate]) => `
+            ${stages.map((stage, index) => `
               <div class="item">
                 <div class="item-head">
-                  <div class="item-title">${esc(label)}</div>
+                  <div class="item-title">${esc(stage.label || stage.key || "Stage")}</div>
                   <div class="audit-meta">
-                    ${renderTag(String(gate.status || "unknown").toUpperCase(), true)}
-                    ${Number(gate.blockingCount || 0) ? renderTag(`block:${gate.blockingCount}`, true) : ""}
-                    ${Number(gate.attentionCount || 0) ? renderTag(`attention:${gate.attentionCount}`) : ""}
+                    ${renderTag(String(stage.gate?.status || "unknown").toUpperCase(), true)}
+                    ${Number(stage.gate?.blockingCount || 0) ? renderTag(`block:${stage.gate.blockingCount}`, true) : ""}
+                    ${Number(stage.gate?.attentionCount || 0) ? renderTag(`attention:${stage.gate.attentionCount}`) : ""}
                   </div>
                 </div>
-                <div class="hint">${esc(gate.headline || gate.summary || "-")}</div>
+                <div class="hint">${esc(stage.gate?.headline || stage.gate?.summary || "-")}</div>
                 <div class="actions">
-                  ${gate.recommendedWorkspace?.key ? `<button type="button" class="secondary" data-stage-workspace-key="${esc(gate.recommendedWorkspace.key)}">${esc(gate.recommendedWorkspace.label || "Open Workspace")}</button>` : ""}
-                  ${gate.recommendedDownload?.key ? `<button type="button" class="secondary" data-stage-download-key="${esc(gate.recommendedDownload.key)}">Download</button>` : ""}
+                  ${stage.workspaceAction?.key ? `<button type="button" class="secondary" data-stage-workspace-index="${index}">${esc(stage.workspaceAction.label || "Open Workspace")}</button>` : ""}
+                  ${stage.recommendedDownload?.key ? `<button type="button" class="secondary" data-stage-download-index="${index}">Download</button>` : ""}
                 </div>
               </div>
             `).join("")}
           </div>
         `;
-      }
-
-      function mainlineDownloadByKey(key = "") {
-        const items = Array.isArray(currentMainline?.mainlineSummary?.recommendedDownloads)
-          ? currentMainline.mainlineSummary.recommendedDownloads
-          : [];
-        return items.find((item) => item.key === key) || null;
-      }
-
-      function stageWorkspaceByKey(key = "") {
-        const map = workspaceActionMap();
-        if (key === "release") return map.release;
-        if (key === "launch") return map.workflow;
-        if (key === "launch-review") return map.review;
-        if (key === "launch-smoke") return map.smoke;
-        if (key === "ops") return map.ops;
-        return null;
       }
 
       function renderMainline() {
@@ -921,21 +898,21 @@
           });
           return;
         }
-        const stageWorkspaceButton = event.target.closest("[data-stage-workspace-key]");
+        const stageWorkspaceButton = event.target.closest("[data-stage-workspace-index]");
         if (stageWorkspaceButton) {
-          const key = stageWorkspaceButton.dataset.stageWorkspaceKey || "";
-          const action = stageWorkspaceByKey(key);
-          if (action) {
-            openWorkspaceAction(action);
+          const index = Number(stageWorkspaceButton.dataset.stageWorkspaceIndex || -1);
+          const stage = currentMainline?.mainlineSummary?.stages?.[index];
+          if (stage?.workspaceAction) {
+            openWorkspaceAction(stage.workspaceAction);
           }
           return;
         }
-        const stageDownloadButton = event.target.closest("[data-stage-download-key]");
+        const stageDownloadButton = event.target.closest("[data-stage-download-index]");
         if (stageDownloadButton) {
-          const key = stageDownloadButton.dataset.stageDownloadKey || "";
-          const item = mainlineDownloadByKey(key);
-          if (item) {
-            await downloadMainlineRecommendedItem(item).catch((error) => {
+          const index = Number(stageDownloadButton.dataset.stageDownloadIndex || -1);
+          const stage = currentMainline?.mainlineSummary?.stages?.[index];
+          if (stage?.recommendedDownload) {
+            await downloadMainlineRecommendedItem(stage.recommendedDownload).catch((error) => {
               setStatus(error.message, "danger");
               setOutput({ error: error.message });
             });

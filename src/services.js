@@ -8957,6 +8957,15 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       summaryDownload: opsSummaryDownload
     }
   ];
+  const stages = stageDefinitions
+    .filter((item) => item.gate)
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      gate: item.gate,
+      workspaceAction: item.gate?.recommendedWorkspace || null,
+      recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null
+    }));
   const gateRank = (status = "unknown") => {
     const normalized = normalizeLaunchMainlineGateStatus(status);
     if (normalized === "hold") {
@@ -9027,6 +9036,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     reviewGate,
     smokeGate,
     opsGate,
+    stages,
     primaryAction: overallGate.primaryAction || preferredStage?.gate?.primaryAction || null,
     recommendedDownload: overallGate.recommendedDownload || preferredStage?.gate?.recommendedDownload || null,
     recommendedWorkspace: overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null,

@@ -5762,7 +5762,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.actionPlan.length >= 1);
       assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
         /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
-        && item.recommendedDownload?.fileName === "developer-ops-primary-summary.txt"
+        && /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.recommendedDownload?.fileName || "")
       ));
       assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
       assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
@@ -5780,9 +5780,15 @@ test("developer release package export bundles integration, versions, and notice
         launchReview.reviewSummary.primaryReviewTarget?.routeActionLabel || "",
         /^Open (Account|Entitlement|Session|Device) Control$/
       );
-      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
-      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
-      assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));
+      assert.match(
+        launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.fileName || "",
+        /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/
+      );
+      assert.match(
+        launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.label || "",
+        /^Primary (account|entitlement|session|device) summary$/i
+      );
+      assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.fileName || "")));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
@@ -6155,7 +6161,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.workspaceAction?.key === "launch-smoke"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
       /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
-      && item.recommendedDownload?.fileName === "developer-ops-primary-summary.txt"
+      && /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.recommendedDownload?.fileName || "")
     ));
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);
@@ -6172,9 +6178,15 @@ test("developer license quickstart bootstrap can create starter launch assets in
       smokeKit.smokeSummary?.primaryReviewTarget?.routeActionLabel || "",
       /^Open (Account|Entitlement|Session|Device) Control$/
     );
-    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
-    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
-    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));
+    assert.match(
+      smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.fileName || "",
+      /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/
+    );
+    assert.match(
+      smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.label || "",
+      /^Primary (account|entitlement|session|device) summary$/i
+    );
+    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.fileName || "")));
     assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.label || "")));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => item.workspaceAction?.key === "ops" || item.workspaceAction?.key === "licenses"));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {

@@ -3236,6 +3236,10 @@ function createLaunchWorkflowPrimaryOpsDownloadShortcut(workspaceAction, {
   if (!focusKind) {
     return null;
   }
+  const descriptor = buildPrimaryOpsDownloadDescriptor(focusKind);
+  const resolvedKey = key === "ops_primary_summary" ? descriptor.key : key;
+  const resolvedLabel = label === "Primary match summary" ? descriptor.label : label;
+  const resolvedFileName = fileName === "developer-ops-primary-summary.txt" ? descriptor.fileName : fileName;
   const params = {
     reviewMode: rawParams.reviewMode || "matched",
     productCode: rawParams.focusProductCode || rawParams.productCode || "",
@@ -3265,9 +3269,9 @@ function createLaunchWorkflowPrimaryOpsDownloadShortcut(workspaceAction, {
     }
   }
   return createLaunchWorkflowDownloadShortcut(
-    key,
-    fileName,
-    label,
+    resolvedKey,
+    resolvedFileName,
+    resolvedLabel,
     {
       source: "developer-ops",
       format,
@@ -3338,6 +3342,43 @@ function buildFocusKindControlRouteAction(focusKind = "") {
     return "control-device";
   }
   return "control-primary";
+}
+
+function buildPrimaryOpsDownloadDescriptor(focusKind = "") {
+  const normalized = String(focusKind || "").trim().toLowerCase();
+  if (normalized === "account") {
+    return {
+      key: "ops_primary_account_summary",
+      label: "Primary account summary",
+      fileName: "developer-ops-primary-account-summary.txt"
+    };
+  }
+  if (normalized === "entitlement") {
+    return {
+      key: "ops_primary_entitlement_summary",
+      label: "Primary entitlement summary",
+      fileName: "developer-ops-primary-entitlement-summary.txt"
+    };
+  }
+  if (normalized === "session") {
+    return {
+      key: "ops_primary_session_summary",
+      label: "Primary session summary",
+      fileName: "developer-ops-primary-session-summary.txt"
+    };
+  }
+  if (normalized === "device") {
+    return {
+      key: "ops_primary_device_summary",
+      label: "Primary device summary",
+      fileName: "developer-ops-primary-device-summary.txt"
+    };
+  }
+  return {
+    key: "ops_primary_summary",
+    label: "Primary match summary",
+    fileName: "developer-ops-primary-summary.txt"
+  };
 }
 
 function createReleasePackageDownloadShortcut({

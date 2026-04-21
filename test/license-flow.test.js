@@ -5760,6 +5760,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary);
       assert.ok(Array.isArray(launchReview.reviewSummary.actionPlan));
       assert.ok(launchReview.reviewSummary.actionPlan.length >= 1);
+      assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
+        item.workspaceAction?.label === "Review Primary Match in Ops"
+        && item.recommendedDownload?.fileName === "developer-ops-primary-summary.txt"
+      ));
       assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
       assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
       assert.ok(launchReview.reviewSummary.primaryReviewTarget);
@@ -6133,6 +6137,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => item.key === "launch-review"));
     assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => item.key === "ops"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.workspaceAction?.key === "launch-smoke"));
+    assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
+      item.workspaceAction?.label === "Review Primary Match in Ops"
+      && item.recommendedDownload?.fileName === "developer-ops-primary-summary.txt"
+    ));
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.key, "ops");

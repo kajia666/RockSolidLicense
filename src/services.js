@@ -6801,6 +6801,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
     }));
   }
 
+  if (primaryReviewTarget?.workspaceAction) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_primary_target",
+      title: "Review the primary routed match",
+      summary: primaryReviewTarget.summary || "Open the primary routed object before scanning the rest of the matched runtime scope.",
+      status: primaryReviewTarget.status || "review",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction: primaryReviewTarget.workspaceAction,
+      recommendedDownload: primaryReviewTarget.recommendedDownload || null
+    }));
+  }
+
   for (const item of visibleReviewTargets.slice(0, 3)) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: item.key,
@@ -7575,6 +7587,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       summary: `Use one of the ready smoke paths first: ${readyPaths.map((item) => item.label).join(" / ")}.`,
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", { reviewMode: "matched" })
+    } : null,
+    primaryReviewTarget?.workspaceAction ? {
+      key: "launch_smoke_primary_review",
+      title: "Review the primary smoke follow-up",
+      priority: "secondary",
+      status: primaryReviewTarget.status || "review",
+      summary: primaryReviewTarget.summary || "Open the primary routed object after smoke setup so first-wave follow-up starts with the most important match.",
+      workspaceAction: primaryReviewTarget.workspaceAction,
+      recommendedDownload: primaryReviewTarget.recommendedDownload || null
     } : null,
     {
       key: "ops_follow_up",

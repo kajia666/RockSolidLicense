@@ -290,6 +290,7 @@
           "control-entitlement",
           "control-session",
           "control-device",
+          "control-next",
           "review-primary",
           "review-next",
           "download-primary",
@@ -324,6 +325,9 @@
         if (normalized === "control-device") {
           return "Open Device Control";
         }
+        if (normalized === "control-next") {
+          return "Open Next Control";
+        }
         return "Open Primary Control";
       }
       function formatRouteReviewActionLabel(actionKey = "") {
@@ -335,7 +339,8 @@
           || normalized === "control-account"
           || normalized === "control-entitlement"
           || normalized === "control-session"
-          || normalized === "control-device") {
+          || normalized === "control-device"
+          || normalized === "control-next") {
           return formatControlRouteReviewActionLabel(normalized);
         }
         if (normalized === "review-primary") {
@@ -1661,6 +1666,7 @@
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="prepare-primary">Prepare Primary Match</button>` : "",
           primaryFocus?.item?.recommendedControl?.label ? `<button type="button" class="secondary" data-route-review-action="control-primary">Open Primary Control</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-primary">Review Primary Match</button>` : "",
+          nextFocus?.item?.recommendedControl?.label ? `<button type="button" class="secondary" data-route-review-action="control-next">Open Next Control</button>` : "",
           nextFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-next">Review Next Match</button>` : "",
           nextFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-next" ${token ? "" : "disabled"}>Download Next Match Summary</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-primary" ${token ? "" : "disabled"}>Download Primary Match Summary</button>` : "",
@@ -1853,6 +1859,36 @@
             return;
           }
           setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} next routed match. ${formatRouteReviewSummary(review)}. Next match ready: ${formatRouteReviewPrimaryTitle(next)}.`);
+          return;
+        }
+        if (normalizedAction === "control-next") {
+          const review = collectRouteReview();
+          const next = buildNextRouteReviewFocus(review, review.focus || requestedAutofocus || "");
+          if (!next?.kind) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match is available yet." };
+          }
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          focusRouteReviewSection(next.section || requestedAutofocus || "");
+          const signature = developerFocusSignature(next.kind, next.item || {});
+          const prepared = await applyDeveloperFocusItem(next.kind, next.item || {}, {
+            focusControls: true,
+            renderOverview: true,
+            statusMessage: "",
+            routePreparedKey: signature
+          });
+          const preparedLabel = prepared?.preparedControl || next.item?.recommendedControl?.label || "";
+          if (!preparedLabel) {
+            setStatus(`${options.auto ? "Auto-opened" : "Opened"} next routed match. ${formatRouteReviewSummary(review)}. No direct control was suggested, so the next match is ready for review: ${formatRouteReviewPrimaryTitle(prepared || next)}.`);
+            return;
+          }
+          setStatus(`${options.auto ? "Auto-opened" : "Opened"} next routed control. ${formatRouteReviewSummary(review)}. Next control ready: ${preparedLabel}.`);
+          setOutput({
+            routeReviewAction: normalizedAction,
+            focusKind: next.kind,
+            focusItem: next.item || {},
+            preparedControl: preparedLabel
+          });
           return;
         }
         if (normalizedAction === "download-primary") {

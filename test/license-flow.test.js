@@ -11143,6 +11143,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Review Primary Match/);
     assert.match(html, /Review Next Match/);
     assert.match(html, /Open Primary Control/);
+    assert.match(html, /Open Next Control/);
     assert.match(html, /Download Next Match Summary/);
     assert.match(html, /Primary control ready while reviewing:/);
     assert.match(html, /focus_account/);

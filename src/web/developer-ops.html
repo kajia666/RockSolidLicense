@@ -2929,6 +2929,35 @@
         return bits;
       }
 
+      function buildDeveloperRouteReviewContinuation(focus = null) {
+        if (!focus?.kind) {
+          return null;
+        }
+        const review = collectRouteReview();
+        if (!review.active) {
+          return null;
+        }
+        const preferredSection = review.focus || requestedAutofocus || "";
+        const orderedFocuses = buildOrderedRouteReviewFocuses(review, preferredSection, { includeDirect: true });
+        if (!orderedFocuses.length) {
+          return null;
+        }
+        const activeSignature = developerFocusSignature(focus.kind, focus.item || {});
+        const activeIndex = orderedFocuses.findIndex((item) => developerFocusSignature(item.kind, item.item || {}) === activeSignature);
+        const nextFocus = activeIndex >= 0
+          ? (orderedFocuses[activeIndex + 1] || null)
+          : (orderedFocuses[0] || null);
+        if (!nextFocus?.kind) {
+          return null;
+        }
+        return {
+          review,
+          nextFocus,
+          nextControlLabel: nextFocus.item?.recommendedControl?.label || "",
+          nextDownload: buildRouteReviewNextDownloadDescriptor(nextFocus, review)
+        };
+      }
+
       function tuneDeveloperFollowUpPlan(plan = {}, comparison = {}, hasDirectControl = false) {
         const outcomeLabel = String(comparison?.outcomeLabel || "").trim();
         const escalationOutcomeLabel = String(comparison?.escalationOutcomeLabel || "").trim();
@@ -3019,7 +3048,22 @@
         const actionTarget = recommendedLabel || actionHint || (hasDirectControl ? "return to the quick controls" : "review the current scoped focus");
         const impactBits = buildDeveloperFollowUpImpactBits(focus);
         const impactSummary = impactBits.length ? `Impact: ${impactBits.join(", ")}.` : "";
+        const routeContinuation = buildDeveloperRouteReviewContinuation(focus);
         if (severityRank === 0 && queuePosition === null) {
+          if (routeContinuation?.nextFocus?.kind) {
+            const nextTitle = formatRouteReviewPrimaryTitle(routeContinuation.nextFocus);
+            return tuneDeveloperFollowUpPlan({
+              priority: "clear",
+              label: "Close Out",
+              tone: "ok",
+              impactBits,
+              hint: `No active scoped signal remains for this object. ${impactSummary ? `${impactSummary} ` : ""}Continue routed review with ${nextTitle}.${routeContinuation.nextControlLabel ? ` Next control: ${routeContinuation.nextControlLabel}.` : ""}`,
+              primaryAction: "review_next",
+              primaryLabel: "Continue Routed Review",
+              secondaryAction: routeContinuation.nextControlLabel ? "control_next" : "download_next",
+              secondaryLabel: routeContinuation.nextControlLabel ? "Open Next Control" : "Download Next Match Summary"
+            }, comparison, hasDirectControl);
+          }
           return tuneDeveloperFollowUpPlan({
             priority: "clear",
             label: "Close Out",
@@ -3346,6 +3390,70 @@
             focusItem: focus.item,
             preparedControl
           });
+          return;
+        }
+        const continuation = buildDeveloperRouteReviewContinuation(focus);
+        if (action === "review_next") {
+          if (!continuation?.nextFocus?.kind) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match is available for follow-up review." };
+          }
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          focusRouteReviewSection(continuation.nextFocus.section || requestedAutofocus || "");
+          const signature = developerFocusSignature(continuation.nextFocus.kind, continuation.nextFocus.item || {});
+          const prepared = await applyDeveloperFocusItem(continuation.nextFocus.kind, continuation.nextFocus.item || {}, {
+            focusControls: true,
+            renderOverview: true,
+            statusMessage: "",
+            routePreparedKey: signature
+          });
+          const preparedLabel = prepared?.preparedControl || continuation.nextControlLabel || "";
+          if (preparedLabel) {
+            setStatus(`Continuing routed review with the next match. ${formatRouteReviewSummary(continuation.review)}. Next control ready: ${preparedLabel}.`);
+            setOutput({
+              mutationAction: action,
+              focusKind: continuation.nextFocus.kind,
+              focusItem: continuation.nextFocus.item || {},
+              preparedControl: preparedLabel
+            });
+            return;
+          }
+          setStatus(`Continuing routed review with the next match. ${formatRouteReviewSummary(continuation.review)}. Next match ready: ${formatRouteReviewPrimaryTitle(continuation.nextFocus)}.`);
+          return;
+        }
+        if (action === "control_next") {
+          if (!continuation?.nextFocus?.kind) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match is available for follow-up review." };
+          }
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          focusRouteReviewSection(continuation.nextFocus.section || requestedAutofocus || "");
+          const signature = developerFocusSignature(continuation.nextFocus.kind, continuation.nextFocus.item || {});
+          const prepared = await applyDeveloperFocusItem(continuation.nextFocus.kind, continuation.nextFocus.item || {}, {
+            focusControls: true,
+            renderOverview: true,
+            statusMessage: "",
+            routePreparedKey: signature
+          });
+          const preparedLabel = prepared?.preparedControl || continuation.nextControlLabel || "";
+          if (!preparedLabel) {
+            setStatus(`Continuing routed review with the next match. ${formatRouteReviewSummary(continuation.review)}. No direct control was suggested, so the next match is ready for review: ${formatRouteReviewPrimaryTitle(continuation.nextFocus)}.`);
+            return;
+          }
+          setStatus(`Continuing routed review with the next control. ${formatRouteReviewSummary(continuation.review)}. Next control ready: ${preparedLabel}.`);
+          setOutput({
+            mutationAction: action,
+            focusKind: continuation.nextFocus.kind,
+            focusItem: continuation.nextFocus.item || {},
+            preparedControl: preparedLabel
+          });
+          return;
+        }
+        if (action === "download_next") {
+          if (!continuation?.nextDownload) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match summary is available for follow-up review." };
+          }
+          await handleExportDownload("summary", continuation.nextDownload.fileName, continuation.nextDownload.label, continuation.nextDownload.params);
         }
       }
 

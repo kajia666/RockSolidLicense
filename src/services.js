@@ -3605,6 +3605,75 @@ function mergeLaunchWorkflowReviewStatus(current = "pass", next = "pass") {
   return (severity[next] ?? 0) > (severity[current] ?? 0) ? next : current;
 }
 
+function normalizeLaunchMainlineGateStatus(status = "unknown") {
+  const normalized = String(status || "unknown").trim().toLowerCase();
+  if (normalized === "hold" || normalized === "block") {
+    return "hold";
+  }
+  if (normalized === "attention" || normalized === "review") {
+    return "attention";
+  }
+  if (normalized === "ready" || normalized === "pass") {
+    return "ready";
+  }
+  return "attention";
+}
+
+function buildLaunchMainlineGatePayload({
+  status = "unknown",
+  headline = "",
+  summary = "",
+  blockingCount = 0,
+  attentionCount = 0,
+  recommendedWorkspace = null,
+  actionPlan = [],
+  recommendedDownloads = []
+} = {}) {
+  const normalizedStatus = normalizeLaunchMainlineGateStatus(status);
+  const primaryAction = (Array.isArray(actionPlan) ? actionPlan : []).find((item) =>
+    item && (item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction)
+  ) || (Array.isArray(actionPlan) ? actionPlan[0] : null) || null;
+  const recommendedDownload = primaryAction?.recommendedDownload
+    || ((Array.isArray(recommendedDownloads) ? recommendedDownloads : []).find((item) => item?.key) || null);
+  const numericBlockingCount = Math.max(0, Number(blockingCount || 0));
+  const numericAttentionCount = Math.max(0, Number(attentionCount || 0));
+  return {
+    status: normalizedStatus,
+    headline: headline || (
+      normalizedStatus === "hold"
+        ? "Mainline gate is blocking rollout"
+        : normalizedStatus === "attention"
+          ? "Mainline gate still needs review"
+          : "Mainline gate looks ready"
+    ),
+    summary: summary || "-",
+    blockingCount: numericBlockingCount,
+    attentionCount: numericAttentionCount,
+    readyForRollout: normalizedStatus === "ready" && numericBlockingCount === 0,
+    recommendedWorkspace: recommendedWorkspace || null,
+    primaryAction: primaryAction || null,
+    recommendedDownload: recommendedDownload || null
+  };
+}
+
+function appendLaunchMainlineGateText(lines = [], gate = null, formatWorkspaceActionText = null) {
+  if (!Array.isArray(lines) || !gate || typeof gate !== "object") {
+    return;
+  }
+  const formatWorkspace = typeof formatWorkspaceActionText === "function"
+    ? formatWorkspaceActionText
+    : ((action = null) => action?.label || action?.key || "-");
+  lines.push("");
+  lines.push("Launch Mainline Gate:");
+  lines.push(`- status: ${String(gate.status || "unknown").toUpperCase()}`);
+  lines.push(`- headline: ${gate.headline || "-"}`);
+  lines.push(`- summary: ${gate.summary || "-"}`);
+  lines.push(`- counts: block=${gate.blockingCount ?? 0} | attention=${gate.attentionCount ?? 0}`);
+  lines.push(`- workspace: ${formatWorkspace(gate.recommendedWorkspace)}`);
+  lines.push(`- primaryAction: ${gate.primaryAction?.title || gate.primaryAction?.label || gate.primaryAction?.key || "-"}`);
+  lines.push(`- recommendedDownload: ${gate.recommendedDownload?.label || gate.recommendedDownload?.key || "-"}`);
+}
+
 function buildLaunchWorkflowAuthorizationReadiness({
   product = {},
   metrics = {},
@@ -5169,6 +5238,17 @@ function buildLaunchWorkflowSummaryPayload({
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff")
   }));
 
+  const mainlineGate = buildLaunchMainlineGatePayload({
+    status: workflowStatus,
+    headline: workflowTitle,
+    summary: readiness.message || deliverySummary.summary || startupDecision.message || clientHardening.summary || "No launch workflow summary available.",
+    blockingCount: workflowChecklist.blockItems ?? 0,
+    attentionCount: workflowChecklist.reviewItems ?? 0,
+    recommendedWorkspace,
+    actionPlan,
+    recommendedDownloads
+  });
+
   return {
     status: workflowStatus,
     title: workflowTitle,
@@ -5197,16 +5277,17 @@ function buildLaunchWorkflowSummaryPayload({
       block: workflowChecklist.blockItems ?? 0
     },
     tokenKeyTotal,
-      activeKeyId: tokenKeySummary.activeKeyId || null,
-      launchBootstrapAction: authReadiness.bootstrapAction || null,
-      launchBootstrapSummary: authReadiness.bootstrapSummary || null,
-      launchFirstBatchSetupAction: authReadiness.firstBatchSetupAction || null,
-      launchFirstBatchSetupSummary: authReadiness.firstBatchSetupSummary || null,
-      recommendedDownloads,
-      downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
-      recommendedWorkspace,
-      workspaceActions,
-      actionPlan,
+    activeKeyId: tokenKeySummary.activeKeyId || null,
+    launchBootstrapAction: authReadiness.bootstrapAction || null,
+    launchBootstrapSummary: authReadiness.bootstrapSummary || null,
+    launchFirstBatchSetupAction: authReadiness.firstBatchSetupAction || null,
+    launchFirstBatchSetupSummary: authReadiness.firstBatchSetupSummary || null,
+    mainlineGate,
+    recommendedDownloads,
+    downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
+    recommendedWorkspace,
+    workspaceActions,
+    actionPlan,
     actionPlanSummary: actionPlan.map((item) => item.title || item.key || "step").join(" -> "),
     nextActions,
     blockers,
@@ -5253,6 +5334,8 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
     `Message: ${workflowSummary.message || "-"}`,
     ""
   ];
+
+  appendLaunchMainlineGateText(lines, workflowSummary.mainlineGate, formatWorkspaceActionText);
 
   const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
   const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
@@ -6414,6 +6497,8 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     return `${action.label || action.key || "-"}@${action.autofocus || "-"}${paramsText ? `?${paramsText}` : ""}`;
   };
 
+  appendLaunchMainlineGateText(lines, reviewSummary.mainlineGate, formatWorkspaceActionText);
+
   if (reviewSummary.recommendedWorkspace?.label || reviewSummary.recommendedWorkspace?.key) {
     lines.push("");
     lines.push("Recommended Workspace:");
@@ -7207,19 +7292,42 @@ function buildDeveloperLaunchReviewSummaryPayload({
     : workflowNeedsReview || queueHasUrgent
       ? "review"
       : "pass";
+  const reviewBlockingCount = Math.max(
+    workflowBlocked ? 1 : 0,
+    Number(workflowChecklist.blockItems || 0),
+    visibleReviewTargets.filter((item) => String(item?.status || "").trim().toLowerCase() === "block").length
+  );
+  const reviewAttentionCount = Math.max(
+    workflowNeedsReview && !workflowBlocked ? 1 : 0,
+    Number(workflowChecklist.reviewItems || 0),
+    visibleReviewTargets.filter((item) => String(item?.status || "").trim().toLowerCase() === "review").length + (queueHasUrgent ? 1 : 0)
+  );
+  const reviewHeadline = reviewStatus === "block"
+    ? "Launch review still has blockers"
+    : reviewStatus === "review"
+      ? "Launch review still needs attention"
+      : "Launch review is ready for handoff";
+  const reviewMessage = workflowNeedsReview
+    ? (workflowSummary.message || "Clear launch blockers and recheck the scoped runtime slice before rollout.")
+    : queueHasUrgent
+      ? "Launch lane looks staged, but routed runtime signals still need another look."
+      : (opsOverview.headline || "Launch lane and routed runtime scope both look ready for handoff.");
+  const mainlineGate = buildLaunchMainlineGatePayload({
+    status: reviewStatus,
+    headline: reviewHeadline,
+    summary: reviewMessage,
+    blockingCount: reviewBlockingCount,
+    attentionCount: reviewAttentionCount,
+    recommendedWorkspace,
+    actionPlan,
+    recommendedDownloads
+  });
 
   return {
     status: reviewStatus,
-    title: reviewStatus === "block"
-      ? "Launch review still has blockers"
-      : reviewStatus === "review"
-        ? "Launch review still needs attention"
-        : "Launch review is ready for handoff",
-      message: workflowNeedsReview
-      ? (workflowSummary.message || "Clear launch blockers and recheck the scoped runtime slice before rollout.")
-      : queueHasUrgent
-        ? "Launch lane looks staged, but routed runtime signals still need another look."
-        : (opsOverview.headline || "Launch lane and routed runtime scope both look ready for handoff."),
+    title: reviewHeadline,
+    message: reviewMessage,
+    mainlineGate,
     recommendedWorkspace,
     workspaceActions,
     primaryReviewTarget,
@@ -8028,19 +8136,41 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     : blockingPaths.length || reviewPaths.length
       ? "review"
       : "ready";
+  const smokeBlockingCount = Math.max(
+    status === "block" ? 1 : 0,
+    blockingPaths.length
+  );
+  const smokeAttentionCount = Math.max(
+    status === "review" ? 1 : 0,
+    reviewPaths.length,
+    visibleReviewTargets.filter((item) => String(item?.status || "").trim().toLowerCase() === "review").length
+  );
+  const smokeTitle = status === "block"
+    ? "Launch smoke kit still has blockers"
+    : status === "review"
+      ? "Launch smoke kit needs one more setup pass"
+      : "Launch smoke kit is ready";
+  const smokeMessage = status === "block"
+    ? "Clear the remaining launch blockers before handing this lane to QA, support, or launch-duty smoke testing."
+    : status === "review"
+      ? "The lane is close, but one or more smoke paths still need review before first-wave validation."
+      : "The lane has a usable startup request and at least one internal smoke path ready for first-wave validation.";
+  const mainlineGate = buildLaunchMainlineGatePayload({
+    status,
+    headline: smokeTitle,
+    summary: smokeMessage,
+    blockingCount: smokeBlockingCount,
+    attentionCount: smokeAttentionCount,
+    recommendedWorkspace,
+    actionPlan,
+    recommendedDownloads
+  });
 
   return {
     status,
-    title: status === "block"
-      ? "Launch smoke kit still has blockers"
-      : status === "review"
-        ? "Launch smoke kit needs one more setup pass"
-        : "Launch smoke kit is ready",
-    message: status === "block"
-      ? "Clear the remaining launch blockers before handing this lane to QA, support, or launch-duty smoke testing."
-      : status === "review"
-        ? "The lane is close, but one or more smoke paths still need review before first-wave validation."
-        : "The lane has a usable startup request and at least one internal smoke path ready for first-wave validation.",
+    title: smokeTitle,
+    message: smokeMessage,
+    mainlineGate,
     startupRequest,
     startupDecision,
     tokenKeySummary,
@@ -8089,6 +8219,8 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     `- tokenKeys: active=${smokeSummary.tokenKeySummary?.activeKeyId || "-"} | total=${smokeSummary.tokenKeySummary?.totalKeys ?? 0}`,
     `- hardening: profile=${smokeSummary.clientHardening?.profile || "-"} | startup=${smokeSummary.clientHardening?.startupBootstrapRequired ? "required" : "recommended"} | localToken=${smokeSummary.clientHardening?.localTokenValidationRequired ? "required" : "optional"} | heartbeat=${smokeSummary.clientHardening?.heartbeatGateRequired ? "required" : "optional"}`
   ];
+
+  appendLaunchMainlineGateText(lines, smokeSummary.mainlineGate, formatWorkspaceActionText);
 
   if (Array.isArray(smokeSummary.verificationPaths) && smokeSummary.verificationPaths.length) {
     lines.push("");

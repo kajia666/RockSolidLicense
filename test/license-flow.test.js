@@ -5528,6 +5528,12 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(launchWorkflow.workflowSummary.authorizationStatus, "block");
     assert.match(launchWorkflow.workflowSummary.authorizationSummary || "", /policies=0/);
     assert.match(launchWorkflow.workflowSummary.authorizationModeSummary || "", /account\+register/);
+    assert.ok(launchWorkflow.workflowSummary.mainlineGate);
+    assert.equal(launchWorkflow.workflowSummary.mainlineGate.status, "hold");
+    assert.ok((launchWorkflow.workflowSummary.mainlineGate.blockingCount || 0) >= 1);
+    assert.equal(launchWorkflow.workflowSummary.mainlineGate.recommendedWorkspace?.key, "integration");
+    assert.ok(launchWorkflow.workflowSummary.mainlineGate.primaryAction?.key);
+    assert.ok(launchWorkflow.workflowSummary.mainlineGate.recommendedDownload?.key);
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.recommendedDownloads));
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.actionPlan));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.length >= 1);
@@ -5583,6 +5589,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
     assert.match(launchWorkflow.summaryText, /Workflow Status: HOLD/);
     assert.match(launchWorkflow.summaryText, /Authorization Status: BLOCK/);
+    assert.match(launchWorkflow.summaryText, /Launch Mainline Gate:/);
+    assert.match(launchWorkflow.summaryText, /- status: HOLD/);
     assert.match(launchWorkflow.summaryText, /Authorization Summary: modes=account\+register/);
     assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
     assert.match(launchWorkflow.summaryText, /Recommended Workspace:/);
@@ -5758,6 +5766,11 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchReview.opsSnapshot.scope.eventType, "session.login");
       assert.equal(launchReview.opsSnapshot.scope.actorType, "account");
       assert.ok(launchReview.reviewSummary);
+      assert.ok(launchReview.reviewSummary.mainlineGate);
+      assert.ok(["hold", "attention", "ready"].includes(launchReview.reviewSummary.mainlineGate.status));
+      assert.ok(launchReview.reviewSummary.mainlineGate.recommendedWorkspace?.key);
+      assert.ok(launchReview.reviewSummary.mainlineGate.primaryAction?.key);
+      assert.ok(launchReview.reviewSummary.mainlineGate.recommendedDownload?.key);
       assert.ok(Array.isArray(launchReview.reviewSummary.actionPlan));
       assert.ok(launchReview.reviewSummary.actionPlan.length >= 1);
     assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
@@ -5837,6 +5850,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.workspaceActions?.some((item) => /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.label || "")));
       assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
       assert.match(launchReview.summaryText, /RockSolid Developer Launch Review/);
+      assert.match(launchReview.summaryText, /Launch Mainline Gate:/);
       assert.match(launchReview.summaryText, /RockSolid Launch Workflow Package/);
       assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
       assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
@@ -6234,6 +6248,11 @@ test("developer license quickstart bootstrap can create starter launch assets in
       /^Primary (account|entitlement|session|device) summary$/i
     );
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.fileName || "")));
+    assert.ok(smokeKit.smokeSummary?.mainlineGate);
+    assert.ok(["hold", "attention", "ready"].includes(smokeKit.smokeSummary.mainlineGate.status));
+    assert.ok(smokeKit.smokeSummary.mainlineGate.recommendedWorkspace?.key);
+    assert.ok(smokeKit.smokeSummary.mainlineGate.primaryAction?.key);
+    assert.ok(smokeKit.smokeSummary.mainlineGate.recommendedDownload?.key);
     assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.label || "")));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => item.workspaceAction?.key === "ops" || item.workspaceAction?.key === "licenses"));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
@@ -6249,6 +6268,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-remaining-summary.txt"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
+    assert.match(smokeKit.summaryText || "", /Launch Mainline Gate:/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Primary Review Target:/);
     assert.match(smokeKit.summaryText || "", /action=Open (Account|Entitlement|Session|Device) Control/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Review Targets:/);

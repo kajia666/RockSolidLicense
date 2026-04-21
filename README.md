@@ -116,7 +116,7 @@
 - 现在还新增了独立的 `/developer/launch-review` 工作台，把当前 lane 的 launch workflow 和带过滤条件的 developer ops snapshot 合并到一个复查页里，适合在跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 后，直接做首轮复查或交给 QA / 客服 / 值守同事
 - 这条 `Launch Review` 现在还会直接给出推荐工作台、复查动作计划和推荐下载，不只是把 launch 和 ops 放在同一页里，软件作者也能更快知道下一步该开哪个工作台、拿哪份摘要
 - 现在 `Launch Workflow / Launch Review / Launch Smoke` 三条主链 payload 也已经统一带上服务端生成的 `mainline gate`，会直接给出统一的放行状态、阻断/关注计数、推荐工作台、主动作和推荐下载；对应导出摘要里也会打印同一节 `Launch Mainline Gate`，减少页面和 handoff 各自解释主线状态的偏差
-- 现在后台/API 里还新增了统一的 `/api/developer/launch-mainline` 聚合入口，会把 `release / workflow / review / smoke` 四段主线 gate 收成一份服务端 handoff，并提供 `json / summary / checksums / zip` 下载，方便把首发主链直接作为一个连续的运营总览来消费
+- 现在后台/API 里还新增了统一的 `/api/developer/launch-mainline` 聚合入口，会把 `release / workflow / review / smoke` 四段主线 gate 收成一份服务端 handoff，并提供 `json / summary / checksums / zip` 下载，方便把首发主链直接作为一个连续的运营总览来消费；同时四段主线自己的 `recommendedDownloads` 现在也会直接回指这份统一的 `launch-mainline summary`，这样 release、launch workflow、launch review、launch smoke 都能顺手把同一份总览 handoff 交给 QA、值守或发布同事
 - `Launch Review` 现在还可以直接运行 `Launch Bootstrap / First Batch Setup / Inventory Refill`，并在页内保留 `Last Review Action` 回执，所以软件作者在复查页里就能直接修正 starter policy、首批库存或补库存动作，再顺着做下一步 launch recheck
 - `Launch Review` 现在还会把复查目标细化成 `accounts / entitlements / sessions / devices / audit` 级别的 routed review targets，软件作者可以直接从复查页跳到最贴合的 `Developer Ops` 区块，而不只是泛化地“去 ops 看看”
 - `Launch Review` 现在也会像 `Launch Smoke` 一样，把最重要的那个 routed follow-up 顶成 `Primary Review Target`，让值守或 QA 先开最关键的复查对象，再决定是否继续展开完整的 review target 列表

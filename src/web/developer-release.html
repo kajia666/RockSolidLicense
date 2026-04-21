@@ -808,6 +808,12 @@
             fileName: shortcut.fileName || "launch-smoke-kit.txt"
           };
         }
+        if (shortcut.source === "developer-launch-mainline") {
+          return {
+            path: `/api/developer/launch-mainline/download${q({ ...params, format })}`,
+            fileName: shortcut.fileName || "developer-launch-mainline-summary.txt"
+          };
+        }
         if (shortcut.source === "developer-ops") {
           return {
             path: `/api/developer/ops/export/download${q({ ...params, format })}`,

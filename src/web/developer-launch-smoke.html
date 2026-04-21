@@ -848,6 +848,19 @@
             item.label || "Launch review summary"
           );
         }
+        if (item.source === "developer-launch-mainline") {
+          return downloadApiFile(
+            `/api/developer/launch-mainline/download${q({
+              productId: target.productId,
+              productCode: target.productCode,
+              channel: target.channel,
+              format: item.format || "summary",
+              ...(item.params && typeof item.params === "object" ? item.params : {})
+            })}`,
+            item.fileName || "developer-launch-mainline-summary.txt",
+            item.label || "Launch mainline summary"
+          );
+        }
         if (item.source === "developer-launch-workflow") {
           return downloadApiFile(
             `/api/developer/launch-workflow/download${q({

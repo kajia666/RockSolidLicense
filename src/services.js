@@ -2613,6 +2613,12 @@ function buildReleaseMainlineFollowUpPayload({
     "summary",
     params
   );
+  const launchMainlineDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline summary",
+    "launch-mainline-summary.txt",
+    "summary",
+    params
+  );
   const launchSmokeKitDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
     "Launch smoke kit summary",
     "launch-smoke-kit.txt",
@@ -2883,7 +2889,8 @@ function buildReleaseMainlineFollowUpPayload({
   const recommendedDownloads = [
     releaseSummaryDownload,
     releaseChecklistDownload,
-    releaseZipDownload
+    releaseZipDownload,
+    launchMainlineDownload
   ];
   if (normalizedStatus !== "hold") {
     recommendedDownloads.push(launchSummaryDownload, launchReviewDownload, launchSmokeKitDownload);
@@ -3417,6 +3424,26 @@ function createLaunchWorkflowSmokeKitDownloadShortcut(label = "Launch smoke kit 
       params: params && typeof params === "object"
         ? { ...params }
       : {}
+    }
+  );
+}
+
+function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary", fileName = "launch-mainline-summary.txt", format = "summary", params = null) {
+  const normalizedFormat = String(format || "summary").trim().toLowerCase() || "summary";
+  return createLaunchWorkflowDownloadShortcut(
+    normalizedFormat === "zip"
+      ? "launch_mainline_zip"
+      : normalizedFormat === "checksums"
+        ? "launch_mainline_checksums"
+        : "launch_mainline_summary",
+    fileName,
+    label,
+    {
+      source: "developer-launch-mainline",
+      format: normalizedFormat,
+      params: params && typeof params === "object"
+        ? { ...params }
+        : {}
     }
   );
 }
@@ -4964,7 +4991,16 @@ function buildLaunchWorkflowSummaryPayload({
       key: "integration_host_skeleton",
       label: "Host skeleton",
       fileName: integrationPackage?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"
-    }
+    },
+    createLaunchMainlineDownloadShortcut(
+      "Launch mainline summary",
+      "launch-mainline-summary.txt",
+      "summary",
+      {
+        productCode: releasePackage?.manifest?.project?.code || null,
+        channel
+      }
+    )
   ];
   const nextActions = [];
   for (const item of Array.isArray(readiness.nextActions) ? readiness.nextActions.slice(0, 2) : []) {
@@ -6770,6 +6806,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
       params: { ...scopedOpsParams }
     }
   );
+  const mainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline summary",
+    "launch-mainline-summary.txt",
+    "summary",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const matchedOpsParams = {
     ...scopedOpsParams,
     reviewMode: "matched"
@@ -7290,6 +7336,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   if (handoffDownload) {
     pushRecommendedDownload(handoffDownload);
   }
+  pushRecommendedDownload(mainlineSummaryDownload);
   for (const item of Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 3) : []) {
     pushRecommendedDownload(item);
   }
@@ -7712,6 +7759,16 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       "launch-smoke-kit.txt",
       "summary",
       { reviewMode: "matched" }
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch mainline summary",
+      "launch-mainline-summary.txt",
+      "summary",
+      {
+        productCode: project.code || filters.productCode || null,
+        channel: manifest.channel || filters.channel || "stable",
+        reviewMode: "matched"
+      }
     )
   ];
   const bootstrapAction = authReadiness.bootstrapAction || null;

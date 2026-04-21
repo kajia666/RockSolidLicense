@@ -473,37 +473,25 @@
 
       function renderLastMainlineFollowUp(result = null) {
         const followUp = result?.followUp;
-        const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
+        const receipt = result?.receipt && typeof result.receipt === "object" ? result.receipt : null;
+        const actions = Array.isArray(receipt?.actions)
+          ? receipt.actions
+          : (Array.isArray(followUp?.actions) ? followUp.actions : []);
         if (!actions.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
-        const operationLabel = result?.operationLabel || followUp.operationLabel || followUp.operation || "launch";
-        const summary = followUp.summary || result?.message || "Review the next unified launch-mainline follow-up actions.";
-        const before = result?.result?.before?.counts || {};
-        const after = result?.result?.after?.counts || {};
-        const created = result?.result?.created && typeof result.result.created === "object"
-          ? result.result.created
-          : {};
-        const createdBatchList = Array.isArray(result?.result?.createdBatches)
-          ? result.result.createdBatches
-          : (Array.isArray(created.cardBatches) ? created.cardBatches : []);
-        const transitions = [
-          renderMainlineCountTransition("policies", before.policies, after.policies),
-          renderMainlineCountTransition("freshCards", before.freshCards, after.freshCards),
-          renderMainlineCountTransition("accounts", before.accounts, after.accounts),
-          renderMainlineCountTransition("activeEntitlements", before.activeEntitlements, after.activeEntitlements)
-        ].filter(Boolean).join("");
-        const createdBits = [
-          created.policy?.name ? renderTag(`policy:${created.policy.name}`, true) : "",
-          created.cardBatch?.batchCode ? renderTag(`batch:${created.cardBatch.batchCode}`, true) : "",
-          createdBatchList.length ? createdBatchList.map((item) => renderTag(`batch:${item.batchCode || item.label || item.key || "-"}`, true)).join("") : "",
-          created.account?.username ? renderTag(`account:${created.account.username}`, true) : "",
-          created.entitlement?.username ? renderTag(`entitlement:${created.entitlement.username}`, true) : ""
-        ].filter(Boolean).join("");
+        const operationLabel = receipt?.operationLabel || result?.operationLabel || followUp?.operationLabel || followUp?.operation || "launch";
+        const summary = receipt?.followUpSummary || receipt?.summary || followUp?.summary || result?.message || "Review the next unified launch-mainline follow-up actions.";
+        const transitions = Array.isArray(receipt?.transitions)
+          ? receipt.transitions.map((item) => renderMainlineCountTransition(item.key || item.label || "count", item.from, item.to)).filter(Boolean).join("")
+          : "";
+        const createdBits = Array.isArray(receipt?.created)
+          ? receipt.created.map((item) => renderTag(`${item.key || item.label || "created"}:${item.value || "-"}`, true)).join("")
+          : "";
         return `
           <div>
             ${renderTag(`after:${operationLabel}`, true)}
-            ${followUp.primaryAction?.label ? renderTag(`next:${followUp.primaryAction.label}`, true) : ""}
+            ${(receipt?.primaryAction?.label || followUp?.primaryAction?.label) ? renderTag(`next:${receipt?.primaryAction?.label || followUp?.primaryAction?.label}`, true) : ""}
             ${result?.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
             ${result?.channel ? renderTag(`channel:${result.channel}`, true) : ""}
           </div>
@@ -852,9 +840,10 @@
           productCode: target.productCode,
           channel: target.channel || "stable",
           operation: "bootstrap",
-          operationLabel: action?.label || response?.followUp?.operationLabel || "Launch Bootstrap",
+          operationLabel: response?.receipt?.operationLabel || action?.label || response?.followUp?.operationLabel || "Launch Bootstrap",
           message: response?.message || `Launch Bootstrap completed for ${target.productCode}.`,
           followUp: response?.followUp || null,
+          receipt: response?.receipt || null,
           result: response?.result || null
         };
         renderMainline();
@@ -902,9 +891,10 @@
           productCode: target.productCode,
           channel: target.channel || "stable",
           operation,
-          operationLabel: effectiveSetupAction?.label || (operation === "restock" ? "Inventory Refill" : "First Batch Setup"),
+          operationLabel: response?.receipt?.operationLabel || effectiveSetupAction?.label || (operation === "restock" ? "Inventory Refill" : "First Batch Setup"),
           message: response?.message || `${effectiveSetupAction?.label || (operation === "restock" ? "Inventory Refill" : "First Batch Setup")} completed for ${target.productCode}.`,
           followUp: response?.followUp || null,
+          receipt: response?.receipt || null,
           result: response?.result || null
         };
         renderMainline();

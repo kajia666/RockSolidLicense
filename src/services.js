@@ -3676,6 +3676,82 @@ function createLaunchWorkflowActionPlanStep({
   };
 }
 
+function buildLaunchMainlineActionReceipt({
+  operation = "",
+  result = null,
+  followUp = null
+} = {}) {
+  const normalizedOperation = String(operation || "").trim().toLowerCase();
+  const operationLabel = normalizedOperation === "restock"
+    ? "Inventory Refill"
+    : normalizedOperation === "first_batch_setup"
+      ? "First Batch Setup"
+      : "Launch Bootstrap";
+  const before = result?.before?.counts && typeof result.before.counts === "object"
+    ? result.before.counts
+    : {};
+  const after = result?.after?.counts && typeof result.after.counts === "object"
+    ? result.after.counts
+    : {};
+  const transitions = [
+    ["policies", "Policies"],
+    ["freshCards", "Fresh cards"],
+    ["accounts", "Accounts"],
+    ["activeEntitlements", "Active entitlements"]
+  ].map(([key, label]) => {
+    const from = Number.isFinite(Number(before[key])) ? Number(before[key]) : 0;
+    const to = Number.isFinite(Number(after[key])) ? Number(after[key]) : 0;
+    return {
+      key,
+      label,
+      from,
+      to,
+      changed: from !== to
+    };
+  }).filter((item) => item.changed);
+  const created = [];
+  if (result?.created?.policy?.name) {
+    created.push({ key: "policy", label: "Policy", value: result.created.policy.name });
+  }
+  if (result?.created?.cardBatch?.batchCode) {
+    created.push({ key: "batch", label: "Batch", value: result.created.cardBatch.batchCode });
+  }
+  for (const item of Array.isArray(result?.createdBatches) ? result.createdBatches : []) {
+    const value = item?.batchCode || item?.label || item?.key || null;
+    if (!value) {
+      continue;
+    }
+    created.push({ key: "batch", label: "Batch", value });
+  }
+  if (result?.created?.account?.username) {
+    created.push({ key: "account", label: "Account", value: result.created.account.username });
+  }
+  if (result?.created?.entitlement?.username) {
+    created.push({ key: "entitlement", label: "Entitlement", value: result.created.entitlement.username });
+  }
+  const actions = (Array.isArray(followUp?.actions) ? followUp.actions : [])
+    .map((item) => ({
+      key: item?.key || null,
+      label: item?.label || item?.key || "follow-up",
+      timing: item?.timing || null,
+      summary: item?.summary || "-",
+      workspaceAction: item?.workspaceAction || null,
+      recommendedDownload: item?.recommendedDownload || null
+    }))
+    .filter((item) => item.key || item.workspaceAction || item.recommendedDownload);
+  return {
+    operation: normalizedOperation || "bootstrap",
+    operationLabel,
+    message: result?.message || `${operationLabel} completed.`,
+    summary: result?.message || `${operationLabel} completed.`,
+    followUpSummary: followUp?.summary || result?.message || `${operationLabel} completed.`,
+    transitions,
+    created,
+    primaryAction: followUp?.primaryAction || null,
+    actions
+  };
+}
+
 function mergeLaunchWorkflowReviewStatus(current = "pass", next = "pass") {
   const severity = {
     pass: 0,
@@ -18320,6 +18396,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         eventType: body.eventType || null,
         actorType: body.actorType || null,
         entityType: body.entityType || null,
+        limit: body.limit || null,
         reviewMode: body.reviewMode || null
       };
 
@@ -18347,10 +18424,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const launchMainline = await this.developerLaunchMainlinePackage(token, selector, options);
+      const followUp = result?.followUp || null;
       return {
         operation,
         message: result?.message || `Launch mainline action ${operation} completed for ${selector.productCode}.`,
-        followUp: result?.followUp || null,
+        followUp,
+        receipt: buildLaunchMainlineActionReceipt({
+          operation,
+          result,
+          followUp
+        }),
         result,
         launchMainline
       };

@@ -6499,6 +6499,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
   };
   const buildReviewTargetRouteActionLabel = (routeAction = "") => {
     const normalized = String(routeAction || "").trim().toLowerCase();
+    if (normalized === "control-primary") {
+      return "Open Primary Control";
+    }
     if (normalized === "review-accounts") {
       return "Review Accounts";
     }
@@ -6533,7 +6536,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     if (!key || !autofocus) {
       return null;
     }
-    const resolvedRouteAction = routeAction || buildReviewTargetRouteAction(autofocus);
+    const resolvedRouteAction = routeAction || (focusParams?.focusKind ? "control-primary" : buildReviewTargetRouteAction(autofocus));
     return {
       key,
       autofocus,
@@ -7372,10 +7375,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
           : "Seed a starter account before account-login smoke validation can continue.",
       count: accountCandidates.length,
       status: accountLoginReady ? "pass" : registerEnabled ? "review" : "block",
-      routeActionLabel: "Review Accounts",
+      routeActionLabel: "Open Primary Control",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", "Open Ops Workspace", {
         reviewMode: "matched",
-        routeAction: "review-primary",
+        routeAction: "control-primary",
         actorType: "account",
         username: accountCandidates[0]?.username || "",
         ...buildSmokeReviewFocusParams("account", accountCandidates[0] || {
@@ -7407,10 +7410,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         : "Account-only smoke lanes should still confirm an internal starter entitlement before first validation.",
       count: entitlementCandidates.length,
       status: entitlementCandidates.length ? "pass" : "review",
-      routeActionLabel: "Review Entitlements",
+      routeActionLabel: "Open Primary Control",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", "Open Ops Workspace", {
         reviewMode: "matched",
-        routeAction: "review-primary",
+        routeAction: "control-primary",
         username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || "",
         ...buildSmokeReviewFocusParams("entitlement", entitlementCandidates[0] || {
           productCode: project.code || filters.productCode || null,
@@ -7455,10 +7458,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       summary: "After the first smoke login or recharge succeeds, confirm the resulting session and heartbeat state before wider rollout.",
       count: readyPaths.length,
       status: startupBlocked ? "review" : "pass",
-      routeActionLabel: "Review Sessions",
+      routeActionLabel: "Open Primary Control",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
         reviewMode: "matched",
-        routeAction: "review-primary",
+        routeAction: "control-primary",
         eventType: "session.login",
         actorType: "account",
         username: accountCandidates[0]?.username || "",

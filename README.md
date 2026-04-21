@@ -93,6 +93,7 @@
 - 现在这两个 `Primary Review Target` 在落到 `/developer/ops` 时，也会默认走更直接的 `Open Primary Control` 路线；如果当前对象已经有推荐处理动作，就会直接把主控制入口准备好，没有的话也会自然回退到主复查对象本身，继续减少 `Launch Review / Launch Smoke -> Developer Ops` 之间的手工判断
 - 因为这条主链现在默认已经是 `control-first`，所以 `Launch Review / Launch Smoke` 顶层的主复查按钮也已经统一改成更直白的 `Open Primary Control in Ops`，不再让软件作者看到 “Review” 文案却实际落到处理入口
 - 这条对齐现在也已经扩到导出的复查摘要里：`Primary Review Target` 的 `action=` 会明确写成 `Open Primary Control`，这样页面内按钮、路由动作和 handoff 文本三边口径一致
+- 现在这条 `control-first` 也开始扩到普通 `review targets`：只要某个 `Launch Review / Launch Smoke` 目标已经能定位到具体账号、授权或会话对象，底层就会默认走 `control-primary`，所以软件作者点进目标后会更接近直接进入建议处理动作，而不是先落到列表再自己找下一步
 - 上线工作台和项目页现在还会在页面内保留 `Last Launch Action` / follow-up 卡片：跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 之后，不只是状态栏提示一下，还会把下一步推荐工作台和可下载的首轮巡检摘要继续留在当前页面，方便软件作者顺着做完下一步
 - 现在还新增了独立的 `/developer/launch-review` 工作台，把当前 lane 的 launch workflow 和带过滤条件的 developer ops snapshot 合并到一个复查页里，适合在跑完 `Launch Bootstrap`、`First Batch Setup`、`Inventory Refill` 后，直接做首轮复查或交给 QA / 客服 / 值守同事
 - 这条 `Launch Review` 现在还会直接给出推荐工作台、复查动作计划和推荐下载，不只是把 launch 和 ops 放在同一页里，软件作者也能更快知道下一步该开哪个工作台、拿哪份摘要

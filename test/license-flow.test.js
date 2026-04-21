@@ -5778,6 +5778,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.routeAction));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.routeAction === "control-primary"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.focusKind));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => {
         const params = item.workspaceAction?.params || {};
@@ -6155,7 +6156,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => item.workspaceAction?.key === "ops" || item.workspaceAction?.key === "licenses"));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
       const params = item.workspaceAction?.params || {};
-      return params.focusKind && params.routeAction === "review-primary";
+      return params.focusKind && params.routeAction === "control-primary";
     }));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);

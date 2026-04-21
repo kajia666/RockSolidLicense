@@ -4712,6 +4712,48 @@ function buildLaunchQuickstartFollowUpPlan({
     "summary",
     preferredOpsAction?.workspaceAction?.params
   );
+  const launchMainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
+    normalizedOperation === "restock"
+      ? "Launch refill mainline summary"
+      : normalizedOperation === "first_batch_setup"
+        ? "Launch inventory mainline summary"
+        : "Launch mainline summary",
+    normalizedOperation === "restock"
+      ? "launch-mainline-restock-summary.txt"
+      : normalizedOperation === "first_batch_setup"
+        ? "launch-mainline-inventory-summary.txt"
+        : "launch-mainline-summary.txt",
+    "summary",
+    preferredOpsAction?.workspaceAction?.params
+  );
+  const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
+    normalizedOperation === "restock"
+      ? "Launch refill mainline checksums"
+      : normalizedOperation === "first_batch_setup"
+        ? "Launch inventory mainline checksums"
+        : "Launch mainline checksums",
+    normalizedOperation === "restock"
+      ? "launch-mainline-restock-sha256.txt"
+      : normalizedOperation === "first_batch_setup"
+        ? "launch-mainline-inventory-sha256.txt"
+        : "launch-mainline-sha256.txt",
+    "checksums",
+    preferredOpsAction?.workspaceAction?.params
+  );
+  const launchMainlineZipDownload = createLaunchMainlineDownloadShortcut(
+    normalizedOperation === "restock"
+      ? "Launch refill mainline zip"
+      : normalizedOperation === "first_batch_setup"
+        ? "Launch inventory mainline zip"
+        : "Launch mainline zip",
+    normalizedOperation === "restock"
+      ? "launch-mainline-restock.zip"
+      : normalizedOperation === "first_batch_setup"
+        ? "launch-mainline-inventory.zip"
+        : "launch-mainline.zip",
+    "zip",
+    preferredOpsAction?.workspaceAction?.params
+  );
   const actions = preferredKeys
     .map((key, index) => {
       const item = actionMap.get(key);
@@ -4729,7 +4771,7 @@ function buildLaunchQuickstartFollowUpPlan({
             "Open Launch Review",
             preferredOpsAction?.workspaceAction?.params
           );
-          nextItem.recommendedDownload = launchReviewDownload;
+          nextItem.recommendedDownload = launchMainlineSummaryDownload;
         }
         return nextItem;
       })
@@ -4739,6 +4781,13 @@ function buildLaunchQuickstartFollowUpPlan({
   const seenDownloadKeys = new Set();
   for (const item of actions) {
     const download = item?.recommendedDownload;
+    if (!download?.key || seenDownloadKeys.has(download.key)) {
+      continue;
+    }
+    seenDownloadKeys.add(download.key);
+    recommendedDownloads.push({ ...download });
+  }
+  for (const download of [launchReviewDownload, launchMainlineSummaryDownload, launchMainlineChecksumsDownload, launchMainlineZipDownload]) {
     if (!download?.key || seenDownloadKeys.has(download.key)) {
       continue;
     }

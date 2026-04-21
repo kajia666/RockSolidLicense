@@ -6192,7 +6192,9 @@ test("developer license quickstart bootstrap can create starter launch assets in
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "starter_account_handoff"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
-      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_zip"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "ops_runtime_smoke_summary"));
@@ -6202,7 +6204,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
       );
       assert.equal(
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
-        "developer-launch-review"
+        "developer-launch-mainline"
       );
       assert.match(bootstrap.followUp.summary, /Next:/);
 
@@ -6407,7 +6409,7 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_recheck"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "launch_smoke_kit"));
       assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "inventory_recheck"));
-      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary"));
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(!bootstrap.followUp.actions.some((item) => item.key === "card_redemption_watch"));
       assert.ok(bootstrap.followUp.actions.some((item) => item.key === "runtime_smoke"));
@@ -6417,7 +6419,7 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
       );
       assert.equal(
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
-        "developer-launch-review"
+        "developer-launch-mainline"
       );
 
     const entitlements = await getJson(
@@ -6540,7 +6542,9 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.ok(setup.followUp.actions.some((item) => item.key === "launch_recheck"));
       assert.ok(setup.followUp.actions.some((item) => item.key === "launch_smoke_kit"));
       assert.ok(setup.followUp.actions.some((item) => item.key === "runtime_smoke"));
-      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary"));
+      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_zip"));
+      assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
@@ -6550,7 +6554,7 @@ test("developer license quickstart first-batch setup can create recommended laun
       );
       assert.equal(
         setup.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
-        "developer-launch-review"
+        "developer-launch-mainline"
       );
 
     const cards = await getJson(
@@ -6706,7 +6710,9 @@ test("developer launch workflow can restock low launch inventory buffers", async
       assert.ok(restock.followUp.actions.some((item) => item.key === "launch_recheck"));
       assert.ok(restock.followUp.actions.some((item) => item.key === "launch_smoke_kit"));
       assert.ok(restock.followUp.actions.some((item) => item.key === "session_review"));
-      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
+      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary"));
+      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_zip"));
+      assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "launch_checklist"));
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
@@ -6716,7 +6722,7 @@ test("developer launch workflow can restock low launch inventory buffers", async
       );
       assert.equal(
         restock.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
-        "developer-launch-review"
+        "developer-launch-mainline"
       );
 
     const launchWorkflowAfterRestock = await getJson(

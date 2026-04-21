@@ -9027,6 +9027,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     reviewGate,
     smokeGate,
     opsGate,
+    primaryAction: overallGate.primaryAction || preferredStage?.gate?.primaryAction || null,
+    recommendedDownload: overallGate.recommendedDownload || preferredStage?.gate?.recommendedDownload || null,
     recommendedWorkspace: overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null,
     actionPlan,
     recommendedDownloads,
@@ -9061,6 +9063,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     ""
   ];
   appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
+  lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
+  lines.push(`Mainline Recommended Download: ${mainlineSummary.recommendedDownload?.label || mainlineSummary.recommendedDownload?.key || "-"}`);
   lines.push("");
   lines.push("Stage Gates:");
   const stageRows = [

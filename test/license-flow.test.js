@@ -5912,6 +5912,16 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(["hold", "attention", "ready"].includes(launchMainline.mainlineSummary.smokeGate?.status));
       assert.ok(["hold", "attention", "ready"].includes(launchMainline.mainlineSummary.opsGate?.status));
       assert.ok(launchMainline.mainlineSummary.overallGate?.recommendedWorkspace?.key);
+      assert.ok(launchMainline.mainlineSummary.primaryAction?.key);
+      assert.ok(launchMainline.mainlineSummary.recommendedDownload?.key);
+      assert.equal(
+        launchMainline.mainlineSummary.primaryAction?.key,
+        launchMainline.mainlineSummary.overallGate?.primaryAction?.key
+      );
+      assert.equal(
+        launchMainline.mainlineSummary.recommendedDownload?.key,
+        launchMainline.mainlineSummary.overallGate?.recommendedDownload?.key
+      );
       assert.ok(Array.isArray(launchMainline.mainlineSummary.actionPlan));
       assert.ok(launchMainline.mainlineSummary.actionPlan.some((item) => item.key === "release_mainline"));
       assert.ok(launchMainline.mainlineSummary.actionPlan.some((item) => item.key === "ops_mainline"));
@@ -5925,6 +5935,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "ops_summary"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
+      assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
+      assert.match(launchMainline.summaryText, /Mainline Recommended Download:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
       assert.match(launchMainline.summaryText, /Ops:/);
 
@@ -5936,6 +5948,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.contentType || "", /^text\/plain/);
       assert.match(launchMainlineSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-summary\.txt"/);
       assert.match(launchMainlineSummaryDownload.body, /RockSolid Developer Launch Mainline/);
+      assert.match(launchMainlineSummaryDownload.body, /Primary Mainline Action:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
 
       const forbidden = await getJsonExpectError(

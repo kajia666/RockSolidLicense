@@ -4795,9 +4795,9 @@ function buildLaunchQuickstartFollowUpPlan({
         };
         if (key === "launch_recheck") {
           nextItem.workspaceAction = createLaunchWorkflowWorkspaceShortcut(
-            "launch-review",
+            "launch-mainline",
             "summary",
-            "Open Launch Review",
+            "Open Launch Mainline",
             preferredOpsAction?.workspaceAction?.params
           );
           nextItem.recommendedDownload = launchMainlineSummaryDownload;

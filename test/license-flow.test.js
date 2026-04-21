@@ -6209,7 +6209,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
       assert.ok(bootstrap.followUp.recommendedDownloads.some((item) => item.key === "ops_runtime_smoke_summary"));
       assert.equal(
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.workspaceAction?.key,
-        "launch-review"
+        "launch-mainline"
       );
       assert.equal(
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
@@ -6560,7 +6560,7 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.ok(setup.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
       assert.equal(
         setup.followUp.actions.find((item) => item.key === "launch_recheck")?.workspaceAction?.key,
-        "launch-review"
+        "launch-mainline"
       );
       assert.equal(
         setup.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
@@ -6728,7 +6728,7 @@ test("developer launch workflow can restock low launch inventory buffers", async
       assert.ok(restock.followUp.recommendedDownloads.some((item) => item.key === "ops_card_redemption_watch_summary"));
       assert.equal(
         restock.followUp.actions.find((item) => item.key === "launch_recheck")?.workspaceAction?.key,
-        "launch-review"
+        "launch-mainline"
       );
       assert.equal(
         restock.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,

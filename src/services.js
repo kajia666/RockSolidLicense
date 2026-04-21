@@ -10367,6 +10367,27 @@ function buildDeveloperOpsSnapshotPayload({
   const normalizedAuditLogs = (auditLogs.items || []).map((item) => normalizeDeveloperOpsAuditLogItem(item));
   const scopeTag = sanitizeExportNameSegment(filters.productCode || "all-projects", "developer-ops");
   const timestampTag = buildExportTimestampTag(generatedAt);
+  const scope = {
+    accessibleProjectCount: accessibleProjects.length,
+    exportedProjectCount: normalizedProjects.length,
+    productCode: filters.productCode || null,
+    username: filters.username || null,
+    search: filters.search || null,
+    eventType: filters.eventType || null,
+    actorType: filters.actorType || null,
+    entityType: filters.entityType || null,
+    auditLimit: Number(filters.limit ?? auditLogs.filters?.limit ?? 0)
+  };
+  const routeReview = buildDeveloperOpsRouteReviewPayload({
+    filters,
+    accounts: normalizedAccounts,
+    entitlements: normalizedEntitlements,
+    sessions: normalizedSessions,
+    bindings: normalizedBindings,
+    blocks: normalizedBlocks,
+    auditLogs: normalizedAuditLogs
+  });
+  routeReview.downloads = buildDeveloperOpsRouteReviewDownloads(scope, routeReview);
 
   const payload = {
     generatedAt,
@@ -10374,17 +10395,7 @@ function buildDeveloperOpsSnapshotPayload({
     summaryFileName: `rocksolid-developer-ops-${scopeTag}-${timestampTag}-summary.txt`,
     developer,
     actor,
-    scope: {
-      accessibleProjectCount: accessibleProjects.length,
-      exportedProjectCount: normalizedProjects.length,
-      productCode: filters.productCode || null,
-      username: filters.username || null,
-      search: filters.search || null,
-      eventType: filters.eventType || null,
-      actorType: filters.actorType || null,
-      entityType: filters.entityType || null,
-      auditLimit: Number(filters.limit ?? auditLogs.filters?.limit ?? 0)
-    },
+    scope,
     summary: {
       projects: normalizedProjects.length,
       accounts: normalizedAccounts.length,
@@ -10404,15 +10415,7 @@ function buildDeveloperOpsSnapshotPayload({
       blocks: normalizedBlocks,
       auditLogs: normalizedAuditLogs
     }),
-    routeReview: buildDeveloperOpsRouteReviewPayload({
-      filters,
-      accounts: normalizedAccounts,
-      entitlements: normalizedEntitlements,
-      sessions: normalizedSessions,
-      bindings: normalizedBindings,
-      blocks: normalizedBlocks,
-      auditLogs: normalizedAuditLogs
-    }),
+    routeReview,
     projects: normalizedProjects,
     accounts: {
       total: Number(accounts.total ?? normalizedAccounts.length),
@@ -10613,6 +10616,79 @@ function buildDeveloperOpsRouteReviewRemainingSummaryText(payload = {}) {
     lines.push(`  control=${match.recommendedControl?.label || "-"}`);
   });
   return lines.join("\n");
+}
+
+function buildDeveloperOpsRouteReviewBaseDownloadParams(scope = {}) {
+  const params = {
+    productCode: scope.productCode || "",
+    username: scope.username || "",
+    search: scope.search || "",
+    eventType: scope.eventType || "",
+    actorType: scope.actorType || "",
+    entityType: scope.entityType || "",
+    limit: Number(scope.auditLimit || 0) || 60
+  };
+  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+    if (!params[field]) {
+      delete params[field];
+    }
+  }
+  return params;
+}
+
+function buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope = {}, routeReview = {}, target = "primary") {
+  const descriptor = buildDeveloperOpsRouteReviewMatchDescriptor({ routeReview }, target);
+  const match = descriptor.match;
+  const params = buildDeveloperOpsRouteReviewBaseDownloadParams(scope);
+  const item = match?.item && typeof match.item === "object" ? match.item : {};
+  if (item.productCode || item.projectCode) {
+    params.productCode = item.productCode || item.projectCode;
+  }
+  if (item.username) {
+    params.username = item.username;
+  }
+  if (match?.kind === "account") {
+    delete params.search;
+  } else if (match?.kind === "entitlement") {
+    params.entityType = "entitlement";
+    delete params.search;
+  } else if (match?.kind === "session") {
+    params.entityType = params.entityType || "session";
+    params.search = item.sessionId || item.id || params.search || "";
+  } else if (match?.kind === "device") {
+    params.entityType = params.entityType || (item.blockId ? "device_block" : (item.bindingId ? "device_binding" : ""));
+    params.search = item.fingerprint || params.search || "";
+  }
+  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+    if (!params[field]) {
+      delete params[field];
+    }
+  }
+  return {
+    key: `route_review_${target}`,
+    label: descriptor.label,
+    fileName: descriptor.fileName,
+    format: target === "next" ? "route-review-next" : "route-review-primary",
+    params
+  };
+}
+
+function buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope = {}) {
+  return {
+    key: "route_review_remaining",
+    label: "Remaining routed review summary",
+    fileName: "developer-ops-remaining-summary.txt",
+    format: "route-review-remaining",
+    params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+  };
+}
+
+function buildDeveloperOpsRouteReviewDownloads(scope = {}, routeReview = {}) {
+  return {
+    primary: buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope, routeReview, "primary"),
+    next: buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope, routeReview, "next"),
+    remaining: buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope)
+  };
 }
 
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {

@@ -75,6 +75,7 @@
 - 这块 `Route Review` 现在还能直接切到 `Show Routed Hits Only`，并一键跳去复查 `accounts / entitlements / sessions / devices / audit` 中命中的那一类对象，让首发后的复查链更像一个连续动作，而不是先看摘要再自己手工筛表
 - 现在这块 routed review 还会自动抽出一个 `Primary Match`，把首个命中的账号 / 授权 / 会话 / 设备 / 审计衍生对象直接预填进 quick controls，并保留到 `Prepared Control` 回执里；开发者运营台里的表格点击也统一走这条 focus-preparation 逻辑，所以从 `Launch Review` 跳进来后的复查会更像“已经帮你选好当前最该看的对象”
 - 这块 `Route Review` 现在还可以直接 `Review Primary Match` 和 `Download Primary Match Summary`，也就是软件作者从 `Launch Review` 跳进 `Developer Ops` 后，不只是知道当前主匹配对象是谁，还能围绕这个对象直接开始复查或导出更聚焦的一份摘要
+- 现在这块 `Route Review` 也会直接吃服务端下发的 `primary / next / remaining` 下载描述，所以 `Download Primary Match Summary / Next Match Summary / Remaining Queue Summary` 这三条 handoff 已经开始统一走 API 主线，而不是主要靠前端自己拼参数
 - 同一块 `Route Review` 现在也支持按命中的对象类型直接导出 `Accounts / Entitlements / Sessions / Devices / Audit` 摘要，所以首发后的 handoff 和异常回看不需要先手动重组过滤条件
 - 现在从 Launch Workflow、项目页内联 launch summary、授权快启跳进开发者运营台时，也会把 `reviewMode=matched` 一起带过去，让首发后的 ops 复查默认就落在更窄的命中视图里
 - 授权快启页现在也会保留 `Last Quickstart Action` 回执，直接总结 bootstrap / 首批发卡 / 补库存前后的 `policies / freshCards / accounts / activeEntitlements` 变化，并列出这次新建出来的 starter batch、starter account 或 internal entitlement，方便软件作者确认这一步到底补上了什么

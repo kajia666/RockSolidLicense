@@ -1077,6 +1077,16 @@
       }
 
       function buildRouteReviewPrimaryDownloadDescriptor(primary = buildPrimaryRouteReviewFocus(), review = collectRouteReview()) {
+        const serverDescriptor = review.serverRouteReview?.downloads?.primary;
+        if (serverDescriptor?.fileName) {
+          return {
+            label: serverDescriptor.label || "Primary match summary",
+            fileName: serverDescriptor.fileName,
+            params: serverDescriptor.params && typeof serverDescriptor.params === "object"
+              ? { ...serverDescriptor.params }
+              : {}
+          };
+        }
         if (!primary?.kind) {
           return null;
         }
@@ -1144,6 +1154,16 @@
       }
 
       function buildRouteReviewNextDownloadDescriptor(next = buildNextRouteReviewFocus(), review = collectRouteReview()) {
+        const serverDescriptor = review.serverRouteReview?.downloads?.next;
+        if (serverDescriptor?.fileName) {
+          return {
+            label: serverDescriptor.label || "Next match summary",
+            fileName: serverDescriptor.fileName,
+            params: serverDescriptor.params && typeof serverDescriptor.params === "object"
+              ? { ...serverDescriptor.params }
+              : {}
+          };
+        }
         if (!next?.kind) {
           return null;
         }
@@ -1208,6 +1228,30 @@
           return null;
         }
         return descriptor;
+      }
+
+      function buildRouteReviewRemainingDownloadDescriptor(review = collectRouteReview()) {
+        const serverDescriptor = review.serverRouteReview?.downloads?.remaining;
+        if (serverDescriptor?.fileName) {
+          return {
+            label: serverDescriptor.label || "Remaining routed review summary",
+            fileName: serverDescriptor.fileName,
+            params: serverDescriptor.params && typeof serverDescriptor.params === "object"
+              ? { ...serverDescriptor.params }
+              : {}
+          };
+        }
+        if (!review?.active) {
+          return null;
+        }
+        return {
+          label: "Remaining routed review summary",
+          fileName: "developer-ops-remaining-summary.txt",
+          params: {
+            ...filters(),
+            limit: filters().limit || 60
+          }
+        };
       }
 
       function routeReviewSectionPrimaryItem(review = collectRouteReview(), section = "") {
@@ -1727,6 +1771,7 @@
           nextFocus?.item?.recommendedControl?.label ? `<button type="button" class="secondary" data-route-review-action="control-next">Open Next Control</button>` : "",
           nextFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-next">Review Next Match</button>` : "",
           nextFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-next" ${token ? "" : "disabled"}>Download Next Match Summary</button>` : "",
+          review.serverRouteReview?.downloads?.remaining?.fileName ? `<button type="button" class="secondary" data-route-review-action="download-remaining" ${token ? "" : "disabled"}>Download Remaining Queue Summary</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-primary" ${token ? "" : "disabled"}>Download Primary Match Summary</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="download-accounts" ${token ? "" : "disabled"}>Download Accounts Summary</button>` : "",
@@ -1961,6 +2006,14 @@
           const descriptor = buildRouteReviewNextDownloadDescriptor();
           if (!descriptor) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match is available yet." };
+          }
+          await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
+          return;
+        }
+        if (normalizedAction === "download-remaining") {
+          const descriptor = buildRouteReviewRemainingDownloadDescriptor();
+          if (!descriptor) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No routed review queue is available yet." };
           }
           await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
           return;

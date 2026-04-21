@@ -7721,6 +7721,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.primaryMatch?.kind, "session");
     assert.equal(exportSnapshot.routeReview?.primaryMatch?.routeAction, "control-session");
     assert.equal(exportSnapshot.routeReview?.nextMatch?.kind, "audit");
+    assert.equal(exportSnapshot.routeReview?.downloads?.primary?.format, "route-review-primary");
+    assert.match(exportSnapshot.routeReview?.downloads?.primary?.fileName || "", /developer-ops-primary-session-summary\.txt/);
+    assert.equal(exportSnapshot.routeReview?.downloads?.remaining?.format, "route-review-remaining");
+    assert.equal(exportSnapshot.routeReview?.downloads?.remaining?.fileName, "developer-ops-remaining-summary.txt");
     assert.ok(Array.isArray(exportSnapshot.routeReview?.remainingMatches));
     assert.equal(exportSnapshot.routeReview?.remainingMatches?.[0]?.kind, "audit");
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
@@ -11198,6 +11202,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Continue Routed Review/);
     assert.match(html, /Complete Routed Review/);
     assert.match(html, /Download Next Match Summary/);
+    assert.match(html, /Download Remaining Queue Summary/);
     assert.match(html, /Primary control ready while reviewing:/);
     assert.match(html, /Next routed review ready\./);
     assert.match(html, /focus_account/);

@@ -211,6 +211,7 @@
           <div class="pill">Route: <code>/developer/launch-mainline</code></div>
           <div class="pill">API: <code>/api/developer/launch-mainline</code></div>
           <div class="pill">Download: <code>/api/developer/launch-mainline/download</code></div>
+          <div class="pill">Action: <code>/api/developer/launch-mainline/action</code></div>
         </div>
       </section>
 
@@ -299,6 +300,11 @@
         <div id="stage-gates-box" class="hint">Generate a launch mainline package to compare Release Mainline, Launch Workflow, Launch Review, Launch Smoke, and Developer Ops together.</div>
       </section>
 
+      <section class="card" style="margin-bottom: 18px;">
+        <h2>Last Mainline Action</h2>
+        <div id="mainline-followup-box" class="hint">Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.</div>
+      </section>
+
       <section class="wide">
         <article class="card">
           <h2>Launch Mainline Summary</h2>
@@ -315,6 +321,7 @@
       let token = "";
       let profile = null;
       let currentMainline = null;
+      let lastMainlineActionResult = null;
       const routeParams = new URLSearchParams(window.location.search);
       const requestedProductId = (routeParams.get("productId") || "").trim();
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
@@ -359,6 +366,15 @@
 
       function renderTag(value, strong = false) {
         return `<span class="tag ${strong ? "strong" : ""}">${esc(value)}</span>`;
+      }
+
+      function renderMainlineCountTransition(label, beforeValue, afterValue) {
+        const before = Number.isFinite(Number(beforeValue)) ? Number(beforeValue) : 0;
+        const after = Number.isFinite(Number(afterValue)) ? Number(afterValue) : 0;
+        if (before === after) {
+          return "";
+        }
+        return renderTag(`${label}:${before}->${after}`, true);
       }
 
       function buildWorkspaceUrl(path, params = {}) {
@@ -445,6 +461,68 @@
           ? currentMainline.mainlineSummary.workspaceActions
           : [];
         return items.find((item) => item.key === key) || null;
+      }
+
+      function currentMainlineSummary() {
+        return currentMainline?.mainlineSummary || {};
+      }
+
+      function currentMainlineActionPlan() {
+        return Array.isArray(currentMainlineSummary().actionPlan) ? currentMainlineSummary().actionPlan : [];
+      }
+
+      function renderLastMainlineFollowUp(result = null) {
+        const followUp = result?.followUp;
+        const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
+        if (!actions.length) {
+          return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
+        }
+        const operationLabel = result?.operationLabel || followUp.operationLabel || followUp.operation || "launch";
+        const summary = followUp.summary || result?.message || "Review the next unified launch-mainline follow-up actions.";
+        const before = result?.result?.before?.counts || {};
+        const after = result?.result?.after?.counts || {};
+        const created = result?.result?.created && typeof result.result.created === "object"
+          ? result.result.created
+          : {};
+        const createdBatchList = Array.isArray(result?.result?.createdBatches)
+          ? result.result.createdBatches
+          : (Array.isArray(created.cardBatches) ? created.cardBatches : []);
+        const transitions = [
+          renderMainlineCountTransition("policies", before.policies, after.policies),
+          renderMainlineCountTransition("freshCards", before.freshCards, after.freshCards),
+          renderMainlineCountTransition("accounts", before.accounts, after.accounts),
+          renderMainlineCountTransition("activeEntitlements", before.activeEntitlements, after.activeEntitlements)
+        ].filter(Boolean).join("");
+        const createdBits = [
+          created.policy?.name ? renderTag(`policy:${created.policy.name}`, true) : "",
+          created.cardBatch?.batchCode ? renderTag(`batch:${created.cardBatch.batchCode}`, true) : "",
+          createdBatchList.length ? createdBatchList.map((item) => renderTag(`batch:${item.batchCode || item.label || item.key || "-"}`, true)).join("") : "",
+          created.account?.username ? renderTag(`account:${created.account.username}`, true) : "",
+          created.entitlement?.username ? renderTag(`entitlement:${created.entitlement.username}`, true) : ""
+        ].filter(Boolean).join("");
+        return `
+          <div>
+            ${renderTag(`after:${operationLabel}`, true)}
+            ${followUp.primaryAction?.label ? renderTag(`next:${followUp.primaryAction.label}`, true) : ""}
+            ${result?.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
+            ${result?.channel ? renderTag(`channel:${result.channel}`, true) : ""}
+          </div>
+          <div class="hint" style="margin-top: 10px;">${esc(result?.message || "Last launch mainline action completed.")}</div>
+          <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
+          ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
+          ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
+          ${actions.map((item, index) => `
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(148,163,184,0.28);">
+              <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
+              ${(item.workspaceAction || item.recommendedDownload) ? `
+                <div class="actions" style="margin-top: 8px;">
+                  ${item.workspaceAction ? `<button type="button" class="secondary" data-mainline-followup-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
+                  ${item.recommendedDownload ? `<button type="button" data-mainline-followup-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                </div>
+              ` : ""}
+            </div>
+          `).join("")}
+        `;
       }
 
       function openWorkspaceAction(action) {
@@ -660,6 +738,8 @@
                 <div class="actions">
                   ${item.workspaceAction?.key ? `<button type="button" class="secondary" data-mainline-action-workspace-index="${index}">${esc(item.workspaceAction.label || "Open Workspace")}</button>` : ""}
                   ${item.recommendedDownload?.key ? `<button type="button" class="secondary" data-mainline-action-download-index="${index}">${esc(item.recommendedDownload.label || "Download Summary")}</button>` : ""}
+                  ${item.bootstrapAction ? `<button type="button" class="secondary" data-mainline-action-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
+                  ${item.setupAction ? `<button type="button" class="secondary" data-mainline-action-setup-index="${index}">${esc(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
                 </div>
               </div>
             `).join("")}
@@ -696,7 +776,7 @@
       }
 
       function renderMainline() {
-        const summary = currentMainline?.mainlineSummary || {};
+        const summary = currentMainlineSummary();
         const overallGate = summary.overallGate || null;
         el("mainline-overview-box").innerHTML = overallGate
           ? `
@@ -717,6 +797,7 @@
         el("mainline-actions-box").innerHTML = renderActionPlan(summary.actionPlan || []);
         el("mainline-downloads-box").innerHTML = renderDownloadButtons(summary.recommendedDownloads || []);
         el("stage-gates-box").innerHTML = renderStageGates(summary);
+        el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = currentMainline?.summaryText || "No launch mainline summary yet.";
       }
 
@@ -726,6 +807,17 @@
           throw new Error("Enter a project code before generating Launch Mainline.");
         }
         const data = await api(`/api/developer/launch-mainline${q(target)}`);
+        const nextProductCode = String(data?.manifest?.project?.code || target.productCode || "").trim().toUpperCase();
+        const nextChannel = String(data?.manifest?.channel || target.channel || "stable").trim().toLowerCase();
+        if (
+          lastMainlineActionResult
+          && (
+            String(lastMainlineActionResult.productCode || "").trim().toUpperCase() !== nextProductCode
+            || String(lastMainlineActionResult.channel || "stable").trim().toLowerCase() !== nextChannel
+          )
+        ) {
+          lastMainlineActionResult = null;
+        }
         currentMainline = data;
         renderMainline();
         setOutput({ launchMainline: data });
@@ -733,6 +825,101 @@
         const tone = overallGate?.status === "hold" ? "danger" : overallGate?.status === "attention" ? "warn" : "";
         setStatus(`Launch Mainline generated for ${target.productCode}. ${overallGate?.headline || "Unified handoff ready."}`, tone);
         return data;
+      }
+
+      async function runLaunchMainlineBootstrap(action = null) {
+        const target = currentMainlineTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running Launch Bootstrap.");
+        }
+        const response = await api("/api/developer/launch-mainline/action", {
+          method: "POST",
+          body: {
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            username: target.username,
+            search: target.search,
+            eventType: target.eventType,
+            actorType: target.actorType,
+            entityType: target.entityType,
+            reviewMode: target.reviewMode,
+            operation: "bootstrap"
+          }
+        });
+        currentMainline = response.launchMainline || currentMainline;
+        lastMainlineActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation: "bootstrap",
+          operationLabel: action?.label || response?.followUp?.operationLabel || "Launch Bootstrap",
+          message: response?.message || `Launch Bootstrap completed for ${target.productCode}.`,
+          followUp: response?.followUp || null,
+          result: response?.result || null
+        };
+        renderMainline();
+        const entitlement = response?.result?.created?.entitlement;
+        const entitlementNote = entitlement
+          ? ` Internal entitlement ${entitlement.username || entitlement.id} is now active through ${entitlement.endsAt || "-"}.`
+          : "";
+        const accountNote = response?.result?.created?.account?.temporaryPassword
+          ? " Temporary starter account password is included in API Output for secure handoff."
+          : "";
+        const followUpNote = response?.followUp?.primaryAction?.label
+          ? ` Next: ${response.followUp.primaryAction.label}.`
+          : (response?.followUp?.summary ? ` ${response.followUp.summary}` : "");
+        setStatus(`${response?.message || `Launch Bootstrap completed for ${target.productCode}.`} Launch Mainline reloaded.${entitlementNote}${accountNote}${followUpNote}`);
+        setOutput({ launchMainlineBootstrap: response, launchMainline: currentMainline });
+        return { launchMainlineBootstrap: response, launchMainline: currentMainline };
+      }
+
+      async function runLaunchMainlineSetup(setupAction = null) {
+        const target = currentMainlineTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before running First Batch Setup.");
+        }
+        const effectiveSetupAction = setupAction && typeof setupAction === "object" ? setupAction : null;
+        const requestedMode = effectiveSetupAction?.mode || "recommended";
+        const operation = effectiveSetupAction?.operation || "first_batch_setup";
+        const response = await api("/api/developer/launch-mainline/action", {
+          method: "POST",
+          body: {
+            productId: target.productId,
+            productCode: target.productCode,
+            channel: target.channel,
+            username: target.username,
+            search: target.search,
+            eventType: target.eventType,
+            actorType: target.actorType,
+            entityType: target.entityType,
+            reviewMode: target.reviewMode,
+            operation,
+            mode: requestedMode
+          }
+        });
+        currentMainline = response.launchMainline || currentMainline;
+        lastMainlineActionResult = {
+          productCode: target.productCode,
+          channel: target.channel || "stable",
+          operation,
+          operationLabel: effectiveSetupAction?.label || (operation === "restock" ? "Inventory Refill" : "First Batch Setup"),
+          message: response?.message || `${effectiveSetupAction?.label || (operation === "restock" ? "Inventory Refill" : "First Batch Setup")} completed for ${target.productCode}.`,
+          followUp: response?.followUp || null,
+          result: response?.result || null
+        };
+        renderMainline();
+        const createdLabels = Array.isArray(response?.result?.createdBatches)
+          ? response.result.createdBatches.map((item) => item.batchCode || item.label || item.key).filter(Boolean)
+          : [];
+        const setupLabel = effectiveSetupAction?.label || (operation === "restock" ? "Inventory Refill" : "First Batch Setup");
+        const followUpNote = response?.followUp?.primaryAction?.label
+          ? ` Next: ${response.followUp.primaryAction.label}.`
+          : (response?.followUp?.summary ? ` ${response.followUp.summary}` : "");
+        setStatus((createdLabels.length
+          ? `${setupLabel} created ${createdLabels.join(", ")} for ${target.productCode}.`
+          : (response?.message || `${setupLabel} completed for ${target.productCode}.`)) + ` Launch Mainline reloaded.${followUpNote}`);
+        setOutput({ launchMainlineSetup: response, launchMainline: currentMainline });
+        return { launchMainlineSetup: response, launchMainline: currentMainline };
       }
 
       async function handleLogin() {
@@ -760,6 +947,7 @@
         token = "";
         profile = null;
         currentMainline = null;
+        lastMainlineActionResult = null;
         el("session-meta").textContent = "No developer session yet.";
         el("mainline-summary").textContent = "Generate a launch mainline package to inspect the aggregated summary here.";
         el("mainline-overview-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>';
@@ -767,6 +955,7 @@
         el("mainline-actions-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the server-side action plan here.</div>';
         el("mainline-downloads-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>';
         el("stage-gates-box").innerHTML = '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
+        el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
         setOutput("Waiting for actions...");
         setStatus("Signed out. Sign in to generate a launch mainline package.");
       }
@@ -870,7 +1059,7 @@
         const actionDownloadButton = event.target.closest("[data-mainline-action-download-index]");
         if (actionDownloadButton) {
           const index = Number(actionDownloadButton.dataset.mainlineActionDownloadIndex || -1);
-          const item = currentMainline?.mainlineSummary?.actionPlan?.[index];
+          const item = currentMainlineActionPlan()[index];
           if (!item?.recommendedDownload) {
             return;
           }
@@ -878,6 +1067,30 @@
             setStatus(error.message, "danger");
             setOutput({ error: error.message });
           });
+          return;
+        }
+        const bootstrapButton = event.target.closest("[data-mainline-action-bootstrap-index]");
+        if (bootstrapButton) {
+          try {
+            const index = Number(bootstrapButton.dataset.mainlineActionBootstrapIndex || -1);
+            const item = currentMainlineActionPlan()[index];
+            await runLaunchMainlineBootstrap(item?.bootstrapAction || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
+        const setupButton = event.target.closest("[data-mainline-action-setup-index]");
+        if (setupButton) {
+          try {
+            const index = Number(setupButton.dataset.mainlineActionSetupIndex || -1);
+            const item = currentMainlineActionPlan()[index];
+            await runLaunchMainlineSetup(item?.setupAction || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
           return;
         }
         const recommendedDownloadButton = event.target.closest("[data-mainline-download-index]");
@@ -888,6 +1101,33 @@
             return;
           }
           await downloadMainlineRecommendedItem(item).catch((error) => {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          });
+          return;
+        }
+        const followUpWorkspaceButton = event.target.closest("[data-mainline-followup-workspace-index]");
+        if (followUpWorkspaceButton) {
+          const index = Number(followUpWorkspaceButton.dataset.mainlineFollowupWorkspaceIndex || -1);
+          const item = Array.isArray(lastMainlineActionResult?.followUp?.actions)
+            ? lastMainlineActionResult.followUp.actions[index]
+            : null;
+          if (!item?.workspaceAction) {
+            return;
+          }
+          openWorkspaceAction(item.workspaceAction);
+          return;
+        }
+        const followUpDownloadButton = event.target.closest("[data-mainline-followup-download-index]");
+        if (followUpDownloadButton) {
+          const index = Number(followUpDownloadButton.dataset.mainlineFollowupDownloadIndex || -1);
+          const item = Array.isArray(lastMainlineActionResult?.followUp?.actions)
+            ? lastMainlineActionResult.followUp.actions[index]
+            : null;
+          if (!item?.recommendedDownload) {
+            return;
+          }
+          await downloadMainlineRecommendedItem(item.recommendedDownload).catch((error) => {
             setStatus(error.message, "danger");
             setOutput({ error: error.message });
           });

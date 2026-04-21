@@ -1381,6 +1381,16 @@ export function createApp(overrides = {}) {
         sendAttachment(res, services.launchMainlineDownloadAsset(data, url.searchParams.get("format")));
         return;
       }
+      if (req.method === "POST" && url.pathname === "/api/developer/launch-mainline/action") {
+        const { body } = await readJsonBody(req);
+        const data = await services.developerRunLaunchMainlineAction(getBearerToken(req), body, {
+          publicBaseUrl: url.origin,
+          publicHost: url.hostname,
+          publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
+        });
+        sendJson(res, 200, { ok: true, data });
+        return;
+      }
 
       if (req.method === "POST" && url.pathname === "/api/developer/logout") {
         sendJson(res, 200, { ok: true, data: services.developerLogout(getBearerToken(req)) });

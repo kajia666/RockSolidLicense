@@ -6767,6 +6767,156 @@ test("developer launch workflow can restock low launch inventory buffers", async
   }
 });
 
+test("developer launch mainline action can bootstrap starter launch assets and return refreshed mainline", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.bootstrap.owner",
+        password: "LaunchMainlineBootstrapOwner123!",
+        displayName: "Launch Mainline Bootstrap Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_BOOT",
+        name: "Mainline Bootstrap App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: true,
+          allowCardLogin: false,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.bootstrap.owner",
+      password: "LaunchMainlineBootstrapOwner123!"
+    });
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_BOOT",
+        channel: "stable",
+        operation: "bootstrap"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "bootstrap");
+    assert.match(actionResult.message || "", /Launch quickstart bootstrap created/i);
+    assert.equal(actionResult.result?.productCode, "MAINLINE_BOOT");
+    assert.equal(actionResult.followUp?.operation, "bootstrap");
+    assert.ok(actionResult.result?.created?.policy);
+    assert.ok(actionResult.result?.created?.account);
+    assert.ok(actionResult.result?.created?.cardBatch);
+    assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_BOOT");
+    assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
+    assert.ok(actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can create first launch batches and return refreshed mainline", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.setup.owner",
+        password: "LaunchMainlineSetupOwner123!",
+        displayName: "Launch Mainline Setup Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_SETUP",
+        name: "Mainline Setup App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.setup.owner",
+      password: "LaunchMainlineSetupOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "MAINLINE_SETUP",
+        name: "Mainline Starter Duration",
+        durationDays: 30,
+        totalPoints: null,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_SETUP",
+        channel: "stable",
+        operation: "first_batch_setup",
+        mode: "recommended"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "first_batch_setup");
+    assert.equal(actionResult.result?.productCode, "MAINLINE_SETUP");
+    assert.equal(actionResult.result?.requestedMode, "recommended");
+    assert.equal(actionResult.followUp?.operation, "first_batch_setup");
+    assert.equal(actionResult.result?.createdBatches?.length, 2);
+    assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
+    assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
+    assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer accounts can change password, logout, and be disabled by admin", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -10433,8 +10583,10 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Developer Launch Mainline/);
     assert.match(html, /api\/developer\/launch-mainline/);
     assert.match(html, /api\/developer\/launch-mainline\/download/);
+    assert.match(html, /api\/developer\/launch-mainline\/action/);
     assert.match(html, /Generate Launch Mainline/);
     assert.match(html, /Launch Mainline Overview/);
+    assert.match(html, /Last Mainline Action/);
     assert.match(html, /Download Mainline JSON/);
     assert.match(html, /Download Mainline Summary/);
     assert.match(html, /Download Mainline Checksums/);

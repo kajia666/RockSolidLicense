@@ -18304,6 +18304,58 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return payload;
     },
 
+    async developerRunLaunchMainlineAction(token, body = {}, options = {}) {
+      requireField(body, "productCode");
+      requireField(body, "operation");
+
+      const operation = String(body.operation || "").trim().toLowerCase();
+      const selector = {
+        productId: body.productId || null,
+        productCode: readProductCodeInput(body),
+        projectCode: body.projectCode || null,
+        softwareCode: body.softwareCode || null,
+        channel: body.channel || null,
+        username: body.username || null,
+        search: body.search || null,
+        eventType: body.eventType || null,
+        actorType: body.actorType || null,
+        entityType: body.entityType || null,
+        reviewMode: body.reviewMode || null
+      };
+
+      let result = null;
+      if (operation === "bootstrap") {
+        result = await this.developerBootstrapLicenseQuickstart(token, {
+          productCode: selector.productCode
+        });
+      } else if (operation === "first_batch_setup") {
+        result = await this.developerCreateLicenseQuickstartFirstBatches(token, {
+          productCode: selector.productCode,
+          mode: body.mode || "recommended"
+        });
+      } else if (operation === "restock") {
+        result = await this.developerRestockLicenseQuickstartBatches(token, {
+          productCode: selector.productCode,
+          mode: body.mode || "recommended"
+        });
+      } else {
+        throw new AppError(
+          400,
+          "INVALID_LAUNCH_MAINLINE_ACTION",
+          "operation must be bootstrap, first_batch_setup, or restock."
+        );
+      }
+
+      const launchMainline = await this.developerLaunchMainlinePackage(token, selector, options);
+      return {
+        operation,
+        message: result?.message || `Launch mainline action ${operation} completed for ${selector.productCode}.`,
+        followUp: result?.followUp || null,
+        result,
+        launchMainline
+      };
+    },
+
     releasePackageDownloadAsset(payload, format = "json") {
       return buildReleasePackageDownloadAsset(payload, format);
     },

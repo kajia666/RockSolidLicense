@@ -2837,6 +2837,14 @@ function buildReleaseMainlineFollowUpPayload({
         setupAction: authReadiness.firstBatchSetupAction || null
       });
     }
+    pushActionPlan({
+      key: "launch_mainline_overview",
+      title: "Review the unified launch mainline handoff",
+      summary: "Use the aggregated launch-mainline handoff to recheck release, workflow, review, and smoke together after the blocker pass.",
+      status: "review",
+      priority: "secondary",
+      recommendedDownload: launchMainlineDownload
+    });
   } else {
     if (normalizedStatus === "attention") {
       pushActionPlan({
@@ -2895,6 +2903,14 @@ function buildReleaseMainlineFollowUpPayload({
       priority: "secondary",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: launchSmokeKitDownload
+    });
+    pushActionPlan({
+      key: "launch_mainline_overview",
+      title: "Review the unified launch mainline handoff",
+      summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned for this lane.",
+      status: normalizedStatus === "ready" ? "pass" : "review",
+      priority: "secondary",
+      recommendedDownload: launchMainlineDownload
     });
   }
 
@@ -5009,6 +5025,15 @@ function buildLaunchWorkflowSummaryPayload({
     : workflowStatus === "attention"
       ? "Review before launch"
       : "Launch lane looks aligned";
+  const launchMainlineDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline summary",
+    "launch-mainline-summary.txt",
+    "summary",
+    {
+      productCode: releasePackage?.manifest?.project?.code || null,
+      channel
+    }
+  );
   const recommendedDownloads = [
     {
       key: "launch_handoff_zip",
@@ -5366,6 +5391,14 @@ function buildLaunchWorkflowSummaryPayload({
     status: workflowStatus === "ready" ? "pass" : workflowStatus === "hold" ? "block" : "review",
     priority: actionPlan.length ? "secondary" : "primary",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff")
+  }));
+  pushActionPlan(createLaunchWorkflowActionPlanStep({
+    key: "launch_mainline_overview",
+    title: "Review the unified launch mainline handoff",
+    summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned for this lane.",
+    status: workflowStatus === "hold" ? "block" : workflowStatus === "attention" ? "review" : "pass",
+    priority: "secondary",
+    recommendedDownload: launchMainlineDownload
   }));
 
   const mainlineGate = buildLaunchMainlineGatePayload({
@@ -7307,6 +7340,14 @@ function buildDeveloperLaunchReviewSummaryPayload({
       : stayAction,
     recommendedDownload: reviewDownload
   }));
+  pushActionPlan(createLaunchWorkflowActionPlanStep({
+    key: "launch_mainline_overview",
+    title: "Review the unified launch mainline handoff",
+    summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke in one recheck loop.",
+    status: workflowBlocked ? "block" : workflowNeedsReview || queueHasUrgent ? "review" : "pass",
+    priority: "secondary",
+    recommendedDownload: mainlineSummaryDownload
+  }));
 
   for (const item of (Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : []).slice(0, 3)) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
@@ -7856,6 +7897,36 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"));
   pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"));
   pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", { reviewMode: "matched" }));
+  const launchMainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline summary",
+    "launch-mainline-summary.txt",
+    "summary",
+    {
+      productCode: project.code || filters.productCode || null,
+      channel: manifest.channel || filters.channel || "stable",
+      reviewMode: "matched"
+    }
+  );
+  const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline checksums",
+    "launch-mainline-sha256.txt",
+    "checksums",
+    {
+      productCode: project.code || filters.productCode || null,
+      channel: manifest.channel || filters.channel || "stable",
+      reviewMode: "matched"
+    }
+  );
+  const launchMainlineZipDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline zip",
+    "launch-mainline.zip",
+    "zip",
+    {
+      productCode: project.code || filters.productCode || null,
+      channel: manifest.channel || filters.channel || "stable",
+      reviewMode: "matched"
+    }
+  );
   const recommendedDownloads = [
     createLaunchWorkflowSmokeKitDownloadShortcut(
       "Launch smoke kit summary",
@@ -7863,36 +7934,9 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       "summary",
       { reviewMode: "matched" }
     ),
-    createLaunchMainlineDownloadShortcut(
-      "Launch mainline summary",
-      "launch-mainline-summary.txt",
-      "summary",
-      {
-        productCode: project.code || filters.productCode || null,
-        channel: manifest.channel || filters.channel || "stable",
-        reviewMode: "matched"
-      }
-    ),
-    createLaunchMainlineDownloadShortcut(
-      "Launch mainline checksums",
-      "launch-mainline-sha256.txt",
-      "checksums",
-      {
-        productCode: project.code || filters.productCode || null,
-        channel: manifest.channel || filters.channel || "stable",
-        reviewMode: "matched"
-      }
-    ),
-    createLaunchMainlineDownloadShortcut(
-      "Launch mainline zip",
-      "launch-mainline.zip",
-      "zip",
-      {
-        productCode: project.code || filters.productCode || null,
-        channel: manifest.channel || filters.channel || "stable",
-        reviewMode: "matched"
-      }
-    )
+    launchMainlineSummaryDownload,
+    launchMainlineChecksumsDownload,
+    launchMainlineZipDownload
   ];
   const bootstrapAction = authReadiness.bootstrapAction || null;
   const setupAction = authReadiness.firstBatchSetupAction || null;
@@ -8265,6 +8309,14 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", { reviewMode: "matched" })
     } : null,
+    {
+      key: "launch_mainline_overview",
+      title: "Review the unified launch mainline handoff",
+      priority: "secondary",
+      status: startupBlocked || !readyPaths.length ? "block" : blockingPaths.length || reviewPaths.length ? "review" : "pass",
+      summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned while smoke validation runs.",
+      recommendedDownload: launchMainlineSummaryDownload
+    },
     primaryReviewTarget?.workspaceAction ? {
       key: "launch_smoke_primary_review",
       title: buildPrimaryReviewStepTitle(

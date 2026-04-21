@@ -5784,6 +5784,11 @@ test("developer release package export bundles integration, versions, and notice
         launchReview.reviewSummary.primaryReviewTarget?.routeActionLabel || "",
         /^Open (Account|Entitlement|Session|Device) Control$/
       );
+      assert.ok(launchReview.reviewSummary.primaryReviewTarget?.recommendedControl);
+      assert.match(
+        launchReview.reviewSummary.primaryReviewTarget?.recommendedControl?.label || "",
+        /^Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)$/i
+      );
       assert.match(
         launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.fileName || "",
         /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/
@@ -5796,6 +5801,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
+      assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.recommendedControl?.label));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => /^control-(account|entitlement|session|device)$/.test(item.workspaceAction?.params?.routeAction || "")));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) =>
@@ -5821,6 +5827,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
       assert.match(launchReview.summaryText, /Launch Review Focus Targets:/);
       assert.match(launchReview.summaryText, /action=Open (Account|Entitlement|Session|Device) Control/);
+      assert.match(
+        launchReview.summaryText,
+        /control=Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)/i
+      );
       assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(

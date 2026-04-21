@@ -6324,6 +6324,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     lines.push(
       `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
       + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
+      + `${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}`
       + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
       + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
     );
@@ -6335,6 +6336,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       lines.push(
         `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
         + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
+        + `${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}`
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
         + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
       );
@@ -6627,13 +6629,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
     status = "review",
     fileName = "developer-ops-summary.txt",
     focusParams = null,
-    routeAction = ""
+    routeAction = "",
+    recommendedControl = null
   } = {}) => {
     if (!key || !autofocus) {
       return null;
     }
     const resolvedRouteAction = routeAction || (focusParams?.focusKind ? buildFocusKindControlRouteAction(focusParams.focusKind) : buildReviewTargetRouteAction(autofocus));
     const controlLabel = buildFocusKindControlLabel(focusParams?.focusKind, " in Ops");
+    const resolvedRecommendedControl = recommendedControl
+      || buildDeveloperOpsReviewGenericControlFromFocusParams(focusParams);
     return {
       key,
       autofocus,
@@ -6643,6 +6648,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       summary: summary || "-",
       routeAction: resolvedRouteAction,
       routeActionLabel: buildReviewTargetRouteActionLabel(resolvedRouteAction, focusParams?.focusKind),
+      recommendedControl: resolvedRecommendedControl || null,
       workspaceAction: createLaunchWorkflowWorkspaceShortcut(
         "ops",
         autofocus,
@@ -6768,6 +6774,12 @@ function buildDeveloperLaunchReviewSummaryPayload({
       summary: "Inspect routed starter accounts and related entitlement state before widening launch access.",
       count: reviewTargetCounts.accounts,
       fileName: "developer-ops-accounts-summary.txt",
+      recommendedControl: buildDeveloperOpsReviewRecommendedControl(
+        "account",
+        Array.isArray(opsSnapshot?.accounts) && opsSnapshot.accounts.length
+          ? opsSnapshot.accounts[0]
+          : null
+      ),
       focusParams: buildReviewTargetFocusParams(
         "account",
         Array.isArray(opsSnapshot?.accounts) && opsSnapshot.accounts.length
@@ -6782,6 +6794,12 @@ function buildDeveloperLaunchReviewSummaryPayload({
       summary: "Confirm starter entitlements, lifecycle state, and grant windows for the routed launch lane.",
       count: reviewTargetCounts.entitlements,
       fileName: "developer-ops-entitlements-summary.txt",
+      recommendedControl: buildDeveloperOpsReviewRecommendedControl(
+        "entitlement",
+        Array.isArray(opsSnapshot?.entitlements) && opsSnapshot.entitlements.length
+          ? opsSnapshot.entitlements[0]
+          : null
+      ),
       focusParams: buildReviewTargetFocusParams(
         "entitlement",
         Array.isArray(opsSnapshot?.entitlements) && opsSnapshot.entitlements.length
@@ -6797,6 +6815,12 @@ function buildDeveloperLaunchReviewSummaryPayload({
       count: reviewTargetCounts.sessions,
       status: queueHasUrgent ? "review" : "pass",
       fileName: "developer-ops-sessions-summary.txt",
+      recommendedControl: buildDeveloperOpsReviewRecommendedControl(
+        "session",
+        Array.isArray(opsSnapshot?.sessions) && opsSnapshot.sessions.length
+          ? opsSnapshot.sessions[0]
+          : null
+      ),
       focusParams: buildReviewTargetFocusParams(
         "session",
         Array.isArray(opsSnapshot?.sessions) && opsSnapshot.sessions.length
@@ -6811,6 +6835,14 @@ function buildDeveloperLaunchReviewSummaryPayload({
       summary: "Inspect routed bindings and device blocks so first-wave users are not accidentally locked out.",
       count: reviewTargetCounts.devices,
       fileName: "developer-ops-devices-summary.txt",
+      recommendedControl: buildDeveloperOpsReviewRecommendedControl(
+        "device",
+        Array.isArray(opsSnapshot?.blocks) && opsSnapshot.blocks.length
+          ? { ...opsSnapshot.blocks[0], kind: "block", blockId: opsSnapshot.blocks[0]?.id || null }
+          : Array.isArray(opsSnapshot?.bindings) && opsSnapshot.bindings.length
+            ? { ...opsSnapshot.bindings[0], kind: "binding", bindingId: opsSnapshot.bindings[0]?.id || null }
+            : null
+      ),
       focusParams: buildReviewTargetFocusParams(
         "device",
         Array.isArray(opsSnapshot?.blocks) && opsSnapshot.blocks.length
@@ -6842,7 +6874,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const visibleReviewTargets = reviewTargets.some((item) => Number(item.count || 0) > 0)
     ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
     : reviewTargets.slice(0, 2);
-  const rawPrimaryReviewTarget = visibleReviewTargets.find((item) => item?.workspaceAction) || visibleReviewTargets[0] || null;
+  const rawPrimaryReviewTarget = visibleReviewTargets.find((item) => recommendedControlPriority(item?.recommendedControl) >= 2 && item?.workspaceAction)
+    || visibleReviewTargets.find((item) => recommendedControlPriority(item?.recommendedControl) >= 1 && item?.workspaceAction)
+    || visibleReviewTargets.find((item) => item?.workspaceAction)
+    || visibleReviewTargets[0]
+    || null;
   const primaryReviewWorkspaceAction = rawPrimaryReviewTarget?.workspaceAction
     ? {
         ...rawPrimaryReviewTarget.workspaceAction,
@@ -7446,7 +7482,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     status = "review",
     routeActionLabel = "",
     workspaceAction = null,
-    recommendedDownload = null
+    recommendedDownload = null,
+    recommendedControl = null
   } = {}) => {
     if (!key) {
       return null;
@@ -7458,6 +7495,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       count: Number.isFinite(Number(count)) ? Number(count) : 0,
       status: status || "review",
       routeActionLabel: routeActionLabel || "",
+      recommendedControl: recommendedControl || null,
       workspaceAction: workspaceAction || null,
       recommendedDownload: recommendedDownload || null
     };
@@ -7474,6 +7512,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       count: accountCandidates.length,
       status: accountLoginReady ? "pass" : registerEnabled ? "review" : "block",
       routeActionLabel: buildFocusKindControlLabel("account"),
+      recommendedControl: buildDeveloperOpsReviewRecommendedControl("account", accountCandidates[0] || null),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", buildFocusKindControlLabel("account", " in Ops"), {
         reviewMode: "matched",
         routeAction: buildFocusKindControlRouteAction("account"),
@@ -7509,6 +7548,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       count: entitlementCandidates.length,
       status: entitlementCandidates.length ? "pass" : "review",
       routeActionLabel: buildFocusKindControlLabel("entitlement"),
+      recommendedControl: buildDeveloperOpsReviewRecommendedControl("entitlement", entitlementCandidates[0] || null),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", buildFocusKindControlLabel("entitlement", " in Ops"), {
         reviewMode: "matched",
         routeAction: buildFocusKindControlRouteAction("entitlement"),
@@ -7623,7 +7663,11 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const visibleReviewTargets = reviewTargets.some((item) => Number(item.count || 0) > 0)
     ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
     : reviewTargets.slice(0, 2);
-  const rawPrimaryReviewTarget = visibleReviewTargets.find((item) => item?.workspaceAction) || visibleReviewTargets[0] || null;
+  const rawPrimaryReviewTarget = visibleReviewTargets.find((item) => recommendedControlPriority(item?.recommendedControl) >= 2 && item?.workspaceAction)
+    || visibleReviewTargets.find((item) => recommendedControlPriority(item?.recommendedControl) >= 1 && item?.workspaceAction)
+    || visibleReviewTargets.find((item) => item?.workspaceAction)
+    || visibleReviewTargets[0]
+    || null;
   const primaryReviewTarget = rawPrimaryReviewTarget?.workspaceAction?.key === "ops"
     ? {
         ...rawPrimaryReviewTarget,
@@ -7845,6 +7889,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     lines.push(
       `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
       + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
+      + `${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}`
       + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
       + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
     );
@@ -7855,7 +7900,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     lines.push("Launch Smoke Review Targets:");
     for (const item of smokeSummary.reviewTargets) {
       lines.push(
-        `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+        `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
       );
     }
   }
@@ -8913,6 +8958,183 @@ function buildSnapshotFocusDeviceRecommendedControl(item = {}) {
     });
   }
   return null;
+}
+
+function buildDeveloperOpsReviewAccountRecommendedControl(item = {}) {
+  const accountId = item.accountId || item.id || null;
+  const status = String(item.accountStatus || item.status || "").trim().toLowerCase();
+  if (accountId && status === "disabled") {
+    return buildSnapshotControl("account_status", "Prepare account re-enable", {
+      accountId,
+      targetStatus: "active"
+    });
+  }
+  return null;
+}
+
+function buildDeveloperOpsReviewGenericControl(focusKind = "", item = {}) {
+  const normalizedFocusKind = String(focusKind || "").trim().toLowerCase();
+  if (normalizedFocusKind === "account" && (item.accountId || item.id)) {
+    return buildSnapshotControl("focus_account", "Prepare account control", {
+      accountId: item.accountId || item.id || null,
+      productCode: item.productCode || item.projectCode || null,
+      username: item.username || null
+    });
+  }
+  if (normalizedFocusKind === "entitlement" && (item.entitlementId || item.id)) {
+    return buildSnapshotControl("focus_entitlement", "Prepare entitlement control", {
+      entitlementId: item.entitlementId || item.id || null,
+      productCode: item.productCode || item.projectCode || null,
+      username: item.username || null
+    });
+  }
+  if (normalizedFocusKind === "session" && (item.sessionId || item.id)) {
+    return buildSnapshotControl("focus_session", "Prepare session control", {
+      sessionId: item.sessionId || item.id || null,
+      productCode: item.productCode || item.projectCode || null,
+      username: item.username || null,
+      fingerprint: item.fingerprint || null,
+      reason: item.reason || item.revokedReason || null
+    });
+  }
+  if (normalizedFocusKind === "device" && (item.bindingId || item.blockId || item.id || item.fingerprint)) {
+    return buildSnapshotControl("focus_device", "Prepare device control", {
+      bindingId: item.bindingId || (String(item.kind || "").trim().toLowerCase() === "binding" ? item.id || null : null),
+      blockId: item.blockId || (String(item.kind || "").trim().toLowerCase() === "block" ? item.id || null : null),
+      fingerprint: item.fingerprint || item.deviceFingerprint || null,
+      productCode: item.productCode || item.projectCode || null,
+      username: item.username || null,
+      reason: item.reason || null
+    });
+  }
+  return null;
+}
+
+function buildDeveloperOpsReviewGenericControlFromFocusParams(focusParams = {}) {
+  const focusKind = String(focusParams?.focusKind || "").trim().toLowerCase();
+  if (focusKind === "account") {
+    return buildSnapshotControl("focus_account", "Prepare account control", {
+      accountId: focusParams.focusAccountId || null,
+      productCode: focusParams.focusProductCode || null,
+      username: focusParams.focusUsername || null
+    });
+  }
+  if (focusKind === "entitlement") {
+    return buildSnapshotControl("focus_entitlement", "Prepare entitlement control", {
+      entitlementId: focusParams.focusEntitlementId || null,
+      productCode: focusParams.focusProductCode || null,
+      username: focusParams.focusUsername || null
+    });
+  }
+  if (focusKind === "session") {
+    return buildSnapshotControl("focus_session", "Prepare session control", {
+      sessionId: focusParams.focusSessionId || null,
+      productCode: focusParams.focusProductCode || null,
+      username: focusParams.focusUsername || null,
+      fingerprint: focusParams.focusFingerprint || null,
+      reason: focusParams.focusReason || null
+    });
+  }
+  if (focusKind === "device") {
+    return buildSnapshotControl("focus_device", "Prepare device control", {
+      bindingId: focusParams.focusBindingId || null,
+      blockId: focusParams.focusBlockId || null,
+      fingerprint: focusParams.focusFingerprint || null,
+      productCode: focusParams.focusProductCode || null,
+      username: focusParams.focusUsername || null,
+      reason: focusParams.focusReason || null
+    });
+  }
+  return null;
+}
+
+function recommendedControlPriority(control = null) {
+  if (!control || typeof control !== "object" || !String(control.type || "").trim()) {
+    return 0;
+  }
+  const normalizedType = String(control.type || "").trim().toLowerCase();
+  if (normalizedType.startsWith("focus_")) {
+    return 1;
+  }
+  return 2;
+}
+
+function buildDeveloperOpsReviewEntitlementRecommendedControl(item = {}) {
+  const entitlementId = item.entitlementId || item.id || null;
+  const lifecycleStatus = String(item.lifecycleStatus || item.status || "").trim().toLowerCase();
+  if (entitlementId && lifecycleStatus === "frozen") {
+    return buildSnapshotControl("entitlement_status", "Prepare entitlement resume", {
+      entitlementId,
+      targetStatus: "active"
+    });
+  }
+  if (entitlementId && lifecycleStatus === "expired") {
+    return buildSnapshotControl("extend_entitlement", "Prepare 7-day extension", {
+      entitlementId,
+      days: 7
+    });
+  }
+  if (entitlementId && Number(item.totalPoints || 0) > 0 && Number(item.remainingPoints || 0) <= 0) {
+    return buildSnapshotControl("adjust_points", "Prepare point top-up", {
+      entitlementId,
+      mode: "add",
+      points: 1
+    });
+  }
+  return null;
+}
+
+function buildDeveloperOpsReviewSessionRecommendedControl(item = {}) {
+  const sessionId = item.sessionId || item.id || null;
+  const status = String(item.status || "").trim().toLowerCase();
+  if (sessionId && status === "active") {
+    return buildSnapshotControl("revoke_session", "Prepare session review", {
+      sessionId,
+      reason: item.reason || item.revokedReason || "launch_review_follow_up"
+    });
+  }
+  return null;
+}
+
+function buildDeveloperOpsReviewDeviceRecommendedControl(item = {}) {
+  const status = String(item.status || "").trim().toLowerCase();
+  const kind = String(item.kind || "").trim().toLowerCase();
+  if ((item.blockId || item.id) && kind === "block" && status === "active") {
+    return buildSnapshotControl("unblock_device", "Prepare device unblock review", {
+      blockId: item.blockId || item.id || null,
+      productCode: item.productCode || item.projectCode || null,
+      fingerprint: item.fingerprint || item.deviceFingerprint || null,
+      reason: item.reason || "launch_review_unblock"
+    });
+  }
+  return null;
+}
+
+function buildDeveloperOpsReviewRecommendedControl(focusKind = "", item = {}) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  if (item.recommendedControl && typeof item.recommendedControl === "object") {
+    return { ...item.recommendedControl };
+  }
+  const normalizedFocusKind = String(focusKind || "").trim().toLowerCase();
+  if (normalizedFocusKind === "account") {
+    return buildDeveloperOpsReviewAccountRecommendedControl(item)
+      || buildDeveloperOpsReviewGenericControl(normalizedFocusKind, item);
+  }
+  if (normalizedFocusKind === "entitlement") {
+    return buildDeveloperOpsReviewEntitlementRecommendedControl(item)
+      || buildDeveloperOpsReviewGenericControl(normalizedFocusKind, item);
+  }
+  if (normalizedFocusKind === "session") {
+    return buildDeveloperOpsReviewSessionRecommendedControl(item)
+      || buildDeveloperOpsReviewGenericControl(normalizedFocusKind, item);
+  }
+  if (normalizedFocusKind === "device") {
+    return buildDeveloperOpsReviewDeviceRecommendedControl(item)
+      || buildDeveloperOpsReviewGenericControl(normalizedFocusKind, item);
+  }
+  return buildDeveloperOpsReviewGenericControl(normalizedFocusKind, item);
 }
 
 function buildSnapshotActionQueueItem(sourceType, item = {}) {

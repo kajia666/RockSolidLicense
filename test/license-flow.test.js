@@ -5770,6 +5770,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.key, "ops");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.label, "Open Primary Control in Ops");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.params?.routeAction, "control-primary");
+      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.routeActionLabel, "Open Primary Control");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
       assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));
@@ -5794,7 +5795,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
       assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
       assert.match(launchReview.summaryText, /Launch Review Focus Targets:/);
-      assert.match(launchReview.summaryText, /action=Review /);
+      assert.match(launchReview.summaryText, /action=Open Primary Control/);
       assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(
@@ -6146,6 +6147,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.key, "ops");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.label, "Open Primary Control in Ops");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.params?.routeAction, "control-primary");
+    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.routeActionLabel, "Open Primary Control");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));

@@ -6758,6 +6758,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const primaryReviewTarget = primaryReviewWorkspaceAction
     ? {
         ...rawPrimaryReviewTarget,
+        routeActionLabel: "Open Primary Control",
         workspaceAction: primaryReviewWorkspaceAction,
         recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(primaryReviewWorkspaceAction)
           || rawPrimaryReviewTarget.recommendedDownload
@@ -7525,6 +7526,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const primaryReviewTarget = rawPrimaryReviewTarget?.workspaceAction?.key === "ops"
     ? {
         ...rawPrimaryReviewTarget,
+        routeActionLabel: "Open Primary Control",
         workspaceAction: {
           ...rawPrimaryReviewTarget.workspaceAction,
           label: "Open Primary Control in Ops",

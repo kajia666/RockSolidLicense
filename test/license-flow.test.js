@@ -5268,6 +5268,12 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(releasePackage.deliveryChecklist.items.some((item) => item.key === "client_hardening" && item.status === "review"));
     assert.ok(releasePackage.deliveryChecklist.items.some((item) => item.key === "handoff_artifacts"));
     assert.equal(releasePackage.mainlineFollowUp.status, "hold");
+    assert.ok(releasePackage.mainlineFollowUp.mainlineGate);
+    assert.equal(releasePackage.mainlineFollowUp.mainlineGate.status, "hold");
+    assert.ok((releasePackage.mainlineFollowUp.mainlineGate.blockingCount || 0) >= 1);
+    assert.ok(releasePackage.mainlineFollowUp.mainlineGate.recommendedWorkspace?.key);
+    assert.ok(releasePackage.mainlineFollowUp.mainlineGate.primaryAction?.key);
+    assert.ok(releasePackage.mainlineFollowUp.mainlineGate.recommendedDownload?.key);
     assert.ok(releasePackage.mainlineFollowUp.recommendedWorkspace?.key);
     assert.ok(Array.isArray(releasePackage.mainlineFollowUp.workspaceActions));
     assert.ok(releasePackage.mainlineFollowUp.workspaceActions.some((item) => item.key === "release"));
@@ -5278,6 +5284,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
     assert.equal(releasePackage.manifest.release.mainlineFollowUp.status, "hold");
+    assert.equal(releasePackage.manifest.release.mainlineFollowUp.mainlineGate?.status, "hold");
     assert.equal(releasePackage.manifest.integration.project.code, "RELPKG_ALPHA");
     assert.equal(releasePackage.manifest.integration.project.featureConfig.allowCardLogin, false);
     assert.equal(releasePackage.manifest.actor.type, "member");
@@ -5332,6 +5339,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Delivery Checklist:/);
     assert.match(releasePackage.summaryText, /Release Checks:/);
     assert.match(releasePackage.summaryText, /Release Mainline Follow-up:/);
+    assert.match(releasePackage.summaryText, /Launch Mainline Gate:/);
+    assert.match(releasePackage.summaryText, /- status: HOLD/);
     assert.match(releasePackage.summaryText, /hostConfig=host-config\/rocksolid_host_config\.env/);
     assert.match(releasePackage.summaryText, /cmake=cmake-consumer\/CMakeLists\.txt/);
     assert.match(releasePackage.summaryText, /vs2022Guide=vs2022-consumer\/RELPKG_ALPHA_vs2022_quickstart\.md/);
@@ -5352,6 +5361,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseSummaryDownload.body, /Blocking Notices: 1/);
     assert.match(releaseSummaryDownload.body, /Release Readiness: HOLD/);
     assert.match(releaseSummaryDownload.body, /Release Mainline Follow-up:/);
+    assert.match(releaseSummaryDownload.body, /Launch Mainline Gate:/);
 
     const releaseChecklistDownload = await getText(
       baseUrl,

@@ -2068,6 +2068,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push(`- Status: ${String(mainlineFollowUp.status || "unknown").toUpperCase()}`);
     lines.push(`- Title: ${mainlineFollowUp.title || "-"}`);
     lines.push(`- Message: ${mainlineFollowUp.message || "-"}`);
+    appendLaunchMainlineGateText(lines, mainlineFollowUp.mainlineGate, formatWorkspaceActionText);
     if (mainlineFollowUp.recommendedWorkspace) {
       lines.push(`- Recommended Workspace: ${formatWorkspaceActionText(mainlineFollowUp.recommendedWorkspace)}`);
     }
@@ -2888,10 +2889,22 @@ function buildReleaseMainlineFollowUpPayload({
     recommendedDownloads.push(launchSummaryDownload, launchReviewDownload, launchSmokeKitDownload);
   }
 
+  const mainlineGate = buildLaunchMainlineGatePayload({
+    status: normalizedStatus,
+    headline: title,
+    summary: message,
+    blockingCount: readiness.blockingChecks ?? deliveryChecklist.blockItems ?? 0,
+    attentionCount: readiness.attentionChecks ?? deliveryChecklist.reviewItems ?? 0,
+    recommendedWorkspace,
+    actionPlan,
+    recommendedDownloads
+  });
+
   return {
     status: normalizedStatus,
     title,
     message,
+    mainlineGate,
     recommendedWorkspace,
     workspaceActions,
     actionPlan,

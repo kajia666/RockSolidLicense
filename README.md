@@ -91,6 +91,7 @@
 - 这两个 `Primary Review Target` 现在连跳转按钮文案也统一收成了 `Review Primary Match in Ops`，这样软件作者或值守同事看到按钮时，就能更直接判断“点下去会立即围绕主复查对象继续看”，而不是再猜是不是只是打开一个总览页
 - 现在这两个 `Primary Review Target` 的窄摘要也正式并进了 `Launch Review / Launch Smoke` 的顶层推荐下载里，所以到页后不必先展开目标区块找按钮，直接就能把当前最关键对象的复查摘要拿走
 - 现在这两个工作台的顶层推荐下载里，还会顺手带上 `Remaining matches summary`，所以首轮 handoff 不只是围绕主对象，也能把主对象之后剩下的复查队列一起交给 QA、客服或值守同事
+- 这条“剩余复查队列”现在也已经正式并进 `Launch Review / Launch Smoke` 的 action plan，所以主链不只是多一个下载入口，而是会明确告诉软件作者：处理完主对象后，下一步该把剩余队列怎么交接出去
 - 同时，这两个 `Primary Review Target` 现在也会提前出现在 `Launch Review / Launch Smoke` 顶层的工作台动作里，所以到页后不需要先往下滚到目标区块，最上面就能直接点进主复查对象
 - 它们现在也已经正式并进 `Launch Review / Launch Smoke` 的动作计划里，所以这一步不只是“一个重点目标”，而是更像系统已经帮软件作者把“先看这个对象”排进了当前流程
 - 现在这两个 `Primary Review Target` 在落到 `/developer/ops` 时，也会默认走更直接的 `Open Primary Control` 路线；如果当前对象已经有推荐处理动作，就会直接把主控制入口准备好，没有的话也会自然回退到主复查对象本身，继续减少 `Launch Review / Launch Smoke -> Developer Ops` 之间的手工判断

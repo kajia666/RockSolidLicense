@@ -7009,6 +7009,21 @@ function buildDeveloperLaunchReviewSummaryPayload({
     }));
   }
 
+  const remainingReviewDownload = primaryReviewTarget?.workspaceAction?.key === "ops"
+    ? createLaunchWorkflowRemainingOpsDownloadShortcut(primaryReviewTarget.workspaceAction)
+    : null;
+  if (remainingReviewDownload) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_remaining_queue",
+      title: "Hand off the remaining routed review queue",
+      summary: "After the primary routed control is ready, pass the remaining matched runtime queue forward so review can continue without rebuilding filters.",
+      status: "review",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction: primaryReviewTarget?.workspaceAction || null,
+      recommendedDownload: remainingReviewDownload
+    }));
+  }
+
   for (const item of visibleReviewTargets.slice(0, 3)) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: item.key,
@@ -7827,6 +7842,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       )} after setup so first-wave follow-up starts with the most important match.`,
       workspaceAction: primaryReviewTarget.workspaceAction,
       recommendedDownload: primaryReviewTarget.recommendedDownload || null
+    } : null,
+    remainingReviewDownload ? {
+      key: "launch_smoke_remaining_queue",
+      title: "Hand off the remaining routed review queue",
+      priority: "secondary",
+      status: "review",
+      summary: "After the primary smoke follow-up is ready, pass the remaining matched runtime queue forward so review can continue without rebuilding filters.",
+      workspaceAction: primaryReviewTarget?.workspaceAction || null,
+      recommendedDownload: remainingReviewDownload
     } : null,
     ...visibleReviewTargets.slice(0, 3).map((item) => createLaunchWorkflowActionPlanStep({
       key: item.key,

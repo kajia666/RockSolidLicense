@@ -5769,6 +5769,10 @@ test("developer release package export bundles integration, versions, and notice
         && /^Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)$/i.test(item.title || "")
       ));
       assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
+        item.key === "launch_review_remaining_queue"
+        && item.recommendedDownload?.fileName === "developer-ops-remaining-summary.txt"
+      ));
+      assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
         /^ops_/.test(item.key || "")
         && /^Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)$/i.test(item.title || "")
       ));
@@ -6189,6 +6193,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
       /^launch_smoke_(accounts|entitlements)_review$/.test(item.key || "")
       && /^Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)$/i.test(item.title || "")
+    ));
+    assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
+      item.key === "launch_smoke_remaining_queue"
+      && item.recommendedDownload?.fileName === "developer-ops-remaining-summary.txt"
     ));
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);

@@ -6767,7 +6767,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const primaryReviewWorkspaceAction = rawPrimaryReviewTarget?.workspaceAction
     ? {
         ...rawPrimaryReviewTarget.workspaceAction,
-        label: "Open Primary Control in Ops",
+        label: buildFocusKindControlLabel(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind, " in Ops"),
         params: {
           ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
             ? rawPrimaryReviewTarget.workspaceAction.params
@@ -6779,7 +6779,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const primaryReviewTarget = primaryReviewWorkspaceAction
     ? {
         ...rawPrimaryReviewTarget,
-        routeActionLabel: "Open Primary Control",
+        routeActionLabel: buildFocusKindControlLabel(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind),
         workspaceAction: primaryReviewWorkspaceAction,
         recommendedDownload: createLaunchWorkflowPrimaryOpsDownloadShortcut(primaryReviewWorkspaceAction)
           || rawPrimaryReviewTarget.recommendedDownload
@@ -7547,10 +7547,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const primaryReviewTarget = rawPrimaryReviewTarget?.workspaceAction?.key === "ops"
     ? {
         ...rawPrimaryReviewTarget,
-        routeActionLabel: "Open Primary Control",
+        routeActionLabel: buildFocusKindControlLabel(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind),
         workspaceAction: {
           ...rawPrimaryReviewTarget.workspaceAction,
-          label: "Open Primary Control in Ops",
+          label: buildFocusKindControlLabel(rawPrimaryReviewTarget.workspaceAction?.params?.focusKind, " in Ops"),
           params: {
             ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
               ? rawPrimaryReviewTarget.workspaceAction.params

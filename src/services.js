@@ -6746,7 +6746,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const primaryReviewWorkspaceAction = rawPrimaryReviewTarget?.workspaceAction
     ? {
         ...rawPrimaryReviewTarget.workspaceAction,
-        label: "Review Primary Match in Ops",
+        label: "Open Primary Control in Ops",
         params: {
           ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
             ? rawPrimaryReviewTarget.workspaceAction.params
@@ -6804,8 +6804,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
   if (primaryReviewTarget?.workspaceAction) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_review_primary_target",
-      title: "Review the primary routed match",
-      summary: primaryReviewTarget.summary || "Open the primary routed object before scanning the rest of the matched runtime scope.",
+      title: "Open the primary routed control",
+      summary: primaryReviewTarget.summary || "Open the primary routed control before scanning the rest of the matched runtime scope.",
       status: primaryReviewTarget.status || "review",
       priority: actionPlan.length ? "secondary" : "primary",
       workspaceAction: primaryReviewTarget.workspaceAction,
@@ -7527,7 +7527,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         ...rawPrimaryReviewTarget,
         workspaceAction: {
           ...rawPrimaryReviewTarget.workspaceAction,
-          label: "Review Primary Match in Ops",
+          label: "Open Primary Control in Ops",
           params: {
             ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
               ? rawPrimaryReviewTarget.workspaceAction.params
@@ -7596,10 +7596,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     } : null,
     primaryReviewTarget?.workspaceAction ? {
       key: "launch_smoke_primary_review",
-      title: "Review the primary smoke follow-up",
+      title: "Open the primary smoke control",
       priority: "secondary",
       status: primaryReviewTarget.status || "review",
-      summary: primaryReviewTarget.summary || "Open the primary routed object after smoke setup so first-wave follow-up starts with the most important match.",
+      summary: primaryReviewTarget.summary || "Open the primary smoke control after setup so first-wave follow-up starts with the most important match.",
       workspaceAction: primaryReviewTarget.workspaceAction,
       recommendedDownload: primaryReviewTarget.recommendedDownload || null
     } : null,

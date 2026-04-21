@@ -5910,17 +5910,21 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchMainline.mainlineSummary.workflowGate?.status, "hold");
       assert.ok(["hold", "attention", "ready"].includes(launchMainline.mainlineSummary.reviewGate?.status));
       assert.ok(["hold", "attention", "ready"].includes(launchMainline.mainlineSummary.smokeGate?.status));
+      assert.ok(["hold", "attention", "ready"].includes(launchMainline.mainlineSummary.opsGate?.status));
       assert.ok(launchMainline.mainlineSummary.overallGate?.recommendedWorkspace?.key);
       assert.ok(Array.isArray(launchMainline.mainlineSummary.actionPlan));
       assert.ok(launchMainline.mainlineSummary.actionPlan.some((item) => item.key === "release_mainline"));
+      assert.ok(launchMainline.mainlineSummary.actionPlan.some((item) => item.key === "ops_mainline"));
       assert.ok(Array.isArray(launchMainline.mainlineSummary.recommendedDownloads));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "release_summary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_summary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_smoke_kit_summary"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "ops_summary"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
+      assert.match(launchMainline.summaryText, /Ops:/);
 
       const launchMainlineSummaryDownload = await getText(
         baseUrl,

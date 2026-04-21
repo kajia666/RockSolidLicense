@@ -8672,12 +8672,15 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   launchWorkflow = null,
   launchReview = null,
   launchSmoke = null,
+  opsSnapshot = null,
   filters = {}
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
   const reviewSummary = launchReview?.reviewSummary || {};
   const smokeSummary = launchSmoke?.smokeSummary || {};
+  const opsOverview = opsSnapshot?.overview || {};
+  const opsRouteReview = opsSnapshot?.routeReview || {};
   const releaseGate = releaseFollowUp.mainlineGate || null;
   const workflowGate = workflowSummary.mainlineGate || null;
   const reviewGate = reviewSummary.mainlineGate || null;
@@ -8702,6 +8705,185 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     ...(filters.username ? { username: filters.username } : {}),
     ...(filters.search ? { search: filters.search } : {})
   };
+  const compactOpsFocusParams = (kind = "", item = {}) => {
+    if (!item || typeof item !== "object") {
+      return {};
+    }
+    const productCode = item.productCode || item.projectCode || null;
+    const username = item.username || null;
+    const reason = item.reason || item.revokedReason || null;
+    const fingerprint = item.fingerprint || null;
+    const compact = (value = {}) => Object.fromEntries(
+      Object.entries(value).filter(([, entry]) => entry !== null && entry !== undefined && String(entry).trim() !== "")
+    );
+    if (kind === "account") {
+      return compact({
+        focusKind: "account",
+        focusAccountId: item.accountId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "entitlement") {
+      return compact({
+        focusKind: "entitlement",
+        focusEntitlementId: item.entitlementId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "session") {
+      return compact({
+        focusKind: "session",
+        focusSessionId: item.sessionId || item.id || null,
+        focusUsername: username,
+        focusReason: reason,
+        focusFingerprint: fingerprint,
+        focusProductCode: productCode
+      });
+    }
+    if (kind === "device") {
+      return compact({
+        focusKind: "device",
+        focusBindingId: item.bindingId || (String(item.kind || "").trim().toLowerCase() === "binding" ? item.id || null : null),
+        focusBlockId: item.blockId || (String(item.kind || "").trim().toLowerCase() === "block" ? item.id || null : null),
+        focusFingerprint: fingerprint,
+        focusReason: reason,
+        focusProductCode: productCode
+      });
+    }
+    return compact({
+      focusUsername: username,
+      focusReason: reason,
+      focusFingerprint: fingerprint,
+      focusProductCode: productCode
+    });
+  };
+  const buildOpsAutofocus = (section = "") => {
+    const normalized = String(section || "").trim().toLowerCase();
+    if (normalized === "accounts") {
+      return "accounts";
+    }
+    if (normalized === "entitlements") {
+      return "entitlements";
+    }
+    if (normalized === "sessions") {
+      return "sessions";
+    }
+    if (normalized === "devices") {
+      return "devices";
+    }
+    if (normalized === "audit") {
+      return "audit";
+    }
+    return "snapshot";
+  };
+  const createOpsMainlineWorkspaceAction = (match = null) => {
+    if (!match || typeof match !== "object") {
+      return createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params);
+    }
+    const focusKind = String(match.kind || "").trim().toLowerCase();
+    const item = match.item && typeof match.item === "object" ? match.item : {};
+    const routeAction = focusKind && focusKind !== "audit"
+      ? buildFocusKindControlRouteAction(focusKind)
+      : match.routeAction || "review-primary";
+    const label = /^control-/.test(routeAction)
+      ? buildFocusKindControlLabel(focusKind, " in Ops")
+      : (match.routeActionLabel || "Open Ops Workspace");
+    return createLaunchWorkflowWorkspaceShortcut(
+      "ops",
+      buildOpsAutofocus(match.section),
+      label,
+      {
+        ...params,
+        reviewMode: params.reviewMode || "matched",
+        ...compactOpsFocusParams(focusKind, item),
+        routeAction
+      }
+    );
+  };
+  const createOpsMainlineDownload = (descriptor = null) => {
+    if (!descriptor?.key) {
+      return null;
+    }
+    return createLaunchWorkflowDownloadShortcut(
+      descriptor.key,
+      descriptor.fileName || "developer-ops-summary.txt",
+      descriptor.label || descriptor.key,
+      {
+        source: "developer-ops",
+        format: descriptor.format || "summary",
+        params: descriptor.params && typeof descriptor.params === "object"
+          ? { ...descriptor.params }
+          : {}
+      }
+    );
+  };
+  const opsPrimaryWorkspaceAction = createOpsMainlineWorkspaceAction(opsRouteReview.primaryMatch || null);
+  const opsSummaryDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_summary",
+    opsSnapshot?.summaryFileName || "developer-ops-summary.txt",
+    "Developer ops summary",
+    {
+      source: "developer-ops",
+      format: "summary",
+      params
+    }
+  );
+  const opsPrimaryDownload = createOpsMainlineDownload(opsRouteReview.downloads?.primary || null);
+  const opsRemainingDownload = createOpsMainlineDownload(opsRouteReview.downloads?.remaining || null);
+  const opsActionPlan = [];
+  if (opsRouteReview.primaryMatch) {
+    opsActionPlan.push(createLaunchWorkflowActionPlanStep({
+      key: "ops_primary_review",
+      title: opsRouteReview.primaryMatch.recommendedControl?.label
+        || opsRouteReview.primaryMatch.routeActionLabel
+        || "Open primary ops review",
+      summary: opsRouteReview.primaryMatch.summary
+        || opsOverview.headline
+        || "Review the primary routed Developer Ops match for this launch lane.",
+      status: String(opsOverview.status || "").trim().toLowerCase() === "attention" ? "review" : "pass",
+      priority: "primary",
+      workspaceAction: opsPrimaryWorkspaceAction,
+      recommendedDownload: opsPrimaryDownload || opsSummaryDownload
+    }));
+  } else {
+    opsActionPlan.push(createLaunchWorkflowActionPlanStep({
+      key: "ops_snapshot_review",
+      title: "Open Developer Ops snapshot review",
+      summary: opsOverview.headline || "Review the routed Developer Ops snapshot for this launch lane.",
+      status: String(opsOverview.status || "").trim().toLowerCase() === "ok" ? "pass" : "review",
+      priority: "primary",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params),
+      recommendedDownload: opsSummaryDownload
+    }));
+  }
+  if (opsRemainingDownload && Number(opsRouteReview.totalMatches || 0) > 1) {
+    opsActionPlan.push(createLaunchWorkflowActionPlanStep({
+      key: "ops_remaining_queue",
+      title: "Hand off the remaining routed ops review queue",
+      summary: "Keep the remaining routed ops matches together so first-wave runtime review can continue without rebuilding filters.",
+      status: "review",
+      priority: "secondary",
+      workspaceAction: opsPrimaryWorkspaceAction,
+      recommendedDownload: opsRemainingDownload
+    }));
+  }
+  const opsGate = buildLaunchMainlineGatePayload({
+    status: String(opsOverview.status || "").trim().toLowerCase() === "ok" ? "ready" : "attention",
+    headline: opsOverview.headline || "Developer Ops launch review",
+    summary: opsRouteReview.primaryMatch?.summary
+      || opsOverview.highlights?.[0]
+      || "Review the routed Developer Ops snapshot after smoke validation completes.",
+    blockingCount: Number(opsOverview.metrics?.activeBlocks || 0),
+    attentionCount: Number(opsRouteReview.totalMatches || 0),
+    recommendedWorkspace: opsPrimaryWorkspaceAction,
+    actionPlan: opsActionPlan,
+    recommendedDownloads: [opsPrimaryDownload, opsRemainingDownload, opsSummaryDownload].filter(Boolean)
+  });
   const stageDefinitions = [
     {
       key: "release",
@@ -8751,6 +8933,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         "summary",
         params
       )
+    },
+    {
+      key: "ops",
+      label: "Developer Ops",
+      gate: opsGate,
+      summaryDownload: opsSummaryDownload
     }
   ];
   const gateRank = (status = "unknown") => {
@@ -8819,6 +9007,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     workflowGate,
     reviewGate,
     smokeGate,
+    opsGate,
     recommendedWorkspace: overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null,
     actionPlan,
     recommendedDownloads,
@@ -8859,7 +9048,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     ["Release", mainlineSummary.releaseGate],
     ["Workflow", mainlineSummary.workflowGate],
     ["Review", mainlineSummary.reviewGate],
-    ["Smoke", mainlineSummary.smokeGate]
+    ["Smoke", mainlineSummary.smokeGate],
+    ["Ops", mainlineSummary.opsGate]
   ];
   for (const [label, gate] of stageRows) {
     lines.push(`- ${label}: ${String(gate?.status || "unknown").toUpperCase()} | ${gate?.headline || "-"} | workspace=${formatWorkspaceActionText(gate?.recommendedWorkspace)}`);
@@ -8891,12 +9081,14 @@ function buildDeveloperLaunchMainlinePayload({
   launchWorkflow = null,
   launchReview = null,
   launchSmoke = null,
+  opsSnapshot = null,
   filters = {}
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
     || launchReview?.manifest?.project
     || launchSmoke?.manifest?.project
+    || opsSnapshot?.projects?.[0]
     || {};
   const channel = releasePackage?.manifest?.release?.channel
     || launchWorkflow?.manifest?.channel
@@ -8935,8 +9127,9 @@ function buildDeveloperLaunchMainlinePayload({
     launchWorkflow,
     launchReview,
     launchSmoke,
+    opsSnapshot,
     notes: [
-      "This package aggregates release, workflow, review, and smoke gates into one service-driven launch mainline summary.",
+      "This package aggregates release, workflow, review, smoke, and ops gates into one service-driven launch mainline summary.",
       "Use it when release duty, QA, support, or launch ops need one handoff artifact for the current rollout lane."
     ]
   };
@@ -8945,6 +9138,7 @@ function buildDeveloperLaunchMainlinePayload({
     launchWorkflow,
     launchReview,
     launchSmoke,
+    opsSnapshot,
     filters: payload.filters
   });
   payload.summaryText = buildDeveloperLaunchMainlineSummaryText(payload);
@@ -8981,6 +9175,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     `smoke/${payload.launchSmoke?.summaryFileName || "launch-smoke-summary.txt"}`,
     payload.launchSmoke?.summaryText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    `ops/${payload.opsSnapshot?.summaryFileName || "developer-ops-summary.txt"}`,
+    payload.opsSnapshot?.summaryText || ""
   );
   return files;
 }
@@ -18019,6 +18218,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const launchWorkflow = await this.developerLaunchWorkflowPackage(token, selector, options);
       const launchReview = await this.developerLaunchReviewPackage(token, selector, options);
       const launchSmoke = await this.developerLaunchSmokeKit(token, selector, options);
+      const opsSnapshot = await this.developerExportOpsSnapshot(token, selector, options);
       const project = releasePackage?.manifest?.project || launchWorkflow?.manifest?.project || {};
       const channel = releasePackage?.manifest?.release?.channel || launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
       const payload = buildDeveloperLaunchMainlinePayload({
@@ -18027,6 +18227,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         launchWorkflow,
         launchReview,
         launchSmoke,
+        opsSnapshot,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,

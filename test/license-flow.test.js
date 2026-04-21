@@ -6126,6 +6126,9 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.workspaceActions?.some((item) => item.key === "ops"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.workspaceAction?.key === "launch-smoke"));
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
+    assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);
+    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.key, "ops");
+    assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.params?.routeAction, "review-primary");
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => item.workspaceAction?.key === "ops" || item.workspaceAction?.key === "licenses"));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
       const params = item.workspaceAction?.params || {};
@@ -6133,6 +6136,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     }));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
+    assert.match(smokeKit.summaryText || "", /Launch Smoke Primary Review Target:/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Review Targets:/);
 
     const smokeKitSummaryDownload = await getText(
@@ -10200,6 +10204,7 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /Run Launch Bootstrap/);
     assert.match(html, /Run First Batch Setup/);
     assert.match(html, /Run Inventory Refill/);
+    assert.match(html, /Primary Review Target/);
     assert.match(html, /downloadSmokeRecommendedItem/);
     assert.match(html, /openWorkspaceAction/);
     assert.match(html, /runLaunchSmokeBootstrap/);
@@ -10207,6 +10212,7 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /renderLastSmokeFollowUp/);
     assert.match(html, /currentSmokeSummary/);
     assert.match(html, /currentActionPlan/);
+    assert.match(html, /currentPrimarySmokeReviewTarget/);
     assert.match(html, /currentSmokeReviewTargets/);
     assert.match(html, /currentWorkspaceActions/);
     assert.match(html, /currentRecommendedDownloads/);

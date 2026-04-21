@@ -13,6 +13,7 @@ Use it when the software author or launch-duty teammate needs one place to:
 - keep the latest smoke-action receipt and follow-up steps visible in the same workspace
 - move straight into the most relevant review target, such as accounts, entitlements, card inventory, sessions, or audit
   When possible, the routed workspace also carries the first direct focus object so the next workspace can prepare the primary review target automatically.
+- see a dedicated `Primary Review Target` before the broader target list, so launch-duty teammates can open the most important follow-up first
 - jump into the next recommended workspace for runtime follow-up
 - download a smoke-validation handoff as `json / summary / checksums / zip`
 

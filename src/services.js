@@ -7355,6 +7355,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const visibleReviewTargets = reviewTargets.some((item) => Number(item.count || 0) > 0)
     ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
     : reviewTargets.slice(0, 2);
+  const primaryReviewTarget = visibleReviewTargets.find((item) => item?.workspaceAction) || visibleReviewTargets[0] || null;
   for (const item of visibleReviewTargets) {
     pushWorkspaceAction(item.workspaceAction);
   }
@@ -7442,6 +7443,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     rechargeCardCandidates,
     recommendedWorkspace,
     workspaceActions,
+    primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     actionPlan,
     recommendedDownloads
@@ -7527,6 +7529,18 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
         `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
       );
     }
+  }
+
+  if (smokeSummary.primaryReviewTarget) {
+    const item = smokeSummary.primaryReviewTarget;
+    lines.push("");
+    lines.push("Launch Smoke Primary Review Target:");
+    lines.push(
+      `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
+      + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
+      + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+      + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+    );
   }
 
   if (Array.isArray(smokeSummary.reviewTargets) && smokeSummary.reviewTargets.length) {

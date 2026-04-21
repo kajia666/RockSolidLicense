@@ -5768,6 +5768,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.params?.routeAction, "review-primary");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
       assert.equal(launchReview.reviewSummary.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
+      assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
@@ -6138,6 +6139,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.params?.routeAction, "review-primary");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.fileName, "developer-ops-primary-summary.txt");
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.recommendedDownload?.label, "Primary match summary");
+    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-primary-summary.txt"));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => item.workspaceAction?.key === "ops" || item.workspaceAction?.key === "licenses"));
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
       const params = item.workspaceAction?.params || {};

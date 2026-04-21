@@ -6852,6 +6852,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
     });
   };
   pushRecommendedDownload(reviewDownload);
+  if (primaryReviewTarget?.recommendedDownload) {
+    pushRecommendedDownload(primaryReviewTarget.recommendedDownload);
+  }
   pushRecommendedDownload(workflowSummaryDownload);
   pushRecommendedDownload(workflowChecklistDownload);
   pushRecommendedDownload(opsSummaryDownload);
@@ -7516,6 +7519,14 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
           || null
       }
     : rawPrimaryReviewTarget;
+  if (primaryReviewTarget?.recommendedDownload?.key) {
+    recommendedDownloads.push({
+      ...primaryReviewTarget.recommendedDownload,
+      params: primaryReviewTarget.recommendedDownload.params && typeof primaryReviewTarget.recommendedDownload.params === "object"
+        ? { ...primaryReviewTarget.recommendedDownload.params }
+        : primaryReviewTarget.recommendedDownload.params
+    });
+  }
   for (const item of visibleReviewTargets) {
     pushWorkspaceAction(item.workspaceAction);
   }

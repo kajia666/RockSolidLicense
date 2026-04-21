@@ -291,6 +291,7 @@
           "control-session",
           "control-device",
           "review-primary",
+          "review-next",
           "download-primary",
           "download-accounts",
           "download-entitlements",
@@ -338,6 +339,9 @@
         }
         if (normalized === "review-primary") {
           return "Review Primary Match";
+        }
+        if (normalized === "review-next") {
+          return "Review Next Match";
         }
         if (normalized === "download-primary") {
           return "Download Primary Match Summary";
@@ -1199,51 +1203,96 @@
       }
 
       function buildPrimaryRouteReviewFocus(review = collectRouteReview(), preferredSection = "") {
-        const directFocus = buildRequestedRouteFocus();
-        if (directFocus?.kind) {
-          return directFocus;
+        const orderedFocuses = buildOrderedRouteReviewFocuses(review, preferredSection, { includeDirect: true });
+        return orderedFocuses.length ? orderedFocuses[0] : null;
+      }
+
+      function buildOrderedRouteReviewFocuses(review = collectRouteReview(), preferredSection = "", options = {}) {
+        const ordered = [];
+        const seen = new Set();
+        const pushFocus = (focus) => {
+          if (!focus?.kind) {
+            return;
+          }
+          const signature = developerFocusSignature(focus.kind, focus.item || {});
+          const key = signature || `${focus.kind}:${focus.section || "-"}`;
+          if (seen.has(key)) {
+            return;
+          }
+          seen.add(key);
+          ordered.push(focus);
+        };
+        if (options.includeDirect) {
+          pushFocus(buildRequestedRouteFocus());
         }
         const sectionOrder = routeReviewPrimarySections(preferredSection || review.focus || requestedAutofocus || "");
         for (const section of sectionOrder) {
           if (section === "accounts" && review.matchedAccounts.length) {
-            return {
-              kind: "account",
-              section,
-              item: buildDeveloperAccountFocusItem(review.matchedAccounts[0])
-            };
+            review.matchedAccounts.forEach((item) => {
+              pushFocus({
+                kind: "account",
+                section,
+                item: buildDeveloperAccountFocusItem(item)
+              });
+            });
           }
           if (section === "entitlements" && review.matchedEntitlements.length) {
-            return {
-              kind: "entitlement",
-              section,
-              item: buildDeveloperEntitlementFocusItem(review.matchedEntitlements[0])
-            };
+            review.matchedEntitlements.forEach((item) => {
+              pushFocus({
+                kind: "entitlement",
+                section,
+                item: buildDeveloperEntitlementFocusItem(item)
+              });
+            });
           }
           if (section === "sessions" && review.matchedSessions.length) {
-            return {
-              kind: "session",
-              section,
-              item: buildDeveloperSessionFocusItem(review.matchedSessions[0])
-            };
+            review.matchedSessions.forEach((item) => {
+              pushFocus({
+                kind: "session",
+                section,
+                item: buildDeveloperSessionFocusItem(item)
+              });
+            });
           }
           if (section === "devices" && review.matchedDevices.length) {
-            return {
-              kind: "device",
-              section,
-              item: buildDeveloperDeviceFocusItem(review.matchedDevices[0], review.matchedDevices[0]?.kind || "binding")
-            };
+            review.matchedDevices.forEach((item) => {
+              pushFocus({
+                kind: "device",
+                section,
+                item: buildDeveloperDeviceFocusItem(item, item?.kind || "binding")
+              });
+            });
           }
           if (section === "audit" && review.matchedAuditLogs.length) {
-            const auditFocus = buildDeveloperFocusFromAudit(review.matchedAuditLogs[0]);
-            if (auditFocus?.kind) {
-              return {
-                ...auditFocus,
-                section
-              };
-            }
+            review.matchedAuditLogs.forEach((item) => {
+              const auditFocus = buildDeveloperFocusFromAudit(item);
+              if (auditFocus?.kind) {
+                pushFocus({
+                  ...auditFocus,
+                  section
+                });
+              }
+            });
           }
         }
-        return null;
+        return ordered;
+      }
+
+      function buildNextRouteReviewFocus(review = collectRouteReview(), preferredSection = "", currentFocus = null) {
+        const orderedFocuses = buildOrderedRouteReviewFocuses(review, preferredSection, { includeDirect: true });
+        if (orderedFocuses.length < 2) {
+          return null;
+        }
+        const activeFocus = currentFocus?.kind ? currentFocus : (preparedFocus?.kind ? preparedFocus : buildPrimaryRouteReviewFocus(review, preferredSection));
+        if (!activeFocus?.kind) {
+          return orderedFocuses[1] || null;
+        }
+        const activeSignature = developerFocusSignature(activeFocus.kind, activeFocus.item || {});
+        const activeIndex = orderedFocuses.findIndex((item) => developerFocusSignature(item.kind, item.item || {}) === activeSignature);
+        if (activeIndex >= 0 && orderedFocuses[activeIndex + 1]) {
+          return orderedFocuses[activeIndex + 1];
+        }
+        return activeIndex < 0 ? orderedFocuses[1] || null : null;
       }
 
       function formatRouteReviewSummary(review = collectRouteReview()) {
@@ -1530,13 +1579,18 @@
           ? review.highlightedEvents.map((item) => renderTag(item, true)).join("")
           : '<span class="hint">No routed audit events matched yet.</span>';
         const primaryFocus = buildPrimaryRouteReviewFocus(review);
+        const nextFocus = buildNextRouteReviewFocus(review, review.focus || requestedAutofocus || "");
         const primaryFocusMarkup = primaryFocus?.kind
           ? `<div class="audit-meta" style="margin-top:8px;">${renderTag(primaryFocus.section || "primary")} ${renderTag(primaryFocus.kind)} ${renderTag(formatRouteReviewPrimaryTitle(primaryFocus))}${primaryFocus.preparedControl ? renderTag(primaryFocus.preparedControl) : ""}</div><div class="hint" style="margin-top:6px;">${esc(formatRouteReviewPrimarySummary(primaryFocus))}</div>`
           : `<div class="hint" style="margin-top:8px;">No routed primary object is ready yet.</div>`;
+        const nextFocusMarkup = nextFocus?.kind
+          ? `<div class="audit-meta" style="margin-top:8px;">${renderTag(nextFocus.section || "next")} ${renderTag(nextFocus.kind)} ${renderTag(formatRouteReviewPrimaryTitle(nextFocus))}${nextFocus.item?.recommendedControl?.label ? renderTag(nextFocus.item.recommendedControl.label) : ""}</div><div class="hint" style="margin-top:6px;">${esc(formatRouteReviewPrimarySummary(nextFocus))}</div>`
+          : `<div class="hint" style="margin-top:8px;">No additional routed match is queued right now.</div>`;
         const reviewButtons = [
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="prepare-primary">Prepare Primary Match</button>` : "",
           primaryFocus?.item?.recommendedControl?.label ? `<button type="button" class="secondary" data-route-review-action="control-primary">Open Primary Control</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-primary">Review Primary Match</button>` : "",
+          nextFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-next">Review Next Match</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-primary" ${token ? "" : "disabled"}>Download Primary Match Summary</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="download-accounts" ${token ? "" : "disabled"}>Download Accounts Summary</button>` : "",
@@ -1560,6 +1614,8 @@
           <div class="audit-meta" style="margin-top:8px;">${highlightedEvents}</div>
           <div class="hint" style="margin-top:10px;">Primary Match</div>
           ${primaryFocusMarkup}
+          <div class="hint" style="margin-top:10px;">Next Match</div>
+          ${nextFocusMarkup}
           <div class="actions" style="margin-top:12px;">
             <button type="button" class="secondary" data-route-review-action="mode-matched" ${routeReviewDisplayMode === "matched" ? "disabled" : ""}>Show Routed Hits Only</button>
             <button type="button" class="secondary" data-route-review-action="mode-all" ${routeReviewDisplayMode === "all" ? "disabled" : ""}>Show Full Scope</button>
@@ -1695,6 +1751,36 @@
             return;
           }
           setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} primary routed match. ${formatRouteReviewSummary()}. Primary match ready: ${formatRouteReviewPrimaryTitle(prepared || primary)}.`);
+          return;
+        }
+        if (normalizedAction === "review-next") {
+          const review = collectRouteReview();
+          const next = buildNextRouteReviewFocus(review, review.focus || requestedAutofocus || "");
+          if (!next?.kind) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match is available yet." };
+          }
+          routeReviewDisplayMode = "matched";
+          renderAll();
+          focusRouteReviewSection(next.section || requestedAutofocus || "");
+          const signature = developerFocusSignature(next.kind, next.item || {});
+          const prepared = await applyDeveloperFocusItem(next.kind, next.item || {}, {
+            focusControls: true,
+            renderOverview: true,
+            statusMessage: "",
+            routePreparedKey: signature
+          });
+          const preparedLabel = prepared?.preparedControl || next.item?.recommendedControl?.label || "";
+          if (preparedLabel) {
+            setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} next routed match. ${formatRouteReviewSummary(review)}. Next control ready while reviewing: ${preparedLabel}.`);
+            setOutput({
+              routeReviewAction: normalizedAction,
+              focusKind: next.kind,
+              focusItem: next.item || {},
+              preparedControl: preparedLabel
+            });
+            return;
+          }
+          setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} next routed match. ${formatRouteReviewSummary(review)}. Next match ready: ${formatRouteReviewPrimaryTitle(next)}.`);
           return;
         }
         if (normalizedAction === "download-primary") {

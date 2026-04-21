@@ -697,6 +697,9 @@
       function collectRouteReview() {
         const active = currentRouteReviewFilters();
         const focus = requestedAutofocus || "snapshot";
+        const serverRouteReview = snapshot.raw?.routeReview && typeof snapshot.raw.routeReview === "object"
+          ? snapshot.raw.routeReview
+          : null;
         const deviceItems = [
           ...snapshot.bindings.map((item) => ({
             kind: "binding",
@@ -727,12 +730,24 @@
           active: hasRouteReviewFilters(),
           focus,
           filters: active,
+          serverRouteReview,
           matchedAccounts,
           matchedEntitlements,
           matchedSessions,
           matchedDevices,
           matchedAuditLogs,
           highlightedEvents
+        };
+      }
+
+      function normalizeServerRouteReviewFocus(match = null) {
+        if (!match?.kind || !match?.item || typeof match.item !== "object") {
+          return null;
+        }
+        return {
+          kind: match.kind,
+          section: match.section || "",
+          item: { ...match.item }
         };
       }
 
@@ -1279,6 +1294,10 @@
       }
 
       function buildPrimaryRouteReviewFocus(review = collectRouteReview(), preferredSection = "") {
+        const serverPrimary = normalizeServerRouteReviewFocus(review.serverRouteReview?.primaryMatch);
+        if (serverPrimary?.kind) {
+          return serverPrimary;
+        }
         const orderedFocuses = buildOrderedRouteReviewFocuses(review, preferredSection, { includeDirect: true });
         return orderedFocuses.length ? orderedFocuses[0] : null;
       }
@@ -1355,6 +1374,21 @@
       }
 
       function buildNextRouteReviewFocus(review = collectRouteReview(), preferredSection = "", currentFocus = null) {
+        const serverPrimary = normalizeServerRouteReviewFocus(review.serverRouteReview?.primaryMatch);
+        const serverNext = normalizeServerRouteReviewFocus(review.serverRouteReview?.nextMatch);
+        if (serverNext?.kind) {
+          const activeFocus = currentFocus?.kind ? currentFocus : (preparedFocus?.kind ? preparedFocus : null);
+          if (!activeFocus?.kind) {
+            return serverNext;
+          }
+          const activeSignature = developerFocusSignature(activeFocus.kind, activeFocus.item || {});
+          const primarySignature = serverPrimary?.kind
+            ? developerFocusSignature(serverPrimary.kind, serverPrimary.item || {})
+            : "";
+          if (activeSignature === primarySignature) {
+            return serverNext;
+          }
+        }
         const orderedFocuses = buildOrderedRouteReviewFocuses(review, preferredSection, { includeDirect: true });
         if (orderedFocuses.length < 2) {
           return null;

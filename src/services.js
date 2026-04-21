@@ -9171,6 +9171,290 @@ function buildDeveloperOpsReviewRecommendedControl(focusKind = "", item = {}) {
   return buildDeveloperOpsReviewGenericControl(normalizedFocusKind, item);
 }
 
+function hasDeveloperOpsRouteReview(filters = {}) {
+  const reviewMode = String(filters.reviewMode || "").trim().toLowerCase();
+  return reviewMode === "matched"
+    || Boolean(
+      String(filters.productCode || "").trim()
+      || String(filters.username || "").trim()
+      || String(filters.search || "").trim()
+      || String(filters.eventType || "").trim()
+      || String(filters.actorType || "").trim()
+      || String(filters.entityType || "").trim()
+    );
+}
+
+function deriveDeveloperOpsRouteReviewFocus(filters = {}) {
+  const entityType = String(filters.entityType || "").trim().toLowerCase();
+  if (entityType === "entitlement") {
+    return "entitlements";
+  }
+  if (entityType === "session") {
+    return "sessions";
+  }
+  if (entityType === "device_binding" || entityType === "device_block") {
+    return "devices";
+  }
+  const eventType = String(filters.eventType || "").trim().toLowerCase();
+  if (eventType.startsWith("session.")) {
+    return "sessions";
+  }
+  if (eventType) {
+    return "audit";
+  }
+  if (String(filters.actorType || "").trim().toLowerCase() === "account" || String(filters.username || "").trim()) {
+    return "accounts";
+  }
+  if (String(filters.search || "").trim()) {
+    return entityType.startsWith("device") ? "devices" : "sessions";
+  }
+  return "snapshot";
+}
+
+function buildDeveloperOpsRouteReviewSectionOrder(preferredSection = "") {
+  const normalized = String(preferredSection || "").trim().toLowerCase();
+  if (normalized === "accounts") {
+    return ["accounts", "entitlements", "sessions", "devices", "audit"];
+  }
+  if (normalized === "entitlements") {
+    return ["entitlements", "accounts", "sessions", "devices", "audit"];
+  }
+  if (normalized === "sessions") {
+    return ["sessions", "audit", "accounts", "devices", "entitlements"];
+  }
+  if (normalized === "devices" || normalized === "bindings" || normalized === "blocks") {
+    return ["devices", "sessions", "audit", "accounts", "entitlements"];
+  }
+  if (normalized === "audit") {
+    return ["audit", "sessions", "accounts", "devices", "entitlements"];
+  }
+  return ["accounts", "sessions", "audit", "devices", "entitlements"];
+}
+
+function buildDeveloperOpsRouteReviewAccountItem(item = {}) {
+  const next = {
+    ...item,
+    accountId: item.accountId || item.id || "",
+    accountStatus: item.accountStatus || item.status || "active"
+  };
+  if (!next.recommendedControl) {
+    next.recommendedControl = buildDeveloperOpsReviewRecommendedControl("account", next);
+  }
+  return next;
+}
+
+function buildDeveloperOpsRouteReviewEntitlementItem(item = {}) {
+  const next = {
+    ...item,
+    entitlementId: item.entitlementId || item.id || ""
+  };
+  if (!next.recommendedControl) {
+    next.recommendedControl = buildDeveloperOpsReviewRecommendedControl("entitlement", next);
+  }
+  return next;
+}
+
+function buildDeveloperOpsRouteReviewSessionItem(item = {}) {
+  const next = {
+    ...item,
+    reason: item.reason || item.revokedReason || "",
+    sessionId: item.sessionId || item.id || ""
+  };
+  if (!next.recommendedControl) {
+    next.recommendedControl = buildDeveloperOpsReviewRecommendedControl("session", next);
+  }
+  return next;
+}
+
+function buildDeveloperOpsRouteReviewDeviceItem(item = {}) {
+  const next = {
+    ...item,
+    kind: item.kind || (item.blockId ? "block" : "binding"),
+    bindingId: item.bindingId || (String(item.kind || "").trim().toLowerCase() === "binding" ? item.id || "" : ""),
+    blockId: item.blockId || (String(item.kind || "").trim().toLowerCase() === "block" ? item.id || "" : "")
+  };
+  if (!next.recommendedControl) {
+    next.recommendedControl = buildDeveloperOpsReviewRecommendedControl("device", next);
+  }
+  return next;
+}
+
+function buildDeveloperOpsRouteReviewAuditItem(item = {}) {
+  return {
+    ...item,
+    metadata: item.metadata && typeof item.metadata === "object" ? item.metadata : {}
+  };
+}
+
+function buildDeveloperOpsRouteReviewEntryTitle(kind = "", item = {}) {
+  const normalizedKind = String(kind || "").trim().toLowerCase();
+  if (normalizedKind === "account") {
+    return `${item.username || "-"} @ ${item.productCode || "-"}`;
+  }
+  if (normalizedKind === "entitlement") {
+    return `${item.username || "-"} | ${item.policyName || item.productCode || "-"}`;
+  }
+  if (normalizedKind === "session") {
+    return `${item.sessionId || item.id || "-"} | ${item.username || "-"}`;
+  }
+  if (normalizedKind === "device") {
+    return `${item.fingerprint || "-"} @ ${item.productCode || "-"}`;
+  }
+  return `${item.eventType || "-"} | ${item.entityType || "-"}`;
+}
+
+function buildDeveloperOpsRouteReviewEntrySummary(kind = "", item = {}) {
+  const normalizedKind = String(kind || "").trim().toLowerCase();
+  if (normalizedKind === "account") {
+    return `${item.productCode || "-"} | status=${item.accountStatus || item.status || "-"} | entitlements=${item.activeEntitlementCount ?? 0} | sessions=${item.activeSessionCount ?? 0}`;
+  }
+  if (normalizedKind === "entitlement") {
+    return `${item.productCode || "-"} | ${item.lifecycleStatus || item.status || "-"} | policy=${item.policyName || "-"} | points=${item.remainingPoints ?? item.totalPoints ?? 0}`;
+  }
+  if (normalizedKind === "session") {
+    return `${item.productCode || "-"} | ${item.status || "-"} | reason=${item.reason || "-"} | device=${item.deviceName || item.fingerprint || "-"}`;
+  }
+  if (normalizedKind === "device") {
+    return `${item.kind || "-"} | ${item.status || "-"} | reason=${item.reason || "-"} | user=${item.username || "-"} | device=${item.deviceName || "-"}`;
+  }
+  return `${item.eventType || "-"} | actor=${item.actorType || "-"} | entity=${item.entityType || "-"} | id=${item.entityId || "-"}`;
+}
+
+function buildDeveloperOpsRouteReviewEntry(kind = "", section = "", item = {}) {
+  const normalizedKind = String(kind || "").trim().toLowerCase();
+  if (!normalizedKind) {
+    return null;
+  }
+  let normalizedItem = null;
+  if (normalizedKind === "account") {
+    normalizedItem = buildDeveloperOpsRouteReviewAccountItem(item);
+  } else if (normalizedKind === "entitlement") {
+    normalizedItem = buildDeveloperOpsRouteReviewEntitlementItem(item);
+  } else if (normalizedKind === "session") {
+    normalizedItem = buildDeveloperOpsRouteReviewSessionItem(item);
+  } else if (normalizedKind === "device") {
+    normalizedItem = buildDeveloperOpsRouteReviewDeviceItem(item);
+  } else if (normalizedKind === "audit") {
+    normalizedItem = buildDeveloperOpsRouteReviewAuditItem(item);
+  } else {
+    return null;
+  }
+  const routeAction = normalizedKind === "audit"
+    ? "review-audit"
+    : buildFocusKindControlRouteAction(normalizedKind);
+  const routeActionLabel = normalizedKind === "audit"
+    ? "Review Audit"
+    : buildFocusKindControlLabel(normalizedKind);
+  return {
+    kind: normalizedKind,
+    section: String(section || "").trim().toLowerCase() || normalizedKind,
+    title: buildDeveloperOpsRouteReviewEntryTitle(normalizedKind, normalizedItem),
+    summary: buildDeveloperOpsRouteReviewEntrySummary(normalizedKind, normalizedItem),
+    routeAction,
+    routeActionLabel,
+    recommendedControl: normalizedItem.recommendedControl || null,
+    item: normalizedItem
+  };
+}
+
+function buildDeveloperOpsRouteReviewPayload({
+  filters = {},
+  accounts = [],
+  entitlements = [],
+  sessions = [],
+  bindings = [],
+  blocks = [],
+  auditLogs = []
+} = {}) {
+  if (!hasDeveloperOpsRouteReview(filters)) {
+    return {
+      active: false,
+      focus: deriveDeveloperOpsRouteReviewFocus(filters),
+      matchedCounts: {
+        accounts: 0,
+        entitlements: 0,
+        sessions: 0,
+        devices: 0,
+        audit: 0
+      },
+      highlightedEvents: [],
+      primaryMatch: null,
+      nextMatch: null,
+      queue: []
+    };
+  }
+
+  const focus = deriveDeveloperOpsRouteReviewFocus(filters);
+  const deviceItems = [
+    ...blocks.map((item) => ({ ...item, kind: "block", blockId: item.blockId || item.id || "" })),
+    ...bindings.map((item) => ({ ...item, kind: "binding", bindingId: item.bindingId || item.id || "" }))
+  ];
+  const highlightedEvents = [...new Set(auditLogs.map((item) => item?.eventType).filter(Boolean))].slice(0, 3);
+  const queue = [];
+  for (const section of buildDeveloperOpsRouteReviewSectionOrder(focus)) {
+    if (section === "accounts") {
+      accounts.forEach((item) => {
+        const entry = buildDeveloperOpsRouteReviewEntry("account", section, item);
+        if (entry) {
+          queue.push(entry);
+        }
+      });
+      continue;
+    }
+    if (section === "entitlements") {
+      entitlements.forEach((item) => {
+        const entry = buildDeveloperOpsRouteReviewEntry("entitlement", section, item);
+        if (entry) {
+          queue.push(entry);
+        }
+      });
+      continue;
+    }
+    if (section === "sessions") {
+      sessions.forEach((item) => {
+        const entry = buildDeveloperOpsRouteReviewEntry("session", section, item);
+        if (entry) {
+          queue.push(entry);
+        }
+      });
+      continue;
+    }
+    if (section === "devices") {
+      deviceItems.forEach((item) => {
+        const entry = buildDeveloperOpsRouteReviewEntry("device", section, item);
+        if (entry) {
+          queue.push(entry);
+        }
+      });
+      continue;
+    }
+    if (section === "audit") {
+      auditLogs.forEach((item) => {
+        const entry = buildDeveloperOpsRouteReviewEntry("audit", section, item);
+        if (entry) {
+          queue.push(entry);
+        }
+      });
+    }
+  }
+
+  return {
+    active: true,
+    focus,
+    matchedCounts: {
+      accounts: accounts.length,
+      entitlements: entitlements.length,
+      sessions: sessions.length,
+      devices: deviceItems.length,
+      audit: auditLogs.length
+    },
+    highlightedEvents,
+    primaryMatch: queue[0] || null,
+    nextMatch: queue[1] || null,
+    queue: queue.slice(0, 12)
+  };
+}
+
 function buildSnapshotActionQueueItem(sourceType, item = {}) {
   const normalizedSourceType = String(sourceType ?? "").trim().toLowerCase();
   const severity = String(item.severity ?? "low").trim().toLowerCase() || "low";
@@ -9864,6 +10148,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
   const overview = payload.overview || {};
+  const routeReview = payload.routeReview || {};
   const lines = [
     "RockSolid Developer Ops Snapshot",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -9942,6 +10227,21 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push(`- ${item.fingerprint || "-"} @ ${item.productCode || "-"} | ${item.kind || "-"} | ${item.status || "-"} | severity=${item.severity || "-"} | control=${item.recommendedControl?.label || "-"} | ${item.reason || "-"} | next=${item.actionHint || "-"}`);
       }
     }
+    if (routeReview.active) {
+      lines.push(`Route Review Focus: ${routeReview.focus || "-"}`);
+      lines.push(`Route Review Counts: accounts:${routeReview.matchedCounts?.accounts ?? 0} | entitlements:${routeReview.matchedCounts?.entitlements ?? 0} | sessions:${routeReview.matchedCounts?.sessions ?? 0} | devices:${routeReview.matchedCounts?.devices ?? 0} | audit:${routeReview.matchedCounts?.audit ?? 0}`);
+      if (Array.isArray(routeReview.highlightedEvents) && routeReview.highlightedEvents.length) {
+        lines.push(`Route Review Events: ${routeReview.highlightedEvents.join(", ")}`);
+      }
+      if (routeReview.primaryMatch) {
+        lines.push("Route Review Primary Match:");
+        lines.push(`- ${routeReview.primaryMatch.title || "-"} | ${routeReview.primaryMatch.summary || "-"} | action=${routeReview.primaryMatch.routeActionLabel || routeReview.primaryMatch.routeAction || "-"} | control=${routeReview.primaryMatch.recommendedControl?.label || "-"}`);
+      }
+      if (routeReview.nextMatch) {
+        lines.push("Route Review Next Match:");
+        lines.push(`- ${routeReview.nextMatch.title || "-"} | ${routeReview.nextMatch.summary || "-"} | action=${routeReview.nextMatch.routeActionLabel || routeReview.nextMatch.routeAction || "-"} | control=${routeReview.nextMatch.recommendedControl?.label || "-"}`);
+      }
+    }
     appendSnapshotEscalationSummaryLines(lines, overview);
     appendSnapshotQueueSummaryLines(lines, overview);
   }
@@ -10010,6 +10310,15 @@ function buildDeveloperOpsSnapshotPayload({
     overview: buildSnapshotOverview({
       generatedAt,
       projects: normalizedProjects,
+      accounts: normalizedAccounts,
+      entitlements: normalizedEntitlements,
+      sessions: normalizedSessions,
+      bindings: normalizedBindings,
+      blocks: normalizedBlocks,
+      auditLogs: normalizedAuditLogs
+    }),
+    routeReview: buildDeveloperOpsRouteReviewPayload({
+      filters,
       accounts: normalizedAccounts,
       entitlements: normalizedEntitlements,
       sessions: normalizedSessions,

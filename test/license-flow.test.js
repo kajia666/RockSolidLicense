@@ -7705,9 +7705,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "account" && typeof item.issueCount === "number"));
     assert.ok(exportSnapshot.overview.recommendedQueue.some((item) => item.sourceType === "device" && typeof item.relatedSessionCount === "number"));
     assert.equal(exportSnapshot.overview.queueSummary.total, exportSnapshot.overview.recommendedQueue.length);
+    assert.equal(exportSnapshot.routeReview?.active, true);
+    assert.equal(exportSnapshot.routeReview?.focus, "sessions");
+    assert.equal(exportSnapshot.routeReview?.matchedCounts?.sessions, 1);
+    assert.equal(exportSnapshot.routeReview?.primaryMatch?.kind, "session");
+    assert.equal(exportSnapshot.routeReview?.primaryMatch?.routeAction, "control-session");
+    assert.equal(exportSnapshot.routeReview?.nextMatch?.kind, "audit");
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: EXPORT_ALPHA/);
     assert.match(exportSnapshot.summaryText, /Overview Status: ok/);
+    assert.match(exportSnapshot.summaryText, /Route Review Focus: sessions/);
+    assert.match(exportSnapshot.summaryText, /Route Review Primary Match:/);
     assert.match(exportSnapshot.summaryText, /Top Reasons:/);
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);

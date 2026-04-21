@@ -75,6 +75,7 @@
 - 同时这份 payload 现在也会下发过滤后的 `matchedIds`，所以 `Developer Ops` 里的命中高亮、`Show Routed Hits Only` 和后续 routed review 流转也开始优先吃服务端命中集合，进一步减少前端自己重跑匹配逻辑的偏差
 - 现在 routed review 里按区块导出的 `Accounts / Entitlements / Sessions / Devices / Audit` 摘要，也开始由服务端直接下发下载描述，`Developer Ops` 只做消费，不再主要靠前端自己拼 section 过滤参数
 - 同时 routed review 里按区块“先看哪个对象”这层也开始由服务端下发 `sections.*.primaryMatch`，所以 `Review Accounts / Sessions / Audit` 这类动作不再主要靠前端自己从本地数组里挑第一个对象
+- 现在 routed review 还会按“当前正在处理的是哪个对象”直接下发对象化的 `continuations`，所以 `Developer Ops` 里从当前 focus 继续看下一个对象时，也开始优先吃服务端给出的 continuation，而不是再主要靠前端自己从队列里推下一个目标
 - 现在 `/api/developer/ops/export/download` 也能直接下发服务端选中的 `route-review-primary / route-review-next / route-review-remaining` 摘要，所以 Launch Review、Launch Smoke 和后续 handoff 可以更稳定地围绕“当前主复查对象 / 下一个对象 / 剩余复查队列”交接，而不是继续靠前端自己重组过滤条件
 - 这块 `Route Review` 现在还能直接切到 `Show Routed Hits Only`，并一键跳去复查 `accounts / entitlements / sessions / devices / audit` 中命中的那一类对象，让首发后的复查链更像一个连续动作，而不是先看摘要再自己手工筛表
 - 现在这块 routed review 还会自动抽出一个 `Primary Match`，把首个命中的账号 / 授权 / 会话 / 设备 / 审计衍生对象直接预填进 quick controls，并保留到 `Prepared Control` 回执里；开发者运营台里的表格点击也统一走这条 focus-preparation 逻辑，所以从 `Launch Review` 跳进来后的复查会更像“已经帮你选好当前最该看的对象”

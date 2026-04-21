@@ -556,6 +556,15 @@
         return "";
       }
 
+      function buildRouteReviewContinuationKey(kind = "", item = {}) {
+        const normalizedKind = String(kind || "").trim().toLowerCase();
+        const matchId = buildRouteReviewMatchId(normalizedKind, item);
+        if (!normalizedKind || !matchId) {
+          return "";
+        }
+        return `${normalizedKind}:${matchId}`;
+      }
+
       function buildRouteReviewMatchedIdSet(values = []) {
         return new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean));
       }
@@ -3099,11 +3108,17 @@
         if (!review.active) {
           return null;
         }
-        const serverContinuation = review.serverRouteReview?.continuation && typeof review.serverRouteReview.continuation === "object"
-          ? review.serverRouteReview.continuation
+        const continuationKey = buildRouteReviewContinuationKey(focus.kind, focus.item || {});
+        const keyedContinuation = continuationKey && review.serverRouteReview?.continuations && typeof review.serverRouteReview.continuations === "object"
+          ? review.serverRouteReview.continuations[continuationKey]
+          : null;
+        const serverContinuation = keyedContinuation && typeof keyedContinuation === "object"
+          ? keyedContinuation
+          : review.serverRouteReview?.continuation && typeof review.serverRouteReview.continuation === "object"
+            ? review.serverRouteReview.continuation
           : null;
         const preferredSection = review.focus || requestedAutofocus || "";
-        const nextFocus = buildNextRouteReviewFocus(review, preferredSection, focus);
+        const nextFocus = normalizeServerRouteReviewFocus(serverContinuation?.nextMatch) || buildNextRouteReviewFocus(review, preferredSection, focus);
         if (!nextFocus?.kind && !serverContinuation) {
           return null;
         }

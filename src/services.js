@@ -9722,6 +9722,15 @@ function buildDeveloperOpsRouteReviewMatchId(kind = "", item = {}) {
   return "";
 }
 
+function buildDeveloperOpsRouteReviewContinuationKey(kind = "", item = {}) {
+  const normalizedKind = String(kind || "").trim().toLowerCase();
+  const matchId = buildDeveloperOpsRouteReviewMatchId(normalizedKind, item);
+  if (!normalizedKind || !matchId) {
+    return "";
+  }
+  return `${normalizedKind}:${matchId}`;
+}
+
 function buildDeveloperOpsRouteReviewMatchedIds({
   accounts = [],
   entitlements = [],
@@ -10741,7 +10750,14 @@ function buildDeveloperOpsSnapshotPayload({
     auditLogs: normalizedAuditLogs
   });
   routeReview.downloads = buildDeveloperOpsRouteReviewDownloads(scope, routeReview);
+  routeReview.continuations = buildDeveloperOpsRouteReviewContinuations(scope, routeReview);
+  const primaryContinuationKey = routeReview.primaryMatch?.kind && routeReview.primaryMatch?.item
+    ? buildDeveloperOpsRouteReviewContinuationKey(routeReview.primaryMatch.kind, routeReview.primaryMatch.item)
+    : "";
   routeReview.continuation = buildDeveloperOpsRouteReviewContinuation(routeReview);
+  if (primaryContinuationKey && routeReview.continuations?.[primaryContinuationKey]) {
+    routeReview.continuation = routeReview.continuations[primaryContinuationKey];
+  }
 
   const payload = {
     generatedAt,
@@ -10993,6 +11009,14 @@ function buildDeveloperOpsRouteReviewBaseDownloadParams(scope = {}) {
 function buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope = {}, routeReview = {}, target = "primary") {
   const descriptor = buildDeveloperOpsRouteReviewMatchDescriptor({ routeReview }, target);
   const match = descriptor.match;
+  return buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope, match, target, descriptor);
+}
+
+function buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope = {}, match = null, target = "primary", descriptor = null) {
+  if (!match || typeof match !== "object" || !match.kind || !match.item || typeof match.item !== "object") {
+    return null;
+  }
+  const normalizedTarget = String(target || "primary").trim().toLowerCase() === "next" ? "next" : "primary";
   const params = buildDeveloperOpsRouteReviewBaseDownloadParams(scope);
   const item = match?.item && typeof match.item === "object" ? match.item : {};
   if (item.productCode || item.projectCode) {
@@ -11018,11 +11042,18 @@ function buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope = {}, routeRe
       delete params[field];
     }
   }
+  const fallbackDescriptor = descriptor && typeof descriptor === "object"
+    ? descriptor
+    : {
+        key: `route_review_${normalizedTarget}`,
+        label: normalizedTarget === "next" ? `Next ${match?.kind || "route"} summary` : `Primary ${match?.kind || "route"} summary`,
+        fileName: `developer-ops-${normalizedTarget}-${match?.kind || "route"}-summary.txt`
+      };
   return {
-    key: `route_review_${target}`,
-    label: descriptor.label,
-    fileName: descriptor.fileName,
-    format: target === "next" ? "route-review-next" : "route-review-primary",
+    key: fallbackDescriptor.key,
+    label: fallbackDescriptor.label,
+    fileName: fallbackDescriptor.fileName,
+    format: normalizedTarget === "next" ? "route-review-next" : "route-review-primary",
     params
   };
 }
@@ -11173,6 +11204,37 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
     nextDownload: null,
     remainingDownload: routeReview.downloads?.remaining || null
   };
+}
+
+function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {}) {
+  const queue = Array.isArray(routeReview.queue) ? routeReview.queue : [];
+  const continuations = {};
+  const remainingDownload = routeReview.downloads?.remaining || buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope);
+  queue.forEach((entry, index) => {
+    if (!entry?.kind || !entry?.item || typeof entry.item !== "object") {
+      return;
+    }
+    const key = buildDeveloperOpsRouteReviewContinuationKey(entry.kind, entry.item);
+    if (!key) {
+      return;
+    }
+    const nextMatch = queue[index + 1] && typeof queue[index + 1] === "object" ? queue[index + 1] : null;
+    const nextControlLabel = nextMatch?.recommendedControl?.label || "";
+    continuations[key] = {
+      remainingCount: nextMatch ? 1 : 0,
+      queuedRemainingCount: Math.max(queue.length - index - 1, 0),
+      nextTitle: nextMatch?.title || "",
+      nextControlLabel,
+      primaryAction: nextMatch ? "review_next" : "complete_route_review",
+      primaryLabel: nextMatch ? "Continue Routed Review" : "Complete Routed Review",
+      secondaryAction: nextMatch ? (nextControlLabel ? "control_next" : "download_next") : "download_route_review",
+      secondaryLabel: nextMatch ? (nextControlLabel ? "Open Next Control" : "Download Next Match Summary") : "Download Routed Summary",
+      nextDownload: nextMatch ? buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope, nextMatch, "next") : null,
+      remainingDownload,
+      nextMatch: nextMatch || null
+    };
+  });
+  return continuations;
 }
 
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {

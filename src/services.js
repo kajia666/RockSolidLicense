@@ -9380,6 +9380,8 @@ function buildDeveloperOpsRouteReviewPayload({
       highlightedEvents: [],
       primaryMatch: null,
       nextMatch: null,
+      remainingMatches: [],
+      totalMatches: 0,
       queue: []
     };
   }
@@ -9451,6 +9453,8 @@ function buildDeveloperOpsRouteReviewPayload({
     highlightedEvents,
     primaryMatch: queue[0] || null,
     nextMatch: queue[1] || null,
+    remainingMatches: queue.slice(1, 12),
+    totalMatches: queue.length,
     queue: queue.slice(0, 12)
   };
 }
@@ -10241,6 +10245,12 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push("Route Review Next Match:");
         lines.push(`- ${routeReview.nextMatch.title || "-"} | ${routeReview.nextMatch.summary || "-"} | action=${routeReview.nextMatch.routeActionLabel || routeReview.nextMatch.routeAction || "-"} | control=${routeReview.nextMatch.recommendedControl?.label || "-"}`);
       }
+      if (Array.isArray(routeReview.remainingMatches) && routeReview.remainingMatches.length) {
+        lines.push("Route Review Remaining Matches:");
+        routeReview.remainingMatches.slice(0, 5).forEach((item) => {
+          lines.push(`- ${item.title || "-"} | ${item.summary || "-"} | action=${item.routeActionLabel || item.routeAction || "-"} | control=${item.recommendedControl?.label || "-"}`);
+        });
+      }
     }
     appendSnapshotEscalationSummaryLines(lines, overview);
     appendSnapshotQueueSummaryLines(lines, overview);
@@ -10487,10 +10497,51 @@ function buildDeveloperOpsRouteReviewMatchSummaryText(payload = {}, target = "pr
   return lines.join("\n");
 }
 
+function buildDeveloperOpsRouteReviewRemainingSummaryText(payload = {}) {
+  const scope = payload.scope || {};
+  const routeReview = payload.routeReview || {};
+  const remainingMatches = Array.isArray(routeReview.remainingMatches) ? routeReview.remainingMatches : [];
+  const lines = [
+    "RockSolid Developer Ops Route Review Summary",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Developer: ${payload.developer?.username || "-"}`,
+    `Actor: ${payload.actor?.username || "-"}`,
+    `Actor Role: ${payload.actor?.role || "-"}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Username Filter: ${scope.username || "-"}`,
+    `Search Filter: ${scope.search || "-"}`,
+    `Audit Event Filter: ${scope.eventType || "-"}`,
+    `Audit Actor Filter: ${scope.actorType || "-"}`,
+    `Audit Entity Filter: ${scope.entityType || "-"}`,
+    `Audit Limit: ${scope.auditLimit ?? 0}`,
+    `Route Review Focus: ${routeReview.focus || "-"}`,
+    `Route Review Counts: accounts:${routeReview.matchedCounts?.accounts ?? 0} | entitlements:${routeReview.matchedCounts?.entitlements ?? 0} | sessions:${routeReview.matchedCounts?.sessions ?? 0} | devices:${routeReview.matchedCounts?.devices ?? 0} | audit:${routeReview.matchedCounts?.audit ?? 0}`,
+    `Route Review Total Matches: ${routeReview.totalMatches ?? 0}`
+  ];
+  if (Array.isArray(routeReview.highlightedEvents) && routeReview.highlightedEvents.length) {
+    lines.push(`Route Review Events: ${routeReview.highlightedEvents.join(", ")}`);
+  }
+  lines.push("");
+  lines.push("Route Review Remaining Matches:");
+  if (!remainingMatches.length) {
+    lines.push("- none");
+    return lines.join("\n");
+  }
+  remainingMatches.forEach((match) => {
+    lines.push(`- ${match.title || "-"}`);
+    lines.push(`  kind=${match.kind || "-"}`);
+    lines.push(`  section=${match.section || "-"}`);
+    lines.push(`  summary=${match.summary || "-"}`);
+    lines.push(`  action=${match.routeActionLabel || match.routeAction || "-"}`);
+    lines.push(`  control=${match.recommendedControl?.label || "-"}`);
+  });
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next"],
+    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -10527,6 +10578,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: descriptor.fileName,
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsRouteReviewMatchSummaryText(payload, target)
+    };
+  }
+
+  if (normalizedFormat === "route-review-remaining") {
+    return {
+      fileName: "developer-ops-remaining-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsRouteReviewRemainingSummaryText(payload)
     };
   }
 

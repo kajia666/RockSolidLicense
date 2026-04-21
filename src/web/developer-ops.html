@@ -751,6 +751,15 @@
         };
       }
 
+      function normalizeServerRouteReviewFocuses(matches = []) {
+        if (!Array.isArray(matches)) {
+          return [];
+        }
+        return matches
+          .map((match) => normalizeServerRouteReviewFocus(match))
+          .filter((focus) => focus?.kind);
+      }
+
       function buildDeveloperAccountFocusItem(item = {}) {
         const next = {
           ...item,
@@ -1376,8 +1385,23 @@
       function buildNextRouteReviewFocus(review = collectRouteReview(), preferredSection = "", currentFocus = null) {
         const serverPrimary = normalizeServerRouteReviewFocus(review.serverRouteReview?.primaryMatch);
         const serverNext = normalizeServerRouteReviewFocus(review.serverRouteReview?.nextMatch);
+        const serverRemaining = normalizeServerRouteReviewFocuses(review.serverRouteReview?.remainingMatches);
+        const serverQueue = [serverPrimary, ...serverRemaining].filter((focus) => focus?.kind);
+        const activeFocus = currentFocus?.kind ? currentFocus : (preparedFocus?.kind ? preparedFocus : null);
+        if (serverQueue.length) {
+          if (!activeFocus?.kind) {
+            return serverNext || serverRemaining[0] || serverQueue[0] || null;
+          }
+          const activeSignature = developerFocusSignature(activeFocus.kind, activeFocus.item || {});
+          const activeIndex = serverQueue.findIndex((item) => developerFocusSignature(item.kind, item.item || {}) === activeSignature);
+          if (activeIndex >= 0 && serverQueue[activeIndex + 1]) {
+            return serverQueue[activeIndex + 1];
+          }
+          if (activeIndex < 0) {
+            return serverQueue[0] || null;
+          }
+        }
         if (serverNext?.kind) {
-          const activeFocus = currentFocus?.kind ? currentFocus : (preparedFocus?.kind ? preparedFocus : null);
           if (!activeFocus?.kind) {
             return serverNext;
           }
@@ -1393,11 +1417,11 @@
         if (orderedFocuses.length < 2) {
           return null;
         }
-        const activeFocus = currentFocus?.kind ? currentFocus : (preparedFocus?.kind ? preparedFocus : buildPrimaryRouteReviewFocus(review, preferredSection));
-        if (!activeFocus?.kind) {
+        const fallbackActiveFocus = activeFocus?.kind ? activeFocus : buildPrimaryRouteReviewFocus(review, preferredSection);
+        if (!fallbackActiveFocus?.kind) {
           return orderedFocuses[1] || null;
         }
-        const activeSignature = developerFocusSignature(activeFocus.kind, activeFocus.item || {});
+        const activeSignature = developerFocusSignature(fallbackActiveFocus.kind, fallbackActiveFocus.item || {});
         const activeIndex = orderedFocuses.findIndex((item) => developerFocusSignature(item.kind, item.item || {}) === activeSignature);
         if (activeIndex >= 0 && orderedFocuses[activeIndex + 1]) {
           return orderedFocuses[activeIndex + 1];
@@ -2972,15 +2996,7 @@
           return null;
         }
         const preferredSection = review.focus || requestedAutofocus || "";
-        const orderedFocuses = buildOrderedRouteReviewFocuses(review, preferredSection, { includeDirect: true });
-        if (!orderedFocuses.length) {
-          return null;
-        }
-        const activeSignature = developerFocusSignature(focus.kind, focus.item || {});
-        const activeIndex = orderedFocuses.findIndex((item) => developerFocusSignature(item.kind, item.item || {}) === activeSignature);
-        const nextFocus = activeIndex >= 0
-          ? (orderedFocuses[activeIndex + 1] || null)
-          : (orderedFocuses[0] || null);
+        const nextFocus = buildNextRouteReviewFocus(review, preferredSection, focus);
         if (!nextFocus?.kind) {
           return null;
         }

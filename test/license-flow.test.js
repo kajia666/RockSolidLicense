@@ -7711,11 +7711,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.primaryMatch?.kind, "session");
     assert.equal(exportSnapshot.routeReview?.primaryMatch?.routeAction, "control-session");
     assert.equal(exportSnapshot.routeReview?.nextMatch?.kind, "audit");
+    assert.ok(Array.isArray(exportSnapshot.routeReview?.remainingMatches));
+    assert.equal(exportSnapshot.routeReview?.remainingMatches?.[0]?.kind, "audit");
     assert.match(exportSnapshot.summaryText, /RockSolid Developer Ops Snapshot/);
     assert.match(exportSnapshot.summaryText, /Project Filter: EXPORT_ALPHA/);
     assert.match(exportSnapshot.summaryText, /Overview Status: ok/);
     assert.match(exportSnapshot.summaryText, /Route Review Focus: sessions/);
     assert.match(exportSnapshot.summaryText, /Route Review Primary Match:/);
+    assert.match(exportSnapshot.summaryText, /Route Review Remaining Matches:/);
     assert.match(exportSnapshot.summaryText, /Top Reasons:/);
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);
@@ -7765,6 +7768,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(nextRouteReviewDownload.contentDisposition || "", /developer-ops-next-audit-summary\.txt/);
     assert.match(nextRouteReviewDownload.body, /Route Review Next Match/);
     assert.match(nextRouteReviewDownload.body, /action=Review Audit/);
+
+    const remainingRouteReviewDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=route-review-remaining",
+      operatorSession.token
+    );
+    assert.equal(remainingRouteReviewDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(remainingRouteReviewDownload.contentDisposition || "", /developer-ops-remaining-summary\.txt/);
+    assert.match(remainingRouteReviewDownload.body, /Route Review Remaining Matches/);
+    assert.match(remainingRouteReviewDownload.body, /Review Audit/);
 
     const checksumsDownload = await getText(
       baseUrl,

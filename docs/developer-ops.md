@@ -115,7 +115,7 @@ This page is intended for day-to-day authorization operations:
 The download route also accepts:
 
 - `format=json|summary|checksums|zip`
-- `format=route-review-primary|route-review-next`
+- `format=route-review-primary|route-review-next|route-review-remaining`
 
 ## Role behavior
 

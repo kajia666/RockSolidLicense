@@ -3369,6 +3369,14 @@ function buildPrimaryReviewStepTitle(workspaceAction = null, recommendedControl 
   return buildPrimaryControlActionTitle(workspaceAction?.params?.focusKind);
 }
 
+function buildReviewTargetActionPlanTitle(item = {}) {
+  const recommendedLabel = String(item?.recommendedControl?.label || "").trim();
+  if (recommendedLabel) {
+    return recommendedLabel;
+  }
+  return item?.label || item?.key || "Review routed ops scope";
+}
+
 function buildPrimaryOpsDownloadDescriptor(focusKind = "") {
   const normalized = String(focusKind || "").trim().toLowerCase();
   if (normalized === "account") {
@@ -6965,7 +6973,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   for (const item of visibleReviewTargets.slice(0, 3)) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: item.key,
-      title: item.label || item.key || "Review routed ops scope",
+      title: buildReviewTargetActionPlanTitle(item),
       summary: item.summary || "-",
       status: item.status || "review",
       priority: actionPlan.length ? "secondary" : "primary",
@@ -7767,6 +7775,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: primaryReviewTarget.workspaceAction,
       recommendedDownload: primaryReviewTarget.recommendedDownload || null
     } : null,
+    ...visibleReviewTargets.slice(0, 3).map((item) => createLaunchWorkflowActionPlanStep({
+      key: item.key,
+      title: buildReviewTargetActionPlanTitle(item),
+      priority: "secondary",
+      status: item.status || "review",
+      summary: item.summary || "-",
+      workspaceAction: item.workspaceAction || null,
+      recommendedDownload: item.recommendedDownload || null
+    })),
     {
       key: "ops_follow_up",
       title: "Recheck sessions and audit after smoke login",

@@ -6549,7 +6549,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut(
         "ops",
         autofocus,
-        label || "Open Ops Workspace",
+        resolvedRouteAction === "control-primary" ? "Open Primary Control in Ops" : (label || "Open Ops Workspace"),
         {
           ...matchedOpsParams,
           ...(focusParams && typeof focusParams === "object" ? focusParams : {}),
@@ -7376,7 +7376,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       count: accountCandidates.length,
       status: accountLoginReady ? "pass" : registerEnabled ? "review" : "block",
       routeActionLabel: "Open Primary Control",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", "Open Ops Workspace", {
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", "Open Primary Control in Ops", {
         reviewMode: "matched",
         routeAction: "control-primary",
         actorType: "account",
@@ -7411,7 +7411,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       count: entitlementCandidates.length,
       status: entitlementCandidates.length ? "pass" : "review",
       routeActionLabel: "Open Primary Control",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", "Open Ops Workspace", {
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", "Open Primary Control in Ops", {
         reviewMode: "matched",
         routeAction: "control-primary",
         username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || "",
@@ -7459,7 +7459,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       count: readyPaths.length,
       status: startupBlocked ? "review" : "pass",
       routeActionLabel: "Open Primary Control",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Ops Workspace", {
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Primary Control in Ops", {
         reviewMode: "matched",
         routeAction: "control-primary",
         eventType: "session.login",

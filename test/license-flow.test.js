@@ -5762,6 +5762,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.actionPlan.length >= 1);
       assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
       assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
+      assert.ok(launchReview.reviewSummary.primaryReviewTarget);
+      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.key, "ops");
+      assert.equal(launchReview.reviewSummary.primaryReviewTarget?.workspaceAction?.params?.routeAction, "review-primary");
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeAction));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.routeActionLabel));
@@ -10149,6 +10152,7 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /\/developer\/launch-smoke/);
       assert.match(html, /Generate Launch Review/);
       assert.match(html, /Review Actions/);
+      assert.match(html, /Primary Review Target/);
       assert.match(html, /Review Targets/);
       assert.match(html, /Workspace Path/);
       assert.match(html, /Last Review Action/);
@@ -10162,6 +10166,7 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /Open License Workspace/);
       assert.match(html, /review-followup-box/);
       assert.match(html, /renderLastReviewFollowUp/);
+      assert.match(html, /currentPrimaryReviewTarget/);
       assert.match(html, /currentReviewTargets/);
       assert.match(html, /runLaunchReviewBootstrap/);
       assert.match(html, /runLaunchReviewSetup/);

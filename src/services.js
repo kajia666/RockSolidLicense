@@ -6111,6 +6111,17 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       );
     }
   }
+  if (reviewSummary.primaryReviewTarget) {
+    const item = reviewSummary.primaryReviewTarget;
+    lines.push("");
+    lines.push("Launch Review Primary Review Target:");
+    lines.push(
+      `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
+      + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
+      + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+      + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+    );
+  }
   if (Array.isArray(reviewSummary.reviewTargets) && reviewSummary.reviewTargets.length) {
     lines.push("");
     lines.push("Launch Review Focus Targets:");
@@ -6617,6 +6628,21 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const visibleReviewTargets = reviewTargets.some((item) => Number(item.count || 0) > 0)
     ? reviewTargets.filter((item) => Number(item.count || 0) > 0)
     : reviewTargets.slice(0, 2);
+  const rawPrimaryReviewTarget = visibleReviewTargets.find((item) => item?.workspaceAction) || visibleReviewTargets[0] || null;
+  const primaryReviewTarget = rawPrimaryReviewTarget?.workspaceAction
+    ? {
+        ...rawPrimaryReviewTarget,
+        workspaceAction: {
+          ...rawPrimaryReviewTarget.workspaceAction,
+          params: {
+            ...(rawPrimaryReviewTarget.workspaceAction.params && typeof rawPrimaryReviewTarget.workspaceAction.params === "object"
+              ? rawPrimaryReviewTarget.workspaceAction.params
+              : {}),
+            routeAction: "review-primary"
+          }
+        }
+      }
+    : rawPrimaryReviewTarget;
   for (const item of visibleReviewTargets) {
     pushWorkspaceAction(item.workspaceAction, item.summary || "");
   }
@@ -6741,10 +6767,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
         : (opsOverview.headline || "Launch lane and routed runtime scope both look ready for handoff."),
     recommendedWorkspace,
     workspaceActions,
-      reviewTargets: visibleReviewTargets,
-      actionPlan,
-      recommendedDownloads,
-      nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
+    primaryReviewTarget,
+    reviewTargets: visibleReviewTargets,
+    actionPlan,
+    recommendedDownloads,
+    nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
   };
 }
 

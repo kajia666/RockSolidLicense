@@ -426,6 +426,9 @@
       function currentReviewWorkspaceActions() {
         return Array.isArray(currentReviewSummary().workspaceActions) ? currentReviewSummary().workspaceActions : [];
       }
+      function currentPrimaryReviewTarget() {
+        return currentReviewSummary().primaryReviewTarget || null;
+      }
       function currentReviewTargets() {
         return Array.isArray(currentReviewSummary().reviewTargets) ? currentReviewSummary().reviewTargets : [];
       }
@@ -587,6 +590,7 @@
         const overview = ops.overview || {};
         const reviewSummary = currentReviewSummary();
         const actionPlan = currentReviewActionPlan();
+        const primaryReviewTarget = currentPrimaryReviewTarget();
         const reviewTargets = currentReviewTargets();
         const workspaceActions = currentReviewWorkspaceActions();
         const recommendedDownloads = currentReviewRecommendedDownloads();
@@ -603,6 +607,17 @@
           ${reviewSummary.recommendedWorkspace?.key ? `
             <div class="actions" style="margin-top: 12px;">
               <button type="button" id="review-open-recommended-inline-btn">${esc(reviewSummary.recommendedWorkspace.label || "Open Recommended Workspace")}</button>
+            </div>
+          ` : ""}
+          ${primaryReviewTarget ? `
+            <div class="hint" style="margin-top: 12px;">Primary Review Target</div>
+            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
+              <div>${renderTag(`count:${primaryReviewTarget.count ?? 0}`, Number(primaryReviewTarget.count || 0) > 0)} ${renderTag(String(primaryReviewTarget.status || "review").toUpperCase(), String(primaryReviewTarget.status || "review").toLowerCase() === "pass")} ${primaryReviewTarget.routeActionLabel ? renderTag(`route:${primaryReviewTarget.routeActionLabel}`) : ""} ${esc(primaryReviewTarget.label || primaryReviewTarget.key || "target")}</div>
+              <div class="hint" style="margin-top: 8px;">${esc(primaryReviewTarget.summary || "-")}</div>
+              <div class="actions" style="margin-top: 8px;">
+                ${primaryReviewTarget.workspaceAction ? `<button type="button" class="secondary" data-review-primary-workspace="1">${esc(primaryReviewTarget.workspaceAction.label || primaryReviewTarget.workspaceAction.key || "Open workspace")}</button>` : ""}
+                ${primaryReviewTarget.recommendedDownload ? `<button type="button" data-review-primary-download="1">${esc(primaryReviewTarget.recommendedDownload.label || primaryReviewTarget.recommendedDownload.key || "Download summary")}</button>` : ""}
+              </div>
             </div>
           ` : ""}
           ${reviewTargets.length ? `
@@ -1159,6 +1174,44 @@
         }
       });
       el("review-actions-box").addEventListener("click", async (event) => {
+        const primaryReviewWorkspaceButton = event.target.closest("[data-review-primary-workspace]");
+        if (primaryReviewWorkspaceButton) {
+          try {
+            const item = currentPrimaryReviewTarget();
+            openWorkspaceAction(item?.workspaceAction, {
+              title: item?.label || item?.key || "Primary launch review target",
+              summary: item?.summary || ""
+            });
+            setOutput({
+              reviewPrimaryWorkspace: {
+                key: item?.workspaceAction?.key || null,
+                autofocus: item?.workspaceAction?.autofocus || null,
+                label: item?.workspaceAction?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
+        const primaryReviewDownloadButton = event.target.closest("[data-review-primary-download]");
+        if (primaryReviewDownloadButton) {
+          try {
+            const item = currentPrimaryReviewTarget();
+            const result = await downloadReviewRecommendedItem(item?.recommendedDownload);
+            setOutput({
+              reviewPrimaryDownload: {
+                key: item?.recommendedDownload?.key || null,
+                fileName: result?.fileName || item?.recommendedDownload?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const reviewTargetWorkspaceButton = event.target.closest("[data-review-target-workspace-index]");
         if (reviewTargetWorkspaceButton) {
           try {

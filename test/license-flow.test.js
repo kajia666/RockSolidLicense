@@ -5764,6 +5764,10 @@ test("developer release package export bundles integration, versions, and notice
         /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
         && /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.recommendedDownload?.fileName || "")
       ));
+      assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
+        item.key === "launch_review_primary_target"
+        && /^Open the primary (account|entitlement|session|device) control$/i.test(item.title || "")
+      ));
       assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
       assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
       assert.ok(launchReview.reviewSummary.primaryReviewTarget);
@@ -6162,6 +6166,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
       /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
       && /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.recommendedDownload?.fileName || "")
+    ));
+    assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
+      item.key === "launch_smoke_primary_review"
+      && /^Open the primary (account|entitlement|session|device) control$/i.test(item.title || "")
     ));
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);
@@ -11117,6 +11125,14 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Review Primary Match/);
     assert.match(html, /Open Primary Control/);
     assert.match(html, /Download Primary Match Summary/);
+    assert.match(html, /Primary account summary/);
+    assert.match(html, /Primary entitlement summary/);
+    assert.match(html, /Primary session summary/);
+    assert.match(html, /Primary device summary/);
+    assert.match(html, /developer-ops-primary-account-summary\.txt/);
+    assert.match(html, /developer-ops-primary-entitlement-summary\.txt/);
+    assert.match(html, /developer-ops-primary-session-summary\.txt/);
+    assert.match(html, /developer-ops-primary-device-summary\.txt/);
     assert.match(html, /Download Accounts Summary/);
     assert.match(html, /Download Sessions Summary/);
     assert.match(html, /Download Audit Summary/);

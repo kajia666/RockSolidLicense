@@ -3344,6 +3344,23 @@ function buildFocusKindControlRouteAction(focusKind = "") {
   return "control-primary";
 }
 
+function buildPrimaryControlActionTitle(focusKind = "") {
+  const normalized = String(focusKind || "").trim().toLowerCase();
+  if (normalized === "account") {
+    return "Open the primary account control";
+  }
+  if (normalized === "entitlement") {
+    return "Open the primary entitlement control";
+  }
+  if (normalized === "session") {
+    return "Open the primary session control";
+  }
+  if (normalized === "device") {
+    return "Open the primary device control";
+  }
+  return "Open the primary routed control";
+}
+
 function buildPrimaryOpsDownloadDescriptor(focusKind = "") {
   const normalized = String(focusKind || "").trim().toLowerCase();
   if (normalized === "account") {
@@ -6886,10 +6903,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
   }
 
   if (primaryReviewTarget?.workspaceAction) {
+    const primaryControlTitle = buildPrimaryControlActionTitle(primaryReviewTarget.workspaceAction?.params?.focusKind);
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_review_primary_target",
-      title: "Open the primary routed control",
-      summary: primaryReviewTarget.summary || "Open the primary routed control before scanning the rest of the matched runtime scope.",
+      title: primaryControlTitle,
+      summary: primaryReviewTarget.summary || `${primaryControlTitle} before scanning the rest of the matched runtime scope.`,
       status: primaryReviewTarget.status || "review",
       priority: actionPlan.length ? "secondary" : "primary",
       workspaceAction: primaryReviewTarget.workspaceAction,
@@ -7681,10 +7699,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     } : null,
     primaryReviewTarget?.workspaceAction ? {
       key: "launch_smoke_primary_review",
-      title: "Open the primary smoke control",
+      title: buildPrimaryControlActionTitle(primaryReviewTarget.workspaceAction?.params?.focusKind),
       priority: "secondary",
       status: primaryReviewTarget.status || "review",
-      summary: primaryReviewTarget.summary || "Open the primary smoke control after setup so first-wave follow-up starts with the most important match.",
+      summary: primaryReviewTarget.summary || `${buildPrimaryControlActionTitle(primaryReviewTarget.workspaceAction?.params?.focusKind)} after setup so first-wave follow-up starts with the most important match.`,
       workspaceAction: primaryReviewTarget.workspaceAction,
       recommendedDownload: primaryReviewTarget.recommendedDownload || null
     } : null,

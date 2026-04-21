@@ -5781,8 +5781,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.routeAction === "control-primary"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) =>
         item.workspaceAction?.params?.routeAction === "control-primary"
-        && item.workspaceAction?.label === "Open Primary Control in Ops"
-        && item.routeActionLabel === "Open Primary Control"
+        && /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
+        && /^Open (Account|Entitlement|Session|Device) Control$/.test(item.routeActionLabel || "")
       ));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.params?.focusKind));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => {
@@ -6166,8 +6166,8 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.reviewTargets?.some((item) => {
       const params = item.workspaceAction?.params || {};
       return params.focusKind && params.routeAction === "control-primary"
-        && item.workspaceAction?.label === "Open Primary Control in Ops"
-        && item.routeActionLabel === "Open Primary Control";
+        && /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
+        && /^Open (Account|Entitlement|Session|Device) Control$/.test(item.routeActionLabel || "");
     }));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.source === "developer-launch-smoke-kit"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);

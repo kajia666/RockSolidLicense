@@ -3306,6 +3306,23 @@ function createLaunchWorkflowSmokeKitDownloadShortcut(label = "Launch smoke kit 
   );
 }
 
+function buildFocusKindControlLabel(focusKind = "", suffix = "") {
+  const normalized = String(focusKind || "").trim().toLowerCase();
+  if (normalized === "account") {
+    return `Open Account Control${suffix}`;
+  }
+  if (normalized === "entitlement") {
+    return `Open Entitlement Control${suffix}`;
+  }
+  if (normalized === "session") {
+    return `Open Session Control${suffix}`;
+  }
+  if (normalized === "device") {
+    return `Open Device Control${suffix}`;
+  }
+  return `Open Primary Control${suffix}`;
+}
+
 function createReleasePackageDownloadShortcut({
   key = "release_summary",
   fileName = "release-package.txt",
@@ -6497,10 +6514,10 @@ function buildDeveloperLaunchReviewSummaryPayload({
     }
     return "prepare-primary";
   };
-  const buildReviewTargetRouteActionLabel = (routeAction = "") => {
+  const buildReviewTargetRouteActionLabel = (routeAction = "", focusKind = "") => {
     const normalized = String(routeAction || "").trim().toLowerCase();
     if (normalized === "control-primary") {
-      return "Open Primary Control";
+      return buildFocusKindControlLabel(focusKind);
     }
     if (normalized === "review-accounts") {
       return "Review Accounts";
@@ -6537,6 +6554,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       return null;
     }
     const resolvedRouteAction = routeAction || (focusParams?.focusKind ? "control-primary" : buildReviewTargetRouteAction(autofocus));
+    const controlLabel = buildFocusKindControlLabel(focusParams?.focusKind, " in Ops");
     return {
       key,
       autofocus,
@@ -6545,11 +6563,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
       status: status || "review",
       summary: summary || "-",
       routeAction: resolvedRouteAction,
-      routeActionLabel: buildReviewTargetRouteActionLabel(resolvedRouteAction),
+      routeActionLabel: buildReviewTargetRouteActionLabel(resolvedRouteAction, focusParams?.focusKind),
       workspaceAction: createLaunchWorkflowWorkspaceShortcut(
         "ops",
         autofocus,
-        resolvedRouteAction === "control-primary" ? "Open Primary Control in Ops" : (label || "Open Ops Workspace"),
+        resolvedRouteAction === "control-primary" ? controlLabel : (label || "Open Ops Workspace"),
         {
           ...matchedOpsParams,
           ...(focusParams && typeof focusParams === "object" ? focusParams : {}),
@@ -7375,8 +7393,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
           : "Seed a starter account before account-login smoke validation can continue.",
       count: accountCandidates.length,
       status: accountLoginReady ? "pass" : registerEnabled ? "review" : "block",
-      routeActionLabel: "Open Primary Control",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", "Open Primary Control in Ops", {
+      routeActionLabel: buildFocusKindControlLabel("account"),
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "accounts", buildFocusKindControlLabel("account", " in Ops"), {
         reviewMode: "matched",
         routeAction: "control-primary",
         actorType: "account",
@@ -7410,8 +7428,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         : "Account-only smoke lanes should still confirm an internal starter entitlement before first validation.",
       count: entitlementCandidates.length,
       status: entitlementCandidates.length ? "pass" : "review",
-      routeActionLabel: "Open Primary Control",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", "Open Primary Control in Ops", {
+      routeActionLabel: buildFocusKindControlLabel("entitlement"),
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "entitlements", buildFocusKindControlLabel("entitlement", " in Ops"), {
         reviewMode: "matched",
         routeAction: "control-primary",
         username: entitlementCandidates[0]?.username || accountCandidates[0]?.username || "",
@@ -7458,8 +7476,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       summary: "After the first smoke login or recharge succeeds, confirm the resulting session and heartbeat state before wider rollout.",
       count: readyPaths.length,
       status: startupBlocked ? "review" : "pass",
-      routeActionLabel: "Open Primary Control",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", "Open Primary Control in Ops", {
+      routeActionLabel: buildFocusKindControlLabel("session"),
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "sessions", buildFocusKindControlLabel("session", " in Ops"), {
         reviewMode: "matched",
         routeAction: "control-primary",
         eventType: "session.login",

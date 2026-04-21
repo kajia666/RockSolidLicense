@@ -6845,6 +6845,8 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_BOOT");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
+    assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
+    assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6934,6 +6936,8 @@ test("developer launch mainline action can create first launch batches and retur
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
+    assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
+    assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

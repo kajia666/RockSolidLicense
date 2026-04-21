@@ -3679,7 +3679,8 @@ function createLaunchWorkflowActionPlanStep({
 function buildLaunchMainlineActionReceipt({
   operation = "",
   result = null,
-  followUp = null
+  followUp = null,
+  launchMainline = null
 } = {}) {
   const normalizedOperation = String(operation || "").trim().toLowerCase();
   const operationLabel = normalizedOperation === "restock"
@@ -3739,6 +3740,12 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: item?.recommendedDownload || null
     }))
     .filter((item) => item.key || item.workspaceAction || item.recommendedDownload);
+  const mainlineSummary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
+    ? launchMainline.mainlineSummary
+    : {};
+  const mainlinePrimaryAction = mainlineSummary.primaryAction || null;
+  const mainlineRecommendedDownload = mainlineSummary.recommendedDownload || null;
+  const mainlineContinuation = mainlineSummary.continuation || null;
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -3748,6 +3755,9 @@ function buildLaunchMainlineActionReceipt({
     transitions,
     created,
     primaryAction: followUp?.primaryAction || null,
+    mainlinePrimaryAction,
+    mainlineRecommendedDownload,
+    mainlineContinuation,
     actions
   };
 }
@@ -18481,7 +18491,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         receipt: buildLaunchMainlineActionReceipt({
           operation,
           result,
-          followUp
+          followUp,
+          launchMainline
         }),
         result,
         launchMainline

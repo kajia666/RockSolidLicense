@@ -491,12 +491,15 @@
         return `
           <div>
             ${renderTag(`after:${operationLabel}`, true)}
-            ${(receipt?.primaryAction?.label || followUp?.primaryAction?.label) ? renderTag(`next:${receipt?.primaryAction?.label || followUp?.primaryAction?.label}`, true) : ""}
+            ${(receipt?.mainlinePrimaryAction?.title || receipt?.mainlinePrimaryAction?.label || receipt?.primaryAction?.label || followUp?.primaryAction?.label)
+              ? renderTag(`next:${receipt?.mainlinePrimaryAction?.title || receipt?.mainlinePrimaryAction?.label || receipt?.primaryAction?.label || followUp?.primaryAction?.label}`, true)
+              : ""}
             ${result?.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
             ${result?.channel ? renderTag(`channel:${result.channel}`, true) : ""}
           </div>
           <div class="hint" style="margin-top: 10px;">${esc(result?.message || "Last launch mainline action completed.")}</div>
           <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
+          ${receipt?.mainlineContinuation ? `<div class="hint" style="margin-top: 8px;">${esc(`Continuation: ${receipt.mainlineContinuation.title || "Continue Routed Review"}${receipt.mainlineContinuation.summary ? ` | ${receipt.mainlineContinuation.summary}` : ""}`)}</div>` : ""}
           ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
           ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
           ${actions.map((item, index) => `

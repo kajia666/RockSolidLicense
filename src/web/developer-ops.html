@@ -293,6 +293,7 @@
           "review-primary",
           "review-next",
           "download-primary",
+          "download-next",
           "download-accounts",
           "download-entitlements",
           "download-sessions",
@@ -345,6 +346,9 @@
         }
         if (normalized === "download-primary") {
           return "Download Primary Match Summary";
+        }
+        if (normalized === "download-next") {
+          return "Download Next Match Summary";
         }
         if (normalized === "download-accounts") {
           return "Download Accounts Summary";
@@ -1110,6 +1114,73 @@
         return descriptor;
       }
 
+      function buildRouteReviewNextDownloadDescriptor(next = buildNextRouteReviewFocus(), review = collectRouteReview()) {
+        if (!next?.kind) {
+          return null;
+        }
+        const baseFilters = filters();
+        const item = next.item || {};
+        const descriptor = {
+          label: "Next match summary",
+          fileName: "developer-ops-next-summary.txt",
+          params: {
+            ...baseFilters,
+            productCode: item.productCode || item.projectCode || baseFilters.productCode || requestedProductCode || "",
+            username: item.username || baseFilters.username || "",
+            search: baseFilters.search || "",
+            eventType: baseFilters.eventType || "",
+            actorType: baseFilters.actorType || "",
+            entityType: baseFilters.entityType || "",
+            limit: baseFilters.limit || 60
+          }
+        };
+        if (next.kind === "account") {
+          descriptor.label = "Next account summary";
+          descriptor.fileName = "developer-ops-next-account-summary.txt";
+          descriptor.params.search = "";
+        } else if (next.kind === "entitlement") {
+          descriptor.label = "Next entitlement summary";
+          descriptor.fileName = "developer-ops-next-entitlement-summary.txt";
+          descriptor.params.entityType = "entitlement";
+          descriptor.params.search = "";
+        } else if (next.kind === "session") {
+          descriptor.label = "Next session summary";
+          descriptor.fileName = "developer-ops-next-session-summary.txt";
+          descriptor.params.search = item.sessionId || item.id || baseFilters.search || "";
+          descriptor.params.entityType = descriptor.params.entityType || "session";
+        } else if (next.kind === "device") {
+          descriptor.label = "Next device summary";
+          descriptor.fileName = "developer-ops-next-device-summary.txt";
+          descriptor.params.search = item.fingerprint || baseFilters.search || "";
+          descriptor.params.entityType = item.blockId ? "device_block" : (item.bindingId ? "device_binding" : descriptor.params.entityType || "");
+        }
+        if (!descriptor.params.search) {
+          delete descriptor.params.search;
+        }
+        if (!descriptor.params.username) {
+          delete descriptor.params.username;
+        }
+        if (!descriptor.params.entityType) {
+          delete descriptor.params.entityType;
+        }
+        if (!descriptor.params.actorType) {
+          delete descriptor.params.actorType;
+        }
+        if (!descriptor.params.eventType) {
+          delete descriptor.params.eventType;
+        }
+        if (!descriptor.params.productCode) {
+          delete descriptor.params.productCode;
+        }
+        if (!descriptor.params.limit) {
+          descriptor.params.limit = 60;
+        }
+        if (!review?.active && !descriptor.params.productCode) {
+          return null;
+        }
+        return descriptor;
+      }
+
       function routeReviewSectionPrimaryItem(review = collectRouteReview(), section = "") {
         const normalized = String(section || "").trim().toLowerCase();
         if (normalized === "accounts") {
@@ -1591,6 +1662,7 @@
           primaryFocus?.item?.recommendedControl?.label ? `<button type="button" class="secondary" data-route-review-action="control-primary">Open Primary Control</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-primary">Review Primary Match</button>` : "",
           nextFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="review-next">Review Next Match</button>` : "",
+          nextFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-next" ${token ? "" : "disabled"}>Download Next Match Summary</button>` : "",
           primaryFocus?.kind ? `<button type="button" class="secondary" data-route-review-action="download-primary" ${token ? "" : "disabled"}>Download Primary Match Summary</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="review-accounts">Review Accounts</button>` : "",
           review.matchedAccounts.length ? `<button type="button" class="secondary" data-route-review-action="download-accounts" ${token ? "" : "disabled"}>Download Accounts Summary</button>` : "",
@@ -1787,6 +1859,14 @@
           const descriptor = buildRouteReviewPrimaryDownloadDescriptor();
           if (!descriptor) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
+          }
+          await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
+          return;
+        }
+        if (normalizedAction === "download-next") {
+          const descriptor = buildRouteReviewNextDownloadDescriptor();
+          if (!descriptor) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match is available yet." };
           }
           await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
           return;

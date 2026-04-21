@@ -108,6 +108,7 @@
 - `Launch Review` 现在也会像 `Launch Smoke` 一样，把最重要的那个 routed follow-up 顶成 `Primary Review Target`，让值守或 QA 先开最关键的复查对象，再决定是否继续展开完整的 review target 列表
 - 这批 `Launch Review` 复查目标现在还会继续带 `routeAction` 进 `Developer Ops`，比如 `Review Sessions / Review Accounts / Review Audit`，所以从复查页跳到运营台时，不再只是到对的页面，而是更接近直接落到当前该做的那一步
 - 现在这两个工作台里的 `Primary Review Target / Review Targets` 还会直接带上服务端生成的 `recommendedControl`，并且主复查对象会优先挑“已经有明确控制建议”的目标；这样主链摘要里已经能直接看到 `control=...`，不再只剩路由动作让前端自己猜下一步
+- 这批主复查步骤现在连 `action plan` 标题也会直接落成服务端给出的控制建议，比如 `Prepare account re-enable / session review / point top-up`，而不是继续停在泛化的 `Open the primary ... control`
 - 开发者发版中心现在也补上了结构化的 `Release Mainline Follow-up`。生成 release package 后，发版页会直接告诉软件作者下一步更该去 `Release / Launch Workflow / Launch Review / Integration` 哪个工作台，并把 `Release checklist / Launch review summary / Launch smoke kit summary` 这些更贴近主链的下载一起挂出来；release package 也正式支持单独下载 `checklist`
 - 这条 `Release Mainline Follow-up` 现在也不只是告诉人“该去哪里”了：当 lane 还缺 starter policy、starter account 或首批库存时，发版页已经可以直接运行 `Launch Bootstrap / First Batch Setup / Inventory Refill`，并把结果保留在 `Last Mainline Action` 回执里，方便发版值守顺着继续做下一步复查
 - 上面这些首发建议现在也不只是说明文字了，软件作者可以直接从建议旁边跳到授权预设、授权中心、上线工作台、发版工作台、开发者运营台，或者直接运行 `Launch Bootstrap`；首批直登卡/充值卡建议也会按推荐的批次数量和前缀直接预填到发卡表单里，把“看建议 -> 去处理”压成更短的动作链

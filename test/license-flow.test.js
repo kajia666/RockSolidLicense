@@ -5760,14 +5760,14 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary);
       assert.ok(Array.isArray(launchReview.reviewSummary.actionPlan));
       assert.ok(launchReview.reviewSummary.actionPlan.length >= 1);
-      assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
-        /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
-        && /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.recommendedDownload?.fileName || "")
-      ));
-      assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
-        item.key === "launch_review_primary_target"
-        && /^Open the primary (account|entitlement|session|device) control$/i.test(item.title || "")
-      ));
+    assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
+      /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.workspaceAction?.label || "")
+      && /^developer-ops-primary-(account|entitlement|session|device)-summary\.txt$/.test(item.recommendedDownload?.fileName || "")
+    ));
+    assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
+      item.key === "launch_review_primary_target"
+      && /^Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)$/i.test(item.title || "")
+    ));
       assert.ok(Array.isArray(launchReview.reviewSummary.reviewTargets));
       assert.ok(launchReview.reviewSummary.reviewTargets.length >= 1);
       assert.ok(launchReview.reviewSummary.primaryReviewTarget);
@@ -6179,7 +6179,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     ));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) =>
       item.key === "launch_smoke_primary_review"
-      && /^Open the primary (account|entitlement|session|device) control$/i.test(item.title || "")
+      && /^Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)$/i.test(item.title || "")
     ));
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);

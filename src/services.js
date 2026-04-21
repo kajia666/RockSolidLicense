@@ -3361,6 +3361,14 @@ function buildPrimaryControlActionTitle(focusKind = "") {
   return "Open the primary routed control";
 }
 
+function buildPrimaryReviewStepTitle(workspaceAction = null, recommendedControl = null) {
+  const recommendedLabel = String(recommendedControl?.label || "").trim();
+  if (recommendedLabel) {
+    return recommendedLabel;
+  }
+  return buildPrimaryControlActionTitle(workspaceAction?.params?.focusKind);
+}
+
 function buildPrimaryOpsDownloadDescriptor(focusKind = "") {
   const normalized = String(focusKind || "").trim().toLowerCase();
   if (normalized === "account") {
@@ -6939,7 +6947,10 @@ function buildDeveloperLaunchReviewSummaryPayload({
   }
 
   if (primaryReviewTarget?.workspaceAction) {
-    const primaryControlTitle = buildPrimaryControlActionTitle(primaryReviewTarget.workspaceAction?.params?.focusKind);
+    const primaryControlTitle = buildPrimaryReviewStepTitle(
+      primaryReviewTarget.workspaceAction,
+      primaryReviewTarget.recommendedControl
+    );
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_review_primary_target",
       title: primaryControlTitle,
@@ -7743,10 +7754,16 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     } : null,
     primaryReviewTarget?.workspaceAction ? {
       key: "launch_smoke_primary_review",
-      title: buildPrimaryControlActionTitle(primaryReviewTarget.workspaceAction?.params?.focusKind),
+      title: buildPrimaryReviewStepTitle(
+        primaryReviewTarget.workspaceAction,
+        primaryReviewTarget.recommendedControl
+      ),
       priority: "secondary",
       status: primaryReviewTarget.status || "review",
-      summary: primaryReviewTarget.summary || `${buildPrimaryControlActionTitle(primaryReviewTarget.workspaceAction?.params?.focusKind)} after setup so first-wave follow-up starts with the most important match.`,
+      summary: primaryReviewTarget.summary || `${buildPrimaryReviewStepTitle(
+        primaryReviewTarget.workspaceAction,
+        primaryReviewTarget.recommendedControl
+      )} after setup so first-wave follow-up starts with the most important match.`,
       workspaceAction: primaryReviewTarget.workspaceAction,
       recommendedDownload: primaryReviewTarget.recommendedDownload || null
     } : null,

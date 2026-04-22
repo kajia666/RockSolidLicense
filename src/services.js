@@ -3721,6 +3721,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_recovery_drill_handoff"
         : normalizedFormat === "operations-handoff"
           ? "launch_mainline_operations_handoff"
+        : normalizedFormat === "post-launch-sweep-handoff"
+          ? "launch_mainline_post_launch_sweep_handoff"
         : "launch_mainline_summary",
     fileName,
     label,
@@ -3933,6 +3935,8 @@ function buildLaunchMainlineActionReceipt({
     ? "Inventory Refill"
     : normalizedOperation === "first_batch_setup"
       ? "First Batch Setup"
+      : normalizedOperation === "record_post_launch_ops_sweep"
+        ? "Record First-Wave Ops Sweep"
       : normalizedOperation === "record_rollback_walkthrough"
         ? "Record Rollback Walkthrough"
         : normalizedOperation === "record_health_verification"
@@ -4557,6 +4561,13 @@ function queryLatestLaunchMainlineLaunchDayReadinessReviewEvidence(db, options =
   });
 }
 
+function queryLatestLaunchMainlinePostLaunchOpsSweepEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.post-launch-ops-sweep"
+  });
+}
+
 function buildLaunchMainlineProductionGatePayload({
   config = {},
   health = null,
@@ -4567,6 +4578,7 @@ function buildLaunchMainlineProductionGatePayload({
   cutoverHandoffDownload = null,
   recoveryDrillHandoffDownload = null,
   operationsHandoffDownload = null,
+  postLaunchSweepHandoffDownload = null,
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
   operationsWalkthroughEvidence = null,
@@ -4574,7 +4586,8 @@ function buildLaunchMainlineProductionGatePayload({
   healthVerificationEvidence = null,
   rollbackWalkthroughEvidence = null,
   cutoverWalkthroughEvidence = null,
-  launchDayReadinessReviewEvidence = null
+  launchDayReadinessReviewEvidence = null,
+  postLaunchOpsSweepEvidence = null
 } = {}) {
   const actionPlan = [];
   const checks = [];
@@ -4599,6 +4612,7 @@ function buildLaunchMainlineProductionGatePayload({
   const effectiveCutoverDownload = cutoverHandoffDownload || effectiveProductionDownload;
   const effectiveRecoveryDrillDownload = recoveryDrillHandoffDownload || effectiveProductionDownload;
   const effectiveOperationsDownload = operationsHandoffDownload || effectiveProductionDownload;
+  const effectivePostLaunchSweepDownload = postLaunchSweepHandoffDownload || effectiveOperationsDownload || effectiveProductionDownload;
   const securityWorkspace = createLaunchWorkflowWorkspaceShortcut(
     "security",
     "summary",
@@ -4779,6 +4793,13 @@ function buildLaunchMainlineProductionGatePayload({
     mode: "evidence",
     operation: "record_launch_day_readiness_review"
   });
+  const postLaunchOpsSweepRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_post_launch_ops_sweep",
+    label: "Record First-Wave Ops Sweep",
+    summary: "Capture a fresh first-wave ops sweep for this lane so the production gate can verify post-launch review and handoff coverage.",
+    mode: "evidence",
+    operation: "record_post_launch_ops_sweep"
+  });
   const backupVerificationRecordedAt = String(backupVerificationEvidence?.createdAt || "").trim();
   const backupVerificationRecordedMs = backupVerificationRecordedAt ? Date.parse(backupVerificationRecordedAt) : Number.NaN;
   const backupVerificationAgeDays = Number.isFinite(backupVerificationRecordedMs)
@@ -4803,6 +4824,12 @@ function buildLaunchMainlineProductionGatePayload({
     ? Math.max(0, Math.floor((Date.now() - launchDayReadinessReviewRecordedMs) / 86400000))
     : null;
   const hasRecentLaunchDayReadinessReviewDirect = launchDayReadinessReviewAgeDays !== null && launchDayReadinessReviewAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const postLaunchOpsSweepRecordedAt = String(postLaunchOpsSweepEvidence?.createdAt || "").trim();
+  const postLaunchOpsSweepRecordedMs = postLaunchOpsSweepRecordedAt ? Date.parse(postLaunchOpsSweepRecordedAt) : Number.NaN;
+  const postLaunchOpsSweepAgeDays = Number.isFinite(postLaunchOpsSweepRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - postLaunchOpsSweepRecordedMs) / 86400000))
+    : null;
+  const hasRecentPostLaunchOpsSweep = postLaunchOpsSweepAgeDays !== null && postLaunchOpsSweepAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
   const deployVerificationRecordedAt = String(deployVerificationEvidence?.createdAt || "").trim();
   const deployVerificationRecordedMs = deployVerificationRecordedAt ? Date.parse(deployVerificationRecordedAt) : Number.NaN;
   const deployVerificationAgeDays = Number.isFinite(deployVerificationRecordedMs)
@@ -5215,6 +5242,40 @@ function buildLaunchMainlineProductionGatePayload({
         effectiveOperationsDownload,
         null,
         operationsWalkthroughRecordAction
+      );
+    }
+  }
+  if (postLaunchSweepHandoffDownload) {
+    pushRecommendedDownload(postLaunchSweepHandoffDownload);
+    addPassCheck(
+      "production_post_launch_sweep_handoff",
+      "Review the post-launch sweep handoff",
+      "The unified post-launch sweep handoff already packages first-wave review targets, routed-review continuation, and remaining queue handoff material for this lane.",
+      opsWorkspace,
+      effectivePostLaunchSweepDownload
+    );
+    if (hasRecentPostLaunchOpsSweep) {
+      addPassCheck(
+        "production_post_launch_ops_sweep_recent",
+        "A recent first-wave ops sweep is recorded",
+        `The latest first-wave ops sweep for this lane was recorded at ${postLaunchOpsSweepRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        opsWorkspace,
+        effectivePostLaunchSweepDownload,
+        null,
+        postLaunchOpsSweepRecordAction
+      );
+    } else {
+      addStep(
+        "hold",
+        "production_post_launch_ops_sweep_recent",
+        "Record a recent first-wave ops sweep",
+        postLaunchOpsSweepRecordedAt
+          ? `The latest first-wave ops sweep was recorded at ${postLaunchOpsSweepRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh ops sweep before widening rollout.`
+          : `No first-wave ops sweep has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+        opsWorkspace,
+        effectivePostLaunchSweepDownload,
+        null,
+        postLaunchOpsSweepRecordAction
       );
     }
   }
@@ -10194,7 +10255,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   healthVerificationEvidence = null,
   rollbackWalkthroughEvidence = null,
   cutoverWalkthroughEvidence = null,
-  launchDayReadinessReviewEvidence = null
+  launchDayReadinessReviewEvidence = null,
+  postLaunchOpsSweepEvidence = null
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
@@ -10380,6 +10442,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "operations-handoff",
     params
   );
+  const postLaunchSweepHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline post-launch sweep handoff",
+    "developer-launch-mainline-post-launch-sweep-handoff.txt",
+    "post-launch-sweep-handoff",
+    params
+  );
   const opsContinuationWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
     opsPrimaryWorkspaceAction,
     opsRouteReview.continuation?.primaryAction,
@@ -10468,6 +10536,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     cutoverHandoffDownload,
     recoveryDrillHandoffDownload,
     operationsHandoffDownload,
+    postLaunchSweepHandoffDownload,
     recoveryDrillEvidence,
     backupVerificationEvidence,
     operationsWalkthroughEvidence,
@@ -10475,7 +10544,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     healthVerificationEvidence,
     rollbackWalkthroughEvidence,
     cutoverWalkthroughEvidence,
-    launchDayReadinessReviewEvidence
+    launchDayReadinessReviewEvidence,
+    postLaunchOpsSweepEvidence
   });
   const stageDefinitions = [
     {
@@ -10704,6 +10774,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(continuation?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(productionHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   const overallGate = buildLaunchMainlineGatePayload({
     status: preferredStage?.gate?.status || "ready",
     headline: preferredStage?.gate?.headline || "Launch mainline overview",
@@ -11175,6 +11246,19 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  if (payload.postLaunchSweepHandoffText) {
+    const postLaunchSweepHandoff = payload.postLaunchSweepHandoffText
+      .split(/\r?\n/)
+      .map((line) => String(line || "").trimEnd())
+      .filter((line) => line !== "");
+    if (postLaunchSweepHandoff.length) {
+      lines.push("");
+      lines.push("Production Post-Launch Sweep Handoff:");
+      for (const line of postLaunchSweepHandoff.slice(1)) {
+        lines.push(`- ${line}`);
+      }
+    }
+  }
   if (Array.isArray(mainlineSummary.actionPlan) && mainlineSummary.actionPlan.length) {
     lines.push("");
     lines.push("Mainline Action Plan:");
@@ -11215,7 +11299,8 @@ function buildDeveloperLaunchMainlinePayload({
   healthVerificationEvidence = null,
   rollbackWalkthroughEvidence = null,
   cutoverWalkthroughEvidence = null,
-  launchDayReadinessReviewEvidence = null
+  launchDayReadinessReviewEvidence = null,
+  postLaunchOpsSweepEvidence = null
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
@@ -11237,6 +11322,7 @@ function buildDeveloperLaunchMainlinePayload({
   const cutoverHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-cutover-handoff.txt`;
   const recoveryDrillHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-recovery-drill-handoff.txt`;
   const operationsHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-operations-handoff.txt`;
+  const postLaunchSweepHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-sweep-handoff.txt`;
   const payload = {
     generatedAt,
     fileName,
@@ -11245,6 +11331,7 @@ function buildDeveloperLaunchMainlinePayload({
     cutoverHandoffFileName,
     recoveryDrillHandoffFileName,
     operationsHandoffFileName,
+    postLaunchSweepHandoffFileName,
     manifest: {
       generatedAt,
       channel,
@@ -11295,7 +11382,8 @@ function buildDeveloperLaunchMainlinePayload({
     healthVerificationEvidence,
     rollbackWalkthroughEvidence,
     cutoverWalkthroughEvidence,
-    launchDayReadinessReviewEvidence
+    launchDayReadinessReviewEvidence,
+    postLaunchOpsSweepEvidence
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
     generatedAt,
@@ -11322,6 +11410,12 @@ function buildDeveloperLaunchMainlinePayload({
     systemHealth
   });
   payload.operationsHandoffText = buildDeveloperLaunchMainlineOperationsHandoffText({
+    generatedAt,
+    manifest: payload.manifest,
+    filters: payload.filters,
+    publicBaseUrl
+  });
+  payload.postLaunchSweepHandoffText = buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
@@ -11390,6 +11484,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
     payload.operationsHandoffText || ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
+    payload.postLaunchSweepHandoffText || ""
+  );
   return files;
 }
 
@@ -11401,7 +11500,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "checksums", "zip"],
+    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -11454,6 +11553,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.operationsHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "post-launch-sweep-handoff") {
+    return {
+      fileName: payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.postLaunchSweepHandoffText || ""
     };
   }
 
@@ -12112,6 +12218,36 @@ function buildDeveloperLaunchMainlineOperationsHandoffText({
     `Operations Docs: ${operationsDocs.join(" | ")}`,
     `Primary Signals: ${operationsSignals.join(" | ")}`,
     "Focus Areas: launch health | login failures | heartbeat failures | backup freshness | alert routing | shift handover"
+  ];
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
+  generatedAt = "",
+  manifest = {},
+  filters = {},
+  publicBaseUrl = ""
+} = {}) {
+  const project = manifest.project || {};
+  const sweepSignals = [
+    "/developer/ops",
+    "/developer/launch-mainline",
+    "/developer/launch-review",
+    "/api/health",
+    "developer-ops-summary"
+  ];
+  const lines = [
+    "RockSolid Developer Launch Mainline Post-Launch Sweep Handoff",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Public Base URL: ${publicBaseUrl || "-"}`,
+    "",
+    `Primary Signals: ${sweepSignals.join(" | ")}`,
+    "Primary Follow-Up: Continue Routed Review",
+    "Secondary Follow-Up: Remaining routed review queue",
+    "Sweep Flow: confirm cutover | continue routed review | hand off remaining queue | capture first-wave ops sweep evidence"
   ];
   return lines.join("\n");
 }
@@ -20832,6 +20968,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
         channel
       });
+      const postLaunchOpsSweepEvidence = queryLatestLaunchMainlinePostLaunchOpsSweepEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
       const payload = buildDeveloperLaunchMainlinePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || launchWorkflow?.manifest?.generatedAt || nowIso(),
         releasePackage,
@@ -20851,6 +20991,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         rollbackWalkthroughEvidence,
         cutoverWalkthroughEvidence,
         launchDayReadinessReviewEvidence,
+        postLaunchOpsSweepEvidence,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,
@@ -21151,11 +21292,41 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             channel
           }
         };
+      } else if (operation === "record_post_launch_ops_sweep") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.post-launch-ops-sweep", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          postLaunchOpsSweepAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `First-wave ops sweep recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "post_launch_ops_sweep",
+            label: "First-wave ops sweep",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
       } else {
         throw new AppError(
           400,
           "INVALID_LAUNCH_MAINLINE_ACTION",
-          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, record_rollback_walkthrough, record_cutover_walkthrough, or record_launch_day_readiness_review."
+          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, record_rollback_walkthrough, record_cutover_walkthrough, record_launch_day_readiness_review, or record_post_launch_ops_sweep."
         );
       }
 

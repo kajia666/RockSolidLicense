@@ -5970,6 +5970,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "ops_summary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_production_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_operations_handoff"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_post_launch_sweep_handoff"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
@@ -5992,6 +5993,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Production Operations Handoff:/);
       assert.match(launchMainline.summaryText, /observability-guide\.md/);
       assert.match(launchMainline.summaryText, /shift-handover-template\.md/);
+      assert.match(launchMainline.summaryText, /Production Post-Launch Sweep Handoff:/);
+      assert.match(launchMainline.summaryText, /Continue Routed Review/);
+      assert.match(launchMainline.summaryText, /Remaining routed review queue/);
 
       const launchMainlineSummaryDownload = await getText(
         baseUrl,
@@ -6010,6 +6014,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Production Cutover Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Recovery Drill Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Operations Handoff:/);
+      assert.match(launchMainlineSummaryDownload.body, /Production Post-Launch Sweep Handoff:/);
 
       const productionHandoffDownload = await getText(
         baseUrl,
@@ -6063,6 +6068,18 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(operationsHandoffDownload.body, /docs\/production-operations-runbook\.md/);
       assert.match(operationsHandoffDownload.body, /docs\/incident-response-playbook\.md/);
       assert.match(operationsHandoffDownload.body, /docs\/shift-handover-template\.md/);
+
+      const postLaunchSweepHandoffDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=post-launch-sweep-handoff",
+        viewerSession.token
+      );
+      assert.match(postLaunchSweepHandoffDownload.contentType || "", /^text\/plain/);
+      assert.match(postLaunchSweepHandoffDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-post-launch-sweep-handoff\.txt"/);
+      assert.match(postLaunchSweepHandoffDownload.body, /RockSolid Developer Launch Mainline Post-Launch Sweep Handoff/);
+      assert.match(postLaunchSweepHandoffDownload.body, /Continue Routed Review/);
+      assert.match(postLaunchSweepHandoffDownload.body, /Remaining routed review queue/);
+      assert.match(postLaunchSweepHandoffDownload.body, /developer-ops-summary/);
 
       const forbidden = await getJsonExpectError(
         baseUrl,
@@ -6225,6 +6242,21 @@ test("developer launch mainline production gate blocks default launch secrets an
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_operations_handoff"
         && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_post_launch_sweep_handoff"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_post_launch_ops_sweep_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_post_launch_ops_sweep"
       )
     );
     assert.ok(
@@ -6981,6 +7013,96 @@ test("developer launch mainline action can record a launch day readiness review 
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
       && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_cutover_walkthrough_recent"
+        && item?.status === "pass"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can record a first-wave ops sweep and refresh post-launch evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineOpsSweepAdmin123!",
+    serverTokenSecret: "mainline-ops-sweep-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineOpsSweepAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.opssweep.owner",
+        password: "LaunchMainlineOpsSweepOwner123!",
+        displayName: "Launch Mainline Ops Sweep Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_OPS_SWEEP",
+        name: "Mainline Ops Sweep App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.opssweep.owner",
+      password: "LaunchMainlineOpsSweepOwner123!"
+    });
+
+    const beforeMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_OPS_SWEEP&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.ok(
+      Array.isArray(beforeMainline.mainlineSummary.productionGate?.checks)
+      && beforeMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_post_launch_ops_sweep_recent"
+        && item?.status === "block"
+      )
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_OPS_SWEEP",
+        channel: "stable",
+        operation: "record_post_launch_ops_sweep"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "record_post_launch_ops_sweep");
+    assert.match(actionResult.message || "", /ops sweep/i);
+    assert.equal(actionResult.result?.recordedEvidence?.key, "post_launch_ops_sweep");
+    assert.ok(actionResult.result?.recordedEvidence?.createdAt);
+    assert.equal(actionResult.receipt?.operation, "record_post_launch_ops_sweep");
+    assert.ok(Array.isArray(actionResult.receipt?.created));
+    assert.ok(actionResult.receipt.created.some((item) => item.key === "post_launch_ops_sweep"));
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_post_launch_ops_sweep_recent"
         && item?.status === "pass"
       )
     );

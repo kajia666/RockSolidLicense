@@ -23,6 +23,7 @@ Supported download formats:
 - `production-handoff`
 - `recovery-drill-handoff`
 - `operations-handoff`
+- `post-launch-sweep-handoff`
 - `checksums`
 - `zip`
 
@@ -68,6 +69,10 @@ It also exposes a dedicated `recovery-drill-handoff` download. That package brin
 That recovery path is now part of the gate itself too. `Launch Mainline` will block the lane when no recovery drill has been recorded inside the current 14-day readiness window, and the same `Production Gate Checks` card can now fire a service-driven `Record Recovery Drill` action from the unified mainline workspace. The production gate now uses the same evidence pattern for backup verification and first-wave operations readiness as well, so the unified mainline can directly record `Record Backup Verification` and `Record Operations Walkthrough` evidence instead of leaving those launch checks as implied manual steps. The same readiness window now also applies to `Record Deploy Verification`, `Record Health Verification`, and `Record Rollback Walkthrough`, and those deploy/health/rollback checks now point at the dedicated `cutover-handoff` package instead of falling back to the generic production handoff. The unified `Record Cutover Walkthrough` action now sits on top of that same gate too, so one fresh cutover run can satisfy the grouped cutover check and the three underlying deploy/health/rollback readiness checks in one pass. On top of that, `Record Launch Day Readiness Review` can now satisfy the grouped launch-day review plus the backup, recovery, operations, and cutover evidence checks together, so the author has one higher-level confirmation path once the lane has actually been rehearsed end-to-end. Once those actions run, the refreshed gate, summary text, and action receipt all carry the new production evidence together.
 
 It also exposes a dedicated `operations-handoff` download for first-wave operations. That package brings together the observability guide, alert-priority guide, incident-response playbook, daily checklist, launch timeline, production operations runbook, and shift handover template, so launch duty can hand monitoring and incident-response expectations to the next operator without rebuilding that bundle manually.
+
+It also exposes a dedicated `post-launch-sweep-handoff` download for the first runtime review after cutover. That package brings together the routed Developer Ops continuation, the remaining review queue handoff, and the primary post-launch sweep signals, so launch duty can keep the first-wave review moving without rebuilding filters or summary exports by hand.
+
+That post-launch review now also enters the gate itself. `Launch Mainline` will block the lane when no recent first-wave ops sweep evidence has been recorded inside the current 14-day readiness window, and the same `Production Gate Checks` card can now fire a service-driven `Record First-Wave Ops Sweep` action from the unified mainline workspace. This keeps the lane from stopping at "launch day looked ready" without proving that the first routed runtime review was actually completed too.
 
 ## Why it matters
 

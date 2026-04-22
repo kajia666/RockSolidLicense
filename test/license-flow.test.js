@@ -5985,6 +5985,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Production Handoff:/);
       assert.match(launchMainline.summaryText, /healthcheck-rocksolid/);
       assert.match(launchMainline.summaryText, /backup-rocksolid/);
+      assert.match(launchMainline.summaryText, /Production Recovery Drill Handoff:/);
+      assert.match(launchMainline.summaryText, /restore-postgres/);
       assert.match(launchMainline.summaryText, /Production Operations Handoff:/);
       assert.match(launchMainline.summaryText, /observability-guide\.md/);
       assert.match(launchMainline.summaryText, /shift-handover-template\.md/);
@@ -6003,6 +6005,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Handoff:/);
+      assert.match(launchMainlineSummaryDownload.body, /Production Recovery Drill Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Operations Handoff:/);
 
       const productionHandoffDownload = await getText(
@@ -6018,6 +6021,18 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(productionHandoffDownload.body, /deploy\/linux\/backup-rocksolid\.sh/);
       assert.match(productionHandoffDownload.body, /docs\/linux-deployment\.md/);
       assert.match(productionHandoffDownload.body, /docs\/windows-deployment-guide\.md/);
+
+      const recoveryDrillHandoffDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=recovery-drill-handoff",
+        viewerSession.token
+      );
+      assert.match(recoveryDrillHandoffDownload.contentType || "", /^text\/plain/);
+      assert.match(recoveryDrillHandoffDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-recovery-drill-handoff\.txt"/);
+      assert.match(recoveryDrillHandoffDownload.body, /RockSolid Developer Launch Mainline Recovery Drill Handoff/);
+      assert.match(recoveryDrillHandoffDownload.body, /docs\/postgres-backup-restore\.md/);
+      assert.match(recoveryDrillHandoffDownload.body, /deploy\/postgres\/restore-postgres\.sh/);
+      assert.match(recoveryDrillHandoffDownload.body, /deploy\/windows\/backup-rocksolid\.ps1/);
 
       const operationsHandoffDownload = await getText(
         baseUrl,
@@ -6107,6 +6122,13 @@ test("developer launch mainline production gate blocks default launch secrets an
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_backup_restore_handoff"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_recovery_drill_handoff"
         && item?.status === "pass"
       )
     );

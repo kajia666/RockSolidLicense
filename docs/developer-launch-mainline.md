@@ -21,6 +21,7 @@ Supported download formats:
 - `json`
 - `summary`
 - `production-handoff`
+- `recovery-drill-handoff`
 - `operations-handoff`
 - `checksums`
 - `zip`
@@ -59,6 +60,8 @@ When one of those checks blocks or needs review, the unified mainline can now se
 Those checks now also surface as a first-class `Production Gate Checks` section inside `/developer/launch-mainline`, not only as a stage status. Each check is rendered as its own card with service-driven controls, so the lane can move from "blocked by production readiness" to the next concrete security or ops action without leaving the unified mainline flow first. The section is no longer limited to blockers either: it now carries a fuller backend/API snapshot with both blocking/review checks and already-prepared production assets like backup/restore and healthcheck handoff coverage.
 
 The same unified handoff now also exposes a dedicated `production-handoff` download. It packages the deployment docs, runtime launch scripts, healthcheck scripts, backup/restore scripts, and the most relevant env/compose skeletons for the current storage/runtime profile, so the launch lane can hand productionization work to QA, release duty, or ops without rebuilding that checklist from README links by hand.
+
+It also exposes a dedicated `recovery-drill-handoff` download. That package brings backup scripts, restore scripts, storage docs, verification signals, and a drill flow together, so launch duty can rehearse "backup -> restore -> healthcheck -> review -> rollback" as one explicit recovery path instead of rebuilding that playbook from scattered deployment docs.
 
 It also exposes a dedicated `operations-handoff` download for first-wave operations. That package brings together the observability guide, alert-priority guide, incident-response playbook, daily checklist, launch timeline, production operations runbook, and shift handover template, so launch duty can hand monitoring and incident-response expectations to the next operator without rebuilding that bundle manually.
 

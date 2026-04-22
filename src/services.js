@@ -3715,6 +3715,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
         ? "launch_mainline_checksums"
         : normalizedFormat === "production-handoff"
           ? "launch_mainline_production_handoff"
+        : normalizedFormat === "recovery-drill-handoff"
+          ? "launch_mainline_recovery_drill_handoff"
         : normalizedFormat === "operations-handoff"
           ? "launch_mainline_operations_handoff"
         : "launch_mainline_summary",
@@ -4438,6 +4440,7 @@ function buildLaunchMainlineProductionGatePayload({
   params = null,
   publicBaseUrl = "",
   productionHandoffDownload = null,
+  recoveryDrillHandoffDownload = null,
   operationsHandoffDownload = null
 } = {}) {
   const actionPlan = [];
@@ -4717,6 +4720,16 @@ function buildLaunchMainlineProductionGatePayload({
     opsWorkspace,
     effectiveProductionDownload
   );
+  if (recoveryDrillHandoffDownload) {
+    pushRecommendedDownload(recoveryDrillHandoffDownload);
+    addPassCheck(
+      "production_recovery_drill_handoff",
+      "Review the production recovery drill handoff",
+      "The unified recovery-drill handoff already packages backup, restore, verification, and rollback drill material for this lane.",
+      opsWorkspace,
+      recoveryDrillHandoffDownload
+    );
+  }
   if (operationsHandoffDownload) {
     pushRecommendedDownload(operationsHandoffDownload);
     addPassCheck(
@@ -9863,6 +9876,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "production-handoff",
     params
   );
+  const recoveryDrillHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline recovery drill handoff",
+    "developer-launch-mainline-recovery-drill-handoff.txt",
+    "recovery-drill-handoff",
+    params
+  );
   const operationsHandoffDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline operations handoff",
     "developer-launch-mainline-operations-handoff.txt",
@@ -9954,6 +9973,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     params,
     publicBaseUrl,
     productionHandoffDownload,
+    recoveryDrillHandoffDownload,
     operationsHandoffDownload
   });
   const stageDefinitions = [
@@ -10614,6 +10634,19 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  if (payload.recoveryDrillHandoffText) {
+    const recoveryDrillHandoff = payload.recoveryDrillHandoffText
+      .split(/\r?\n/)
+      .map((line) => String(line || "").trimEnd())
+      .filter((line) => line !== "");
+    if (recoveryDrillHandoff.length) {
+      lines.push("");
+      lines.push("Production Recovery Drill Handoff:");
+      for (const line of recoveryDrillHandoff.slice(1)) {
+        lines.push(`- ${line}`);
+      }
+    }
+  }
   if (payload.operationsHandoffText) {
     const operationsHandoff = payload.operationsHandoffText
       .split(/\r?\n/)
@@ -10678,12 +10711,14 @@ function buildDeveloperLaunchMainlinePayload({
   const fileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
   const productionHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-production-handoff.txt`;
+  const recoveryDrillHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-recovery-drill-handoff.txt`;
   const operationsHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-operations-handoff.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
     productionHandoffFileName,
+    recoveryDrillHandoffFileName,
     operationsHandoffFileName,
     manifest: {
       generatedAt,
@@ -10730,6 +10765,14 @@ function buildDeveloperLaunchMainlinePayload({
     runtimeConfig
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
+    generatedAt,
+    manifest: payload.manifest,
+    filters: payload.filters,
+    runtimeConfig,
+    publicBaseUrl,
+    systemHealth
+  });
+  payload.recoveryDrillHandoffText = buildDeveloperLaunchMainlineRecoveryDrillHandoffText({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
@@ -10793,6 +10836,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt",
+    payload.recoveryDrillHandoffText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
     payload.operationsHandoffText || ""
   );
@@ -10807,7 +10855,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "operations-handoff", "checksums", "zip"],
+    ["json", "summary", "production-handoff", "recovery-drill-handoff", "operations-handoff", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -10839,6 +10887,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.productionHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "recovery-drill-handoff") {
+    return {
+      fileName: payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.recoveryDrillHandoffText || ""
     };
   }
   if (normalizedFormat === "operations-handoff") {
@@ -11334,6 +11389,69 @@ function buildDeveloperLaunchMainlineProductionHandoffText({
     `Healthchecks: ${healthcheckAssets.join(" | ")}`,
     `Backups: ${backupAssets.join(" | ")}`,
     `Environment Profiles: ${envAssets.join(" | ")}`
+  ];
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlineRecoveryDrillHandoffText({
+  generatedAt = "",
+  manifest = {},
+  filters = {},
+  runtimeConfig = {},
+  publicBaseUrl = "",
+  systemHealth = null
+} = {}) {
+  const project = manifest.project || {};
+  const mainStoreDriver = String(
+    systemHealth?.storage?.mainStore?.targetDriver
+    || systemHealth?.storage?.mainStore?.driver
+    || runtimeConfig.mainStoreDriver
+    || "sqlite"
+  ).trim().toLowerCase();
+  const runtimeStateDriver = String(
+    systemHealth?.storage?.runtimeState?.targetDriver
+    || systemHealth?.storage?.runtimeState?.driver
+    || runtimeConfig.stateStoreDriver
+    || "memory"
+  ).trim().toLowerCase();
+  const recoveryDocs = [
+    "docs/storage-deployment-guide.md",
+    "docs/linux-deployment.md",
+    "docs/windows-deployment-guide.md",
+    "docs/postgres-backup-restore.md"
+  ];
+  const backupAssets = [
+    "deploy/linux/backup-rocksolid.sh",
+    "deploy/windows/backup-rocksolid.ps1",
+    "deploy/postgres/backup-postgres.sh",
+    "deploy/postgres/backup-postgres.ps1"
+  ];
+  const restoreAssets = [
+    "deploy/postgres/restore-postgres.sh",
+    "deploy/postgres/restore-postgres.ps1",
+    "deploy/postgres/init.sql"
+  ];
+  const verificationSignals = [
+    "/api/health",
+    "/developer/launch-mainline",
+    "/developer/launch-review",
+    "/developer/ops"
+  ];
+  const lines = [
+    "RockSolid Developer Launch Mainline Recovery Drill Handoff",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Public Base URL: ${publicBaseUrl || "-"}`,
+    `Main Store Driver: ${mainStoreDriver || "-"}`,
+    `Runtime State Driver: ${runtimeStateDriver || "-"}`,
+    "",
+    `Recovery Docs: ${recoveryDocs.join(" | ")}`,
+    `Backup Assets: ${backupAssets.join(" | ")}`,
+    `Restore Assets: ${restoreAssets.join(" | ")}`,
+    `Verification Signals: ${verificationSignals.join(" | ")}`,
+    "Drill Flow: capture backup checkpoint | restore into standby data path | verify health | run launch review | confirm ops snapshot | record rollback decision"
   ];
   return lines.join("\n");
 }

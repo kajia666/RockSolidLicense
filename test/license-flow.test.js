@@ -6872,6 +6872,26 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           ].filter(Boolean))
         : []
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
+        ? actionResult.launchMainline.mainlineSummary.heroControls.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      [
+        ...(Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
+          ? actionResult.launchMainline.mainlineSummary.workspaceActions.slice(0, 5).map((item) => ({
+              kind: "workspace",
+              key: item?.key || null
+            }))
+          : []),
+        { kind: "download", key: "launch_mainline_json" },
+        { kind: "download", key: "launch_mainline_summary" },
+        { kind: "download", key: "launch_mainline_checksums" },
+        { kind: "download", key: "launch_mainline_zip" }
+      ].filter((item) => item.key)
+    );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(
@@ -6929,6 +6949,20 @@ test("developer launch mainline action can bootstrap starter launch assets and r
             item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
             item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null
           ].filter(Boolean))
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineHeroControls)
+        ? actionResult.receipt.mainlineHeroControls.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
+        ? actionResult.launchMainline.mainlineSummary.heroControls.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
         : []
     );
     assert.deepEqual(
@@ -7118,6 +7152,26 @@ test("developer launch mainline action can create first launch batches and retur
           ].filter(Boolean))
         : []
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
+        ? actionResult.launchMainline.mainlineSummary.heroControls.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      [
+        ...(Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
+          ? actionResult.launchMainline.mainlineSummary.workspaceActions.slice(0, 5).map((item) => ({
+              kind: "workspace",
+              key: item?.key || null
+            }))
+          : []),
+        { kind: "download", key: "launch_mainline_json" },
+        { kind: "download", key: "launch_mainline_summary" },
+        { kind: "download", key: "launch_mainline_checksums" },
+        { kind: "download", key: "launch_mainline_zip" }
+      ].filter((item) => item.key)
+    );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(
@@ -7175,6 +7229,20 @@ test("developer launch mainline action can create first launch batches and retur
             item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
             item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null
           ].filter(Boolean))
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineHeroControls)
+        ? actionResult.receipt.mainlineHeroControls.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
+        ? actionResult.launchMainline.mainlineSummary.heroControls.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
         : []
     );
     assert.deepEqual(
@@ -10936,20 +11004,13 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Generate Launch Mainline/);
     assert.match(html, /Launch Mainline Overview/);
     assert.match(html, /Last Mainline Action/);
-    assert.match(html, /Download Mainline JSON/);
-    assert.match(html, /Download Mainline Summary/);
-    assert.match(html, /Download Mainline Checksums/);
-    assert.match(html, /Download Mainline Zip/);
     assert.match(html, /Release Mainline/);
     assert.match(html, /Launch Workflow/);
     assert.match(html, /Launch Review/);
     assert.match(html, /Launch Smoke/);
     assert.match(html, /Developer Ops/);
-    assert.match(html, /Open Release Workspace/);
-    assert.match(html, /Open Workflow Workspace/);
-    assert.match(html, /Open Review Workspace/);
-    assert.match(html, /Open Smoke Workspace/);
-    assert.match(html, /Open Ops Workspace/);
+    assert.match(html, /mainlineHeroControls/);
+    assert.match(html, /data-mainline-hero-control-index/);
     assert.match(html, /mainlineFollowUpActions/);
     assert.match(html, /data-mainline-receipt-followup-action-index/);
     assert.match(html, /data-mainline-followup-action-control-index/);

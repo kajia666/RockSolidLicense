@@ -3471,7 +3471,9 @@ function createLaunchWorkflowSmokeKitDownloadShortcut(label = "Launch smoke kit 
 function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary", fileName = "launch-mainline-summary.txt", format = "summary", params = null) {
   const normalizedFormat = String(format || "summary").trim().toLowerCase() || "summary";
   return createLaunchWorkflowDownloadShortcut(
-    normalizedFormat === "zip"
+    normalizedFormat === "json"
+      ? "launch_mainline_json"
+      : normalizedFormat === "zip"
       ? "launch_mainline_zip"
       : normalizedFormat === "checksums"
         ? "launch_mainline_checksums"
@@ -3760,6 +3762,15 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: item?.recommendedDownload || null
     }))
     .filter((item) => item.key || item.gate || item.workspaceAction || item.recommendedDownload);
+  const mainlineHeroControls = (Array.isArray(mainlineSummary.heroControls) ? mainlineSummary.heroControls : [])
+    .slice(0, 9)
+    .map((item) => ({
+      kind: item?.kind || null,
+      label: item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action",
+      workspaceAction: item?.workspaceAction || null,
+      recommendedDownload: item?.recommendedDownload || null
+    }))
+    .filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
   const mainlineWorkspaceActions = (Array.isArray(mainlineSummary.workspaceActions) ? mainlineSummary.workspaceActions : [])
     .slice(0, 5)
     .map((item) => ({
@@ -3859,6 +3870,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineContinuation,
     mainlineNextActions,
     mainlineStages,
+    mainlineHeroControls,
     mainlineWorkspaceActions,
     mainlineRecommendedDownloads,
     mainlineActions,
@@ -9211,6 +9223,24 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Smoke Workspace", params),
     createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params)
   ];
+  const heroDownloads = [
+    createLaunchMainlineDownloadShortcut("Download Launch Mainline JSON", "developer-launch-mainline.json", "json", params),
+    createLaunchMainlineDownloadShortcut("Download Launch Mainline Summary", "developer-launch-mainline-summary.txt", "summary", params),
+    createLaunchMainlineDownloadShortcut("Download Launch Mainline Checksums", "developer-launch-mainline-sha256.txt", "checksums", params),
+    createLaunchMainlineDownloadShortcut("Download Launch Mainline Zip", "developer-launch-mainline.zip", "zip", params)
+  ].filter((item) => item?.key);
+  const heroControls = [
+    ...workspaceActions.map((item) => ({
+      kind: "workspace",
+      label: item?.label || item?.key || "Open workspace",
+      workspaceAction: item
+    })),
+    ...heroDownloads.map((item) => ({
+      kind: "download",
+      label: item?.label || item?.key || "Download",
+      recommendedDownload: item
+    }))
+  ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
   const gateRank = (status = "unknown") => {
     const normalized = normalizeLaunchMainlineGateStatus(status);
     if (normalized === "hold") {
@@ -9337,6 +9367,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     opsGate,
     continuation,
     stages,
+    heroControls,
     workspaceActions,
     primaryAction: overallGate.primaryAction || preferredStage?.gate?.primaryAction || null,
     recommendedDownload: overallGate.recommendedDownload || preferredStage?.gate?.recommendedDownload || null,

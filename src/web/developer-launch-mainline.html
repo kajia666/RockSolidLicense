@@ -258,18 +258,8 @@
           <button id="generate-mainline-btn">Generate Launch Mainline</button>
           <button class="secondary" id="refresh-mainline-btn">Refresh Mainline</button>
         </div>
-        <div class="actions" style="margin-top: 10px;">
-          <button class="secondary" id="open-release-btn">Open Release Workspace</button>
-          <button class="secondary" id="open-workflow-btn">Open Workflow Workspace</button>
-          <button class="secondary" id="open-review-btn">Open Review Workspace</button>
-          <button class="secondary" id="open-smoke-btn">Open Smoke Workspace</button>
-          <button class="secondary" id="open-ops-btn">Open Ops Workspace</button>
-        </div>
-        <div class="actions" style="margin-top: 10px;">
-          <button class="secondary" id="download-mainline-json-btn">Download Mainline JSON</button>
-          <button class="secondary" id="download-mainline-summary-btn">Download Mainline Summary</button>
-          <button class="secondary" id="download-mainline-checksums-btn">Download Mainline Checksums</button>
-          <button class="secondary" id="download-mainline-zip-btn">Download Mainline Zip</button>
+        <div id="mainline-hero-controls-box" class="actions" style="margin-top: 10px;">
+          <button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>
         </div>
       </section>
 
@@ -454,13 +444,6 @@
           routeTitle: requestedRouteTitle || "Launch mainline handoff",
           routeReason: requestedRouteReason || "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops."
         };
-      }
-
-      function workspaceActionByKey(key = "") {
-        const items = Array.isArray(currentMainline?.mainlineSummary?.workspaceActions)
-          ? currentMainline.mainlineSummary.workspaceActions
-          : [];
-        return items.find((item) => item.key === key) || null;
       }
 
       function currentMainlineSummary() {
@@ -735,6 +718,18 @@
         `;
       }
 
+      function renderHeroControls(summary = {}) {
+        const mainlineHeroControls = Array.isArray(summary.heroControls) ? summary.heroControls : [];
+        if (!mainlineHeroControls.length) {
+          return '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
+        }
+        return mainlineHeroControls.map((item, index) => `
+          <button type="button" class="secondary" data-mainline-hero-control-index="${index}">
+            ${esc(item.label || item.workspaceAction?.label || item.recommendedDownload?.label || item.kind || "Action")}
+          </button>
+        `).join("");
+      }
+
       function renderActionPlan(items = []) {
         if (!items.length) {
           return '<div class="hint">No mainline action plan yet.</div>';
@@ -805,6 +800,7 @@
             </div>
           `
           : '<div class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>';
+        el("mainline-hero-controls-box").innerHTML = renderHeroControls(summary);
         el("mainline-workspace-box").innerHTML = renderWorkspacePath(summary.recommendedWorkspace || overallGate?.recommendedWorkspace || null);
         el("mainline-actions-box").innerHTML = renderActionPlan(summary.actionPlan || []);
         el("mainline-downloads-box").innerHTML = renderDownloadButtons(summary.recommendedDownloads || []);
@@ -936,6 +932,24 @@
         return { launchMainlineSetup: response, launchMainline: currentMainline };
       }
 
+      async function executeMainlineControl(control = null) {
+        if (control?.workspaceAction?.key) {
+          openWorkspaceAction(control.workspaceAction);
+          return;
+        }
+        if (control?.recommendedDownload?.key) {
+          await downloadMainlineRecommendedItem(control.recommendedDownload);
+          return;
+        }
+        if (control?.bootstrapAction) {
+          await runLaunchMainlineBootstrap(control.bootstrapAction);
+          return;
+        }
+        if (control?.setupAction) {
+          await runLaunchMainlineSetup(control.setupAction);
+        }
+      }
+
       async function handleLogin() {
         const response = await api("/api/developer/login", {
           method: "POST",
@@ -964,6 +978,7 @@
         lastMainlineActionResult = null;
         el("session-meta").textContent = "No developer session yet.";
         el("mainline-summary").textContent = "Generate a launch mainline package to inspect the aggregated summary here.";
+        el("mainline-hero-controls-box").innerHTML = '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
         el("mainline-overview-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>';
         el("mainline-workspace-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>';
         el("mainline-actions-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the server-side action plan here.</div>';
@@ -1022,77 +1037,30 @@
         setStatus(error.message, "danger");
         setOutput({ error: error.message });
       }));
-      el("download-mainline-json-btn").addEventListener("click", () => downloadLaunchMainline("json", "developer-launch-mainline.json", "Launch Mainline JSON").catch((error) => {
-        setStatus(error.message, "danger");
-        setOutput({ error: error.message });
-      }));
-      el("download-mainline-summary-btn").addEventListener("click", () => downloadLaunchMainline("summary", "developer-launch-mainline-summary.txt", "Launch Mainline Summary").catch((error) => {
-        setStatus(error.message, "danger");
-        setOutput({ error: error.message });
-      }));
-      el("download-mainline-checksums-btn").addEventListener("click", () => downloadLaunchMainline("checksums", "developer-launch-mainline-sha256.txt", "Launch Mainline Checksums").catch((error) => {
-        setStatus(error.message, "danger");
-        setOutput({ error: error.message });
-      }));
-      el("download-mainline-zip-btn").addEventListener("click", () => downloadLaunchMainline("zip", "developer-launch-mainline.zip", "Launch Mainline Zip").catch((error) => {
-        setStatus(error.message, "danger");
-        setOutput({ error: error.message });
-      }));
-      el("open-release-btn").addEventListener("click", () => {
-        const action = workspaceActionByKey("release") || { key: "release", label: "Open Release Workspace", autofocus: "summary" };
-        openWorkspaceAction(action);
-      });
-      el("open-workflow-btn").addEventListener("click", () => {
-        const action = workspaceActionByKey("launch") || { key: "launch", label: "Open Workflow Workspace", autofocus: "handoff" };
-        openWorkspaceAction(action);
-      });
-      el("open-review-btn").addEventListener("click", () => {
-        const action = workspaceActionByKey("launch-review") || { key: "launch-review", label: "Open Review Workspace", autofocus: "summary" };
-        openWorkspaceAction(action);
-      });
-      el("open-smoke-btn").addEventListener("click", () => {
-        const action = workspaceActionByKey("launch-smoke") || { key: "launch-smoke", label: "Open Smoke Workspace", autofocus: "summary" };
-        openWorkspaceAction(action);
-      });
-      el("open-ops-btn").addEventListener("click", () => {
-        const action = workspaceActionByKey("ops") || { key: "ops", label: "Open Ops Workspace", autofocus: "snapshot" };
-        openWorkspaceAction(action);
-      });
-
       document.addEventListener("click", async (event) => {
+        const heroControlButton = event.target.closest("[data-mainline-hero-control-index]");
+        if (heroControlButton) {
+          const index = Number(heroControlButton.dataset.mainlineHeroControlIndex || -1);
+          const item = currentMainline?.mainlineSummary?.heroControls?.[index] || null;
+          try {
+            await executeMainlineControl(item);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
         const actionControlButton = event.target.closest("[data-mainline-action-control-index]");
         if (actionControlButton) {
           const index = Number(actionControlButton.dataset.mainlineActionIndex || -1);
           const controlIndex = Number(actionControlButton.dataset.mainlineActionControlIndex || -1);
           const item = currentMainlineActionPlan()[index];
           const control = Array.isArray(item?.controls) ? item.controls[controlIndex] : null;
-          if (control?.workspaceAction?.key) {
-            openWorkspaceAction(control.workspaceAction);
-            return;
-          }
-          if (control?.recommendedDownload?.key) {
-            await downloadMainlineRecommendedItem(control.recommendedDownload).catch((error) => {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            });
-            return;
-          }
-          if (control?.bootstrapAction) {
-            try {
-              await runLaunchMainlineBootstrap(control.bootstrapAction);
-            } catch (error) {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            }
-            return;
-          }
-          if (control?.setupAction) {
-            try {
-              await runLaunchMainlineSetup(control.setupAction);
-            } catch (error) {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            }
+          try {
+            await executeMainlineControl(control);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
           }
           return;
         }
@@ -1119,33 +1087,11 @@
             ? lastMainlineActionResult.followUp.actions[index]
             : null;
           const control = Array.isArray(item?.controls) ? item.controls[controlIndex] : null;
-          if (control?.workspaceAction?.key) {
-            openWorkspaceAction(control.workspaceAction);
-            return;
-          }
-          if (control?.recommendedDownload?.key) {
-            await downloadMainlineRecommendedItem(control.recommendedDownload).catch((error) => {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            });
-            return;
-          }
-          if (control?.bootstrapAction) {
-            try {
-              await runLaunchMainlineBootstrap(control.bootstrapAction);
-            } catch (error) {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            }
-            return;
-          }
-          if (control?.setupAction) {
-            try {
-              await runLaunchMainlineSetup(control.setupAction);
-            } catch (error) {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            }
+          try {
+            await executeMainlineControl(control);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
           }
           return;
         }

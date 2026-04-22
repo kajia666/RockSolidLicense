@@ -7033,6 +7033,40 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       ]
     );
     assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineFollowUpCards)
+        ? actionResult.receipt.mainlineFollowUpCards.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.mainlineActions)
+        ? actionResult.receipt.mainlineActions.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          }))
+        : []
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineHeroControls)
         ? actionResult.receipt.mainlineHeroControls.map((item) => ({
             kind: item?.kind || null,
@@ -7367,6 +7401,40 @@ test("developer launch mainline action can create first launch batches and retur
         },
         { key: "transition_summary", controls: [] }
       ]
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineFollowUpCards)
+        ? actionResult.receipt.mainlineFollowUpCards.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.mainlineActions)
+        ? actionResult.receipt.mainlineActions.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          }))
+        : []
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineHeroControls)
@@ -11144,11 +11212,10 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /mainlineHeroControls/);
     assert.match(html, /overviewCards/);
     assert.match(html, /mainlineRecapCards/);
+    assert.match(html, /mainlineFollowUpCards/);
     assert.match(html, /data-mainline-hero-control-index/);
     assert.match(html, /data-mainline-overview-control-index/);
-    assert.match(html, /mainlineFollowUpActions/);
-    assert.match(html, /data-mainline-receipt-followup-action-index/);
-    assert.match(html, /data-mainline-followup-action-control-index/);
+    assert.match(html, /data-mainline-receipt-card-control-index/);
     assert.match(html, /data-mainline-action-control-index/);
     assert.match(html, /data-stage-control-index/);
   } finally {

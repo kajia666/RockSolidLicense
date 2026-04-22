@@ -3876,6 +3876,28 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: item?.recommendedDownload || null
     }))
   ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
+  const mainlineFollowUpCards = mainlineActions.map((item) => ({
+    key: item?.key || null,
+    title: item?.title || item?.key || "Follow-up",
+    summary: item?.summary || "-",
+    tags: [
+      item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
+      item?.status ? { label: "status", value: item.status, strong: false } : null
+    ].filter(Boolean),
+    details: [
+      item?.timing ? `Timing: ${item.timing}` : ""
+    ].filter(Boolean),
+    controls: Array.isArray(item?.controls)
+      ? item.controls.map((control) => ({
+          kind: control?.kind || null,
+          label: control?.label || control?.workspaceAction?.label || control?.recommendedDownload?.label || control?.bootstrapAction?.label || control?.setupAction?.label || control?.kind || "Action",
+          workspaceAction: control?.workspaceAction || null,
+          recommendedDownload: control?.recommendedDownload || null,
+          bootstrapAction: control?.bootstrapAction || null,
+          setupAction: control?.setupAction || null
+        }))
+      : []
+  })).filter((item) => item.key || item.summary || item.controls.length);
   const mainlineRecapCards = [
     {
       key: "result_status",
@@ -3964,6 +3986,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineWorkspaceActions,
     mainlineRecommendedDownloads,
     mainlineActions,
+    mainlineFollowUpCards,
     mainlineContinuationActions,
     mainlineFollowUpActions,
     actions

@@ -460,38 +460,60 @@
         return Array.isArray(receipt?.mainlineRecapCards) ? receipt.mainlineRecapCards : [];
       }
 
-      function renderLastMainlineFollowUp(result = null) {
-        const followUp = result?.followUp;
-        const receipt = result?.receipt && typeof result.receipt === "object" ? result.receipt : null;
-        const recapCards = currentMainlineRecapCards();
-        const actions = Array.isArray(receipt?.mainlineActions)
-          ? receipt.mainlineActions
-          : Array.isArray(receipt?.actions)
-          ? receipt.actions
-          : (Array.isArray(followUp?.actions) ? followUp.actions : []);
-        const followUpActions = Array.isArray(receipt?.mainlineFollowUpActions)
-          ? receipt.mainlineFollowUpActions
+      function currentMainlineFollowUpCards() {
+        const receipt = currentLastMainlineReceipt();
+        return Array.isArray(receipt?.mainlineFollowUpCards) ? receipt.mainlineFollowUpCards : [];
+      }
+
+      function currentMainlineReceiptCard(kind = "", key = "") {
+        const normalizedKind = String(kind || "").trim().toLowerCase();
+        const normalizedKey = String(key || "").trim();
+        if (!normalizedKey) {
+          return null;
+        }
+        const source = normalizedKind === "followup" ? currentMainlineFollowUpCards() : currentMainlineRecapCards();
+        return source.find((item) => String(item?.key || "").trim() === normalizedKey) || null;
+      }
+
+      function renderReceiptCard(card = null, kind = "recap") {
+        if (!card?.key) {
+          return "";
+        }
+        const tags = Array.isArray(card.tags)
+          ? card.tags.map((tag) => renderTag(`${tag?.label || "tag"}:${tag?.value ?? "-"}`, tag?.strong === true)).join("")
+          : "";
+        const controls = Array.isArray(card.controls) ? card.controls : [];
+        const details = Array.isArray(card.details)
+          ? card.details.filter((item) => String(item || "").trim() !== "")
           : [];
-        if (!actions.length && !recapCards.length) {
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(card.title || card.key || "Follow-up")}</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint">${esc(card.summary || "-")}</div>
+            ${details.length ? details.map((item) => `<div class="hint">${esc(item)}</div>`).join("") : ""}
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-receipt-card-kind="${esc(kind)}" data-mainline-receipt-card-key="${esc(card.key)}" data-mainline-receipt-card-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
+      function renderLastMainlineFollowUp(result = null) {
+        const recapCards = currentMainlineRecapCards();
+        const followUpCards = currentMainlineFollowUpCards();
+        if (!followUpCards.length && !recapCards.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
         return `
-          ${recapCards.length ? `<div class="list">${recapCards.map((card) => renderOverviewCard(card)).join("")}</div>` : ""}
-          ${followUpActions.length ? `
-            <div class="actions" style="margin-top: 8px;">
-              ${followUpActions.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-followup-action-index="${index}">${esc(item.label || item.workspaceAction?.label || item.recommendedDownload?.label || item.kind || "Continue")}</button>`).join("")}
-            </div>
-          ` : ""}
-          ${actions.map((item, index) => `
-            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(148,163,184,0.28);">
-              <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
-              ${Array.isArray(item.controls) && item.controls.length ? `
-                <div class="actions" style="margin-top: 8px;">
-                  ${item.controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-followup-action-index="${index}" data-mainline-followup-action-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
-                </div>
-              ` : ""}
-            </div>
-          `).join("")}
+          <div class="list">
+            ${recapCards.map((card) => renderReceiptCard(card, "recap")).join("")}
+            ${followUpCards.map((card) => renderReceiptCard(card, "followup")).join("")}
+          </div>
         `;
       }
 
@@ -1023,39 +1045,18 @@
           }
           return;
         }
-        const followUpActionButton = event.target.closest("[data-mainline-followup-action-control-index]");
-        if (followUpActionButton) {
-          const index = Number(followUpActionButton.dataset.mainlineFollowupActionIndex || -1);
-          const controlIndex = Number(followUpActionButton.dataset.mainlineFollowupActionControlIndex || -1);
-          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineActions)
-            ? currentLastMainlineReceipt().mainlineActions[index]
-            : Array.isArray(lastMainlineActionResult?.followUp?.actions)
-            ? lastMainlineActionResult.followUp.actions[index]
-            : null;
-          const control = Array.isArray(item?.controls) ? item.controls[controlIndex] : null;
+        const receiptCardControlButton = event.target.closest("[data-mainline-receipt-card-control-index]");
+        if (receiptCardControlButton) {
+          const kind = String(receiptCardControlButton.dataset.mainlineReceiptCardKind || "").trim();
+          const key = String(receiptCardControlButton.dataset.mainlineReceiptCardKey || "").trim();
+          const controlIndex = Number(receiptCardControlButton.dataset.mainlineReceiptCardControlIndex || -1);
+          const card = currentMainlineReceiptCard(kind, key);
+          const control = Array.isArray(card?.controls) ? card.controls[controlIndex] : null;
           try {
             await executeMainlineControl(control);
           } catch (error) {
             setStatus(error.message, "danger");
             setOutput({ error: error.message });
-          }
-          return;
-        }
-        const receiptFollowUpActionButton = event.target.closest("[data-mainline-receipt-followup-action-index]");
-        if (receiptFollowUpActionButton) {
-          const index = Number(receiptFollowUpActionButton.dataset.mainlineReceiptFollowupActionIndex || -1);
-          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineFollowUpActions)
-            ? currentLastMainlineReceipt().mainlineFollowUpActions[index]
-            : null;
-          if (item?.workspaceAction?.key) {
-            openWorkspaceAction(item.workspaceAction);
-            return;
-          }
-          if (item?.recommendedDownload?.key) {
-            await downloadMainlineRecommendedItem(item.recommendedDownload).catch((error) => {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            });
           }
           return;
         }

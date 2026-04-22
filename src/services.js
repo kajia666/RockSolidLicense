@@ -3931,6 +3931,10 @@ function buildLaunchMainlineActionReceipt({
     ? "Inventory Refill"
     : normalizedOperation === "first_batch_setup"
       ? "First Batch Setup"
+      : normalizedOperation === "record_operations_walkthrough"
+        ? "Record Operations Walkthrough"
+        : normalizedOperation === "record_backup_verification"
+          ? "Record Backup Verification"
       : normalizedOperation === "record_recovery_drill"
         ? "Record Recovery Drill"
         : "Launch Bootstrap";
@@ -3978,6 +3982,13 @@ function buildLaunchMainlineActionReceipt({
   }
   if (result?.recordedDrill?.createdAt) {
     created.push({ key: "recovery_drill", label: "Recovery drill", value: result.recordedDrill.createdAt });
+  }
+  if (result?.recordedEvidence?.createdAt && result?.recordedEvidence?.key && result?.recordedEvidence?.label) {
+    created.push({
+      key: result.recordedEvidence.key,
+      label: result.recordedEvidence.label,
+      value: result.recordedEvidence.createdAt
+    });
   }
   const actions = (Array.isArray(followUp?.actions) ? followUp.actions : [])
     .map((item) => ({
@@ -4439,13 +4450,15 @@ function parseProductionEndpoint(value) {
   }
 }
 
-function queryLatestLaunchMainlineRecoveryDrillEvidence(db, {
+function queryLatestLaunchMainlineEvidence(db, {
   productCode = "",
-  channel = "stable"
+  channel = "stable",
+  eventType = ""
 } = {}) {
   const normalizedProductCode = String(productCode || "").trim().toUpperCase();
   const normalizedChannel = String(channel || "stable").trim().toLowerCase();
-  if (!normalizedProductCode) {
+  const normalizedEventType = String(eventType || "").trim();
+  if (!normalizedProductCode || !normalizedEventType) {
     return null;
   }
   const row = one(
@@ -4459,7 +4472,7 @@ function queryLatestLaunchMainlineRecoveryDrillEvidence(db, {
       ORDER BY created_at DESC
       LIMIT 1
     `,
-    "product.launch-mainline.recovery-drill",
+    normalizedEventType,
     `%\"productCode\":\"${normalizedProductCode.replaceAll("\"", "\\\"")}\"%`,
     `%\"channel\":\"${normalizedChannel.replaceAll("\"", "\\\"")}\"%`
   );
@@ -4476,6 +4489,27 @@ function queryLatestLaunchMainlineRecoveryDrillEvidence(db, {
   };
 }
 
+function queryLatestLaunchMainlineRecoveryDrillEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.recovery-drill"
+  });
+}
+
+function queryLatestLaunchMainlineBackupVerificationEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.backup-verification"
+  });
+}
+
+function queryLatestLaunchMainlineOperationsWalkthroughEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.operations-walkthrough"
+  });
+}
+
 function buildLaunchMainlineProductionGatePayload({
   config = {},
   health = null,
@@ -4485,7 +4519,9 @@ function buildLaunchMainlineProductionGatePayload({
   productionHandoffDownload = null,
   recoveryDrillHandoffDownload = null,
   operationsHandoffDownload = null,
-  recoveryDrillEvidence = null
+  recoveryDrillEvidence = null,
+  backupVerificationEvidence = null,
+  operationsWalkthroughEvidence = null
 } = {}) {
   const actionPlan = [];
   const checks = [];
@@ -4638,6 +4674,32 @@ function buildLaunchMainlineProductionGatePayload({
     ? Math.max(0, Math.floor((Date.now() - recoveryDrillRecordedMs) / 86400000))
     : null;
   const hasRecentRecoveryDrill = recoveryDrillAgeDays !== null && recoveryDrillAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const backupVerificationRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_backup_verification",
+    label: "Record Backup Verification",
+    summary: "Capture a fresh backup verification for this lane so the production gate can verify recent backup evidence.",
+    mode: "evidence",
+    operation: "record_backup_verification"
+  });
+  const operationsWalkthroughRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_operations_walkthrough",
+    label: "Record Operations Walkthrough",
+    summary: "Capture a fresh operations walkthrough for this lane so the production gate can verify recent launch-duty readiness evidence.",
+    mode: "evidence",
+    operation: "record_operations_walkthrough"
+  });
+  const backupVerificationRecordedAt = String(backupVerificationEvidence?.createdAt || "").trim();
+  const backupVerificationRecordedMs = backupVerificationRecordedAt ? Date.parse(backupVerificationRecordedAt) : Number.NaN;
+  const backupVerificationAgeDays = Number.isFinite(backupVerificationRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - backupVerificationRecordedMs) / 86400000))
+    : null;
+  const hasRecentBackupVerification = backupVerificationAgeDays !== null && backupVerificationAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const operationsWalkthroughRecordedAt = String(operationsWalkthroughEvidence?.createdAt || "").trim();
+  const operationsWalkthroughRecordedMs = operationsWalkthroughRecordedAt ? Date.parse(operationsWalkthroughRecordedAt) : Number.NaN;
+  const operationsWalkthroughAgeDays = Number.isFinite(operationsWalkthroughRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - operationsWalkthroughRecordedMs) / 86400000))
+    : null;
+  const hasRecentOperationsWalkthrough = operationsWalkthroughAgeDays !== null && operationsWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
 
   if (defaultAdminPassword) {
     addStep(
@@ -4802,6 +4864,30 @@ function buildLaunchMainlineProductionGatePayload({
     opsWorkspace,
     effectiveProductionDownload
   );
+  if (hasRecentBackupVerification) {
+    addPassCheck(
+      "production_backup_verification_recent",
+      "A recent backup verification is recorded",
+      `The latest backup verification for this lane was recorded at ${backupVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+      opsWorkspace,
+      effectiveProductionDownload,
+      null,
+      backupVerificationRecordAction
+    );
+  } else {
+    addStep(
+      "hold",
+      "production_backup_verification_recent",
+      "Record a recent backup verification",
+      backupVerificationRecordedAt
+        ? `The latest backup verification was recorded at ${backupVerificationRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh verification before widening rollout.`
+        : `No backup verification has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+      opsWorkspace,
+      effectiveProductionDownload,
+      null,
+      backupVerificationRecordAction
+    );
+  }
   if (recoveryDrillHandoffDownload) {
     pushRecommendedDownload(recoveryDrillHandoffDownload);
     addPassCheck(
@@ -4845,6 +4931,30 @@ function buildLaunchMainlineProductionGatePayload({
       opsWorkspace,
       operationsHandoffDownload
     );
+    if (hasRecentOperationsWalkthrough) {
+      addPassCheck(
+        "production_operations_walkthrough_recent",
+        "A recent operations walkthrough is recorded",
+        `The latest operations walkthrough for this lane was recorded at ${operationsWalkthroughRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        opsWorkspace,
+        operationsHandoffDownload,
+        null,
+        operationsWalkthroughRecordAction
+      );
+    } else {
+      addStep(
+        "hold",
+        "production_operations_walkthrough_recent",
+        "Record a recent operations walkthrough",
+        operationsWalkthroughRecordedAt
+          ? `The latest operations walkthrough was recorded at ${operationsWalkthroughRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh walkthrough before widening rollout.`
+          : `No operations walkthrough has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+        opsWorkspace,
+        operationsHandoffDownload,
+        null,
+        operationsWalkthroughRecordAction
+      );
+    }
   }
 
   const status = blockingCount > 0
@@ -9815,7 +9925,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   tokenKeySummary = null,
   publicBaseUrl = "",
   runtimeConfig = {},
-  recoveryDrillEvidence = null
+  recoveryDrillEvidence = null,
+  backupVerificationEvidence = null,
+  operationsWalkthroughEvidence = null
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
@@ -10082,7 +10194,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     productionHandoffDownload,
     recoveryDrillHandoffDownload,
     operationsHandoffDownload,
-    recoveryDrillEvidence
+    recoveryDrillEvidence,
+    backupVerificationEvidence,
+    operationsWalkthroughEvidence
   });
   const stageDefinitions = [
     {
@@ -10802,7 +10916,9 @@ function buildDeveloperLaunchMainlinePayload({
   tokenKeySummary = null,
   publicBaseUrl = "",
   runtimeConfig = {},
-  recoveryDrillEvidence = null
+  recoveryDrillEvidence = null,
+  backupVerificationEvidence = null,
+  operationsWalkthroughEvidence = null
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
@@ -10873,7 +10989,9 @@ function buildDeveloperLaunchMainlinePayload({
     tokenKeySummary,
     publicBaseUrl,
     runtimeConfig,
-    recoveryDrillEvidence
+    recoveryDrillEvidence,
+    backupVerificationEvidence,
+    operationsWalkthroughEvidence
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
     generatedAt,
@@ -20293,6 +20411,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
         channel
       });
+      const backupVerificationEvidence = queryLatestLaunchMainlineBackupVerificationEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
+      const operationsWalkthroughEvidence = queryLatestLaunchMainlineOperationsWalkthroughEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
       const payload = buildDeveloperLaunchMainlinePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || launchWorkflow?.manifest?.generatedAt || nowIso(),
         releasePackage,
@@ -20305,6 +20431,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         publicBaseUrl: options.publicBaseUrl || "",
         runtimeConfig: config,
         recoveryDrillEvidence,
+        backupVerificationEvidence,
+        operationsWalkthroughEvidence,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,
@@ -20382,7 +20510,74 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           message: `Recovery drill recorded for ${ownedProduct.code} (${channel}).`,
           before: { counts: {} },
           after: { counts: {} },
+          recordedEvidence: {
+            key: "recovery_drill",
+            label: "Recovery drill",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          },
           recordedDrill: {
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
+      } else if (operation === "record_backup_verification") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.backup-verification", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          backupVerifiedAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Backup verification recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "backup_verification",
+            label: "Backup verification",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
+      } else if (operation === "record_operations_walkthrough") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.operations-walkthrough", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          operationsWalkthroughAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Operations walkthrough recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "operations_walkthrough",
+            label: "Operations walkthrough",
             createdAt: recordedAt,
             productCode: ownedProduct.code,
             channel
@@ -20392,7 +20587,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(
           400,
           "INVALID_LAUNCH_MAINLINE_ACTION",
-          "operation must be bootstrap, first_batch_setup, restock, or record_recovery_drill."
+          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, or record_operations_walkthrough."
         );
       }
 

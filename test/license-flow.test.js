@@ -6143,6 +6143,22 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_backup_verification_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_backup_verification"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_operations_walkthrough_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_operations_walkthrough"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_operations_handoff"
         && item?.status === "pass"
       )
@@ -6441,6 +6457,112 @@ test("developer launch mainline action can record a recovery drill and refresh p
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
       && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_recovery_drill_recent"
+        && item?.status === "pass"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can record backup verification and operations walkthrough evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineEvidenceAdmin123!",
+    serverTokenSecret: "mainline-evidence-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineEvidenceAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.evidence.owner",
+        password: "LaunchMainlineEvidenceOwner123!",
+        displayName: "Launch Mainline Evidence Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_EVIDENCE",
+        name: "Mainline Evidence App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.evidence.owner",
+      password: "LaunchMainlineEvidenceOwner123!"
+    });
+
+    const backupResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_EVIDENCE",
+        channel: "stable",
+        operation: "record_backup_verification"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(backupResult.operation, "record_backup_verification");
+    assert.match(backupResult.message || "", /backup verification/i);
+    assert.equal(backupResult.result?.productCode, "MAINLINE_EVIDENCE");
+    assert.equal(backupResult.result?.channel, "stable");
+    assert.equal(backupResult.result?.recordedEvidence?.key, "backup_verification");
+    assert.ok(backupResult.result?.recordedEvidence?.createdAt);
+    assert.equal(backupResult.receipt?.operation, "record_backup_verification");
+    assert.ok(Array.isArray(backupResult.receipt?.created));
+    assert.ok(backupResult.receipt.created.some((item) => item.key === "backup_verification"));
+    assert.ok(
+      Array.isArray(backupResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && backupResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_backup_verification_recent"
+        && item?.status === "pass"
+      )
+    );
+
+    const operationsResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_EVIDENCE",
+        channel: "stable",
+        operation: "record_operations_walkthrough"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(operationsResult.operation, "record_operations_walkthrough");
+    assert.match(operationsResult.message || "", /operations walkthrough/i);
+    assert.equal(operationsResult.result?.productCode, "MAINLINE_EVIDENCE");
+    assert.equal(operationsResult.result?.channel, "stable");
+    assert.equal(operationsResult.result?.recordedEvidence?.key, "operations_walkthrough");
+    assert.ok(operationsResult.result?.recordedEvidence?.createdAt);
+    assert.equal(operationsResult.receipt?.operation, "record_operations_walkthrough");
+    assert.ok(Array.isArray(operationsResult.receipt?.created));
+    assert.ok(operationsResult.receipt.created.some((item) => item.key === "operations_walkthrough"));
+    assert.ok(
+      Array.isArray(operationsResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && operationsResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_operations_walkthrough_recent"
         && item?.status === "pass"
       )
     );

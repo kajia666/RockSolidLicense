@@ -3715,6 +3715,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
         ? "launch_mainline_checksums"
         : normalizedFormat === "production-handoff"
           ? "launch_mainline_production_handoff"
+        : normalizedFormat === "cutover-handoff"
+          ? "launch_mainline_cutover_handoff"
         : normalizedFormat === "recovery-drill-handoff"
           ? "launch_mainline_recovery_drill_handoff"
         : normalizedFormat === "operations-handoff"
@@ -4544,6 +4546,7 @@ function buildLaunchMainlineProductionGatePayload({
   params = null,
   publicBaseUrl = "",
   productionHandoffDownload = null,
+  cutoverHandoffDownload = null,
   recoveryDrillHandoffDownload = null,
   operationsHandoffDownload = null,
   recoveryDrillEvidence = null,
@@ -4573,6 +4576,7 @@ function buildLaunchMainlineProductionGatePayload({
     params
   );
   const effectiveProductionDownload = productionHandoffDownload || mainlineSummaryDownload;
+  const effectiveCutoverDownload = cutoverHandoffDownload || effectiveProductionDownload;
   const effectiveRecoveryDrillDownload = recoveryDrillHandoffDownload || effectiveProductionDownload;
   const effectiveOperationsDownload = operationsHandoffDownload || effectiveProductionDownload;
   const securityWorkspace = createLaunchWorkflowWorkspaceShortcut(
@@ -4935,13 +4939,23 @@ function buildLaunchMainlineProductionGatePayload({
     opsWorkspace,
     effectiveProductionDownload
   );
+  if (cutoverHandoffDownload) {
+    pushRecommendedDownload(cutoverHandoffDownload);
+    addPassCheck(
+      "production_cutover_handoff",
+      "Review the production cutover handoff",
+      "The unified cutover handoff already packages deploy, health, verification, and rollback material for this lane.",
+      opsWorkspace,
+      effectiveCutoverDownload
+    );
+  }
   if (hasRecentDeployVerification) {
     addPassCheck(
       "production_deploy_verification_recent",
       "A recent deploy verification is recorded",
       `The latest deploy verification for this lane was recorded at ${deployVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
       opsWorkspace,
-      effectiveProductionDownload,
+      effectiveCutoverDownload,
       null,
       deployVerificationRecordAction
     );
@@ -4954,7 +4968,7 @@ function buildLaunchMainlineProductionGatePayload({
         ? `The latest deploy verification was recorded at ${deployVerificationRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh deploy verification before widening rollout.`
         : `No deploy verification has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
       opsWorkspace,
-      effectiveProductionDownload,
+      effectiveCutoverDownload,
       null,
       deployVerificationRecordAction
     );
@@ -4965,7 +4979,7 @@ function buildLaunchMainlineProductionGatePayload({
       "A recent health verification is recorded",
       `The latest health verification for this lane was recorded at ${healthVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
       opsWorkspace,
-      effectiveProductionDownload,
+      effectiveCutoverDownload,
       null,
       healthVerificationRecordAction
     );
@@ -4978,7 +4992,7 @@ function buildLaunchMainlineProductionGatePayload({
         ? `The latest health verification was recorded at ${healthVerificationRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh health verification before widening rollout.`
         : `No health verification has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
       opsWorkspace,
-      effectiveProductionDownload,
+      effectiveCutoverDownload,
       null,
       healthVerificationRecordAction
     );
@@ -5046,7 +5060,7 @@ function buildLaunchMainlineProductionGatePayload({
         "A recent rollback walkthrough is recorded",
         `The latest rollback walkthrough for this lane was recorded at ${rollbackWalkthroughRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
         opsWorkspace,
-        effectiveRecoveryDrillDownload,
+        effectiveCutoverDownload,
         null,
         rollbackWalkthroughRecordAction
       );
@@ -5059,7 +5073,7 @@ function buildLaunchMainlineProductionGatePayload({
           ? `The latest rollback walkthrough was recorded at ${rollbackWalkthroughRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh walkthrough before widening rollout.`
           : `No rollback walkthrough has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
         opsWorkspace,
-        effectiveRecoveryDrillDownload,
+        effectiveCutoverDownload,
         null,
         rollbackWalkthroughRecordAction
       );
@@ -10241,6 +10255,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "production-handoff",
     params
   );
+  const cutoverHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline cutover handoff",
+    "developer-launch-mainline-cutover-handoff.txt",
+    "cutover-handoff",
+    params
+  );
   const recoveryDrillHandoffDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline recovery drill handoff",
     "developer-launch-mainline-recovery-drill-handoff.txt",
@@ -10338,6 +10358,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     params,
     publicBaseUrl,
     productionHandoffDownload,
+    cutoverHandoffDownload,
     recoveryDrillHandoffDownload,
     operationsHandoffDownload,
     recoveryDrillEvidence,
@@ -11006,6 +11027,19 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  if (payload.cutoverHandoffText) {
+    const cutoverHandoff = payload.cutoverHandoffText
+      .split(/\r?\n/)
+      .map((line) => String(line || "").trimEnd())
+      .filter((line) => line !== "");
+    if (cutoverHandoff.length) {
+      lines.push("");
+      lines.push("Production Cutover Handoff:");
+      for (const line of cutoverHandoff.slice(1)) {
+        lines.push(`- ${line}`);
+      }
+    }
+  }
   if (payload.recoveryDrillHandoffText) {
     const recoveryDrillHandoff = payload.recoveryDrillHandoffText
       .split(/\r?\n/)
@@ -11089,6 +11123,7 @@ function buildDeveloperLaunchMainlinePayload({
   const fileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
   const productionHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-production-handoff.txt`;
+  const cutoverHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-cutover-handoff.txt`;
   const recoveryDrillHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-recovery-drill-handoff.txt`;
   const operationsHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-operations-handoff.txt`;
   const payload = {
@@ -11096,6 +11131,7 @@ function buildDeveloperLaunchMainlinePayload({
     fileName,
     summaryFileName,
     productionHandoffFileName,
+    cutoverHandoffFileName,
     recoveryDrillHandoffFileName,
     operationsHandoffFileName,
     manifest: {
@@ -11149,6 +11185,14 @@ function buildDeveloperLaunchMainlinePayload({
     rollbackWalkthroughEvidence
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
+    generatedAt,
+    manifest: payload.manifest,
+    filters: payload.filters,
+    runtimeConfig,
+    publicBaseUrl,
+    systemHealth
+  });
+  payload.cutoverHandoffText = buildDeveloperLaunchMainlineCutoverHandoffText({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
@@ -11220,6 +11264,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    payload.cutoverHandoffFileName || "developer-launch-mainline-cutover-handoff.txt",
+    payload.cutoverHandoffText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt",
     payload.recoveryDrillHandoffText || ""
   );
@@ -11239,7 +11288,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "recovery-drill-handoff", "operations-handoff", "checksums", "zip"],
+    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -11271,6 +11320,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.productionHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "cutover-handoff") {
+    return {
+      fileName: payload.cutoverHandoffFileName || "developer-launch-mainline-cutover-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.cutoverHandoffText || ""
     };
   }
   if (normalizedFormat === "recovery-drill-handoff") {
@@ -11773,6 +11829,75 @@ function buildDeveloperLaunchMainlineProductionHandoffText({
     `Healthchecks: ${healthcheckAssets.join(" | ")}`,
     `Backups: ${backupAssets.join(" | ")}`,
     `Environment Profiles: ${envAssets.join(" | ")}`
+  ];
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlineCutoverHandoffText({
+  generatedAt = "",
+  manifest = {},
+  filters = {},
+  runtimeConfig = {},
+  publicBaseUrl = "",
+  systemHealth = null
+} = {}) {
+  const project = manifest.project || {};
+  const mainStoreDriver = String(
+    systemHealth?.storage?.mainStore?.targetDriver
+    || systemHealth?.storage?.mainStore?.driver
+    || runtimeConfig.mainStoreDriver
+    || "sqlite"
+  ).trim().toLowerCase();
+  const runtimeStateDriver = String(
+    systemHealth?.storage?.runtimeState?.targetDriver
+    || systemHealth?.storage?.runtimeState?.driver
+    || runtimeConfig.stateStoreDriver
+    || "memory"
+  ).trim().toLowerCase();
+  const deploymentDocs = [
+    "docs/linux-deployment.md",
+    "docs/windows-deployment-guide.md",
+    "docs/storage-deployment-guide.md"
+  ];
+  const runtimeAssets = [
+    "deploy/linux/run-rocksolid.sh",
+    "deploy/windows/run-rocksolid.ps1",
+    "deploy/linux/Caddyfile.example",
+    "deploy/nginx/rocksolid.tls.conf.example"
+  ];
+  const healthcheckAssets = [
+    "deploy/linux/healthcheck-rocksolid.sh",
+    "deploy/windows/healthcheck-rocksolid.ps1",
+    "/api/health"
+  ];
+  const rollbackMaterials = [
+    "docs/postgres-backup-restore.md",
+    "deploy/postgres/restore-postgres.sh",
+    "deploy/postgres/restore-postgres.ps1",
+    "docs/incident-response-playbook.md"
+  ];
+  const verificationSignals = [
+    "/api/health",
+    "/developer/launch-mainline",
+    "/developer/launch-review",
+    "/developer/ops"
+  ];
+  const lines = [
+    "RockSolid Developer Launch Mainline Cutover Handoff",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Public Base URL: ${publicBaseUrl || "-"}`,
+    `Main Store Driver: ${mainStoreDriver || "-"}`,
+    `Runtime State Driver: ${runtimeStateDriver || "-"}`,
+    "",
+    `Deployment Docs: ${deploymentDocs.join(" | ")}`,
+    `Runtime Assets: ${runtimeAssets.join(" | ")}`,
+    `Healthchecks: ${healthcheckAssets.join(" | ")}`,
+    `Verification Signals: ${verificationSignals.join(" | ")}`,
+    `Rollback Materials: ${rollbackMaterials.join(" | ")}`,
+    "Cutover Flow: deploy build | verify health | run launch review | confirm ops watch | prepare rollback decision"
   ];
   return lines.join("\n");
 }

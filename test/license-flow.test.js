@@ -5985,6 +5985,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Production Handoff:/);
       assert.match(launchMainline.summaryText, /healthcheck-rocksolid/);
       assert.match(launchMainline.summaryText, /backup-rocksolid/);
+      assert.match(launchMainline.summaryText, /Production Cutover Handoff:/);
+      assert.match(launchMainline.summaryText, /run-rocksolid/);
       assert.match(launchMainline.summaryText, /Production Recovery Drill Handoff:/);
       assert.match(launchMainline.summaryText, /restore-postgres/);
       assert.match(launchMainline.summaryText, /Production Operations Handoff:/);
@@ -6005,6 +6007,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Handoff:/);
+      assert.match(launchMainlineSummaryDownload.body, /Production Cutover Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Recovery Drill Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Operations Handoff:/);
 
@@ -6021,6 +6024,20 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(productionHandoffDownload.body, /deploy\/linux\/backup-rocksolid\.sh/);
       assert.match(productionHandoffDownload.body, /docs\/linux-deployment\.md/);
       assert.match(productionHandoffDownload.body, /docs\/windows-deployment-guide\.md/);
+
+      const cutoverHandoffDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=cutover-handoff",
+        viewerSession.token
+      );
+      assert.match(cutoverHandoffDownload.contentType || "", /^text\/plain/);
+      assert.match(cutoverHandoffDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-cutover-handoff\.txt"/);
+      assert.match(cutoverHandoffDownload.body, /RockSolid Developer Launch Mainline Cutover Handoff/);
+      assert.match(cutoverHandoffDownload.body, /deploy\/linux\/run-rocksolid\.sh/);
+      assert.match(cutoverHandoffDownload.body, /deploy\/windows\/run-rocksolid\.ps1/);
+      assert.match(cutoverHandoffDownload.body, /\/api\/health/);
+      assert.match(cutoverHandoffDownload.body, /deploy\/linux\/Caddyfile\.example/);
+      assert.match(cutoverHandoffDownload.body, /rollback/i);
 
       const recoveryDrillHandoffDownload = await getText(
         baseUrl,
@@ -6122,6 +6139,13 @@ test("developer launch mainline production gate blocks default launch secrets an
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_backup_restore_handoff"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_cutover_handoff"
         && item?.status === "pass"
       )
     );

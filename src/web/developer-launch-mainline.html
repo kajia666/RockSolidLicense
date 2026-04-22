@@ -265,28 +265,28 @@
 
       <section class="wide">
         <article class="card">
-          <h2>Launch Mainline Overview</h2>
+          <h2 id="mainline-overview-title">Launch Mainline Overview</h2>
           <div id="mainline-overview-box" class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>
         </article>
         <article class="card">
-          <h2>Workspace Path</h2>
+          <h2 id="mainline-workspace-title">Workspace Path</h2>
           <div id="mainline-workspace-box" class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>
         </article>
       </section>
 
       <section class="wide">
         <article class="card">
-          <h2>Mainline Action Plan</h2>
+          <h2 id="mainline-actions-title">Mainline Action Plan</h2>
           <div id="mainline-actions-box" class="hint">Generate a launch mainline package to inspect the server-side action plan here.</div>
         </article>
         <article class="card">
-          <h2>Recommended Downloads</h2>
+          <h2 id="mainline-downloads-title">Recommended Downloads</h2>
           <div id="mainline-downloads-box" class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>
         </article>
       </section>
 
       <section class="card" style="margin-bottom: 18px;">
-        <h2>Stage Gates</h2>
+        <h2 id="stage-gates-title">Stage Gates</h2>
         <div id="stage-gates-box" class="hint">Generate a launch mainline package to compare Release Mainline, Launch Workflow, Launch Review, Launch Smoke, and Developer Ops together.</div>
       </section>
 
@@ -441,6 +441,14 @@
         return currentMainline?.mainlineSummary || {};
       }
 
+      function currentMainlineSections() {
+        return Array.isArray(currentMainlineSummary().sections) ? currentMainlineSummary().sections : [];
+      }
+
+      function currentMainlineSection(key = "") {
+        return currentMainlineSections().find((item) => String(item?.key || "").trim() === String(key || "").trim()) || null;
+      }
+
       function currentMainlineOverviewCards() {
         return Array.isArray(currentMainlineSummary().overviewCards) ? currentMainlineSummary().overviewCards : [];
       }
@@ -475,6 +483,16 @@
         return source.find((item) => String(item?.key || "").trim() === normalizedKey) || null;
       }
 
+      function currentMainlineSectionCard(sectionKey = "", cardKey = "") {
+        const section = currentMainlineSection(sectionKey);
+        if (!section || !cardKey) {
+          return null;
+        }
+        return Array.isArray(section.cards)
+          ? section.cards.find((item) => String(item?.key || "").trim() === String(cardKey || "").trim()) || null
+          : null;
+      }
+
       function renderReceiptCard(card = null, kind = "recap") {
         if (!card?.key) {
           return "";
@@ -499,6 +517,49 @@
                 ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-receipt-card-kind="${esc(kind)}" data-mainline-receipt-card-key="${esc(card.key)}" data-mainline-receipt-card-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
               </div>
             ` : ""}
+          </div>
+        `;
+      }
+
+      function renderMainlineSectionCard(sectionKey = "", card = null) {
+        if (!card?.key) {
+          return "";
+        }
+        const tags = Array.isArray(card.tags)
+          ? card.tags.map((tag) => renderTag(`${tag?.label || "tag"}:${tag?.value ?? "-"}`, tag?.strong === true)).join("")
+          : "";
+        const controls = Array.isArray(card.controls) ? card.controls : [];
+        const details = Array.isArray(card.details)
+          ? card.details.filter((item) => String(item || "").trim() !== "")
+          : [];
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(card.title || card.key || "Section")}</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint">${esc(card.summary || "-")}</div>
+            ${details.length ? details.map((item) => `<div class="hint">${esc(item)}</div>`).join("") : ""}
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-section-key="${esc(sectionKey)}" data-mainline-section-card-key="${esc(card.key)}" data-mainline-section-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
+      function renderMainlineSection(section = null, fallbackMessage = "Generate Launch Mainline to inspect this section.") {
+        if (!section?.key) {
+          return `<div class="hint">${esc(fallbackMessage)}</div>`;
+        }
+        const cards = Array.isArray(section.cards) ? section.cards : [];
+        if (!cards.length) {
+          return `<div class="hint">${esc(section.emptyState || fallbackMessage)}</div>`;
+        }
+        return `
+          <div class="list">
+            ${cards.map((card) => renderMainlineSectionCard(section.key, card)).join("")}
           </div>
         `;
       }
@@ -659,38 +720,6 @@
         return downloadLaunchMainline(item.format || "summary", item.fileName || "developer-launch-mainline-summary.txt", item.label || "Launch mainline summary");
       }
 
-      function currentMainlineOverviewCard(key = "") {
-        return currentMainlineOverviewCards().find((item) => item?.key === key) || null;
-      }
-
-      function renderOverviewCard(card = null, fallbackMessage = "Generate Launch Mainline to inspect this overview card.") {
-        if (!card?.key) {
-          return `<div class="hint">${esc(fallbackMessage)}</div>`;
-        }
-        const tags = Array.isArray(card.tags)
-          ? card.tags.map((tag) => renderTag(`${tag?.label || "tag"}:${tag?.value ?? "-"}`, tag?.strong === true)).join("")
-          : "";
-        const controls = Array.isArray(card.controls) ? card.controls : [];
-        const details = Array.isArray(card.details)
-          ? card.details.filter((item) => String(item || "").trim() !== "")
-          : [];
-        return `
-          <div class="item">
-            <div class="item-head">
-              <div class="item-title">${esc(card.title || card.key || "Overview")}</div>
-              <div class="audit-meta">${tags}</div>
-            </div>
-            <div class="hint">${esc(card.summary || "-")}</div>
-            ${details.length ? details.map((item) => `<div class="hint">${esc(item)}</div>`).join("") : ""}
-            ${controls.length ? `
-              <div class="actions">
-                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-overview-card-key="${esc(card.key)}" data-mainline-overview-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
-              </div>
-            ` : ""}
-          </div>
-        `;
-      }
-
       function renderHeroControls(summary = {}) {
         const mainlineHeroControls = Array.isArray(summary.heroControls) ? summary.heroControls : [];
         if (!mainlineHeroControls.length) {
@@ -703,75 +732,57 @@
         `).join("");
       }
 
-      function renderActionPlan(items = []) {
-        if (!items.length) {
-          return '<div class="hint">No mainline action plan yet.</div>';
-        }
-        return `
-          <div class="list">
-            ${items.map((item, index) => `
-              <div class="item">
-                <div class="item-head">
-                  <div class="item-title">${esc(item.title || item.key || "Step")}</div>
-                  <div class="audit-meta">
-                    ${renderTag(item.priority || "secondary", true)}
-                    ${renderTag(item.status || "review")}
-                  </div>
-                </div>
-                <div class="hint">${esc(item.summary || "-")}</div>
-                <div class="actions">
-                  ${Array.isArray(item.controls) ? item.controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-action-index="${index}" data-mainline-action-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("") : ""}
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        `;
-      }
-
-      function renderStageGates(summary = {}) {
-        const stages = Array.isArray(summary.stages) ? summary.stages : [];
-        if (!stages.length) {
-          return '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
-        }
-        return `
-          <div class="list">
-            ${stages.map((stage, index) => `
-              <div class="item">
-                <div class="item-head">
-                  <div class="item-title">${esc(stage.label || stage.key || "Stage")}</div>
-                  <div class="audit-meta">
-                    ${renderTag(String(stage.gate?.status || "unknown").toUpperCase(), true)}
-                    ${Number(stage.gate?.blockingCount || 0) ? renderTag(`block:${stage.gate.blockingCount}`, true) : ""}
-                    ${Number(stage.gate?.attentionCount || 0) ? renderTag(`attention:${stage.gate.attentionCount}`) : ""}
-                  </div>
-                </div>
-                <div class="hint">${esc(stage.gate?.headline || stage.gate?.summary || "-")}</div>
-                <div class="actions">
-                  ${Array.isArray(stage.controls) ? stage.controls.map((control, controlIndex) => `<button type="button" class="secondary" data-stage-index="${index}" data-stage-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.kind || "Action")}</button>`).join("") : ""}
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        `;
-      }
-
       function renderMainline() {
         const summary = currentMainlineSummary();
-        el("mainline-overview-box").innerHTML = renderOverviewCard(
-          currentMainlineOverviewCard("overall_gate"),
-          "Generate a launch mainline package to inspect the unified overall gate here."
-        );
+        const sectionBindings = [
+          {
+            key: "overall_gate",
+            titleId: "mainline-overview-title",
+            boxId: "mainline-overview-box",
+            fallbackTitle: "Launch Mainline Overview",
+            fallbackMessage: "Generate a launch mainline package to inspect the unified overall gate here."
+          },
+          {
+            key: "workspace_path",
+            titleId: "mainline-workspace-title",
+            boxId: "mainline-workspace-box",
+            fallbackTitle: "Workspace Path",
+            fallbackMessage: "Generate a launch mainline package to inspect the routed workspace path here."
+          },
+          {
+            key: "action_plan",
+            titleId: "mainline-actions-title",
+            boxId: "mainline-actions-box",
+            fallbackTitle: "Mainline Action Plan",
+            fallbackMessage: "Generate a launch mainline package to inspect the server-side action plan here."
+          },
+          {
+            key: "recommended_downloads",
+            titleId: "mainline-downloads-title",
+            boxId: "mainline-downloads-box",
+            fallbackTitle: "Recommended Downloads",
+            fallbackMessage: "Generate a launch mainline package to inspect the unified downloads here."
+          },
+          {
+            key: "stages",
+            titleId: "stage-gates-title",
+            boxId: "stage-gates-box",
+            fallbackTitle: "Stage Gates",
+            fallbackMessage: "Generate a launch mainline package to compare Release Mainline, Launch Workflow, Launch Review, Launch Smoke, and Developer Ops together."
+          }
+        ];
+        for (const binding of sectionBindings) {
+          const section = currentMainlineSection(binding.key);
+          const titleNode = el(binding.titleId);
+          if (titleNode) {
+            titleNode.textContent = section?.title || binding.fallbackTitle;
+          }
+          const boxNode = el(binding.boxId);
+          if (boxNode) {
+            boxNode.innerHTML = renderMainlineSection(section, binding.fallbackMessage);
+          }
+        }
         el("mainline-hero-controls-box").innerHTML = renderHeroControls(summary);
-        el("mainline-workspace-box").innerHTML = renderOverviewCard(
-          currentMainlineOverviewCard("workspace_path"),
-          "Generate a launch mainline package to inspect the routed workspace path here."
-        );
-        el("mainline-actions-box").innerHTML = renderActionPlan(summary.actionPlan || []);
-        el("mainline-downloads-box").innerHTML = renderOverviewCard(
-          currentMainlineOverviewCard("recommended_downloads"),
-          "Generate a launch mainline package to inspect the unified downloads here."
-        );
-        el("stage-gates-box").innerHTML = renderStageGates(summary);
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = currentMainline?.summaryText || "No launch mainline summary yet.";
       }
@@ -1005,11 +1016,12 @@
         setOutput({ error: error.message });
       }));
       document.addEventListener("click", async (event) => {
-        const overviewControlButton = event.target.closest("[data-mainline-overview-control-index]");
-        if (overviewControlButton) {
-          const key = String(overviewControlButton.dataset.mainlineOverviewCardKey || "").trim();
-          const controlIndex = Number(overviewControlButton.dataset.mainlineOverviewControlIndex || -1);
-          const card = currentMainlineOverviewCard(key);
+        const sectionControlButton = event.target.closest("[data-mainline-section-control-index]");
+        if (sectionControlButton) {
+          const sectionKey = String(sectionControlButton.dataset.mainlineSectionKey || "").trim();
+          const cardKey = String(sectionControlButton.dataset.mainlineSectionCardKey || "").trim();
+          const controlIndex = Number(sectionControlButton.dataset.mainlineSectionControlIndex || -1);
+          const card = currentMainlineSectionCard(sectionKey, cardKey);
           const control = Array.isArray(card?.controls) ? card.controls[controlIndex] : null;
           try {
             await executeMainlineControl(control);
@@ -1031,20 +1043,6 @@
           }
           return;
         }
-        const actionControlButton = event.target.closest("[data-mainline-action-control-index]");
-        if (actionControlButton) {
-          const index = Number(actionControlButton.dataset.mainlineActionIndex || -1);
-          const controlIndex = Number(actionControlButton.dataset.mainlineActionControlIndex || -1);
-          const item = currentMainlineActionPlan()[index];
-          const control = Array.isArray(item?.controls) ? item.controls[controlIndex] : null;
-          try {
-            await executeMainlineControl(control);
-          } catch (error) {
-            setStatus(error.message, "danger");
-            setOutput({ error: error.message });
-          }
-          return;
-        }
         const receiptCardControlButton = event.target.closest("[data-mainline-receipt-card-control-index]");
         if (receiptCardControlButton) {
           const kind = String(receiptCardControlButton.dataset.mainlineReceiptCardKind || "").trim();
@@ -1059,24 +1057,6 @@
             setOutput({ error: error.message });
           }
           return;
-        }
-        const stageControlButton = event.target.closest("[data-stage-control-index]");
-        if (stageControlButton) {
-          const index = Number(stageControlButton.dataset.stageIndex || -1);
-          const controlIndex = Number(stageControlButton.dataset.stageControlIndex || -1);
-          const stage = currentMainline?.mainlineSummary?.stages?.[index];
-          const control = Array.isArray(stage?.controls) ? stage.controls[controlIndex] : null;
-          if (control?.workspaceAction?.key) {
-            openWorkspaceAction(control.workspaceAction);
-            return;
-          }
-          if (control?.recommendedDownload?.key) {
-            await downloadMainlineRecommendedItem(control.recommendedDownload).catch((error) => {
-              setStatus(error.message, "danger");
-              setOutput({ error: error.message });
-            });
-            return;
-          }
         }
       });
 

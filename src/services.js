@@ -9575,6 +9575,69 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       }))
     }
   ];
+  const actionPlanCards = actionPlan.map((item) => ({
+    key: item?.key || null,
+    title: item?.title || item?.key || "Step",
+    summary: item?.summary || "-",
+    tags: [
+      item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
+      item?.status ? { label: "status", value: item.status, strong: false } : null
+    ].filter(Boolean),
+    details: [],
+    controls: Array.isArray(item?.controls) ? item.controls : []
+  })).filter((item) => item.key || item.summary || item.controls.length);
+  const stageCards = stages.map((item) => ({
+    key: item?.key || null,
+    title: item?.label || item?.key || "Stage",
+    summary: item?.gate?.headline || item?.gate?.summary || "-",
+    tags: [
+      {
+        label: "status",
+        value: String(item?.gate?.status || "unknown").toUpperCase(),
+        strong: true
+      },
+      Number(item?.gate?.blockingCount || 0)
+        ? { label: "block", value: Number(item.gate.blockingCount || 0), strong: true }
+        : null,
+      Number(item?.gate?.attentionCount || 0)
+        ? { label: "attention", value: Number(item.gate.attentionCount || 0), strong: false }
+        : null
+    ].filter(Boolean),
+    details: [],
+    controls: Array.isArray(item?.controls) ? item.controls : []
+  })).filter((item) => item.key || item.summary || item.controls.length);
+  const sections = [
+    {
+      key: "overall_gate",
+      title: "Launch Mainline Overview",
+      emptyState: "Generate a launch mainline package to inspect the unified overall gate here.",
+      cards: overviewCards.filter((item) => item?.key === "overall_gate")
+    },
+    {
+      key: "workspace_path",
+      title: "Workspace Path",
+      emptyState: "Generate a launch mainline package to inspect the routed workspace path here.",
+      cards: overviewCards.filter((item) => item?.key === "workspace_path")
+    },
+    {
+      key: "action_plan",
+      title: "Mainline Action Plan",
+      emptyState: "Generate a launch mainline package to inspect the server-side action plan here.",
+      cards: actionPlanCards
+    },
+    {
+      key: "recommended_downloads",
+      title: "Recommended Downloads",
+      emptyState: "Generate a launch mainline package to inspect the unified downloads here.",
+      cards: overviewCards.filter((item) => item?.key === "recommended_downloads")
+    },
+    {
+      key: "stages",
+      title: "Stage Gates",
+      emptyState: "Generate a launch mainline package to compare Release Mainline, Launch Workflow, Launch Review, Launch Smoke, and Developer Ops together.",
+      cards: stageCards
+    }
+  ];
   return {
     overallGate,
     releaseGate,
@@ -9585,6 +9648,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     continuation,
     stages,
     overviewCards,
+    sections,
     heroControls,
     workspaceActions,
     primaryAction,

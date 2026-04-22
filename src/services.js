@@ -11928,8 +11928,8 @@ function buildDeveloperOpsSnapshotPayload({
     auditLogs: normalizedAuditLogs
   });
   routeReview.downloads = buildDeveloperOpsRouteReviewDownloads(scope, routeReview);
-  routeReview.continuations = buildDeveloperOpsRouteReviewContinuations(scope, routeReview);
   routeReview.mainlineHandoff = buildDeveloperOpsMainlineHandoff(scope);
+  routeReview.continuations = buildDeveloperOpsRouteReviewContinuations(scope, routeReview);
   const primaryContinuationKey = routeReview.primaryMatch?.kind && routeReview.primaryMatch?.item
     ? buildDeveloperOpsRouteReviewContinuationKey(routeReview.primaryMatch.kind, routeReview.primaryMatch.item)
     : "";
@@ -12501,6 +12501,8 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
     : Math.max(Number(routeReview.totalMatches || 0) - 1, 0);
   const remainingCount = nextMatch ? 1 : 0;
   const nextControlLabel = nextMatch?.recommendedControl?.label || "";
+  const completionWorkspaceAction = routeReview.mainlineHandoff?.workspaceAction || null;
+  const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
   if (nextMatch) {
     return {
       remainingCount,
@@ -12512,7 +12514,9 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
       secondaryAction: nextControlLabel ? "control_next" : "download_next",
       secondaryLabel: nextControlLabel ? "Open Next Control" : "Download Next Match Summary",
       nextDownload: routeReview.downloads?.next || null,
-      remainingDownload: routeReview.downloads?.remaining || null
+      remainingDownload: routeReview.downloads?.remaining || null,
+      completionWorkspaceAction,
+      completionDownload
     };
   }
   return {
@@ -12525,7 +12529,9 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
     secondaryAction: "download_route_review",
     secondaryLabel: "Download Routed Summary",
     nextDownload: null,
-    remainingDownload: routeReview.downloads?.remaining || null
+    remainingDownload: routeReview.downloads?.remaining || null,
+    completionWorkspaceAction,
+    completionDownload
   };
 }
 
@@ -12533,6 +12539,8 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
   const queue = Array.isArray(routeReview.queue) ? routeReview.queue : [];
   const continuations = {};
   const remainingDownload = routeReview.downloads?.remaining || buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope);
+  const completionWorkspaceAction = routeReview.mainlineHandoff?.workspaceAction || null;
+  const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
   queue.forEach((entry, index) => {
     if (!entry?.kind || !entry?.item || typeof entry.item !== "object") {
       return;
@@ -12554,7 +12562,9 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
       secondaryLabel: nextMatch ? (nextControlLabel ? "Open Next Control" : "Download Next Match Summary") : "Download Routed Summary",
       nextDownload: nextMatch ? buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope, nextMatch, "next") : null,
       remainingDownload,
-      nextMatch: nextMatch || null
+      nextMatch: nextMatch || null,
+      completionWorkspaceAction,
+      completionDownload
     };
   });
   return continuations;

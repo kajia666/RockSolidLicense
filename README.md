@@ -79,6 +79,7 @@
 - 这块 `Route Review` 顶部动作现在也开始由服务端下发 `actions`，所以 `Prepare / Review / Download` 这批按钮不再主要靠前端自己按命中结果临时拼出来，而是更统一地回到后台/API 主线上
 - 现在 `/api/developer/ops/export/download` 也能直接下发服务端选中的 `route-review-primary / route-review-next / route-review-remaining` 摘要，所以 Launch Review、Launch Smoke 和后续 handoff 可以更稳定地围绕“当前主复查对象 / 下一个对象 / 剩余复查队列”交接，而不是继续靠前端自己重组过滤条件
 - 现在 `/api/developer/ops/export` 还会直接带上统一的 `launch-mainline` handoff，包括 `Open Launch Mainline` 工作台动作和 `launch-mainline summary / checksums / zip` 下载描述；对应的 routed review 动作里也会直接给出 `Open Launch Mainline / Download Launch Mainline Summary`，这样从 Developer Ops 回到统一首发主线时不需要再靠页面自己拼跳转和下载参数
+- 这条 routed review continuation 现在还会把“完成这一轮复查后回到 launch-mainline”的 handoff 一起由服务端下发，所以 `Developer Ops` 里的 `Last Action Result` 在没有下一个命中对象时，会直接给 `Open Launch Mainline / Download Launch Mainline Summary`，而不是只停在本地“已完成”的状态提示
 - 这块 `Route Review` 现在还能直接切到 `Show Routed Hits Only`，并一键跳去复查 `accounts / entitlements / sessions / devices / audit` 中命中的那一类对象，让首发后的复查链更像一个连续动作，而不是先看摘要再自己手工筛表
 - 现在这块 routed review 还会自动抽出一个 `Primary Match`，把首个命中的账号 / 授权 / 会话 / 设备 / 审计衍生对象直接预填进 quick controls，并保留到 `Prepared Control` 回执里；开发者运营台里的表格点击也统一走这条 focus-preparation 逻辑，所以从 `Launch Review` 跳进来后的复查会更像“已经帮你选好当前最该看的对象”
 - 这块 `Route Review` 现在还可以直接 `Review Primary Match` 和 `Download Primary Match Summary`，也就是软件作者从 `Launch Review` 跳进 `Developer Ops` 后，不只是知道当前主匹配对象是谁，还能围绕这个对象直接开始复查或导出更聚焦的一份摘要

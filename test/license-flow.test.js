@@ -8114,6 +8114,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.continuations?.[primaryContinuationKey]?.nextMatch?.kind, "audit");
     assert.equal(exportSnapshot.routeReview?.continuations?.[primaryContinuationKey]?.nextDownload?.format, "route-review-next");
     assert.match(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.primaryAction || "", /^(review_next|complete_route_review)$/);
+    assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionWorkspaceAction?.key, "launch-mainline");
+    assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionDownload?.key, "launch_mainline_summary");
     assert.equal(exportSnapshot.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
     assert.equal(exportSnapshot.mainlineHandoff?.downloads?.summary?.key, "launch_mainline_summary");
     assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
@@ -11694,6 +11696,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /buildPrimaryRouteReviewFocus/);
     assert.match(html, /applyDeveloperFocusItem/);
     assert.match(html, /preparePrimaryRouteReviewFocus/);
+    assert.match(html, /action === "open-mainline"/);
+    assert.match(html, /action === "download-mainline"/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

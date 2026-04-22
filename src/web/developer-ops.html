@@ -3230,6 +3230,8 @@
           nextControlLabel,
           nextDownload,
           remainingDownload: serverContinuation?.remainingDownload || review.serverRouteReview?.downloads?.remaining || null,
+          completionWorkspaceAction: serverContinuation?.completionWorkspaceAction || review.serverRouteReview?.mainlineHandoff?.workspaceAction || null,
+          completionDownload: serverContinuation?.completionDownload || review.serverRouteReview?.mainlineHandoff?.downloads?.summary || null,
           primaryAction: serverContinuation?.primaryAction || (nextFocus?.kind ? "review_next" : "complete_route_review"),
           primaryLabel: serverContinuation?.primaryLabel || (nextFocus?.kind ? "Continue Routed Review" : "Complete Routed Review"),
           secondaryAction: serverContinuation?.secondaryAction || (nextFocus?.kind ? (nextControlLabel ? "control_next" : "download_next") : "download_route_review"),
@@ -3500,6 +3502,54 @@
         };
       }
 
+      function buildDeveloperRouteReviewCompletionRecap(review = collectRouteReview()) {
+        const continuation = review?.serverRouteReview?.continuation && typeof review.serverRouteReview.continuation === "object"
+          ? review.serverRouteReview.continuation
+          : null;
+        const handoff = buildRouteReviewMainlineHandoff(review);
+        const workspaceAction = continuation?.completionWorkspaceAction || handoff?.workspaceAction || null;
+        const summaryDownload = continuation?.completionDownload || handoff?.downloads?.summary || null;
+        return {
+          timestamp: new Date().toISOString(),
+          successMessage: "Routed review complete.",
+          focusKind: "",
+          status: "ok",
+          title: workspaceAction?.label || "Launch Mainline Ready",
+          summary: summaryDownload?.label || "No additional routed matches remain.",
+          focusItem: null,
+          recommendedControl: null,
+          preparedControl: "",
+          severity: "",
+          actionHint: "",
+          trendLabel: "Route Completed",
+          trendTone: "ok",
+          escalationLabel: "",
+          escalationTone: "",
+          outcomeLabel: "Queue Cleared",
+          outcomeTone: "ok",
+          outcomeHint: "No additional matched objects remain in this routed review pass.",
+          escalationOutcomeLabel: "",
+          escalationOutcomeTone: "",
+          escalationOutcomeHint: "",
+          headline: workspaceAction?.key ? "Launch mainline ready." : "Routed review complete.",
+          detail: workspaceAction?.key
+            ? "No additional matched objects remain. Continue in the unified launch mainline workspace."
+            : "No additional matched objects remain in this routed review pass.",
+          before: { queuePosition: 1, maxSeverity: "" },
+          after: { queuePosition: null, maxSeverity: "", maxSeverityRank: 0 },
+          followUp: {
+            primaryAction: workspaceAction?.key ? "open-mainline" : "refresh_snapshot",
+            primaryLabel: workspaceAction?.label || "Refresh Snapshot",
+            secondaryAction: summaryDownload?.key ? "download-mainline" : "download_route_review",
+            secondaryLabel: summaryDownload?.label || "Download Routed Summary",
+            hint: workspaceAction?.key
+              ? "Continue in launch mainline to review the unified release, workflow, review, smoke, and ops gate."
+              : "No additional routed matches remain. You can export the routed summary or refresh the snapshot."
+          },
+          snapshotHits: []
+        };
+      }
+
       function renderDeveloperMutationRecap() {
         if (!lastMutation) {
           return "";
@@ -3699,6 +3749,30 @@
         if (!lastMutation) {
           return;
         }
+        if (action === "open-mainline") {
+          const handoff = buildRouteReviewMainlineHandoff();
+          if (!handoff?.workspaceAction?.key) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No launch mainline handoff is available yet." };
+          }
+          openRouteReviewWorkspaceAction(
+            handoff.workspaceAction,
+            requestedRouteTitle || "Launch Mainline",
+            requestedRouteReason || "Unified launch mainline follow-up"
+          );
+          return;
+        }
+        if (action === "download-mainline") {
+          const handoff = buildRouteReviewMainlineHandoff();
+          if (!handoff?.downloads?.summary?.key) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No launch mainline summary is available yet." };
+          }
+          await downloadRouteReviewShortcut(handoff.downloads.summary);
+          return;
+        }
+        if (action === "download_route_review") {
+          await handleExportDownload("summary", "developer-ops-summary.txt", "Routed ops summary");
+          return;
+        }
         const focus = lastMutation.focusKind ? {
           kind: lastMutation.focusKind,
           item: lastMutation.focusItem || {},
@@ -3828,15 +3902,15 @@
             return;
           }
           setStatus(`Routed review complete. ${formatRouteReviewSummary(review)} No additional matched objects remain.`);
+          lastMutation = buildDeveloperRouteReviewCompletionRecap(review);
+          renderSnapshotOverview();
           setOutput({
             mutationAction: action,
             routedReviewComplete: true,
-            matchedCount: totalMatches
+            matchedCount: totalMatches,
+            mainlineHandoff: buildRouteReviewMainlineHandoff(review)
           });
           return;
-        }
-        if (action === "download_route_review") {
-          await handleExportDownload("summary", "developer-ops-summary.txt", "Routed ops summary");
         }
       }
 

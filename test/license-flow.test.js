@@ -6086,6 +6086,13 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.ok(Number(launchMainline.mainlineSummary.productionGate?.blockingCount || 0) >= 2);
     assert.equal(launchMainline.mainlineSummary.productionGate?.recommendedWorkspace?.key, "security");
     assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_backup_restore_handoff"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
       && launchMainline.mainlineSummary.productionGate.actionPlan.some((item) =>
         item?.key === "production_default_admin_password"
@@ -6110,8 +6117,8 @@ test("developer launch mainline production gate blocks default launch secrets an
         key: "production_checks",
         title: "Production Gate Checks",
         emptyState: "Generate a launch mainline package to inspect the production readiness checks here.",
-        cards: Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
-          ? launchMainline.mainlineSummary.productionGate.actionPlan.map((item) => item?.key || null)
+        cards: Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+          ? launchMainline.mainlineSummary.productionGate.checks.map((item) => item?.key || null)
           : []
       }
     );
@@ -6125,6 +6132,7 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.match(launchMainline.summaryText || "", /Production:/);
     assert.match(launchMainline.summaryText || "", /default admin password/i);
     assert.match(launchMainline.summaryText || "", /server token secret/i);
+    assert.match(launchMainline.summaryText || "", /backup and restore handoff/i);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -7232,8 +7240,8 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     assert.deepEqual(bootstrapMainlineSections.overall_gate, ["overall_gate"]);
     assert.deepEqual(
       bootstrapMainlineSections.production_checks,
-      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.actionPlan)
-        ? actionResult.launchMainline.mainlineSummary.productionGate.actionPlan.map((item) => item?.key || null)
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+        ? actionResult.launchMainline.mainlineSummary.productionGate.checks.map((item) => item?.key || null)
         : []
     );
     assert.deepEqual(bootstrapMainlineSections.workspace_path, ["workspace_path"]);
@@ -7896,8 +7904,8 @@ test("developer launch mainline action can create first launch batches and retur
     assert.deepEqual(setupMainlineSections.overall_gate, ["overall_gate"]);
     assert.deepEqual(
       setupMainlineSections.production_checks,
-      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.actionPlan)
-        ? actionResult.launchMainline.mainlineSummary.productionGate.actionPlan.map((item) => item?.key || null)
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+        ? actionResult.launchMainline.mainlineSummary.productionGate.checks.map((item) => item?.key || null)
         : []
     );
     assert.deepEqual(setupMainlineSections.workspace_path, ["workspace_path"]);

@@ -4406,10 +4406,16 @@ function buildLaunchMainlineProductionGatePayload({
   productionHandoffDownload = null
 } = {}) {
   const actionPlan = [];
+  const checks = [];
   const recommendedDownloads = [];
   const pushAction = (step) => {
     if (step?.key) {
       actionPlan.push(step);
+    }
+  };
+  const pushCheck = (step) => {
+    if (step?.key) {
+      checks.push(step);
     }
   };
   const mainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
@@ -4447,6 +4453,23 @@ function buildLaunchMainlineProductionGatePayload({
     }
     recommendedWorkspace = action;
   };
+  const buildCheckStep = ({
+    key,
+    title,
+    summary,
+    status = "review",
+    workspaceAction = null,
+    recommendedDownload = effectiveProductionDownload,
+    priority = "secondary"
+  }) => createLaunchWorkflowActionPlanStep({
+    key,
+    title,
+    summary,
+    status,
+    priority,
+    workspaceAction,
+    recommendedDownload
+  });
   const addStep = (severity, key, title, summary, workspaceAction = null) => {
     if (severity === "hold") {
       blockingCount += 1;
@@ -4456,7 +4479,7 @@ function buildLaunchMainlineProductionGatePayload({
     if (workspaceAction) {
       recommendWorkspace(workspaceAction);
     }
-    pushAction(createLaunchWorkflowActionPlanStep({
+    const step = buildCheckStep({
       key,
       title,
       summary,
@@ -4464,6 +4487,19 @@ function buildLaunchMainlineProductionGatePayload({
       priority: actionPlan.length ? "secondary" : "primary",
       workspaceAction,
       recommendedDownload: effectiveProductionDownload
+    });
+    pushAction(step);
+    pushCheck(step);
+  };
+  const addPassCheck = (key, title, summary, workspaceAction = null, recommendedDownload = effectiveProductionDownload) => {
+    pushCheck(buildCheckStep({
+      key,
+      title,
+      summary,
+      status: "pass",
+      priority: "secondary",
+      workspaceAction,
+      recommendedDownload
     }));
   };
 
@@ -4514,6 +4550,13 @@ function buildLaunchMainlineProductionGatePayload({
       "production_healthcheck",
       "Stabilize the service healthcheck",
       "The health endpoint is not reporting an OK status. Fix health before widening rollout.",
+      opsWorkspace
+    );
+  } else {
+    addPassCheck(
+      "production_healthcheck_ready",
+      "Healthcheck path looks stable",
+      "The health endpoint is reporting OK and the unified production handoff already includes host-side healthcheck scripts.",
       opsWorkspace
     );
   }
@@ -4594,10 +4637,24 @@ function buildLaunchMainlineProductionGatePayload({
       "Put the public entrypoint behind HTTPS",
       "The current public launch-mainline URL is still HTTP. Move the production entrypoint behind HTTPS before launch-day traffic."
     );
+  } else if (!publicEntryIsLoopback) {
+    addPassCheck(
+      "production_public_entrypoint_ready",
+      "Public entrypoint looks production-shaped",
+      `The launch lane is already advertising an external HTTPS entrypoint at ${normalizedPublicBaseUrl}.`,
+      opsWorkspace
+    );
   }
 
   pushRecommendedDownload(effectiveProductionDownload);
   pushRecommendedDownload(mainlineSummaryDownload);
+  addPassCheck(
+    "production_backup_restore_handoff",
+    "Review the production backup and restore handoff",
+    "The unified production handoff already packages deployment docs, healthcheck scripts, backup scripts, restore assets, and environment skeletons for this lane.",
+    opsWorkspace,
+    effectiveProductionDownload
+  );
 
   const status = blockingCount > 0
     ? "hold"
@@ -4616,7 +4673,7 @@ function buildLaunchMainlineProductionGatePayload({
       : "Core production launch checks look aligned for this lane.";
 
   return {
-    checks: actionPlan,
+    checks,
     ...buildLaunchMainlineGatePayload({
       status,
       headline,
@@ -10224,7 +10281,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     details: [],
     controls: Array.isArray(item?.controls) ? item.controls : []
   })).filter((item) => item.key || item.summary || item.controls.length);
-  const productionCheckCards = (Array.isArray(productionGate?.actionPlan) ? productionGate.actionPlan : []).map((item) => {
+  const productionCheckCards = (Array.isArray(productionGate?.checks) ? productionGate.checks : Array.isArray(productionGate?.actionPlan) ? productionGate.actionPlan : []).map((item) => {
     const controls = [
       item?.workspaceAction ? ensureLaunchMainlineControlHrefs({
         kind: "workspace",
@@ -10449,10 +10506,15 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   for (const [label, gate] of stageRows) {
     lines.push(`- ${label}: ${String(gate?.status || "unknown").toUpperCase()} | ${gate?.headline || "-"} | workspace=${formatWorkspaceActionText(gate?.recommendedWorkspace)}`);
   }
-  if (Array.isArray(mainlineSummary.productionGate?.actionPlan) && mainlineSummary.productionGate.actionPlan.length) {
+  const productionGateChecks = Array.isArray(mainlineSummary.productionGate?.checks)
+    ? mainlineSummary.productionGate.checks
+    : Array.isArray(mainlineSummary.productionGate?.actionPlan)
+      ? mainlineSummary.productionGate.actionPlan
+      : [];
+  if (productionGateChecks.length) {
     lines.push("");
     lines.push("Production Gate Checks:");
-    for (const item of mainlineSummary.productionGate.actionPlan) {
+    for (const item of productionGateChecks) {
       lines.push(
         `- ${item.title || item.key || "step"} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`

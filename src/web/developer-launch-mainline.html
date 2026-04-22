@@ -442,7 +442,12 @@
       }
 
       function currentMainlineSections() {
-        return Array.isArray(currentMainlineSummary().sections) ? currentMainlineSummary().sections : [];
+        const summarySections = Array.isArray(currentMainlineSummary().sections) ? currentMainlineSummary().sections : [];
+        if (summarySections.length) {
+          return summarySections;
+        }
+        const receipt = currentLastMainlineReceipt();
+        return Array.isArray(receipt?.mainlineSections) ? receipt.mainlineSections : [];
       }
 
       function currentMainlineSection(key = "") {
@@ -721,7 +726,10 @@
       }
 
       function renderHeroControls(summary = {}) {
-        const mainlineHeroControls = Array.isArray(summary.heroControls) ? summary.heroControls : [];
+        const receipt = currentLastMainlineReceipt();
+        const mainlineHeroControls = Array.isArray(summary.heroControls) && summary.heroControls.length
+          ? summary.heroControls
+          : (Array.isArray(receipt?.mainlineHeroControls) ? receipt.mainlineHeroControls : []);
         if (!mainlineHeroControls.length) {
           return '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
         }

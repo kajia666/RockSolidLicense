@@ -3777,6 +3777,39 @@ function buildLaunchMainlineActionReceipt({
         : []
     }))
     .filter((item) => item.key || item.summary || item.controls.length);
+  const mainlineSections = (Array.isArray(mainlineSummary.sections) ? mainlineSummary.sections : [])
+    .slice(0, 5)
+    .map((item) => ({
+      key: item?.key || null,
+      title: item?.title || item?.key || "Section",
+      emptyState: item?.emptyState || null,
+      cards: Array.isArray(item?.cards)
+        ? item.cards.map((card) => ({
+            key: card?.key || null,
+            title: card?.title || card?.key || "Card",
+            summary: card?.summary || "-",
+            tags: Array.isArray(card?.tags)
+              ? card.tags.map((tag) => ({
+                  label: tag?.label || "tag",
+                  value: tag?.value ?? "-",
+                  strong: tag?.strong === true
+                }))
+              : [],
+            details: Array.isArray(card?.details) ? card.details.filter(Boolean) : [],
+            controls: Array.isArray(card?.controls)
+              ? card.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  label: control?.label || control?.workspaceAction?.label || control?.recommendedDownload?.label || control?.bootstrapAction?.label || control?.setupAction?.label || control?.kind || "Action",
+                  workspaceAction: control?.workspaceAction || null,
+                  recommendedDownload: control?.recommendedDownload || null,
+                  bootstrapAction: control?.bootstrapAction || null,
+                  setupAction: control?.setupAction || null
+                }))
+              : []
+          }))
+        : []
+    }))
+    .filter((item) => item.key || item.cards.length);
   const mainlineStages = (Array.isArray(mainlineSummary.stages) ? mainlineSummary.stages : [])
     .slice(0, 5)
     .map((item) => ({
@@ -3981,6 +4014,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineNextActions,
     mainlineRecapCards,
     mainlineOverviewCards,
+    mainlineSections,
     mainlineStages,
     mainlineHeroControls,
     mainlineWorkspaceActions,

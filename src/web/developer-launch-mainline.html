@@ -358,15 +358,6 @@
         return `<span class="tag ${strong ? "strong" : ""}">${esc(value)}</span>`;
       }
 
-      function renderMainlineCountTransition(label, beforeValue, afterValue) {
-        const before = Number.isFinite(Number(beforeValue)) ? Number(beforeValue) : 0;
-        const after = Number.isFinite(Number(afterValue)) ? Number(afterValue) : 0;
-        if (before === after) {
-          return "";
-        }
-        return renderTag(`${label}:${before}->${after}`, true);
-      }
-
       function buildWorkspaceUrl(path, params = {}) {
         return `${path}${q(params)}`;
       }
@@ -464,57 +455,33 @@
           : null;
       }
 
+      function currentMainlineRecapCards() {
+        const receipt = currentLastMainlineReceipt();
+        return Array.isArray(receipt?.mainlineRecapCards) ? receipt.mainlineRecapCards : [];
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const followUp = result?.followUp;
         const receipt = result?.receipt && typeof result.receipt === "object" ? result.receipt : null;
+        const recapCards = currentMainlineRecapCards();
         const actions = Array.isArray(receipt?.mainlineActions)
           ? receipt.mainlineActions
           : Array.isArray(receipt?.actions)
           ? receipt.actions
           : (Array.isArray(followUp?.actions) ? followUp.actions : []);
-        const stageBits = Array.isArray(receipt?.mainlineStages)
-          ? receipt.mainlineStages.map((item) => {
-              const label = item?.label || item?.key || "stage";
-              const status = String(item?.gate?.status || "unknown").toUpperCase();
-              return renderTag(`${label}:${status}`, item?.gate?.status === "hold");
-            }).join("")
-          : "";
         const followUpActions = Array.isArray(receipt?.mainlineFollowUpActions)
           ? receipt.mainlineFollowUpActions
           : [];
-        if (!actions.length) {
+        if (!actions.length && !recapCards.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
-        const operationLabel = receipt?.operationLabel || result?.operationLabel || followUp?.operationLabel || followUp?.operation || "launch";
-        const summary = receipt?.followUpSummary || receipt?.summary || followUp?.summary || result?.message || "Review the next unified launch-mainline follow-up actions.";
-        const transitions = Array.isArray(receipt?.transitions)
-          ? receipt.transitions.map((item) => renderMainlineCountTransition(item.key || item.label || "count", item.from, item.to)).filter(Boolean).join("")
-          : "";
-        const createdBits = Array.isArray(receipt?.created)
-          ? receipt.created.map((item) => renderTag(`${item.key || item.label || "created"}:${item.value || "-"}`, true)).join("")
-          : "";
         return `
-          <div>
-            ${renderTag(`after:${operationLabel}`, true)}
-            ${(receipt?.mainlinePrimaryAction?.title || receipt?.mainlinePrimaryAction?.label || receipt?.primaryAction?.label || followUp?.primaryAction?.label)
-              ? renderTag(`next:${receipt?.mainlinePrimaryAction?.title || receipt?.mainlinePrimaryAction?.label || receipt?.primaryAction?.label || followUp?.primaryAction?.label}`, true)
-              : ""}
-            ${result?.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
-            ${result?.channel ? renderTag(`channel:${result.channel}`, true) : ""}
-          </div>
-          <div class="hint" style="margin-top: 10px;">${esc(result?.message || "Last launch mainline action completed.")}</div>
-          <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
-          ${receipt?.mainlineOverallGate ? `<div class="hint" style="margin-top: 8px;">${esc(`Gate: ${String(receipt.mainlineOverallGate.status || "unknown").toUpperCase()} | ${receipt.mainlineOverallGate.headline || "-"}`)}</div>` : ""}
-          ${receipt?.mainlineContinuation ? `<div class="hint" style="margin-top: 8px;">${esc(`Continuation: ${receipt.mainlineContinuation.title || "Continue Routed Review"}${receipt.mainlineContinuation.summary ? ` | ${receipt.mainlineContinuation.summary}` : ""}`)}</div>` : ""}
+          ${recapCards.length ? `<div class="list">${recapCards.map((card) => renderOverviewCard(card)).join("")}</div>` : ""}
           ${followUpActions.length ? `
             <div class="actions" style="margin-top: 8px;">
               ${followUpActions.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-followup-action-index="${index}">${esc(item.label || item.workspaceAction?.label || item.recommendedDownload?.label || item.kind || "Continue")}</button>`).join("")}
             </div>
           ` : ""}
-          ${Array.isArray(receipt?.mainlineNextActions) && receipt.mainlineNextActions.length ? `<div class="hint" style="margin-top: 8px;">${esc(`Next actions: ${receipt.mainlineNextActions.join(" | ")}`)}</div>` : ""}
-          ${stageBits ? `<div style="margin-top: 8px;">${stageBits}</div>` : ""}
-          ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
-          ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
           ${actions.map((item, index) => `
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(148,163,184,0.28);">
               <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
@@ -682,6 +649,9 @@
           ? card.tags.map((tag) => renderTag(`${tag?.label || "tag"}:${tag?.value ?? "-"}`, tag?.strong === true)).join("")
           : "";
         const controls = Array.isArray(card.controls) ? card.controls : [];
+        const details = Array.isArray(card.details)
+          ? card.details.filter((item) => String(item || "").trim() !== "")
+          : [];
         return `
           <div class="item">
             <div class="item-head">
@@ -689,6 +659,7 @@
               <div class="audit-meta">${tags}</div>
             </div>
             <div class="hint">${esc(card.summary || "-")}</div>
+            ${details.length ? details.map((item) => `<div class="hint">${esc(item)}</div>`).join("") : ""}
             ${controls.length ? `
               <div class="actions">
                 ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-overview-card-key="${esc(card.key)}" data-mainline-overview-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
@@ -764,7 +735,6 @@
 
       function renderMainline() {
         const summary = currentMainlineSummary();
-        const overallGate = summary.overallGate || null;
         el("mainline-overview-box").innerHTML = renderOverviewCard(
           currentMainlineOverviewCard("overall_gate"),
           "Generate a launch mainline package to inspect the unified overall gate here."

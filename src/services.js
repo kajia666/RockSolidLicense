@@ -3876,6 +3876,73 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: item?.recommendedDownload || null
     }))
   ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
+  const mainlineRecapCards = [
+    {
+      key: "result_status",
+      title: `${operationLabel} completed`,
+      summary: result?.message || `${operationLabel} completed.`,
+      tags: [
+        { label: "after", value: normalizedOperation || "bootstrap", strong: true },
+        (mainlinePrimaryAction?.title || mainlinePrimaryAction?.label || followUp?.primaryAction?.label)
+          ? {
+              label: "next",
+              value: mainlinePrimaryAction?.title || mainlinePrimaryAction?.label || followUp?.primaryAction?.label,
+              strong: true
+            }
+          : null,
+        result?.productCode ? { label: "project", value: result.productCode, strong: true } : null,
+        result?.channel ? { label: "channel", value: result.channel, strong: true } : null
+      ].filter(Boolean),
+      details: [
+        followUp?.summary || result?.message || `${operationLabel} completed.`
+      ].filter(Boolean),
+      controls: []
+    },
+    {
+      key: "mainline_status",
+      title: mainlineOverallGate?.headline || "Unified launch mainline status",
+      summary: mainlineOverallGate
+        ? `Gate: ${String(mainlineOverallGate.status || "unknown").toUpperCase()} | ${mainlineOverallGate.headline || "-"}`
+        : "Unified launch mainline refreshed.",
+      tags: [
+        ...mainlineStages.map((item) => ({
+          label: item?.label || item?.key || "stage",
+          value: String(item?.gate?.status || "unknown").toUpperCase(),
+          strong: item?.gate?.status === "hold"
+        }))
+      ],
+      details: [
+        mainlineContinuation
+          ? `Continuation: ${mainlineContinuation.title || "Continue Routed Review"}${mainlineContinuation.summary ? ` | ${mainlineContinuation.summary}` : ""}`
+          : "",
+        Array.isArray(mainlineNextActions) && mainlineNextActions.length
+          ? `Next actions: ${mainlineNextActions.join(" | ")}`
+          : ""
+      ].filter(Boolean),
+      controls: mainlineFollowUpActions
+    },
+    {
+      key: "transition_summary",
+      title: "Applied changes",
+      summary: transitions.length || created.length
+        ? "Review the updated counts and created launch assets before continuing."
+        : "No count or asset changes were recorded for this action.",
+      tags: [
+        ...transitions.map((item) => ({
+          label: item?.key || item?.label || "count",
+          value: `${item?.from ?? 0}->${item?.to ?? 0}`,
+          strong: true
+        })),
+        ...created.map((item) => ({
+          label: item?.key || item?.label || "created",
+          value: item?.value || "-",
+          strong: true
+        }))
+      ],
+      details: [],
+      controls: []
+    }
+  ];
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -3890,6 +3957,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecommendedDownload,
     mainlineContinuation,
     mainlineNextActions,
+    mainlineRecapCards,
     mainlineOverviewCards,
     mainlineStages,
     mainlineHeroControls,

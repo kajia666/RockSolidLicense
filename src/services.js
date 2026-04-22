@@ -3809,6 +3809,19 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: mainlineContinuation.recommendedDownload
     });
   }
+  const mainlineFollowUpActions = [
+    ...mainlineContinuationActions,
+    ...mainlineWorkspaceActions.map((item) => ({
+      kind: "workspace",
+      label: item?.label || item?.key || "Open workspace",
+      workspaceAction: item
+    })),
+    ...mainlineRecommendedDownloads.map((item) => ({
+      kind: "download",
+      label: item?.label || item?.key || "Download",
+      recommendedDownload: item
+    }))
+  ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -3828,6 +3841,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecommendedDownloads,
     mainlineActions,
     mainlineContinuationActions,
+    mainlineFollowUpActions,
     actions
   };
 }

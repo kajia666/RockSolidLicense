@@ -492,14 +492,8 @@
               return renderTag(`${label}:${status}`, item?.gate?.status === "hold");
             }).join("")
           : "";
-        const receiptWorkspaceActions = Array.isArray(receipt?.mainlineWorkspaceActions)
-          ? receipt.mainlineWorkspaceActions.slice(0, 5)
-          : [];
-        const receiptRecommendedDownloads = Array.isArray(receipt?.mainlineRecommendedDownloads)
-          ? receipt.mainlineRecommendedDownloads.slice(0, 6)
-          : [];
-        const continuationActions = Array.isArray(receipt?.mainlineContinuationActions)
-          ? receipt.mainlineContinuationActions
+        const followUpActions = Array.isArray(receipt?.mainlineFollowUpActions)
+          ? receipt.mainlineFollowUpActions
           : [];
         if (!actions.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
@@ -525,19 +519,13 @@
           <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
           ${receipt?.mainlineOverallGate ? `<div class="hint" style="margin-top: 8px;">${esc(`Gate: ${String(receipt.mainlineOverallGate.status || "unknown").toUpperCase()} | ${receipt.mainlineOverallGate.headline || "-"}`)}</div>` : ""}
           ${receipt?.mainlineContinuation ? `<div class="hint" style="margin-top: 8px;">${esc(`Continuation: ${receipt.mainlineContinuation.title || "Continue Routed Review"}${receipt.mainlineContinuation.summary ? ` | ${receipt.mainlineContinuation.summary}` : ""}`)}</div>` : ""}
-          ${continuationActions.length ? `
+          ${followUpActions.length ? `
             <div class="actions" style="margin-top: 8px;">
-              ${continuationActions.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-continuation-action-index="${index}">${esc(item.label || item.workspaceAction?.label || item.recommendedDownload?.label || item.kind || "Continue")}</button>`).join("")}
+              ${followUpActions.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-followup-action-index="${index}">${esc(item.label || item.workspaceAction?.label || item.recommendedDownload?.label || item.kind || "Continue")}</button>`).join("")}
             </div>
           ` : ""}
           ${Array.isArray(receipt?.mainlineNextActions) && receipt.mainlineNextActions.length ? `<div class="hint" style="margin-top: 8px;">${esc(`Next actions: ${receipt.mainlineNextActions.join(" | ")}`)}</div>` : ""}
           ${stageBits ? `<div style="margin-top: 8px;">${stageBits}</div>` : ""}
-          ${(receiptWorkspaceActions.length || receiptRecommendedDownloads.length) ? `
-            <div class="actions" style="margin-top: 8px;">
-              ${receiptWorkspaceActions.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-workspace-index="${index}">${esc(item.label || item.key || "Open workspace")}</button>`).join("")}
-              ${receiptRecommendedDownloads.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-download-index="${index}">${esc(item.label || item.key || "Download")}</button>`).join("")}
-            </div>
-          ` : ""}
           ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
           ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
           ${actions.map((item, index) => `
@@ -1168,38 +1156,11 @@
           });
           return;
         }
-        const receiptWorkspaceButton = event.target.closest("[data-mainline-receipt-workspace-index]");
-        if (receiptWorkspaceButton) {
-          const index = Number(receiptWorkspaceButton.dataset.mainlineReceiptWorkspaceIndex || -1);
-          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineWorkspaceActions)
-            ? currentLastMainlineReceipt().mainlineWorkspaceActions[index]
-            : null;
-          if (!item?.key) {
-            return;
-          }
-          openWorkspaceAction(item);
-          return;
-        }
-        const receiptDownloadButton = event.target.closest("[data-mainline-receipt-download-index]");
-        if (receiptDownloadButton) {
-          const index = Number(receiptDownloadButton.dataset.mainlineReceiptDownloadIndex || -1);
-          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineRecommendedDownloads)
-            ? currentLastMainlineReceipt().mainlineRecommendedDownloads[index]
-            : null;
-          if (!item?.key) {
-            return;
-          }
-          await downloadMainlineRecommendedItem(item).catch((error) => {
-            setStatus(error.message, "danger");
-            setOutput({ error: error.message });
-          });
-          return;
-        }
-        const receiptContinuationActionButton = event.target.closest("[data-mainline-receipt-continuation-action-index]");
-        if (receiptContinuationActionButton) {
-          const index = Number(receiptContinuationActionButton.dataset.mainlineReceiptContinuationActionIndex || -1);
-          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineContinuationActions)
-            ? currentLastMainlineReceipt().mainlineContinuationActions[index]
+        const receiptFollowUpActionButton = event.target.closest("[data-mainline-receipt-followup-action-index]");
+        if (receiptFollowUpActionButton) {
+          const index = Number(receiptFollowUpActionButton.dataset.mainlineReceiptFollowupActionIndex || -1);
+          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineFollowUpActions)
+            ? currentLastMainlineReceipt().mainlineFollowUpActions[index]
             : null;
           if (item?.workspaceAction?.key) {
             openWorkspaceAction(item.workspaceAction);

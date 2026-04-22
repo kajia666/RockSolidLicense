@@ -6905,6 +6905,34 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineFollowUpActions)
+        ? actionResult.receipt.mainlineFollowUpActions.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      [
+        ...(Array.isArray(actionResult.receipt?.mainlineContinuationActions) ? actionResult.receipt.mainlineContinuationActions : []),
+        ...(Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
+          ? actionResult.receipt.mainlineWorkspaceActions.map((item) => ({
+              kind: "workspace",
+              workspaceAction: item
+            }))
+          : []),
+        ...(Array.isArray(actionResult.receipt?.mainlineRecommendedDownloads)
+          ? actionResult.receipt.mainlineRecommendedDownloads.map((item) => ({
+              kind: "download",
+              recommendedDownload: item
+            }))
+          : [])
+      ]
+        .map((item) => ({
+          kind: item?.kind || null,
+          key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+        }))
+        .filter((item) => item.key)
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -7051,6 +7079,34 @@ test("developer launch mainline action can create first launch batches and retur
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineFollowUpActions)
+        ? actionResult.receipt.mainlineFollowUpActions.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      [
+        ...(Array.isArray(actionResult.receipt?.mainlineContinuationActions) ? actionResult.receipt.mainlineContinuationActions : []),
+        ...(Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
+          ? actionResult.receipt.mainlineWorkspaceActions.map((item) => ({
+              kind: "workspace",
+              workspaceAction: item
+            }))
+          : []),
+        ...(Array.isArray(actionResult.receipt?.mainlineRecommendedDownloads)
+          ? actionResult.receipt.mainlineRecommendedDownloads.map((item) => ({
+              kind: "download",
+              recommendedDownload: item
+            }))
+          : [])
+      ]
+        .map((item) => ({
+          kind: item?.kind || null,
+          key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+        }))
+        .filter((item) => item.key)
     );
   } finally {
     await app.close();
@@ -10752,8 +10808,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Open Review Workspace/);
     assert.match(html, /Open Smoke Workspace/);
     assert.match(html, /Open Ops Workspace/);
-    assert.match(html, /mainlineContinuationActions/);
-    assert.match(html, /data-mainline-receipt-continuation-action-index/);
+    assert.match(html, /mainlineFollowUpActions/);
+    assert.match(html, /data-mainline-receipt-followup-action-index/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

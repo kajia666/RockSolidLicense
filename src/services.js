@@ -3760,6 +3760,26 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: item?.recommendedDownload || null
     }))
     .filter((item) => item.key || item.gate || item.workspaceAction || item.recommendedDownload);
+  const mainlineWorkspaceActions = (Array.isArray(mainlineSummary.workspaceActions) ? mainlineSummary.workspaceActions : [])
+    .slice(0, 5)
+    .map((item) => ({
+      key: item?.key || null,
+      label: item?.label || item?.key || "workspace",
+      autofocus: item?.autofocus || null,
+      params: item?.params || null
+    }))
+    .filter((item) => item.key);
+  const mainlineRecommendedDownloads = (Array.isArray(mainlineSummary.recommendedDownloads) ? mainlineSummary.recommendedDownloads : [])
+    .slice(0, 6)
+    .map((item) => ({
+      key: item?.key || null,
+      label: item?.label || item?.key || "download",
+      source: item?.source || null,
+      format: item?.format || null,
+      fileName: item?.fileName || null,
+      params: item?.params || null
+    }))
+    .filter((item) => item.key);
   const mainlineActions = (Array.isArray(mainlineSummary.actionPlan) ? mainlineSummary.actionPlan : [])
     .slice(0, 4)
     .map((item) => ({
@@ -3789,6 +3809,8 @@ function buildLaunchMainlineActionReceipt({
     mainlineContinuation,
     mainlineNextActions,
     mainlineStages,
+    mainlineWorkspaceActions,
+    mainlineRecommendedDownloads,
     mainlineActions,
     actions
   };

@@ -471,6 +471,12 @@
         return Array.isArray(currentMainlineSummary().actionPlan) ? currentMainlineSummary().actionPlan : [];
       }
 
+      function currentLastMainlineReceipt() {
+        return lastMainlineActionResult?.receipt && typeof lastMainlineActionResult.receipt === "object"
+          ? lastMainlineActionResult.receipt
+          : null;
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const followUp = result?.followUp;
         const receipt = result?.receipt && typeof result.receipt === "object" ? result.receipt : null;
@@ -486,6 +492,12 @@
               return renderTag(`${label}:${status}`, item?.gate?.status === "hold");
             }).join("")
           : "";
+        const receiptWorkspaceActions = Array.isArray(receipt?.mainlineWorkspaceActions)
+          ? receipt.mainlineWorkspaceActions.slice(0, 5)
+          : [];
+        const receiptRecommendedDownloads = Array.isArray(receipt?.mainlineRecommendedDownloads)
+          ? receipt.mainlineRecommendedDownloads.slice(0, 6)
+          : [];
         if (!actions.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
@@ -512,6 +524,12 @@
           ${receipt?.mainlineContinuation ? `<div class="hint" style="margin-top: 8px;">${esc(`Continuation: ${receipt.mainlineContinuation.title || "Continue Routed Review"}${receipt.mainlineContinuation.summary ? ` | ${receipt.mainlineContinuation.summary}` : ""}`)}</div>` : ""}
           ${Array.isArray(receipt?.mainlineNextActions) && receipt.mainlineNextActions.length ? `<div class="hint" style="margin-top: 8px;">${esc(`Next actions: ${receipt.mainlineNextActions.join(" | ")}`)}</div>` : ""}
           ${stageBits ? `<div style="margin-top: 8px;">${stageBits}</div>` : ""}
+          ${(receiptWorkspaceActions.length || receiptRecommendedDownloads.length) ? `
+            <div class="actions" style="margin-top: 8px;">
+              ${receiptWorkspaceActions.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-workspace-index="${index}">${esc(item.label || item.key || "Open workspace")}</button>`).join("")}
+              ${receiptRecommendedDownloads.map((item, index) => `<button type="button" class="secondary" data-mainline-receipt-download-index="${index}">${esc(item.label || item.key || "Download")}</button>`).join("")}
+            </div>
+          ` : ""}
           ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
           ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
           ${actions.map((item, index) => `
@@ -1114,7 +1132,9 @@
         const followUpWorkspaceButton = event.target.closest("[data-mainline-followup-workspace-index]");
         if (followUpWorkspaceButton) {
           const index = Number(followUpWorkspaceButton.dataset.mainlineFollowupWorkspaceIndex || -1);
-          const item = Array.isArray(lastMainlineActionResult?.followUp?.actions)
+          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineActions)
+            ? currentLastMainlineReceipt().mainlineActions[index]
+            : Array.isArray(lastMainlineActionResult?.followUp?.actions)
             ? lastMainlineActionResult.followUp.actions[index]
             : null;
           if (!item?.workspaceAction) {
@@ -1126,13 +1146,42 @@
         const followUpDownloadButton = event.target.closest("[data-mainline-followup-download-index]");
         if (followUpDownloadButton) {
           const index = Number(followUpDownloadButton.dataset.mainlineFollowupDownloadIndex || -1);
-          const item = Array.isArray(lastMainlineActionResult?.followUp?.actions)
+          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineActions)
+            ? currentLastMainlineReceipt().mainlineActions[index]
+            : Array.isArray(lastMainlineActionResult?.followUp?.actions)
             ? lastMainlineActionResult.followUp.actions[index]
             : null;
           if (!item?.recommendedDownload) {
             return;
           }
           await downloadMainlineRecommendedItem(item.recommendedDownload).catch((error) => {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          });
+          return;
+        }
+        const receiptWorkspaceButton = event.target.closest("[data-mainline-receipt-workspace-index]");
+        if (receiptWorkspaceButton) {
+          const index = Number(receiptWorkspaceButton.dataset.mainlineReceiptWorkspaceIndex || -1);
+          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineWorkspaceActions)
+            ? currentLastMainlineReceipt().mainlineWorkspaceActions[index]
+            : null;
+          if (!item?.key) {
+            return;
+          }
+          openWorkspaceAction(item);
+          return;
+        }
+        const receiptDownloadButton = event.target.closest("[data-mainline-receipt-download-index]");
+        if (receiptDownloadButton) {
+          const index = Number(receiptDownloadButton.dataset.mainlineReceiptDownloadIndex || -1);
+          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineRecommendedDownloads)
+            ? currentLastMainlineReceipt().mainlineRecommendedDownloads[index]
+            : null;
+          if (!item?.key) {
+            return;
+          }
+          await downloadMainlineRecommendedItem(item).catch((error) => {
             setStatus(error.message, "danger");
             setOutput({ error: error.message });
           });

@@ -6866,6 +6866,22 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         : []
     );
     assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
+        ? actionResult.receipt.mainlineWorkspaceActions.map((item) => item?.key || null)
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
+        ? actionResult.launchMainline.mainlineSummary.workspaceActions.slice(0, 5).map((item) => item?.key || null)
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineRecommendedDownloads)
+        ? actionResult.receipt.mainlineRecommendedDownloads.map((item) => item?.key || null)
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads)
+        ? actionResult.launchMainline.mainlineSummary.recommendedDownloads.slice(0, 6).map((item) => item?.key || null)
+        : []
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
     );
@@ -6974,6 +6990,22 @@ test("developer launch mainline action can create first launch batches and retur
             key: item?.key || null,
             status: item?.gate?.status || null
           }))
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
+        ? actionResult.receipt.mainlineWorkspaceActions.map((item) => item?.key || null)
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
+        ? actionResult.launchMainline.mainlineSummary.workspaceActions.slice(0, 5).map((item) => item?.key || null)
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineRecommendedDownloads)
+        ? actionResult.receipt.mainlineRecommendedDownloads.map((item) => item?.key || null)
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads)
+        ? actionResult.launchMainline.mainlineSummary.recommendedDownloads.slice(0, 6).map((item) => item?.key || null)
         : []
     );
     assert.deepEqual(

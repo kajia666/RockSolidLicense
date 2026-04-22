@@ -291,8 +291,10 @@
           "control-session",
           "control-device",
           "control-next",
+          "open-mainline",
           "review-primary",
           "review-next",
+          "download-mainline",
           "download-primary",
           "download-next",
           "download-remaining",
@@ -349,6 +351,12 @@
         }
         if (normalized === "review-next") {
           return "Review Next Match";
+        }
+        if (normalized === "open-mainline") {
+          return "Open Launch Mainline";
+        }
+        if (normalized === "download-mainline") {
+          return "Download Launch Mainline Summary";
         }
         if (normalized === "download-primary") {
           return "Download Primary Match Summary";
@@ -1304,6 +1312,58 @@
         };
       }
 
+      function buildRouteReviewMainlineHandoff(review = collectRouteReview()) {
+        if (review?.serverRouteReview?.mainlineHandoff && typeof review.serverRouteReview.mainlineHandoff === "object") {
+          return review.serverRouteReview.mainlineHandoff;
+        }
+        if (snapshot.raw?.mainlineHandoff && typeof snapshot.raw.mainlineHandoff === "object") {
+          return snapshot.raw.mainlineHandoff;
+        }
+        return null;
+      }
+
+      function openRouteReviewWorkspaceAction(action, fallbackTitle = "", fallbackReason = "") {
+        if (!action?.key) {
+          throw { code: "MISSING_ROUTE_FOCUS", message: "No routed workspace handoff is available yet." };
+        }
+        const target = currentOpsTarget();
+        const params = {
+          productId: target.productId || requestedProductId || "",
+          productCode: target.productCode || requestedProductCode || "",
+          channel: target.channel || requestedChannel || "stable",
+          autofocus: action.autofocus || "summary",
+          routeTitle: requestedRouteTitle || fallbackTitle || currentOpsRouteFocus().title || "Developer Ops",
+          routeReason: requestedRouteReason || fallbackReason || currentOpsRouteFocus().summary || "",
+          ...(action.params && typeof action.params === "object" ? action.params : {})
+        };
+        if (action.key === "launch-mainline") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", params);
+          return;
+        }
+        throw { code: "UNSUPPORTED_ROUTE_WORKSPACE", message: `Unsupported routed workspace handoff: ${action.key}` };
+      }
+
+      async function downloadRouteReviewShortcut(item) {
+        if (!item?.source) {
+          throw { code: "MISSING_ROUTE_FOCUS", message: "No routed handoff download is available yet." };
+        }
+        const baseParams = filters();
+        const params = {
+          productCode: currentOpsTarget().productCode || requestedProductCode || "",
+          limit: baseParams.limit || 60,
+          ...(item.params && typeof item.params === "object" ? item.params : {})
+        };
+        if (item.source === "developer-launch-mainline") {
+          await downloadApiFile(
+            `/api/developer/launch-mainline/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "launch-mainline-summary.txt",
+            item.label || "Launch mainline summary"
+          );
+          return;
+        }
+        throw { code: "UNSUPPORTED_ROUTE_DOWNLOAD", message: `Unsupported routed handoff download: ${item.source}` };
+      }
+
       function routeReviewSectionPrimaryItem(review = collectRouteReview(), section = "") {
         const normalized = String(section || "").trim().toLowerCase();
         const serverPrimary = normalizeServerRouteReviewFocus(review.serverRouteReview?.sections?.[normalized]?.primaryMatch);
@@ -2039,6 +2099,26 @@
             return;
           }
           setStatus(`${options.auto ? "Auto-reviewing" : "Reviewing"} next routed match. ${formatRouteReviewSummary(review)}. Next match ready: ${formatRouteReviewPrimaryTitle(next)}.`);
+          return;
+        }
+        if (normalizedAction === "open-mainline") {
+          const handoff = buildRouteReviewMainlineHandoff();
+          if (!handoff?.workspaceAction?.key) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No launch mainline handoff is available yet." };
+          }
+          openRouteReviewWorkspaceAction(
+            handoff.workspaceAction,
+            "Launch Mainline Handoff",
+            "Continue the unified launch mainline from Developer Ops."
+          );
+          return;
+        }
+        if (normalizedAction === "download-mainline") {
+          const handoff = buildRouteReviewMainlineHandoff();
+          if (!handoff?.downloads?.summary?.key) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No launch mainline summary is available yet." };
+          }
+          await downloadRouteReviewShortcut(handoff.downloads.summary);
           return;
         }
         if (normalizedAction === "control-next") {

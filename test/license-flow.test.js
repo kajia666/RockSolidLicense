@@ -8114,9 +8114,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.continuations?.[primaryContinuationKey]?.nextMatch?.kind, "audit");
     assert.equal(exportSnapshot.routeReview?.continuations?.[primaryContinuationKey]?.nextDownload?.format, "route-review-next");
     assert.match(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.primaryAction || "", /^(review_next|complete_route_review)$/);
+    assert.equal(exportSnapshot.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
+    assert.equal(exportSnapshot.mainlineHandoff?.downloads?.summary?.key, "launch_mainline_summary");
+    assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
+    assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.downloads?.summary?.key, "launch_mainline_summary");
     assert.ok(Array.isArray(exportSnapshot.routeReview?.actions));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-primary" && item.label === "Review Primary Match"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-next" && item.label === "Review Next Match"));
+    assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "open-mainline" && item.label === "Open Launch Mainline"));
+    assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-mainline" && item.label === "Download Launch Mainline Summary"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-remaining" && item.label === "Download Remaining Queue Summary"));
     assert.ok(Array.isArray(exportSnapshot.routeReview?.remainingMatches));
     assert.equal(exportSnapshot.routeReview?.remainingMatches?.[0]?.kind, "audit");
@@ -8126,6 +8132,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /Route Review Focus: sessions/);
     assert.match(exportSnapshot.summaryText, /Route Review Primary Match:/);
     assert.match(exportSnapshot.summaryText, /Route Review Remaining Matches:/);
+    assert.match(exportSnapshot.summaryText, /Launch Mainline Handoff:/);
+    assert.match(exportSnapshot.summaryText, /Open Launch Mainline@summary/);
     assert.match(exportSnapshot.summaryText, /Top Reasons:/);
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);

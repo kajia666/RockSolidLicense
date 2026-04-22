@@ -11863,6 +11863,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           lines.push(`- ${item.title || "-"} | ${item.summary || "-"} | action=${item.routeActionLabel || item.routeAction || "-"} | control=${item.recommendedControl?.label || "-"}`);
         });
       }
+      if (routeReview.mainlineHandoff?.workspaceAction?.key) {
+        lines.push("Launch Mainline Handoff:");
+        lines.push(`- workspace=${routeReview.mainlineHandoff.workspaceAction.label || "-"}@${routeReview.mainlineHandoff.workspaceAction.autofocus || "-"}`);
+        lines.push(`- summary=${routeReview.mainlineHandoff.downloads?.summary?.label || routeReview.mainlineHandoff.recommendedDownload?.label || "-"}`);
+      }
     }
     appendSnapshotEscalationSummaryLines(lines, overview);
     appendSnapshotQueueSummaryLines(lines, overview);
@@ -11924,6 +11929,7 @@ function buildDeveloperOpsSnapshotPayload({
   });
   routeReview.downloads = buildDeveloperOpsRouteReviewDownloads(scope, routeReview);
   routeReview.continuations = buildDeveloperOpsRouteReviewContinuations(scope, routeReview);
+  routeReview.mainlineHandoff = buildDeveloperOpsMainlineHandoff(scope);
   const primaryContinuationKey = routeReview.primaryMatch?.kind && routeReview.primaryMatch?.item
     ? buildDeveloperOpsRouteReviewContinuationKey(routeReview.primaryMatch.kind, routeReview.primaryMatch.item)
     : "";
@@ -11959,6 +11965,7 @@ function buildDeveloperOpsSnapshotPayload({
       blocks: normalizedBlocks,
       auditLogs: normalizedAuditLogs
     }),
+    mainlineHandoff: routeReview.mainlineHandoff,
     routeReview,
     projects: normalizedProjects,
     accounts: {
@@ -12360,6 +12367,47 @@ function buildDeveloperOpsRouteReviewDownloads(scope = {}, routeReview = {}) {
   };
 }
 
+function buildDeveloperOpsMainlineHandoff(scope = {}) {
+  if (!scope || typeof scope !== "object" || !scope.productCode) {
+    return null;
+  }
+  const params = {
+    ...buildDeveloperOpsRouteReviewBaseDownloadParams(scope),
+    reviewMode: "matched"
+  };
+  const workspaceAction = createLaunchWorkflowWorkspaceShortcut(
+    "launch-mainline",
+    "summary",
+    "Open Launch Mainline",
+    params
+  );
+  const downloads = {
+    summary: createLaunchMainlineDownloadShortcut(
+      "Launch mainline summary",
+      "launch-mainline-summary.txt",
+      "summary",
+      params
+    ),
+    checksums: createLaunchMainlineDownloadShortcut(
+      "Launch mainline checksums",
+      "launch-mainline-sha256.txt",
+      "checksums",
+      params
+    ),
+    zip: createLaunchMainlineDownloadShortcut(
+      "Launch mainline zip",
+      "launch-mainline.zip",
+      "zip",
+      params
+    )
+  };
+  return {
+    workspaceAction,
+    recommendedDownload: downloads.summary,
+    downloads
+  };
+}
+
 function buildDeveloperOpsRouteReviewActions(routeReview = {}) {
   if (!routeReview || typeof routeReview !== "object") {
     return [];
@@ -12414,6 +12462,16 @@ function buildDeveloperOpsRouteReviewActions(routeReview = {}) {
   }
   if (downloads.primary?.fileName && primaryMatch) {
     pushAction("download-primary", "Download Primary Match Summary", { requiresToken: true });
+  }
+  if (routeReview.mainlineHandoff?.workspaceAction?.key) {
+    pushAction("open-mainline", routeReview.mainlineHandoff.workspaceAction.label || "Open Launch Mainline");
+  }
+  if (routeReview.mainlineHandoff?.downloads?.summary?.fileName) {
+    pushAction(
+      "download-mainline",
+      "Download Launch Mainline Summary",
+      { requiresToken: true }
+    );
   }
 
   const sectionDefinitions = [

@@ -467,6 +467,34 @@
           : null;
       }
 
+      function currentMainlineLastActionScreen() {
+        const receipt = currentLastMainlineReceipt();
+        if (receipt?.mainlineLastActionScreen && typeof receipt.mainlineLastActionScreen === "object") {
+          return receipt.mainlineLastActionScreen;
+        }
+        const recapCards = currentMainlineRecapCards();
+        const followUpCards = currentMainlineFollowUpCards();
+        if (!recapCards.length && !followUpCards.length) {
+          return { sections: [] };
+        }
+        return {
+          sections: [
+            {
+              key: "recap",
+              title: "Last Mainline Action Recap",
+              emptyState: "Run a launch-mainline action to review the unified recap here.",
+              cards: recapCards
+            },
+            {
+              key: "follow_up",
+              title: "Continue Launch Mainline",
+              emptyState: "Run a launch-mainline action to keep the next unified follow-up visible here.",
+              cards: followUpCards
+            }
+          ]
+        };
+      }
+
       function currentMainlineRecapCards() {
         const receipt = currentLastMainlineReceipt();
         return Array.isArray(receipt?.mainlineRecapCards) ? receipt.mainlineRecapCards : [];
@@ -569,15 +597,25 @@
       }
 
       function renderLastMainlineFollowUp(result = null) {
-        const recapCards = currentMainlineRecapCards();
-        const followUpCards = currentMainlineFollowUpCards();
-        if (!followUpCards.length && !recapCards.length) {
+        const screen = currentMainlineLastActionScreen();
+        const sections = Array.isArray(screen.sections) ? screen.sections : [];
+        if (!sections.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
         return `
           <div class="list">
-            ${recapCards.map((card) => renderReceiptCard(card, "recap")).join("")}
-            ${followUpCards.map((card) => renderReceiptCard(card, "followup")).join("")}
+            ${sections.map((section) => `
+              <div class="item">
+                <div class="item-head">
+                  <div class="item-title">${esc(section?.title || section?.key || "Last action")}</div>
+                </div>
+                <div class="list">
+                  ${Array.isArray(section?.cards)
+                    ? section.cards.map((card) => renderReceiptCard(card, section?.key === "follow_up" ? "followup" : "recap")).join("")
+                    : ""}
+                </div>
+              </div>
+            `).join("")}
           </div>
         `;
       }

@@ -4002,6 +4002,22 @@ function buildLaunchMainlineActionReceipt({
       controls: []
     }
   ];
+  const mainlineLastActionScreen = {
+    sections: [
+      {
+        key: "recap",
+        title: "Last Mainline Action Recap",
+        emptyState: "Run a launch-mainline action to review the unified recap here.",
+        cards: mainlineRecapCards
+      },
+      {
+        key: "follow_up",
+        title: "Continue Launch Mainline",
+        emptyState: "Run a launch-mainline action to keep the next unified follow-up visible here.",
+        cards: mainlineFollowUpCards
+      }
+    ]
+  };
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -4026,6 +4042,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecommendedDownloads,
     mainlineActions,
     mainlineFollowUpCards,
+    mainlineLastActionScreen,
     mainlineContinuationActions,
     mainlineFollowUpActions,
     actions

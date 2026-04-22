@@ -6912,6 +6912,16 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         { kind: "download", key: "launch_mainline_zip" }
       ].filter((item) => item.key)
     );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
+      && actionResult.launchMainline.mainlineSummary.heroControls.every((item) =>
+        item?.workspaceAction?.key
+          ? /^\/developer\//.test(String(item.workspaceAction.href || ""))
+          : item?.recommendedDownload?.key
+            ? /^\/api\/developer\//.test(String(item.recommendedDownload.href || ""))
+            : false
+      )
+    );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(
@@ -7186,6 +7196,28 @@ test("developer launch mainline action can bootstrap starter launch assets and r
             : []
         }
       ]
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+        ? actionResult.receipt.mainlineLastActionScreen.sections.flatMap((section) =>
+            Array.isArray(section?.cards)
+              ? section.cards.flatMap((card) =>
+                  Array.isArray(card?.controls)
+                    ? card.controls.flatMap((control) => {
+                        if (control?.workspaceAction?.key && !/^\/developer\//.test(String(control.workspaceAction.href || ""))) {
+                          return [`workspace:${section?.key || "?"}:${card?.key || "?"}:${control.workspaceAction.key}`];
+                        }
+                        if (control?.recommendedDownload?.key && !/^\/api\/developer\//.test(String(control.recommendedDownload.href || ""))) {
+                          return [`download:${section?.key || "?"}:${card?.key || "?"}:${control.recommendedDownload.key}`];
+                        }
+                        return [];
+                      })
+                    : []
+                )
+              : []
+          )
+        : [],
+      []
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineHeroControls)
@@ -7403,6 +7435,16 @@ test("developer launch mainline action can create first launch batches and retur
         { kind: "download", key: "launch_mainline_zip" }
       ].filter((item) => item.key)
     );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
+      && actionResult.launchMainline.mainlineSummary.heroControls.every((item) =>
+        item?.workspaceAction?.key
+          ? /^\/developer\//.test(String(item.workspaceAction.href || ""))
+          : item?.recommendedDownload?.key
+            ? /^\/api\/developer\//.test(String(item.recommendedDownload.href || ""))
+            : false
+      )
+    );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(
@@ -7677,6 +7719,28 @@ test("developer launch mainline action can create first launch batches and retur
             : []
         }
       ]
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+        ? actionResult.receipt.mainlineLastActionScreen.sections.flatMap((section) =>
+            Array.isArray(section?.cards)
+              ? section.cards.flatMap((card) =>
+                  Array.isArray(card?.controls)
+                    ? card.controls.flatMap((control) => {
+                        if (control?.workspaceAction?.key && !/^\/developer\//.test(String(control.workspaceAction.href || ""))) {
+                          return [`workspace:${section?.key || "?"}:${card?.key || "?"}:${control.workspaceAction.key}`];
+                        }
+                        if (control?.recommendedDownload?.key && !/^\/api\/developer\//.test(String(control.recommendedDownload.href || ""))) {
+                          return [`download:${section?.key || "?"}:${card?.key || "?"}:${control.recommendedDownload.key}`];
+                        }
+                        return [];
+                      })
+                    : []
+                )
+              : []
+          )
+        : [],
+      []
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineHeroControls)

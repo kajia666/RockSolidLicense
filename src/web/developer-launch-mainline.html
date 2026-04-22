@@ -624,6 +624,10 @@
         if (!action?.key) {
           throw new Error("Generate Launch Mainline first so the workspace action can be resolved.");
         }
+        if (action.href) {
+          window.location.href = action.href;
+          return;
+        }
         const target = currentMainlineTarget();
         if (!target.productCode) {
           throw new Error("Enter a project code before opening another workspace.");
@@ -700,8 +704,15 @@
       }
 
       async function downloadMainlineRecommendedItem(item) {
-        if (!item?.source) {
+        if (!item?.source && !item?.href) {
           throw new Error("Generate Launch Mainline first so the recommended download can be resolved.");
+        }
+        if (item.href) {
+          return downloadApiFile(
+            item.href,
+            item.fileName || "developer-launch-mainline-summary.txt",
+            item.label || "Launch mainline summary"
+          );
         }
         const target = currentMainlineTarget();
         const params = {
@@ -722,6 +733,13 @@
             `/api/developer/launch-mainline/download${q({ ...params, format: item.format || "summary" })}`,
             item.fileName || "developer-launch-mainline-summary.txt",
             item.label || "Launch mainline summary"
+          );
+        }
+        if (item.source === "developer-integration-package") {
+          return downloadApiFile(
+            `/api/developer/integration/package/download${q({ ...params, format: item.format || "summary" })}`,
+            item.fileName || "integration-package.txt",
+            item.label || "Integration package summary"
           );
         }
         if (item.source === "developer-launch-review") {

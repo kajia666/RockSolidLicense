@@ -3166,82 +3166,290 @@ function pickLaunchWorkflowReleaseAutofocus(readiness = {}) {
   return "package";
 }
 
+function normalizeLaunchWorkflowActionParams(params = null) {
+  if (!params || typeof params !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => {
+      if (value === null || value === undefined) {
+        return false;
+      }
+      return typeof value !== "string" || value.trim() !== "";
+    })
+  );
+}
+
+function buildLaunchWorkflowActionQuery(params = null) {
+  const normalized = normalizeLaunchWorkflowActionParams(params);
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(normalized)) {
+    search.set(key, String(value));
+  }
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+function resolveLaunchWorkflowWorkspaceAutofocus(key, autofocus = "") {
+  if (key === "project") {
+    return autofocus || "detail";
+  }
+  if (key === "integration") {
+    return autofocus || "package";
+  }
+  if (key === "release") {
+    return autofocus || "package";
+  }
+  if (key === "licenses") {
+    return autofocus || "policy-control";
+  }
+  if (key === "ops") {
+    return autofocus || "snapshot";
+  }
+  if (key === "launch-review" || key === "launch-mainline" || key === "launch-smoke") {
+    return autofocus || "summary";
+  }
+  return autofocus || "handoff";
+}
+
+function resolveLaunchWorkflowWorkspacePath(key) {
+  if (key === "project") {
+    return "/developer/projects";
+  }
+  if (key === "integration") {
+    return "/developer/integration";
+  }
+  if (key === "release") {
+    return "/developer/releases";
+  }
+  if (key === "licenses") {
+    return "/developer/licenses";
+  }
+  if (key === "ops") {
+    return "/developer/ops";
+  }
+  if (key === "launch-review") {
+    return "/developer/launch-review";
+  }
+  if (key === "launch-mainline") {
+    return "/developer/launch-mainline";
+  }
+  if (key === "launch-smoke") {
+    return "/developer/launch-smoke";
+  }
+  return "/developer/launch-workflow";
+}
+
+function buildLaunchWorkflowWorkspaceHref(key, autofocus = "", params = null) {
+  if (!key) {
+    return null;
+  }
+  const resolvedAutofocus = resolveLaunchWorkflowWorkspaceAutofocus(key, autofocus);
+  return `${resolveLaunchWorkflowWorkspacePath(key)}${buildLaunchWorkflowActionQuery({
+    ...normalizeLaunchWorkflowActionParams(params),
+    autofocus: resolvedAutofocus
+  })}`;
+}
+
+function resolveLaunchWorkflowDownloadPath(source = "") {
+  const normalized = String(source || "").trim().toLowerCase();
+  if (normalized === "developer-launch-mainline") {
+    return "/api/developer/launch-mainline/download";
+  }
+  if (normalized === "developer-integration-package") {
+    return "/api/developer/integration/package/download";
+  }
+  if (normalized === "developer-launch-review") {
+    return "/api/developer/launch-review/download";
+  }
+  if (normalized === "developer-launch-smoke-kit") {
+    return "/api/developer/launch-smoke-kit/download";
+  }
+  if (normalized === "developer-launch-workflow") {
+    return "/api/developer/launch-workflow/download";
+  }
+  if (normalized === "developer-ops") {
+    return "/api/developer/ops/export/download";
+  }
+  if (normalized === "developer-release-package") {
+    return "/api/developer/release-package/download";
+  }
+  return null;
+}
+
+function inferLaunchWorkflowDownloadSource(key = "", source = "") {
+  const normalizedSource = String(source || "").trim();
+  if (normalizedSource) {
+    return normalizedSource;
+  }
+  const normalizedKey = String(key || "").trim().toLowerCase();
+  if (!normalizedKey) {
+    return "";
+  }
+  if (normalizedKey.startsWith("launch_mainline_")) {
+    return "developer-launch-mainline";
+  }
+  if (normalizedKey.startsWith("integration_")) {
+    return "developer-integration-package";
+  }
+  if (normalizedKey.startsWith("release_")) {
+    return "developer-release-package";
+  }
+  if (normalizedKey.startsWith("ops_")) {
+    return "developer-ops";
+  }
+  if (normalizedKey.startsWith("launch_")) {
+    return "developer-launch-workflow";
+  }
+  return "";
+}
+
+function buildLaunchWorkflowDownloadHref(source = "", format = "", params = null) {
+  const resolvedPath = resolveLaunchWorkflowDownloadPath(source);
+  if (!resolvedPath) {
+    return null;
+  }
+  return `${resolvedPath}${buildLaunchWorkflowActionQuery({
+    ...normalizeLaunchWorkflowActionParams(params),
+    format: String(format || "summary").trim().toLowerCase() || "summary"
+  })}`;
+}
+
+function ensureLaunchWorkflowWorkspaceHref(action = null, fallbackParams = null) {
+  if (!action?.key) {
+    return action;
+  }
+  const resolvedAutofocus = resolveLaunchWorkflowWorkspaceAutofocus(action.key, action.autofocus);
+  const resolvedParams = {
+    ...normalizeLaunchWorkflowActionParams(fallbackParams),
+    ...normalizeLaunchWorkflowActionParams(action.params)
+  };
+  return {
+    ...action,
+    autofocus: resolvedAutofocus,
+    ...(Object.keys(resolvedParams).length ? { params: resolvedParams } : {}),
+    href: action.href || buildLaunchWorkflowWorkspaceHref(action.key, resolvedAutofocus, resolvedParams)
+  };
+}
+
+function ensureLaunchWorkflowDownloadHref(download = null, fallbackParams = null) {
+  if (!download?.key) {
+    return download;
+  }
+  const resolvedSource = inferLaunchWorkflowDownloadSource(download.key, download.source);
+  const resolvedFormat = download.format ? String(download.format) : "";
+  const resolvedParams = {
+    ...normalizeLaunchWorkflowActionParams(fallbackParams),
+    ...normalizeLaunchWorkflowActionParams(download.params)
+  };
+  return {
+    ...download,
+    ...(resolvedSource ? { source: resolvedSource } : {}),
+    ...(resolvedFormat ? { format: resolvedFormat } : {}),
+    ...(Object.keys(resolvedParams).length ? { params: resolvedParams } : {}),
+    href: download.href || buildLaunchWorkflowDownloadHref(resolvedSource, resolvedFormat, resolvedParams)
+  };
+}
+
+function ensureLaunchMainlineControlHrefs(control = null, fallbackParams = null) {
+  if (!control || typeof control !== "object") {
+    return control;
+  }
+  return {
+    ...control,
+    workspaceAction: ensureLaunchWorkflowWorkspaceHref(control.workspaceAction, fallbackParams),
+    recommendedDownload: ensureLaunchWorkflowDownloadHref(control.recommendedDownload, fallbackParams)
+  };
+}
+
 function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "", params = null) {
   if (!key) {
     return null;
   }
-  const extras = params && typeof params === "object"
-    ? { params: { ...params } }
+  const resolvedAutofocus = resolveLaunchWorkflowWorkspaceAutofocus(key, autofocus);
+  const resolvedParams = normalizeLaunchWorkflowActionParams(params);
+  const extras = Object.keys(resolvedParams).length
+    ? { params: resolvedParams }
     : {};
+  const href = buildLaunchWorkflowWorkspaceHref(key, resolvedAutofocus, resolvedParams);
   if (key === "project") {
     return {
       key,
       label: label || "Open Project Workspace",
-      autofocus: autofocus || "detail",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   if (key === "integration") {
     return {
       key,
       label: label || "Open Integration Workspace",
-      autofocus: autofocus || "package",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   if (key === "release") {
     return {
       key,
       label: label || "Open Release Workspace",
-      autofocus: autofocus || "package",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   if (key === "licenses") {
     return {
       key,
       label: label || "Open License Workspace",
-      autofocus: autofocus || "policy-control",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   if (key === "ops") {
     return {
       key,
       label: label || "Open Ops Workspace",
-      autofocus: autofocus || "snapshot",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   if (key === "launch-review") {
     return {
       key,
       label: label || "Open Launch Review",
-      autofocus: autofocus || "summary",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   if (key === "launch-mainline") {
     return {
       key,
       label: label || "Open Launch Mainline",
-      autofocus: autofocus || "summary",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   if (key === "launch-smoke") {
     return {
       key,
       label: label || "Open Launch Smoke",
-      autofocus: autofocus || "summary",
-      ...extras
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
     };
   }
   return {
     key: "launch",
     label: label || "Stay in Launch Workflow",
-    autofocus: autofocus || "handoff",
-    ...extras
+    autofocus: resolvedAutofocus,
+    ...extras,
+    href
   };
 }
 
@@ -3249,11 +3457,24 @@ function createLaunchWorkflowDownloadShortcut(key, fileName = "", label = "", ex
   if (!key) {
     return null;
   }
+  const resolvedExtra = extra && typeof extra === "object" ? { ...extra } : {};
+  const resolvedParams = normalizeLaunchWorkflowActionParams(resolvedExtra.params);
+  const resolvedSource = inferLaunchWorkflowDownloadSource(key, resolvedExtra.source);
+  const resolvedFormat = resolvedExtra.format ? String(resolvedExtra.format) : "";
+  const href = resolvedExtra.href || buildLaunchWorkflowDownloadHref(
+    resolvedSource,
+    resolvedFormat,
+    resolvedParams
+  );
   return {
     key,
     fileName: fileName || "",
     label: label || key,
-    ...(extra && typeof extra === "object" ? extra : {})
+    ...resolvedExtra,
+    ...(resolvedSource ? { source: resolvedSource } : {}),
+    ...(resolvedFormat ? { format: resolvedFormat } : {}),
+    ...(Object.keys(resolvedParams).length ? { params: resolvedParams } : {}),
+    ...(href ? { href } : {})
   };
 }
 
@@ -9366,22 +9587,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         key: item.key,
         label: item.label,
         gate: item.gate,
-        workspaceAction: item.gate?.recommendedWorkspace || null,
-        recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null
+        workspaceAction: ensureLaunchWorkflowWorkspaceHref(item.gate?.recommendedWorkspace || null, params),
+        recommendedDownload: ensureLaunchWorkflowDownloadHref(item.gate?.recommendedDownload || item.summaryDownload || null, params)
       };
       return {
         ...stage,
         controls: [
-          stage.workspaceAction ? {
+          stage.workspaceAction ? ensureLaunchMainlineControlHrefs({
             kind: "workspace",
             label: stage.workspaceAction.label || stage.label || stage.key || "Open workspace",
             workspaceAction: stage.workspaceAction
-          } : null,
-          stage.recommendedDownload ? {
+          }, params) : null,
+          stage.recommendedDownload ? ensureLaunchMainlineControlHrefs({
             kind: "download",
             label: stage.recommendedDownload.label || stage.label || stage.key || "Download summary",
             recommendedDownload: stage.recommendedDownload
-          } : null
+          }, params) : null
         ].filter(Boolean)
       };
     });
@@ -9442,24 +9663,24 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       summary: item.gate?.summary || item.gate?.headline || "-",
       status: mapGateStatusToStepStatus(item.gate?.status),
       priority: item.key === preferredStage?.key || (!preferredStage && index === 0) ? "primary" : "secondary",
-      workspaceAction: item.gate?.primaryAction?.workspaceAction || item.gate?.recommendedWorkspace || null,
-      recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null,
+      workspaceAction: ensureLaunchWorkflowWorkspaceHref(item.gate?.primaryAction?.workspaceAction || item.gate?.recommendedWorkspace || null, params),
+      recommendedDownload: ensureLaunchWorkflowDownloadHref(item.gate?.recommendedDownload || item.summaryDownload || null, params),
       bootstrapAction: item.gate?.primaryAction?.bootstrapAction || null,
       setupAction: item.gate?.primaryAction?.setupAction || null
     });
     return {
       ...step,
       controls: [
-        step.workspaceAction ? {
+        step.workspaceAction ? ensureLaunchMainlineControlHrefs({
           kind: "workspace",
           label: step.workspaceAction.label || step.title || step.key || "Open workspace",
           workspaceAction: step.workspaceAction
-        } : null,
-        step.recommendedDownload ? {
+        }, params) : null,
+        step.recommendedDownload ? ensureLaunchMainlineControlHrefs({
           kind: "download",
           label: step.recommendedDownload.label || step.title || step.key || "Download summary",
           recommendedDownload: step.recommendedDownload
-        } : null,
+        }, params) : null,
         step.bootstrapAction ? {
           kind: "bootstrap",
           label: step.bootstrapAction.label || step.title || step.key || "Run bootstrap",
@@ -9480,22 +9701,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       summary: continuation.summary,
       status: continuation.status,
       priority: "secondary",
-      workspaceAction: continuation.workspaceAction,
-      recommendedDownload: continuation.recommendedDownload || null
+      workspaceAction: ensureLaunchWorkflowWorkspaceHref(continuation.workspaceAction, params),
+      recommendedDownload: ensureLaunchWorkflowDownloadHref(continuation.recommendedDownload || null, params)
     });
     actionPlan.push({
       ...continuationStep,
       controls: [
-        continuationStep.workspaceAction ? {
+        continuationStep.workspaceAction ? ensureLaunchMainlineControlHrefs({
           kind: "workspace",
           label: continuationStep.workspaceAction.label || continuationStep.title || continuationStep.key || "Open workspace",
           workspaceAction: continuationStep.workspaceAction
-        } : null,
-        continuationStep.recommendedDownload ? {
+        }, params) : null,
+        continuationStep.recommendedDownload ? ensureLaunchMainlineControlHrefs({
           kind: "download",
           label: continuationStep.recommendedDownload.label || continuationStep.title || continuationStep.key || "Download summary",
           recommendedDownload: continuationStep.recommendedDownload
-        } : null
+        }, params) : null
       ].filter(Boolean)
     });
   }
@@ -9510,12 +9731,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   for (const item of activeStages) {
     for (const download of Array.isArray(item.gate?.recommendedDownloads) ? item.gate.recommendedDownloads : []) {
-      pushRecommendedDownload(download);
+      pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(download, params));
     }
-    pushRecommendedDownload(item.gate?.recommendedDownload || null);
-    pushRecommendedDownload(item.summaryDownload || null);
+    pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(item.gate?.recommendedDownload || null, params));
+    pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(item.summaryDownload || null, params));
   }
-  pushRecommendedDownload(continuation?.recommendedDownload || null);
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(continuation?.recommendedDownload || null, params));
   const overallGate = buildLaunchMainlineGatePayload({
     status: preferredStage?.gate?.status || "ready",
     headline: preferredStage?.gate?.headline || "Launch mainline overview",
@@ -9527,7 +9748,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     actionPlan,
     recommendedDownloads
   });
-  const recommendedWorkspace = overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null;
+  const recommendedWorkspace = ensureLaunchWorkflowWorkspaceHref(overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null, params);
   const primaryAction = overallGate.primaryAction || preferredStage?.gate?.primaryAction || null;
   const overviewCards = [
     {
@@ -9552,11 +9773,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter(Boolean),
       controls: [
-        primaryAction?.workspaceAction ? {
+        primaryAction?.workspaceAction ? ensureLaunchMainlineControlHrefs({
           kind: "workspace",
           label: primaryAction.workspaceAction.label || primaryAction.title || "Open recommended workspace",
           workspaceAction: primaryAction.workspaceAction
-        } : null,
+        }, params) : null,
         primaryAction?.bootstrapAction ? {
           kind: "bootstrap",
           label: primaryAction.bootstrapAction.label || primaryAction.title || "Run bootstrap",
@@ -9567,11 +9788,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           label: primaryAction.setupAction.label || primaryAction.title || "Run setup",
           setupAction: primaryAction.setupAction
         } : null,
-        overallGate.recommendedDownload ? {
+        overallGate.recommendedDownload ? ensureLaunchMainlineControlHrefs({
           kind: "download",
           label: overallGate.recommendedDownload.label || "Download recommended summary",
           recommendedDownload: overallGate.recommendedDownload
-        } : null
+        }, params) : null
       ].filter(Boolean)
     },
     {
@@ -9603,11 +9824,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         : [],
       controls: recommendedWorkspace
         ? [
-            {
+            ensureLaunchMainlineControlHrefs({
               kind: "workspace",
               label: recommendedWorkspace.label || "Open routed workspace",
               workspaceAction: recommendedWorkspace
-            }
+            }, params)
           ]
         : []
     },
@@ -9625,9 +9846,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         }
       ],
       controls: recommendedDownloads.map((item) => ({
-        kind: "download",
-        label: item?.label || item?.key || "Download",
-        recommendedDownload: item
+        ...ensureLaunchMainlineControlHrefs({
+          kind: "download",
+          label: item?.label || item?.key || "Download",
+          recommendedDownload: item
+        }, params)
       }))
     }
   ];
@@ -9695,7 +9918,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     }
   ];
   const screen = {
-    heroControls,
+    heroControls: heroControls.map((item) => ensureLaunchMainlineControlHrefs(item, params)),
     sections
   };
   return {
@@ -9710,13 +9933,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     overviewCards,
     sections,
     screen,
-    heroControls,
-    workspaceActions,
+    heroControls: screen.heroControls,
+    workspaceActions: workspaceActions.map((item) => ensureLaunchWorkflowWorkspaceHref(item, params)),
     primaryAction,
     recommendedDownload: overallGate.recommendedDownload || preferredStage?.gate?.recommendedDownload || null,
     recommendedWorkspace,
     actionPlan,
-    recommendedDownloads,
+    recommendedDownloads: recommendedDownloads.map((item) => ensureLaunchWorkflowDownloadHref(item, params)),
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
   };
 }

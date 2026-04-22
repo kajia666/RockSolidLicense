@@ -3931,6 +3931,12 @@ function buildLaunchMainlineActionReceipt({
     ? "Inventory Refill"
     : normalizedOperation === "first_batch_setup"
       ? "First Batch Setup"
+      : normalizedOperation === "record_rollback_walkthrough"
+        ? "Record Rollback Walkthrough"
+        : normalizedOperation === "record_health_verification"
+          ? "Record Health Verification"
+          : normalizedOperation === "record_deploy_verification"
+            ? "Record Deploy Verification"
       : normalizedOperation === "record_operations_walkthrough"
         ? "Record Operations Walkthrough"
         : normalizedOperation === "record_backup_verification"
@@ -4510,6 +4516,27 @@ function queryLatestLaunchMainlineOperationsWalkthroughEvidence(db, options = {}
   });
 }
 
+function queryLatestLaunchMainlineDeployVerificationEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.deploy-verification"
+  });
+}
+
+function queryLatestLaunchMainlineHealthVerificationEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.health-verification"
+  });
+}
+
+function queryLatestLaunchMainlineRollbackWalkthroughEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.rollback-walkthrough"
+  });
+}
+
 function buildLaunchMainlineProductionGatePayload({
   config = {},
   health = null,
@@ -4521,7 +4548,10 @@ function buildLaunchMainlineProductionGatePayload({
   operationsHandoffDownload = null,
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
-  operationsWalkthroughEvidence = null
+  operationsWalkthroughEvidence = null,
+  deployVerificationEvidence = null,
+  healthVerificationEvidence = null,
+  rollbackWalkthroughEvidence = null
 } = {}) {
   const actionPlan = [];
   const checks = [];
@@ -4543,6 +4573,8 @@ function buildLaunchMainlineProductionGatePayload({
     params
   );
   const effectiveProductionDownload = productionHandoffDownload || mainlineSummaryDownload;
+  const effectiveRecoveryDrillDownload = recoveryDrillHandoffDownload || effectiveProductionDownload;
+  const effectiveOperationsDownload = operationsHandoffDownload || effectiveProductionDownload;
   const securityWorkspace = createLaunchWorkflowWorkspaceShortcut(
     "security",
     "summary",
@@ -4688,6 +4720,27 @@ function buildLaunchMainlineProductionGatePayload({
     mode: "evidence",
     operation: "record_operations_walkthrough"
   });
+  const deployVerificationRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_deploy_verification",
+    label: "Record Deploy Verification",
+    summary: "Capture a fresh deploy verification for this lane so the production gate can verify recent production rollout evidence.",
+    mode: "evidence",
+    operation: "record_deploy_verification"
+  });
+  const healthVerificationRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_health_verification",
+    label: "Record Health Verification",
+    summary: "Capture a fresh health verification for this lane so the production gate can verify recent production health evidence.",
+    mode: "evidence",
+    operation: "record_health_verification"
+  });
+  const rollbackWalkthroughRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_rollback_walkthrough",
+    label: "Record Rollback Walkthrough",
+    summary: "Capture a fresh rollback walkthrough for this lane so the production gate can verify recent rollback readiness evidence.",
+    mode: "evidence",
+    operation: "record_rollback_walkthrough"
+  });
   const backupVerificationRecordedAt = String(backupVerificationEvidence?.createdAt || "").trim();
   const backupVerificationRecordedMs = backupVerificationRecordedAt ? Date.parse(backupVerificationRecordedAt) : Number.NaN;
   const backupVerificationAgeDays = Number.isFinite(backupVerificationRecordedMs)
@@ -4700,6 +4753,24 @@ function buildLaunchMainlineProductionGatePayload({
     ? Math.max(0, Math.floor((Date.now() - operationsWalkthroughRecordedMs) / 86400000))
     : null;
   const hasRecentOperationsWalkthrough = operationsWalkthroughAgeDays !== null && operationsWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const deployVerificationRecordedAt = String(deployVerificationEvidence?.createdAt || "").trim();
+  const deployVerificationRecordedMs = deployVerificationRecordedAt ? Date.parse(deployVerificationRecordedAt) : Number.NaN;
+  const deployVerificationAgeDays = Number.isFinite(deployVerificationRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - deployVerificationRecordedMs) / 86400000))
+    : null;
+  const hasRecentDeployVerification = deployVerificationAgeDays !== null && deployVerificationAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const healthVerificationRecordedAt = String(healthVerificationEvidence?.createdAt || "").trim();
+  const healthVerificationRecordedMs = healthVerificationRecordedAt ? Date.parse(healthVerificationRecordedAt) : Number.NaN;
+  const healthVerificationAgeDays = Number.isFinite(healthVerificationRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - healthVerificationRecordedMs) / 86400000))
+    : null;
+  const hasRecentHealthVerification = healthVerificationAgeDays !== null && healthVerificationAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const rollbackWalkthroughRecordedAt = String(rollbackWalkthroughEvidence?.createdAt || "").trim();
+  const rollbackWalkthroughRecordedMs = rollbackWalkthroughRecordedAt ? Date.parse(rollbackWalkthroughRecordedAt) : Number.NaN;
+  const rollbackWalkthroughAgeDays = Number.isFinite(rollbackWalkthroughRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - rollbackWalkthroughRecordedMs) / 86400000))
+    : null;
+  const hasRecentRollbackWalkthrough = rollbackWalkthroughAgeDays !== null && rollbackWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
 
   if (defaultAdminPassword) {
     addStep(
@@ -4864,6 +4935,54 @@ function buildLaunchMainlineProductionGatePayload({
     opsWorkspace,
     effectiveProductionDownload
   );
+  if (hasRecentDeployVerification) {
+    addPassCheck(
+      "production_deploy_verification_recent",
+      "A recent deploy verification is recorded",
+      `The latest deploy verification for this lane was recorded at ${deployVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+      opsWorkspace,
+      effectiveProductionDownload,
+      null,
+      deployVerificationRecordAction
+    );
+  } else {
+    addStep(
+      "hold",
+      "production_deploy_verification_recent",
+      "Record a recent deploy verification",
+      deployVerificationRecordedAt
+        ? `The latest deploy verification was recorded at ${deployVerificationRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh deploy verification before widening rollout.`
+        : `No deploy verification has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+      opsWorkspace,
+      effectiveProductionDownload,
+      null,
+      deployVerificationRecordAction
+    );
+  }
+  if (hasRecentHealthVerification) {
+    addPassCheck(
+      "production_health_verification_recent",
+      "A recent health verification is recorded",
+      `The latest health verification for this lane was recorded at ${healthVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+      opsWorkspace,
+      effectiveProductionDownload,
+      null,
+      healthVerificationRecordAction
+    );
+  } else {
+    addStep(
+      "hold",
+      "production_health_verification_recent",
+      "Record a recent health verification",
+      healthVerificationRecordedAt
+        ? `The latest health verification was recorded at ${healthVerificationRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh health verification before widening rollout.`
+        : `No health verification has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+      opsWorkspace,
+      effectiveProductionDownload,
+      null,
+      healthVerificationRecordAction
+    );
+  }
   if (hasRecentBackupVerification) {
     addPassCheck(
       "production_backup_verification_recent",
@@ -4921,6 +5040,30 @@ function buildLaunchMainlineProductionGatePayload({
         recoveryDrillRecordAction
       );
     }
+    if (hasRecentRollbackWalkthrough) {
+      addPassCheck(
+        "production_rollback_walkthrough_recent",
+        "A recent rollback walkthrough is recorded",
+        `The latest rollback walkthrough for this lane was recorded at ${rollbackWalkthroughRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        opsWorkspace,
+        effectiveRecoveryDrillDownload,
+        null,
+        rollbackWalkthroughRecordAction
+      );
+    } else {
+      addStep(
+        "hold",
+        "production_rollback_walkthrough_recent",
+        "Record a recent rollback walkthrough",
+        rollbackWalkthroughRecordedAt
+          ? `The latest rollback walkthrough was recorded at ${rollbackWalkthroughRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh walkthrough before widening rollout.`
+          : `No rollback walkthrough has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+        opsWorkspace,
+        effectiveRecoveryDrillDownload,
+        null,
+        rollbackWalkthroughRecordAction
+      );
+    }
   }
   if (operationsHandoffDownload) {
     pushRecommendedDownload(operationsHandoffDownload);
@@ -4929,7 +5072,7 @@ function buildLaunchMainlineProductionGatePayload({
       "Review the production observability and handover package",
       "The unified operations handoff already packages observability, alerting, incident-response, and shift-handover material for this lane.",
       opsWorkspace,
-      operationsHandoffDownload
+      effectiveOperationsDownload
     );
     if (hasRecentOperationsWalkthrough) {
       addPassCheck(
@@ -4937,7 +5080,7 @@ function buildLaunchMainlineProductionGatePayload({
         "A recent operations walkthrough is recorded",
         `The latest operations walkthrough for this lane was recorded at ${operationsWalkthroughRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
         opsWorkspace,
-        operationsHandoffDownload,
+        effectiveOperationsDownload,
         null,
         operationsWalkthroughRecordAction
       );
@@ -4950,7 +5093,7 @@ function buildLaunchMainlineProductionGatePayload({
           ? `The latest operations walkthrough was recorded at ${operationsWalkthroughRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh walkthrough before widening rollout.`
           : `No operations walkthrough has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
         opsWorkspace,
-        operationsHandoffDownload,
+        effectiveOperationsDownload,
         null,
         operationsWalkthroughRecordAction
       );
@@ -9927,7 +10070,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   runtimeConfig = {},
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
-  operationsWalkthroughEvidence = null
+  operationsWalkthroughEvidence = null,
+  deployVerificationEvidence = null,
+  healthVerificationEvidence = null,
+  rollbackWalkthroughEvidence = null
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
@@ -10196,7 +10342,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     operationsHandoffDownload,
     recoveryDrillEvidence,
     backupVerificationEvidence,
-    operationsWalkthroughEvidence
+    operationsWalkthroughEvidence,
+    deployVerificationEvidence,
+    healthVerificationEvidence,
+    rollbackWalkthroughEvidence
   });
   const stageDefinitions = [
     {
@@ -10918,7 +11067,10 @@ function buildDeveloperLaunchMainlinePayload({
   runtimeConfig = {},
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
-  operationsWalkthroughEvidence = null
+  operationsWalkthroughEvidence = null,
+  deployVerificationEvidence = null,
+  healthVerificationEvidence = null,
+  rollbackWalkthroughEvidence = null
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
@@ -10991,7 +11143,10 @@ function buildDeveloperLaunchMainlinePayload({
     runtimeConfig,
     recoveryDrillEvidence,
     backupVerificationEvidence,
-    operationsWalkthroughEvidence
+    operationsWalkthroughEvidence,
+    deployVerificationEvidence,
+    healthVerificationEvidence,
+    rollbackWalkthroughEvidence
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
     generatedAt,
@@ -20419,6 +20574,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
         channel
       });
+      const deployVerificationEvidence = queryLatestLaunchMainlineDeployVerificationEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
+      const healthVerificationEvidence = queryLatestLaunchMainlineHealthVerificationEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
+      const rollbackWalkthroughEvidence = queryLatestLaunchMainlineRollbackWalkthroughEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
       const payload = buildDeveloperLaunchMainlinePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || launchWorkflow?.manifest?.generatedAt || nowIso(),
         releasePackage,
@@ -20433,6 +20600,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         recoveryDrillEvidence,
         backupVerificationEvidence,
         operationsWalkthroughEvidence,
+        deployVerificationEvidence,
+        healthVerificationEvidence,
+        rollbackWalkthroughEvidence,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,
@@ -20583,11 +20753,101 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             channel
           }
         };
+      } else if (operation === "record_deploy_verification") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.deploy-verification", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          deployVerifiedAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Deploy verification recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "deploy_verification",
+            label: "Deploy verification",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
+      } else if (operation === "record_health_verification") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.health-verification", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          healthVerifiedAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Health verification recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "health_verification",
+            label: "Health verification",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
+      } else if (operation === "record_rollback_walkthrough") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.rollback-walkthrough", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          rollbackWalkthroughAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Rollback walkthrough recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "rollback_walkthrough",
+            label: "Rollback walkthrough",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
       } else {
         throw new AppError(
           400,
           "INVALID_LAUNCH_MAINLINE_ACTION",
-          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, or record_operations_walkthrough."
+          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, or record_rollback_walkthrough."
         );
       }
 

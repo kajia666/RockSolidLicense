@@ -6159,6 +6159,30 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_deploy_verification_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_deploy_verification"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_health_verification_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_health_verification"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_rollback_walkthrough_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_rollback_walkthrough"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_operations_handoff"
         && item?.status === "pass"
       )
@@ -6563,6 +6587,131 @@ test("developer launch mainline action can record backup verification and operat
       Array.isArray(operationsResult.launchMainline?.mainlineSummary?.productionGate?.checks)
       && operationsResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_operations_walkthrough_recent"
+        && item?.status === "pass"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can record deploy, health, and rollback evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineProdEvidenceAdmin123!",
+    serverTokenSecret: "mainline-prod-evidence-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineProdEvidenceAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.prodev.owner",
+        password: "LaunchMainlineProdEvidenceOwner123!",
+        displayName: "Launch Mainline Production Evidence Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_PROD_EVIDENCE",
+        name: "Mainline Production Evidence App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.prodev.owner",
+      password: "LaunchMainlineProdEvidenceOwner123!"
+    });
+
+    const deployResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_PROD_EVIDENCE",
+        channel: "stable",
+        operation: "record_deploy_verification"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(deployResult.operation, "record_deploy_verification");
+    assert.match(deployResult.message || "", /deploy verification/i);
+    assert.equal(deployResult.result?.recordedEvidence?.key, "deploy_verification");
+    assert.ok(deployResult.result?.recordedEvidence?.createdAt);
+    assert.ok(Array.isArray(deployResult.receipt?.created));
+    assert.ok(deployResult.receipt.created.some((item) => item.key === "deploy_verification"));
+
+    const healthResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_PROD_EVIDENCE",
+        channel: "stable",
+        operation: "record_health_verification"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(healthResult.operation, "record_health_verification");
+    assert.match(healthResult.message || "", /health verification/i);
+    assert.equal(healthResult.result?.recordedEvidence?.key, "health_verification");
+    assert.ok(healthResult.result?.recordedEvidence?.createdAt);
+    assert.ok(Array.isArray(healthResult.receipt?.created));
+    assert.ok(healthResult.receipt.created.some((item) => item.key === "health_verification"));
+
+    const rollbackResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_PROD_EVIDENCE",
+        channel: "stable",
+        operation: "record_rollback_walkthrough"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(rollbackResult.operation, "record_rollback_walkthrough");
+    assert.match(rollbackResult.message || "", /rollback walkthrough/i);
+    assert.equal(rollbackResult.result?.recordedEvidence?.key, "rollback_walkthrough");
+    assert.ok(rollbackResult.result?.recordedEvidence?.createdAt);
+    assert.ok(Array.isArray(rollbackResult.receipt?.created));
+    assert.ok(rollbackResult.receipt.created.some((item) => item.key === "rollback_walkthrough"));
+    assert.ok(
+      Array.isArray(rollbackResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && rollbackResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_deploy_verification_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(rollbackResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && rollbackResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_health_verification_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(rollbackResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && rollbackResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_rollback_walkthrough_recent"
         && item?.status === "pass"
       )
     );

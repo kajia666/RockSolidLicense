@@ -6135,6 +6135,14 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_recovery_drill_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_recovery_drill"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_operations_handoff"
         && item?.status === "pass"
       )
@@ -6343,6 +6351,99 @@ test("developer launch mainline production gate blocks loopback external data se
     assert.match(launchMainline.summaryText || "", /postgres/i);
     assert.match(launchMainline.summaryText || "", /redis/i);
     assert.match(launchMainline.summaryText || "", /127\.0\.0\.1|localhost/i);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can record a recovery drill and refresh production evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "RecoveryDrillAdmin123!",
+    serverTokenSecret: "recovery-drill-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "RecoveryDrillAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.drill.owner",
+        password: "LaunchMainlineDrillOwner123!",
+        displayName: "Launch Mainline Drill Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_DRILL",
+        name: "Mainline Drill App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.drill.owner",
+      password: "LaunchMainlineDrillOwner123!"
+    });
+
+    const beforeMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_DRILL&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.ok(
+      Array.isArray(beforeMainline.mainlineSummary.productionGate?.checks)
+      && beforeMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_recovery_drill_recent"
+        && item?.status === "block"
+      )
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_DRILL",
+        channel: "stable",
+        operation: "record_recovery_drill"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "record_recovery_drill");
+    assert.match(actionResult.message || "", /recovery drill/i);
+    assert.equal(actionResult.result?.productCode, "MAINLINE_DRILL");
+    assert.equal(actionResult.result?.channel, "stable");
+    assert.ok(actionResult.result?.recordedDrill?.createdAt);
+    assert.equal(actionResult.followUp?.operation, "record_recovery_drill");
+    assert.equal(actionResult.receipt?.operation, "record_recovery_drill");
+    assert.match(actionResult.receipt?.summary || "", /recovery drill/i);
+    assert.ok(Array.isArray(actionResult.receipt?.created));
+    assert.ok(actionResult.receipt?.created?.some((item) => item.key === "recovery_drill"));
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_recovery_drill_recent"
+        && item?.status === "pass"
+      )
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

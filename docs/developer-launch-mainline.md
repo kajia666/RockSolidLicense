@@ -63,6 +63,8 @@ The same unified handoff now also exposes a dedicated `production-handoff` downl
 
 It also exposes a dedicated `recovery-drill-handoff` download. That package brings backup scripts, restore scripts, storage docs, verification signals, and a drill flow together, so launch duty can rehearse "backup -> restore -> healthcheck -> review -> rollback" as one explicit recovery path instead of rebuilding that playbook from scattered deployment docs.
 
+That recovery path is now part of the gate itself too. `Launch Mainline` will block the lane when no recovery drill has been recorded inside the current 14-day readiness window, and the same `Production Gate Checks` card can now fire a service-driven `Record Recovery Drill` action from the unified mainline workspace. Once that action runs, the refreshed gate, summary text, and action receipt all carry the new drill evidence together.
+
 It also exposes a dedicated `operations-handoff` download for first-wave operations. That package brings together the observability guide, alert-priority guide, incident-response playbook, daily checklist, launch timeline, production operations runbook, and shift handover template, so launch duty can hand monitoring and incident-response expectations to the next operator without rebuilding that bundle manually.
 
 ## Why it matters

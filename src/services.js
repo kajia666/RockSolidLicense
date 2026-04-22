@@ -3931,7 +3931,9 @@ function buildLaunchMainlineActionReceipt({
     ? "Inventory Refill"
     : normalizedOperation === "first_batch_setup"
       ? "First Batch Setup"
-      : "Launch Bootstrap";
+      : normalizedOperation === "record_recovery_drill"
+        ? "Record Recovery Drill"
+        : "Launch Bootstrap";
   const before = result?.before?.counts && typeof result.before.counts === "object"
     ? result.before.counts
     : {};
@@ -3973,6 +3975,9 @@ function buildLaunchMainlineActionReceipt({
   }
   if (result?.created?.entitlement?.username) {
     created.push({ key: "entitlement", label: "Entitlement", value: result.created.entitlement.username });
+  }
+  if (result?.recordedDrill?.createdAt) {
+    created.push({ key: "recovery_drill", label: "Recovery drill", value: result.recordedDrill.createdAt });
   }
   const actions = (Array.isArray(followUp?.actions) ? followUp.actions : [])
     .map((item) => ({
@@ -4339,6 +4344,7 @@ function normalizeLaunchMainlineGateStatus(status = "unknown") {
 
 const DEFAULT_PRODUCTION_ADMIN_PASSWORD = "ChangeMe!123";
 const DEFAULT_PRODUCTION_SERVER_TOKEN_SECRET = "change-me-before-production-rocksolid";
+const LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS = 14;
 
 function buildLaunchMainlineGatePayload({
   status = "unknown",
@@ -4433,6 +4439,43 @@ function parseProductionEndpoint(value) {
   }
 }
 
+function queryLatestLaunchMainlineRecoveryDrillEvidence(db, {
+  productCode = "",
+  channel = "stable"
+} = {}) {
+  const normalizedProductCode = String(productCode || "").trim().toUpperCase();
+  const normalizedChannel = String(channel || "stable").trim().toLowerCase();
+  if (!normalizedProductCode) {
+    return null;
+  }
+  const row = one(
+    db,
+    `
+      SELECT id, event_type, entity_type, entity_id, metadata_json, created_at
+      FROM audit_logs
+      WHERE event_type = ?
+        AND metadata_json LIKE ?
+        AND metadata_json LIKE ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    "product.launch-mainline.recovery-drill",
+    `%\"productCode\":\"${normalizedProductCode.replaceAll("\"", "\\\"")}\"%`,
+    `%\"channel\":\"${normalizedChannel.replaceAll("\"", "\\\"")}\"%`
+  );
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    eventType: row.event_type,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    createdAt: row.created_at,
+    metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null
+  };
+}
+
 function buildLaunchMainlineProductionGatePayload({
   config = {},
   health = null,
@@ -4441,7 +4484,8 @@ function buildLaunchMainlineProductionGatePayload({
   publicBaseUrl = "",
   productionHandoffDownload = null,
   recoveryDrillHandoffDownload = null,
-  operationsHandoffDownload = null
+  operationsHandoffDownload = null,
+  recoveryDrillEvidence = null
 } = {}) {
   const actionPlan = [];
   const checks = [];
@@ -4498,7 +4542,9 @@ function buildLaunchMainlineProductionGatePayload({
     status = "review",
     workspaceAction = null,
     recommendedDownload = effectiveProductionDownload,
-    priority = "secondary"
+    priority = "secondary",
+    bootstrapAction = null,
+    setupAction = null
   }) => createLaunchWorkflowActionPlanStep({
     key,
     title,
@@ -4506,9 +4552,20 @@ function buildLaunchMainlineProductionGatePayload({
     status,
     priority,
     workspaceAction,
-    recommendedDownload
+    recommendedDownload,
+    bootstrapAction,
+    setupAction
   });
-  const addStep = (severity, key, title, summary, workspaceAction = null) => {
+  const addStep = (
+    severity,
+    key,
+    title,
+    summary,
+    workspaceAction = null,
+    recommendedDownload = effectiveProductionDownload,
+    bootstrapAction = null,
+    setupAction = null
+  ) => {
     if (severity === "hold") {
       blockingCount += 1;
     } else {
@@ -4524,12 +4581,22 @@ function buildLaunchMainlineProductionGatePayload({
       status: severity === "hold" ? "block" : "review",
       priority: actionPlan.length ? "secondary" : "primary",
       workspaceAction,
-      recommendedDownload: effectiveProductionDownload
+      recommendedDownload,
+      bootstrapAction,
+      setupAction
     });
     pushAction(step);
     pushCheck(step);
   };
-  const addPassCheck = (key, title, summary, workspaceAction = null, recommendedDownload = effectiveProductionDownload) => {
+  const addPassCheck = (
+    key,
+    title,
+    summary,
+    workspaceAction = null,
+    recommendedDownload = effectiveProductionDownload,
+    bootstrapAction = null,
+    setupAction = null
+  ) => {
     pushCheck(buildCheckStep({
       key,
       title,
@@ -4537,7 +4604,9 @@ function buildLaunchMainlineProductionGatePayload({
       status: "pass",
       priority: "secondary",
       workspaceAction,
-      recommendedDownload
+      recommendedDownload,
+      bootstrapAction,
+      setupAction
     }));
   };
 
@@ -4556,6 +4625,19 @@ function buildLaunchMainlineProductionGatePayload({
   const runtimeStateDriver = String(runtimeStateHealth?.targetDriver || config.stateStoreDriver || runtimeStateHealth?.driver || "").trim().toLowerCase();
   const postgresEndpoint = parseProductionEndpoint(config.postgresUrl);
   const redisEndpoint = parseProductionEndpoint(config.redisUrl);
+  const recoveryDrillRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_recovery_drill",
+    label: "Record Recovery Drill",
+    summary: "Capture a fresh recovery drill for this lane so the production gate can verify recent restore evidence.",
+    mode: "evidence",
+    operation: "record_recovery_drill"
+  });
+  const recoveryDrillRecordedAt = String(recoveryDrillEvidence?.createdAt || "").trim();
+  const recoveryDrillRecordedMs = recoveryDrillRecordedAt ? Date.parse(recoveryDrillRecordedAt) : Number.NaN;
+  const recoveryDrillAgeDays = Number.isFinite(recoveryDrillRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - recoveryDrillRecordedMs) / 86400000))
+    : null;
+  const hasRecentRecoveryDrill = recoveryDrillAgeDays !== null && recoveryDrillAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
 
   if (defaultAdminPassword) {
     addStep(
@@ -4729,6 +4811,30 @@ function buildLaunchMainlineProductionGatePayload({
       opsWorkspace,
       recoveryDrillHandoffDownload
     );
+    if (hasRecentRecoveryDrill) {
+      addPassCheck(
+        "production_recovery_drill_recent",
+        "A recent recovery drill is recorded",
+        `The latest recovery drill for this lane was recorded at ${recoveryDrillRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        opsWorkspace,
+        recoveryDrillHandoffDownload,
+        null,
+        recoveryDrillRecordAction
+      );
+    } else {
+      addStep(
+        "hold",
+        "production_recovery_drill_recent",
+        "Record a recent recovery drill",
+        recoveryDrillRecordedAt
+          ? `The latest recovery drill was recorded at ${recoveryDrillRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh drill before widening rollout.`
+          : `No recovery drill has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+        opsWorkspace,
+        recoveryDrillHandoffDownload,
+        null,
+        recoveryDrillRecordAction
+      );
+    }
   }
   if (operationsHandoffDownload) {
     pushRecommendedDownload(operationsHandoffDownload);
@@ -9708,7 +9814,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   systemHealth = null,
   tokenKeySummary = null,
   publicBaseUrl = "",
-  runtimeConfig = {}
+  runtimeConfig = {},
+  recoveryDrillEvidence = null
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
@@ -9974,7 +10081,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     publicBaseUrl,
     productionHandoffDownload,
     recoveryDrillHandoffDownload,
-    operationsHandoffDownload
+    operationsHandoffDownload,
+    recoveryDrillEvidence
   });
   const stageDefinitions = [
     {
@@ -10618,6 +10726,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       lines.push(
         `- ${item.title || item.key || "step"} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+        + `${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
       );
     }
   }
@@ -10692,7 +10801,8 @@ function buildDeveloperLaunchMainlinePayload({
   systemHealth = null,
   tokenKeySummary = null,
   publicBaseUrl = "",
-  runtimeConfig = {}
+  runtimeConfig = {},
+  recoveryDrillEvidence = null
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
@@ -10762,7 +10872,8 @@ function buildDeveloperLaunchMainlinePayload({
     systemHealth,
     tokenKeySummary,
     publicBaseUrl,
-    runtimeConfig
+    runtimeConfig,
+    recoveryDrillEvidence
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
     generatedAt,
@@ -20178,6 +20289,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const tokenKeySummary = this.tokenKeys();
       const project = releasePackage?.manifest?.project || launchWorkflow?.manifest?.project || {};
       const channel = releasePackage?.manifest?.release?.channel || launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
+      const recoveryDrillEvidence = queryLatestLaunchMainlineRecoveryDrillEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
       const payload = buildDeveloperLaunchMainlinePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || launchWorkflow?.manifest?.generatedAt || nowIso(),
         releasePackage,
@@ -20189,6 +20304,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         tokenKeySummary,
         publicBaseUrl: options.publicBaseUrl || "",
         runtimeConfig: config,
+        recoveryDrillEvidence,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,
@@ -20244,16 +20360,59 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           productCode: selector.productCode,
           mode: body.mode || "recommended"
         });
+      } else if (operation === "record_recovery_drill") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.recovery-drill", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          drillRecordedAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Recovery drill recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedDrill: {
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
       } else {
         throw new AppError(
           400,
           "INVALID_LAUNCH_MAINLINE_ACTION",
-          "operation must be bootstrap, first_batch_setup, or restock."
+          "operation must be bootstrap, first_batch_setup, restock, or record_recovery_drill."
         );
       }
 
       const launchMainline = await this.developerLaunchMainlinePackage(token, selector, options);
-      const followUp = result?.followUp || null;
+      const followUp = result?.followUp || (operation === "record_recovery_drill"
+        ? {
+            operation,
+            summary: "Recovery drill evidence recorded. Review the refreshed production gate and continue the unified launch mainline.",
+            primaryAction: launchMainline?.mainlineSummary?.primaryAction || null,
+            actions: Array.isArray(launchMainline?.mainlineSummary?.actionPlan)
+              ? launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => ({
+                  key: item?.key || null,
+                  label: item?.title || item?.key || "follow-up",
+                  summary: item?.summary || "-",
+                  workspaceAction: item?.workspaceAction || null,
+                  recommendedDownload: item?.recommendedDownload || null
+                }))
+              : []
+          }
+        : null);
       return {
         operation,
         message: result?.message || `Launch mainline action ${operation} completed for ${selector.productCode}.`,

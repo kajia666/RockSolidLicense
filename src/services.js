@@ -4242,14 +4242,19 @@ function buildLaunchMainlineActionReceipt({
   const mainlineRouteFocus = launchMainline?.mainlineSummary?.routeFocus && typeof launchMainline.mainlineSummary.routeFocus === "object"
     ? launchMainline.mainlineSummary.routeFocus
     : null;
+  const mainlineForm = launchMainline?.mainlineSummary?.form && typeof launchMainline.mainlineSummary.form === "object"
+    ? launchMainline.mainlineSummary.form
+    : null;
   const mainlineView = {
     heroControls: mainlineHeroControls,
+    form: mainlineForm,
     routeFocus: mainlineRouteFocus,
     sections: mainlineSections,
     lastActionScreen: mainlineLastActionScreen
   };
   const mainlinePage = {
     heroControls: mainlineView.heroControls,
+    form: mainlineForm,
     routeFocus: mainlineRouteFocus,
     sections: mainlineView.sections,
     lastActionScreen: mainlineView.lastActionScreen,
@@ -4271,6 +4276,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineNextActions,
     mainlineRecapCards,
     mainlineOverviewCards,
+    mainlineForm,
     mainlineRouteFocus,
     mainlineSections,
     mainlinePage,
@@ -9911,6 +9917,18 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       }, params)
     ].filter(Boolean)
   };
+  const form = {
+    productId: filters.productId || null,
+    productCode: params.productCode || "",
+    channel: params.channel || "stable",
+    reviewMode: params.reviewMode || "matched",
+    username: filters.username || "",
+    search: filters.search || "",
+    eventType: filters.eventType || "",
+    actorType: filters.actorType || "",
+    entityType: filters.entityType || "",
+    limit: String(filters.limit || 60)
+  };
   const actionPlanCards = actionPlan.map((item) => ({
     key: item?.key || null,
     title: item?.title || item?.key || "Step",
@@ -9980,6 +9998,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   const mainlineView = {
     heroControls: screen.heroControls,
+    form,
     routeFocus,
     sections: screen.sections,
     lastActionScreen: {
@@ -9988,6 +10007,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   const mainlinePage = {
     heroControls: mainlineView.heroControls,
+    form,
     routeFocus,
     sections: mainlineView.sections,
     lastActionScreen: mainlineView.lastActionScreen,
@@ -10003,6 +10023,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     continuation,
     stages,
     overviewCards,
+    form,
     routeFocus,
     sections,
     screen,

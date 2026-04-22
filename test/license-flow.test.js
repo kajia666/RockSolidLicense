@@ -7241,6 +7241,13 @@ test("developer launch mainline action can bootstrap starter launch assets and r
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.receipt?.mainlineView?.form
+          ? {
+              productCode: actionResult.receipt.mainlineView.form.productCode || null,
+              channel: actionResult.receipt.mainlineView.form.channel || null,
+              reviewMode: actionResult.receipt.mainlineView.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.receipt?.mainlineView?.routeFocus
           ? {
               title: actionResult.receipt.mainlineView.routeFocus.title || null,
@@ -7267,6 +7274,13 @@ test("developer launch mainline action can bootstrap starter launch assets and r
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.receipt?.mainlinePage?.form
+          ? {
+              productCode: actionResult.receipt.mainlinePage.form.productCode || null,
+              channel: actionResult.receipt.mainlinePage.form.channel || null,
+              reviewMode: actionResult.receipt.mainlinePage.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.receipt?.mainlinePage?.routeFocus
           ? {
               title: actionResult.receipt.mainlinePage.routeFocus.title || null,
@@ -7288,6 +7302,9 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       }
     );
     assert.equal(actionResult.receipt?.mainlinePage?.summaryText, actionResult.launchMainline?.summaryText || "");
+    assert.equal(actionResult.receipt?.mainlinePage?.form?.productCode, "MAINLINE_BOOT");
+    assert.equal(actionResult.receipt?.mainlinePage?.form?.channel, "stable");
+    assert.equal(actionResult.receipt?.mainlinePage?.form?.reviewMode, "matched");
     assert.equal(typeof actionResult.receipt?.mainlinePage?.routeFocus?.title, "string");
     assert.equal(typeof actionResult.receipt?.mainlinePage?.routeFocus?.summary, "string");
     assert.deepEqual(
@@ -7298,6 +7315,13 @@ test("developer launch mainline action can bootstrap starter launch assets and r
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.launchMainline?.mainlineSummary?.mainlinePage?.form
+          ? {
+              productCode: actionResult.launchMainline.mainlineSummary.mainlinePage.form.productCode || null,
+              channel: actionResult.launchMainline.mainlineSummary.mainlinePage.form.channel || null,
+              reviewMode: actionResult.launchMainline.mainlineSummary.mainlinePage.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.launchMainline?.mainlineSummary?.mainlinePage?.routeFocus
           ? {
               title: actionResult.launchMainline.mainlineSummary.mainlinePage.routeFocus.title || null,
@@ -7324,6 +7348,13 @@ test("developer launch mainline action can bootstrap starter launch assets and r
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.launchMainline?.mainlineSummary?.form
+          ? {
+              productCode: actionResult.launchMainline.mainlineSummary.form.productCode || null,
+              channel: actionResult.launchMainline.mainlineSummary.form.channel || null,
+              reviewMode: actionResult.launchMainline.mainlineSummary.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.launchMainline?.mainlineSummary?.routeFocus
           ? {
               title: actionResult.launchMainline.mainlineSummary.routeFocus.title || null,
@@ -7870,6 +7901,13 @@ test("developer launch mainline action can create first launch batches and retur
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.receipt?.mainlineView?.form
+          ? {
+              productCode: actionResult.receipt.mainlineView.form.productCode || null,
+              channel: actionResult.receipt.mainlineView.form.channel || null,
+              reviewMode: actionResult.receipt.mainlineView.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.receipt?.mainlineView?.routeFocus
           ? {
               title: actionResult.receipt.mainlineView.routeFocus.title || null,
@@ -7896,6 +7934,13 @@ test("developer launch mainline action can create first launch batches and retur
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.receipt?.mainlinePage?.form
+          ? {
+              productCode: actionResult.receipt.mainlinePage.form.productCode || null,
+              channel: actionResult.receipt.mainlinePage.form.channel || null,
+              reviewMode: actionResult.receipt.mainlinePage.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.receipt?.mainlinePage?.routeFocus
           ? {
               title: actionResult.receipt.mainlinePage.routeFocus.title || null,
@@ -7917,6 +7962,9 @@ test("developer launch mainline action can create first launch batches and retur
       }
     );
     assert.equal(actionResult.receipt?.mainlinePage?.summaryText, actionResult.launchMainline?.summaryText || "");
+    assert.equal(actionResult.receipt?.mainlinePage?.form?.productCode, "MAINLINE_SETUP");
+    assert.equal(actionResult.receipt?.mainlinePage?.form?.channel, "stable");
+    assert.equal(actionResult.receipt?.mainlinePage?.form?.reviewMode, "matched");
     assert.equal(typeof actionResult.receipt?.mainlinePage?.routeFocus?.title, "string");
     assert.equal(typeof actionResult.receipt?.mainlinePage?.routeFocus?.summary, "string");
     assert.deepEqual(
@@ -7927,6 +7975,13 @@ test("developer launch mainline action can create first launch batches and retur
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.launchMainline?.mainlineSummary?.mainlinePage?.form
+          ? {
+              productCode: actionResult.launchMainline.mainlineSummary.mainlinePage.form.productCode || null,
+              channel: actionResult.launchMainline.mainlineSummary.mainlinePage.form.channel || null,
+              reviewMode: actionResult.launchMainline.mainlineSummary.mainlinePage.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.launchMainline?.mainlineSummary?.mainlinePage?.routeFocus
           ? {
               title: actionResult.launchMainline.mainlineSummary.mainlinePage.routeFocus.title || null,
@@ -7953,6 +8008,13 @@ test("developer launch mainline action can create first launch batches and retur
               key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
             }))
           : [],
+        form: actionResult.launchMainline?.mainlineSummary?.form
+          ? {
+              productCode: actionResult.launchMainline.mainlineSummary.form.productCode || null,
+              channel: actionResult.launchMainline.mainlineSummary.form.channel || null,
+              reviewMode: actionResult.launchMainline.mainlineSummary.form.reviewMode || null
+            }
+          : null,
         routeFocus: actionResult.launchMainline?.mainlineSummary?.routeFocus
           ? {
               title: actionResult.launchMainline.mainlineSummary.routeFocus.title || null,
@@ -11731,6 +11793,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /mainlinePage/);
     assert.match(html, /currentMainlineView/);
     assert.match(html, /currentMainlinePage/);
+    assert.match(html, /currentMainlineForm/);
+    assert.match(html, /applyMainlineForm/);
     assert.match(html, /currentMainlineRouteFocus/);
     assert.match(html, /mainlineHeroControls/);
     assert.match(html, /currentMainlineSections/);

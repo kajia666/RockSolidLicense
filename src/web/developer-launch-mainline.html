@@ -441,6 +441,21 @@
         };
       }
 
+      function fallbackMainlineForm() {
+        return {
+          productId: requestedProductId || "",
+          productCode: requestedProductCode || "",
+          channel: requestedChannel || "stable",
+          reviewMode: requestedReviewMode || "matched",
+          username: requestedUsername || "",
+          search: requestedSearch || "",
+          eventType: requestedEventType || "",
+          actorType: requestedActorType || "",
+          entityType: requestedEntityType || "",
+          limit: "60"
+        };
+      }
+
       function currentMainlineSummary() {
         return currentMainline?.mainlineSummary || {};
       }
@@ -500,6 +515,13 @@
                 });
         return {
           heroControls,
+          form:
+            (currentView?.form && typeof currentView.form === "object" ? currentView.form : null)
+            || (receipt?.mainlineView?.form && typeof receipt.mainlineView.form === "object" ? receipt.mainlineView.form : null)
+            || (receipt?.mainlinePage?.form && typeof receipt.mainlinePage.form === "object" ? receipt.mainlinePage.form : null)
+            || (summaryPage?.form && typeof summaryPage.form === "object" ? summaryPage.form : null)
+            || (currentMainlineSummary().form && typeof currentMainlineSummary().form === "object" ? currentMainlineSummary().form : null)
+            || fallbackMainlineForm(),
           routeFocus:
             (currentView?.routeFocus && typeof currentView.routeFocus === "object" ? currentView.routeFocus : null)
             || (receipt?.mainlineView?.routeFocus && typeof receipt.mainlineView.routeFocus === "object" ? receipt.mainlineView.routeFocus : null)
@@ -515,6 +537,26 @@
             || currentMainline?.summaryText
             || ""
         };
+      }
+
+      function currentMainlineForm() {
+        const page = currentMainlinePage();
+        return page.form && typeof page.form === "object"
+          ? page.form
+          : fallbackMainlineForm();
+      }
+
+      function applyMainlineForm(form = null) {
+        const nextForm = form && typeof form === "object" ? form : fallbackMainlineForm();
+        el("mainline-product-code").value = String(nextForm.productCode || "").trim();
+        el("mainline-channel").value = String(nextForm.channel || "stable").trim() || "stable";
+        el("mainline-review-mode").value = String(nextForm.reviewMode || "matched").trim().toLowerCase() === "all" ? "all" : "matched";
+        el("mainline-username").value = String(nextForm.username || "").trim();
+        el("mainline-search").value = String(nextForm.search || "").trim();
+        el("mainline-event-type").value = String(nextForm.eventType || "").trim();
+        el("mainline-actor-type").value = String(nextForm.actorType || "").trim();
+        el("mainline-entity-type").value = String(nextForm.entityType || "").trim();
+        el("mainline-limit").value = String(nextForm.limit || "60").trim() || "60";
       }
 
       function currentMainlineRouteFocus() {
@@ -727,6 +769,7 @@
 
       function renderMainline() {
         const page = currentMainlinePage();
+        applyMainlineForm(currentMainlineForm());
         const sectionBindings = [
           {
             key: "overall_gate",
@@ -948,6 +991,7 @@
         profile = null;
         currentMainline = null;
         lastMainlineActionResult = null;
+        applyMainlineForm(fallbackMainlineForm());
         el("session-meta").textContent = "No developer session yet.";
         el("mainline-summary").textContent = "Generate a launch mainline package to inspect the aggregated summary here.";
         el("mainline-hero-controls-box").innerHTML = '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
@@ -963,14 +1007,7 @@
       }
 
       function hydrateRouteFocus() {
-        el("mainline-product-code").value = requestedProductCode;
-        el("mainline-channel").value = requestedChannel;
-        el("mainline-review-mode").value = requestedReviewMode === "all" ? "all" : "matched";
-        el("mainline-username").value = requestedUsername;
-        el("mainline-search").value = requestedSearch;
-        el("mainline-event-type").value = requestedEventType;
-        el("mainline-actor-type").value = requestedActorType;
-        el("mainline-entity-type").value = requestedEntityType;
+        applyMainlineForm(currentMainlineForm());
         el("route-focus-box").innerHTML = renderRouteFocus();
       }
 
@@ -990,14 +1027,7 @@
       });
       el("logout-btn").addEventListener("click", handleLogout);
       el("use-route-project-btn").addEventListener("click", () => {
-        el("mainline-product-code").value = requestedProductCode;
-        el("mainline-channel").value = requestedChannel;
-        el("mainline-review-mode").value = requestedReviewMode === "all" ? "all" : "matched";
-        el("mainline-username").value = requestedUsername;
-        el("mainline-search").value = requestedSearch;
-        el("mainline-event-type").value = requestedEventType;
-        el("mainline-actor-type").value = requestedActorType;
-        el("mainline-entity-type").value = requestedEntityType;
+        applyMainlineForm(fallbackMainlineForm());
         setStatus(requestedProductCode ? `Loaded routed project ${requestedProductCode}.` : "No routed project was provided.", requestedProductCode ? "" : "warn");
       });
       el("generate-mainline-btn").addEventListener("click", () => generateLaunchMainline().catch((error) => {

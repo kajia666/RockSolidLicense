@@ -6160,6 +6160,14 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_day_readiness_review_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_launch_day_readiness_review"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_recovery_drill_handoff"
         && item?.status === "pass"
       )
@@ -6855,6 +6863,124 @@ test("developer launch mainline action can record a cutover walkthrough and refr
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
       && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_rollback_walkthrough_recent"
+        && item?.status === "pass"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can record a launch day readiness review and refresh grouped production evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineLaunchDayAdmin123!",
+    serverTokenSecret: "mainline-launch-day-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineLaunchDayAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.lday.owner",
+        password: "LaunchMainlineLDayOwner123!",
+        displayName: "Launch Mainline Launch Day Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_LAUNCH_DAY",
+        name: "Mainline Launch Day App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.lday.owner",
+      password: "LaunchMainlineLDayOwner123!"
+    });
+
+    const beforeMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_LAUNCH_DAY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.ok(
+      Array.isArray(beforeMainline.mainlineSummary.productionGate?.checks)
+      && beforeMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_day_readiness_review_recent"
+        && item?.status === "block"
+      )
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_LAUNCH_DAY",
+        channel: "stable",
+        operation: "record_launch_day_readiness_review"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "record_launch_day_readiness_review");
+    assert.match(actionResult.message || "", /launch day readiness review/i);
+    assert.equal(actionResult.result?.recordedEvidence?.key, "launch_day_readiness_review");
+    assert.ok(actionResult.result?.recordedEvidence?.createdAt);
+    assert.equal(actionResult.receipt?.operation, "record_launch_day_readiness_review");
+    assert.ok(Array.isArray(actionResult.receipt?.created));
+    assert.ok(actionResult.receipt.created.some((item) => item.key === "launch_day_readiness_review"));
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_day_readiness_review_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_backup_verification_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_recovery_drill_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_operations_walkthrough_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_cutover_walkthrough_recent"
         && item?.status === "pass"
       )
     );

@@ -3939,6 +3939,8 @@ function buildLaunchMainlineActionReceipt({
           ? "Record Health Verification"
           : normalizedOperation === "record_deploy_verification"
             ? "Record Deploy Verification"
+            : normalizedOperation === "record_launch_day_readiness_review"
+              ? "Record Launch Day Readiness Review"
             : normalizedOperation === "record_cutover_walkthrough"
               ? "Record Cutover Walkthrough"
       : normalizedOperation === "record_operations_walkthrough"
@@ -4548,6 +4550,13 @@ function queryLatestLaunchMainlineCutoverWalkthroughEvidence(db, options = {}) {
   });
 }
 
+function queryLatestLaunchMainlineLaunchDayReadinessReviewEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.launch-day-readiness-review"
+  });
+}
+
 function buildLaunchMainlineProductionGatePayload({
   config = {},
   health = null,
@@ -4564,7 +4573,8 @@ function buildLaunchMainlineProductionGatePayload({
   deployVerificationEvidence = null,
   healthVerificationEvidence = null,
   rollbackWalkthroughEvidence = null,
-  cutoverWalkthroughEvidence = null
+  cutoverWalkthroughEvidence = null,
+  launchDayReadinessReviewEvidence = null
 } = {}) {
   const actionPlan = [];
   const checks = [];
@@ -4719,7 +4729,7 @@ function buildLaunchMainlineProductionGatePayload({
   const recoveryDrillAgeDays = Number.isFinite(recoveryDrillRecordedMs)
     ? Math.max(0, Math.floor((Date.now() - recoveryDrillRecordedMs) / 86400000))
     : null;
-  const hasRecentRecoveryDrill = recoveryDrillAgeDays !== null && recoveryDrillAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const hasRecentRecoveryDrillDirect = recoveryDrillAgeDays !== null && recoveryDrillAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
   const backupVerificationRecordAction = createLaunchWorkflowSetupAction({
     key: "launch_mainline_record_backup_verification",
     label: "Record Backup Verification",
@@ -4762,24 +4772,37 @@ function buildLaunchMainlineProductionGatePayload({
     mode: "evidence",
     operation: "record_cutover_walkthrough"
   });
+  const launchDayReadinessReviewRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_launch_day_readiness_review",
+    label: "Record Launch Day Readiness Review",
+    summary: "Capture a fresh launch-day readiness review for this lane so the production gate can verify backup, recovery, operations, and cutover readiness together.",
+    mode: "evidence",
+    operation: "record_launch_day_readiness_review"
+  });
   const backupVerificationRecordedAt = String(backupVerificationEvidence?.createdAt || "").trim();
   const backupVerificationRecordedMs = backupVerificationRecordedAt ? Date.parse(backupVerificationRecordedAt) : Number.NaN;
   const backupVerificationAgeDays = Number.isFinite(backupVerificationRecordedMs)
     ? Math.max(0, Math.floor((Date.now() - backupVerificationRecordedMs) / 86400000))
     : null;
-  const hasRecentBackupVerification = backupVerificationAgeDays !== null && backupVerificationAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const hasRecentBackupVerificationDirect = backupVerificationAgeDays !== null && backupVerificationAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
   const operationsWalkthroughRecordedAt = String(operationsWalkthroughEvidence?.createdAt || "").trim();
   const operationsWalkthroughRecordedMs = operationsWalkthroughRecordedAt ? Date.parse(operationsWalkthroughRecordedAt) : Number.NaN;
   const operationsWalkthroughAgeDays = Number.isFinite(operationsWalkthroughRecordedMs)
     ? Math.max(0, Math.floor((Date.now() - operationsWalkthroughRecordedMs) / 86400000))
     : null;
-  const hasRecentOperationsWalkthrough = operationsWalkthroughAgeDays !== null && operationsWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const hasRecentOperationsWalkthroughDirect = operationsWalkthroughAgeDays !== null && operationsWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
   const cutoverWalkthroughRecordedAt = String(cutoverWalkthroughEvidence?.createdAt || "").trim();
   const cutoverWalkthroughRecordedMs = cutoverWalkthroughRecordedAt ? Date.parse(cutoverWalkthroughRecordedAt) : Number.NaN;
   const cutoverWalkthroughAgeDays = Number.isFinite(cutoverWalkthroughRecordedMs)
     ? Math.max(0, Math.floor((Date.now() - cutoverWalkthroughRecordedMs) / 86400000))
     : null;
   const hasRecentCutoverWalkthroughDirect = cutoverWalkthroughAgeDays !== null && cutoverWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const launchDayReadinessReviewRecordedAt = String(launchDayReadinessReviewEvidence?.createdAt || "").trim();
+  const launchDayReadinessReviewRecordedMs = launchDayReadinessReviewRecordedAt ? Date.parse(launchDayReadinessReviewRecordedAt) : Number.NaN;
+  const launchDayReadinessReviewAgeDays = Number.isFinite(launchDayReadinessReviewRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - launchDayReadinessReviewRecordedMs) / 86400000))
+    : null;
+  const hasRecentLaunchDayReadinessReviewDirect = launchDayReadinessReviewAgeDays !== null && launchDayReadinessReviewAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
   const deployVerificationRecordedAt = String(deployVerificationEvidence?.createdAt || "").trim();
   const deployVerificationRecordedMs = deployVerificationRecordedAt ? Date.parse(deployVerificationRecordedAt) : Number.NaN;
   const deployVerificationAgeDays = Number.isFinite(deployVerificationRecordedMs)
@@ -4798,11 +4821,15 @@ function buildLaunchMainlineProductionGatePayload({
     ? Math.max(0, Math.floor((Date.now() - rollbackWalkthroughRecordedMs) / 86400000))
     : null;
   const hasRecentRollbackWalkthroughDirect = rollbackWalkthroughAgeDays !== null && rollbackWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
-  const hasRecentCutoverReadiness = hasRecentCutoverWalkthroughDirect
+  const hasRecentCutoverReadiness = hasRecentLaunchDayReadinessReviewDirect
+    || hasRecentCutoverWalkthroughDirect
     || (hasRecentDeployVerificationDirect && hasRecentHealthVerificationDirect && hasRecentRollbackWalkthroughDirect);
-  const hasRecentDeployVerification = hasRecentDeployVerificationDirect || hasRecentCutoverWalkthroughDirect;
-  const hasRecentHealthVerification = hasRecentHealthVerificationDirect || hasRecentCutoverWalkthroughDirect;
-  const hasRecentRollbackWalkthrough = hasRecentRollbackWalkthroughDirect || hasRecentCutoverWalkthroughDirect;
+  const hasRecentBackupVerification = hasRecentBackupVerificationDirect || hasRecentLaunchDayReadinessReviewDirect;
+  const hasRecentRecoveryDrill = hasRecentRecoveryDrillDirect || hasRecentLaunchDayReadinessReviewDirect;
+  const hasRecentOperationsWalkthrough = hasRecentOperationsWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
+  const hasRecentDeployVerification = hasRecentDeployVerificationDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
+  const hasRecentHealthVerification = hasRecentHealthVerificationDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
+  const hasRecentRollbackWalkthrough = hasRecentRollbackWalkthroughDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
 
   if (defaultAdminPassword) {
     addStep(
@@ -4976,6 +5003,30 @@ function buildLaunchMainlineProductionGatePayload({
       opsWorkspace,
       effectiveCutoverDownload
     );
+    if (hasRecentLaunchDayReadinessReviewDirect) {
+      addPassCheck(
+        "production_launch_day_readiness_review_recent",
+        "A recent launch day readiness review is recorded",
+        `The latest launch day readiness review for this lane was recorded at ${launchDayReadinessReviewRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        opsWorkspace,
+        effectiveCutoverDownload,
+        null,
+        launchDayReadinessReviewRecordAction
+      );
+    } else {
+      addStep(
+        "hold",
+        "production_launch_day_readiness_review_recent",
+        "Record a recent launch day readiness review",
+        launchDayReadinessReviewRecordedAt
+          ? `The latest launch day readiness review was recorded at ${launchDayReadinessReviewRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh launch day readiness review before widening rollout.`
+          : `No launch day readiness review has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
+        opsWorkspace,
+        effectiveCutoverDownload,
+        null,
+        launchDayReadinessReviewRecordAction
+      );
+    }
     if (hasRecentCutoverReadiness) {
       addPassCheck(
         "production_cutover_walkthrough_recent",
@@ -10142,7 +10193,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   deployVerificationEvidence = null,
   healthVerificationEvidence = null,
   rollbackWalkthroughEvidence = null,
-  cutoverWalkthroughEvidence = null
+  cutoverWalkthroughEvidence = null,
+  launchDayReadinessReviewEvidence = null
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
@@ -10422,7 +10474,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     deployVerificationEvidence,
     healthVerificationEvidence,
     rollbackWalkthroughEvidence,
-    cutoverWalkthroughEvidence
+    cutoverWalkthroughEvidence,
+    launchDayReadinessReviewEvidence
   });
   const stageDefinitions = [
     {
@@ -11161,7 +11214,8 @@ function buildDeveloperLaunchMainlinePayload({
   deployVerificationEvidence = null,
   healthVerificationEvidence = null,
   rollbackWalkthroughEvidence = null,
-  cutoverWalkthroughEvidence = null
+  cutoverWalkthroughEvidence = null,
+  launchDayReadinessReviewEvidence = null
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
@@ -11240,7 +11294,8 @@ function buildDeveloperLaunchMainlinePayload({
     deployVerificationEvidence,
     healthVerificationEvidence,
     rollbackWalkthroughEvidence,
-    cutoverWalkthroughEvidence
+    cutoverWalkthroughEvidence,
+    launchDayReadinessReviewEvidence
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
     generatedAt,
@@ -20773,6 +20828,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
         channel
       });
+      const launchDayReadinessReviewEvidence = queryLatestLaunchMainlineLaunchDayReadinessReviewEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
       const payload = buildDeveloperLaunchMainlinePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || launchWorkflow?.manifest?.generatedAt || nowIso(),
         releasePackage,
@@ -20791,6 +20850,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         healthVerificationEvidence,
         rollbackWalkthroughEvidence,
         cutoverWalkthroughEvidence,
+        launchDayReadinessReviewEvidence,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,
@@ -21061,11 +21121,41 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             channel
           }
         };
+      } else if (operation === "record_launch_day_readiness_review") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.launch-day-readiness-review", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          launchDayReadinessReviewedAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Launch day readiness review recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "launch_day_readiness_review",
+            label: "Launch day readiness review",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
       } else {
         throw new AppError(
           400,
           "INVALID_LAUNCH_MAINLINE_ACTION",
-          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, record_rollback_walkthrough, or record_cutover_walkthrough."
+          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, record_rollback_walkthrough, record_cutover_walkthrough, or record_launch_day_readiness_review."
         );
       }
 

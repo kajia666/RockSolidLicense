@@ -6246,6 +6246,87 @@ test("developer launch mainline production gate blocks loopback entrypoints and 
   }
 });
 
+test("developer launch mainline production gate blocks loopback external data services", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "ProdExternalAdmin123!",
+    serverTokenSecret: "prod-external-server-secret",
+    mainStoreDriver: "postgres",
+    postgresUrl: "postgresql://127.0.0.1:5432/rocksolid",
+    stateStoreDriver: "redis",
+    redisUrl: "redis://localhost:6379/0"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "ProdExternalAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.external.owner",
+        password: "LaunchMainlineExternalOwner123!",
+        displayName: "Launch Mainline External Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_EXTERNAL",
+        name: "Mainline External App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.external.owner",
+      password: "LaunchMainlineExternalOwner123!"
+    });
+
+    const launchMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_EXTERNAL&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.equal(launchMainline.mainlineSummary.productionGate?.status, "hold");
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
+      && launchMainline.mainlineSummary.productionGate.actionPlan.some((item) =>
+        item?.key === "production_main_store_loopback"
+        && item?.status === "block"
+        && item?.workspaceAction?.key === "ops"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
+      && launchMainline.mainlineSummary.productionGate.actionPlan.some((item) =>
+        item?.key === "production_runtime_state_loopback"
+        && item?.status === "block"
+        && item?.workspaceAction?.key === "ops"
+      )
+    );
+    assert.match(launchMainline.summaryText || "", /postgres/i);
+    assert.match(launchMainline.summaryText || "", /redis/i);
+    assert.match(launchMainline.summaryText || "", /127\.0\.0\.1|localhost/i);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("launch workflow routes login-path blockers to project authorization presets", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

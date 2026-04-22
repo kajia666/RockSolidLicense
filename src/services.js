@@ -4399,6 +4399,38 @@ function appendLaunchMainlineGateText(lines = [], gate = null, formatWorkspaceAc
   lines.push(`- recommendedDownload: ${gate.recommendedDownload?.label || gate.recommendedDownload?.key || "-"}`);
 }
 
+function parseProductionEndpoint(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return {
+      raw: "",
+      host: "",
+      loopback: true
+    };
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const host = String(parsed.hostname || "").trim().toLowerCase();
+    return {
+      raw,
+      host,
+      loopback: !host
+        || host === "localhost"
+        || host === "0.0.0.0"
+        || host === "::1"
+        || host === "[::1]"
+        || host.startsWith("127.")
+    };
+  } catch {
+    return {
+      raw,
+      host: "",
+      loopback: true
+    };
+  }
+}
+
 function buildLaunchMainlineProductionGatePayload({
   config = {},
   health = null,
@@ -4511,23 +4543,16 @@ function buildLaunchMainlineProductionGatePayload({
   const tokenKeyRows = Array.isArray(tokenKeys?.keys) ? tokenKeys.keys : [];
   const activeKeyId = String(tokenKeys?.activeKeyId || "").trim();
   const normalizedPublicBaseUrl = String(publicBaseUrl || "").trim();
-  let publicEntryHost = "";
-  try {
-    publicEntryHost = normalizedPublicBaseUrl ? new URL(normalizedPublicBaseUrl).hostname.toLowerCase() : "";
-  } catch {
-    publicEntryHost = "";
-  }
+  const publicEntry = parseProductionEndpoint(normalizedPublicBaseUrl);
+  const publicEntryHost = publicEntry.host;
   const publicEntryIsHttps = normalizedPublicBaseUrl.toLowerCase().startsWith("https://");
-  const publicEntryIsLoopback = !publicEntryHost
-    || publicEntryHost === "localhost"
-    || publicEntryHost === "0.0.0.0"
-    || publicEntryHost === "::1"
-    || publicEntryHost === "[::1]"
-    || publicEntryHost.startsWith("127.");
+  const publicEntryIsLoopback = publicEntry.loopback;
   const mainStoreHealth = health?.storage?.mainStore || {};
   const runtimeStateHealth = health?.storage?.runtimeState || {};
-  const mainStoreDriver = String(mainStoreHealth?.driver || config.mainStoreDriver || "").trim().toLowerCase();
-  const runtimeStateDriver = String(runtimeStateHealth?.driver || config.stateStoreDriver || "").trim().toLowerCase();
+  const mainStoreDriver = String(mainStoreHealth?.targetDriver || config.mainStoreDriver || mainStoreHealth?.driver || "").trim().toLowerCase();
+  const runtimeStateDriver = String(runtimeStateHealth?.targetDriver || config.stateStoreDriver || runtimeStateHealth?.driver || "").trim().toLowerCase();
+  const postgresEndpoint = parseProductionEndpoint(config.postgresUrl);
+  const redisEndpoint = parseProductionEndpoint(config.redisUrl);
 
   if (defaultAdminPassword) {
     addStep(
@@ -4572,6 +4597,15 @@ function buildLaunchMainlineProductionGatePayload({
       opsWorkspace
     );
   }
+  if (mainStoreDriver === "postgres" && postgresEndpoint.raw && postgresEndpoint.loopback) {
+    addStep(
+      "hold",
+      "production_main_store_loopback",
+      "Move PostgreSQL off loopback-only endpoints",
+      `The configured PostgreSQL main-store endpoint still points at ${postgresEndpoint.raw}. Move it behind a real production network path before widening rollout.`,
+      opsWorkspace
+    );
+  }
   if (mainStoreDriver === "postgres" && !Boolean(mainStoreHealth?.externalReady)) {
     addStep(
       "hold",
@@ -4579,6 +4613,14 @@ function buildLaunchMainlineProductionGatePayload({
       "Confirm PostgreSQL main-store readiness",
       "Main storage is configured for PostgreSQL but the external-ready signal is not healthy yet.",
       opsWorkspace
+    );
+  } else if (mainStoreDriver === "postgres" && postgresEndpoint.raw && !postgresEndpoint.loopback) {
+    addPassCheck(
+      "production_main_store_endpoint_ready",
+      "PostgreSQL main-store endpoint looks production-shaped",
+      `The configured PostgreSQL main-store endpoint is already pointing at ${postgresEndpoint.raw}.`,
+      opsWorkspace,
+      effectiveProductionDownload
     );
   }
   if (mainStoreDriver === "sqlite") {
@@ -4590,6 +4632,15 @@ function buildLaunchMainlineProductionGatePayload({
       opsWorkspace
     );
   }
+  if (runtimeStateDriver === "redis" && redisEndpoint.raw && redisEndpoint.loopback) {
+    addStep(
+      "hold",
+      "production_runtime_state_loopback",
+      "Move Redis runtime-state off loopback-only endpoints",
+      `The configured Redis runtime-state endpoint still points at ${redisEndpoint.raw}. Move it behind a real production network path before widening rollout.`,
+      opsWorkspace
+    );
+  }
   if (runtimeStateDriver === "redis" && !Boolean(runtimeStateHealth?.externalReady)) {
     addStep(
       "hold",
@@ -4597,6 +4648,14 @@ function buildLaunchMainlineProductionGatePayload({
       "Confirm Redis runtime-state readiness",
       "Runtime state is configured for Redis but the external-ready signal is not healthy yet.",
       opsWorkspace
+    );
+  } else if (runtimeStateDriver === "redis" && redisEndpoint.raw && !redisEndpoint.loopback) {
+    addPassCheck(
+      "production_runtime_state_endpoint_ready",
+      "Redis runtime-state endpoint looks production-shaped",
+      `The configured Redis runtime-state endpoint is already pointing at ${redisEndpoint.raw}.`,
+      opsWorkspace,
+      effectiveProductionDownload
     );
   }
   if (runtimeStateDriver === "memory") {

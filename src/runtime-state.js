@@ -705,12 +705,19 @@ function createRedisRuntimeStateStore(db, config) {
     },
 
     async health() {
+      let activeSessions = null;
+      try {
+        activeSessions = await this.countActiveSessions();
+      } catch (error) {
+        state.externalReady = false;
+        state.lastError = error instanceof Error ? error.message : String(error);
+      }
       return {
         driver: "redis",
         nonceReplayStore: "redis",
         sessionPresenceStore: "redis_mirror",
         persistence: "external_runtime",
-        activeSessions: await this.countActiveSessions(),
+        activeSessions,
         redisUrlConfigured: true,
         redisKeyPrefix: config.redisKeyPrefix,
         externalReady: state.externalReady,

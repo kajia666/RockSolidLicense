@@ -46,6 +46,7 @@ The production gate is the part that answers "can this lane widen beyond interna
 - default admin password still in use
 - default server token secret still in use
 - whether the current public entrypoint still points at localhost / 127.x / another loopback-style host
+- whether configured PostgreSQL or Redis production endpoints still point at localhost / 127.x / another loopback-style host
 - runtime-state still on `memory`
 - whether main storage is still on single-host `sqlite`
 - whether runtime state is still on single-host `sqlite`

@@ -6849,6 +6849,14 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     assert.ok(actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
+    assert.equal(
+      actionResult.receipt?.mainlineContinuation?.workspaceAction?.key,
+      actionResult.launchMainline?.mainlineSummary?.continuation?.workspaceAction?.key
+    );
+    assert.equal(
+      actionResult.receipt?.mainlineContinuation?.recommendedDownload?.key,
+      actionResult.launchMainline?.mainlineSummary?.continuation?.recommendedDownload?.key
+    );
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
     assert.deepEqual(
@@ -6976,6 +6984,14 @@ test("developer launch mainline action can create first launch batches and retur
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
+    assert.equal(
+      actionResult.receipt?.mainlineContinuation?.workspaceAction?.key,
+      actionResult.launchMainline?.mainlineSummary?.continuation?.workspaceAction?.key
+    );
+    assert.equal(
+      actionResult.receipt?.mainlineContinuation?.recommendedDownload?.key,
+      actionResult.launchMainline?.mainlineSummary?.continuation?.recommendedDownload?.key
+    );
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
     assert.deepEqual(
@@ -10712,6 +10728,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Open Review Workspace/);
     assert.match(html, /Open Smoke Workspace/);
     assert.match(html, /Open Ops Workspace/);
+    assert.match(html, /data-mainline-receipt-continuation-workspace/);
+    assert.match(html, /data-mainline-receipt-continuation-download/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

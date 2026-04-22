@@ -126,6 +126,7 @@
 - 这份 receipt 现在还会带上刷新后的 unified `actionPlan` 前几步，`Last Mainline Action` 也会优先吃这份服务端 `mainlineActions`，所以初始化动作做完以后，页内 follow-up 按钮会更贴近统一主线，而不是继续主要依赖 quickstart follow-up
 - 现在这份 `receipt` 也会把刷新后的 unified `stages` 一起带回来，所以 `Last Mainline Action` 会直接显示 `release / workflow / review / smoke / ops` 各阶段 gate 状态，不用再主要靠前端回头翻完整 `launchMainline` payload
 - 现在这份 `receipt` 还会把刷新后的 unified `workspaceActions / recommendedDownloads` 一起带回来，所以 `Last Mainline Action` 能直接继续打开统一主线工作台或下载主线 handoff，不用再主要依赖当前页去翻完整 `launchMainline.mainlineSummary`
+- 现在这份 `receipt` 里的 `mainlineContinuation` 也已经变成可点击的 follow-up 了：`Launch Mainline` 工作台会直接把 continuation 对应的 workspace 和下载按钮渲染进 `Last Mainline Action`，所以初始化动作做完后，不只是看见“下一步是什么”，还能顺手继续 routed ops 复查或拿走下一份统一 handoff
 - 统一的 `launch-mainline` summary / summary download 现在也会正式打印 `Mainline Next Actions`，所以 handoff 文本不只看得到 gate、primary action、continuation，还能直接看到当前主线上最值得继续的几步
 - 这条 `/api/developer/launch-mainline` 聚合结果现在还会在 `mainlineSummary` 顶层直接下发统一的 `primaryAction` 和 `recommendedDownload`，不再要求页面或后续工作台自己再去钻 `overallGate` 里挑主动作
 - 同时它现在也会在 `mainlineSummary` 顶层直接下发 `continuation`，把 routed `Developer Ops` 复查链的下一步动作和推荐下载直接抬出来；统一的 `launch-mainline` 摘要里也会多出 `Mainline Continuation`，这样交接和复查都不需要再自己从 ops payload 里翻“下一步该怎么继续”

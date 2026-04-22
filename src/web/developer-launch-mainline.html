@@ -498,6 +498,8 @@
         const receiptRecommendedDownloads = Array.isArray(receipt?.mainlineRecommendedDownloads)
           ? receipt.mainlineRecommendedDownloads.slice(0, 6)
           : [];
+        const continuationWorkspaceAction = receipt?.mainlineContinuation?.workspaceAction || null;
+        const continuationDownload = receipt?.mainlineContinuation?.recommendedDownload || null;
         if (!actions.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
@@ -522,6 +524,12 @@
           <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
           ${receipt?.mainlineOverallGate ? `<div class="hint" style="margin-top: 8px;">${esc(`Gate: ${String(receipt.mainlineOverallGate.status || "unknown").toUpperCase()} | ${receipt.mainlineOverallGate.headline || "-"}`)}</div>` : ""}
           ${receipt?.mainlineContinuation ? `<div class="hint" style="margin-top: 8px;">${esc(`Continuation: ${receipt.mainlineContinuation.title || "Continue Routed Review"}${receipt.mainlineContinuation.summary ? ` | ${receipt.mainlineContinuation.summary}` : ""}`)}</div>` : ""}
+          ${(continuationWorkspaceAction || continuationDownload) ? `
+            <div class="actions" style="margin-top: 8px;">
+              ${continuationWorkspaceAction ? `<button type="button" class="secondary" data-mainline-receipt-continuation-workspace="1">${esc(continuationWorkspaceAction.label || continuationWorkspaceAction.key || "Open continuation workspace")}</button>` : ""}
+              ${continuationDownload ? `<button type="button" class="secondary" data-mainline-receipt-continuation-download="1">${esc(continuationDownload.label || continuationDownload.key || "Download continuation summary")}</button>` : ""}
+            </div>
+          ` : ""}
           ${Array.isArray(receipt?.mainlineNextActions) && receipt.mainlineNextActions.length ? `<div class="hint" style="margin-top: 8px;">${esc(`Next actions: ${receipt.mainlineNextActions.join(" | ")}`)}</div>` : ""}
           ${stageBits ? `<div style="margin-top: 8px;">${stageBits}</div>` : ""}
           ${(receiptWorkspaceActions.length || receiptRecommendedDownloads.length) ? `
@@ -1178,6 +1186,27 @@
           const item = Array.isArray(currentLastMainlineReceipt()?.mainlineRecommendedDownloads)
             ? currentLastMainlineReceipt().mainlineRecommendedDownloads[index]
             : null;
+          if (!item?.key) {
+            return;
+          }
+          await downloadMainlineRecommendedItem(item).catch((error) => {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          });
+          return;
+        }
+        const receiptContinuationWorkspaceButton = event.target.closest("[data-mainline-receipt-continuation-workspace]");
+        if (receiptContinuationWorkspaceButton) {
+          const item = currentLastMainlineReceipt()?.mainlineContinuation?.workspaceAction || null;
+          if (!item?.key) {
+            return;
+          }
+          openWorkspaceAction(item);
+          return;
+        }
+        const receiptContinuationDownloadButton = event.target.closest("[data-mainline-receipt-continuation-download]");
+        if (receiptContinuationDownloadButton) {
+          const item = currentLastMainlineReceipt()?.mainlineContinuation?.recommendedDownload || null;
           if (!item?.key) {
             return;
           }

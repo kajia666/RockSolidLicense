@@ -6906,6 +6906,31 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
     );
     assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineActions)
+        ? actionResult.receipt.mainlineActions.map((item) =>
+            Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          )
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => [
+            item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
+            item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null,
+            item?.bootstrapAction?.key ? { kind: "bootstrap", key: item.bootstrapAction.key } : null,
+            item?.setupAction?.key ? { kind: "setup", key: item.setupAction.key } : null
+          ].filter(Boolean))
+        : []
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineFollowUpActions)
         ? actionResult.receipt.mainlineFollowUpActions.map((item) => ({
             kind: item?.kind || null,
@@ -7079,6 +7104,31 @@ test("developer launch mainline action can create first launch batches and retur
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineActions)
+        ? actionResult.receipt.mainlineActions.map((item) =>
+            Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          )
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => [
+            item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
+            item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null,
+            item?.bootstrapAction?.key ? { kind: "bootstrap", key: item.bootstrapAction.key } : null,
+            item?.setupAction?.key ? { kind: "setup", key: item.setupAction.key } : null
+          ].filter(Boolean))
+        : []
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineFollowUpActions)
@@ -10810,6 +10860,7 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Open Ops Workspace/);
     assert.match(html, /mainlineFollowUpActions/);
     assert.match(html, /data-mainline-receipt-followup-action-index/);
+    assert.match(html, /data-mainline-followup-action-control-index/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

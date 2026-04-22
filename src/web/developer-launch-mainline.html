@@ -531,10 +531,9 @@
           ${actions.map((item, index) => `
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(148,163,184,0.28);">
               <div>${index + 1}. ${esc(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
-              ${(item.workspaceAction || item.recommendedDownload) ? `
+              ${Array.isArray(item.controls) && item.controls.length ? `
                 <div class="actions" style="margin-top: 8px;">
-                  ${item.workspaceAction ? `<button type="button" class="secondary" data-mainline-followup-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}
-                  ${item.recommendedDownload ? `<button type="button" data-mainline-followup-download-index="${index}">${esc(item.recommendedDownload.label || item.recommendedDownload.key || "Download summary")}</button>` : ""}
+                  ${item.controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-followup-action-index="${index}" data-mainline-followup-action-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
                 </div>
               ` : ""}
             </div>
@@ -1125,35 +1124,44 @@
           });
           return;
         }
-        const followUpWorkspaceButton = event.target.closest("[data-mainline-followup-workspace-index]");
-        if (followUpWorkspaceButton) {
-          const index = Number(followUpWorkspaceButton.dataset.mainlineFollowupWorkspaceIndex || -1);
+        const followUpActionButton = event.target.closest("[data-mainline-followup-action-control-index]");
+        if (followUpActionButton) {
+          const index = Number(followUpActionButton.dataset.mainlineFollowupActionIndex || -1);
+          const controlIndex = Number(followUpActionButton.dataset.mainlineFollowupActionControlIndex || -1);
           const item = Array.isArray(currentLastMainlineReceipt()?.mainlineActions)
             ? currentLastMainlineReceipt().mainlineActions[index]
             : Array.isArray(lastMainlineActionResult?.followUp?.actions)
             ? lastMainlineActionResult.followUp.actions[index]
             : null;
-          if (!item?.workspaceAction) {
+          const control = Array.isArray(item?.controls) ? item.controls[controlIndex] : null;
+          if (control?.workspaceAction?.key) {
+            openWorkspaceAction(control.workspaceAction);
             return;
           }
-          openWorkspaceAction(item.workspaceAction);
-          return;
-        }
-        const followUpDownloadButton = event.target.closest("[data-mainline-followup-download-index]");
-        if (followUpDownloadButton) {
-          const index = Number(followUpDownloadButton.dataset.mainlineFollowupDownloadIndex || -1);
-          const item = Array.isArray(currentLastMainlineReceipt()?.mainlineActions)
-            ? currentLastMainlineReceipt().mainlineActions[index]
-            : Array.isArray(lastMainlineActionResult?.followUp?.actions)
-            ? lastMainlineActionResult.followUp.actions[index]
-            : null;
-          if (!item?.recommendedDownload) {
+          if (control?.recommendedDownload?.key) {
+            await downloadMainlineRecommendedItem(control.recommendedDownload).catch((error) => {
+              setStatus(error.message, "danger");
+              setOutput({ error: error.message });
+            });
             return;
           }
-          await downloadMainlineRecommendedItem(item.recommendedDownload).catch((error) => {
-            setStatus(error.message, "danger");
-            setOutput({ error: error.message });
-          });
+          if (control?.bootstrapAction) {
+            try {
+              await runLaunchMainlineBootstrap(control.bootstrapAction);
+            } catch (error) {
+              setStatus(error.message, "danger");
+              setOutput({ error: error.message });
+            }
+            return;
+          }
+          if (control?.setupAction) {
+            try {
+              await runLaunchMainlineSetup(control.setupAction);
+            } catch (error) {
+              setStatus(error.message, "danger");
+              setOutput({ error: error.message });
+            }
+          }
           return;
         }
         const receiptFollowUpActionButton = event.target.closest("[data-mainline-receipt-followup-action-index]");

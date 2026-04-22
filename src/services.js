@@ -3791,7 +3791,29 @@ function buildLaunchMainlineActionReceipt({
       workspaceAction: item?.workspaceAction || null,
       recommendedDownload: item?.recommendedDownload || null,
       bootstrapAction: item?.bootstrapAction || null,
-      setupAction: item?.setupAction || null
+      setupAction: item?.setupAction || null,
+      controls: [
+        item?.workspaceAction ? {
+          kind: "workspace",
+          label: item.workspaceAction.label || item.title || item.key || "Open workspace",
+          workspaceAction: item.workspaceAction
+        } : null,
+        item?.recommendedDownload ? {
+          kind: "download",
+          label: item.recommendedDownload.label || item.title || item.key || "Download summary",
+          recommendedDownload: item.recommendedDownload
+        } : null,
+        item?.bootstrapAction ? {
+          kind: "bootstrap",
+          label: item.bootstrapAction.label || item.title || item.key || "Run bootstrap",
+          bootstrapAction: item.bootstrapAction
+        } : null,
+        item?.setupAction ? {
+          kind: "setup",
+          label: item.setupAction.label || item.title || item.key || "Run setup",
+          setupAction: item.setupAction
+        } : null
+      ].filter(Boolean)
     }))
     .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
   const mainlineContinuationActions = [];

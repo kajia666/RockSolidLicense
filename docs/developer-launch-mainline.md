@@ -24,6 +24,7 @@ Supported download formats:
 - `recovery-drill-handoff`
 - `operations-handoff`
 - `post-launch-sweep-handoff`
+- `closeout-handoff`
 - `checksums`
 - `zip`
 
@@ -73,6 +74,10 @@ It also exposes a dedicated `operations-handoff` download for first-wave operati
 It also exposes a dedicated `post-launch-sweep-handoff` download for the first runtime review after cutover. That package brings together the routed Developer Ops continuation, the remaining review queue handoff, and the primary post-launch sweep signals, so launch duty can keep the first-wave review moving without rebuilding filters or summary exports by hand.
 
 That post-launch review now also enters the gate itself. `Launch Mainline` will block the lane when no recent first-wave ops sweep evidence has been recorded inside the current 14-day readiness window, and the same `Production Gate Checks` card can now fire a service-driven `Record First-Wave Ops Sweep` action from the unified mainline workspace. This keeps the lane from stopping at "launch day looked ready" without proving that the first routed runtime review was actually completed too.
+
+It also exposes a dedicated `closeout-handoff` download for the end of the first-wave rollout. That package brings together launch-day readiness, the first-wave ops sweep, the remaining routed review queue, and the shift-handover material, so the operator can close out the rollout with one service-driven handoff instead of stitching the last mile together from several earlier artifacts.
+
+That closeout path now also enters the gate itself. `Launch Mainline` will block the lane when no recent launch closeout review evidence has been recorded inside the current 14-day readiness window, and the same `Production Gate Checks` card can now fire a service-driven `Record Launch Closeout Review` action. Recording that grouped closeout evidence also lifts the launch-day readiness review and first-wave ops sweep checks together, so the author has one final confirmation step after the rollout has actually been watched and handed off.
 
 ## Why it matters
 

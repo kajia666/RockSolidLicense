@@ -3723,6 +3723,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_operations_handoff"
         : normalizedFormat === "post-launch-sweep-handoff"
           ? "launch_mainline_post_launch_sweep_handoff"
+        : normalizedFormat === "closeout-handoff"
+          ? "launch_mainline_closeout_handoff"
         : "launch_mainline_summary",
     fileName,
     label,
@@ -3935,6 +3937,8 @@ function buildLaunchMainlineActionReceipt({
     ? "Inventory Refill"
     : normalizedOperation === "first_batch_setup"
       ? "First Batch Setup"
+      : normalizedOperation === "record_launch_closeout_review"
+        ? "Record Launch Closeout Review"
       : normalizedOperation === "record_post_launch_ops_sweep"
         ? "Record First-Wave Ops Sweep"
       : normalizedOperation === "record_rollback_walkthrough"
@@ -4568,6 +4572,13 @@ function queryLatestLaunchMainlinePostLaunchOpsSweepEvidence(db, options = {}) {
   });
 }
 
+function queryLatestLaunchMainlineLaunchCloseoutReviewEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.launch-closeout-review"
+  });
+}
+
 function buildLaunchMainlineProductionGatePayload({
   config = {},
   health = null,
@@ -4579,6 +4590,7 @@ function buildLaunchMainlineProductionGatePayload({
   recoveryDrillHandoffDownload = null,
   operationsHandoffDownload = null,
   postLaunchSweepHandoffDownload = null,
+  closeoutHandoffDownload = null,
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
   operationsWalkthroughEvidence = null,
@@ -4587,7 +4599,8 @@ function buildLaunchMainlineProductionGatePayload({
   rollbackWalkthroughEvidence = null,
   cutoverWalkthroughEvidence = null,
   launchDayReadinessReviewEvidence = null,
-  postLaunchOpsSweepEvidence = null
+  postLaunchOpsSweepEvidence = null,
+  launchCloseoutReviewEvidence = null
 } = {}) {
   const actionPlan = [];
   const checks = [];
@@ -4613,6 +4626,7 @@ function buildLaunchMainlineProductionGatePayload({
   const effectiveRecoveryDrillDownload = recoveryDrillHandoffDownload || effectiveProductionDownload;
   const effectiveOperationsDownload = operationsHandoffDownload || effectiveProductionDownload;
   const effectivePostLaunchSweepDownload = postLaunchSweepHandoffDownload || effectiveOperationsDownload || effectiveProductionDownload;
+  const effectiveCloseoutDownload = closeoutHandoffDownload || effectivePostLaunchSweepDownload || effectiveOperationsDownload || effectiveProductionDownload;
   const securityWorkspace = createLaunchWorkflowWorkspaceShortcut(
     "security",
     "summary",
@@ -4800,6 +4814,13 @@ function buildLaunchMainlineProductionGatePayload({
     mode: "evidence",
     operation: "record_post_launch_ops_sweep"
   });
+  const launchCloseoutReviewRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_launch_closeout_review",
+    label: "Record Launch Closeout Review",
+    summary: "Capture a fresh launch closeout review for this lane so the production gate can verify launch-day and first-wave closeout readiness together.",
+    mode: "evidence",
+    operation: "record_launch_closeout_review"
+  });
   const backupVerificationRecordedAt = String(backupVerificationEvidence?.createdAt || "").trim();
   const backupVerificationRecordedMs = backupVerificationRecordedAt ? Date.parse(backupVerificationRecordedAt) : Number.NaN;
   const backupVerificationAgeDays = Number.isFinite(backupVerificationRecordedMs)
@@ -4829,7 +4850,13 @@ function buildLaunchMainlineProductionGatePayload({
   const postLaunchOpsSweepAgeDays = Number.isFinite(postLaunchOpsSweepRecordedMs)
     ? Math.max(0, Math.floor((Date.now() - postLaunchOpsSweepRecordedMs) / 86400000))
     : null;
-  const hasRecentPostLaunchOpsSweep = postLaunchOpsSweepAgeDays !== null && postLaunchOpsSweepAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const hasRecentPostLaunchOpsSweepDirect = postLaunchOpsSweepAgeDays !== null && postLaunchOpsSweepAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const launchCloseoutReviewRecordedAt = String(launchCloseoutReviewEvidence?.createdAt || "").trim();
+  const launchCloseoutReviewRecordedMs = launchCloseoutReviewRecordedAt ? Date.parse(launchCloseoutReviewRecordedAt) : Number.NaN;
+  const launchCloseoutReviewAgeDays = Number.isFinite(launchCloseoutReviewRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - launchCloseoutReviewRecordedMs) / 86400000))
+    : null;
+  const hasRecentLaunchCloseoutReviewDirect = launchCloseoutReviewAgeDays !== null && launchCloseoutReviewAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
   const deployVerificationRecordedAt = String(deployVerificationEvidence?.createdAt || "").trim();
   const deployVerificationRecordedMs = deployVerificationRecordedAt ? Date.parse(deployVerificationRecordedAt) : Number.NaN;
   const deployVerificationAgeDays = Number.isFinite(deployVerificationRecordedMs)
@@ -4848,15 +4875,26 @@ function buildLaunchMainlineProductionGatePayload({
     ? Math.max(0, Math.floor((Date.now() - rollbackWalkthroughRecordedMs) / 86400000))
     : null;
   const hasRecentRollbackWalkthroughDirect = rollbackWalkthroughAgeDays !== null && rollbackWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
-  const hasRecentCutoverReadiness = hasRecentLaunchDayReadinessReviewDirect
+  const hasRecentLaunchDayReadinessReview = hasRecentLaunchDayReadinessReviewDirect || hasRecentLaunchCloseoutReviewDirect;
+  const hasRecentPostLaunchOpsSweep = hasRecentPostLaunchOpsSweepDirect || hasRecentLaunchCloseoutReviewDirect;
+  const launchDayReadinessEvidenceAt = launchDayReadinessReviewRecordedAt || launchCloseoutReviewRecordedAt;
+  const postLaunchOpsSweepEvidenceAt = postLaunchOpsSweepRecordedAt || launchCloseoutReviewRecordedAt;
+  const cutoverReadinessEvidenceAt = cutoverWalkthroughRecordedAt || launchDayReadinessEvidenceAt;
+  const backupVerificationEvidenceAt = backupVerificationRecordedAt || launchDayReadinessEvidenceAt;
+  const recoveryDrillEvidenceAt = recoveryDrillRecordedAt || launchDayReadinessEvidenceAt;
+  const operationsWalkthroughEvidenceAt = operationsWalkthroughRecordedAt || launchDayReadinessEvidenceAt;
+  const deployVerificationEvidenceAt = deployVerificationRecordedAt || cutoverReadinessEvidenceAt;
+  const healthVerificationEvidenceAt = healthVerificationRecordedAt || cutoverReadinessEvidenceAt;
+  const rollbackWalkthroughEvidenceAt = rollbackWalkthroughRecordedAt || cutoverReadinessEvidenceAt;
+  const hasRecentCutoverReadiness = hasRecentLaunchDayReadinessReview
     || hasRecentCutoverWalkthroughDirect
     || (hasRecentDeployVerificationDirect && hasRecentHealthVerificationDirect && hasRecentRollbackWalkthroughDirect);
-  const hasRecentBackupVerification = hasRecentBackupVerificationDirect || hasRecentLaunchDayReadinessReviewDirect;
-  const hasRecentRecoveryDrill = hasRecentRecoveryDrillDirect || hasRecentLaunchDayReadinessReviewDirect;
-  const hasRecentOperationsWalkthrough = hasRecentOperationsWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
-  const hasRecentDeployVerification = hasRecentDeployVerificationDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
-  const hasRecentHealthVerification = hasRecentHealthVerificationDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
-  const hasRecentRollbackWalkthrough = hasRecentRollbackWalkthroughDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReviewDirect;
+  const hasRecentBackupVerification = hasRecentBackupVerificationDirect || hasRecentLaunchDayReadinessReview;
+  const hasRecentRecoveryDrill = hasRecentRecoveryDrillDirect || hasRecentLaunchDayReadinessReview;
+  const hasRecentOperationsWalkthrough = hasRecentOperationsWalkthroughDirect || hasRecentLaunchDayReadinessReview;
+  const hasRecentDeployVerification = hasRecentDeployVerificationDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReview;
+  const hasRecentHealthVerification = hasRecentHealthVerificationDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReview;
+  const hasRecentRollbackWalkthrough = hasRecentRollbackWalkthroughDirect || hasRecentCutoverWalkthroughDirect || hasRecentLaunchDayReadinessReview;
 
   if (defaultAdminPassword) {
     addStep(
@@ -5030,11 +5068,11 @@ function buildLaunchMainlineProductionGatePayload({
       opsWorkspace,
       effectiveCutoverDownload
     );
-    if (hasRecentLaunchDayReadinessReviewDirect) {
+    if (hasRecentLaunchDayReadinessReview) {
       addPassCheck(
         "production_launch_day_readiness_review_recent",
         "A recent launch day readiness review is recorded",
-        `The latest launch day readiness review for this lane was recorded at ${launchDayReadinessReviewRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        `The latest launch day readiness review for this lane was recorded at ${launchDayReadinessEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
         opsWorkspace,
         effectiveCutoverDownload,
         null,
@@ -5045,8 +5083,8 @@ function buildLaunchMainlineProductionGatePayload({
         "hold",
         "production_launch_day_readiness_review_recent",
         "Record a recent launch day readiness review",
-        launchDayReadinessReviewRecordedAt
-          ? `The latest launch day readiness review was recorded at ${launchDayReadinessReviewRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh launch day readiness review before widening rollout.`
+        launchDayReadinessEvidenceAt
+          ? `The latest launch day readiness review was recorded at ${launchDayReadinessEvidenceAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh launch day readiness review before widening rollout.`
           : `No launch day readiness review has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
         opsWorkspace,
         effectiveCutoverDownload,
@@ -5059,7 +5097,7 @@ function buildLaunchMainlineProductionGatePayload({
         "production_cutover_walkthrough_recent",
         "A recent cutover walkthrough is recorded",
         hasRecentCutoverWalkthroughDirect
-          ? `The latest cutover walkthrough for this lane was recorded at ${cutoverWalkthroughRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`
+          ? `The latest cutover walkthrough for this lane was recorded at ${cutoverReadinessEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`
           : `Recent deploy, health, and rollback evidence already cover the cutover walkthrough readiness window for this lane.`,
         opsWorkspace,
         effectiveCutoverDownload,
@@ -5085,7 +5123,7 @@ function buildLaunchMainlineProductionGatePayload({
     addPassCheck(
       "production_deploy_verification_recent",
       "A recent deploy verification is recorded",
-      `The latest deploy verification for this lane was recorded at ${deployVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+      `The latest deploy verification for this lane was recorded at ${deployVerificationEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
       opsWorkspace,
       effectiveCutoverDownload,
       null,
@@ -5109,7 +5147,7 @@ function buildLaunchMainlineProductionGatePayload({
     addPassCheck(
       "production_health_verification_recent",
       "A recent health verification is recorded",
-      `The latest health verification for this lane was recorded at ${healthVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+      `The latest health verification for this lane was recorded at ${healthVerificationEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
       opsWorkspace,
       effectiveCutoverDownload,
       null,
@@ -5133,7 +5171,7 @@ function buildLaunchMainlineProductionGatePayload({
     addPassCheck(
       "production_backup_verification_recent",
       "A recent backup verification is recorded",
-      `The latest backup verification for this lane was recorded at ${backupVerificationRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+      `The latest backup verification for this lane was recorded at ${backupVerificationEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
       opsWorkspace,
       effectiveProductionDownload,
       null,
@@ -5166,7 +5204,7 @@ function buildLaunchMainlineProductionGatePayload({
       addPassCheck(
         "production_recovery_drill_recent",
         "A recent recovery drill is recorded",
-        `The latest recovery drill for this lane was recorded at ${recoveryDrillRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        `The latest recovery drill for this lane was recorded at ${recoveryDrillEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
         opsWorkspace,
         recoveryDrillHandoffDownload,
         null,
@@ -5190,7 +5228,7 @@ function buildLaunchMainlineProductionGatePayload({
       addPassCheck(
         "production_rollback_walkthrough_recent",
         "A recent rollback walkthrough is recorded",
-        `The latest rollback walkthrough for this lane was recorded at ${rollbackWalkthroughRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        `The latest rollback walkthrough for this lane was recorded at ${rollbackWalkthroughEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
         opsWorkspace,
         effectiveCutoverDownload,
         null,
@@ -5224,7 +5262,7 @@ function buildLaunchMainlineProductionGatePayload({
       addPassCheck(
         "production_operations_walkthrough_recent",
         "A recent operations walkthrough is recorded",
-        `The latest operations walkthrough for this lane was recorded at ${operationsWalkthroughRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        `The latest operations walkthrough for this lane was recorded at ${operationsWalkthroughEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
         opsWorkspace,
         effectiveOperationsDownload,
         null,
@@ -5258,7 +5296,7 @@ function buildLaunchMainlineProductionGatePayload({
       addPassCheck(
         "production_post_launch_ops_sweep_recent",
         "A recent first-wave ops sweep is recorded",
-        `The latest first-wave ops sweep for this lane was recorded at ${postLaunchOpsSweepRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        `The latest first-wave ops sweep for this lane was recorded at ${postLaunchOpsSweepEvidenceAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
         opsWorkspace,
         effectivePostLaunchSweepDownload,
         null,
@@ -5269,13 +5307,47 @@ function buildLaunchMainlineProductionGatePayload({
         "hold",
         "production_post_launch_ops_sweep_recent",
         "Record a recent first-wave ops sweep",
-        postLaunchOpsSweepRecordedAt
-          ? `The latest first-wave ops sweep was recorded at ${postLaunchOpsSweepRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh ops sweep before widening rollout.`
+        postLaunchOpsSweepEvidenceAt
+          ? `The latest first-wave ops sweep was recorded at ${postLaunchOpsSweepEvidenceAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh ops sweep before widening rollout.`
           : `No first-wave ops sweep has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before widening rollout.`,
         opsWorkspace,
         effectivePostLaunchSweepDownload,
         null,
         postLaunchOpsSweepRecordAction
+      );
+    }
+  }
+  if (closeoutHandoffDownload) {
+    pushRecommendedDownload(closeoutHandoffDownload);
+    addPassCheck(
+      "production_launch_closeout_handoff",
+      "Review the launch closeout handoff",
+      "The unified launch closeout handoff already packages launch-day review, first-wave ops sweep, and closeout handoff material for this lane.",
+      opsWorkspace,
+      effectiveCloseoutDownload
+    );
+    if (hasRecentLaunchCloseoutReviewDirect) {
+      addPassCheck(
+        "production_launch_closeout_review_recent",
+        "A recent launch closeout review is recorded",
+        `The latest launch closeout review for this lane was recorded at ${launchCloseoutReviewRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        opsWorkspace,
+        effectiveCloseoutDownload,
+        null,
+        launchCloseoutReviewRecordAction
+      );
+    } else {
+      addStep(
+        "hold",
+        "production_launch_closeout_review_recent",
+        "Record a recent launch closeout review",
+        launchCloseoutReviewRecordedAt
+          ? `The latest launch closeout review was recorded at ${launchCloseoutReviewRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh launch closeout review before closing out the first-wave rollout.`
+          : `No launch closeout review has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one before closing out the first-wave rollout.`,
+        opsWorkspace,
+        effectiveCloseoutDownload,
+        null,
+        launchCloseoutReviewRecordAction
       );
     }
   }
@@ -10256,7 +10328,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   rollbackWalkthroughEvidence = null,
   cutoverWalkthroughEvidence = null,
   launchDayReadinessReviewEvidence = null,
-  postLaunchOpsSweepEvidence = null
+  postLaunchOpsSweepEvidence = null,
+  launchCloseoutReviewEvidence = null
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
@@ -10442,6 +10515,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "operations-handoff",
     params
   );
+  const closeoutHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline closeout handoff",
+    "developer-launch-mainline-closeout-handoff.txt",
+    "closeout-handoff",
+    params
+  );
   const postLaunchSweepHandoffDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline post-launch sweep handoff",
     "developer-launch-mainline-post-launch-sweep-handoff.txt",
@@ -10537,6 +10616,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     recoveryDrillHandoffDownload,
     operationsHandoffDownload,
     postLaunchSweepHandoffDownload,
+    closeoutHandoffDownload,
     recoveryDrillEvidence,
     backupVerificationEvidence,
     operationsWalkthroughEvidence,
@@ -10545,7 +10625,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     rollbackWalkthroughEvidence,
     cutoverWalkthroughEvidence,
     launchDayReadinessReviewEvidence,
-    postLaunchOpsSweepEvidence
+    postLaunchOpsSweepEvidence,
+    launchCloseoutReviewEvidence
   });
   const stageDefinitions = [
     {
@@ -10775,6 +10856,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(productionHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   const overallGate = buildLaunchMainlineGatePayload({
     status: preferredStage?.gate?.status || "ready",
     headline: preferredStage?.gate?.headline || "Launch mainline overview",
@@ -11259,6 +11341,19 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  if (payload.closeoutHandoffText) {
+    const closeoutHandoff = payload.closeoutHandoffText
+      .split(/\r?\n/)
+      .map((line) => String(line || "").trimEnd())
+      .filter((line) => line !== "");
+    if (closeoutHandoff.length) {
+      lines.push("");
+      lines.push("Production Launch Closeout Handoff:");
+      for (const line of closeoutHandoff.slice(1)) {
+        lines.push(`- ${line}`);
+      }
+    }
+  }
   if (Array.isArray(mainlineSummary.actionPlan) && mainlineSummary.actionPlan.length) {
     lines.push("");
     lines.push("Mainline Action Plan:");
@@ -11300,7 +11395,8 @@ function buildDeveloperLaunchMainlinePayload({
   rollbackWalkthroughEvidence = null,
   cutoverWalkthroughEvidence = null,
   launchDayReadinessReviewEvidence = null,
-  postLaunchOpsSweepEvidence = null
+  postLaunchOpsSweepEvidence = null,
+  launchCloseoutReviewEvidence = null
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
@@ -11323,6 +11419,7 @@ function buildDeveloperLaunchMainlinePayload({
   const recoveryDrillHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-recovery-drill-handoff.txt`;
   const operationsHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-operations-handoff.txt`;
   const postLaunchSweepHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-sweep-handoff.txt`;
+  const closeoutHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-closeout-handoff.txt`;
   const payload = {
     generatedAt,
     fileName,
@@ -11332,6 +11429,7 @@ function buildDeveloperLaunchMainlinePayload({
     recoveryDrillHandoffFileName,
     operationsHandoffFileName,
     postLaunchSweepHandoffFileName,
+    closeoutHandoffFileName,
     manifest: {
       generatedAt,
       channel,
@@ -11383,7 +11481,8 @@ function buildDeveloperLaunchMainlinePayload({
     rollbackWalkthroughEvidence,
     cutoverWalkthroughEvidence,
     launchDayReadinessReviewEvidence,
-    postLaunchOpsSweepEvidence
+    postLaunchOpsSweepEvidence,
+    launchCloseoutReviewEvidence
   });
   payload.productionHandoffText = buildDeveloperLaunchMainlineProductionHandoffText({
     generatedAt,
@@ -11416,6 +11515,12 @@ function buildDeveloperLaunchMainlinePayload({
     publicBaseUrl
   });
   payload.postLaunchSweepHandoffText = buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
+    generatedAt,
+    manifest: payload.manifest,
+    filters: payload.filters,
+    publicBaseUrl
+  });
+  payload.closeoutHandoffText = buildDeveloperLaunchMainlineCloseoutHandoffText({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
@@ -11489,6 +11594,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
     payload.postLaunchSweepHandoffText || ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt",
+    payload.closeoutHandoffText || ""
+  );
   return files;
 }
 
@@ -11500,7 +11610,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "checksums", "zip"],
+    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -11560,6 +11670,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.postLaunchSweepHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "closeout-handoff") {
+    return {
+      fileName: payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.closeoutHandoffText || ""
     };
   }
 
@@ -12248,6 +12365,42 @@ function buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
     "Primary Follow-Up: Continue Routed Review",
     "Secondary Follow-Up: Remaining routed review queue",
     "Sweep Flow: confirm cutover | continue routed review | hand off remaining queue | capture first-wave ops sweep evidence"
+  ];
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlineCloseoutHandoffText({
+  generatedAt = "",
+  manifest = {},
+  filters = {},
+  publicBaseUrl = ""
+} = {}) {
+  const project = manifest.project || {};
+  const closeoutDocs = [
+    "docs/launch-timeline-playbook.md",
+    "docs/shift-handover-template.md",
+    "docs/incident-response-playbook.md",
+    "docs/production-operations-runbook.md"
+  ];
+  const closeoutSignals = [
+    "/developer/launch-mainline",
+    "/developer/ops",
+    "developer-ops-summary",
+    "launch day readiness review",
+    "first-wave ops sweep"
+  ];
+  const lines = [
+    "RockSolid Developer Launch Mainline Closeout Handoff",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Public Base URL: ${publicBaseUrl || "-"}`,
+    "",
+    `Closeout Docs: ${closeoutDocs.join(" | ")}`,
+    `Closeout Signals: ${closeoutSignals.join(" | ")}`,
+    "Primary Follow-Up: Launch closeout review",
+    "Closeout Flow: confirm launch day readiness evidence | confirm first-wave ops sweep | hand off remaining routed review queue | capture launch closeout review"
   ];
   return lines.join("\n");
 }
@@ -20972,6 +21125,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
         channel
       });
+      const launchCloseoutReviewEvidence = queryLatestLaunchMainlineLaunchCloseoutReviewEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
       const payload = buildDeveloperLaunchMainlinePayload({
         generatedAt: releasePackage?.manifest?.generatedAt || launchWorkflow?.manifest?.generatedAt || nowIso(),
         releasePackage,
@@ -20992,6 +21149,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         cutoverWalkthroughEvidence,
         launchDayReadinessReviewEvidence,
         postLaunchOpsSweepEvidence,
+        launchCloseoutReviewEvidence,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,
@@ -21322,11 +21480,41 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             channel
           }
         };
+      } else if (operation === "record_launch_closeout_review") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.launch-closeout-review", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          launchCloseoutReviewedAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Launch closeout review recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "launch_closeout_review",
+            label: "Launch closeout review",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
       } else {
         throw new AppError(
           400,
           "INVALID_LAUNCH_MAINLINE_ACTION",
-          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, record_rollback_walkthrough, record_cutover_walkthrough, record_launch_day_readiness_review, or record_post_launch_ops_sweep."
+          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, record_rollback_walkthrough, record_cutover_walkthrough, record_launch_day_readiness_review, record_post_launch_ops_sweep, or record_launch_closeout_review."
         );
       }
 

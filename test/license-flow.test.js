@@ -5971,6 +5971,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_production_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_operations_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_post_launch_sweep_handoff"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_closeout_handoff"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
@@ -5996,6 +5997,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Production Post-Launch Sweep Handoff:/);
       assert.match(launchMainline.summaryText, /Continue Routed Review/);
       assert.match(launchMainline.summaryText, /Remaining routed review queue/);
+      assert.match(launchMainline.summaryText, /Production Launch Closeout Handoff:/);
+      assert.match(launchMainline.summaryText, /Launch closeout review/);
+      assert.match(launchMainline.summaryText, /first-wave ops sweep/i);
 
       const launchMainlineSummaryDownload = await getText(
         baseUrl,
@@ -6015,6 +6019,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Production Recovery Drill Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Operations Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Post-Launch Sweep Handoff:/);
+      assert.match(launchMainlineSummaryDownload.body, /Production Launch Closeout Handoff:/);
 
       const productionHandoffDownload = await getText(
         baseUrl,
@@ -6080,6 +6085,18 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(postLaunchSweepHandoffDownload.body, /Continue Routed Review/);
       assert.match(postLaunchSweepHandoffDownload.body, /Remaining routed review queue/);
       assert.match(postLaunchSweepHandoffDownload.body, /developer-ops-summary/);
+
+      const closeoutHandoffDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=closeout-handoff",
+        viewerSession.token
+      );
+      assert.match(closeoutHandoffDownload.contentType || "", /^text\/plain/);
+      assert.match(closeoutHandoffDownload.contentDisposition || "", /attachment; filename=\"rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-closeout-handoff\.txt\"/);
+      assert.match(closeoutHandoffDownload.body, /RockSolid Developer Launch Mainline Closeout Handoff/);
+      assert.match(closeoutHandoffDownload.body, /Launch closeout review/);
+      assert.match(closeoutHandoffDownload.body, /first-wave ops sweep/i);
+      assert.match(closeoutHandoffDownload.body, /shift-handover-template\.md/);
 
       const forbidden = await getJsonExpectError(
         baseUrl,
@@ -6254,9 +6271,24 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_closeout_handoff"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_post_launch_ops_sweep_recent"
         && item?.status === "block"
         && item?.setupAction?.operation === "record_post_launch_ops_sweep"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_closeout_review_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_launch_closeout_review"
       )
     );
     assert.ok(
@@ -7099,6 +7131,110 @@ test("developer launch mainline action can record a first-wave ops sweep and ref
     assert.equal(actionResult.receipt?.operation, "record_post_launch_ops_sweep");
     assert.ok(Array.isArray(actionResult.receipt?.created));
     assert.ok(actionResult.receipt.created.some((item) => item.key === "post_launch_ops_sweep"));
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_post_launch_ops_sweep_recent"
+        && item?.status === "pass"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can record a launch closeout review and refresh grouped closeout evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineCloseoutAdmin123!",
+    serverTokenSecret: "mainline-closeout-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineCloseoutAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.closeout.owner",
+        password: "LaunchMainlineCloseoutOwner123!",
+        displayName: "Launch Mainline Closeout Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_CLOSEOUT",
+        name: "Mainline Closeout App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.closeout.owner",
+      password: "LaunchMainlineCloseoutOwner123!"
+    });
+
+    const beforeMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_CLOSEOUT&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.ok(
+      Array.isArray(beforeMainline.mainlineSummary.productionGate?.checks)
+      && beforeMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_closeout_review_recent"
+        && item?.status === "block"
+      )
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_CLOSEOUT",
+        channel: "stable",
+        operation: "record_launch_closeout_review"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "record_launch_closeout_review");
+    assert.match(actionResult.message || "", /launch closeout review/i);
+    assert.equal(actionResult.result?.recordedEvidence?.key, "launch_closeout_review");
+    assert.ok(actionResult.result?.recordedEvidence?.createdAt);
+    assert.equal(actionResult.receipt?.operation, "record_launch_closeout_review");
+    assert.ok(Array.isArray(actionResult.receipt?.created));
+    assert.ok(actionResult.receipt.created.some((item) => item.key === "launch_closeout_review"));
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_closeout_review_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_day_readiness_review_recent"
+        && item?.status === "pass"
+      )
+    );
     assert.ok(
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
       && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>

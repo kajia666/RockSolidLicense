@@ -3844,15 +3844,11 @@ function buildLaunchMainlineActionReceipt({
   }
   const mainlineFollowUpActions = [
     ...mainlineContinuationActions,
-    ...mainlineWorkspaceActions.map((item) => ({
-      kind: "workspace",
-      label: item?.label || item?.key || "Open workspace",
-      workspaceAction: item
-    })),
-    ...mainlineRecommendedDownloads.map((item) => ({
-      kind: "download",
-      label: item?.label || item?.key || "Download",
-      recommendedDownload: item
+    ...mainlineHeroControls.map((item) => ({
+      kind: item?.kind || null,
+      label: item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action",
+      workspaceAction: item?.workspaceAction || null,
+      recommendedDownload: item?.recommendedDownload || null
     }))
   ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
   return {

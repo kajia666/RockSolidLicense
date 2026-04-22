@@ -7019,16 +7019,11 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         : [],
       [
         ...(Array.isArray(actionResult.receipt?.mainlineContinuationActions) ? actionResult.receipt.mainlineContinuationActions : []),
-        ...(Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
-          ? actionResult.receipt.mainlineWorkspaceActions.map((item) => ({
-              kind: "workspace",
-              workspaceAction: item
-            }))
-          : []),
-        ...(Array.isArray(actionResult.receipt?.mainlineRecommendedDownloads)
-          ? actionResult.receipt.mainlineRecommendedDownloads.map((item) => ({
-              kind: "download",
-              recommendedDownload: item
+        ...(Array.isArray(actionResult.receipt?.mainlineHeroControls)
+          ? actionResult.receipt.mainlineHeroControls.map((item) => ({
+              kind: item?.kind || null,
+              workspaceAction: item?.workspaceAction || null,
+              recommendedDownload: item?.recommendedDownload || null
             }))
           : [])
       ]
@@ -7299,16 +7294,11 @@ test("developer launch mainline action can create first launch batches and retur
         : [],
       [
         ...(Array.isArray(actionResult.receipt?.mainlineContinuationActions) ? actionResult.receipt.mainlineContinuationActions : []),
-        ...(Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
-          ? actionResult.receipt.mainlineWorkspaceActions.map((item) => ({
-              kind: "workspace",
-              workspaceAction: item
-            }))
-          : []),
-        ...(Array.isArray(actionResult.receipt?.mainlineRecommendedDownloads)
-          ? actionResult.receipt.mainlineRecommendedDownloads.map((item) => ({
-              kind: "download",
-              recommendedDownload: item
+        ...(Array.isArray(actionResult.receipt?.mainlineHeroControls)
+          ? actionResult.receipt.mainlineHeroControls.map((item) => ({
+              kind: item?.kind || null,
+              workspaceAction: item?.workspaceAction || null,
+              recommendedDownload: item?.recommendedDownload || null
             }))
           : [])
       ]

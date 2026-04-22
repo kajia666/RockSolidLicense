@@ -138,6 +138,7 @@
 - 现在统一 `launch-mainline` 里各层 `workspaceAction / recommendedDownload` 也会直接带上服务端生成的可执行 `href`，并且 `release_summary / integration_env` 这类旧的 key-only 下载动作也会在服务端先补齐归属 source；`Launch Mainline` 页面会优先执行这些服务端链接，不再主要靠前端自己按 key/source 去拼跳转和下载 URL
 - 同时统一主线现在也会直接下发一份完整的 `mainlineView`：生成主线时 summary 里就有 `heroControls + sections`，动作执行后 receipt 里会补齐同一份 view 和 `lastActionScreen`；`Launch Mainline` 页面现在连 `Last Mainline Action` 的卡片查找也会直接围着这份服务端 `lastActionScreen` 工作，不再需要在 summary、receipt 和本地结构之间来回拼 screen 语义
 - 在这之上，统一主线现在还会额外下发 `mainlinePage`：summary 里会给完整的 `heroControls + sections + summaryText`，动作执行后 receipt 会补齐同一份 page 快照和 `lastActionScreen`，所以 `Launch Mainline` 页面本身也开始优先围着一份统一 page model 工作，不再继续主要依赖旧的 `currentMainlineScreen` 路径
+- 进一步地，`Launch Mainline` 页面里的 workspace / download 控制现在也不再主要靠页面自己按 `action.key` 或 `item.source` 去拼 URL，而是直接执行服务端下发的 `href`；这条统一主线又少了一层前端侧分发判断
 - 同时它现在也会在 `mainlineSummary` 顶层直接下发 `continuation`，把 routed `Developer Ops` 复查链的下一步动作和推荐下载直接抬出来；统一的 `launch-mainline` 摘要里也会多出 `Mainline Continuation`，这样交接和复查都不需要再自己从 ops payload 里翻“下一步该怎么继续”
 - 这条 `continuation` 现在也已经正式并进统一主线自己的 `actionPlan` 和 `recommendedDownloads`，所以 `launch-mainline` 不只是“看得到下一步”，而是会把 routed ops 复查的继续步骤直接排进总览工作流里
 - 现在 `launch-mainline` 主体区块本身也开始直接吃服务端 sections 了：`mainlineSummary.sections` 会统一下发 `Launch Mainline Overview / Workspace Path / Mainline Action Plan / Recommended Downloads / Stage Gates` 这几块的标题、空态和卡片列表，页面不再自己分别拼 overview、action plan、stage gates 这几套结构

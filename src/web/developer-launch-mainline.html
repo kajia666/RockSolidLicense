@@ -358,10 +358,6 @@
         return `<span class="tag ${strong ? "strong" : ""}">${esc(value)}</span>`;
       }
 
-      function buildWorkspaceUrl(path, params = {}) {
-        return `${path}${q(params)}`;
-      }
-
       function setStatus(message, level = "") {
         const node = el("status-box");
         node.className = `status${level ? ` ${level}` : ""}`;
@@ -652,160 +648,24 @@
         if (!action?.key) {
           throw new Error("Generate Launch Mainline first so the workspace action can be resolved.");
         }
-        if (action.href) {
-          window.location.href = action.href;
-          return;
+        if (!action.href) {
+          throw new Error("This launch-mainline workspace action is missing a service-provided href.");
         }
-        const target = currentMainlineTarget();
-        if (!target.productCode) {
-          throw new Error("Enter a project code before opening another workspace.");
-        }
-        const routeBits = {
-          productId: target.productId,
-          productCode: target.productCode,
-          channel: target.channel,
-          autofocus: action.autofocus || "summary",
-          routeTitle: currentRouteContext().routeTitle,
-          routeReason: currentRouteContext().routeReason,
-          ...(action.params && typeof action.params === "object" ? action.params : {})
-        };
-        if (action.key === "project") {
-          window.location.href = buildWorkspaceUrl("/developer/projects", routeBits);
-          return;
-        }
-        if (action.key === "integration") {
-          window.location.href = buildWorkspaceUrl("/developer/integration", routeBits);
-          return;
-        }
-        if (action.key === "release") {
-          window.location.href = buildWorkspaceUrl("/developer/releases", routeBits);
-          return;
-        }
-        if (action.key === "licenses") {
-          window.location.href = buildWorkspaceUrl("/developer/licenses", routeBits);
-          return;
-        }
-        if (action.key === "ops") {
-          window.location.href = buildWorkspaceUrl("/developer/ops", routeBits);
-          return;
-        }
-        if (action.key === "launch-review") {
-          window.location.href = buildWorkspaceUrl("/developer/launch-review", routeBits);
-          return;
-        }
-        if (action.key === "launch-smoke") {
-          window.location.href = buildWorkspaceUrl("/developer/launch-smoke", routeBits);
-          return;
-        }
-        if (action.key === "launch-mainline") {
-          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", routeBits);
-          return;
-        }
-        window.location.href = buildWorkspaceUrl("/developer/launch-workflow", {
-          ...routeBits,
-          autofocus: action.autofocus || "handoff"
-        });
-      }
-
-      async function downloadLaunchMainline(format, fallbackFileName, label) {
-        const target = currentMainlineTarget();
-        if (!target.productCode) {
-          throw new Error("Enter a project code before downloading Launch Mainline.");
-        }
-        return downloadApiFile(
-          `/api/developer/launch-mainline/download${q({
-            productId: target.productId,
-            productCode: target.productCode,
-            channel: target.channel,
-            username: target.username,
-            search: target.search,
-            eventType: target.eventType,
-            actorType: target.actorType,
-            entityType: target.entityType,
-            limit: target.limit,
-            reviewMode: target.reviewMode,
-            format
-          })}`,
-          fallbackFileName,
-          label
-        );
+        window.location.href = action.href;
       }
 
       async function downloadMainlineRecommendedItem(item) {
-        if (!item?.source && !item?.href) {
+        if (!item?.key) {
           throw new Error("Generate Launch Mainline first so the recommended download can be resolved.");
         }
-        if (item.href) {
-          return downloadApiFile(
-            item.href,
-            item.fileName || "developer-launch-mainline-summary.txt",
-            item.label || "Launch mainline summary"
-          );
+        if (!item.href) {
+          throw new Error("This launch-mainline download is missing a service-provided href.");
         }
-        const target = currentMainlineTarget();
-        const params = {
-          productId: target.productId,
-          productCode: target.productCode,
-          channel: target.channel,
-          username: target.username,
-          search: target.search,
-          eventType: target.eventType,
-          actorType: target.actorType,
-          entityType: target.entityType,
-          limit: target.limit,
-          reviewMode: target.reviewMode,
-          ...(item.params && typeof item.params === "object" ? item.params : {})
-        };
-        if (item.source === "developer-launch-mainline") {
-          return downloadApiFile(
-            `/api/developer/launch-mainline/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "developer-launch-mainline-summary.txt",
-            item.label || "Launch mainline summary"
-          );
-        }
-        if (item.source === "developer-integration-package") {
-          return downloadApiFile(
-            `/api/developer/integration/package/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "integration-package.txt",
-            item.label || "Integration package summary"
-          );
-        }
-        if (item.source === "developer-launch-review") {
-          return downloadApiFile(
-            `/api/developer/launch-review/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "launch-review.txt",
-            item.label || "Launch review summary"
-          );
-        }
-        if (item.source === "developer-launch-smoke-kit") {
-          return downloadApiFile(
-            `/api/developer/launch-smoke-kit/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "launch-smoke-kit.txt",
-            item.label || "Launch smoke kit summary"
-          );
-        }
-        if (item.source === "developer-launch-workflow") {
-          return downloadApiFile(
-            `/api/developer/launch-workflow/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "launch-workflow.txt",
-            item.label || "Launch workflow summary"
-          );
-        }
-        if (item.source === "developer-ops") {
-          return downloadApiFile(
-            `/api/developer/ops/export/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "developer-ops-summary.txt",
-            item.label || "Developer ops summary"
-          );
-        }
-        if (item.source === "developer-release-package") {
-          return downloadApiFile(
-            `/api/developer/release-package/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "release-package.txt",
-            item.label || "Release package summary"
-          );
-        }
-        return downloadLaunchMainline(item.format || "summary", item.fileName || "developer-launch-mainline-summary.txt", item.label || "Launch mainline summary");
+        return downloadApiFile(
+          item.href,
+          item.fileName || "developer-launch-mainline-summary.txt",
+          item.label || "Launch mainline summary"
+        );
       }
 
       function renderHeroControls() {

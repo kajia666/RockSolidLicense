@@ -11688,6 +11688,10 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.doesNotMatch(html, /currentMainlineRecapCards/);
     assert.doesNotMatch(html, /currentMainlineFollowUpCards/);
     assert.doesNotMatch(html, /currentMainlineScreen/);
+    assert.doesNotMatch(html, /buildWorkspaceUrl\("/);
+    assert.doesNotMatch(html, /action\.key === "project"/);
+    assert.doesNotMatch(html, /item\.source === "developer-launch-mainline"/);
+    assert.doesNotMatch(html, /item\.source === "developer-ops"/);
     assert.match(html, /data-mainline-hero-control-index/);
     assert.match(html, /data-mainline-section-control-index/);
     assert.match(html, /data-mainline-receipt-card-control-index/);

@@ -3752,6 +3752,31 @@ function buildLaunchMainlineActionReceipt({
   const mainlineNextActions = Array.isArray(mainlineSummary.nextActions)
     ? mainlineSummary.nextActions.slice(0, 4)
     : [];
+  const mainlineOverviewCards = (Array.isArray(mainlineSummary.overviewCards) ? mainlineSummary.overviewCards : [])
+    .slice(0, 3)
+    .map((item) => ({
+      key: item?.key || null,
+      title: item?.title || item?.key || "Overview",
+      summary: item?.summary || "-",
+      tags: Array.isArray(item?.tags)
+        ? item.tags.map((tag) => ({
+            label: tag?.label || "tag",
+            value: tag?.value ?? "-",
+            strong: tag?.strong === true
+          }))
+        : [],
+      controls: Array.isArray(item?.controls)
+        ? item.controls.map((control) => ({
+            kind: control?.kind || null,
+            label: control?.label || control?.workspaceAction?.label || control?.recommendedDownload?.label || control?.bootstrapAction?.label || control?.setupAction?.label || control?.kind || "Action",
+            workspaceAction: control?.workspaceAction || null,
+            recommendedDownload: control?.recommendedDownload || null,
+            bootstrapAction: control?.bootstrapAction || null,
+            setupAction: control?.setupAction || null
+          }))
+        : []
+    }))
+    .filter((item) => item.key || item.summary || item.controls.length);
   const mainlineStages = (Array.isArray(mainlineSummary.stages) ? mainlineSummary.stages : [])
     .slice(0, 5)
     .map((item) => ({
@@ -3865,6 +3890,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecommendedDownload,
     mainlineContinuation,
     mainlineNextActions,
+    mainlineOverviewCards,
     mainlineStages,
     mainlineHeroControls,
     mainlineWorkspaceActions,
@@ -9354,6 +9380,110 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     actionPlan,
     recommendedDownloads
   });
+  const recommendedWorkspace = overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null;
+  const primaryAction = overallGate.primaryAction || preferredStage?.gate?.primaryAction || null;
+  const overviewCards = [
+    {
+      key: "overall_gate",
+      title: overallGate.headline || "Launch mainline overview",
+      summary: overallGate.summary || "Review the unified launch gate before first-wave rollout.",
+      tags: [
+        {
+          label: "status",
+          value: String(overallGate.status || "unknown").toUpperCase(),
+          strong: true
+        },
+        Number(overallGate.blockingCount || 0) ? {
+          label: "block",
+          value: Number(overallGate.blockingCount || 0),
+          strong: true
+        } : null,
+        Number(overallGate.attentionCount || 0) ? {
+          label: "attention",
+          value: Number(overallGate.attentionCount || 0),
+          strong: false
+        } : null
+      ].filter(Boolean),
+      controls: [
+        primaryAction?.workspaceAction ? {
+          kind: "workspace",
+          label: primaryAction.workspaceAction.label || primaryAction.title || "Open recommended workspace",
+          workspaceAction: primaryAction.workspaceAction
+        } : null,
+        primaryAction?.bootstrapAction ? {
+          kind: "bootstrap",
+          label: primaryAction.bootstrapAction.label || primaryAction.title || "Run bootstrap",
+          bootstrapAction: primaryAction.bootstrapAction
+        } : null,
+        primaryAction?.setupAction ? {
+          kind: "setup",
+          label: primaryAction.setupAction.label || primaryAction.title || "Run setup",
+          setupAction: primaryAction.setupAction
+        } : null,
+        overallGate.recommendedDownload ? {
+          kind: "download",
+          label: overallGate.recommendedDownload.label || "Download recommended summary",
+          recommendedDownload: overallGate.recommendedDownload
+        } : null
+      ].filter(Boolean)
+    },
+    {
+      key: "workspace_path",
+      title: recommendedWorkspace?.label || recommendedWorkspace?.key || "Workspace path",
+      summary: recommendedWorkspace
+        ? `Continue this launch lane through ${recommendedWorkspace.label || recommendedWorkspace.key || "the recommended workspace"} before widening rollout.`
+        : "Generate a launch mainline package to inspect the routed workspace path here.",
+      tags: recommendedWorkspace
+        ? [
+            {
+              label: "key",
+              value: recommendedWorkspace.key || "-",
+              strong: true
+            },
+            {
+              label: "autofocus",
+              value: recommendedWorkspace.autofocus || "summary",
+              strong: false
+            },
+            ...Object.entries(recommendedWorkspace.params || {})
+              .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+              .map(([key, value]) => ({
+                label: key,
+                value: String(value),
+                strong: false
+              }))
+          ]
+        : [],
+      controls: recommendedWorkspace
+        ? [
+            {
+              kind: "workspace",
+              label: recommendedWorkspace.label || "Open routed workspace",
+              workspaceAction: recommendedWorkspace
+            }
+          ]
+        : []
+    },
+    {
+      key: "recommended_downloads",
+      title: "Recommended downloads",
+      summary: recommendedDownloads.length
+        ? "Use these unified handoff downloads to keep release, review, smoke, and ops aligned for the current lane."
+        : "No recommended downloads yet.",
+      tags: [
+        {
+          label: "count",
+          value: recommendedDownloads.length,
+          strong: true
+        }
+      ],
+      controls: recommendedDownloads.map((item) => ({
+        kind: "download",
+        label: item?.label || item?.key || "Download",
+        recommendedDownload: item
+      }))
+    }
+  ];
   return {
     overallGate,
     releaseGate,
@@ -9363,11 +9493,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     opsGate,
     continuation,
     stages,
+    overviewCards,
     heroControls,
     workspaceActions,
-    primaryAction: overallGate.primaryAction || preferredStage?.gate?.primaryAction || null,
+    primaryAction,
     recommendedDownload: overallGate.recommendedDownload || preferredStage?.gate?.recommendedDownload || null,
-    recommendedWorkspace: overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null,
+    recommendedWorkspace,
     actionPlan,
     recommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
@@ -9409,6 +9540,24 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push(`- summary: ${mainlineSummary.continuation.summary || "-"}`);
     lines.push(`- workspace: ${formatWorkspaceActionText(mainlineSummary.continuation.workspaceAction)}`);
     lines.push(`- recommendedDownload: ${mainlineSummary.continuation.recommendedDownload?.label || mainlineSummary.continuation.recommendedDownload?.key || "-"}`);
+  }
+  if (Array.isArray(mainlineSummary.overviewCards) && mainlineSummary.overviewCards.length) {
+    lines.push("Mainline Overview Cards:");
+    for (const item of mainlineSummary.overviewCards) {
+      lines.push(`- ${item?.title || item?.key || "Overview"} | ${item?.summary || "-"}`);
+      if (Array.isArray(item?.tags) && item.tags.length) {
+        lines.push(`  tags: ${item.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
+      }
+      if (Array.isArray(item?.controls) && item.controls.length) {
+        for (const control of item.controls) {
+          lines.push(
+            `  control: ${control?.label || control?.kind || "Action"}`
+            + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+            + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+          );
+        }
+      }
+    }
   }
   if (Array.isArray(mainlineSummary.heroControls) && mainlineSummary.heroControls.length) {
     lines.push("Mainline Hero Controls:");

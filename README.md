@@ -139,6 +139,7 @@
 - 这块 `Stage Gates` 现在也进一步和统一主线的其他动作对齐了：每个 stage 自身就会带服务端下发的 `controls`，页面不再自己拆 `workspace/download` 两类按钮，所以 stage 层的跟进动作也回到了后台/API 主线上
 - 同时它现在也会单独下发顶层 `workspaceActions`，把那排固定的 `Release / Workflow / Review / Smoke / Ops` 入口也统一交给服务端编排；这样页面只负责消费，不再自己维护这排入口和 stage 推荐动作之间的语义差异
 - 统一 `Launch Mainline` 页头那排固定入口现在也已经彻底回到后台/API 主线上了：`mainlineSummary.heroControls` 会统一下发工作台入口和 `launch-mainline json / summary / checksums / zip` 下载动作，页面不再自己维护一排固定按钮；动作回执里也会同步带回 `mainlineHeroControls`，所以初始化之后页内 follow-up 和页头主入口吃的是同一套服务端语义
+- 现在统一 `Launch Mainline` 里原本还在页面层拼的 `Overview / Workspace Path / Recommended Downloads` 三块，也已经收成服务端下发的 `mainlineSummary.overviewCards` 了；动作回执里也会同步带回 `mainlineOverviewCards`，所以这几块卡片现在和 hero controls、action plan、stage gates 一样，都开始直接吃后台/API 语义，而不是再由前端自己拼标签、路径参数和下载按钮
 - `Last Mainline Action` 顶层 follow-up 现在也已经和这套 `heroControls` 对齐了：服务端会直接把 continuation 和 `mainlineHeroControls` 收成统一的 `mainlineFollowUpActions`，不再继续混用一套旧的 `workspaceActions + recommendedDownloads` 组合，所以初始化后的继续动作和页头统一入口已经是同一套主线语义
 - 统一 `launch-mainline` 的 summary 文本现在也会把这套 `Mainline Hero Controls` 一起打印出来，所以 handoff 材料不只看得到 gate、continuation 和 next actions，也能直接看到统一主线页头那组入口动作，交给 QA、值守或发布同事时更接近可执行交接单
 - 开发者授权快启里的 `Launch Bootstrap / First Batch Setup / Inventory Refill` follow-up 现在也会优先把 `launch-mainline summary / checksums / zip` 一起带出来，同时 `launch_recheck` 这一步也已经直接回到统一的 `/developer/launch-mainline` 工作台，所以初始化动作做完以后，可以直接顺着同一份总览 handoff 去做后续 launch review、smoke 和 ops 复查，而不是还要自己在几份材料和几个工作台之间来回切

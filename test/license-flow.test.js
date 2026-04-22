@@ -5918,6 +5918,21 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(Array.isArray(launchMainline.mainlineSummary.workspaceActions));
       assert.ok(launchMainline.mainlineSummary.workspaceActions.some((item) => item.key === "release"));
       assert.ok(launchMainline.mainlineSummary.workspaceActions.some((item) => item.key === "ops"));
+      assert.deepEqual(
+        Array.isArray(launchMainline.mainlineSummary.overviewCards)
+          ? launchMainline.mainlineSummary.overviewCards.map((item) => item?.key || null)
+          : [],
+        ["overall_gate", "workspace_path", "recommended_downloads"]
+      );
+      assert.ok(
+        launchMainline.mainlineSummary.overviewCards?.find((item) => item?.key === "overall_gate")?.controls?.some((control) => control?.workspaceAction?.key || control?.recommendedDownload?.key)
+      );
+      assert.ok(
+        launchMainline.mainlineSummary.overviewCards?.find((item) => item?.key === "workspace_path")?.controls?.some((control) => control?.workspaceAction?.key === launchMainline.mainlineSummary.recommendedWorkspace?.key)
+      );
+      assert.ok(
+        launchMainline.mainlineSummary.overviewCards?.find((item) => item?.key === "recommended_downloads")?.controls?.some((control) => control?.recommendedDownload?.key === "launch_mainline_summary")
+      );
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "release" && item.workspaceAction?.key));
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "ops" && item.recommendedDownload?.key));
       assert.ok(launchMainline.mainlineSummary.continuation);
@@ -6957,6 +6972,36 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         : []
     );
     assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineOverviewCards)
+        ? actionResult.receipt.mainlineOverviewCards.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || null
+                }))
+              : []
+          }))
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.overviewCards)
+        ? actionResult.launchMainline.mainlineSummary.overviewCards.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || null
+                }))
+              : []
+          }))
+        : []
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineHeroControls)
         ? actionResult.receipt.mainlineHeroControls.map((item) => ({
             kind: item?.kind || null,
@@ -7229,6 +7274,36 @@ test("developer launch mainline action can create first launch batches and retur
             item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
             item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null
           ].filter(Boolean))
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineOverviewCards)
+        ? actionResult.receipt.mainlineOverviewCards.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || null
+                }))
+              : []
+          }))
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.overviewCards)
+        ? actionResult.launchMainline.mainlineSummary.overviewCards.map((item) => ({
+            key: item?.key || null,
+            controls: Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || null
+                }))
+              : []
+          }))
         : []
     );
     assert.deepEqual(
@@ -11005,7 +11080,9 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Launch Smoke/);
     assert.match(html, /Developer Ops/);
     assert.match(html, /mainlineHeroControls/);
+    assert.match(html, /overviewCards/);
     assert.match(html, /data-mainline-hero-control-index/);
+    assert.match(html, /data-mainline-overview-control-index/);
     assert.match(html, /mainlineFollowUpActions/);
     assert.match(html, /data-mainline-receipt-followup-action-index/);
     assert.match(html, /data-mainline-followup-action-control-index/);

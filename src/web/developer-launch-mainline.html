@@ -450,6 +450,10 @@
         return currentMainline?.mainlineSummary || {};
       }
 
+      function currentMainlineOverviewCards() {
+        return Array.isArray(currentMainlineSummary().overviewCards) ? currentMainlineSummary().overviewCards : [];
+      }
+
       function currentMainlineActionPlan() {
         return Array.isArray(currentMainlineSummary().actionPlan) ? currentMainlineSummary().actionPlan : [];
       }
@@ -666,54 +670,30 @@
         return downloadLaunchMainline(item.format || "summary", item.fileName || "developer-launch-mainline-summary.txt", item.label || "Launch mainline summary");
       }
 
-      function renderWorkspacePath(action = null) {
-        if (!action?.key) {
-          return '<div class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>';
+      function currentMainlineOverviewCard(key = "") {
+        return currentMainlineOverviewCards().find((item) => item?.key === key) || null;
+      }
+
+      function renderOverviewCard(card = null, fallbackMessage = "Generate Launch Mainline to inspect this overview card.") {
+        if (!card?.key) {
+          return `<div class="hint">${esc(fallbackMessage)}</div>`;
         }
-        const bits = [
-          renderTag(`key:${action.key}`, true),
-          renderTag(`autofocus:${action.autofocus || "summary"}`)
-        ];
-        const params = action.params && typeof action.params === "object"
-          ? Object.entries(action.params)
-              .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
-              .map(([key, value]) => renderTag(`${key}:${value}`))
-              .join("")
+        const tags = Array.isArray(card.tags)
+          ? card.tags.map((tag) => renderTag(`${tag?.label || "tag"}:${tag?.value ?? "-"}`, tag?.strong === true)).join("")
           : "";
+        const controls = Array.isArray(card.controls) ? card.controls : [];
         return `
           <div class="item">
             <div class="item-head">
-              <div class="item-title">${esc(action.label || action.key)}</div>
-              <div class="audit-meta">${bits.join("")}</div>
+              <div class="item-title">${esc(card.title || card.key || "Overview")}</div>
+              <div class="audit-meta">${tags}</div>
             </div>
-            <div class="hint">${esc(currentRouteContext().routeReason)}</div>
-            <div class="audit-meta">${params || '<span class="hint">No extra params.</span>'}</div>
-          </div>
-        `;
-      }
-
-      function renderDownloadButtons(items = []) {
-        if (!items.length) {
-          return '<div class="hint">No recommended downloads yet.</div>';
-        }
-        return `
-          <div class="list">
-            ${items.map((item, index) => `
-              <div class="item">
-                <div class="item-head">
-                  <div class="item-title">${esc(item.label || item.key || "Download")}</div>
-                  <div class="audit-meta">
-                    ${renderTag(item.key || "download", true)}
-                    ${item.source ? renderTag(item.source) : ""}
-                    ${item.format ? renderTag(item.format) : ""}
-                  </div>
-                </div>
-                <div class="hint">${esc(item.fileName || "download.txt")}</div>
-                <div class="actions">
-                  <button type="button" class="secondary" data-mainline-download-index="${index}">Download</button>
-                </div>
+            <div class="hint">${esc(card.summary || "-")}</div>
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-overview-card-key="${esc(card.key)}" data-mainline-overview-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
               </div>
-            `).join("")}
+            ` : ""}
           </div>
         `;
       }
@@ -785,25 +765,20 @@
       function renderMainline() {
         const summary = currentMainlineSummary();
         const overallGate = summary.overallGate || null;
-        el("mainline-overview-box").innerHTML = overallGate
-          ? `
-            <div class="item">
-              <div class="item-head">
-                <div class="item-title">${esc(overallGate.headline || "Launch mainline overview")}</div>
-                <div class="audit-meta">
-                  ${renderTag(String(overallGate.status || "unknown").toUpperCase(), true)}
-                  ${Number(overallGate.blockingCount || 0) ? renderTag(`block:${overallGate.blockingCount}`, true) : ""}
-                  ${Number(overallGate.attentionCount || 0) ? renderTag(`attention:${overallGate.attentionCount}`) : ""}
-                </div>
-              </div>
-              <div class="hint">${esc(overallGate.summary || "-")}</div>
-            </div>
-          `
-          : '<div class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>';
+        el("mainline-overview-box").innerHTML = renderOverviewCard(
+          currentMainlineOverviewCard("overall_gate"),
+          "Generate a launch mainline package to inspect the unified overall gate here."
+        );
         el("mainline-hero-controls-box").innerHTML = renderHeroControls(summary);
-        el("mainline-workspace-box").innerHTML = renderWorkspacePath(summary.recommendedWorkspace || overallGate?.recommendedWorkspace || null);
+        el("mainline-workspace-box").innerHTML = renderOverviewCard(
+          currentMainlineOverviewCard("workspace_path"),
+          "Generate a launch mainline package to inspect the routed workspace path here."
+        );
         el("mainline-actions-box").innerHTML = renderActionPlan(summary.actionPlan || []);
-        el("mainline-downloads-box").innerHTML = renderDownloadButtons(summary.recommendedDownloads || []);
+        el("mainline-downloads-box").innerHTML = renderOverviewCard(
+          currentMainlineOverviewCard("recommended_downloads"),
+          "Generate a launch mainline package to inspect the unified downloads here."
+        );
         el("stage-gates-box").innerHTML = renderStageGates(summary);
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = currentMainline?.summaryText || "No launch mainline summary yet.";
@@ -1038,6 +1013,20 @@
         setOutput({ error: error.message });
       }));
       document.addEventListener("click", async (event) => {
+        const overviewControlButton = event.target.closest("[data-mainline-overview-control-index]");
+        if (overviewControlButton) {
+          const key = String(overviewControlButton.dataset.mainlineOverviewCardKey || "").trim();
+          const controlIndex = Number(overviewControlButton.dataset.mainlineOverviewControlIndex || -1);
+          const card = currentMainlineOverviewCard(key);
+          const control = Array.isArray(card?.controls) ? card.controls[controlIndex] : null;
+          try {
+            await executeMainlineControl(control);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
         const heroControlButton = event.target.closest("[data-mainline-hero-control-index]");
         if (heroControlButton) {
           const index = Number(heroControlButton.dataset.mainlineHeroControlIndex || -1);
@@ -1062,19 +1051,6 @@
             setStatus(error.message, "danger");
             setOutput({ error: error.message });
           }
-          return;
-        }
-        const recommendedDownloadButton = event.target.closest("[data-mainline-download-index]");
-        if (recommendedDownloadButton) {
-          const index = Number(recommendedDownloadButton.dataset.mainlineDownloadIndex || -1);
-          const item = currentMainline?.mainlineSummary?.recommendedDownloads?.[index];
-          if (!item) {
-            return;
-          }
-          await downloadMainlineRecommendedItem(item).catch((error) => {
-            setStatus(error.message, "danger");
-            setOutput({ error: error.message });
-          });
           return;
         }
         const followUpActionButton = event.target.closest("[data-mainline-followup-action-control-index]");

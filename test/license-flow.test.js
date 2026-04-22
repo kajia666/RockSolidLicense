@@ -5963,6 +5963,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "route_review_primary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "route_review_remaining"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "ops_summary"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_production_handoff"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
@@ -5975,6 +5976,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Stage Gates:/);
       assert.match(launchMainline.summaryText, /Production:/);
       assert.match(launchMainline.summaryText, /Ops:/);
+      assert.match(launchMainline.summaryText, /Production Handoff:/);
+      assert.match(launchMainline.summaryText, /healthcheck-rocksolid/);
+      assert.match(launchMainline.summaryText, /backup-rocksolid/);
 
       const launchMainlineSummaryDownload = await getText(
         baseUrl,
@@ -5989,6 +5993,21 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Download Launch Mainline Zip/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
+      assert.match(launchMainlineSummaryDownload.body, /Production Handoff:/);
+
+      const productionHandoffDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=production-handoff",
+        viewerSession.token
+      );
+      assert.match(productionHandoffDownload.contentType || "", /^text\/plain/);
+      assert.match(productionHandoffDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-production-handoff\.txt"/);
+      assert.match(productionHandoffDownload.body, /RockSolid Developer Launch Mainline Production Handoff/);
+      assert.match(productionHandoffDownload.body, /deploy\/linux\/healthcheck-rocksolid\.sh/);
+      assert.match(productionHandoffDownload.body, /deploy\/windows\/healthcheck-rocksolid\.ps1/);
+      assert.match(productionHandoffDownload.body, /deploy\/linux\/backup-rocksolid\.sh/);
+      assert.match(productionHandoffDownload.body, /docs\/linux-deployment\.md/);
+      assert.match(productionHandoffDownload.body, /docs\/windows-deployment-guide\.md/);
 
       const forbidden = await getJsonExpectError(
         baseUrl,

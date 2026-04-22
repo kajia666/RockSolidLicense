@@ -4471,7 +4471,20 @@ function buildLaunchMainlineProductionGatePayload({
   const defaultServerTokenSecret = String(config.serverTokenSecret || "") === DEFAULT_PRODUCTION_SERVER_TOKEN_SECRET;
   const tokenKeyRows = Array.isArray(tokenKeys?.keys) ? tokenKeys.keys : [];
   const activeKeyId = String(tokenKeys?.activeKeyId || "").trim();
-  const publicEntryIsHttps = String(publicBaseUrl || "").trim().toLowerCase().startsWith("https://");
+  const normalizedPublicBaseUrl = String(publicBaseUrl || "").trim();
+  let publicEntryHost = "";
+  try {
+    publicEntryHost = normalizedPublicBaseUrl ? new URL(normalizedPublicBaseUrl).hostname.toLowerCase() : "";
+  } catch {
+    publicEntryHost = "";
+  }
+  const publicEntryIsHttps = normalizedPublicBaseUrl.toLowerCase().startsWith("https://");
+  const publicEntryIsLoopback = !publicEntryHost
+    || publicEntryHost === "localhost"
+    || publicEntryHost === "0.0.0.0"
+    || publicEntryHost === "::1"
+    || publicEntryHost === "[::1]"
+    || publicEntryHost.startsWith("127.");
   const mainStoreHealth = health?.storage?.mainStore || {};
   const runtimeStateHealth = health?.storage?.runtimeState || {};
   const mainStoreDriver = String(mainStoreHealth?.driver || config.mainStoreDriver || "").trim().toLowerCase();
@@ -4504,12 +4517,30 @@ function buildLaunchMainlineProductionGatePayload({
       opsWorkspace
     );
   }
+  if (publicEntryIsLoopback) {
+    addStep(
+      "hold",
+      "production_public_entrypoint",
+      "Publish a non-loopback public entrypoint",
+      "The current launch-mainline URL still points to localhost, 127.x, or another loopback-style entrypoint. Move it behind the real production hostname before widening rollout.",
+      opsWorkspace
+    );
+  }
   if (mainStoreDriver === "postgres" && !Boolean(mainStoreHealth?.externalReady)) {
     addStep(
       "hold",
       "production_main_store",
       "Confirm PostgreSQL main-store readiness",
       "Main storage is configured for PostgreSQL but the external-ready signal is not healthy yet.",
+      opsWorkspace
+    );
+  }
+  if (mainStoreDriver === "sqlite") {
+    addStep(
+      "attention",
+      "production_main_store_single_host",
+      "Review the single-host SQLite main store plan",
+      "Main storage is still on SQLite. Confirm the backup, restore, and operator plan before widening beyond a single-host launch lane.",
       opsWorkspace
     );
   }
@@ -4528,6 +4559,14 @@ function buildLaunchMainlineProductionGatePayload({
       "production_runtime_memory",
       "Replace the memory runtime-state driver",
       "The launch lane is still using in-memory runtime state. Move to sqlite or redis before production traffic.",
+      opsWorkspace
+    );
+  } else if (runtimeStateDriver === "sqlite") {
+    addStep(
+      "attention",
+      "production_runtime_state_single_host",
+      "Review the single-host runtime-state plan",
+      "Runtime state is still on SQLite. Confirm how sessions, nonce replay data, and restore steps will behave during first-wave operations.",
       opsWorkspace
     );
   }

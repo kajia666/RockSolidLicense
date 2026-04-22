@@ -5937,7 +5937,12 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "release" && item.workspaceAction?.key));
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "ops" && item.recommendedDownload?.key));
       assert.ok(launchMainline.mainlineSummary.productionGate);
-      assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "production" && item.workspaceAction?.key === "security"));
+      assert.ok(
+        launchMainline.mainlineSummary.stages.some((item) =>
+          item.key === "production"
+          && item.workspaceAction?.key === launchMainline.mainlineSummary.productionGate?.recommendedWorkspace?.key
+        )
+      );
       assert.ok(launchMainline.mainlineSummary.continuation);
       assert.equal(launchMainline.mainlineSummary.continuation?.workspaceAction?.key, "ops");
       assert.match(launchMainline.mainlineSummary.continuation?.workspaceAction?.params?.routeAction || "", /^(review_next|complete_route_review)$/);
@@ -6120,6 +6125,88 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.match(launchMainline.summaryText || "", /Production:/);
     assert.match(launchMainline.summaryText || "", /default admin password/i);
     assert.match(launchMainline.summaryText || "", /server token secret/i);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline production gate blocks loopback entrypoints and flags single-host storage", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "ProdReadyAdmin123!",
+    serverTokenSecret: "prod-ready-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "ProdReadyAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.runtime.owner",
+        password: "LaunchMainlineRuntimeOwner123!",
+        displayName: "Launch Mainline Runtime Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_RUNTIME",
+        name: "Mainline Runtime App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.runtime.owner",
+      password: "LaunchMainlineRuntimeOwner123!"
+    });
+
+    const launchMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_RUNTIME&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.equal(launchMainline.mainlineSummary.productionGate?.status, "hold");
+    assert.equal(launchMainline.mainlineSummary.productionGate?.recommendedWorkspace?.key, "ops");
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
+      && launchMainline.mainlineSummary.productionGate.actionPlan.some((item) =>
+        item?.key === "production_public_entrypoint"
+        && item?.workspaceAction?.key === "ops"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
+      && launchMainline.mainlineSummary.productionGate.actionPlan.some((item) =>
+        item?.key === "production_main_store_single_host"
+        && item?.status === "review"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
+      && launchMainline.mainlineSummary.productionGate.actionPlan.some((item) =>
+        item?.key === "production_runtime_state_single_host"
+        && item?.status === "review"
+      )
+    );
+    assert.match(launchMainline.summaryText || "", /loopback/i);
+    assert.match(launchMainline.summaryText || "", /sqlite/i);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

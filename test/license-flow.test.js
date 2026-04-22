@@ -6152,6 +6152,14 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_cutover_walkthrough_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_cutover_walkthrough"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_recovery_drill_handoff"
         && item?.status === "pass"
       )
@@ -6735,6 +6743,117 @@ test("developer launch mainline action can record deploy, health, and rollback e
     assert.ok(
       Array.isArray(rollbackResult.launchMainline?.mainlineSummary?.productionGate?.checks)
       && rollbackResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_rollback_walkthrough_recent"
+        && item?.status === "pass"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline action can record a cutover walkthrough and refresh grouped production evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineCutoverAdmin123!",
+    serverTokenSecret: "mainline-cutover-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineCutoverAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.cutover.owner",
+        password: "LaunchMainlineCutoverOwner123!",
+        displayName: "Launch Mainline Cutover Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_CUTOVER",
+        name: "Mainline Cutover App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.cutover.owner",
+      password: "LaunchMainlineCutoverOwner123!"
+    });
+
+    const beforeMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_CUTOVER&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.ok(
+      Array.isArray(beforeMainline.mainlineSummary.productionGate?.checks)
+      && beforeMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_cutover_walkthrough_recent"
+        && item?.status === "block"
+      )
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_CUTOVER",
+        channel: "stable",
+        operation: "record_cutover_walkthrough"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "record_cutover_walkthrough");
+    assert.match(actionResult.message || "", /cutover walkthrough/i);
+    assert.equal(actionResult.result?.recordedEvidence?.key, "cutover_walkthrough");
+    assert.ok(actionResult.result?.recordedEvidence?.createdAt);
+    assert.equal(actionResult.receipt?.operation, "record_cutover_walkthrough");
+    assert.ok(Array.isArray(actionResult.receipt?.created));
+    assert.ok(actionResult.receipt.created.some((item) => item.key === "cutover_walkthrough"));
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_cutover_walkthrough_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_deploy_verification_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_health_verification_recent"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_rollback_walkthrough_recent"
         && item?.status === "pass"
       )

@@ -9239,6 +9239,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push(`- workspace: ${formatWorkspaceActionText(mainlineSummary.continuation.workspaceAction)}`);
     lines.push(`- recommendedDownload: ${mainlineSummary.continuation.recommendedDownload?.label || mainlineSummary.continuation.recommendedDownload?.key || "-"}`);
   }
+  if (Array.isArray(mainlineSummary.nextActions) && mainlineSummary.nextActions.length) {
+    lines.push("Mainline Next Actions:");
+    for (const item of mainlineSummary.nextActions) {
+      lines.push(`- ${item}`);
+    }
+  }
   lines.push("");
   lines.push("Stage Gates:");
   const stageRows = [

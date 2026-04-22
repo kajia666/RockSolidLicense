@@ -9410,6 +9410,16 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push(`- workspace: ${formatWorkspaceActionText(mainlineSummary.continuation.workspaceAction)}`);
     lines.push(`- recommendedDownload: ${mainlineSummary.continuation.recommendedDownload?.label || mainlineSummary.continuation.recommendedDownload?.key || "-"}`);
   }
+  if (Array.isArray(mainlineSummary.heroControls) && mainlineSummary.heroControls.length) {
+    lines.push("Mainline Hero Controls:");
+    for (const item of mainlineSummary.heroControls) {
+      lines.push(
+        `- ${item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action"}`
+        + `${item?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+        + `${item?.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+      );
+    }
+  }
   if (Array.isArray(mainlineSummary.nextActions) && mainlineSummary.nextActions.length) {
     lines.push("Mainline Next Actions:");
     for (const item of mainlineSummary.nextActions) {

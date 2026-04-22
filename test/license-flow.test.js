@@ -5950,6 +5950,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
       assert.match(launchMainline.summaryText, /Mainline Recommended Download:/);
       assert.match(launchMainline.summaryText, /Mainline Continuation:/);
+      assert.match(launchMainline.summaryText, /Mainline Hero Controls:/);
+      assert.match(launchMainline.summaryText, /Open Release Workspace/);
+      assert.match(launchMainline.summaryText, /Download Launch Mainline Summary/);
       assert.match(launchMainline.summaryText, /Mainline Next Actions:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
       assert.match(launchMainline.summaryText, /Ops:/);
@@ -5963,6 +5966,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-summary\.txt"/);
       assert.match(launchMainlineSummaryDownload.body, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainlineSummaryDownload.body, /Primary Mainline Action:/);
+      assert.match(launchMainlineSummaryDownload.body, /Mainline Hero Controls:/);
+      assert.match(launchMainlineSummaryDownload.body, /Download Launch Mainline Zip/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
 

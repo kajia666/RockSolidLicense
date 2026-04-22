@@ -441,25 +441,24 @@
         return currentMainline?.mainlineSummary || {};
       }
 
-      function currentMainlineSections() {
-        const summarySections = Array.isArray(currentMainlineSummary().sections) ? currentMainlineSummary().sections : [];
-        if (summarySections.length) {
-          return summarySections;
+      function currentMainlineScreen() {
+        const summaryScreen = currentMainlineSummary().screen;
+        if (summaryScreen && typeof summaryScreen === "object") {
+          return summaryScreen;
         }
         const receipt = currentLastMainlineReceipt();
-        return Array.isArray(receipt?.mainlineSections) ? receipt.mainlineSections : [];
+        if (receipt?.mainlineScreen && typeof receipt.mainlineScreen === "object") {
+          return receipt.mainlineScreen;
+        }
+        return {};
+      }
+
+      function currentMainlineSections() {
+        return Array.isArray(currentMainlineScreen().sections) ? currentMainlineScreen().sections : [];
       }
 
       function currentMainlineSection(key = "") {
         return currentMainlineSections().find((item) => String(item?.key || "").trim() === String(key || "").trim()) || null;
-      }
-
-      function currentMainlineOverviewCards() {
-        return Array.isArray(currentMainlineSummary().overviewCards) ? currentMainlineSummary().overviewCards : [];
-      }
-
-      function currentMainlineActionPlan() {
-        return Array.isArray(currentMainlineSummary().actionPlan) ? currentMainlineSummary().actionPlan : [];
       }
 
       function currentLastMainlineReceipt() {
@@ -726,10 +725,10 @@
       }
 
       function renderHeroControls(summary = {}) {
-        const receipt = currentLastMainlineReceipt();
-        const mainlineHeroControls = Array.isArray(summary.heroControls) && summary.heroControls.length
-          ? summary.heroControls
-          : (Array.isArray(receipt?.mainlineHeroControls) ? receipt.mainlineHeroControls : []);
+        const screen = currentMainlineScreen();
+        const mainlineHeroControls = Array.isArray(screen.heroControls) && screen.heroControls.length
+          ? screen.heroControls
+          : (Array.isArray(summary.heroControls) ? summary.heroControls : []);
         if (!mainlineHeroControls.length) {
           return '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
         }

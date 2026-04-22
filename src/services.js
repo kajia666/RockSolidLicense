@@ -3829,6 +3829,10 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: item?.recommendedDownload || null
     }))
     .filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
+  const mainlineScreen = {
+    heroControls: mainlineHeroControls,
+    sections: mainlineSections
+  };
   const mainlineWorkspaceActions = (Array.isArray(mainlineSummary.workspaceActions) ? mainlineSummary.workspaceActions : [])
     .slice(0, 5)
     .map((item) => ({
@@ -4015,6 +4019,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineSections,
+    mainlineScreen,
     mainlineStages,
     mainlineHeroControls,
     mainlineWorkspaceActions,
@@ -9672,6 +9677,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: stageCards
     }
   ];
+  const screen = {
+    heroControls,
+    sections
+  };
   return {
     overallGate,
     releaseGate,
@@ -9683,6 +9692,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     stages,
     overviewCards,
     sections,
+    screen,
     heroControls,
     workspaceActions,
     primaryAction,

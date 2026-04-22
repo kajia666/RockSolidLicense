@@ -6857,6 +6857,18 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       actionResult.receipt?.mainlineContinuation?.recommendedDownload?.key,
       actionResult.launchMainline?.mainlineSummary?.continuation?.recommendedDownload?.key
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineContinuationActions)
+        ? actionResult.receipt.mainlineContinuationActions.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      [
+        { kind: "workspace", key: actionResult.launchMainline?.mainlineSummary?.continuation?.workspaceAction?.key || null },
+        { kind: "download", key: actionResult.launchMainline?.mainlineSummary?.continuation?.recommendedDownload?.key || null }
+      ].filter((item) => item.key)
+    );
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
     assert.deepEqual(
@@ -6991,6 +7003,18 @@ test("developer launch mainline action can create first launch batches and retur
     assert.equal(
       actionResult.receipt?.mainlineContinuation?.recommendedDownload?.key,
       actionResult.launchMainline?.mainlineSummary?.continuation?.recommendedDownload?.key
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineContinuationActions)
+        ? actionResult.receipt.mainlineContinuationActions.map((item) => ({
+            kind: item?.kind || null,
+            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          }))
+        : [],
+      [
+        { kind: "workspace", key: actionResult.launchMainline?.mainlineSummary?.continuation?.workspaceAction?.key || null },
+        { kind: "download", key: actionResult.launchMainline?.mainlineSummary?.continuation?.recommendedDownload?.key || null }
+      ].filter((item) => item.key)
     );
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
@@ -10728,8 +10752,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Open Review Workspace/);
     assert.match(html, /Open Smoke Workspace/);
     assert.match(html, /Open Ops Workspace/);
-    assert.match(html, /data-mainline-receipt-continuation-workspace/);
-    assert.match(html, /data-mainline-receipt-continuation-download/);
+    assert.match(html, /mainlineContinuationActions/);
+    assert.match(html, /data-mainline-receipt-continuation-action-index/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

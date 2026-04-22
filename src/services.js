@@ -3794,6 +3794,21 @@ function buildLaunchMainlineActionReceipt({
       setupAction: item?.setupAction || null
     }))
     .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
+  const mainlineContinuationActions = [];
+  if (mainlineContinuation?.workspaceAction) {
+    mainlineContinuationActions.push({
+      kind: "workspace",
+      label: mainlineContinuation.workspaceAction.label || mainlineContinuation.title || "Open continuation workspace",
+      workspaceAction: mainlineContinuation.workspaceAction
+    });
+  }
+  if (mainlineContinuation?.recommendedDownload) {
+    mainlineContinuationActions.push({
+      kind: "download",
+      label: mainlineContinuation.recommendedDownload.label || "Download continuation summary",
+      recommendedDownload: mainlineContinuation.recommendedDownload
+    });
+  }
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -3812,6 +3827,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineWorkspaceActions,
     mainlineRecommendedDownloads,
     mainlineActions,
+    mainlineContinuationActions,
     actions
   };
 }

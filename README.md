@@ -147,6 +147,8 @@
 - 同时 `Last Mainline Action` 这块现在也开始吃服务端 screen 了：action receipt 会直接带 `mainlineLastActionScreen`，把 recap 和 follow-up 两组卡片收成统一区块，页面不再需要自己把 `mainlineRecapCards + mainlineFollowUpCards` 手工拼成两段结构
 - 现在统一 `Launch Mainline` 顶部那块 `Route Focus` 也开始直接吃服务端 payload 了：`mainlineSummary.routeFocus` 和 `mainlinePage.routeFocus` 会把当前 lane 的 handoff 标题、摘要、标签和 controls 一起下发，页面不再主要靠 query 参数自己拼 route context 文案
 - 同时统一 `Launch Mainline` 里的当前 lane 表单快照也开始直接吃服务端 payload 了：`mainlineSummary.form`、`mainlineView.form`、`mainlinePage.form` 和 action receipt 会把 `Project Code / Channel / Review Mode / Filters` 一起带回来，页面加载、刷新和动作执行后都会优先回填这份统一表单快照，不再主要靠 query 参数和页面本地状态长期维持这组上下文
+- 统一 `Launch Mainline` 现在还额外带上了 `productionGate`，会直接把默认管理员密码、默认 server token secret、运行态 driver 安全性、HTTPS 入口状态和 token-key 冗余这些上线前硬条件并进主线 gate；一旦这些条件阻断或需要复查，主线会直接把 lane 路由到 `Developer Security` 或 `Developer Ops`，而不是把这层生产化检查留在主线外面
+- 现在这层 `productionGate` 也不再只是 `Stage Gates` 里的一行状态了：统一主线会直接下发 `Production Gate Checks` section，把每条生产 readiness 检查作为独立卡片和可执行 controls 一起给页面和 action receipt，所以软件作者在主线里就能直接看见“到底是哪几项阻断、该先点哪个安全/运维动作”
 - 现在这条 `/api/developer/launch-mainline` 聚合结果还会直接下发 `stages`，把 `release / workflow / review / smoke / ops` 每一段的 gate、workspaceAction 和 recommendedDownload 一起给出来，所以 `Launch Mainline` 工作台里的 stage 按钮也开始优先吃服务端 payload，不再主要靠前端自己按 key 做映射
 - 这块 `Stage Gates` 现在也进一步和统一主线的其他动作对齐了：每个 stage 自身就会带服务端下发的 `controls`，页面不再自己拆 `workspace/download` 两类按钮，所以 stage 层的跟进动作也回到了后台/API 主线上
 - 同时它现在也会单独下发顶层 `workspaceActions`，把那排固定的 `Release / Workflow / Review / Smoke / Ops` 入口也统一交给服务端编排；这样页面只负责消费，不再自己维护这排入口和 stage 推荐动作之间的语义差异

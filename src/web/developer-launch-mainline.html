@@ -269,6 +269,13 @@
           <div id="mainline-overview-box" class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>
         </article>
         <article class="card">
+          <h2 id="production-checks-title">Production Gate Checks</h2>
+          <div id="production-checks-box" class="hint">Generate a launch mainline package to inspect the production readiness checks here.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
           <h2 id="mainline-workspace-title">Workspace Path</h2>
           <div id="mainline-workspace-box" class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>
         </article>
@@ -779,6 +786,13 @@
             fallbackMessage: "Generate a launch mainline package to inspect the unified overall gate here."
           },
           {
+            key: "production_checks",
+            titleId: "production-checks-title",
+            boxId: "production-checks-box",
+            fallbackTitle: "Production Gate Checks",
+            fallbackMessage: "Generate a launch mainline package to inspect the production readiness checks here."
+          },
+          {
             key: "workspace_path",
             titleId: "mainline-workspace-title",
             boxId: "mainline-workspace-box",
@@ -996,6 +1010,7 @@
         el("mainline-summary").textContent = "Generate a launch mainline package to inspect the aggregated summary here.";
         el("mainline-hero-controls-box").innerHTML = '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
         el("mainline-overview-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>';
+        el("production-checks-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the production readiness checks here.</div>';
         el("mainline-workspace-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the routed workspace path here.</div>';
         el("mainline-actions-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the server-side action plan here.</div>';
         el("mainline-downloads-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>';

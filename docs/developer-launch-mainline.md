@@ -4,6 +4,7 @@ The developer launch mainline workspace is available at `/developer/launch-mainl
 
 It is the unified author-side control tower for first-wave rollout. Use it when you want one place to review:
 
+- production readiness
 - release readiness
 - launch workflow readiness
 - launch review follow-up
@@ -27,6 +28,7 @@ Supported download formats:
 The workspace keeps the launch mainline as one server-driven package and surfaces:
 
 - `overallGate`
+- `productionGate`
 - `releaseGate`
 - `workflowGate`
 - `reviewGate`
@@ -36,6 +38,19 @@ The workspace keeps the launch mainline as one server-driven package and surface
 - unified `recommendedDownloads`
 
 That makes it useful when the software author, QA, release, or launch-duty teammates need one handoff instead of bouncing between several related pages first.
+
+The production gate is the part that answers "can this lane widen beyond internal launch traffic yet?" It now checks a practical first production slice directly from backend/API state, including:
+
+- default admin password still in use
+- default server token secret still in use
+- runtime-state still on `memory`
+- PostgreSQL or Redis external readiness when those drivers are configured
+- whether the current public entrypoint is still HTTP
+- whether token-key rotation still starts from only one published key
+
+When one of those checks blocks or needs review, the unified mainline can now send the software author straight into `Developer Security` or `Developer Ops` from the same launch path instead of leaving production-readiness review outside the main rollout flow.
+
+Those checks now also surface as a first-class `Production Gate Checks` section inside `/developer/launch-mainline`, not only as a stage status. Each check is rendered as its own card with service-driven controls, so the lane can move from "blocked by production readiness" to the next concrete security or ops action without leaving the unified mainline flow first.
 
 ## Why it matters
 

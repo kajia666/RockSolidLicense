@@ -3206,6 +3206,9 @@ function resolveLaunchWorkflowWorkspaceAutofocus(key, autofocus = "") {
   if (key === "ops") {
     return autofocus || "snapshot";
   }
+  if (key === "security") {
+    return autofocus || "summary";
+  }
   if (key === "launch-review" || key === "launch-mainline" || key === "launch-smoke") {
     return autofocus || "summary";
   }
@@ -3227,6 +3230,9 @@ function resolveLaunchWorkflowWorkspacePath(key) {
   }
   if (key === "ops") {
     return "/developer/ops";
+  }
+  if (key === "security") {
+    return "/developer/security";
   }
   if (key === "launch-review") {
     return "/developer/launch-review";
@@ -3412,6 +3418,15 @@ function createLaunchWorkflowWorkspaceShortcut(key, autofocus = "", label = "", 
     return {
       key,
       label: label || "Open Ops Workspace",
+      autofocus: resolvedAutofocus,
+      ...extras,
+      href
+    };
+  }
+  if (key === "security") {
+    return {
+      key,
+      label: label || "Open Security Workspace",
       autofocus: resolvedAutofocus,
       ...extras,
       href
@@ -3999,7 +4014,6 @@ function buildLaunchMainlineActionReceipt({
     }))
     .filter((item) => item.key || item.summary || item.controls.length);
   const mainlineSections = (Array.isArray(mainlineSummary.sections) ? mainlineSummary.sections : [])
-    .slice(0, 5)
     .map((item) => ({
       key: item?.key || null,
       title: item?.title || item?.key || "Section",
@@ -4032,7 +4046,6 @@ function buildLaunchMainlineActionReceipt({
     }))
     .filter((item) => item.key || item.cards.length);
   const mainlineStages = (Array.isArray(mainlineSummary.stages) ? mainlineSummary.stages : [])
-    .slice(0, 5)
     .map((item) => ({
       key: item?.key || null,
       label: item?.label || item?.key || "stage",
@@ -4318,6 +4331,9 @@ function normalizeLaunchMainlineGateStatus(status = "unknown") {
   return "attention";
 }
 
+const DEFAULT_PRODUCTION_ADMIN_PASSWORD = "ChangeMe!123";
+const DEFAULT_PRODUCTION_SERVER_TOKEN_SECRET = "change-me-before-production-rocksolid";
+
 function buildLaunchMainlineGatePayload({
   status = "unknown",
   headline = "",
@@ -4352,6 +4368,9 @@ function buildLaunchMainlineGatePayload({
     recommendedWorkspace: recommendedWorkspace || null,
     primaryAction: primaryAction || null,
     recommendedDownload: recommendedDownload || null,
+    actionPlan: Array.isArray(actionPlan)
+      ? actionPlan.filter((item) => item?.key)
+      : [],
     recommendedDownloads: Array.isArray(recommendedDownloads)
       ? recommendedDownloads.filter((item) => item?.key)
       : []
@@ -4374,6 +4393,197 @@ function appendLaunchMainlineGateText(lines = [], gate = null, formatWorkspaceAc
   lines.push(`- workspace: ${formatWorkspace(gate.recommendedWorkspace)}`);
   lines.push(`- primaryAction: ${gate.primaryAction?.title || gate.primaryAction?.label || gate.primaryAction?.key || "-"}`);
   lines.push(`- recommendedDownload: ${gate.recommendedDownload?.label || gate.recommendedDownload?.key || "-"}`);
+}
+
+function buildLaunchMainlineProductionGatePayload({
+  config = {},
+  health = null,
+  tokenKeys = null,
+  params = null,
+  publicBaseUrl = ""
+} = {}) {
+  const actionPlan = [];
+  const recommendedDownloads = [];
+  const pushAction = (step) => {
+    if (step?.key) {
+      actionPlan.push(step);
+    }
+  };
+  const mainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline summary",
+    "developer-launch-mainline-summary.txt",
+    "summary",
+    params
+  );
+  const securityWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    "security",
+    "summary",
+    "Open Security Workspace",
+    params
+  );
+  const opsWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    "ops",
+    "snapshot",
+    "Open Ops Workspace",
+    params
+  );
+  const pushRecommendedDownload = (item) => {
+    if (!item?.key || recommendedDownloads.some((entry) => entry?.key === item.key)) {
+      return;
+    }
+    recommendedDownloads.push(item);
+  };
+
+  let blockingCount = 0;
+  let attentionCount = 0;
+  let recommendedWorkspace = null;
+  const recommendWorkspace = (action) => {
+    if (!action?.key || recommendedWorkspace?.key) {
+      return;
+    }
+    recommendedWorkspace = action;
+  };
+  const addStep = (severity, key, title, summary, workspaceAction = null) => {
+    if (severity === "hold") {
+      blockingCount += 1;
+    } else {
+      attentionCount += 1;
+    }
+    if (workspaceAction) {
+      recommendWorkspace(workspaceAction);
+    }
+    pushAction(createLaunchWorkflowActionPlanStep({
+      key,
+      title,
+      summary,
+      status: severity === "hold" ? "block" : "review",
+      priority: actionPlan.length ? "secondary" : "primary",
+      workspaceAction,
+      recommendedDownload: mainlineSummaryDownload
+    }));
+  };
+
+  const defaultAdminPassword = String(config.adminPassword || "") === DEFAULT_PRODUCTION_ADMIN_PASSWORD;
+  const defaultServerTokenSecret = String(config.serverTokenSecret || "") === DEFAULT_PRODUCTION_SERVER_TOKEN_SECRET;
+  const tokenKeyRows = Array.isArray(tokenKeys?.keys) ? tokenKeys.keys : [];
+  const activeKeyId = String(tokenKeys?.activeKeyId || "").trim();
+  const publicEntryIsHttps = String(publicBaseUrl || "").trim().toLowerCase().startsWith("https://");
+  const mainStoreHealth = health?.storage?.mainStore || {};
+  const runtimeStateHealth = health?.storage?.runtimeState || {};
+  const mainStoreDriver = String(mainStoreHealth?.driver || config.mainStoreDriver || "").trim().toLowerCase();
+  const runtimeStateDriver = String(runtimeStateHealth?.driver || config.stateStoreDriver || "").trim().toLowerCase();
+
+  if (defaultAdminPassword) {
+    addStep(
+      "hold",
+      "production_default_admin_password",
+      "Replace the default admin password",
+      "The service is still using the stock admin password. Replace it before letting real operators or customers near this lane.",
+      securityWorkspace
+    );
+  }
+  if (defaultServerTokenSecret) {
+    addStep(
+      "hold",
+      "production_default_server_secret",
+      "Rotate the default server token secret",
+      "The server token secret is still on the default value. Rotate it and restart the service before launch-day traffic.",
+      securityWorkspace
+    );
+  }
+  if (!String(health?.status || "").trim().toLowerCase().startsWith("ok")) {
+    addStep(
+      "hold",
+      "production_healthcheck",
+      "Stabilize the service healthcheck",
+      "The health endpoint is not reporting an OK status. Fix health before widening rollout.",
+      opsWorkspace
+    );
+  }
+  if (mainStoreDriver === "postgres" && !Boolean(mainStoreHealth?.externalReady)) {
+    addStep(
+      "hold",
+      "production_main_store",
+      "Confirm PostgreSQL main-store readiness",
+      "Main storage is configured for PostgreSQL but the external-ready signal is not healthy yet.",
+      opsWorkspace
+    );
+  }
+  if (runtimeStateDriver === "redis" && !Boolean(runtimeStateHealth?.externalReady)) {
+    addStep(
+      "hold",
+      "production_runtime_state",
+      "Confirm Redis runtime-state readiness",
+      "Runtime state is configured for Redis but the external-ready signal is not healthy yet.",
+      opsWorkspace
+    );
+  }
+  if (runtimeStateDriver === "memory") {
+    addStep(
+      "hold",
+      "production_runtime_memory",
+      "Replace the memory runtime-state driver",
+      "The launch lane is still using in-memory runtime state. Move to sqlite or redis before production traffic.",
+      opsWorkspace
+    );
+  }
+  if (!activeKeyId || !tokenKeyRows.some((item) => String(item?.keyId || "").trim() === activeKeyId)) {
+    addStep(
+      "hold",
+      "production_active_token_key",
+      "Publish a valid active token key",
+      "The current token-key set does not expose a valid active signing key yet.",
+      securityWorkspace
+    );
+  } else if (tokenKeyRows.length < 2) {
+    addStep(
+      "attention",
+      "production_token_key_redundancy",
+      "Prepare the next token-key rotation",
+      "Only one token key is currently published. Add another key before launch so rotation does not start from zero redundancy.",
+      securityWorkspace
+    );
+  }
+  if (!publicEntryIsHttps) {
+    addStep(
+      "attention",
+      "production_https",
+      "Put the public entrypoint behind HTTPS",
+      "The current public launch-mainline URL is still HTTP. Move the production entrypoint behind HTTPS before launch-day traffic."
+    );
+  }
+
+  pushRecommendedDownload(mainlineSummaryDownload);
+
+  const status = blockingCount > 0
+    ? "hold"
+    : attentionCount > 0
+      ? "attention"
+      : "ready";
+  const headline = status === "hold"
+    ? "Production readiness is blocking rollout"
+    : status === "attention"
+      ? "Production readiness still needs review"
+      : "Production readiness looks aligned";
+  const summary = blockingCount > 0
+    ? "Resolve default secrets, storage, or token-key blockers before widening rollout."
+    : attentionCount > 0
+      ? "The lane is close, but HTTPS and token-key launch hygiene still deserve one more pass."
+      : "Core production launch checks look aligned for this lane.";
+
+  return {
+    checks: actionPlan,
+    ...buildLaunchMainlineGatePayload({
+      status,
+      headline,
+      summary,
+      blockingCount,
+      attentionCount,
+      recommendedWorkspace: recommendedWorkspace || securityWorkspace || opsWorkspace,
+      actionPlan,
+      recommendedDownloads
+    })
+  };
 }
 
 function buildLaunchWorkflowAuthorizationReadiness({
@@ -9308,7 +9518,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   launchReview = null,
   launchSmoke = null,
   opsSnapshot = null,
-  filters = {}
+  filters = {},
+  systemHealth = null,
+  tokenKeySummary = null,
+  publicBaseUrl = "",
+  runtimeConfig = {}
 } = {}) {
   const releaseFollowUp = releasePackage?.mainlineFollowUp || releasePackage?.manifest?.release?.mainlineFollowUp || {};
   const workflowSummary = launchWorkflow?.workflowSummary || {};
@@ -9548,7 +9762,25 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     actionPlan: opsActionPlan,
     recommendedDownloads: [opsPrimaryDownload, opsRemainingDownload, opsSummaryDownload].filter(Boolean)
   });
+  const productionGate = buildLaunchMainlineProductionGatePayload({
+    config: runtimeConfig,
+    health: systemHealth,
+    tokenKeys: tokenKeySummary,
+    params,
+    publicBaseUrl
+  });
   const stageDefinitions = [
+    {
+      key: "production",
+      label: "Production",
+      gate: productionGate,
+      summaryDownload: createLaunchMainlineDownloadShortcut(
+        "Launch mainline summary",
+        "developer-launch-mainline-summary.txt",
+        "summary",
+        params
+      )
+    },
     {
       key: "release",
       label: "Release Mainline",
@@ -9940,6 +10172,41 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     details: [],
     controls: Array.isArray(item?.controls) ? item.controls : []
   })).filter((item) => item.key || item.summary || item.controls.length);
+  const productionCheckCards = (Array.isArray(productionGate?.actionPlan) ? productionGate.actionPlan : []).map((item) => {
+    const controls = [
+      item?.workspaceAction ? ensureLaunchMainlineControlHrefs({
+        kind: "workspace",
+        label: item.workspaceAction.label || item.title || item.key || "Open workspace",
+        workspaceAction: item.workspaceAction
+      }, params) : null,
+      item?.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+        kind: "download",
+        label: item.recommendedDownload.label || item.title || item.key || "Download summary",
+        recommendedDownload: item.recommendedDownload
+      }, params) : null,
+      item?.bootstrapAction ? {
+        kind: "bootstrap",
+        label: item.bootstrapAction.label || item.title || item.key || "Run bootstrap",
+        bootstrapAction: item.bootstrapAction
+      } : null,
+      item?.setupAction ? {
+        kind: "setup",
+        label: item.setupAction.label || item.title || item.key || "Run setup",
+        setupAction: item.setupAction
+      } : null
+    ].filter(Boolean);
+    return {
+      key: item?.key || null,
+      title: item?.title || item?.key || "Production check",
+      summary: item?.summary || "-",
+      tags: [
+        item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
+        item?.status ? { label: "status", value: item.status, strong: false } : null
+      ].filter(Boolean),
+      details: [],
+      controls
+    };
+  }).filter((item) => item.key || item.summary || item.controls.length);
   const stageCards = stages.map((item) => ({
     key: item?.key || null,
     title: item?.label || item?.key || "Stage",
@@ -9966,6 +10233,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       title: "Launch Mainline Overview",
       emptyState: "Generate a launch mainline package to inspect the unified overall gate here.",
       cards: overviewCards.filter((item) => item?.key === "overall_gate")
+    },
+    {
+      key: "production_checks",
+      title: "Production Gate Checks",
+      emptyState: "Generate a launch mainline package to inspect the production readiness checks here.",
+      cards: productionCheckCards
     },
     {
       key: "workspace_path",
@@ -10015,6 +10288,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   return {
     overallGate,
+    productionGate,
     releaseGate,
     workflowGate,
     reviewGate,
@@ -10113,6 +10387,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   lines.push("");
   lines.push("Stage Gates:");
   const stageRows = [
+    ["Production", mainlineSummary.productionGate],
     ["Release", mainlineSummary.releaseGate],
     ["Workflow", mainlineSummary.workflowGate],
     ["Review", mainlineSummary.reviewGate],
@@ -10121,6 +10396,16 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   ];
   for (const [label, gate] of stageRows) {
     lines.push(`- ${label}: ${String(gate?.status || "unknown").toUpperCase()} | ${gate?.headline || "-"} | workspace=${formatWorkspaceActionText(gate?.recommendedWorkspace)}`);
+  }
+  if (Array.isArray(mainlineSummary.productionGate?.actionPlan) && mainlineSummary.productionGate.actionPlan.length) {
+    lines.push("");
+    lines.push("Production Gate Checks:");
+    for (const item of mainlineSummary.productionGate.actionPlan) {
+      lines.push(
+        `- ${item.title || item.key || "step"} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
+        + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
+      );
+    }
   }
   if (Array.isArray(mainlineSummary.actionPlan) && mainlineSummary.actionPlan.length) {
     lines.push("");
@@ -10150,7 +10435,11 @@ function buildDeveloperLaunchMainlinePayload({
   launchReview = null,
   launchSmoke = null,
   opsSnapshot = null,
-  filters = {}
+  filters = {},
+  systemHealth = null,
+  tokenKeySummary = null,
+  publicBaseUrl = "",
+  runtimeConfig = {}
 } = {}) {
   const project = releasePackage?.manifest?.project
     || launchWorkflow?.manifest?.project
@@ -10197,7 +10486,7 @@ function buildDeveloperLaunchMainlinePayload({
     launchSmoke,
     opsSnapshot,
     notes: [
-      "This package aggregates release, workflow, review, smoke, and ops gates into one service-driven launch mainline summary.",
+      "This package aggregates production, release, workflow, review, smoke, and ops gates into one service-driven launch mainline summary.",
       "Use it when release duty, QA, support, or launch ops need one handoff artifact for the current rollout lane."
     ]
   };
@@ -10207,7 +10496,11 @@ function buildDeveloperLaunchMainlinePayload({
     launchReview,
     launchSmoke,
     opsSnapshot,
-    filters: payload.filters
+    filters: payload.filters,
+    systemHealth,
+    tokenKeySummary,
+    publicBaseUrl,
+    runtimeConfig
   });
   payload.summaryText = buildDeveloperLaunchMainlineSummaryText(payload);
   if (payload.mainlineSummary?.mainlinePage && typeof payload.mainlineSummary.mainlinePage === "object") {
@@ -19373,6 +19666,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const launchReview = await this.developerLaunchReviewPackage(token, selector, options);
       const launchSmoke = await this.developerLaunchSmokeKit(token, selector, options);
       const opsSnapshot = await this.developerExportOpsSnapshot(token, selector, options);
+      const systemHealth = await this.health();
+      const tokenKeySummary = this.tokenKeys();
       const project = releasePackage?.manifest?.project || launchWorkflow?.manifest?.project || {};
       const channel = releasePackage?.manifest?.release?.channel || launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
       const payload = buildDeveloperLaunchMainlinePayload({
@@ -19382,6 +19677,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         launchReview,
         launchSmoke,
         opsSnapshot,
+        systemHealth,
+        tokenKeySummary,
+        publicBaseUrl: options.publicBaseUrl || "",
+        runtimeConfig: config,
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
           channel,

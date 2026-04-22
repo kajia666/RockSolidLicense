@@ -12,7 +12,7 @@ import {
   verifyLicenseToken
 } from "../src/security.js";
 
-async function startServer() {
+async function startServer(overrides = {}) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rocksolid-license-"));
   const app = createApp({
     host: "127.0.0.1",
@@ -25,7 +25,8 @@ async function startServer() {
     licenseKeyringPath: path.join(tempDir, "license_keyring.json"),
     adminUsername: "admin",
     adminPassword: "Pass123!abc",
-    serverTokenSecret: "test-secret"
+    serverTokenSecret: "test-secret",
+    ...overrides
   });
 
   await app.listen();
@@ -5935,6 +5936,8 @@ test("developer release package export bundles integration, versions, and notice
       );
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "release" && item.workspaceAction?.key));
       assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "ops" && item.recommendedDownload?.key));
+      assert.ok(launchMainline.mainlineSummary.productionGate);
+      assert.ok(launchMainline.mainlineSummary.stages.some((item) => item.key === "production" && item.workspaceAction?.key === "security"));
       assert.ok(launchMainline.mainlineSummary.continuation);
       assert.equal(launchMainline.mainlineSummary.continuation?.workspaceAction?.key, "ops");
       assert.match(launchMainline.mainlineSummary.continuation?.workspaceAction?.params?.routeAction || "", /^(review_next|complete_route_review)$/);
@@ -5970,6 +5973,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Download Launch Mainline Summary/);
       assert.match(launchMainline.summaryText, /Mainline Next Actions:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
+      assert.match(launchMainline.summaryText, /Production:/);
       assert.match(launchMainline.summaryText, /Ops:/);
 
       const launchMainlineSummaryDownload = await getText(
@@ -5997,6 +6001,106 @@ test("developer release package export bundles integration, versions, and notice
     const viewerAuditLogs = await getJson(baseUrl, "/api/developer/audit-logs?limit=120", viewerSession.token);
     assert.ok(viewerAuditLogs.items.some((entry) => entry.event_type === "product.release-package.export"));
     assert.ok(viewerAuditLogs.items.some((entry) => entry.event_type === "product.launch-workflow.export"));
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("developer launch mainline production gate blocks default launch secrets and routes to security", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "ChangeMe!123",
+    serverTokenSecret: "change-me-before-production-rocksolid"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "ChangeMe!123"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.production.owner",
+        password: "LaunchMainlineProductionOwner123!",
+        displayName: "Launch Mainline Production Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_PROD",
+        name: "Mainline Production App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.production.owner",
+      password: "LaunchMainlineProductionOwner123!"
+    });
+
+    const launchMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_PROD&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.equal(launchMainline.mainlineSummary.productionGate?.status, "hold");
+    assert.ok(Number(launchMainline.mainlineSummary.productionGate?.blockingCount || 0) >= 2);
+    assert.equal(launchMainline.mainlineSummary.productionGate?.recommendedWorkspace?.key, "security");
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
+      && launchMainline.mainlineSummary.productionGate.actionPlan.some((item) =>
+        item?.key === "production_default_admin_password"
+        && item?.workspaceAction?.key === "security"
+      )
+    );
+    assert.deepEqual(
+      Array.isArray(launchMainline.mainlineSummary.sections)
+        ? (() => {
+            const section = launchMainline.mainlineSummary.sections.find((item) => item?.key === "production_checks");
+            return section
+              ? {
+                  key: section.key || null,
+                  title: section.title || null,
+                  emptyState: section.emptyState || null,
+                  cards: Array.isArray(section.cards) ? section.cards.map((item) => item?.key || null) : []
+                }
+              : null;
+          })()
+        : null,
+      {
+        key: "production_checks",
+        title: "Production Gate Checks",
+        emptyState: "Generate a launch mainline package to inspect the production readiness checks here.",
+        cards: Array.isArray(launchMainline.mainlineSummary.productionGate?.actionPlan)
+          ? launchMainline.mainlineSummary.productionGate.actionPlan.map((item) => item?.key || null)
+          : []
+      }
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.stages)
+      && launchMainline.mainlineSummary.stages.some((item) =>
+        item?.key === "production"
+        && item?.workspaceAction?.key === "security"
+      )
+    );
+    assert.match(launchMainline.summaryText || "", /Production:/);
+    assert.match(launchMainline.summaryText || "", /default admin password/i);
+    assert.match(launchMainline.summaryText || "", /server token secret/i);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6954,7 +7058,7 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           }))
         : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => ({
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) => ({
             key: item?.key || null,
             status: item?.gate?.status || null
           }))
@@ -6962,7 +7066,7 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     );
     assert.deepEqual(
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) =>
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) =>
             Array.isArray(item?.controls)
               ? item.controls.map((control) => ({
                   kind: control?.kind || null,
@@ -6975,7 +7079,7 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           )
         : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => [
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) => [
             item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
             item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null
           ].filter(Boolean))
@@ -7011,30 +7115,34 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           }))
         : []
     );
-    assert.deepEqual(
+    const bootstrapMainlineSections = Object.fromEntries(
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.sections)
-        ? actionResult.launchMainline.mainlineSummary.sections.map((item) => ({
-            key: item?.key || null,
-            cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
-          }))
-        : [],
-      [
-        { key: "overall_gate", cards: ["overall_gate"] },
-        { key: "workspace_path", cards: ["workspace_path"] },
-        {
-          key: "action_plan",
-          cards: Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
-            ? actionResult.launchMainline.mainlineSummary.actionPlan.map((item) => item?.key || null)
-            : []
-        },
-        { key: "recommended_downloads", cards: ["recommended_downloads"] },
-        {
-          key: "stages",
-          cards: Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-            ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => item?.key || null)
-            : []
-        }
-      ]
+        ? actionResult.launchMainline.mainlineSummary.sections.map((item) => [
+            item?.key || null,
+            Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+          ])
+        : []
+    );
+    assert.deepEqual(bootstrapMainlineSections.overall_gate, ["overall_gate"]);
+    assert.deepEqual(
+      bootstrapMainlineSections.production_checks,
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.productionGate.actionPlan.map((item) => item?.key || null)
+        : []
+    );
+    assert.deepEqual(bootstrapMainlineSections.workspace_path, ["workspace_path"]);
+    assert.deepEqual(
+      bootstrapMainlineSections.action_plan,
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.map((item) => item?.key || null)
+        : []
+    );
+    assert.deepEqual(bootstrapMainlineSections.recommended_downloads, ["recommended_downloads"]);
+    assert.deepEqual(
+      bootstrapMainlineSections.stages,
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) => item?.key || null)
+        : []
     );
     assert.deepEqual(
       {
@@ -7614,7 +7722,7 @@ test("developer launch mainline action can create first launch batches and retur
           }))
         : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => ({
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) => ({
             key: item?.key || null,
             status: item?.gate?.status || null
           }))
@@ -7622,7 +7730,7 @@ test("developer launch mainline action can create first launch batches and retur
     );
     assert.deepEqual(
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) =>
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) =>
             Array.isArray(item?.controls)
               ? item.controls.map((control) => ({
                   kind: control?.kind || null,
@@ -7635,7 +7743,7 @@ test("developer launch mainline action can create first launch batches and retur
           )
         : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => [
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) => [
             item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
             item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null
           ].filter(Boolean))
@@ -7671,30 +7779,34 @@ test("developer launch mainline action can create first launch batches and retur
           }))
         : []
     );
-    assert.deepEqual(
+    const setupMainlineSections = Object.fromEntries(
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.sections)
-        ? actionResult.launchMainline.mainlineSummary.sections.map((item) => ({
-            key: item?.key || null,
-            cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
-          }))
-        : [],
-      [
-        { key: "overall_gate", cards: ["overall_gate"] },
-        { key: "workspace_path", cards: ["workspace_path"] },
-        {
-          key: "action_plan",
-          cards: Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
-            ? actionResult.launchMainline.mainlineSummary.actionPlan.map((item) => item?.key || null)
-            : []
-        },
-        { key: "recommended_downloads", cards: ["recommended_downloads"] },
-        {
-          key: "stages",
-          cards: Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
-            ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => item?.key || null)
-            : []
-        }
-      ]
+        ? actionResult.launchMainline.mainlineSummary.sections.map((item) => [
+            item?.key || null,
+            Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+          ])
+        : []
+    );
+    assert.deepEqual(setupMainlineSections.overall_gate, ["overall_gate"]);
+    assert.deepEqual(
+      setupMainlineSections.production_checks,
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.productionGate.actionPlan.map((item) => item?.key || null)
+        : []
+    );
+    assert.deepEqual(setupMainlineSections.workspace_path, ["workspace_path"]);
+    assert.deepEqual(
+      setupMainlineSections.action_plan,
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.map((item) => item?.key || null)
+        : []
+    );
+    assert.deepEqual(setupMainlineSections.recommended_downloads, ["recommended_downloads"]);
+    assert.deepEqual(
+      setupMainlineSections.stages,
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.map((item) => item?.key || null)
+        : []
     );
     assert.deepEqual(
       {
@@ -11783,6 +11895,9 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /api\/developer\/launch-mainline\/action/);
     assert.match(html, /Generate Launch Mainline/);
     assert.match(html, /Launch Mainline Overview/);
+    assert.match(html, /Production Gate Checks/);
+    assert.match(html, /production-checks-title/);
+    assert.match(html, /production-checks-box/);
     assert.match(html, /Last Mainline Action/);
     assert.match(html, /Release Mainline/);
     assert.match(html, /Launch Workflow/);

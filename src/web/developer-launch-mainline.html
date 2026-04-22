@@ -426,10 +426,18 @@
         };
       }
 
-      function currentRouteContext() {
+      function fallbackMainlineRouteFocus() {
         return {
-          routeTitle: requestedRouteTitle || "Launch mainline handoff",
-          routeReason: requestedRouteReason || "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops."
+          title: requestedRouteTitle || "Launch mainline handoff",
+          summary: requestedRouteReason || "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops.",
+          tags: requestedProductCode
+            ? [
+                { label: "project", value: requestedProductCode, strong: true },
+                { label: "channel", value: requestedChannel || "stable", strong: false },
+                { label: "reviewMode", value: requestedReviewMode || "matched", strong: false }
+              ]
+            : [],
+          controls: []
         };
       }
 
@@ -492,6 +500,13 @@
                 });
         return {
           heroControls,
+          routeFocus:
+            (currentView?.routeFocus && typeof currentView.routeFocus === "object" ? currentView.routeFocus : null)
+            || (receipt?.mainlineView?.routeFocus && typeof receipt.mainlineView.routeFocus === "object" ? receipt.mainlineView.routeFocus : null)
+            || (receipt?.mainlinePage?.routeFocus && typeof receipt.mainlinePage.routeFocus === "object" ? receipt.mainlinePage.routeFocus : null)
+            || (summaryPage?.routeFocus && typeof summaryPage.routeFocus === "object" ? summaryPage.routeFocus : null)
+            || (currentMainlineSummary().routeFocus && typeof currentMainlineSummary().routeFocus === "object" ? currentMainlineSummary().routeFocus : null)
+            || fallbackMainlineRouteFocus(),
           sections,
           lastActionScreen: lastActionScreen && typeof lastActionScreen === "object" ? lastActionScreen : { sections: [] },
           summaryText:
@@ -500,6 +515,13 @@
             || currentMainline?.summaryText
             || ""
         };
+      }
+
+      function currentMainlineRouteFocus() {
+        const page = currentMainlinePage();
+        return page.routeFocus && typeof page.routeFocus === "object"
+          ? page.routeFocus
+          : fallbackMainlineRouteFocus();
       }
 
       function currentMainlineSections() {
@@ -620,6 +642,28 @@
         `;
       }
 
+      function renderRouteFocus() {
+        const routeFocus = currentMainlineRouteFocus();
+        const tags = Array.isArray(routeFocus?.tags)
+          ? routeFocus.tags.map((tag) => renderTag(`${tag?.label || "tag"}:${tag?.value ?? "-"}`, tag?.strong === true)).join("")
+          : "";
+        const controls = Array.isArray(routeFocus?.controls) ? routeFocus.controls : [];
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(routeFocus?.title || "Launch mainline handoff")}</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint">${esc(routeFocus?.summary || "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops.")}</div>
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-route-focus-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const screen = currentMainlineLastActionScreen();
         const sections = Array.isArray(screen.sections) ? screen.sections : [];
@@ -731,6 +775,7 @@
             boxNode.innerHTML = renderMainlineSection(section, binding.fallbackMessage);
           }
         }
+        el("route-focus-box").innerHTML = renderRouteFocus();
         el("mainline-hero-controls-box").innerHTML = renderHeroControls();
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = page.summaryText || "No launch mainline summary yet.";
@@ -912,6 +957,7 @@
         el("mainline-downloads-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>';
         el("stage-gates-box").innerHTML = '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
         el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
+        el("route-focus-box").innerHTML = renderRouteFocus();
         setOutput("Waiting for actions...");
         setStatus("Signed out. Sign in to generate a launch mainline package.");
       }
@@ -925,9 +971,7 @@
         el("mainline-event-type").value = requestedEventType;
         el("mainline-actor-type").value = requestedActorType;
         el("mainline-entity-type").value = requestedEntityType;
-        el("route-focus-box").innerHTML = requestedProductCode
-          ? `<strong>${esc(requestedRouteTitle || "Launch mainline route focus")}</strong><div class="hint" style="margin-top:8px;">${esc(requestedRouteReason || `Continue the unified launch mainline handoff for ${requestedProductCode}.`)}</div>`
-          : "Open this page from release, launch workflow, launch review, launch smoke, or ops to keep the same lane and route context here.";
+        el("route-focus-box").innerHTML = renderRouteFocus();
       }
 
       el("login-btn").addEventListener("click", () => handleLogin().catch((error) => {
@@ -965,6 +1009,19 @@
         setOutput({ error: error.message });
       }));
       document.addEventListener("click", async (event) => {
+        const routeFocusControlButton = event.target.closest("[data-mainline-route-focus-control-index]");
+        if (routeFocusControlButton) {
+          const controlIndex = Number(routeFocusControlButton.dataset.mainlineRouteFocusControlIndex || -1);
+          const routeFocus = currentMainlineRouteFocus();
+          const control = Array.isArray(routeFocus?.controls) ? routeFocus.controls[controlIndex] : null;
+          try {
+            await executeMainlineControl(control);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
         const sectionControlButton = event.target.closest("[data-mainline-section-control-index]");
         if (sectionControlButton) {
           const sectionKey = String(sectionControlButton.dataset.mainlineSectionKey || "").trim();
@@ -983,7 +1040,7 @@
         const heroControlButton = event.target.closest("[data-mainline-hero-control-index]");
         if (heroControlButton) {
           const index = Number(heroControlButton.dataset.mainlineHeroControlIndex || -1);
-          const item = currentMainline?.mainlineSummary?.heroControls?.[index] || null;
+          const item = currentMainlinePage()?.heroControls?.[index] || currentMainline?.mainlineSummary?.heroControls?.[index] || null;
           try {
             await executeMainlineControl(item);
           } catch (error) {

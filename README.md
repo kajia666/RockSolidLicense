@@ -145,6 +145,7 @@
 - 同时 `POST /api/developer/launch-mainline/action` 返回的 receipt 现在也会同步带上 `mainlineSections`，`Launch Mainline` 页面在动作完成后会优先用这份服务端 section 快照做 fallback；这样就算当前页主要在消费 action receipt，也能继续拿到统一主线的区块结构，而不需要再靠页面自己补 section 语义
 - 现在 `launch-mainline` summary 和 action receipt 还会进一步共享同一份 `mainlineScreen` 快照，里面统一收 `heroControls + sections`；`Launch Mainline` 页面现在优先直接吃这份 screen 来渲染主入口和主体区块，而不是继续分别从 summary、receipt 和页面本地逻辑里拼这些结构
 - 同时 `Last Mainline Action` 这块现在也开始吃服务端 screen 了：action receipt 会直接带 `mainlineLastActionScreen`，把 recap 和 follow-up 两组卡片收成统一区块，页面不再需要自己把 `mainlineRecapCards + mainlineFollowUpCards` 手工拼成两段结构
+- 现在统一 `Launch Mainline` 顶部那块 `Route Focus` 也开始直接吃服务端 payload 了：`mainlineSummary.routeFocus` 和 `mainlinePage.routeFocus` 会把当前 lane 的 handoff 标题、摘要、标签和 controls 一起下发，页面不再主要靠 query 参数自己拼 route context 文案
 - 现在这条 `/api/developer/launch-mainline` 聚合结果还会直接下发 `stages`，把 `release / workflow / review / smoke / ops` 每一段的 gate、workspaceAction 和 recommendedDownload 一起给出来，所以 `Launch Mainline` 工作台里的 stage 按钮也开始优先吃服务端 payload，不再主要靠前端自己按 key 做映射
 - 这块 `Stage Gates` 现在也进一步和统一主线的其他动作对齐了：每个 stage 自身就会带服务端下发的 `controls`，页面不再自己拆 `workspace/download` 两类按钮，所以 stage 层的跟进动作也回到了后台/API 主线上
 - 同时它现在也会单独下发顶层 `workspaceActions`，把那排固定的 `Release / Workflow / Review / Smoke / Ops` 入口也统一交给服务端编排；这样页面只负责消费，不再自己维护这排入口和 stage 推荐动作之间的语义差异

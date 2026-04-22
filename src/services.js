@@ -4239,13 +4239,18 @@ function buildLaunchMainlineActionReceipt({
       }
     ]
   };
+  const mainlineRouteFocus = launchMainline?.mainlineSummary?.routeFocus && typeof launchMainline.mainlineSummary.routeFocus === "object"
+    ? launchMainline.mainlineSummary.routeFocus
+    : null;
   const mainlineView = {
     heroControls: mainlineHeroControls,
+    routeFocus: mainlineRouteFocus,
     sections: mainlineSections,
     lastActionScreen: mainlineLastActionScreen
   };
   const mainlinePage = {
     heroControls: mainlineView.heroControls,
+    routeFocus: mainlineRouteFocus,
     sections: mainlineView.sections,
     lastActionScreen: mainlineView.lastActionScreen,
     summaryText: launchMainline?.summaryText || ""
@@ -4266,6 +4271,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineNextActions,
     mainlineRecapCards,
     mainlineOverviewCards,
+    mainlineRouteFocus,
     mainlineSections,
     mainlinePage,
     mainlineView,
@@ -9867,6 +9873,44 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       }))
     }
   ];
+  const routeFocus = {
+    title: params.productCode
+      ? `Launch mainline handoff for ${params.productCode}`
+      : "Launch mainline handoff",
+    summary: params.productCode
+      ? `Keep ${params.productCode} on the unified launch-mainline path across release, workflow, review, smoke, and ops before widening rollout.`
+      : "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops.",
+    tags: [
+      params.productCode
+        ? { label: "project", value: params.productCode, strong: true }
+        : null,
+      params.channel
+        ? { label: "channel", value: params.channel, strong: false }
+        : null,
+      params.reviewMode
+        ? { label: "reviewMode", value: params.reviewMode, strong: false }
+        : null
+    ].filter(Boolean),
+    controls: [
+      recommendedWorkspace
+        ? ensureLaunchMainlineControlHrefs({
+            kind: "workspace",
+            label: recommendedWorkspace.label || "Open routed workspace",
+            workspaceAction: recommendedWorkspace
+          }, params)
+        : null,
+      ensureLaunchMainlineControlHrefs({
+        kind: "download",
+        label: "Download Launch Mainline Summary",
+        recommendedDownload: createLaunchMainlineDownloadShortcut(
+          "Download Launch Mainline Summary",
+          "developer-launch-mainline-summary.txt",
+          "summary",
+          params
+        )
+      }, params)
+    ].filter(Boolean)
+  };
   const actionPlanCards = actionPlan.map((item) => ({
     key: item?.key || null,
     title: item?.title || item?.key || "Step",
@@ -9936,6 +9980,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   const mainlineView = {
     heroControls: screen.heroControls,
+    routeFocus,
     sections: screen.sections,
     lastActionScreen: {
       sections: []
@@ -9943,6 +9988,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   const mainlinePage = {
     heroControls: mainlineView.heroControls,
+    routeFocus,
     sections: mainlineView.sections,
     lastActionScreen: mainlineView.lastActionScreen,
     summaryText: ""
@@ -9957,6 +10003,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     continuation,
     stages,
     overviewCards,
+    routeFocus,
     sections,
     screen,
     mainlinePage,

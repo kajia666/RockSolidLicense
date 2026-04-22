@@ -6849,6 +6849,10 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -6942,6 +6946,10 @@ test("developer launch mainline action can create first launch batches and retur
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

@@ -3750,6 +3750,20 @@ function buildLaunchMainlineActionReceipt({
   const mainlineNextActions = Array.isArray(mainlineSummary.nextActions)
     ? mainlineSummary.nextActions.slice(0, 4)
     : [];
+  const mainlineActions = (Array.isArray(mainlineSummary.actionPlan) ? mainlineSummary.actionPlan : [])
+    .slice(0, 4)
+    .map((item) => ({
+      key: item?.key || null,
+      title: item?.title || item?.key || "step",
+      priority: item?.priority || null,
+      status: item?.status || null,
+      summary: item?.summary || "-",
+      workspaceAction: item?.workspaceAction || null,
+      recommendedDownload: item?.recommendedDownload || null,
+      bootstrapAction: item?.bootstrapAction || null,
+      setupAction: item?.setupAction || null
+    }))
+    .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -3764,6 +3778,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecommendedDownload,
     mainlineContinuation,
     mainlineNextActions,
+    mainlineActions,
     actions
   };
 }

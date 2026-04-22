@@ -474,7 +474,9 @@
       function renderLastMainlineFollowUp(result = null) {
         const followUp = result?.followUp;
         const receipt = result?.receipt && typeof result.receipt === "object" ? result.receipt : null;
-        const actions = Array.isArray(receipt?.actions)
+        const actions = Array.isArray(receipt?.mainlineActions)
+          ? receipt.mainlineActions
+          : Array.isArray(receipt?.actions)
           ? receipt.actions
           : (Array.isArray(followUp?.actions) ? followUp.actions : []);
         if (!actions.length) {

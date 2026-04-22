@@ -779,8 +779,7 @@
                 </div>
                 <div class="hint">${esc(stage.gate?.headline || stage.gate?.summary || "-")}</div>
                 <div class="actions">
-                  ${stage.workspaceAction?.key ? `<button type="button" class="secondary" data-stage-workspace-index="${index}">${esc(stage.workspaceAction.label || "Open Workspace")}</button>` : ""}
-                  ${stage.recommendedDownload?.key ? `<button type="button" class="secondary" data-stage-download-index="${index}">Download</button>` : ""}
+                  ${Array.isArray(stage.controls) ? stage.controls.map((control, controlIndex) => `<button type="button" class="secondary" data-stage-index="${index}" data-stage-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.kind || "Action")}</button>`).join("") : ""}
                 </div>
               </div>
             `).join("")}
@@ -1168,24 +1167,22 @@
           }
           return;
         }
-        const stageWorkspaceButton = event.target.closest("[data-stage-workspace-index]");
-        if (stageWorkspaceButton) {
-          const index = Number(stageWorkspaceButton.dataset.stageWorkspaceIndex || -1);
+        const stageControlButton = event.target.closest("[data-stage-control-index]");
+        if (stageControlButton) {
+          const index = Number(stageControlButton.dataset.stageIndex || -1);
+          const controlIndex = Number(stageControlButton.dataset.stageControlIndex || -1);
           const stage = currentMainline?.mainlineSummary?.stages?.[index];
-          if (stage?.workspaceAction) {
-            openWorkspaceAction(stage.workspaceAction);
+          const control = Array.isArray(stage?.controls) ? stage.controls[controlIndex] : null;
+          if (control?.workspaceAction?.key) {
+            openWorkspaceAction(control.workspaceAction);
+            return;
           }
-          return;
-        }
-        const stageDownloadButton = event.target.closest("[data-stage-download-index]");
-        if (stageDownloadButton) {
-          const index = Number(stageDownloadButton.dataset.stageDownloadIndex || -1);
-          const stage = currentMainline?.mainlineSummary?.stages?.[index];
-          if (stage?.recommendedDownload) {
-            await downloadMainlineRecommendedItem(stage.recommendedDownload).catch((error) => {
+          if (control?.recommendedDownload?.key) {
+            await downloadMainlineRecommendedItem(control.recommendedDownload).catch((error) => {
               setStatus(error.message, "danger");
               setOutput({ error: error.message });
             });
+            return;
           }
         }
       });

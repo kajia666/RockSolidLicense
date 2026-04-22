@@ -9180,13 +9180,30 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   ];
   const stages = stageDefinitions
     .filter((item) => item.gate)
-    .map((item) => ({
-      key: item.key,
-      label: item.label,
-      gate: item.gate,
-      workspaceAction: item.gate?.recommendedWorkspace || null,
-      recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null
-    }));
+    .map((item) => {
+      const stage = {
+        key: item.key,
+        label: item.label,
+        gate: item.gate,
+        workspaceAction: item.gate?.recommendedWorkspace || null,
+        recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null
+      };
+      return {
+        ...stage,
+        controls: [
+          stage.workspaceAction ? {
+            kind: "workspace",
+            label: stage.workspaceAction.label || stage.label || stage.key || "Open workspace",
+            workspaceAction: stage.workspaceAction
+          } : null,
+          stage.recommendedDownload ? {
+            kind: "download",
+            label: stage.recommendedDownload.label || stage.label || stage.key || "Download summary",
+            recommendedDownload: stage.recommendedDownload
+          } : null
+        ].filter(Boolean)
+      };
+    });
   const workspaceActions = [
     createLaunchWorkflowWorkspaceShortcut("release", "summary", "Open Release Workspace", params),
     createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Workflow Workspace", params),

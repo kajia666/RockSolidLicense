@@ -6911,6 +6911,27 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         : []
     );
     assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) =>
+            Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || null
+                }))
+              : []
+          )
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => [
+            item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
+            item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null
+          ].filter(Boolean))
+        : []
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
         ? actionResult.receipt.mainlineWorkspaceActions.map((item) => item?.key || null)
         : [],
@@ -7133,6 +7154,27 @@ test("developer launch mainline action can create first launch batches and retur
             key: item?.key || null,
             status: item?.gate?.status || null
           }))
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) =>
+            Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || null
+                }))
+              : []
+          )
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => [
+            item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
+            item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null
+          ].filter(Boolean))
         : []
     );
     assert.deepEqual(
@@ -10912,6 +10954,7 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /data-mainline-receipt-followup-action-index/);
     assert.match(html, /data-mainline-followup-action-control-index/);
     assert.match(html, /data-mainline-action-control-index/);
+    assert.match(html, /data-stage-control-index/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

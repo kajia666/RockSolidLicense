@@ -136,6 +136,7 @@
 - 同时它现在也会在 `mainlineSummary` 顶层直接下发 `continuation`，把 routed `Developer Ops` 复查链的下一步动作和推荐下载直接抬出来；统一的 `launch-mainline` 摘要里也会多出 `Mainline Continuation`，这样交接和复查都不需要再自己从 ops payload 里翻“下一步该怎么继续”
 - 这条 `continuation` 现在也已经正式并进统一主线自己的 `actionPlan` 和 `recommendedDownloads`，所以 `launch-mainline` 不只是“看得到下一步”，而是会把 routed ops 复查的继续步骤直接排进总览工作流里
 - 现在这条 `/api/developer/launch-mainline` 聚合结果还会直接下发 `stages`，把 `release / workflow / review / smoke / ops` 每一段的 gate、workspaceAction 和 recommendedDownload 一起给出来，所以 `Launch Mainline` 工作台里的 stage 按钮也开始优先吃服务端 payload，不再主要靠前端自己按 key 做映射
+- 这块 `Stage Gates` 现在也进一步和统一主线的其他动作对齐了：每个 stage 自身就会带服务端下发的 `controls`，页面不再自己拆 `workspace/download` 两类按钮，所以 stage 层的跟进动作也回到了后台/API 主线上
 - 同时它现在也会单独下发顶层 `workspaceActions`，把那排固定的 `Release / Workflow / Review / Smoke / Ops` 入口也统一交给服务端编排；这样页面只负责消费，不再自己维护这排入口和 stage 推荐动作之间的语义差异
 - 开发者授权快启里的 `Launch Bootstrap / First Batch Setup / Inventory Refill` follow-up 现在也会优先把 `launch-mainline summary / checksums / zip` 一起带出来，同时 `launch_recheck` 这一步也已经直接回到统一的 `/developer/launch-mainline` 工作台，所以初始化动作做完以后，可以直接顺着同一份总览 handoff 去做后续 launch review、smoke 和 ops 复查，而不是还要自己在几份材料和几个工作台之间来回切
 - `Launch Review` 现在还可以直接运行 `Launch Bootstrap / First Batch Setup / Inventory Refill`，并在页内保留 `Last Review Action` 回执，所以软件作者在复查页里就能直接修正 starter policy、首批库存或补库存动作，再顺着做下一步 launch recheck

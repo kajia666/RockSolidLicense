@@ -499,7 +499,9 @@
           </div>
           <div class="hint" style="margin-top: 10px;">${esc(result?.message || "Last launch mainline action completed.")}</div>
           <div class="hint" style="margin-top: 8px;">${esc(summary)}</div>
+          ${receipt?.mainlineOverallGate ? `<div class="hint" style="margin-top: 8px;">${esc(`Gate: ${String(receipt.mainlineOverallGate.status || "unknown").toUpperCase()} | ${receipt.mainlineOverallGate.headline || "-"}`)}</div>` : ""}
           ${receipt?.mainlineContinuation ? `<div class="hint" style="margin-top: 8px;">${esc(`Continuation: ${receipt.mainlineContinuation.title || "Continue Routed Review"}${receipt.mainlineContinuation.summary ? ` | ${receipt.mainlineContinuation.summary}` : ""}`)}</div>` : ""}
+          ${Array.isArray(receipt?.mainlineNextActions) && receipt.mainlineNextActions.length ? `<div class="hint" style="margin-top: 8px;">${esc(`Next actions: ${receipt.mainlineNextActions.join(" | ")}`)}</div>` : ""}
           ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
           ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
           ${actions.map((item, index) => `

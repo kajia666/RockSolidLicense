@@ -3743,9 +3743,13 @@ function buildLaunchMainlineActionReceipt({
   const mainlineSummary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
     ? launchMainline.mainlineSummary
     : {};
+  const mainlineOverallGate = mainlineSummary.overallGate || null;
   const mainlinePrimaryAction = mainlineSummary.primaryAction || null;
   const mainlineRecommendedDownload = mainlineSummary.recommendedDownload || null;
   const mainlineContinuation = mainlineSummary.continuation || null;
+  const mainlineNextActions = Array.isArray(mainlineSummary.nextActions)
+    ? mainlineSummary.nextActions.slice(0, 4)
+    : [];
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -3755,9 +3759,11 @@ function buildLaunchMainlineActionReceipt({
     transitions,
     created,
     primaryAction: followUp?.primaryAction || null,
+    mainlineOverallGate,
     mainlinePrimaryAction,
     mainlineRecommendedDownload,
     mainlineContinuation,
+    mainlineNextActions,
     actions
   };
 }

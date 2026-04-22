@@ -120,6 +120,7 @@
 - 这条统一的 `/developer/launch-mainline` 工作台现在也已经能直接运行 `Launch Bootstrap / First Batch Setup / Inventory Refill`，并会把结果保留在 `Last Mainline Action` 回执里，所以初始化动作做完以后，软件作者不需要再切回别的 launch 工作台确认变化，而是能继续在统一主线上顺着做下一步复查和下载 handoff
 - 同时 `POST /api/developer/launch-mainline/action` 现在也会直接返回服务端生成的 `receipt`，把这次动作的结果摘要、前后计数变化、创建出来的 starter 资产，以及后续 follow-up 一起收好；统一工作台现在优先吃这份 receipt，不再主要靠前端自己再拼一层 recap
 - 这份 `receipt` 现在还会把刷新后的 unified `launch-mainline` 主动作、推荐下载和 routed review continuation 一起带回来，所以初始化动作做完以后，当前页 recap 就能直接看见统一主线下一步该怎么继续，不需要再额外钻 `launchMainline.mainlineSummary`
+- 同时它现在也会把刷新后的 unified overall gate 和 `nextActions` 一起带回来，所以 `Last Mainline Action` 不只是知道“这次做了什么”，也能直接看见当前主线状态和接下来最值得继续的几步
 - 这条 `/api/developer/launch-mainline` 聚合结果现在还会在 `mainlineSummary` 顶层直接下发统一的 `primaryAction` 和 `recommendedDownload`，不再要求页面或后续工作台自己再去钻 `overallGate` 里挑主动作
 - 同时它现在也会在 `mainlineSummary` 顶层直接下发 `continuation`，把 routed `Developer Ops` 复查链的下一步动作和推荐下载直接抬出来；统一的 `launch-mainline` 摘要里也会多出 `Mainline Continuation`，这样交接和复查都不需要再自己从 ops payload 里翻“下一步该怎么继续”
 - 这条 `continuation` 现在也已经正式并进统一主线自己的 `actionPlan` 和 `recommendedDownloads`，所以 `launch-mainline` 不只是“看得到下一步”，而是会把 routed ops 复查的继续步骤直接排进总览工作流里

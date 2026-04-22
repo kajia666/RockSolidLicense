@@ -4244,6 +4244,12 @@ function buildLaunchMainlineActionReceipt({
     sections: mainlineSections,
     lastActionScreen: mainlineLastActionScreen
   };
+  const mainlinePage = {
+    heroControls: mainlineView.heroControls,
+    sections: mainlineView.sections,
+    lastActionScreen: mainlineView.lastActionScreen,
+    summaryText: launchMainline?.summaryText || ""
+  };
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -4261,6 +4267,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineSections,
+    mainlinePage,
     mainlineView,
     mainlineScreen,
     mainlineStages,
@@ -9934,6 +9941,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       sections: []
     }
   };
+  const mainlinePage = {
+    heroControls: mainlineView.heroControls,
+    sections: mainlineView.sections,
+    lastActionScreen: mainlineView.lastActionScreen,
+    summaryText: ""
+  };
   return {
     overallGate,
     releaseGate,
@@ -9946,6 +9959,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     overviewCards,
     sections,
     screen,
+    mainlinePage,
     mainlineView,
     heroControls: screen.heroControls,
     workspaceActions: workspaceActions.map((item) => ensureLaunchWorkflowWorkspaceHref(item, params)),
@@ -10128,6 +10142,9 @@ function buildDeveloperLaunchMainlinePayload({
     filters: payload.filters
   });
   payload.summaryText = buildDeveloperLaunchMainlineSummaryText(payload);
+  if (payload.mainlineSummary?.mainlinePage && typeof payload.mainlineSummary.mainlinePage === "object") {
+    payload.mainlineSummary.mainlinePage.summaryText = payload.summaryText || "";
+  }
   return payload;
 }
 

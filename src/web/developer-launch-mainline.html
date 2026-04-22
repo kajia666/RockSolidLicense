@@ -453,27 +453,62 @@
         return {};
       }
 
-      function currentMainlineScreen() {
-        const currentView = currentMainlineView();
-        if (currentView && typeof currentView === "object") {
-          return {
-            heroControls: Array.isArray(currentView.heroControls) ? currentView.heroControls : [],
-            sections: Array.isArray(currentView.sections) ? currentView.sections : []
-          };
-        }
-        const summaryScreen = currentMainlineSummary().screen;
-        if (summaryScreen && typeof summaryScreen === "object") {
-          return summaryScreen;
-        }
+      function currentMainlinePage() {
         const receipt = currentLastMainlineReceipt();
-        if (receipt?.mainlineScreen && typeof receipt.mainlineScreen === "object") {
-          return receipt.mainlineScreen;
+        if (receipt?.mainlinePage && typeof receipt.mainlinePage === "object") {
+          return receipt.mainlinePage;
         }
-        return {};
+        const summaryPage = currentMainlineSummary().mainlinePage;
+        if (summaryPage && typeof summaryPage === "object") {
+          return summaryPage;
+        }
+        const currentView = currentMainlineView();
+        const summaryScreen = currentMainlineSummary().screen;
+        const heroControls = Array.isArray(currentView?.heroControls)
+          ? currentView.heroControls
+          : (Array.isArray(summaryScreen?.heroControls)
+              ? summaryScreen.heroControls
+              : (Array.isArray(receipt?.mainlineScreen?.heroControls) ? receipt.mainlineScreen.heroControls : []));
+        const sections = Array.isArray(currentView?.sections)
+          ? currentView.sections
+          : (Array.isArray(summaryScreen?.sections)
+              ? summaryScreen.sections
+              : (Array.isArray(receipt?.mainlineScreen?.sections) ? receipt.mainlineScreen.sections : []));
+        const lastActionScreen = currentView?.lastActionScreen && typeof currentView.lastActionScreen === "object"
+          ? currentView.lastActionScreen
+          : (receipt?.mainlineLastActionScreen && typeof receipt.mainlineLastActionScreen === "object"
+              ? receipt.mainlineLastActionScreen
+              : {
+                  sections: [
+                    {
+                      key: "recap",
+                      title: "Last Mainline Action Recap",
+                      emptyState: "Run a launch-mainline action to review the unified recap here.",
+                      cards: Array.isArray(receipt?.mainlineRecapCards) ? receipt.mainlineRecapCards : []
+                    },
+                    {
+                      key: "follow_up",
+                      title: "Continue Launch Mainline",
+                      emptyState: "Run a launch-mainline action to keep the next unified follow-up visible here.",
+                      cards: Array.isArray(receipt?.mainlineFollowUpCards) ? receipt.mainlineFollowUpCards : []
+                    }
+                  ].filter((section) => Array.isArray(section.cards) && section.cards.length)
+                });
+        return {
+          heroControls,
+          sections,
+          lastActionScreen: lastActionScreen && typeof lastActionScreen === "object" ? lastActionScreen : { sections: [] },
+          summaryText:
+            (typeof receipt?.mainlinePage?.summaryText === "string" && receipt.mainlinePage.summaryText)
+            || (typeof summaryPage?.summaryText === "string" && summaryPage.summaryText)
+            || currentMainline?.summaryText
+            || ""
+        };
       }
 
       function currentMainlineSections() {
-        return Array.isArray(currentMainlineScreen().sections) ? currentMainlineScreen().sections : [];
+        const page = currentMainlinePage();
+        return Array.isArray(page.sections) ? page.sections : [];
       }
 
       function currentMainlineSection(key = "") {
@@ -487,35 +522,10 @@
       }
 
       function currentMainlineLastActionScreen() {
-        const currentView = currentMainlineView();
-        if (currentView?.lastActionScreen && typeof currentView.lastActionScreen === "object") {
-          return currentView.lastActionScreen;
-        }
-        const receipt = currentLastMainlineReceipt();
-        if (receipt?.mainlineLastActionScreen && typeof receipt.mainlineLastActionScreen === "object") {
-          return receipt.mainlineLastActionScreen;
-        }
-        const recapCards = Array.isArray(receipt?.mainlineRecapCards) ? receipt.mainlineRecapCards : [];
-        const followUpCards = Array.isArray(receipt?.mainlineFollowUpCards) ? receipt.mainlineFollowUpCards : [];
-        if (!recapCards.length && !followUpCards.length) {
-          return { sections: [] };
-        }
-        return {
-          sections: [
-            {
-              key: "recap",
-              title: "Last Mainline Action Recap",
-              emptyState: "Run a launch-mainline action to review the unified recap here.",
-              cards: recapCards
-            },
-            {
-              key: "follow_up",
-              title: "Continue Launch Mainline",
-              emptyState: "Run a launch-mainline action to keep the next unified follow-up visible here.",
-              cards: followUpCards
-            }
-          ]
-        };
+        const page = currentMainlinePage();
+        return page.lastActionScreen && typeof page.lastActionScreen === "object"
+          ? page.lastActionScreen
+          : { sections: [] };
       }
 
       function currentMainlineReceiptCard(kind = "", key = "") {
@@ -798,11 +808,9 @@
         return downloadLaunchMainline(item.format || "summary", item.fileName || "developer-launch-mainline-summary.txt", item.label || "Launch mainline summary");
       }
 
-      function renderHeroControls(summary = {}) {
-        const screen = currentMainlineScreen();
-        const mainlineHeroControls = Array.isArray(screen.heroControls) && screen.heroControls.length
-          ? screen.heroControls
-          : (Array.isArray(summary.heroControls) ? summary.heroControls : []);
+      function renderHeroControls() {
+        const page = currentMainlinePage();
+        const mainlineHeroControls = Array.isArray(page.heroControls) ? page.heroControls : [];
         if (!mainlineHeroControls.length) {
           return '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
         }
@@ -814,7 +822,7 @@
       }
 
       function renderMainline() {
-        const summary = currentMainlineSummary();
+        const page = currentMainlinePage();
         const sectionBindings = [
           {
             key: "overall_gate",
@@ -863,9 +871,9 @@
             boxNode.innerHTML = renderMainlineSection(section, binding.fallbackMessage);
           }
         }
-        el("mainline-hero-controls-box").innerHTML = renderHeroControls(summary);
+        el("mainline-hero-controls-box").innerHTML = renderHeroControls();
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
-        el("mainline-summary").textContent = currentMainline?.summaryText || "No launch mainline summary yet.";
+        el("mainline-summary").textContent = page.summaryText || "No launch mainline summary yet.";
       }
 
       async function generateLaunchMainline() {

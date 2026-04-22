@@ -5969,6 +5969,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "route_review_remaining"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "ops_summary"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_production_handoff"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_operations_handoff"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
@@ -5984,6 +5985,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Production Handoff:/);
       assert.match(launchMainline.summaryText, /healthcheck-rocksolid/);
       assert.match(launchMainline.summaryText, /backup-rocksolid/);
+      assert.match(launchMainline.summaryText, /Production Operations Handoff:/);
+      assert.match(launchMainline.summaryText, /observability-guide\.md/);
+      assert.match(launchMainline.summaryText, /shift-handover-template\.md/);
 
       const launchMainlineSummaryDownload = await getText(
         baseUrl,
@@ -5999,6 +6003,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Handoff:/);
+      assert.match(launchMainlineSummaryDownload.body, /Production Operations Handoff:/);
 
       const productionHandoffDownload = await getText(
         baseUrl,
@@ -6013,6 +6018,19 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(productionHandoffDownload.body, /deploy\/linux\/backup-rocksolid\.sh/);
       assert.match(productionHandoffDownload.body, /docs\/linux-deployment\.md/);
       assert.match(productionHandoffDownload.body, /docs\/windows-deployment-guide\.md/);
+
+      const operationsHandoffDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=operations-handoff",
+        viewerSession.token
+      );
+      assert.match(operationsHandoffDownload.contentType || "", /^text\/plain/);
+      assert.match(operationsHandoffDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-operations-handoff\.txt"/);
+      assert.match(operationsHandoffDownload.body, /RockSolid Developer Launch Mainline Operations Handoff/);
+      assert.match(operationsHandoffDownload.body, /docs\/observability-guide\.md/);
+      assert.match(operationsHandoffDownload.body, /docs\/production-operations-runbook\.md/);
+      assert.match(operationsHandoffDownload.body, /docs\/incident-response-playbook\.md/);
+      assert.match(operationsHandoffDownload.body, /docs\/shift-handover-template\.md/);
 
       const forbidden = await getJsonExpectError(
         baseUrl,
@@ -6089,6 +6107,13 @@ test("developer launch mainline production gate blocks default launch secrets an
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
         item?.key === "production_backup_restore_handoff"
+        && item?.status === "pass"
+      )
+    );
+    assert.ok(
+      Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
+      && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_operations_handoff"
         && item?.status === "pass"
       )
     );

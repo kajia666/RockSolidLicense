@@ -3715,6 +3715,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
         ? "launch_mainline_checksums"
         : normalizedFormat === "production-handoff"
           ? "launch_mainline_production_handoff"
+        : normalizedFormat === "operations-handoff"
+          ? "launch_mainline_operations_handoff"
         : "launch_mainline_summary",
     fileName,
     label,
@@ -4403,7 +4405,8 @@ function buildLaunchMainlineProductionGatePayload({
   tokenKeys = null,
   params = null,
   publicBaseUrl = "",
-  productionHandoffDownload = null
+  productionHandoffDownload = null,
+  operationsHandoffDownload = null
 } = {}) {
   const actionPlan = [];
   const checks = [];
@@ -4655,6 +4658,16 @@ function buildLaunchMainlineProductionGatePayload({
     opsWorkspace,
     effectiveProductionDownload
   );
+  if (operationsHandoffDownload) {
+    pushRecommendedDownload(operationsHandoffDownload);
+    addPassCheck(
+      "production_operations_handoff",
+      "Review the production observability and handover package",
+      "The unified operations handoff already packages observability, alerting, incident-response, and shift-handover material for this lane.",
+      opsWorkspace,
+      operationsHandoffDownload
+    );
+  }
 
   const status = blockingCount > 0
     ? "hold"
@@ -9791,6 +9804,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "production-handoff",
     params
   );
+  const operationsHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline operations handoff",
+    "developer-launch-mainline-operations-handoff.txt",
+    "operations-handoff",
+    params
+  );
   const opsContinuationWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
     opsPrimaryWorkspaceAction,
     opsRouteReview.continuation?.primaryAction,
@@ -9875,7 +9894,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     tokenKeys: tokenKeySummary,
     params,
     publicBaseUrl,
-    productionHandoffDownload
+    productionHandoffDownload,
+    operationsHandoffDownload
   });
   const stageDefinitions = [
     {
@@ -10103,6 +10123,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   }
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(continuation?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(productionHandoffDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   const overallGate = buildLaunchMainlineGatePayload({
     status: preferredStage?.gate?.status || "ready",
     headline: preferredStage?.gate?.headline || "Launch mainline overview",
@@ -10534,6 +10555,19 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  if (payload.operationsHandoffText) {
+    const operationsHandoff = payload.operationsHandoffText
+      .split(/\r?\n/)
+      .map((line) => String(line || "").trimEnd())
+      .filter((line) => line !== "");
+    if (operationsHandoff.length) {
+      lines.push("");
+      lines.push("Production Operations Handoff:");
+      for (const line of operationsHandoff.slice(1)) {
+        lines.push(`- ${line}`);
+      }
+    }
+  }
   if (Array.isArray(mainlineSummary.actionPlan) && mainlineSummary.actionPlan.length) {
     lines.push("");
     lines.push("Mainline Action Plan:");
@@ -10585,11 +10619,13 @@ function buildDeveloperLaunchMainlinePayload({
   const fileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
   const productionHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-production-handoff.txt`;
+  const operationsHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-operations-handoff.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
     productionHandoffFileName,
+    operationsHandoffFileName,
     manifest: {
       generatedAt,
       channel,
@@ -10642,6 +10678,12 @@ function buildDeveloperLaunchMainlinePayload({
     publicBaseUrl,
     systemHealth
   });
+  payload.operationsHandoffText = buildDeveloperLaunchMainlineOperationsHandoffText({
+    generatedAt,
+    manifest: payload.manifest,
+    filters: payload.filters,
+    publicBaseUrl
+  });
   payload.summaryText = buildDeveloperLaunchMainlineSummaryText(payload);
   if (payload.mainlineSummary?.mainlinePage && typeof payload.mainlineSummary.mainlinePage === "object") {
     payload.mainlineSummary.mainlinePage.summaryText = payload.summaryText || "";
@@ -10690,6 +10732,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",
     payload.productionHandoffText || ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
+    payload.operationsHandoffText || ""
+  );
   return files;
 }
 
@@ -10701,7 +10748,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "checksums", "zip"],
+    ["json", "summary", "production-handoff", "operations-handoff", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -10733,6 +10780,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.productionHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "operations-handoff") {
+    return {
+      fileName: payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.operationsHandoffText || ""
     };
   }
 
@@ -11221,6 +11275,44 @@ function buildDeveloperLaunchMainlineProductionHandoffText({
     `Healthchecks: ${healthcheckAssets.join(" | ")}`,
     `Backups: ${backupAssets.join(" | ")}`,
     `Environment Profiles: ${envAssets.join(" | ")}`
+  ];
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlineOperationsHandoffText({
+  generatedAt = "",
+  manifest = {},
+  filters = {},
+  publicBaseUrl = ""
+} = {}) {
+  const project = manifest.project || {};
+  const operationsDocs = [
+    "docs/production-operations-runbook.md",
+    "docs/daily-operations-checklist.md",
+    "docs/observability-guide.md",
+    "docs/alert-priority-guide.md",
+    "docs/incident-response-playbook.md",
+    "docs/shift-handover-template.md",
+    "docs/launch-timeline-playbook.md"
+  ];
+  const operationsSignals = [
+    "/api/health",
+    "/developer/ops",
+    "/developer/launch-mainline",
+    "/developer/launch-review",
+    "/developer/launch-smoke"
+  ];
+  const lines = [
+    "RockSolid Developer Launch Mainline Operations Handoff",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Public Base URL: ${publicBaseUrl || "-"}`,
+    "",
+    `Operations Docs: ${operationsDocs.join(" | ")}`,
+    `Primary Signals: ${operationsSignals.join(" | ")}`,
+    "Focus Areas: launch health | login failures | heartbeat failures | backup freshness | alert routing | shift handover"
   ];
   return lines.join("\n");
 }

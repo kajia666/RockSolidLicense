@@ -6852,6 +6852,20 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
     assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineStages)
+        ? actionResult.receipt.mainlineStages.map((item) => ({
+            key: item?.key || null,
+            status: item?.gate?.status || null
+          }))
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => ({
+            key: item?.key || null,
+            status: item?.gate?.status || null
+          }))
+        : []
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
     );
@@ -6948,6 +6962,20 @@ test("developer launch mainline action can create first launch batches and retur
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(actionResult.receipt?.mainlineOverallGate?.status, actionResult.launchMainline?.mainlineSummary?.overallGate?.status);
     assert.deepEqual(actionResult.receipt?.mainlineNextActions, actionResult.launchMainline?.mainlineSummary?.nextActions);
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.mainlineStages)
+        ? actionResult.receipt.mainlineStages.map((item) => ({
+            key: item?.key || null,
+            status: item?.gate?.status || null
+          }))
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.stages)
+        ? actionResult.launchMainline.mainlineSummary.stages.slice(0, 5).map((item) => ({
+            key: item?.key || null,
+            status: item?.gate?.status || null
+          }))
+        : []
+    );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []

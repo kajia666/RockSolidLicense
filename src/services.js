@@ -3750,6 +3750,16 @@ function buildLaunchMainlineActionReceipt({
   const mainlineNextActions = Array.isArray(mainlineSummary.nextActions)
     ? mainlineSummary.nextActions.slice(0, 4)
     : [];
+  const mainlineStages = (Array.isArray(mainlineSummary.stages) ? mainlineSummary.stages : [])
+    .slice(0, 5)
+    .map((item) => ({
+      key: item?.key || null,
+      label: item?.label || item?.key || "stage",
+      gate: item?.gate || null,
+      workspaceAction: item?.workspaceAction || null,
+      recommendedDownload: item?.recommendedDownload || null
+    }))
+    .filter((item) => item.key || item.gate || item.workspaceAction || item.recommendedDownload);
   const mainlineActions = (Array.isArray(mainlineSummary.actionPlan) ? mainlineSummary.actionPlan : [])
     .slice(0, 4)
     .map((item) => ({
@@ -3778,6 +3788,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecommendedDownload,
     mainlineContinuation,
     mainlineNextActions,
+    mainlineStages,
     mainlineActions,
     actions
   };

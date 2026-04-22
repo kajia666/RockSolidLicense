@@ -479,6 +479,13 @@
           : Array.isArray(receipt?.actions)
           ? receipt.actions
           : (Array.isArray(followUp?.actions) ? followUp.actions : []);
+        const stageBits = Array.isArray(receipt?.mainlineStages)
+          ? receipt.mainlineStages.map((item) => {
+              const label = item?.label || item?.key || "stage";
+              const status = String(item?.gate?.status || "unknown").toUpperCase();
+              return renderTag(`${label}:${status}`, item?.gate?.status === "hold");
+            }).join("")
+          : "";
         if (!actions.length) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
@@ -504,6 +511,7 @@
           ${receipt?.mainlineOverallGate ? `<div class="hint" style="margin-top: 8px;">${esc(`Gate: ${String(receipt.mainlineOverallGate.status || "unknown").toUpperCase()} | ${receipt.mainlineOverallGate.headline || "-"}`)}</div>` : ""}
           ${receipt?.mainlineContinuation ? `<div class="hint" style="margin-top: 8px;">${esc(`Continuation: ${receipt.mainlineContinuation.title || "Continue Routed Review"}${receipt.mainlineContinuation.summary ? ` | ${receipt.mainlineContinuation.summary}` : ""}`)}</div>` : ""}
           ${Array.isArray(receipt?.mainlineNextActions) && receipt.mainlineNextActions.length ? `<div class="hint" style="margin-top: 8px;">${esc(`Next actions: ${receipt.mainlineNextActions.join(" | ")}`)}</div>` : ""}
+          ${stageBits ? `<div style="margin-top: 8px;">${stageBits}</div>` : ""}
           ${transitions ? `<div style="margin-top: 8px;">${transitions}</div>` : ""}
           ${createdBits ? `<div style="margin-top: 8px;">${createdBits}</div>` : ""}
           ${actions.map((item, index) => `

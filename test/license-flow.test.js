@@ -7234,6 +7234,48 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         : []
     );
     assert.deepEqual(
+      {
+        heroControls: Array.isArray(actionResult.receipt?.mainlineView?.heroControls)
+          ? actionResult.receipt.mainlineView.heroControls.map((item) => ({
+              kind: item?.kind || null,
+              key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            }))
+          : [],
+        sections: Array.isArray(actionResult.receipt?.mainlineView?.sections)
+          ? actionResult.receipt.mainlineView.sections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : [],
+        lastAction: Array.isArray(actionResult.receipt?.mainlineView?.lastActionScreen?.sections)
+          ? actionResult.receipt.mainlineView.lastActionScreen.sections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : []
+      },
+      {
+        heroControls: Array.isArray(actionResult.receipt?.mainlineHeroControls)
+          ? actionResult.receipt.mainlineHeroControls.map((item) => ({
+              kind: item?.kind || null,
+              key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            }))
+          : [],
+        sections: Array.isArray(actionResult.receipt?.mainlineSections)
+          ? actionResult.receipt.mainlineSections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : [],
+        lastAction: Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+          ? actionResult.receipt.mainlineLastActionScreen.sections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : []
+      }
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
         ? actionResult.receipt.mainlineWorkspaceActions.map((item) => item?.key || null)
         : [],
@@ -7755,6 +7797,48 @@ test("developer launch mainline action can create first launch batches and retur
             key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
           }))
         : []
+    );
+    assert.deepEqual(
+      {
+        heroControls: Array.isArray(actionResult.receipt?.mainlineView?.heroControls)
+          ? actionResult.receipt.mainlineView.heroControls.map((item) => ({
+              kind: item?.kind || null,
+              key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            }))
+          : [],
+        sections: Array.isArray(actionResult.receipt?.mainlineView?.sections)
+          ? actionResult.receipt.mainlineView.sections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : [],
+        lastAction: Array.isArray(actionResult.receipt?.mainlineView?.lastActionScreen?.sections)
+          ? actionResult.receipt.mainlineView.lastActionScreen.sections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : []
+      },
+      {
+        heroControls: Array.isArray(actionResult.receipt?.mainlineHeroControls)
+          ? actionResult.receipt.mainlineHeroControls.map((item) => ({
+              kind: item?.kind || null,
+              key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            }))
+          : [],
+        sections: Array.isArray(actionResult.receipt?.mainlineSections)
+          ? actionResult.receipt.mainlineSections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : [],
+        lastAction: Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+          ? actionResult.receipt.mainlineLastActionScreen.sections.map((item) => ({
+              key: item?.key || null,
+              cards: Array.isArray(item?.cards) ? item.cards.map((card) => card?.key || null) : []
+            }))
+          : []
+      }
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineWorkspaceActions)
@@ -11515,6 +11599,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Launch Review/);
     assert.match(html, /Launch Smoke/);
     assert.match(html, /Developer Ops/);
+    assert.match(html, /mainlineView/);
+    assert.match(html, /currentMainlineView/);
     assert.match(html, /mainlineHeroControls/);
     assert.match(html, /currentMainlineScreen/);
     assert.match(html, /currentMainlineSections/);
@@ -11522,6 +11608,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /currentMainlineLastActionScreen/);
     assert.match(html, /mainlineRecapCards/);
     assert.match(html, /mainlineFollowUpCards/);
+    assert.doesNotMatch(html, /currentMainlineRecapCards/);
+    assert.doesNotMatch(html, /currentMainlineFollowUpCards/);
     assert.match(html, /data-mainline-hero-control-index/);
     assert.match(html, /data-mainline-section-control-index/);
     assert.match(html, /data-mainline-receipt-card-control-index/);

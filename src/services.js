@@ -4239,6 +4239,11 @@ function buildLaunchMainlineActionReceipt({
       }
     ]
   };
+  const mainlineView = {
+    heroControls: mainlineHeroControls,
+    sections: mainlineSections,
+    lastActionScreen: mainlineLastActionScreen
+  };
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -4256,6 +4261,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineSections,
+    mainlineView,
     mainlineScreen,
     mainlineStages,
     mainlineHeroControls,
@@ -9921,6 +9927,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     heroControls: heroControls.map((item) => ensureLaunchMainlineControlHrefs(item, params)),
     sections
   };
+  const mainlineView = {
+    heroControls: screen.heroControls,
+    sections: screen.sections,
+    lastActionScreen: {
+      sections: []
+    }
+  };
   return {
     overallGate,
     releaseGate,
@@ -9933,6 +9946,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     overviewCards,
     sections,
     screen,
+    mainlineView,
     heroControls: screen.heroControls,
     workspaceActions: workspaceActions.map((item) => ensureLaunchWorkflowWorkspaceHref(item, params)),
     primaryAction,

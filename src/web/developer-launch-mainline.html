@@ -441,7 +441,26 @@
         return currentMainline?.mainlineSummary || {};
       }
 
+      function currentMainlineView() {
+        const receipt = currentLastMainlineReceipt();
+        if (receipt?.mainlineView && typeof receipt.mainlineView === "object") {
+          return receipt.mainlineView;
+        }
+        const summaryView = currentMainlineSummary().mainlineView;
+        if (summaryView && typeof summaryView === "object") {
+          return summaryView;
+        }
+        return {};
+      }
+
       function currentMainlineScreen() {
+        const currentView = currentMainlineView();
+        if (currentView && typeof currentView === "object") {
+          return {
+            heroControls: Array.isArray(currentView.heroControls) ? currentView.heroControls : [],
+            sections: Array.isArray(currentView.sections) ? currentView.sections : []
+          };
+        }
         const summaryScreen = currentMainlineSummary().screen;
         if (summaryScreen && typeof summaryScreen === "object") {
           return summaryScreen;
@@ -468,12 +487,16 @@
       }
 
       function currentMainlineLastActionScreen() {
+        const currentView = currentMainlineView();
+        if (currentView?.lastActionScreen && typeof currentView.lastActionScreen === "object") {
+          return currentView.lastActionScreen;
+        }
         const receipt = currentLastMainlineReceipt();
         if (receipt?.mainlineLastActionScreen && typeof receipt.mainlineLastActionScreen === "object") {
           return receipt.mainlineLastActionScreen;
         }
-        const recapCards = currentMainlineRecapCards();
-        const followUpCards = currentMainlineFollowUpCards();
+        const recapCards = Array.isArray(receipt?.mainlineRecapCards) ? receipt.mainlineRecapCards : [];
+        const followUpCards = Array.isArray(receipt?.mainlineFollowUpCards) ? receipt.mainlineFollowUpCards : [];
         if (!recapCards.length && !followUpCards.length) {
           return { sections: [] };
         }
@@ -495,24 +518,19 @@
         };
       }
 
-      function currentMainlineRecapCards() {
-        const receipt = currentLastMainlineReceipt();
-        return Array.isArray(receipt?.mainlineRecapCards) ? receipt.mainlineRecapCards : [];
-      }
-
-      function currentMainlineFollowUpCards() {
-        const receipt = currentLastMainlineReceipt();
-        return Array.isArray(receipt?.mainlineFollowUpCards) ? receipt.mainlineFollowUpCards : [];
-      }
-
       function currentMainlineReceiptCard(kind = "", key = "") {
         const normalizedKind = String(kind || "").trim().toLowerCase();
         const normalizedKey = String(key || "").trim();
         if (!normalizedKey) {
           return null;
         }
-        const source = normalizedKind === "followup" ? currentMainlineFollowUpCards() : currentMainlineRecapCards();
-        return source.find((item) => String(item?.key || "").trim() === normalizedKey) || null;
+        const screen = currentMainlineLastActionScreen();
+        const sectionKey = normalizedKind === "followup" ? "follow_up" : "recap";
+        const section = Array.isArray(screen?.sections)
+          ? screen.sections.find((item) => String(item?.key || "").trim() === sectionKey)
+          : null;
+        const cards = Array.isArray(section?.cards) ? section.cards : [];
+        return cards.find((item) => String(item?.key || "").trim() === normalizedKey) || null;
       }
 
       function currentMainlineSectionCard(sectionKey = "", cardKey = "") {

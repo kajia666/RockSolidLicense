@@ -6847,6 +6847,31 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_BOOT");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) =>
+            Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          )
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => [
+            item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
+            item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null,
+            item?.bootstrapAction?.key ? { kind: "bootstrap", key: item.bootstrapAction.key } : null,
+            item?.setupAction?.key ? { kind: "setup", key: item.setupAction.key } : null
+          ].filter(Boolean))
+        : []
+    );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(
@@ -7047,6 +7072,31 @@ test("developer launch mainline action can create first launch batches and retur
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) =>
+            Array.isArray(item?.controls)
+              ? item.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  key:
+                    control?.workspaceAction?.key
+                    || control?.recommendedDownload?.key
+                    || control?.bootstrapAction?.key
+                    || control?.setupAction?.key
+                    || null
+                }))
+              : []
+          )
+        : [],
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan)
+        ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => [
+            item?.workspaceAction?.key ? { kind: "workspace", key: item.workspaceAction.key } : null,
+            item?.recommendedDownload?.key ? { kind: "download", key: item.recommendedDownload.key } : null,
+            item?.bootstrapAction?.key ? { kind: "bootstrap", key: item.bootstrapAction.key } : null,
+            item?.setupAction?.key ? { kind: "setup", key: item.setupAction.key } : null
+          ].filter(Boolean))
+        : []
+    );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
     assert.equal(actionResult.receipt?.mainlineRecommendedDownload?.key, actionResult.launchMainline?.mainlineSummary?.recommendedDownload?.key);
     assert.equal(
@@ -10861,6 +10911,7 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /mainlineFollowUpActions/);
     assert.match(html, /data-mainline-receipt-followup-action-index/);
     assert.match(html, /data-mainline-followup-action-control-index/);
+    assert.match(html, /data-mainline-action-control-index/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

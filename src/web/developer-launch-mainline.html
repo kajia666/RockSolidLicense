@@ -752,10 +752,7 @@
                 </div>
                 <div class="hint">${esc(item.summary || "-")}</div>
                 <div class="actions">
-                  ${item.workspaceAction?.key ? `<button type="button" class="secondary" data-mainline-action-workspace-index="${index}">${esc(item.workspaceAction.label || "Open Workspace")}</button>` : ""}
-                  ${item.recommendedDownload?.key ? `<button type="button" class="secondary" data-mainline-action-download-index="${index}">${esc(item.recommendedDownload.label || "Download Summary")}</button>` : ""}
-                  ${item.bootstrapAction ? `<button type="button" class="secondary" data-mainline-action-bootstrap-index="${index}">${esc(item.bootstrapAction.label || item.bootstrapAction.key || "Run bootstrap")}</button>` : ""}
-                  ${item.setupAction ? `<button type="button" class="secondary" data-mainline-action-setup-index="${index}">${esc(item.setupAction.label || item.setupAction.key || "Run setup")}</button>` : ""}
+                  ${Array.isArray(item.controls) ? item.controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-action-index="${index}" data-mainline-action-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.bootstrapAction?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("") : ""}
                 </div>
               </div>
             `).join("")}
@@ -1064,50 +1061,39 @@
       });
 
       document.addEventListener("click", async (event) => {
-        const actionWorkspaceButton = event.target.closest("[data-mainline-action-workspace-index]");
-        if (actionWorkspaceButton) {
-          const index = Number(actionWorkspaceButton.dataset.mainlineActionWorkspaceIndex || -1);
-          const item = currentMainline?.mainlineSummary?.actionPlan?.[index];
-          if (!item?.workspaceAction) {
-            return;
-          }
-          openWorkspaceAction(item.workspaceAction);
-          return;
-        }
-        const actionDownloadButton = event.target.closest("[data-mainline-action-download-index]");
-        if (actionDownloadButton) {
-          const index = Number(actionDownloadButton.dataset.mainlineActionDownloadIndex || -1);
+        const actionControlButton = event.target.closest("[data-mainline-action-control-index]");
+        if (actionControlButton) {
+          const index = Number(actionControlButton.dataset.mainlineActionIndex || -1);
+          const controlIndex = Number(actionControlButton.dataset.mainlineActionControlIndex || -1);
           const item = currentMainlineActionPlan()[index];
-          if (!item?.recommendedDownload) {
+          const control = Array.isArray(item?.controls) ? item.controls[controlIndex] : null;
+          if (control?.workspaceAction?.key) {
+            openWorkspaceAction(control.workspaceAction);
             return;
           }
-          await downloadMainlineRecommendedItem(item.recommendedDownload).catch((error) => {
-            setStatus(error.message, "danger");
-            setOutput({ error: error.message });
-          });
-          return;
-        }
-        const bootstrapButton = event.target.closest("[data-mainline-action-bootstrap-index]");
-        if (bootstrapButton) {
-          try {
-            const index = Number(bootstrapButton.dataset.mainlineActionBootstrapIndex || -1);
-            const item = currentMainlineActionPlan()[index];
-            await runLaunchMainlineBootstrap(item?.bootstrapAction || null);
-          } catch (error) {
-            setStatus(error.message, "danger");
-            setOutput({ error: error.message });
+          if (control?.recommendedDownload?.key) {
+            await downloadMainlineRecommendedItem(control.recommendedDownload).catch((error) => {
+              setStatus(error.message, "danger");
+              setOutput({ error: error.message });
+            });
+            return;
           }
-          return;
-        }
-        const setupButton = event.target.closest("[data-mainline-action-setup-index]");
-        if (setupButton) {
-          try {
-            const index = Number(setupButton.dataset.mainlineActionSetupIndex || -1);
-            const item = currentMainlineActionPlan()[index];
-            await runLaunchMainlineSetup(item?.setupAction || null);
-          } catch (error) {
-            setStatus(error.message, "danger");
-            setOutput({ error: error.message });
+          if (control?.bootstrapAction) {
+            try {
+              await runLaunchMainlineBootstrap(control.bootstrapAction);
+            } catch (error) {
+              setStatus(error.message, "danger");
+              setOutput({ error: error.message });
+            }
+            return;
+          }
+          if (control?.setupAction) {
+            try {
+              await runLaunchMainlineSetup(control.setupAction);
+            } catch (error) {
+              setStatus(error.message, "danger");
+              setOutput({ error: error.message });
+            }
           }
           return;
         }

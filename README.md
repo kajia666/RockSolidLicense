@@ -130,6 +130,7 @@
 - 这层 continuation 按钮现在也已经不再由页面自己拼了：服务端 receipt 会直接下发 `mainlineContinuationActions`，`Launch Mainline` 工作台只消费这份 payload，所以 unified continuation 的 workspace / download 语义也回到了后台/API 主线上
 - 现在 `Last Mainline Action` 顶层那组 follow-up 按钮也不再分成 `workspaceActions / recommendedDownloads / continuation` 三块由页面各自拼了：服务端 receipt 会统一下发 `mainlineFollowUpActions`，把 continuation、统一工作台入口和统一下载动作收成一份连续 follow-up，`Launch Mainline` 工作台直接消费这份 payload 即可
 - 同时 `Last Mainline Action` 里每条 unified `mainlineActions` 也不再由页面自己按 `workspace/download/bootstrap/setup` 分支去拼按钮了：服务端 receipt 会把每一步可执行 controls 一起下发，页面只消费 `controls`，所以初始化后的下一步处理动作也进一步收回到了后台/API 主线上
+- 现在统一 `Launch Mainline` 页面中间那块 `Mainline Action Plan` 也已经和上面的 receipt recap 对齐了：`mainlineSummary.actionPlan` 自身就会带服务端下发的 `controls`，页面不再自己拆四种按钮，这样统一主线的当前动作和动作回执终于吃的是同一套后台/API 语义
 - 统一的 `launch-mainline` summary / summary download 现在也会正式打印 `Mainline Next Actions`，所以 handoff 文本不只看得到 gate、primary action、continuation，还能直接看到当前主线上最值得继续的几步
 - 这条 `/api/developer/launch-mainline` 聚合结果现在还会在 `mainlineSummary` 顶层直接下发统一的 `primaryAction` 和 `recommendedDownload`，不再要求页面或后续工作台自己再去钻 `overallGate` 里挑主动作
 - 同时它现在也会在 `mainlineSummary` 顶层直接下发 `continuation`，把 routed `Developer Ops` 复查链的下一步动作和推荐下载直接抬出来；统一的 `launch-mainline` 摘要里也会多出 `Mainline Continuation`，这样交接和复查都不需要再自己从 ops payload 里翻“下一步该怎么继续”

@@ -9219,19 +9219,46 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     .slice()
     .sort((left, right) => gateRank(right.gate?.status) - gateRank(left.gate?.status))[0]
     || null;
-  const actionPlan = activeStages.map((item, index) => createLaunchWorkflowActionPlanStep({
-    key: `${item.key}_mainline`,
-    title: item.gate?.primaryAction?.title || `${item.label}: ${item.gate?.headline || item.gate?.summary || "Review this stage"}`,
-    summary: item.gate?.summary || item.gate?.headline || "-",
-    status: mapGateStatusToStepStatus(item.gate?.status),
-    priority: item.key === preferredStage?.key || (!preferredStage && index === 0) ? "primary" : "secondary",
-    workspaceAction: item.gate?.primaryAction?.workspaceAction || item.gate?.recommendedWorkspace || null,
-    recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null,
-    bootstrapAction: item.gate?.primaryAction?.bootstrapAction || null,
-    setupAction: item.gate?.primaryAction?.setupAction || null
-  }));
+  const actionPlan = activeStages.map((item, index) => {
+    const step = createLaunchWorkflowActionPlanStep({
+      key: `${item.key}_mainline`,
+      title: item.gate?.primaryAction?.title || `${item.label}: ${item.gate?.headline || item.gate?.summary || "Review this stage"}`,
+      summary: item.gate?.summary || item.gate?.headline || "-",
+      status: mapGateStatusToStepStatus(item.gate?.status),
+      priority: item.key === preferredStage?.key || (!preferredStage && index === 0) ? "primary" : "secondary",
+      workspaceAction: item.gate?.primaryAction?.workspaceAction || item.gate?.recommendedWorkspace || null,
+      recommendedDownload: item.gate?.recommendedDownload || item.summaryDownload || null,
+      bootstrapAction: item.gate?.primaryAction?.bootstrapAction || null,
+      setupAction: item.gate?.primaryAction?.setupAction || null
+    });
+    return {
+      ...step,
+      controls: [
+        step.workspaceAction ? {
+          kind: "workspace",
+          label: step.workspaceAction.label || step.title || step.key || "Open workspace",
+          workspaceAction: step.workspaceAction
+        } : null,
+        step.recommendedDownload ? {
+          kind: "download",
+          label: step.recommendedDownload.label || step.title || step.key || "Download summary",
+          recommendedDownload: step.recommendedDownload
+        } : null,
+        step.bootstrapAction ? {
+          kind: "bootstrap",
+          label: step.bootstrapAction.label || step.title || step.key || "Run bootstrap",
+          bootstrapAction: step.bootstrapAction
+        } : null,
+        step.setupAction ? {
+          kind: "setup",
+          label: step.setupAction.label || step.title || step.key || "Run setup",
+          setupAction: step.setupAction
+        } : null
+      ].filter(Boolean)
+    };
+  });
   if (continuation) {
-    actionPlan.push(createLaunchWorkflowActionPlanStep({
+    const continuationStep = createLaunchWorkflowActionPlanStep({
       key: "launch_mainline_route_continuation",
       title: continuation.title,
       summary: continuation.summary,
@@ -9239,7 +9266,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       priority: "secondary",
       workspaceAction: continuation.workspaceAction,
       recommendedDownload: continuation.recommendedDownload || null
-    }));
+    });
+    actionPlan.push({
+      ...continuationStep,
+      controls: [
+        continuationStep.workspaceAction ? {
+          kind: "workspace",
+          label: continuationStep.workspaceAction.label || continuationStep.title || continuationStep.key || "Open workspace",
+          workspaceAction: continuationStep.workspaceAction
+        } : null,
+        continuationStep.recommendedDownload ? {
+          kind: "download",
+          label: continuationStep.recommendedDownload.label || continuationStep.title || continuationStep.key || "Download summary",
+          recommendedDownload: continuationStep.recommendedDownload
+        } : null
+      ].filter(Boolean)
+    });
   }
   const recommendedDownloads = [];
   const recommendedDownloadKeys = new Set();

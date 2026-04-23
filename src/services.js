@@ -4748,8 +4748,20 @@ function buildLaunchMainlineActionReceipt({
             label: item?.label || item?.key || "owner",
             actionCount: item?.actionCount || 0
           })),
+          ownerPath: firstLaunchOpsQueue.ownerGroups.map((item) => ({
+            key: item?.key || null,
+            label: item?.label || item?.key || "owner",
+            actionCount: item?.actionCount || 0
+          })),
           primaryHandoff: firstLaunchPrimaryHandoff,
           launchWindowFlow: firstLaunchWindowFlow,
+          stagePath: firstLaunchOpsQueue.stageGroups.map((item) => ({
+            key: item?.key || null,
+            label: item?.label || item?.key || "stage",
+            ownerRole: item?.ownerRole || null,
+            ownerLabel: item?.ownerLabel || null,
+            actionCount: item?.actionCount || 0
+          })),
           stageGroups: firstLaunchOpsQueue.stageGroups.map((item) => ({
             key: item?.key || null,
             label: item?.label || item?.key || "stage",
@@ -4834,6 +4846,12 @@ function buildLaunchMainlineActionReceipt({
           mainlineEvidenceQueue ? formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production evidence") : "",
           firstLaunchWindowFlow.length
             ? `Launch window flow: ${firstLaunchWindowFlow.map((item) => item.label || item.key).join(" | ")}`
+            : "",
+          firstLaunchOpsQueue.ownerGroups.length
+            ? `Owner path: ${firstLaunchOpsQueue.ownerGroups.map((item) => item.label || item.key).join(" -> ")}`
+            : "",
+          firstLaunchOpsQueue.stageGroups.length
+            ? `Stage path: ${firstLaunchOpsQueue.stageGroups.map((item) => item.label || item.key).join(" -> ")}`
             : "",
           firstLaunchOpsQueue.ownerGroups.length
             ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`

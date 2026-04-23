@@ -11,6 +11,7 @@ After the first launch is complete, continue with:
 
 - [production-operations-runbook.md](/D:/code/OnlineVerification/docs/production-operations-runbook.md)
 - [launch-timeline-playbook.md](/D:/code/OnlineVerification/docs/launch-timeline-playbook.md)
+- [launch-mainline-rehearsal.md](/D:/code/OnlineVerification/docs/launch-mainline-rehearsal.md)
 
 ## Phase 1: Server ready
 

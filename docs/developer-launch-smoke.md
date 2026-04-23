@@ -4,6 +4,10 @@ The developer launch smoke workspace is available at `/developer/launch-smoke`.
 
 This workspace is the smoke-validation step between launch preparation and launch review.
 
+If you want the full rehearsal order around this step, including what should happen before and after smoke validation, also see:
+
+- [launch-mainline-rehearsal.md](/D:/code/OnlineVerification/docs/launch-mainline-rehearsal.md)
+
 Use it when the software author or launch-duty teammate needs one place to:
 
 - inspect the staged startup bootstrap request

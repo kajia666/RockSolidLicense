@@ -2,6 +2,10 @@
 
 The developer launch mainline workspace is available at `/developer/launch-mainline`.
 
+For one realistic end-to-end rehearsal path across release, smoke, review, ops, and mainline, also see:
+
+- [launch-mainline-rehearsal.md](/D:/code/OnlineVerification/docs/launch-mainline-rehearsal.md)
+
 It is the unified author-side control tower for first-wave rollout. Use it when you want one place to review:
 
 - production readiness

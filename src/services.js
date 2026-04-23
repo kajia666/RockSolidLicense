@@ -3940,6 +3940,42 @@ function createLaunchWorkflowActionPlanStep({
   };
 }
 
+function buildLaunchInventoryHealthFromStates(states = []) {
+  const normalizedStates = (Array.isArray(states) ? states : [])
+    .map((item) => ({
+      key: item?.key || item?.mode || null,
+      mode: item?.mode || item?.key || null,
+      status: String(item?.status || item?.inventoryStatus || "unknown").trim().toLowerCase()
+    }))
+    .filter((item) => item.key || item.mode);
+  const byStatus = (status) => normalizedStates.filter((item) => item.status === status);
+  const readyStates = byStatus("ready");
+  const lowStates = byStatus("low");
+  const missingStates = byStatus("missing");
+  const modeList = (items = []) => items.map((item) => item.mode || item.key || null).filter(Boolean);
+  return {
+    status: missingStates.length || lowStates.length ? "review" : normalizedStates.length ? "ready" : "unknown",
+    readyStateCount: readyStates.length,
+    lowStateCount: lowStates.length,
+    missingStateCount: missingStates.length,
+    readyModes: modeList(readyStates),
+    lowModes: modeList(lowStates),
+    missingModes: modeList(missingStates)
+  };
+}
+
+function formatLaunchInventoryHealthLine(health = {}, label = "Inventory health") {
+  const readyModes = Array.isArray(health?.readyModes) ? health.readyModes.filter(Boolean) : [];
+  const lowModes = Array.isArray(health?.lowModes) ? health.lowModes.filter(Boolean) : [];
+  const missingModes = Array.isArray(health?.missingModes) ? health.missingModes.filter(Boolean) : [];
+  return [
+    `${label}: ${String(health?.status || "unknown").trim().toUpperCase()} | ready=${Number(health?.readyStateCount || 0)} | low=${Number(health?.lowStateCount || 0)} | missing=${Number(health?.missingStateCount || 0)}`,
+    readyModes.length ? `readyModes=${readyModes.join(",")}` : "",
+    lowModes.length ? `lowModes=${lowModes.join(",")}` : "",
+    missingModes.length ? `missingModes=${missingModes.join(",")}` : ""
+  ].filter(Boolean).join(" | ");
+}
+
 function buildLaunchMainlineActionReceipt({
   operation = "",
   result = null,
@@ -4067,23 +4103,7 @@ function buildLaunchMainlineActionReceipt({
       refillCount: Number(item?.refillCount || 0)
     }))
     .filter((item) => item.key || item.label);
-  const firstLaunchInventoryHealth = (() => {
-    const states = firstLaunchInventoryStates;
-    const byStatus = (status) => states.filter((item) => String(item?.status || "").trim().toLowerCase() === status);
-    const readyStates = byStatus("ready");
-    const lowStates = byStatus("low");
-    const missingStates = byStatus("missing");
-    const modeList = (items = []) => items.map((item) => item?.mode || item?.key || null).filter(Boolean);
-    return {
-      status: missingStates.length || lowStates.length ? "review" : states.length ? "ready" : "unknown",
-      readyStateCount: readyStates.length,
-      lowStateCount: lowStates.length,
-      missingStateCount: missingStates.length,
-      readyModes: modeList(readyStates),
-      lowModes: modeList(lowStates),
-      missingModes: modeList(missingStates)
-    };
-  })();
+  const firstLaunchInventoryHealth = buildLaunchInventoryHealthFromStates(firstLaunchInventoryStates);
   const firstLaunchInventorySkipped = (Array.isArray(result?.skipped) ? result.skipped : [])
     .map((item) => ({
       key: item?.key || item?.mode || item?.label || null,
@@ -4692,6 +4712,7 @@ function buildLaunchMainlineActionReceipt({
         ].filter((item) => item?.key),
         details: [
           `Duty chain: ${operationLabel} -> ${firstLaunchOpsQueue.nextAction?.label || firstLaunchOpsQueue.nextAction?.key || firstLaunchInventoryQueue?.nextAction?.label || firstLaunchInventoryQueue?.nextAction?.key || "first launch action"} -> ${firstLaunchHandoffDownload?.label || "First launch handoff"} -> ${mainlineEvidenceQueue?.nextAction?.title || followUp?.nextProductionAction?.title || mainlineEvidenceQueue?.nextAction?.key || followUp?.nextProductionAction?.key || "production evidence queue"}`,
+          formatLaunchInventoryHealthLine(firstLaunchInventoryHealth, "Inventory health"),
           firstLaunchOpsQueue.ownerGroups.length
             ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
             : "",
@@ -13655,6 +13676,11 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
   const readySuggestedBatches = firstBatchCardRecommendations.filter((item) =>
     String(item?.inventoryStatus || "ready").trim().toLowerCase() === "ready"
   ).length;
+  const firstBatchInventoryHealth = buildLaunchInventoryHealthFromStates(firstBatchCardRecommendations.map((item) => ({
+    key: item?.key || item?.mode || null,
+    mode: item?.mode || item?.key || null,
+    status: item?.inventoryStatus || "unknown"
+  })));
   const dutyActionLabels = [
     "inventory recheck",
     "launch workflow recheck",
@@ -13674,6 +13700,7 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     "",
     "Launch Duty Summary:",
     `- First-batch inventory: ${firstBatchCardRecommendations.length} suggestion${firstBatchCardRecommendations.length === 1 ? "" : "s"} | targetCards=${totalSuggestedCards} | readyBatches=${readySuggestedBatches}`,
+    `- ${formatLaunchInventoryHealthLine(firstBatchInventoryHealth, "Inventory Health")}`,
     `- First ops actions: ${firstOpsActions.length}`,
     `- Owner path: ${ownerHandoffs.map((item) => item.owner).join(" -> ")}`,
     `- Duty Chain: ${dutyActionLabels.join(" -> ")}`,

@@ -8661,6 +8661,12 @@ test("developer launch mainline action can restock low inventory and return duty
         missingModes: []
       }
     );
+    assert.ok(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
+        /Inventory health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/i.test(String(detail || ""))
+      )
+    );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.inventory?.refillPlan)
         ? actionResult.receipt.firstLaunchDutySummary.inventory.refillPlan.map((item) => ({
@@ -8717,6 +8723,7 @@ test("developer launch mainline action can restock low inventory and return duty
       ownerSession.token
     );
     assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Inventory Health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
   } finally {
     await app.close();
@@ -9785,6 +9792,7 @@ test("developer launch mainline action can create first launch batches and retur
     assert.match(firstLaunchHandoffDownloadResponse.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-MAINLINE_SETUP-stable-.*-first-launch-handoff\.txt"/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /RockSolid Developer Launch Mainline First Launch Handoff/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Inventory Health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Batch Card Suggestions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:/);
@@ -9892,6 +9900,7 @@ test("developer launch mainline action can create first launch batches and retur
     assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Duty chain:/i.test(String(detail || "")))
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Inventory health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
     );
     assert.ok(

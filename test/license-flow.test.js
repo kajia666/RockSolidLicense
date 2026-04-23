@@ -7529,6 +7529,32 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     assert.ok(actionResult.result?.recordedEvidence?.createdAt);
     assert.ok(actionResult.followUp);
     assert.match(actionResult.followUp.summary || "", /Launch rehearsal run evidence recorded/i);
+    assert.equal(actionResult.followUp.productionGate?.status, "hold");
+    assert.ok(Array.isArray(actionResult.followUp.remainingProductionChecks));
+    assert.ok(actionResult.followUp.remainingProductionChecks.length >= 1);
+    assert.ok(!actionResult.followUp.remainingProductionChecks.some((item) =>
+      item?.key === "production_launch_rehearsal_run_recent"
+    ));
+    assert.ok(actionResult.followUp.remainingProductionChecks.some((item) =>
+      item?.status === "block"
+      && item?.setupAction?.operation
+      && item.setupAction.operation !== "record_launch_rehearsal_run"
+    ));
+    assert.ok(actionResult.followUp.nextProductionAction?.key);
+    assert.ok(actionResult.followUp.nextProductionAction?.setupAction?.operation);
+    assert.notEqual(actionResult.followUp.nextProductionAction.setupAction.operation, "record_launch_rehearsal_run");
+    assert.ok(actionResult.followUp.remainingProductionChecks.some((item) =>
+      item?.key === actionResult.followUp.nextProductionAction.key
+    ));
+    assert.ok(Array.isArray(actionResult.receipt?.mainlineFollowUpCards));
+    assert.ok(actionResult.receipt.mainlineFollowUpCards.some((item) =>
+      item?.key === actionResult.followUp.nextProductionAction.key
+      && Array.isArray(item.controls)
+      && item.controls.some((control) =>
+        control?.setupAction?.operation
+        && control.setupAction.operation !== "record_launch_rehearsal_run"
+      )
+    ));
     assert.ok(Array.isArray(actionResult.followUp.actions));
     assert.ok(actionResult.followUp.actions.some((item) =>
       item?.recommendedDownload?.key === "launch_mainline_rehearsal_guide"

@@ -4033,9 +4033,11 @@ function buildLaunchMainlineActionReceipt({
       timing: item?.timing || null,
       summary: item?.summary || "-",
       workspaceAction: item?.workspaceAction || null,
-      recommendedDownload: item?.recommendedDownload || null
+      recommendedDownload: item?.recommendedDownload || null,
+      bootstrapAction: item?.bootstrapAction || null,
+      setupAction: item?.setupAction || null
     }))
-    .filter((item) => item.key || item.workspaceAction || item.recommendedDownload);
+    .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
   const mainlineSummary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
     ? launchMainline.mainlineSummary
     : {};
@@ -4204,7 +4206,60 @@ function buildLaunchMainlineActionReceipt({
       recommendedDownload: item?.recommendedDownload || null
     }))
   ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
-  const mainlineFollowUpCards = mainlineActions.map((item) => ({
+  const productionFollowUpChecks = [];
+  const pushProductionFollowUpCheck = (item = null) => {
+    const key = item?.key || "";
+    if (!key || productionFollowUpChecks.some((entry) => entry.key === key)) {
+      return;
+    }
+    productionFollowUpChecks.push(item);
+  };
+  pushProductionFollowUpCheck(followUp?.nextProductionAction || null);
+  for (const item of Array.isArray(followUp?.remainingProductionChecks) ? followUp.remainingProductionChecks : []) {
+    pushProductionFollowUpCheck(item);
+    if (productionFollowUpChecks.length >= 4) {
+      break;
+    }
+  }
+  const productionFollowUpCards = productionFollowUpChecks
+    .map((item) => ({
+      key: item?.key || null,
+      title: item?.title || item?.label || item?.key || "Production follow-up",
+      summary: item?.summary || "-",
+      tags: [
+        { label: "scope", value: "production", strong: true },
+        item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
+        item?.status ? { label: "status", value: item.status, strong: false } : null
+      ].filter(Boolean),
+      details: [
+        "Remaining production gate check after the last recorded evidence."
+      ],
+      controls: [
+        item?.workspaceAction ? {
+          kind: "workspace",
+          label: item.workspaceAction.label || item.title || item.key || "Open workspace",
+          workspaceAction: item.workspaceAction
+        } : null,
+        item?.recommendedDownload ? {
+          kind: "download",
+          label: item.recommendedDownload.label || item.title || item.key || "Download handoff",
+          recommendedDownload: item.recommendedDownload
+        } : null,
+        item?.bootstrapAction ? {
+          kind: "bootstrap",
+          label: item.bootstrapAction.label || item.title || item.key || "Run bootstrap",
+          bootstrapAction: item.bootstrapAction
+        } : null,
+        item?.setupAction ? {
+          kind: "setup",
+          label: item.setupAction.label || item.title || item.key || "Run setup",
+          setupAction: item.setupAction
+        } : null
+      ].filter(Boolean)
+    }))
+    .filter((item) => item.key || item.summary || item.controls.length);
+  const mainlineFollowUpCardKeys = new Set();
+  const mainlineFollowUpCards = [...productionFollowUpCards, ...mainlineActions.map((item) => ({
     key: item?.key || null,
     title: item?.title || item?.key || "Follow-up",
     summary: item?.summary || "-",
@@ -4225,7 +4280,16 @@ function buildLaunchMainlineActionReceipt({
           setupAction: control?.setupAction || null
         }))
       : []
-  })).filter((item) => item.key || item.summary || item.controls.length);
+  }))].filter((item) => {
+    const key = item?.key || "";
+    if (key && mainlineFollowUpCardKeys.has(key)) {
+      return false;
+    }
+    if (key) {
+      mainlineFollowUpCardKeys.add(key);
+    }
+    return item?.key || item?.summary || item?.controls?.length;
+  });
   const mainlineRecapCards = [
     {
       key: "result_status",
@@ -21999,6 +22063,50 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const summary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
           ? launchMainline.mainlineSummary
           : {};
+        const productionGate = summary.productionGate && typeof summary.productionGate === "object"
+          ? summary.productionGate
+          : null;
+        const productionChecks = Array.isArray(productionGate?.checks)
+          ? productionGate.checks
+          : Array.isArray(productionGate?.actionPlan)
+            ? productionGate.actionPlan
+            : [];
+        const remainingProductionChecks = productionChecks
+          .filter((item) => {
+            const status = String(item?.status || "").trim().toLowerCase();
+            return status && status !== "pass" && status !== "ready";
+          })
+          .slice(0, 8)
+          .map((item) => ({
+            key: item?.key || null,
+            title: item?.title || item?.label || item?.key || "Production follow-up",
+            label: item?.label || item?.title || item?.key || "Production follow-up",
+            summary: item?.summary || "-",
+            status: item?.status || "review",
+            priority: item?.priority || null,
+            workspaceAction: item?.workspaceAction || null,
+            recommendedDownload: item?.recommendedDownload || null,
+            bootstrapAction: item?.bootstrapAction || null,
+            setupAction: item?.setupAction || null
+          }))
+          .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
+        const nextProductionAction = remainingProductionChecks.find((item) =>
+          item?.setupAction?.operation || item?.bootstrapAction?.key
+        ) || remainingProductionChecks.find((item) =>
+          item?.workspaceAction?.key || item?.recommendedDownload?.key
+        ) || remainingProductionChecks[0] || null;
+        const productionGateSnapshot = productionGate
+          ? {
+              status: productionGate.status || "unknown",
+              headline: productionGate.headline || "",
+              summary: productionGate.summary || "",
+              blockingCount: Number(productionGate.blockingCount || 0),
+              attentionCount: Number(productionGate.attentionCount || 0),
+              recommendedWorkspace: productionGate.recommendedWorkspace || null,
+              primaryAction: productionGate.primaryAction || null,
+              recommendedDownload: productionGate.recommendedDownload || null
+            }
+          : null;
         const actions = [];
         const pushAction = (item = {}) => {
           const key = item?.key || item?.recommendedDownload?.key || item?.workspaceAction?.key || item?.setupAction?.key || item?.bootstrapAction?.key || "";
@@ -22015,6 +22123,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             setupAction: item?.setupAction || null
           });
         };
+        for (const item of remainingProductionChecks.slice(0, 4)) {
+          pushAction(item);
+        }
         for (const control of Array.isArray(summary.heroControls) ? summary.heroControls : []) {
           pushAction({
             key: control?.recommendedDownload?.key || control?.workspaceAction?.key || control?.kind || "",
@@ -22035,9 +22146,15 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             setupAction: item?.setupAction || null
           });
         }
+        const remainingSummary = remainingProductionChecks.length
+          ? ` ${remainingProductionChecks.length} production gate check${remainingProductionChecks.length === 1 ? "" : "s"} still need action; next: ${nextProductionAction?.title || nextProductionAction?.label || nextProductionAction?.key || "review production gate"}.`
+          : " Production gate checks are no longer blocked by recorded evidence.";
         return {
           operation,
-          summary: `${result.recordedEvidence.label} evidence recorded. Review the refreshed production gate and continue the unified launch mainline.`,
+          summary: `${result.recordedEvidence.label} evidence recorded.${remainingSummary}`,
+          productionGate: productionGateSnapshot,
+          remainingProductionChecks,
+          nextProductionAction,
           primaryAction: summary.primaryAction || null,
           actions
         };

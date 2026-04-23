@@ -9379,6 +9379,8 @@ test("developer launch mainline action can create first launch batches and retur
     assert.ok(
       actionResult.receipt?.firstLaunchOpsQueue?.actions?.some((item) =>
         item?.key === "runtime_smoke"
+        && item?.stage === "runtime_validation"
+        && item?.ownerRole === "qa"
         && item?.workspaceAction?.key === "ops"
         && item?.recommendedDownload?.key
       )
@@ -9386,9 +9388,67 @@ test("developer launch mainline action can create first launch batches and retur
     assert.ok(
       actionResult.receipt?.firstLaunchOpsQueue?.actions?.some((item) =>
         item?.key === "card_redemption_watch"
+        && item?.stage === "first_sale_watch"
+        && item?.ownerRole === "support"
         && item?.workspaceAction?.key === "ops"
         && item?.recommendedDownload?.key
       )
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.stageGroups)
+        ? actionResult.receipt.firstLaunchOpsQueue.stageGroups.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : [],
+      [
+        {
+          key: "inventory_handoff",
+          ownerRole: "launch_ops",
+          actionKeys: ["inventory_recheck"]
+        },
+        {
+          key: "launch_recheck",
+          ownerRole: "release_manager",
+          actionKeys: ["launch_recheck", "launch_smoke_kit"]
+        },
+        {
+          key: "first_sale_watch",
+          ownerRole: "support",
+          actionKeys: ["card_redemption_watch"]
+        },
+        {
+          key: "runtime_validation",
+          ownerRole: "qa",
+          actionKeys: ["runtime_smoke"]
+        },
+        {
+          key: "runtime_ops_watch",
+          ownerRole: "ops",
+          actionKeys: ["session_review", "startup_rule_watch"]
+        },
+        {
+          key: "support_handoff",
+          ownerRole: "support",
+          actionKeys: ["starter_account_handoff"]
+        }
+      ]
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.ownerGroups)
+        ? actionResult.receipt.firstLaunchOpsQueue.ownerGroups.map((item) => ({
+            key: item?.key || null,
+            actionCount: item?.actionCount ?? null
+          }))
+        : [],
+      [
+        { key: "launch_ops", actionCount: 1 },
+        { key: "release_manager", actionCount: 2 },
+        { key: "support", actionCount: 2 },
+        { key: "qa", actionCount: 1 },
+        { key: "ops", actionCount: 2 }
+      ]
     );
     const firstLaunchOpsSection = Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
       ? actionResult.receipt.mainlineLastActionScreen.sections.find((item) => item?.key === "first_launch_ops_queue")

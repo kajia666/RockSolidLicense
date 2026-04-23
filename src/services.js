@@ -4093,18 +4093,124 @@ function buildLaunchMainlineActionReceipt({
         nextActions: firstLaunchInventoryNextActions
       }
     : null;
+  const classifyFirstLaunchOpsAction = (key = "") => {
+    const normalizedKey = String(key || "").trim().toLowerCase();
+    if (normalizedKey === "inventory_recheck") {
+      return {
+        stage: "inventory_handoff",
+        stageLabel: "Inventory Handoff",
+        ownerRole: "launch_ops",
+        ownerLabel: "Launch Ops"
+      };
+    }
+    if (normalizedKey === "launch_recheck" || normalizedKey === "launch_smoke_kit") {
+      return {
+        stage: "launch_recheck",
+        stageLabel: "Launch Recheck",
+        ownerRole: "release_manager",
+        ownerLabel: "Release Manager"
+      };
+    }
+    if (normalizedKey === "card_redemption_watch") {
+      return {
+        stage: "first_sale_watch",
+        stageLabel: "First-Sale Watch",
+        ownerRole: "support",
+        ownerLabel: "Support"
+      };
+    }
+    if (normalizedKey === "runtime_smoke") {
+      return {
+        stage: "runtime_validation",
+        stageLabel: "Runtime Validation",
+        ownerRole: "qa",
+        ownerLabel: "QA"
+      };
+    }
+    if (normalizedKey === "session_review" || normalizedKey === "startup_rule_watch") {
+      return {
+        stage: "runtime_ops_watch",
+        stageLabel: "Runtime Ops Watch",
+        ownerRole: "ops",
+        ownerLabel: "Ops"
+      };
+    }
+    if (normalizedKey === "starter_account_handoff") {
+      return {
+        stage: "support_handoff",
+        stageLabel: "Support Handoff",
+        ownerRole: "support",
+        ownerLabel: "Support"
+      };
+    }
+    return {
+      stage: "launch_follow_up",
+      stageLabel: "Launch Follow-Up",
+      ownerRole: "launch_ops",
+      ownerLabel: "Launch Ops"
+    };
+  };
   const firstLaunchOpsActions = isFirstLaunchInventoryOperation
-    ? actions.map((item) => ({
-        key: item?.key || null,
-        label: item?.label || item?.key || "Ops action",
-        timing: item?.timing || null,
-        summary: item?.summary || "-",
-        workspaceAction: item?.workspaceAction || null,
-        recommendedDownload: item?.recommendedDownload || null,
-        bootstrapAction: item?.bootstrapAction || null,
-        setupAction: item?.setupAction || null
-      })).filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction)
+    ? actions.map((item) => {
+        const classification = classifyFirstLaunchOpsAction(item?.key);
+        return {
+          key: item?.key || null,
+          label: item?.label || item?.key || "Ops action",
+          timing: item?.timing || null,
+          summary: item?.summary || "-",
+          stage: classification.stage,
+          stageLabel: classification.stageLabel,
+          ownerRole: classification.ownerRole,
+          ownerLabel: classification.ownerLabel,
+          workspaceAction: item?.workspaceAction || null,
+          recommendedDownload: item?.recommendedDownload || null,
+          bootstrapAction: item?.bootstrapAction || null,
+          setupAction: item?.setupAction || null
+        };
+      }).filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction)
     : [];
+  const buildFirstLaunchOpsStageGroups = (items = []) => {
+    const groups = [];
+    for (const item of items) {
+      const key = item?.stage || "launch_follow_up";
+      let group = groups.find((entry) => entry.key === key);
+      if (!group) {
+        group = {
+          key,
+          label: item?.stageLabel || key,
+          ownerRole: item?.ownerRole || "launch_ops",
+          ownerLabel: item?.ownerLabel || "Launch Ops",
+          actionCount: 0,
+          actions: []
+        };
+        groups.push(group);
+      }
+      group.actionCount += 1;
+      group.actions.push(item);
+    }
+    return groups;
+  };
+  const buildFirstLaunchOpsOwnerGroups = (items = []) => {
+    const groups = [];
+    for (const item of items) {
+      const key = item?.ownerRole || "launch_ops";
+      let group = groups.find((entry) => entry.key === key);
+      if (!group) {
+        group = {
+          key,
+          label: item?.ownerLabel || key,
+          actionCount: 0,
+          actions: []
+        };
+        groups.push(group);
+      }
+      group.actionCount += 1;
+      group.actions.push(item);
+    }
+    return groups;
+  };
+  const firstLaunchOpsStageGroups = buildFirstLaunchOpsStageGroups(firstLaunchOpsActions);
+  const firstLaunchOpsOwnerGroups = buildFirstLaunchOpsOwnerGroups(firstLaunchOpsActions);
   const firstLaunchOpsQueue = isFirstLaunchInventoryOperation
     ? {
         operation: normalizedOperation,
@@ -4116,7 +4222,9 @@ function buildLaunchMainlineActionReceipt({
         runtimeActionCount: firstLaunchOpsActions.filter((item) => ["runtime_smoke", "session_review"].includes(item?.key)).length,
         watchActionCount: firstLaunchOpsActions.filter((item) => /watch|review|smoke/i.test(String(item?.key || ""))).length,
         nextAction: firstLaunchOpsActions[0] || null,
-        actions: firstLaunchOpsActions
+        actions: firstLaunchOpsActions,
+        stageGroups: firstLaunchOpsStageGroups,
+        ownerGroups: firstLaunchOpsOwnerGroups
       }
     : null;
   const mainlineSummary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
@@ -4492,7 +4600,9 @@ function buildLaunchMainlineActionReceipt({
             summary: item.summary || "-",
             tags: [
               item.timing ? { label: "timing", value: item.timing, strong: true } : null,
-              item.key ? { label: "action", value: item.key, strong: false } : null
+              item.key ? { label: "action", value: item.key, strong: false } : null,
+              item.stageLabel ? { label: "stage", value: item.stageLabel, strong: false } : null,
+              item.ownerLabel ? { label: "owner", value: item.ownerLabel, strong: false } : null
             ].filter(Boolean),
             details: [],
             controls: firstLaunchInventoryQueueControlList(item)

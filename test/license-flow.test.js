@@ -8670,6 +8670,13 @@ test("developer launch mainline action can restock low inventory and return duty
         /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || ""))
       )
     );
+    assert.ok(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.controls)
+      && actionResult.receipt.firstLaunchDutySummary.controls.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation
+      )
+    );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.inventory?.refillPlan)
         ? actionResult.receipt.firstLaunchDutySummary.inventory.refillPlan.map((item) => ({
@@ -9788,6 +9795,13 @@ test("developer launch mainline action can create first launch batches and retur
       && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Stages: Inventory Handoff \| Launch Recheck \| First-Sale Watch \| Runtime Validation \| Runtime Ops Watch \| Support Handoff/i.test(String(detail || "")))
       && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
     );
+    assert.ok(
+      Array.isArray(firstLaunchHandoffCards.first_launch_handoff_summary?.controls)
+      && firstLaunchHandoffCards.first_launch_handoff_summary.controls.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation
+      )
+    );
     const firstLaunchHandoffDownloadResponse = await getText(
       baseUrl,
       firstLaunchHandoffDownload.href,
@@ -9920,6 +9934,10 @@ test("developer launch mainline action can create first launch batches and retur
         control?.kind === "workspace"
         && control?.workspaceAction?.key === actionResult.receipt.firstLaunchOpsQueue.nextAction?.workspaceAction?.key
       )
+      && actionResult.receipt.firstLaunchDutySummary.controls.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation
+      )
     );
     assert.ok(
       actionResult.receipt?.mainlineRecapCards?.some((item) =>
@@ -9929,6 +9947,7 @@ test("developer launch mainline action can create first launch batches and retur
         && item.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
         && Array.isArray(item.controls)
         && item.controls.some((control) => control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff")
+        && item.controls.some((control) => control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation)
       )
     );
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");

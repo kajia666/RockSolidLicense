@@ -4350,13 +4350,16 @@ function buildLaunchMainlineActionReceipt({
           mainlineEvidenceQueue ? formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production evidence") : "",
           firstLaunchHandoffDownload?.href ? `Download: ${firstLaunchHandoffDownload.label || firstLaunchHandoffDownload.key} | ${firstLaunchHandoffDownload.href}` : ""
         ].filter(Boolean),
-        controls: firstLaunchHandoffDownload
-          ? [{
-              kind: "download",
-              label: firstLaunchHandoffDownload.label || "Download first launch handoff",
-              recommendedDownload: firstLaunchHandoffDownload
-            }]
-          : []
+        controls: dedupeLaunchMainlineControls([
+          firstLaunchHandoffDownload
+            ? {
+                kind: "download",
+                label: firstLaunchHandoffDownload.label || "Download first launch handoff",
+                recommendedDownload: firstLaunchHandoffDownload
+              }
+            : null,
+          ...firstLaunchInventoryQueueControlList(mainlineEvidenceQueue?.nextAction || null)
+        ].filter(Boolean))
       }
     : null;
   const mainlineOverviewCards = (Array.isArray(mainlineSummary.overviewCards) ? mainlineSummary.overviewCards : [])
@@ -4601,28 +4604,47 @@ function buildLaunchMainlineActionReceipt({
     }
     return item?.key || item?.summary || item?.controls?.length;
   });
-  const firstLaunchInventoryQueueControlList = (item = null) => [
-    item?.workspaceAction ? {
-      kind: "workspace",
-      label: item.workspaceAction.label || item.label || item.title || item.key || "Open workspace",
-      workspaceAction: item.workspaceAction
-    } : null,
-    item?.recommendedDownload ? {
-      kind: "download",
-      label: item.recommendedDownload.label || item.label || item.title || item.key || "Download summary",
-      recommendedDownload: item.recommendedDownload
-    } : null,
-    item?.bootstrapAction ? {
-      kind: "bootstrap",
-      label: item.bootstrapAction.label || item.label || item.title || item.key || "Run bootstrap",
-      bootstrapAction: item.bootstrapAction
-    } : null,
-    item?.setupAction ? {
-      kind: "setup",
-      label: item.setupAction.label || item.label || item.title || item.key || "Run setup",
-      setupAction: item.setupAction
-    } : null
-  ].filter(Boolean);
+  function firstLaunchInventoryQueueControlList(item = null) {
+    return [
+      item?.workspaceAction ? {
+        kind: "workspace",
+        label: item.workspaceAction.label || item.label || item.title || item.key || "Open workspace",
+        workspaceAction: item.workspaceAction
+      } : null,
+      item?.recommendedDownload ? {
+        kind: "download",
+        label: item.recommendedDownload.label || item.label || item.title || item.key || "Download summary",
+        recommendedDownload: item.recommendedDownload
+      } : null,
+      item?.bootstrapAction ? {
+        kind: "bootstrap",
+        label: item.bootstrapAction.label || item.label || item.title || item.key || "Run bootstrap",
+        bootstrapAction: item.bootstrapAction
+      } : null,
+      item?.setupAction ? {
+        kind: "setup",
+        label: item.setupAction.label || item.label || item.title || item.key || "Run setup",
+        setupAction: item.setupAction
+      } : null
+    ].filter(Boolean);
+  }
+  function dedupeLaunchMainlineControls(items = []) {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      const controlKey = [
+        item?.kind || "",
+        item?.workspaceAction?.key || "",
+        item?.recommendedDownload?.key || "",
+        item?.bootstrapAction?.key || "",
+        item?.setupAction?.operation || item?.setupAction?.key || ""
+      ].join(":");
+      if (!controlKey || seen.has(controlKey)) {
+        return false;
+      }
+      seen.add(controlKey);
+      return true;
+    });
+  }
   const firstLaunchDutySummary = firstLaunchOpsQueue
     ? {
         key: "first_launch_duty_summary",
@@ -4741,7 +4763,7 @@ function buildLaunchMainlineActionReceipt({
             ? `Download: ${firstLaunchHandoffDownload.label || firstLaunchHandoffDownload.key} | ${firstLaunchHandoffDownload.href}`
             : ""
         ].filter(Boolean),
-        controls: [
+        controls: dedupeLaunchMainlineControls([
           firstLaunchHandoffDownload
             ? {
                 kind: "download",
@@ -4749,8 +4771,9 @@ function buildLaunchMainlineActionReceipt({
                 recommendedDownload: firstLaunchHandoffDownload
               }
             : null,
-          ...firstLaunchInventoryQueueControlList(firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null)
-        ].filter(Boolean)
+          ...firstLaunchInventoryQueueControlList(firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null),
+          ...firstLaunchInventoryQueueControlList(mainlineEvidenceQueue?.nextAction || null)
+        ].filter(Boolean))
       }
     : null;
   const firstLaunchInventoryQueueSection = firstLaunchInventoryQueue

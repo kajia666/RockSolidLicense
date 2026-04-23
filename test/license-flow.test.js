@@ -8666,6 +8666,9 @@ test("developer launch mainline action can restock low inventory and return duty
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
         /Inventory health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/i.test(String(detail || ""))
       )
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
+        /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || ""))
+      )
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.inventory?.refillPlan)
@@ -9783,6 +9786,7 @@ test("developer launch mainline action can create first launch batches and retur
       Array.isArray(firstLaunchHandoffCards.first_launch_handoff_summary?.details)
       && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
       && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Stages: Inventory Handoff \| Launch Recheck \| First-Sale Watch \| Runtime Validation \| Runtime Ops Watch \| Support Handoff/i.test(String(detail || "")))
+      && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
     );
     const firstLaunchHandoffDownloadResponse = await getText(
       baseUrl,
@@ -9903,6 +9907,7 @@ test("developer launch mainline action can create first launch batches and retur
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Duty chain:/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Inventory health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/i.test(String(detail || "")))
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
     );
     assert.ok(
@@ -9921,6 +9926,7 @@ test("developer launch mainline action can create first launch batches and retur
         item?.key === "first_launch_duty_summary"
         && Array.isArray(item.details)
         && item.details.some((detail) => /Duty chain:/i.test(String(detail || "")))
+        && item.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
         && Array.isArray(item.controls)
         && item.controls.some((control) => control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff")
       )

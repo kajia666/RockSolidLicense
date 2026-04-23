@@ -4347,6 +4347,7 @@ function buildLaunchMainlineActionReceipt({
           firstLaunchOpsQueue.stageGroups.length
             ? `Stages: ${firstLaunchOpsQueue.stageGroups.map((item) => item.label || item.key).join(" | ")}`
             : "",
+          mainlineEvidenceQueue ? formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production evidence") : "",
           firstLaunchHandoffDownload?.href ? `Download: ${firstLaunchHandoffDownload.label || firstLaunchHandoffDownload.key} | ${firstLaunchHandoffDownload.href}` : ""
         ].filter(Boolean),
         controls: firstLaunchHandoffDownload
@@ -4723,6 +4724,7 @@ function buildLaunchMainlineActionReceipt({
         details: [
           `Duty chain: ${operationLabel} -> ${firstLaunchOpsQueue.nextAction?.label || firstLaunchOpsQueue.nextAction?.key || firstLaunchInventoryQueue?.nextAction?.label || firstLaunchInventoryQueue?.nextAction?.key || "first launch action"} -> ${firstLaunchHandoffDownload?.label || "First launch handoff"} -> ${mainlineEvidenceQueue?.nextAction?.title || followUp?.nextProductionAction?.title || mainlineEvidenceQueue?.nextAction?.key || followUp?.nextProductionAction?.key || "production evidence queue"}`,
           formatLaunchInventoryHealthLine(firstLaunchInventoryHealth, "Inventory health"),
+          mainlineEvidenceQueue ? formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production evidence") : "",
           firstLaunchOpsQueue.ownerGroups.length
             ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
             : "",

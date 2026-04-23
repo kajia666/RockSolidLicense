@@ -11338,19 +11338,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionWorkspaceAction?.key, "launch-mainline");
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionDownload?.key, "launch_mainline_summary");
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionGuideDownload?.key, "launch_mainline_rehearsal_guide");
+    assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionFirstLaunchHandoffDownload?.key, "launch_mainline_first_launch_handoff");
     assert.equal(exportSnapshot.routeReview?.continuation?.completionGuideDownload?.key, "launch_mainline_rehearsal_guide");
+    assert.equal(exportSnapshot.routeReview?.continuation?.completionFirstLaunchHandoffDownload?.key, "launch_mainline_first_launch_handoff");
     assert.equal(exportSnapshot.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
     assert.equal(exportSnapshot.mainlineHandoff?.downloads?.summary?.key, "launch_mainline_summary");
     assert.equal(exportSnapshot.mainlineHandoff?.downloads?.rehearsalGuide?.key, "launch_mainline_rehearsal_guide");
+    assert.equal(exportSnapshot.mainlineHandoff?.downloads?.firstLaunchHandoff?.key, "launch_mainline_first_launch_handoff");
+    assert.match(exportSnapshot.mainlineHandoff?.downloads?.firstLaunchHandoff?.href || "", /\/api\/developer\/launch-mainline\/download\?/);
+    assert.match(exportSnapshot.mainlineHandoff?.downloads?.firstLaunchHandoff?.href || "", /format=first-launch-handoff/);
     assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
     assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.downloads?.summary?.key, "launch_mainline_summary");
     assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.downloads?.rehearsalGuide?.key, "launch_mainline_rehearsal_guide");
+    assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.downloads?.firstLaunchHandoff?.key, "launch_mainline_first_launch_handoff");
     assert.ok(Array.isArray(exportSnapshot.routeReview?.actions));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-primary" && item.label === "Review Primary Match"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-next" && item.label === "Review Next Match"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "open-mainline" && item.label === "Open Launch Mainline"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-mainline" && item.label === "Download Launch Mainline Summary"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-mainline-rehearsal" && item.label === "Download Launch Mainline Rehearsal Guide"));
+    assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-mainline-first-launch-handoff" && item.label === "Download First Launch Handoff"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-remaining" && item.label === "Download Remaining Queue Summary"));
     assert.ok(Array.isArray(exportSnapshot.routeReview?.remainingMatches));
     assert.equal(exportSnapshot.routeReview?.remainingMatches?.[0]?.kind, "audit");
@@ -11363,6 +11370,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /Launch Mainline Handoff:/);
     assert.match(exportSnapshot.summaryText, /Open Launch Mainline@summary/);
     assert.match(exportSnapshot.summaryText, /Launch mainline rehearsal guide/i);
+    assert.match(exportSnapshot.summaryText, /First launch handoff/i);
     assert.match(exportSnapshot.summaryText, /Top Reasons:/);
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);
@@ -11422,6 +11430,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(remainingRouteReviewDownload.contentDisposition || "", /developer-ops-remaining-summary\.txt/);
     assert.match(remainingRouteReviewDownload.body, /Route Review Remaining Matches/);
     assert.match(remainingRouteReviewDownload.body, /Review Audit/);
+
+    const firstLaunchHandoffDownload = await getText(
+      baseUrl,
+      exportSnapshot.mainlineHandoff.downloads.firstLaunchHandoff.href,
+      operatorSession.token
+    );
+    assert.equal(firstLaunchHandoffDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(firstLaunchHandoffDownload.contentDisposition || "", /first-launch-handoff\.txt/);
+    assert.match(firstLaunchHandoffDownload.body, /RockSolid Developer Launch Mainline First Launch Handoff/);
+    assert.match(firstLaunchHandoffDownload.body, /First Ops Actions:/);
 
     const checksumsDownload = await getText(
       baseUrl,
@@ -14961,6 +14979,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /action === "open-mainline"/);
     assert.match(html, /action === "download-mainline"/);
     assert.match(html, /action === "download-mainline-rehearsal"/);
+    assert.match(html, /action === "download-mainline-first-launch-handoff"/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

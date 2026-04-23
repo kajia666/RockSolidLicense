@@ -15621,6 +15621,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push(`- workspace=${routeReview.mainlineHandoff.workspaceAction.label || "-"}@${routeReview.mainlineHandoff.workspaceAction.autofocus || "-"}`);
         lines.push(`- summary=${routeReview.mainlineHandoff.downloads?.summary?.label || routeReview.mainlineHandoff.recommendedDownload?.label || "-"}`);
         lines.push(`- rehearsal=${routeReview.mainlineHandoff.downloads?.rehearsalGuide?.label || "-"}`);
+        lines.push(`- firstLaunch=${routeReview.mainlineHandoff.downloads?.firstLaunchHandoff?.label || "-"}`);
       }
     }
     appendSnapshotEscalationSummaryLines(lines, overview);
@@ -16148,6 +16149,12 @@ function buildDeveloperOpsMainlineHandoff(scope = {}) {
       "rehearsal-guide",
       params
     ),
+    firstLaunchHandoff: createLaunchMainlineDownloadShortcut(
+      "First launch handoff",
+      "launch-mainline-first-launch-handoff.txt",
+      "first-launch-handoff",
+      params
+    ),
     checksums: createLaunchMainlineDownloadShortcut(
       "Launch mainline checksums",
       "launch-mainline-sha256.txt",
@@ -16240,6 +16247,13 @@ function buildDeveloperOpsRouteReviewActions(routeReview = {}) {
       { requiresToken: true }
     );
   }
+  if (routeReview.mainlineHandoff?.downloads?.firstLaunchHandoff?.fileName) {
+    pushAction(
+      "download-mainline-first-launch-handoff",
+      "Download First Launch Handoff",
+      { requiresToken: true }
+    );
+  }
 
   const sectionDefinitions = [
     ["accounts", "accounts", "Accounts"],
@@ -16271,6 +16285,7 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
   const completionWorkspaceAction = routeReview.mainlineHandoff?.workspaceAction || null;
   const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
   const completionGuideDownload = routeReview.mainlineHandoff?.downloads?.rehearsalGuide || null;
+  const completionFirstLaunchHandoffDownload = routeReview.mainlineHandoff?.downloads?.firstLaunchHandoff || null;
   if (nextMatch) {
     return {
       remainingCount,
@@ -16285,7 +16300,8 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
       remainingDownload: routeReview.downloads?.remaining || null,
       completionWorkspaceAction,
       completionDownload,
-      completionGuideDownload
+      completionGuideDownload,
+      completionFirstLaunchHandoffDownload
     };
   }
   return {
@@ -16301,7 +16317,8 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
     remainingDownload: routeReview.downloads?.remaining || null,
     completionWorkspaceAction,
     completionDownload,
-    completionGuideDownload
+    completionGuideDownload,
+    completionFirstLaunchHandoffDownload
   };
 }
 
@@ -16312,6 +16329,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
   const completionWorkspaceAction = routeReview.mainlineHandoff?.workspaceAction || null;
   const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
   const completionGuideDownload = routeReview.mainlineHandoff?.downloads?.rehearsalGuide || null;
+  const completionFirstLaunchHandoffDownload = routeReview.mainlineHandoff?.downloads?.firstLaunchHandoff || null;
   queue.forEach((entry, index) => {
     if (!entry?.kind || !entry?.item || typeof entry.item !== "object") {
       return;
@@ -16336,7 +16354,8 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
       nextMatch: nextMatch || null,
       completionWorkspaceAction,
       completionDownload,
-      completionGuideDownload
+      completionGuideDownload,
+      completionFirstLaunchHandoffDownload
     };
   });
   return continuations;

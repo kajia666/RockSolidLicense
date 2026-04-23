@@ -296,6 +296,7 @@
           "review-next",
           "download-mainline",
           "download-mainline-rehearsal",
+          "download-mainline-first-launch-handoff",
           "download-primary",
           "download-next",
           "download-remaining",
@@ -361,6 +362,9 @@
         }
         if (normalized === "download-mainline-rehearsal") {
           return "Download Launch Mainline Rehearsal Guide";
+        }
+        if (normalized === "download-mainline-first-launch-handoff") {
+          return "Download First Launch Handoff";
         }
         if (normalized === "download-primary") {
           return "Download Primary Match Summary";
@@ -2133,6 +2137,14 @@
           await downloadRouteReviewShortcut(handoff.downloads.rehearsalGuide);
           return;
         }
+        if (normalizedAction === "download-mainline-first-launch-handoff") {
+          const handoff = buildRouteReviewMainlineHandoff();
+          if (!handoff?.downloads?.firstLaunchHandoff?.key) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No first launch handoff is available yet." };
+          }
+          await downloadRouteReviewShortcut(handoff.downloads.firstLaunchHandoff);
+          return;
+        }
         if (normalizedAction === "control-next") {
           const review = collectRouteReview();
           const next = buildNextRouteReviewFocus(review, review.focus || requestedAutofocus || "");
@@ -3520,9 +3532,10 @@
           : null;
         const handoff = buildRouteReviewMainlineHandoff(review);
         const workspaceAction = continuation?.completionWorkspaceAction || handoff?.workspaceAction || null;
+        const firstLaunchHandoffDownload = continuation?.completionFirstLaunchHandoffDownload || handoff?.downloads?.firstLaunchHandoff || null;
         const guideDownload = continuation?.completionGuideDownload || handoff?.downloads?.rehearsalGuide || null;
         const summaryDownload = continuation?.completionDownload || handoff?.downloads?.summary || null;
-        const secondaryDownload = guideDownload || summaryDownload || null;
+        const secondaryDownload = firstLaunchHandoffDownload || guideDownload || summaryDownload || null;
         return {
           timestamp: new Date().toISOString(),
           successMessage: "Routed review complete.",
@@ -3554,14 +3567,16 @@
           followUp: {
             primaryAction: workspaceAction?.key ? "open-mainline" : "refresh_snapshot",
             primaryLabel: workspaceAction?.label || "Refresh Snapshot",
-            secondaryAction: guideDownload?.key
-              ? "download-mainline-rehearsal"
-              : summaryDownload?.key
-                ? "download-mainline"
-                : "download_route_review",
+            secondaryAction: firstLaunchHandoffDownload?.key
+              ? "download-mainline-first-launch-handoff"
+              : guideDownload?.key
+                ? "download-mainline-rehearsal"
+                : summaryDownload?.key
+                  ? "download-mainline"
+                  : "download_route_review",
             secondaryLabel: secondaryDownload?.label || "Download Routed Summary",
             hint: workspaceAction?.key
-              ? "Continue in launch mainline and use the rehearsal guide to drive the unified release, workflow, review, smoke, and ops gate."
+              ? "Continue in launch mainline and use the first launch handoff to keep launch ops, support, QA, and ops aligned."
               : "No additional routed matches remain. You can export the routed summary or refresh the snapshot."
           },
           snapshotHits: []
@@ -3793,6 +3808,14 @@
             throw { code: "MISSING_ROUTE_FOCUS", message: "No launch mainline rehearsal guide is available yet." };
           }
           await downloadRouteReviewShortcut(handoff.downloads.rehearsalGuide);
+          return;
+        }
+        if (action === "download-mainline-first-launch-handoff") {
+          const handoff = buildRouteReviewMainlineHandoff();
+          if (!handoff?.downloads?.firstLaunchHandoff?.key) {
+            throw { code: "MISSING_ROUTE_FOCUS", message: "No first launch handoff is available yet." };
+          }
+          await downloadRouteReviewShortcut(handoff.downloads.firstLaunchHandoff);
           return;
         }
         if (action === "download_route_review") {

@@ -5973,6 +5973,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_post_launch_sweep_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_closeout_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_stabilization_handoff"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide"));
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
@@ -6004,6 +6005,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Production Stabilization Handoff:/);
       assert.match(launchMainline.summaryText, /Launch stabilization review/);
       assert.match(launchMainline.summaryText, /daily-operations-checklist\.md/);
+      assert.match(launchMainline.summaryText, /Launch Mainline Rehearsal Guide:/);
+      assert.match(launchMainline.summaryText, /Phase 1: Release And Workflow Precheck/);
+      assert.match(launchMainline.summaryText, /Record Launch Stabilization Review/);
 
       const launchMainlineSummaryDownload = await getText(
         baseUrl,
@@ -6025,6 +6029,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Production Post-Launch Sweep Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Launch Closeout Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Stabilization Handoff:/);
+      assert.match(launchMainlineSummaryDownload.body, /Launch Mainline Rehearsal Guide:/);
 
       const productionHandoffDownload = await getText(
         baseUrl,
@@ -6114,6 +6119,27 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(stabilizationHandoffDownload.body, /Launch stabilization review/);
       assert.match(stabilizationHandoffDownload.body, /shift-handover-template\.md/);
       assert.match(stabilizationHandoffDownload.body, /daily-operations-checklist\.md/);
+
+      const rehearsalGuideDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=rehearsal-guide",
+        viewerSession.token
+      );
+      assert.match(rehearsalGuideDownload.contentType || "", /^text\/plain/);
+      assert.match(rehearsalGuideDownload.contentDisposition || "", /attachment; filename=\"rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-rehearsal-guide\.txt\"/);
+      assert.match(rehearsalGuideDownload.body, /RockSolid Developer Launch Mainline Rehearsal Guide/);
+      assert.match(rehearsalGuideDownload.body, /Phase 1: Release And Workflow Precheck/);
+      assert.match(rehearsalGuideDownload.body, /Phase 5: Evidence Recording Order/);
+      assert.match(rehearsalGuideDownload.body, /Record Launch Stabilization Review/);
+
+      const launchMainlineChecksumsDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=checksums",
+        viewerSession.token
+      );
+      assert.match(launchMainlineChecksumsDownload.contentType || "", /^text\/plain/);
+      assert.match(launchMainlineChecksumsDownload.contentDisposition || "", /attachment; filename=\"rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-sha256\.txt\"/);
+      assert.match(launchMainlineChecksumsDownload.body, /rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-rehearsal-guide\.txt/);
 
       const forbidden = await getJsonExpectError(
         baseUrl,
@@ -8289,6 +8315,7 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           : []),
         { kind: "download", key: "launch_mainline_json" },
         { kind: "download", key: "launch_mainline_summary" },
+        { kind: "download", key: "launch_mainline_rehearsal_guide" },
         { kind: "download", key: "launch_mainline_checksums" },
         { kind: "download", key: "launch_mainline_zip" }
       ].filter((item) => item.key)
@@ -8953,6 +8980,7 @@ test("developer launch mainline action can create first launch batches and retur
           : []),
         { kind: "download", key: "launch_mainline_json" },
         { kind: "download", key: "launch_mainline_summary" },
+        { kind: "download", key: "launch_mainline_rehearsal_guide" },
         { kind: "download", key: "launch_mainline_checksums" },
         { kind: "download", key: "launch_mainline_zip" }
       ].filter((item) => item.key)

@@ -3709,6 +3709,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
   return createLaunchWorkflowDownloadShortcut(
     normalizedFormat === "json"
       ? "launch_mainline_json"
+      : normalizedFormat === "rehearsal-guide"
+        ? "launch_mainline_rehearsal_guide"
       : normalizedFormat === "zip"
       ? "launch_mainline_zip"
       : normalizedFormat === "checksums"
@@ -4101,7 +4103,6 @@ function buildLaunchMainlineActionReceipt({
     }))
     .filter((item) => item.key || item.gate || item.workspaceAction || item.recommendedDownload);
   const mainlineHeroControls = (Array.isArray(mainlineSummary.heroControls) ? mainlineSummary.heroControls : [])
-    .slice(0, 9)
     .map((item) => ({
       kind: item?.kind || null,
       label: item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action",
@@ -10579,6 +10580,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "operations-handoff",
     params
   );
+  const rehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline rehearsal guide",
+    "developer-launch-mainline-rehearsal-guide.txt",
+    "rehearsal-guide",
+    params
+  );
   const closeoutHandoffDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline closeout handoff",
     "developer-launch-mainline-closeout-handoff.txt",
@@ -10804,6 +10811,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const heroDownloads = [
     createLaunchMainlineDownloadShortcut("Download Launch Mainline JSON", "developer-launch-mainline.json", "json", params),
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Summary", "developer-launch-mainline-summary.txt", "summary", params),
+    createLaunchMainlineDownloadShortcut("Download Launch Mainline Rehearsal Guide", "developer-launch-mainline-rehearsal-guide.txt", "rehearsal-guide", params),
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Checksums", "developer-launch-mainline-sha256.txt", "checksums", params),
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Zip", "developer-launch-mainline.zip", "zip", params)
   ].filter((item) => item?.key);
@@ -10925,6 +10933,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(item.summaryDownload || null, params));
   }
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(continuation?.recommendedDownload || null, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(rehearsalGuideDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(productionHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
@@ -11440,6 +11449,19 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  if (payload.rehearsalGuideText) {
+    const rehearsalGuide = payload.rehearsalGuideText
+      .split(/\r?\n/)
+      .map((line) => String(line || "").trimEnd())
+      .filter((line) => line !== "");
+    if (rehearsalGuide.length) {
+      lines.push("");
+      lines.push("Launch Mainline Rehearsal Guide:");
+      for (const line of rehearsalGuide.slice(1)) {
+        lines.push(`- ${line}`);
+      }
+    }
+  }
   if (Array.isArray(mainlineSummary.actionPlan) && mainlineSummary.actionPlan.length) {
     lines.push("");
     lines.push("Mainline Action Plan:");
@@ -11508,6 +11530,7 @@ function buildDeveloperLaunchMainlinePayload({
   const postLaunchSweepHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-sweep-handoff.txt`;
   const closeoutHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-closeout-handoff.txt`;
   const stabilizationHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-stabilization-handoff.txt`;
+  const rehearsalGuideFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-rehearsal-guide.txt`;
   const payload = {
     generatedAt,
     fileName,
@@ -11519,6 +11542,7 @@ function buildDeveloperLaunchMainlinePayload({
     postLaunchSweepHandoffFileName,
     closeoutHandoffFileName,
     stabilizationHandoffFileName,
+    rehearsalGuideFileName,
     manifest: {
       generatedAt,
       channel,
@@ -11622,6 +11646,12 @@ function buildDeveloperLaunchMainlinePayload({
     filters: payload.filters,
     publicBaseUrl
   });
+  payload.rehearsalGuideText = buildDeveloperLaunchMainlineRehearsalGuideText({
+    generatedAt,
+    manifest: payload.manifest,
+    filters: payload.filters,
+    publicBaseUrl
+  });
   payload.summaryText = buildDeveloperLaunchMainlineSummaryText(payload);
   if (payload.mainlineSummary?.mainlinePage && typeof payload.mainlineSummary.mainlinePage === "object") {
     payload.mainlineSummary.mainlinePage.summaryText = payload.summaryText || "";
@@ -11700,6 +11730,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
     payload.stabilizationHandoffText || ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.rehearsalGuideFileName || "developer-launch-mainline-rehearsal-guide.txt",
+    payload.rehearsalGuideText || ""
+  );
   return files;
 }
 
@@ -11711,7 +11746,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "checksums", "zip"],
+    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -11785,6 +11820,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.stabilizationHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "rehearsal-guide") {
+    return {
+      fileName: payload.rehearsalGuideFileName || "developer-launch-mainline-rehearsal-guide.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.rehearsalGuideText || ""
     };
   }
 
@@ -12547,6 +12589,62 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
     `Stabilization Signals: ${stabilizationSignals.join(" | ")}`,
     "Primary Follow-Up: Launch stabilization review",
     "Stabilization Flow: confirm launch closeout review | verify daily handover docs | confirm steady-state ops signals | capture launch stabilization review"
+  ];
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlineRehearsalGuideText({
+  generatedAt = "",
+  manifest = {},
+  filters = {},
+  publicBaseUrl = ""
+} = {}) {
+  const project = manifest.project || {};
+  const lines = [
+    "RockSolid Developer Launch Mainline Rehearsal Guide",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Public Base URL: ${publicBaseUrl || "-"}`,
+    "",
+    "Goal: rehearse one realistic rollout lane from release packaging through first-week stabilization without rebuilding the flow from multiple launch pages.",
+    "Inputs: one productCode | one channel | one intended public entrypoint | one intended storage/runtime topology",
+    "",
+    "Phase 1: Release And Workflow Precheck",
+    "- Start in: /developer/releases | /developer/launch-workflow",
+    "- Confirm: release lane, version rules, startup defaults, starter inventory, and current lane handoff downloads",
+    "- Exit: lane is no longer blocked by missing starter assets or obvious release/startup misconfiguration",
+    "",
+    "Phase 2: Smoke Validation",
+    "- Continue in: /developer/launch-smoke",
+    "- Confirm: one realistic login or recharge path and one heartbeat for the current lane",
+    "- Exit: at least one realistic internal path completes login and heartbeat successfully",
+    "",
+    "Phase 3: Review The First Runtime Signals",
+    "- Continue in: /developer/launch-review | /developer/ops",
+    "- Run: Primary Review Target | Primary Match | Next Match | Remaining routed review queue",
+    "- Exit: first runtime follow-up no longer depends on hand-built filters",
+    "",
+    "Phase 4: Production Readiness And Launch-Day Handoffs",
+    "- Continue in: /developer/launch-mainline",
+    "- Inspect in order: production-handoff | cutover-handoff | recovery-drill-handoff | operations-handoff | post-launch-sweep-handoff | closeout-handoff | stabilization-handoff",
+    "- Exit: one consistent author-side handoff path covers deployment, launch day, and first-week stabilization",
+    "",
+    "Phase 5: Evidence Recording Order",
+    "- Record Recovery Drill",
+    "- Record Backup Verification",
+    "- Record Operations Walkthrough",
+    "- Record Deploy Verification",
+    "- Record Health Verification",
+    "- Record Rollback Walkthrough",
+    "- Record Cutover Walkthrough",
+    "- Record Launch Day Readiness Review",
+    "- Record First-Wave Ops Sweep",
+    "- Record Launch Closeout Review",
+    "- Record Launch Stabilization Review",
+    "",
+    "Suggested Minimal Artifact Set: launch workflow summary | launch smoke kit summary | launch review summary | developer ops primary match summary | launch mainline summary | cutover-handoff | post-launch-sweep-handoff | closeout-handoff | stabilization-handoff"
   ];
   return lines.join("\n");
 }

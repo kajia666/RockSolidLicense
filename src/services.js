@@ -4385,6 +4385,21 @@ function normalizeLaunchMainlineGateStatus(status = "unknown") {
   return "attention";
 }
 
+function frontloadLaunchMainlineRehearsalDownload(items = []) {
+  if (!Array.isArray(items) || items.length < 2) {
+    return Array.isArray(items) ? [...items] : [];
+  }
+  const summaryIndex = items.findIndex((item) => item?.key === "launch_mainline_summary");
+  const rehearsalIndex = items.findIndex((item) => item?.key === "launch_mainline_rehearsal_guide");
+  if (summaryIndex < 0 || rehearsalIndex < 0 || rehearsalIndex < summaryIndex) {
+    return [...items];
+  }
+  const reordered = [...items];
+  const [rehearsalItem] = reordered.splice(rehearsalIndex, 1);
+  reordered.splice(summaryIndex, 0, rehearsalItem);
+  return reordered;
+}
+
 const DEFAULT_PRODUCTION_ADMIN_PASSWORD = "ChangeMe!123";
 const DEFAULT_PRODUCTION_SERVER_TOKEN_SECRET = "change-me-before-production-rocksolid";
 const LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS = 14;
@@ -11001,6 +11016,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stabilizationHandoffDownload, params));
+  const orderedRecommendedDownloads = frontloadLaunchMainlineRehearsalDownload(recommendedDownloads);
   const overallGate = buildLaunchMainlineGatePayload({
     status: preferredStage?.gate?.status || "ready",
     headline: preferredStage?.gate?.headline || "Launch mainline overview",
@@ -11010,7 +11026,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     attentionCount: activeStages.reduce((sum, item) => sum + Number(item.gate?.attentionCount || 0), 0),
     recommendedWorkspace: preferredStage?.gate?.recommendedWorkspace || null,
     actionPlan,
-    recommendedDownloads
+    recommendedDownloads: orderedRecommendedDownloads
   });
   const recommendedWorkspace = ensureLaunchWorkflowWorkspaceHref(overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null, params);
   const primaryAction = overallGate.primaryAction || preferredStage?.gate?.primaryAction || null;
@@ -11099,17 +11115,17 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
-      summary: recommendedDownloads.length
+      summary: orderedRecommendedDownloads.length
         ? "Use these unified handoff downloads to keep release, review, smoke, and ops aligned for the current lane."
         : "No recommended downloads yet.",
       tags: [
         {
           label: "count",
-          value: recommendedDownloads.length,
+          value: orderedRecommendedDownloads.length,
           strong: true
         }
       ],
-      controls: recommendedDownloads.map((item) => ({
+      controls: orderedRecommendedDownloads.map((item) => ({
         ...ensureLaunchMainlineControlHrefs({
           kind: "download",
           label: item?.label || item?.key || "Download",
@@ -11316,7 +11332,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     recommendedDownload: overallGate.recommendedDownload || preferredStage?.gate?.recommendedDownload || null,
     recommendedWorkspace,
     actionPlan,
-    recommendedDownloads: recommendedDownloads.map((item) => ensureLaunchWorkflowDownloadHref(item, params)),
+    recommendedDownloads: orderedRecommendedDownloads.map((item) => ensureLaunchWorkflowDownloadHref(item, params)),
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
   };
 }

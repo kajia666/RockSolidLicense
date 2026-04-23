@@ -5977,6 +5977,14 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_closeout_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_stabilization_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide"));
+      assert.ok(
+        launchMainline.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
+        < launchMainline.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
+      );
+      assert.ok(
+        launchMainline.mainlineSummary.overviewCards?.find((item) => item?.key === "recommended_downloads")?.controls?.findIndex((control) => control?.recommendedDownload?.key === "launch_mainline_rehearsal_guide")
+        < launchMainline.mainlineSummary.overviewCards?.find((item) => item?.key === "recommended_downloads")?.controls?.findIndex((control) => control?.recommendedDownload?.key === "launch_mainline_summary")
+      );
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
@@ -8822,6 +8830,10 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         ? actionResult.launchMainline.mainlineSummary.recommendedDownloads.slice(0, 6).map((item) => item?.key || null)
         : []
     );
+    assert.ok(
+      actionResult.receipt?.mainlineRecommendedDownloads?.findIndex((item) => item?.key === "launch_mainline_rehearsal_guide")
+      < actionResult.receipt?.mainlineRecommendedDownloads?.findIndex((item) => item?.key === "launch_mainline_summary")
+    );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.actionPlan) ? actionResult.launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => item?.key || null) : []
@@ -9486,6 +9498,10 @@ test("developer launch mainline action can create first launch batches and retur
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads)
         ? actionResult.launchMainline.mainlineSummary.recommendedDownloads.slice(0, 6).map((item) => item?.key || null)
         : []
+    );
+    assert.ok(
+      actionResult.receipt?.mainlineRecommendedDownloads?.findIndex((item) => item?.key === "launch_mainline_rehearsal_guide")
+      < actionResult.receipt?.mainlineRecommendedDownloads?.findIndex((item) => item?.key === "launch_mainline_summary")
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineActions) ? actionResult.receipt.mainlineActions.map((item) => item?.key || null) : [],

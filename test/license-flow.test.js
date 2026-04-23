@@ -9358,6 +9358,66 @@ test("developer launch mainline action can create first launch batches and retur
         && control?.workspaceAction?.key === actionResult.followUp.primaryAction?.workspaceAction?.key
       )
     );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchOpsQueue
+        ? {
+            operation: actionResult.receipt.firstLaunchOpsQueue.operation || null,
+            actionCount: actionResult.receipt.firstLaunchOpsQueue.actionCount ?? null,
+            runtimeActionCount: actionResult.receipt.firstLaunchOpsQueue.runtimeActionCount ?? null,
+            watchActionCount: actionResult.receipt.firstLaunchOpsQueue.watchActionCount ?? null,
+            nextActionKey: actionResult.receipt.firstLaunchOpsQueue.nextAction?.key || null
+          }
+        : null,
+      {
+        operation: "first_batch_setup",
+        actionCount: actionResult.followUp.actions.length,
+        runtimeActionCount: actionResult.followUp.actions.filter((item) => ["runtime_smoke", "session_review"].includes(item?.key)).length,
+        watchActionCount: actionResult.followUp.actions.filter((item) => /watch|review|smoke/i.test(String(item?.key || ""))).length,
+        nextActionKey: actionResult.followUp.actions[0]?.key
+      }
+    );
+    assert.ok(
+      actionResult.receipt?.firstLaunchOpsQueue?.actions?.some((item) =>
+        item?.key === "runtime_smoke"
+        && item?.workspaceAction?.key === "ops"
+        && item?.recommendedDownload?.key
+      )
+    );
+    assert.ok(
+      actionResult.receipt?.firstLaunchOpsQueue?.actions?.some((item) =>
+        item?.key === "card_redemption_watch"
+        && item?.workspaceAction?.key === "ops"
+        && item?.recommendedDownload?.key
+      )
+    );
+    const firstLaunchOpsSection = Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+      ? actionResult.receipt.mainlineLastActionScreen.sections.find((item) => item?.key === "first_launch_ops_queue")
+      : null;
+    assert.deepEqual(
+      firstLaunchOpsSection
+        ? {
+            key: firstLaunchOpsSection.key || null,
+            title: firstLaunchOpsSection.title || null,
+            cards: Array.isArray(firstLaunchOpsSection.cards)
+              ? firstLaunchOpsSection.cards.map((item) => item?.key || null)
+              : []
+          }
+        : null,
+      {
+        key: "first_launch_ops_queue",
+        title: "First Launch Ops Queue",
+        cards: [
+          "first_launch_ops_progress",
+          ...actionResult.followUp.actions.map((item) => `first_launch_ops_${item.key}`)
+        ]
+      }
+    );
+    assert.ok(
+      firstLaunchOpsSection?.cards?.find((item) => item?.key === "first_launch_ops_runtime_smoke")?.controls?.some((control) =>
+        control?.kind === "workspace"
+        && control?.workspaceAction?.key === "ops"
+      )
+    );
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
@@ -9696,6 +9756,17 @@ test("developer launch mainline action can create first launch batches and retur
                   "first_launch_inventory_progress",
                   "first_launch_inventory_next_action",
                   ...actionResult.receipt.firstLaunchInventoryQueue.createdBatches.map((item) => `first_launch_batch_${item.key}`)
+                ]
+              }
+            ]
+          : []),
+        ...(actionResult.receipt?.firstLaunchOpsQueue
+          ? [
+              {
+                key: "first_launch_ops_queue",
+                cards: [
+                  "first_launch_ops_progress",
+                  ...actionResult.receipt.firstLaunchOpsQueue.actions.map((item) => `first_launch_ops_${item.key}`)
                 ]
               }
             ]

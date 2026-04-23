@@ -4093,6 +4093,32 @@ function buildLaunchMainlineActionReceipt({
         nextActions: firstLaunchInventoryNextActions
       }
     : null;
+  const firstLaunchOpsActions = isFirstLaunchInventoryOperation
+    ? actions.map((item) => ({
+        key: item?.key || null,
+        label: item?.label || item?.key || "Ops action",
+        timing: item?.timing || null,
+        summary: item?.summary || "-",
+        workspaceAction: item?.workspaceAction || null,
+        recommendedDownload: item?.recommendedDownload || null,
+        bootstrapAction: item?.bootstrapAction || null,
+        setupAction: item?.setupAction || null
+      })).filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction)
+    : [];
+  const firstLaunchOpsQueue = isFirstLaunchInventoryOperation
+    ? {
+        operation: normalizedOperation,
+        operationLabel,
+        summary: firstLaunchOpsActions.length
+          ? `${operationLabel} has ${firstLaunchOpsActions.length} first-launch operations follow-up${firstLaunchOpsActions.length === 1 ? "" : "s"} queued.`
+          : `${operationLabel} has no first-launch operations follow-ups queued.`,
+        actionCount: firstLaunchOpsActions.length,
+        runtimeActionCount: firstLaunchOpsActions.filter((item) => ["runtime_smoke", "session_review"].includes(item?.key)).length,
+        watchActionCount: firstLaunchOpsActions.filter((item) => /watch|review|smoke/i.test(String(item?.key || ""))).length,
+        nextAction: firstLaunchOpsActions[0] || null,
+        actions: firstLaunchOpsActions
+      }
+    : null;
   const mainlineSummary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
     ? launchMainline.mainlineSummary
     : {};
@@ -4438,6 +4464,42 @@ function buildLaunchMainlineActionReceipt({
         ].filter((item) => item.key || item.summary || item.controls.length)
       }
     : null;
+  const firstLaunchOpsQueueSection = firstLaunchOpsQueue
+    ? {
+        key: "first_launch_ops_queue",
+        title: "First Launch Ops Queue",
+        emptyState: "Run first-batch setup or inventory refill to review the first-launch ops queue here.",
+        cards: [
+          {
+            key: "first_launch_ops_progress",
+            title: "First Launch Ops Progress",
+            summary: firstLaunchOpsQueue.summary,
+            tags: [
+              { label: "actions", value: firstLaunchOpsQueue.actionCount, strong: true },
+              { label: "runtime", value: firstLaunchOpsQueue.runtimeActionCount, strong: true },
+              { label: "watch", value: firstLaunchOpsQueue.watchActionCount, strong: false }
+            ],
+            details: [
+              firstLaunchOpsQueue.actions.length
+                ? `Queue: ${firstLaunchOpsQueue.actions.map((item) => item.label || item.key).join(" | ")}`
+                : ""
+            ].filter(Boolean),
+            controls: firstLaunchInventoryQueueControlList(firstLaunchOpsQueue.nextAction)
+          },
+          ...firstLaunchOpsQueue.actions.map((item) => ({
+            key: `first_launch_ops_${item.key}`,
+            title: item.label || item.key || "First launch ops action",
+            summary: item.summary || "-",
+            tags: [
+              item.timing ? { label: "timing", value: item.timing, strong: true } : null,
+              item.key ? { label: "action", value: item.key, strong: false } : null
+            ].filter(Boolean),
+            details: [],
+            controls: firstLaunchInventoryQueueControlList(item)
+          }))
+        ].filter((item) => item.key || item.summary || item.controls.length)
+      }
+    : null;
   const mainlineRecapCards = [
     {
       key: "result_status",
@@ -4483,6 +4545,9 @@ function buildLaunchMainlineActionReceipt({
         mainlineEvidenceQueueDetail,
         firstLaunchInventoryQueue
           ? `First launch inventory: batches=${firstLaunchInventoryQueue.createdBatchCount} | cards=${firstLaunchInventoryQueue.createdCardCount} | next=${firstLaunchInventoryQueue.nextAction?.label || firstLaunchInventoryQueue.nextAction?.key || "-"}`
+          : "",
+        firstLaunchOpsQueue
+          ? `First launch ops: actions=${firstLaunchOpsQueue.actionCount} | runtime=${firstLaunchOpsQueue.runtimeActionCount} | watch=${firstLaunchOpsQueue.watchActionCount} | next=${firstLaunchOpsQueue.nextAction?.label || firstLaunchOpsQueue.nextAction?.key || "-"}`
           : ""
       ].filter(Boolean),
       controls: mainlineFollowUpActions
@@ -4518,6 +4583,7 @@ function buildLaunchMainlineActionReceipt({
         cards: mainlineRecapCards
       },
       firstLaunchInventoryQueueSection,
+      firstLaunchOpsQueueSection,
       {
         key: "follow_up",
         title: "Continue Launch Mainline",
@@ -4563,6 +4629,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineNextActions,
     mainlineEvidenceQueue,
     firstLaunchInventoryQueue,
+    firstLaunchOpsQueue,
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineForm,

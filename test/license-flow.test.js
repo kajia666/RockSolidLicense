@@ -6030,6 +6030,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /daily-operations-checklist\.md/);
       assert.match(launchMainline.summaryText, /Launch Mainline Rehearsal Guide:/);
       assert.match(launchMainline.summaryText, /Phase 1: Release And Workflow Precheck/);
+      assert.match(launchMainline.summaryText, /Record Launch Rehearsal Run/);
       assert.match(launchMainline.summaryText, /Record Launch Stabilization Review/);
 
       const launchMainlineSummaryDownload = await getText(
@@ -6153,6 +6154,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(rehearsalGuideDownload.body, /RockSolid Developer Launch Mainline Rehearsal Guide/);
       assert.match(rehearsalGuideDownload.body, /Phase 1: Release And Workflow Precheck/);
       assert.match(rehearsalGuideDownload.body, /Phase 5: Evidence Recording Order/);
+      assert.match(rehearsalGuideDownload.body, /Record Launch Rehearsal Run/);
       assert.match(rehearsalGuideDownload.body, /Record Launch Stabilization Review/);
 
       const launchMainlineChecksumsDownload = await getText(

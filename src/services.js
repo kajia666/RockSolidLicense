@@ -12771,6 +12771,7 @@ function buildDeveloperLaunchMainlineRehearsalGuideText({
     "- Exit: one consistent author-side handoff path covers deployment, launch day, and first-week stabilization",
     "",
     "Phase 5: Evidence Recording Order",
+    "- Record Launch Rehearsal Run",
     "- Record Recovery Drill",
     "- Record Backup Verification",
     "- Record Operations Walkthrough",
@@ -12783,7 +12784,7 @@ function buildDeveloperLaunchMainlineRehearsalGuideText({
     "- Record Launch Closeout Review",
     "- Record Launch Stabilization Review",
     "",
-    "Suggested Minimal Artifact Set: launch workflow summary | launch smoke kit summary | launch review summary | developer ops primary match summary | launch mainline summary | cutover-handoff | post-launch-sweep-handoff | closeout-handoff | stabilization-handoff"
+    "Suggested Minimal Artifact Set: launch workflow summary | launch smoke kit summary | launch review summary | developer ops primary match summary | launch mainline summary | rehearsal-guide | cutover-handoff | post-launch-sweep-handoff | closeout-handoff | stabilization-handoff"
   ];
   return lines.join("\n");
 }

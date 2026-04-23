@@ -2619,6 +2619,12 @@ function buildReleaseMainlineFollowUpPayload({
     "summary",
     params
   );
+  const launchMainlineRehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline rehearsal guide",
+    "launch-mainline-rehearsal-guide.txt",
+    "rehearsal-guide",
+    params
+  );
   const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline checksums",
     "launch-mainline-sha256.txt",
@@ -2921,6 +2927,7 @@ function buildReleaseMainlineFollowUpPayload({
     releaseChecklistDownload,
     releaseZipDownload,
     launchMainlineDownload,
+    launchMainlineRehearsalGuideDownload,
     launchMainlineChecksumsDownload,
     launchMainlineZipDownload
   ];
@@ -6445,6 +6452,20 @@ function buildLaunchQuickstartFollowUpPlan({
     "summary",
     preferredOpsAction?.workspaceAction?.params
   );
+  const launchMainlineRehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
+    normalizedOperation === "restock"
+      ? "Launch refill mainline rehearsal guide"
+      : normalizedOperation === "first_batch_setup"
+        ? "Launch inventory mainline rehearsal guide"
+        : "Launch mainline rehearsal guide",
+    normalizedOperation === "restock"
+      ? "launch-mainline-restock-rehearsal-guide.txt"
+      : normalizedOperation === "first_batch_setup"
+        ? "launch-mainline-inventory-rehearsal-guide.txt"
+        : "launch-mainline-rehearsal-guide.txt",
+    "rehearsal-guide",
+    preferredOpsAction?.workspaceAction?.params
+  );
   const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
     normalizedOperation === "restock"
       ? "Launch refill mainline checksums"
@@ -6484,10 +6505,11 @@ function buildLaunchQuickstartFollowUpPlan({
           priority: index === 0 ? "primary" : "secondary"
         };
         if (key === "launch_recheck") {
+          const useReviewWorkspace = normalizedOperation === "bootstrap" && !hasCardInventoryFlow;
           nextItem.workspaceAction = createLaunchWorkflowWorkspaceShortcut(
-            "launch-mainline",
+            useReviewWorkspace ? "launch-review" : "launch-mainline",
             "summary",
-            "Open Launch Mainline",
+            useReviewWorkspace ? "Open Launch Review" : "Open Launch Mainline",
             preferredOpsAction?.workspaceAction?.params
           );
           nextItem.recommendedDownload = launchMainlineSummaryDownload;
@@ -6506,7 +6528,7 @@ function buildLaunchQuickstartFollowUpPlan({
     seenDownloadKeys.add(download.key);
     recommendedDownloads.push({ ...download });
   }
-  for (const download of [launchReviewDownload, launchMainlineSummaryDownload, launchMainlineChecksumsDownload, launchMainlineZipDownload]) {
+  for (const download of [launchReviewDownload, launchMainlineSummaryDownload, launchMainlineRehearsalGuideDownload, launchMainlineChecksumsDownload, launchMainlineZipDownload]) {
     if (!download?.key || seenDownloadKeys.has(download.key)) {
       continue;
     }
@@ -6787,6 +6809,15 @@ function buildLaunchWorkflowSummaryPayload({
       "Launch mainline summary",
       "launch-mainline-summary.txt",
       "summary",
+      {
+        productCode: releasePackage?.manifest?.project?.code || null,
+        channel
+      }
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch mainline rehearsal guide",
+      "launch-mainline-rehearsal-guide.txt",
+      "rehearsal-guide",
       {
         productCode: releasePackage?.manifest?.project?.code || null,
         channel
@@ -8634,6 +8665,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineRehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline rehearsal guide",
+    "launch-mainline-rehearsal-guide.txt",
+    "rehearsal-guide",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline checksums",
     "launch-mainline-sha256.txt",
@@ -9184,6 +9225,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     pushRecommendedDownload(handoffDownload);
   }
   pushRecommendedDownload(mainlineSummaryDownload);
+  pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineChecksumsDownload);
   pushRecommendedDownload(mainlineZipDownload);
   for (const item of Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 3) : []) {
@@ -9612,6 +9654,16 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       reviewMode: "matched"
     }
   );
+  const launchMainlineRehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline rehearsal guide",
+    "launch-mainline-rehearsal-guide.txt",
+    "rehearsal-guide",
+    {
+      productCode: project.code || filters.productCode || null,
+      channel: manifest.channel || filters.channel || "stable",
+      reviewMode: "matched"
+    }
+  );
   const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline checksums",
     "launch-mainline-sha256.txt",
@@ -9640,6 +9692,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       { reviewMode: "matched" }
     ),
     launchMainlineSummaryDownload,
+    launchMainlineRehearsalGuideDownload,
     launchMainlineChecksumsDownload,
     launchMainlineZipDownload
   ];

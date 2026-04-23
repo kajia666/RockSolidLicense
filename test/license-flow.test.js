@@ -9526,6 +9526,54 @@ test("developer launch mainline action can create first launch batches and retur
       && item.details.some((detail) => /Handoff checklist:/i.test(String(detail || "")))
       && item.details.some((detail) => /Support:2/i.test(String(detail || "")))
     ));
+    const firstLaunchHandoffSection = Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+      ? actionResult.receipt.mainlineLastActionScreen.sections.find((item) => item?.key === "first_launch_handoff_checklist")
+      : null;
+    assert.deepEqual(
+      firstLaunchHandoffSection
+        ? {
+            key: firstLaunchHandoffSection.key || null,
+            title: firstLaunchHandoffSection.title || null,
+            cards: Array.isArray(firstLaunchHandoffSection.cards)
+              ? firstLaunchHandoffSection.cards.map((item) => item?.key || null)
+              : []
+          }
+        : null,
+      {
+        key: "first_launch_handoff_checklist",
+        title: "First Launch Handoff Checklist",
+        cards: actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => item?.key || null)
+      }
+    );
+    const firstLaunchHandoffCards = Object.fromEntries(
+      Array.isArray(firstLaunchHandoffSection?.cards)
+        ? firstLaunchHandoffSection.cards.map((item) => [item?.key || null, item])
+        : []
+    );
+    assert.deepEqual(
+      firstLaunchHandoffCards.support_handoff
+        ? {
+            title: firstLaunchHandoffCards.support_handoff.title || null,
+            actions: Array.isArray(firstLaunchHandoffCards.support_handoff.details)
+              ? firstLaunchHandoffCards.support_handoff.details.filter((item) => /^Action:/i.test(String(item || ""))).length
+              : 0,
+            controlKeys: Array.isArray(firstLaunchHandoffCards.support_handoff.controls)
+              ? firstLaunchHandoffCards.support_handoff.controls.map((control) =>
+                  control?.workspaceAction?.key
+                  || control?.recommendedDownload?.key
+                  || control?.bootstrapAction?.key
+                  || control?.setupAction?.key
+                  || null
+                ).filter(Boolean)
+              : []
+          }
+        : null,
+      {
+        title: "Support Handoff",
+        actions: 2,
+        controlKeys: ["ops", "ops_card_redemption_watch_summary", "licenses"]
+      }
+    );
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
@@ -9876,6 +9924,14 @@ test("developer launch mainline action can create first launch batches and retur
                   "first_launch_ops_progress",
                   ...actionResult.receipt.firstLaunchOpsQueue.actions.map((item) => `first_launch_ops_${item.key}`)
                 ]
+              }
+            ]
+          : []),
+        ...(actionResult.receipt?.firstLaunchOpsQueue?.handoffChecklist
+          ? [
+              {
+                key: "first_launch_handoff_checklist",
+                cards: actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => item?.key || null)
               }
             ]
           : []),

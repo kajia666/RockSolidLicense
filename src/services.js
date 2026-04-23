@@ -4636,6 +4636,34 @@ function buildLaunchMainlineActionReceipt({
         ].filter((item) => item.key || item.summary || item.controls.length)
       }
     : null;
+  const firstLaunchHandoffChecklistSection = firstLaunchOpsQueue?.handoffChecklist?.length
+    ? {
+        key: "first_launch_handoff_checklist",
+        title: "First Launch Handoff Checklist",
+        emptyState: "Run first-batch setup or inventory refill to review owner-based first-launch handoffs here.",
+        cards: firstLaunchOpsQueue.handoffChecklist.map((item) => ({
+          key: item?.key || `${item?.ownerRole || "launch_ops"}_handoff`,
+          title: item?.ownerLabel ? `${item.ownerLabel} Handoff` : "First launch handoff",
+          summary: item?.summary || "Review this owner's first-launch handoff actions.",
+          tags: [
+            item?.ownerRole ? { label: "owner", value: item.ownerRole, strong: true } : null,
+            { label: "actions", value: Number(item?.actionCount || 0), strong: true },
+            { label: "stages", value: Array.isArray(item?.stageKeys) ? item.stageKeys.length : 0, strong: false }
+          ].filter(Boolean),
+          details: [
+            Array.isArray(item?.stageLabels) && item.stageLabels.length
+              ? `Stages: ${item.stageLabels.join(" | ")}`
+              : "",
+            ...(Array.isArray(item?.actions) ? item.actions.map((action) =>
+              `Action: ${action?.label || action?.key || "follow-up"} | stage=${action?.stageLabel || action?.stage || "-"}${action?.timing ? ` | timing=${action.timing}` : ""}`
+            ) : [])
+          ].filter(Boolean),
+          controls: (Array.isArray(item?.actions) ? item.actions : []).flatMap((action) =>
+            firstLaunchInventoryQueueControlList(action)
+          )
+        })).filter((item) => item.key || item.summary || item.controls.length)
+      }
+    : null;
   const mainlineRecapCards = [
     {
       key: "result_status",
@@ -4720,6 +4748,7 @@ function buildLaunchMainlineActionReceipt({
       },
       firstLaunchInventoryQueueSection,
       firstLaunchOpsQueueSection,
+      firstLaunchHandoffChecklistSection,
       {
         key: "follow_up",
         title: "Continue Launch Mainline",

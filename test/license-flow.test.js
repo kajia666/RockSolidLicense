@@ -9616,6 +9616,48 @@ test("developer launch mainline action can create first launch batches and retur
         controlKeys: ["ops", "ops_card_redemption_watch_summary", "licenses"]
       }
     );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary
+        ? {
+            key: actionResult.receipt.firstLaunchDutySummary.key || null,
+            status: actionResult.receipt.firstLaunchDutySummary.status || null,
+            inventoryBatches: actionResult.receipt.firstLaunchDutySummary.inventory?.createdBatchCount ?? null,
+            inventoryCards: actionResult.receipt.firstLaunchDutySummary.inventory?.createdCardCount ?? null,
+            opsActions: actionResult.receipt.firstLaunchDutySummary.ops?.actionCount ?? null,
+            ownerCount: actionResult.receipt.firstLaunchDutySummary.ops?.ownerCount ?? null,
+            nextActionKey: actionResult.receipt.firstLaunchDutySummary.nextAction?.key || null,
+            handoffDownloadKey: actionResult.receipt.firstLaunchDutySummary.handoffDownload?.key || null,
+            productionNextActionKey: actionResult.receipt.firstLaunchDutySummary.productionNextAction?.key || null
+          }
+        : null,
+      {
+        key: "first_launch_duty_summary",
+        status: "ready",
+        inventoryBatches: actionResult.result.createdBatches.length,
+        inventoryCards: actionResult.result.createdBatches.reduce((sum, item) => sum + Number(item?.count || 0), 0),
+        opsActions: actionResult.followUp.actions.length,
+        ownerCount: actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.length,
+        nextActionKey: actionResult.receipt.firstLaunchOpsQueue.nextAction?.key,
+        handoffDownloadKey: "launch_mainline_first_launch_handoff",
+        productionNextActionKey: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.key || null
+      }
+    );
+    assert.ok(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Duty chain:/i.test(String(detail || "")))
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
+    );
+    assert.ok(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.controls)
+      && actionResult.receipt.firstLaunchDutySummary.controls.some((control) =>
+        control?.kind === "download"
+        && control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff"
+      )
+      && actionResult.receipt.firstLaunchDutySummary.controls.some((control) =>
+        control?.kind === "workspace"
+        && control?.workspaceAction?.key === actionResult.receipt.firstLaunchOpsQueue.nextAction?.workspaceAction?.key
+      )
+    );
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));

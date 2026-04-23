@@ -4575,6 +4575,70 @@ function buildLaunchMainlineActionReceipt({
       setupAction: item.setupAction
     } : null
   ].filter(Boolean);
+  const firstLaunchDutySummary = firstLaunchOpsQueue
+    ? {
+        key: "first_launch_duty_summary",
+        title: "First Launch Duty Summary",
+        status: firstLaunchOpsQueue.actionCount > 0 ? "ready" : "review",
+        summary: `${operationLabel} is ready for first-launch duty with ${firstLaunchInventoryQueue?.createdBatchCount || 0} inventory batch${Number(firstLaunchInventoryQueue?.createdBatchCount || 0) === 1 ? "" : "es"}, ${firstLaunchInventoryQueue?.createdCardCount || 0} card${Number(firstLaunchInventoryQueue?.createdCardCount || 0) === 1 ? "" : "s"}, and ${firstLaunchOpsQueue.actionCount} operations action${firstLaunchOpsQueue.actionCount === 1 ? "" : "s"} across ${firstLaunchOpsQueue.handoffChecklist.length} owner handoff${firstLaunchOpsQueue.handoffChecklist.length === 1 ? "" : "s"}.`,
+        tags: [
+          { label: "status", value: firstLaunchOpsQueue.actionCount > 0 ? "READY" : "REVIEW", strong: true },
+          { label: "batches", value: firstLaunchInventoryQueue?.createdBatchCount || 0, strong: true },
+          { label: "cards", value: firstLaunchInventoryQueue?.createdCardCount || 0, strong: true },
+          { label: "owners", value: firstLaunchOpsQueue.handoffChecklist.length, strong: false },
+          { label: "ops", value: firstLaunchOpsQueue.actionCount, strong: false }
+        ],
+        inventory: {
+          operation: firstLaunchInventoryQueue?.operation || null,
+          createdBatchCount: firstLaunchInventoryQueue?.createdBatchCount || 0,
+          createdCardCount: firstLaunchInventoryQueue?.createdCardCount || 0,
+          skippedCount: firstLaunchInventoryQueue?.skippedCount || 0,
+          nextAction: firstLaunchInventoryQueue?.nextAction || null
+        },
+        ops: {
+          actionCount: firstLaunchOpsQueue.actionCount || 0,
+          runtimeActionCount: firstLaunchOpsQueue.runtimeActionCount || 0,
+          watchActionCount: firstLaunchOpsQueue.watchActionCount || 0,
+          ownerCount: firstLaunchOpsQueue.handoffChecklist.length,
+          owners: firstLaunchOpsQueue.ownerGroups.map((item) => ({
+            key: item?.key || null,
+            label: item?.label || item?.key || "owner",
+            actionCount: item?.actionCount || 0
+          }))
+        },
+        nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,
+        productionNextAction: mainlineEvidenceQueue?.nextAction || followUp?.nextProductionAction || null,
+        handoffDownload: firstLaunchHandoffDownload || null,
+        details: [
+          `Duty chain: ${operationLabel} -> ${firstLaunchOpsQueue.nextAction?.label || firstLaunchOpsQueue.nextAction?.key || firstLaunchInventoryQueue?.nextAction?.label || firstLaunchInventoryQueue?.nextAction?.key || "first launch action"} -> ${firstLaunchHandoffDownload?.label || "First launch handoff"} -> ${mainlineEvidenceQueue?.nextAction?.title || followUp?.nextProductionAction?.title || mainlineEvidenceQueue?.nextAction?.key || followUp?.nextProductionAction?.key || "production evidence queue"}`,
+          firstLaunchOpsQueue.ownerGroups.length
+            ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
+            : "",
+          firstLaunchOpsQueue.stageGroups.length
+            ? `Stages: ${firstLaunchOpsQueue.stageGroups.map((item) => item.label || item.key).join(" | ")}`
+            : "",
+          firstLaunchOpsQueue.nextAction
+            ? `Next action: ${firstLaunchOpsQueue.nextAction.label || firstLaunchOpsQueue.nextAction.key}${firstLaunchOpsQueue.nextAction.timing ? ` | timing=${firstLaunchOpsQueue.nextAction.timing}` : ""}`
+            : "",
+          mainlineEvidenceQueue?.nextAction
+            ? `Production next evidence: ${mainlineEvidenceQueue.nextAction.title || mainlineEvidenceQueue.nextAction.label || mainlineEvidenceQueue.nextAction.key}`
+            : "",
+          firstLaunchHandoffDownload?.href
+            ? `Download: ${firstLaunchHandoffDownload.label || firstLaunchHandoffDownload.key} | ${firstLaunchHandoffDownload.href}`
+            : ""
+        ].filter(Boolean),
+        controls: [
+          firstLaunchHandoffDownload
+            ? {
+                kind: "download",
+                label: firstLaunchHandoffDownload.label || "Download first launch handoff",
+                recommendedDownload: firstLaunchHandoffDownload
+              }
+            : null,
+          ...firstLaunchInventoryQueueControlList(firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null)
+        ].filter(Boolean)
+      }
+    : null;
   const firstLaunchInventoryQueueSection = firstLaunchInventoryQueue
     ? {
         key: "first_launch_inventory_queue",
@@ -4842,6 +4906,7 @@ function buildLaunchMainlineActionReceipt({
     firstLaunchInventoryQueue,
     firstLaunchOpsQueue,
     firstLaunchHandoffDownload,
+    firstLaunchDutySummary,
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineForm,

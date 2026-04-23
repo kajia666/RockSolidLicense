@@ -9590,6 +9590,8 @@ test("developer launch mainline action can create first launch batches and retur
     assert.match(firstLaunchHandoffDownloadResponse.contentType || "", /^text\/plain/);
     assert.match(firstLaunchHandoffDownloadResponse.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-MAINLINE_SETUP-stable-.*-first-launch-handoff\.txt"/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /RockSolid Developer Launch Mainline First Launch Handoff/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Batch Card Suggestions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Watch first card redemptions/);

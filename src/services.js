@@ -13570,6 +13570,17 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
       fallback: "Watch early sessions, device state, notices, version gates, and first-wave runtime signals."
     }
   ];
+  const totalSuggestedCards = firstBatchCardRecommendations.reduce((sum, item) => sum + Number(item?.targetCount ?? item?.count ?? 0), 0);
+  const readySuggestedBatches = firstBatchCardRecommendations.filter((item) =>
+    String(item?.inventoryStatus || "ready").trim().toLowerCase() === "ready"
+  ).length;
+  const dutyActionLabels = [
+    "inventory recheck",
+    "launch workflow recheck",
+    "smoke kit",
+    ...firstOpsActions.map((item) => item?.label || item?.key || "first ops action"),
+    "first launch handoff"
+  ];
   const lines = [
     "RockSolid Developer Launch Mainline First Launch Handoff",
     `Generated At: ${generatedAt || ""}`,
@@ -13579,6 +13590,12 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     `Public Base URL: ${publicBaseUrl || "-"}`,
     "",
     "Purpose: give release duty, launch ops, support, QA, and operations one owner-based checklist for the first customer-facing launch window.",
+    "",
+    "Launch Duty Summary:",
+    `- First-batch inventory: ${firstBatchCardRecommendations.length} suggestion${firstBatchCardRecommendations.length === 1 ? "" : "s"} | targetCards=${totalSuggestedCards} | readyBatches=${readySuggestedBatches}`,
+    `- First ops actions: ${firstOpsActions.length}`,
+    `- Owner path: ${ownerHandoffs.map((item) => item.owner).join(" -> ")}`,
+    `- Duty Chain: ${dutyActionLabels.join(" -> ")}`,
     "",
     "First Batch Card Suggestions:"
   ];

@@ -8727,6 +8727,54 @@ test("developer launch mainline action can restock low inventory and return duty
         : []
     );
     assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.ops?.primaryHandoff
+        ? {
+            key: actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.key || null,
+            ownerRole: actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.ownerRole || null,
+            stageKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.stageKeys)
+              ? actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.stageKeys
+              : [],
+            actionKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.actions)
+              ? actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.actions.map((action) => action?.key || null)
+              : [],
+            controlKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.controls)
+              ? actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.controls.map((control) =>
+                  control?.workspaceAction?.key
+                  || control?.recommendedDownload?.key
+                  || control?.bootstrapAction?.key
+                  || control?.setupAction?.key
+                  || null
+                ).filter(Boolean)
+              : []
+          }
+        : null,
+      {
+        key: "launch_ops_handoff",
+        ownerRole: "launch_ops",
+        stageKeys: ["inventory_handoff"],
+        actionKeys: ["inventory_recheck"],
+        controlKeys: ["licenses", "launch_checklist"]
+      }
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.launchWindowFlow)
+        ? actionResult.receipt.firstLaunchDutySummary.ops.launchWindowFlow.map((item) => ({
+            key: item?.key || null,
+            stage: item?.stage || null,
+            ownerRole: item?.ownerRole || null,
+            timing: item?.timing || null
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.actions)
+        ? actionResult.receipt.firstLaunchOpsQueue.actions.map((item) => ({
+            key: item?.key || null,
+            stage: item?.stage || null,
+            ownerRole: item?.ownerRole || null,
+            timing: item?.timing || null
+          }))
+        : []
+    );
+    assert.deepEqual(
       (() => {
         const supportHandoff = Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.handoffs)
           ? actionResult.receipt.firstLaunchDutySummary.ops.handoffs.find((item) => item?.key === "support_handoff")
@@ -8752,6 +8800,9 @@ test("developer launch mainline action can restock low inventory and return duty
       )
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
         /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || ""))
+      )
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
+        /Launch window flow:/i.test(String(detail || ""))
       )
     );
     assert.ok(
@@ -10044,6 +10095,54 @@ test("developer launch mainline action can create first launch batches and retur
         : []
     );
     assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.ops?.primaryHandoff
+        ? {
+            key: actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.key || null,
+            ownerRole: actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.ownerRole || null,
+            stageKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.stageKeys)
+              ? actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.stageKeys
+              : [],
+            actionKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.actions)
+              ? actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.actions.map((action) => action?.key || null)
+              : [],
+            controlKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.controls)
+              ? actionResult.receipt.firstLaunchDutySummary.ops.primaryHandoff.controls.map((control) =>
+                  control?.workspaceAction?.key
+                  || control?.recommendedDownload?.key
+                  || control?.bootstrapAction?.key
+                  || control?.setupAction?.key
+                  || null
+                ).filter(Boolean)
+              : []
+          }
+        : null,
+      {
+        key: "launch_ops_handoff",
+        ownerRole: "launch_ops",
+        stageKeys: ["inventory_handoff"],
+        actionKeys: ["inventory_recheck"],
+        controlKeys: ["licenses", "launch_checklist"]
+      }
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.launchWindowFlow)
+        ? actionResult.receipt.firstLaunchDutySummary.ops.launchWindowFlow.map((item) => ({
+            key: item?.key || null,
+            stage: item?.stage || null,
+            ownerRole: item?.ownerRole || null,
+            timing: item?.timing || null
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.actions)
+        ? actionResult.receipt.firstLaunchOpsQueue.actions.map((item) => ({
+            key: item?.key || null,
+            stage: item?.stage || null,
+            ownerRole: item?.ownerRole || null,
+            timing: item?.timing || null
+          }))
+        : []
+    );
+    assert.deepEqual(
       (() => {
         const supportHandoff = Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.handoffs)
           ? actionResult.receipt.firstLaunchDutySummary.ops.handoffs.find((item) => item?.key === "support_handoff")
@@ -10090,6 +10189,7 @@ test("developer launch mainline action can create first launch batches and retur
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Duty chain:/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Inventory health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Launch window flow:/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
     );
     assert.ok(
@@ -10113,6 +10213,7 @@ test("developer launch mainline action can create first launch batches and retur
         && Array.isArray(item.details)
         && item.details.some((detail) => /Duty chain:/i.test(String(detail || "")))
         && item.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
+        && item.details.some((detail) => /Launch window flow:/i.test(String(detail || "")))
         && Array.isArray(item.controls)
         && item.controls.some((control) => control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff")
         && item.controls.some((control) => control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation)

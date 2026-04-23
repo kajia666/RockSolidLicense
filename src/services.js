@@ -4645,6 +4645,37 @@ function buildLaunchMainlineActionReceipt({
       return true;
     });
   }
+  const mapFirstLaunchActionSummary = (action = null) => ({
+    key: action?.key || null,
+    label: action?.label || action?.key || "action",
+    stage: action?.stage || null,
+    stageLabel: action?.stageLabel || action?.stage || null,
+    ownerRole: action?.ownerRole || null,
+    ownerLabel: action?.ownerLabel || null,
+    timing: action?.timing || null,
+    controls: dedupeLaunchMainlineControls(firstLaunchInventoryQueueControlList(action))
+  });
+  const mapFirstLaunchHandoffSummary = (item = null) => ({
+    key: item?.key || null,
+    ownerRole: item?.ownerRole || null,
+    ownerLabel: item?.ownerLabel || null,
+    actionCount: item?.actionCount || 0,
+    stageKeys: Array.isArray(item?.stageKeys) ? item.stageKeys : [],
+    stageLabels: Array.isArray(item?.stageLabels) ? item.stageLabels : [],
+    summary: item?.summary || "",
+    actions: Array.isArray(item?.actions)
+      ? item.actions.map((action) => mapFirstLaunchActionSummary(action))
+      : [],
+    controls: dedupeLaunchMainlineControls(
+      (Array.isArray(item?.actions) ? item.actions : []).flatMap((action) =>
+        firstLaunchInventoryQueueControlList(action)
+      )
+    )
+  });
+  const firstLaunchWindowFlow = firstLaunchOpsQueue.actions.map((item) => mapFirstLaunchActionSummary(item));
+  const firstLaunchPrimaryHandoff = firstLaunchOpsQueue.handoffChecklist.length
+    ? mapFirstLaunchHandoffSummary(firstLaunchOpsQueue.handoffChecklist[0])
+    : null;
   const firstLaunchProductionEvidence = mainlineEvidenceQueue || followUp?.nextProductionAction
     ? {
         status: Number(
@@ -4717,6 +4748,8 @@ function buildLaunchMainlineActionReceipt({
             label: item?.label || item?.key || "owner",
             actionCount: item?.actionCount || 0
           })),
+          primaryHandoff: firstLaunchPrimaryHandoff,
+          launchWindowFlow: firstLaunchWindowFlow,
           stageGroups: firstLaunchOpsQueue.stageGroups.map((item) => ({
             key: item?.key || null,
             label: item?.label || item?.key || "stage",
@@ -4739,10 +4772,7 @@ function buildLaunchMainlineActionReceipt({
             stageLabels: Array.isArray(item?.stageLabels) ? item.stageLabels : [],
             summary: item?.summary || "",
             actions: Array.isArray(item?.actions)
-              ? item.actions.map((action) => ({
-                  key: action?.key || null,
-                  label: action?.label || action?.key || "action"
-                }))
+              ? item.actions.map((action) => mapFirstLaunchActionSummary(action))
               : [],
             controls: dedupeLaunchMainlineControls(
               (Array.isArray(item?.actions) ? item.actions : []).flatMap((action) =>
@@ -4802,6 +4832,9 @@ function buildLaunchMainlineActionReceipt({
           `Duty chain: ${operationLabel} -> ${firstLaunchOpsQueue.nextAction?.label || firstLaunchOpsQueue.nextAction?.key || firstLaunchInventoryQueue?.nextAction?.label || firstLaunchInventoryQueue?.nextAction?.key || "first launch action"} -> ${firstLaunchHandoffDownload?.label || "First launch handoff"} -> ${mainlineEvidenceQueue?.nextAction?.title || followUp?.nextProductionAction?.title || mainlineEvidenceQueue?.nextAction?.key || followUp?.nextProductionAction?.key || "production evidence queue"}`,
           formatLaunchInventoryHealthLine(firstLaunchInventoryHealth, "Inventory health"),
           mainlineEvidenceQueue ? formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production evidence") : "",
+          firstLaunchWindowFlow.length
+            ? `Launch window flow: ${firstLaunchWindowFlow.map((item) => item.label || item.key).join(" | ")}`
+            : "",
           firstLaunchOpsQueue.ownerGroups.length
             ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
             : "",

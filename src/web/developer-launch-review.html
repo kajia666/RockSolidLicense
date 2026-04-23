@@ -435,6 +435,19 @@
       function currentReviewRecommendedDownloads() {
         return Array.isArray(currentReviewSummary().recommendedDownloads) ? currentReviewSummary().recommendedDownloads : [];
       }
+      function currentReviewMainlineWorkspaceAction() {
+        const mainlineStep = currentReviewActionPlan().find((item) => item?.workspaceAction?.key === "launch-mainline") || null;
+        return cloneAction(mainlineStep?.workspaceAction || null);
+      }
+      function currentReviewMainlineRehearsalDownload() {
+        const actionDownload = currentReviewActionPlan()
+          .map((item) => item?.recommendedDownload || null)
+          .find((item) => item?.key === "launch_mainline_rehearsal_guide")
+          || null;
+        return actionDownload
+          || currentReviewRecommendedDownloads().find((item) => item?.key === "launch_mainline_rehearsal_guide")
+          || null;
+      }
       function currentRecommendedWorkspace() {
         return currentReviewSummary().recommendedWorkspace || null;
       }
@@ -594,6 +607,8 @@
         const reviewTargets = currentReviewTargets();
         const workspaceActions = currentReviewWorkspaceActions();
         const recommendedDownloads = currentReviewRecommendedDownloads();
+        const mainlineWorkspaceAction = currentReviewMainlineWorkspaceAction();
+        const mainlineRehearsalDownload = currentReviewMainlineRehearsalDownload();
         el("review-summary").textContent = reviewPackage.summaryText || "";
         el("review-launch-summary").textContent = workflow.summaryText || "";
         el("review-launch-checklist").textContent = workflow.checklistText || "";
@@ -604,6 +619,13 @@
             ${reviewSummary.recommendedWorkspace?.label ? renderTag(`next:${reviewSummary.recommendedWorkspace.label}`, true) : ""}
           </div>
           <div class="hint" style="margin-top: 10px;">${esc(reviewSummary.message || "No launch review guidance is available yet.")}</div>
+          ${(mainlineWorkspaceAction || mainlineRehearsalDownload) ? `
+            <div class="hint" style="margin-top: 12px;">Review Mainline Handoff</div>
+            <div class="actions" style="margin-top: 8px;">
+              ${mainlineWorkspaceAction ? `<button type="button" data-review-mainline-workspace="1">${esc(mainlineWorkspaceAction.label || "Open Launch Mainline")}</button>` : ""}
+              ${mainlineRehearsalDownload ? `<button type="button" class="secondary" data-review-mainline-rehearsal-download="1">${esc(mainlineRehearsalDownload.label || "Download Launch Mainline Rehearsal Guide")}</button>` : ""}
+            </div>
+          ` : ""}
           ${reviewSummary.recommendedWorkspace?.key ? `
             <div class="actions" style="margin-top: 12px;">
               <button type="button" id="review-open-recommended-inline-btn">${esc(reviewSummary.recommendedWorkspace.label || "Open Recommended Workspace")}</button>
@@ -1191,6 +1213,43 @@
         }
       });
       el("review-actions-box").addEventListener("click", async (event) => {
+        const mainlineWorkspaceButton = event.target.closest("[data-review-mainline-workspace]");
+        if (mainlineWorkspaceButton) {
+          try {
+            const action = currentReviewMainlineWorkspaceAction();
+            openWorkspaceAction(action, {
+              title: currentReviewSummary().title || "Launch review mainline handoff",
+              summary: currentReviewSummary().message || ""
+            });
+            setOutput({
+              reviewMainlineWorkspace: {
+                key: action?.key || null,
+                autofocus: action?.autofocus || null,
+                label: action?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const mainlineRehearsalButton = event.target.closest("[data-review-mainline-rehearsal-download]");
+        if (mainlineRehearsalButton) {
+          try {
+            const item = currentReviewMainlineRehearsalDownload();
+            const result = await downloadReviewRecommendedItem(item);
+            setOutput({
+              reviewMainlineRehearsalDownload: {
+                key: item?.key || null,
+                fileName: result?.fileName || item?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const primaryReviewWorkspaceButton = event.target.closest("[data-review-primary-workspace]");
         if (primaryReviewWorkspaceButton) {
           try {

@@ -437,6 +437,19 @@
       function currentRecommendedDownloads() {
         return Array.isArray(currentSmokeSummary().recommendedDownloads) ? currentSmokeSummary().recommendedDownloads : [];
       }
+      function currentSmokeMainlineWorkspaceAction() {
+        const mainlineStep = currentActionPlan().find((item) => item?.workspaceAction?.key === "launch-mainline") || null;
+        return cloneAction(mainlineStep?.workspaceAction || null);
+      }
+      function currentSmokeMainlineRehearsalDownload() {
+        const actionDownload = currentActionPlan()
+          .map((item) => item?.recommendedDownload || null)
+          .find((item) => item?.key === "launch_mainline_rehearsal_guide")
+          || null;
+        return actionDownload
+          || currentRecommendedDownloads().find((item) => item?.key === "launch_mainline_rehearsal_guide")
+          || null;
+      }
       function currentRecommendedWorkspace() {
         return currentSmokeSummary().recommendedWorkspace || null;
       }
@@ -574,6 +587,8 @@
         const reviewTargets = currentSmokeReviewTargets();
         const workspaces = currentWorkspaceActions();
         const downloads = currentRecommendedDownloads();
+        const mainlineWorkspaceAction = currentSmokeMainlineWorkspaceAction();
+        const mainlineRehearsalDownload = currentSmokeMainlineRehearsalDownload();
         el("smoke-summary").textContent = smokeKit.summaryText || "";
         el("smoke-startup-request").textContent = JSON.stringify(summary.startupRequest || {}, null, 2);
         el("smoke-actions-box").innerHTML = `
@@ -582,6 +597,13 @@
             ${summary.recommendedWorkspace?.label ? renderTag(`next:${summary.recommendedWorkspace.label}`, true) : ""}
           </div>
           <div class="hint" style="margin-top: 10px;">${esc(summary.message || "No smoke guidance is available yet.")}</div>
+          ${(mainlineWorkspaceAction || mainlineRehearsalDownload) ? `
+            <div class="hint" style="margin-top: 12px;">Smoke Mainline Handoff</div>
+            <div class="actions" style="margin-top: 8px;">
+              ${mainlineWorkspaceAction ? `<button type="button" data-smoke-mainline-workspace="1">${esc(mainlineWorkspaceAction.label || "Open Launch Mainline")}</button>` : ""}
+              ${mainlineRehearsalDownload ? `<button type="button" class="secondary" data-smoke-mainline-rehearsal-download="1">${esc(mainlineRehearsalDownload.label || "Download Launch Mainline Rehearsal Guide")}</button>` : ""}
+            </div>
+          ` : ""}
           ${primaryReviewTarget ? `
             <div class="hint" style="margin-top: 12px;">Primary Review Target</div>
             <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
@@ -1128,6 +1150,43 @@
         }
       });
       el("smoke-actions-box").addEventListener("click", async (event) => {
+        const mainlineWorkspaceButton = event.target.closest("[data-smoke-mainline-workspace]");
+        if (mainlineWorkspaceButton) {
+          try {
+            const action = currentSmokeMainlineWorkspaceAction();
+            openWorkspaceAction(action, {
+              title: currentSmokeSummary().title || "Launch smoke mainline handoff",
+              summary: currentSmokeSummary().message || ""
+            });
+            setOutput({
+              smokeMainlineWorkspace: {
+                key: action?.key || null,
+                autofocus: action?.autofocus || null,
+                label: action?.label || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          return;
+        }
+        const mainlineRehearsalButton = event.target.closest("[data-smoke-mainline-rehearsal-download]");
+        if (mainlineRehearsalButton) {
+          try {
+            const item = currentSmokeMainlineRehearsalDownload();
+            const result = await downloadSmokeRecommendedItem(item);
+            setOutput({
+              smokeMainlineRehearsalDownload: {
+                key: item?.key || null,
+                fileName: result?.fileName || item?.fileName || null
+              }
+            });
+          } catch (error) {
+            setStatus(error.message, true);
+            setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+          }
+          return;
+        }
         const primaryReviewWorkspaceButton = event.target.closest("[data-smoke-primary-review-workspace]");
         if (primaryReviewWorkspaceButton) {
           try {

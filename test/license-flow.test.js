@@ -13335,6 +13335,11 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /currentReviewTargets/);
       assert.match(html, /runLaunchReviewBootstrap/);
       assert.match(html, /runLaunchReviewSetup/);
+      assert.match(html, /Review Mainline Handoff/);
+      assert.match(html, /currentReviewMainlineWorkspaceAction/);
+      assert.match(html, /currentReviewMainlineRehearsalDownload/);
+      assert.match(html, /data-review-mainline-workspace/);
+      assert.match(html, /data-review-mainline-rehearsal-download/);
       assert.match(html, /data-review-target-workspace-index/);
       assert.match(html, /data-review-target-download-index/);
       assert.match(html, /data-review-action-bootstrap-index/);
@@ -13386,6 +13391,11 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /currentSmokeReviewTargets/);
     assert.match(html, /currentWorkspaceActions/);
     assert.match(html, /currentRecommendedDownloads/);
+    assert.match(html, /Smoke Mainline Handoff/);
+    assert.match(html, /currentSmokeMainlineWorkspaceAction/);
+    assert.match(html, /currentSmokeMainlineRehearsalDownload/);
+    assert.match(html, /data-smoke-mainline-workspace/);
+    assert.match(html, /data-smoke-mainline-rehearsal-download/);
     assert.match(html, /data-smoke-review-target-workspace-index/);
     assert.match(html, /data-smoke-review-target-download-index/);
     assert.match(html, /data-smoke-action-bootstrap-index/);

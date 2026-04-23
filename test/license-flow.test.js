@@ -6278,6 +6278,80 @@ test("developer launch mainline production gate blocks default launch secrets an
       launchMainline.mainlineSummary.productionGate.evidenceQueue?.items?.[0]?.setupAction?.operation,
       "record_launch_rehearsal_run"
     );
+    const productionEvidenceQueueSection = Array.isArray(launchMainline.mainlineSummary.sections)
+      ? launchMainline.mainlineSummary.sections.find((item) => item?.key === "production_evidence_queue")
+      : null;
+    assert.deepEqual(
+      productionEvidenceQueueSection
+        ? {
+            key: productionEvidenceQueueSection.key || null,
+            title: productionEvidenceQueueSection.title || null,
+            emptyState: productionEvidenceQueueSection.emptyState || null,
+            cards: Array.isArray(productionEvidenceQueueSection.cards)
+              ? productionEvidenceQueueSection.cards.map((item) => item?.key || null)
+              : []
+          }
+        : null,
+      {
+        key: "production_evidence_queue",
+        title: "Production Evidence Queue",
+        emptyState: "Generate a launch mainline package to inspect the production evidence queue here.",
+        cards: [
+          "production_evidence_queue_progress",
+          "production_evidence_queue_next",
+          ...(Array.isArray(launchMainline.mainlineSummary.productionGate.evidenceQueue?.items)
+            ? launchMainline.mainlineSummary.productionGate.evidenceQueue.items.map((item) => item?.key || null)
+            : [])
+        ]
+      }
+    );
+    const productionEvidenceQueueCards = Object.fromEntries(
+      Array.isArray(productionEvidenceQueueSection?.cards)
+        ? productionEvidenceQueueSection.cards.map((item) => [item?.key || null, item])
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(productionEvidenceQueueCards.production_evidence_queue_progress?.tags)
+        ? productionEvidenceQueueCards.production_evidence_queue_progress.tags.map((item) => ({
+            label: item?.label || null,
+            value: item?.value ?? null,
+            strong: Boolean(item?.strong)
+          }))
+        : [],
+      [
+        {
+          label: "completed",
+          value: launchMainline.mainlineSummary.productionGate.evidenceQueue?.completedCount,
+          strong: true
+        },
+        {
+          label: "remaining",
+          value: launchMainline.mainlineSummary.productionGate.evidenceQueue?.remainingCount,
+          strong: true
+        },
+        {
+          label: "total",
+          value: launchMainline.mainlineSummary.productionGate.evidenceQueue?.totalCount,
+          strong: false
+        }
+      ]
+    );
+    assert.ok(productionEvidenceQueueCards.production_evidence_queue_progress?.details?.some((detail) => /Remaining:/i.test(String(detail || ""))));
+    assert.ok(productionEvidenceQueueCards.production_evidence_queue_progress?.details?.some((detail) => /Completed:/i.test(String(detail || ""))));
+    assert.equal(
+      productionEvidenceQueueCards.production_evidence_queue_next?.controls?.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === "record_launch_rehearsal_run"
+      ),
+      true
+    );
+    assert.equal(
+      productionEvidenceQueueCards.production_launch_rehearsal_run_recent?.controls?.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === "record_launch_rehearsal_run"
+      ),
+      true
+    );
     assert.ok(launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks.every((item) =>
       item?.setupAction?.operation
       && item?.status !== "pass"

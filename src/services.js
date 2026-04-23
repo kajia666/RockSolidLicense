@@ -11387,6 +11387,96 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     details: [],
     controls: Array.isArray(item?.controls) ? item.controls : []
   })).filter((item) => item.key || item.summary || item.controls.length);
+  const buildProductionEvidenceQueueControls = (item = null) => [
+    item?.workspaceAction ? ensureLaunchMainlineControlHrefs({
+      kind: "workspace",
+      label: item.workspaceAction.label || item.title || item.key || "Open workspace",
+      workspaceAction: item.workspaceAction
+    }, params) : null,
+    item?.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+      kind: "download",
+      label: item.recommendedDownload.label || item.title || item.key || "Download summary",
+      recommendedDownload: item.recommendedDownload
+    }, params) : null,
+    item?.bootstrapAction ? {
+      kind: "bootstrap",
+      label: item.bootstrapAction.label || item.title || item.key || "Run bootstrap",
+      bootstrapAction: item.bootstrapAction
+    } : null,
+    item?.setupAction ? {
+      kind: "setup",
+      label: item.setupAction.label || item.title || item.key || "Run setup",
+      setupAction: item.setupAction
+    } : null
+  ].filter(Boolean);
+  const productionEvidenceQueue = productionGate?.evidenceQueue || buildLaunchMainlineEvidenceQueue(productionGate);
+  const formatProductionEvidenceQueueList = (items = []) => {
+    const labels = (Array.isArray(items) ? items : [])
+      .map((item) => item?.title || item?.label || item?.key || item?.setupAction?.operation || null)
+      .filter(Boolean);
+    return labels.length ? labels.join("; ") : "none";
+  };
+  const productionEvidenceQueueCards = [
+    {
+      key: "production_evidence_queue_progress",
+      title: "Production Evidence Progress",
+      summary: productionEvidenceQueue?.summary || "No production evidence queue is available yet.",
+      tags: [
+        {
+          label: "completed",
+          value: Number(productionEvidenceQueue?.completedCount || 0),
+          strong: true
+        },
+        {
+          label: "remaining",
+          value: Number(productionEvidenceQueue?.remainingCount || 0),
+          strong: true
+        },
+        {
+          label: "total",
+          value: Number(productionEvidenceQueue?.totalCount || 0),
+          strong: false
+        }
+      ],
+      details: [
+        `Remaining: ${formatProductionEvidenceQueueList(productionEvidenceQueue?.remainingChecks)}`,
+        `Completed: ${formatProductionEvidenceQueueList(productionEvidenceQueue?.completedChecks)}`
+      ],
+      controls: buildProductionEvidenceQueueControls(productionEvidenceQueue?.nextAction)
+    },
+    {
+      key: "production_evidence_queue_next",
+      title: productionEvidenceQueue?.nextAction
+        ? `Next evidence: ${productionEvidenceQueue.nextAction.title || productionEvidenceQueue.nextAction.label || productionEvidenceQueue.nextAction.key}`
+        : "Next production evidence",
+      summary: productionEvidenceQueue?.nextAction?.summary || "All production evidence queue items are recorded.",
+      tags: [
+        productionEvidenceQueue?.nextAction?.priority
+          ? { label: "priority", value: productionEvidenceQueue.nextAction.priority, strong: true }
+          : null,
+        productionEvidenceQueue?.nextAction?.status
+          ? { label: "status", value: productionEvidenceQueue.nextAction.status, strong: false }
+          : null,
+        productionEvidenceQueue?.nextAction?.setupAction?.operation
+          ? { label: "operation", value: productionEvidenceQueue.nextAction.setupAction.operation, strong: false }
+          : null
+      ].filter(Boolean),
+      details: [],
+      controls: buildProductionEvidenceQueueControls(productionEvidenceQueue?.nextAction)
+    },
+    ...(Array.isArray(productionEvidenceQueue?.items) ? productionEvidenceQueue.items : []).map((item) => ({
+      key: item?.key || item?.setupAction?.operation || null,
+      title: item?.title || item?.label || item?.key || "Production evidence",
+      summary: item?.summary || "-",
+      tags: [
+        item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
+        item?.status ? { label: "status", value: item.status, strong: false } : null,
+        item?.setupAction?.operation ? { label: "operation", value: item.setupAction.operation, strong: false } : null
+      ].filter(Boolean),
+      details: item?.setupAction?.operation ? [`Operation: ${item.setupAction.operation}`] : [],
+      controls: buildProductionEvidenceQueueControls(item)
+    }))
+  ].filter((item) => item.key || item.summary || item.controls.length);
   const productionCheckCards = (Array.isArray(productionGate?.checks) ? productionGate.checks : Array.isArray(productionGate?.actionPlan) ? productionGate.actionPlan : []).map((item) => {
     const controls = [
       item?.workspaceAction ? ensureLaunchMainlineControlHrefs({
@@ -11448,6 +11538,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       title: "Launch Mainline Overview",
       emptyState: "Generate a launch mainline package to inspect the unified overall gate here.",
       cards: overviewCards.filter((item) => item?.key === "overall_gate")
+    },
+    {
+      key: "production_evidence_queue",
+      title: "Production Evidence Queue",
+      emptyState: "Generate a launch mainline package to inspect the production evidence queue here.",
+      cards: productionEvidenceQueueCards
     },
     {
       key: "production_checks",

@@ -4645,6 +4645,24 @@ function buildLaunchMainlineActionReceipt({
       return true;
     });
   }
+  const firstLaunchProductionEvidence = mainlineEvidenceQueue || followUp?.nextProductionAction
+    ? {
+        status: Number(
+          mainlineEvidenceQueue?.remainingCount
+          ?? (followUp?.nextProductionAction ? 1 : 0)
+        ) > 0 ? "review" : "ready",
+        totalCount: Number(mainlineEvidenceQueue?.totalCount ?? (followUp?.nextProductionAction ? 1 : 0)),
+        completedCount: Number(mainlineEvidenceQueue?.completedCount || 0),
+        remainingCount: Number(mainlineEvidenceQueue?.remainingCount ?? (followUp?.nextProductionAction ? 1 : 0)),
+        nextAction: mainlineEvidenceQueue?.nextAction || followUp?.nextProductionAction || null,
+        remainingKeys: (Array.isArray(mainlineEvidenceQueue?.remainingChecks) ? mainlineEvidenceQueue.remainingChecks : [])
+          .map((item) => item?.key || item?.setupAction?.operation || null)
+          .filter(Boolean),
+        completedKeys: (Array.isArray(mainlineEvidenceQueue?.completedChecks) ? mainlineEvidenceQueue.completedChecks : [])
+          .map((item) => item?.key || item?.setupAction?.operation || null)
+          .filter(Boolean)
+      }
+    : null;
   const firstLaunchDutySummary = firstLaunchOpsQueue
     ? {
         key: "first_launch_duty_summary",
@@ -4698,7 +4716,8 @@ function buildLaunchMainlineActionReceipt({
           }))
         },
         nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,
-        productionNextAction: mainlineEvidenceQueue?.nextAction || followUp?.nextProductionAction || null,
+        productionEvidence: firstLaunchProductionEvidence,
+        productionNextAction: firstLaunchProductionEvidence?.nextAction || null,
         handoffDownload: firstLaunchHandoffDownload || null,
         dutyChain: [
           {

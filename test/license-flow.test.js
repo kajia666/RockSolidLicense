@@ -8661,6 +8661,26 @@ test("developer launch mainline action can restock low inventory and return duty
         missingModes: []
       }
     );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.productionEvidence
+        ? {
+            status: actionResult.receipt.firstLaunchDutySummary.productionEvidence.status || null,
+            totalCount: actionResult.receipt.firstLaunchDutySummary.productionEvidence.totalCount ?? null,
+            completedCount: actionResult.receipt.firstLaunchDutySummary.productionEvidence.completedCount ?? null,
+            remainingCount: actionResult.receipt.firstLaunchDutySummary.productionEvidence.remainingCount ?? null,
+            nextActionKey: actionResult.receipt.firstLaunchDutySummary.productionEvidence.nextAction?.key || null,
+            nextOperation: actionResult.receipt.firstLaunchDutySummary.productionEvidence.nextAction?.setupAction?.operation || null
+          }
+        : null,
+      {
+        status: Number(actionResult.receipt.mainlineEvidenceQueue?.remainingCount || 0) > 0 ? "review" : "ready",
+        totalCount: actionResult.receipt.mainlineEvidenceQueue?.totalCount ?? null,
+        completedCount: actionResult.receipt.mainlineEvidenceQueue?.completedCount ?? null,
+        remainingCount: actionResult.receipt.mainlineEvidenceQueue?.remainingCount ?? null,
+        nextActionKey: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.key || null,
+        nextOperation: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation || null
+      }
+    );
     assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
@@ -9892,6 +9912,26 @@ test("developer launch mainline action can create first launch batches and retur
         readyModes: ["direct_card", "recharge"],
         lowModes: [],
         missingModes: []
+      }
+    );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.productionEvidence
+        ? {
+            status: actionResult.receipt.firstLaunchDutySummary.productionEvidence.status || null,
+            totalCount: actionResult.receipt.firstLaunchDutySummary.productionEvidence.totalCount ?? null,
+            completedCount: actionResult.receipt.firstLaunchDutySummary.productionEvidence.completedCount ?? null,
+            remainingCount: actionResult.receipt.firstLaunchDutySummary.productionEvidence.remainingCount ?? null,
+            nextActionKey: actionResult.receipt.firstLaunchDutySummary.productionEvidence.nextAction?.key || null,
+            nextOperation: actionResult.receipt.firstLaunchDutySummary.productionEvidence.nextAction?.setupAction?.operation || null
+          }
+        : null,
+      {
+        status: Number(actionResult.receipt.mainlineEvidenceQueue?.remainingCount || 0) > 0 ? "review" : "ready",
+        totalCount: actionResult.receipt.mainlineEvidenceQueue?.totalCount ?? null,
+        completedCount: actionResult.receipt.mainlineEvidenceQueue?.completedCount ?? null,
+        remainingCount: actionResult.receipt.mainlineEvidenceQueue?.remainingCount ?? null,
+        nextActionKey: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.key || null,
+        nextOperation: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation || null
       }
     );
     assert.deepEqual(

@@ -7508,6 +7508,15 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     assert.match(actionResult.message || "", /launch rehearsal run/i);
     assert.equal(actionResult.result?.recordedEvidence?.key, "launch_rehearsal_run");
     assert.ok(actionResult.result?.recordedEvidence?.createdAt);
+    assert.ok(actionResult.followUp);
+    assert.match(actionResult.followUp.summary || "", /Launch rehearsal run evidence recorded/i);
+    assert.ok(Array.isArray(actionResult.followUp.actions));
+    assert.ok(actionResult.followUp.actions.some((item) =>
+      item?.recommendedDownload?.key === "launch_mainline_rehearsal_guide"
+    ));
+    assert.ok(actionResult.followUp.actions.some((item) =>
+      item?.workspaceAction?.key || item?.setupAction?.operation
+    ));
     assert.equal(actionResult.receipt?.operation, "record_launch_rehearsal_run");
     assert.ok(Array.isArray(actionResult.receipt?.created));
     assert.ok(actionResult.receipt.created.some((item) => item.key === "launch_rehearsal_run"));

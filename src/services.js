@@ -21991,22 +21991,57 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const launchMainline = await this.developerLaunchMainlinePackage(token, selector, options);
-      const followUp = result?.followUp || (operation === "record_recovery_drill"
-        ? {
-            operation,
-            summary: "Recovery drill evidence recorded. Review the refreshed production gate and continue the unified launch mainline.",
-            primaryAction: launchMainline?.mainlineSummary?.primaryAction || null,
-            actions: Array.isArray(launchMainline?.mainlineSummary?.actionPlan)
-              ? launchMainline.mainlineSummary.actionPlan.slice(0, 4).map((item) => ({
-                  key: item?.key || null,
-                  label: item?.title || item?.key || "follow-up",
-                  summary: item?.summary || "-",
-                  workspaceAction: item?.workspaceAction || null,
-                  recommendedDownload: item?.recommendedDownload || null
-                }))
-              : []
+      const buildRecordedEvidenceFollowUp = () => {
+        if (!result?.recordedEvidence?.key) {
+          return null;
+        }
+        const summary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
+          ? launchMainline.mainlineSummary
+          : {};
+        const actions = [];
+        const pushAction = (item = {}) => {
+          const key = item?.key || item?.recommendedDownload?.key || item?.workspaceAction?.key || item?.setupAction?.key || item?.bootstrapAction?.key || "";
+          if (!key || actions.some((entry) => entry.key === key)) {
+            return;
           }
-        : null);
+          actions.push({
+            key,
+            label: item?.label || item?.title || item?.recommendedDownload?.label || item?.workspaceAction?.label || item?.setupAction?.label || item?.bootstrapAction?.label || key,
+            summary: item?.summary || "-",
+            workspaceAction: item?.workspaceAction || null,
+            recommendedDownload: item?.recommendedDownload || null,
+            bootstrapAction: item?.bootstrapAction || null,
+            setupAction: item?.setupAction || null
+          });
+        };
+        for (const control of Array.isArray(summary.heroControls) ? summary.heroControls : []) {
+          pushAction({
+            key: control?.recommendedDownload?.key || control?.workspaceAction?.key || control?.kind || "",
+            label: control?.label || control?.recommendedDownload?.label || control?.workspaceAction?.label || "Mainline follow-up",
+            summary: "Use the refreshed launch-mainline control after recording evidence.",
+            workspaceAction: control?.workspaceAction || null,
+            recommendedDownload: control?.recommendedDownload || null
+          });
+        }
+        for (const item of Array.isArray(summary.actionPlan) ? summary.actionPlan.slice(0, 4) : []) {
+          pushAction({
+            key: item?.key || "",
+            label: item?.title || item?.key || "follow-up",
+            summary: item?.summary || "-",
+            workspaceAction: item?.workspaceAction || null,
+            recommendedDownload: item?.recommendedDownload || null,
+            bootstrapAction: item?.bootstrapAction || null,
+            setupAction: item?.setupAction || null
+          });
+        }
+        return {
+          operation,
+          summary: `${result.recordedEvidence.label} evidence recorded. Review the refreshed production gate and continue the unified launch mainline.`,
+          primaryAction: summary.primaryAction || null,
+          actions
+        };
+      };
+      const followUp = result?.followUp || buildRecordedEvidenceFollowUp();
       return {
         operation,
         message: result?.message || `Launch mainline action ${operation} completed for ${selector.productCode}.`,

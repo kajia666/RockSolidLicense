@@ -8726,6 +8726,25 @@ test("developer launch mainline action can restock low inventory and return duty
           }))
         : []
     );
+    assert.deepEqual(
+      (() => {
+        const supportHandoff = Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.handoffs)
+          ? actionResult.receipt.firstLaunchDutySummary.ops.handoffs.find((item) => item?.key === "support_handoff")
+          : null;
+        return supportHandoff
+          ? (Array.isArray(supportHandoff.controls)
+            ? supportHandoff.controls.map((control) =>
+                control?.workspaceAction?.key
+                || control?.recommendedDownload?.key
+                || control?.bootstrapAction?.key
+                || control?.setupAction?.key
+                || null
+              ).filter(Boolean)
+            : [])
+          : [];
+      })(),
+      ["ops", "ops_card_redemption_watch_summary", "licenses"]
+    );
     assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
@@ -10023,6 +10042,25 @@ test("developer launch mainline action can create first launch batches and retur
             actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
           }))
         : []
+    );
+    assert.deepEqual(
+      (() => {
+        const supportHandoff = Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.handoffs)
+          ? actionResult.receipt.firstLaunchDutySummary.ops.handoffs.find((item) => item?.key === "support_handoff")
+          : null;
+        return supportHandoff
+          ? (Array.isArray(supportHandoff.controls)
+            ? supportHandoff.controls.map((control) =>
+                control?.workspaceAction?.key
+                || control?.recommendedDownload?.key
+                || control?.bootstrapAction?.key
+                || control?.setupAction?.key
+                || null
+              ).filter(Boolean)
+            : [])
+          : [];
+      })(),
+      ["ops", "ops_card_redemption_watch_summary", "licenses"]
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.dutyChain)

@@ -4743,7 +4743,12 @@ function buildLaunchMainlineActionReceipt({
                   key: action?.key || null,
                   label: action?.label || action?.key || "action"
                 }))
-              : []
+              : [],
+            controls: dedupeLaunchMainlineControls(
+              (Array.isArray(item?.actions) ? item.actions : []).flatMap((action) =>
+                firstLaunchInventoryQueueControlList(action)
+              )
+            )
           }))
         },
         nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,

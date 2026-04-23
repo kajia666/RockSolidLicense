@@ -8630,6 +8630,7 @@ test("developer launch mainline action can restock low inventory and return duty
     assert.equal(actionResult.result?.createdBatches?.length, 2);
     assert.ok(actionResult.result.createdBatches.some((item) => item.mode === "direct_card" && item.refillCount === 40));
     assert.ok(actionResult.result.createdBatches.some((item) => item.mode === "recharge" && item.refillCount === 80));
+    assert.ok(actionResult.result.inventoryStates.every((item) => item.status === "ready"));
     assert.deepEqual(
       actionResult.receipt?.firstLaunchDutySummary?.inventory
         ? {
@@ -8646,6 +8647,18 @@ test("developer launch mainline action can restock low inventory and return duty
         createdCardCount: 120,
         refillCardCount: 120,
         modes: ["direct_card", "recharge"]
+      }
+    );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.inventory?.health || null,
+      {
+        status: "ready",
+        readyStateCount: 2,
+        lowStateCount: 0,
+        missingStateCount: 0,
+        readyModes: ["direct_card", "recharge"],
+        lowModes: [],
+        missingModes: []
       }
     );
     assert.deepEqual(
@@ -9462,6 +9475,7 @@ test("developer launch mainline action can create first launch batches and retur
     assert.ok(Array.isArray(actionResult.receipt?.actions));
     assert.ok(actionResult.receipt?.actions?.length >= 1);
     assert.equal(actionResult.result?.createdBatches?.length, 2);
+    assert.ok(actionResult.result.inventoryStates.every((item) => item.status === "ready"));
     assert.deepEqual(
       actionResult.receipt?.firstLaunchInventoryQueue
         ? {
@@ -9838,6 +9852,18 @@ test("developer launch mainline action can create first launch batches and retur
         batchCodes: actionResult.result.createdBatches.map((item) => item.batchCode),
         modes: actionResult.result.createdBatches.map((item) => item.mode),
         refillCardCount: 0
+      }
+    );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.inventory?.health || null,
+      {
+        status: "ready",
+        readyStateCount: 2,
+        lowStateCount: 0,
+        missingStateCount: 0,
+        readyModes: ["direct_card", "recharge"],
+        lowModes: [],
+        missingModes: []
       }
     );
     assert.deepEqual(

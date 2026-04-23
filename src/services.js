@@ -4067,6 +4067,23 @@ function buildLaunchMainlineActionReceipt({
       refillCount: Number(item?.refillCount || 0)
     }))
     .filter((item) => item.key || item.label);
+  const firstLaunchInventoryHealth = (() => {
+    const states = firstLaunchInventoryStates;
+    const byStatus = (status) => states.filter((item) => String(item?.status || "").trim().toLowerCase() === status);
+    const readyStates = byStatus("ready");
+    const lowStates = byStatus("low");
+    const missingStates = byStatus("missing");
+    const modeList = (items = []) => items.map((item) => item?.mode || item?.key || null).filter(Boolean);
+    return {
+      status: missingStates.length || lowStates.length ? "review" : states.length ? "ready" : "unknown",
+      readyStateCount: readyStates.length,
+      lowStateCount: lowStates.length,
+      missingStateCount: missingStates.length,
+      readyModes: modeList(readyStates),
+      lowModes: modeList(lowStates),
+      missingModes: modeList(missingStates)
+    };
+  })();
   const firstLaunchInventorySkipped = (Array.isArray(result?.skipped) ? result.skipped : [])
     .map((item) => ({
       key: item?.key || item?.mode || item?.label || null,
@@ -4601,6 +4618,7 @@ function buildLaunchMainlineActionReceipt({
           modes: (Array.isArray(firstLaunchInventoryQueue?.createdBatches) ? firstLaunchInventoryQueue.createdBatches : [])
             .map((item) => item?.mode || null)
             .filter(Boolean),
+          health: firstLaunchInventoryHealth,
           refillPlan: (Array.isArray(firstLaunchInventoryQueue?.createdBatches) ? firstLaunchInventoryQueue.createdBatches : [])
             .map((item) => ({
               key: item?.key || null,
@@ -24584,6 +24602,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const after = await collectState();
+      const afterRecommendedStates = buildLaunchRecommendedCardInventoryStates(product, after.activePolicies, after.cards);
       const followUp = buildLaunchQuickstartFollowUpPlan({
         product,
         policies: after.activePolicies,
@@ -24614,7 +24633,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         requestedMode,
         createdBatches,
         skipped,
-        inventoryStates: recommendedStates.map((item) => ({
+        inventoryStates: afterRecommendedStates.map((item) => ({
           key: item.key,
           mode: item.mode,
           label: item.label,
@@ -24776,6 +24795,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       }
 
       const after = await collectState();
+      const afterRecommendedStates = buildLaunchRecommendedCardInventoryStates(product, after.activePolicies, after.cards);
       const followUp = buildLaunchQuickstartFollowUpPlan({
         product,
         policies: after.activePolicies,
@@ -24804,7 +24824,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
         requestedMode,
         createdBatches,
-        inventoryStates: recommendedStates.map((item) => ({
+        inventoryStates: afterRecommendedStates.map((item) => ({
           key: item.key,
           mode: item.mode,
           label: item.label,

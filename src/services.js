@@ -6512,7 +6512,7 @@ function buildLaunchQuickstartFollowUpPlan({
             useReviewWorkspace ? "Open Launch Review" : "Open Launch Mainline",
             preferredOpsAction?.workspaceAction?.params
           );
-          nextItem.recommendedDownload = launchMainlineSummaryDownload;
+          nextItem.recommendedDownload = launchMainlineRehearsalGuideDownload;
         }
         return nextItem;
       })

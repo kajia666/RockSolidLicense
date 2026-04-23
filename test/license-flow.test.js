@@ -7674,6 +7674,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-mainline"
       );
+      assert.equal(
+        bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.key,
+        "launch_mainline_rehearsal_guide"
+      );
       assert.match(bootstrap.followUp.summary, /Next:/);
 
     const policies = await getJson(
@@ -7892,6 +7896,10 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-mainline"
       );
+      assert.equal(
+        bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.key,
+        "launch_mainline_rehearsal_guide"
+      );
 
     const entitlements = await getJson(
       baseUrl,
@@ -8027,6 +8035,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.equal(
         setup.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-mainline"
+      );
+      assert.equal(
+        setup.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.key,
+        "launch_mainline_rehearsal_guide"
       );
 
     const cards = await getJson(
@@ -8196,6 +8208,10 @@ test("developer launch workflow can restock low launch inventory buffers", async
       assert.equal(
         restock.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.source,
         "developer-launch-mainline"
+      );
+      assert.equal(
+        restock.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.key,
+        "launch_mainline_rehearsal_guide"
       );
 
     const launchWorkflowAfterRestock = await getJson(

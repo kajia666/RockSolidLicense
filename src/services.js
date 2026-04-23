@@ -4826,6 +4826,7 @@ function buildLaunchMainlineActionReceipt({
       ].filter(Boolean),
       controls: mainlineFollowUpActions
     },
+    firstLaunchDutySummary,
     {
       key: "transition_summary",
       title: "Applied changes",
@@ -4847,7 +4848,7 @@ function buildLaunchMainlineActionReceipt({
       details: [],
       controls: []
     }
-  ];
+  ].filter(Boolean);
   const mainlineLastActionScreen = {
     sections: [
       {

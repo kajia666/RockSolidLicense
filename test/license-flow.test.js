@@ -8852,7 +8852,9 @@ test("developer launch mainline action can bootstrap starter launch assets and r
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineRecapCards)
-        ? actionResult.receipt.mainlineRecapCards.map((item) => ({
+        ? actionResult.receipt.mainlineRecapCards.filter((item) =>
+            item?.key !== "first_launch_duty_summary"
+          ).map((item) => ({
             key: item?.key || null,
             controls: Array.isArray(item?.controls)
               ? item.controls.map((control) => ({
@@ -9658,6 +9660,15 @@ test("developer launch mainline action can create first launch batches and retur
         && control?.workspaceAction?.key === actionResult.receipt.firstLaunchOpsQueue.nextAction?.workspaceAction?.key
       )
     );
+    assert.ok(
+      actionResult.receipt?.mainlineRecapCards?.some((item) =>
+        item?.key === "first_launch_duty_summary"
+        && Array.isArray(item.details)
+        && item.details.some((detail) => /Duty chain:/i.test(String(detail || "")))
+        && Array.isArray(item.controls)
+        && item.controls.some((control) => control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff")
+      )
+    );
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
@@ -9911,7 +9922,9 @@ test("developer launch mainline action can create first launch batches and retur
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.mainlineRecapCards)
-        ? actionResult.receipt.mainlineRecapCards.map((item) => ({
+        ? actionResult.receipt.mainlineRecapCards.filter((item) =>
+            item?.key !== "first_launch_duty_summary"
+          ).map((item) => ({
             key: item?.key || null,
             controls: Array.isArray(item?.controls)
               ? item.controls.map((control) => ({

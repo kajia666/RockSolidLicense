@@ -3737,6 +3737,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_closeout_handoff"
         : normalizedFormat === "stabilization-handoff"
           ? "launch_mainline_stabilization_handoff"
+        : normalizedFormat === "first-launch-handoff"
+          ? "launch_mainline_first_launch_handoff"
         : "launch_mainline_summary",
     fileName,
     label,
@@ -4268,6 +4270,47 @@ function buildLaunchMainlineActionReceipt({
   const mainlineEvidenceQueueDetail = mainlineEvidenceQueue
     ? `Evidence queue: completed=${mainlineEvidenceQueue.completedCount ?? 0} | remaining=${mainlineEvidenceQueue.remainingCount ?? 0} | total=${mainlineEvidenceQueue.totalCount ?? 0} | next=${mainlineEvidenceQueue.nextAction?.title || mainlineEvidenceQueue.nextAction?.label || mainlineEvidenceQueue.nextAction?.key || "-"}`
     : "";
+  const firstLaunchHandoffDownloadParams = {
+    productCode: result?.productCode || launchMainline?.manifest?.project?.code || mainlineSummary.form?.productCode || null,
+    channel: result?.channel || launchMainline?.manifest?.channel || mainlineSummary.form?.channel || "stable",
+    ...(mainlineSummary.form?.reviewMode ? { reviewMode: mainlineSummary.form.reviewMode } : {})
+  };
+  const firstLaunchHandoffDownload = firstLaunchOpsQueue
+    ? createLaunchMainlineDownloadShortcut(
+        "First launch handoff",
+        "launch-mainline-first-launch-handoff.txt",
+        "first-launch-handoff",
+        firstLaunchHandoffDownloadParams
+      )
+    : null;
+  const firstLaunchHandoffSummaryCard = firstLaunchOpsQueue?.handoffChecklist?.length
+    ? {
+        key: "first_launch_handoff_summary",
+        title: "First Launch Handoff Summary",
+        summary: `${operationLabel} is ready for ${firstLaunchOpsQueue.handoffChecklist.length} owner handoff${firstLaunchOpsQueue.handoffChecklist.length === 1 ? "" : "s"} across ${firstLaunchOpsQueue.actionCount} first-launch action${firstLaunchOpsQueue.actionCount === 1 ? "" : "s"}.`,
+        tags: [
+          { label: "owners", value: firstLaunchOpsQueue.handoffChecklist.length, strong: true },
+          { label: "actions", value: firstLaunchOpsQueue.actionCount, strong: true },
+          { label: "download", value: firstLaunchHandoffDownload?.key || "none", strong: false }
+        ],
+        details: [
+          firstLaunchOpsQueue.ownerGroups.length
+            ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
+            : "",
+          firstLaunchOpsQueue.stageGroups.length
+            ? `Stages: ${firstLaunchOpsQueue.stageGroups.map((item) => item.label || item.key).join(" | ")}`
+            : "",
+          firstLaunchHandoffDownload?.href ? `Download: ${firstLaunchHandoffDownload.label || firstLaunchHandoffDownload.key} | ${firstLaunchHandoffDownload.href}` : ""
+        ].filter(Boolean),
+        controls: firstLaunchHandoffDownload
+          ? [{
+              kind: "download",
+              label: firstLaunchHandoffDownload.label || "Download first launch handoff",
+              recommendedDownload: firstLaunchHandoffDownload
+            }]
+          : []
+      }
+    : null;
   const mainlineOverviewCards = (Array.isArray(mainlineSummary.overviewCards) ? mainlineSummary.overviewCards : [])
     .slice(0, 3)
     .map((item) => ({
@@ -4641,27 +4684,30 @@ function buildLaunchMainlineActionReceipt({
         key: "first_launch_handoff_checklist",
         title: "First Launch Handoff Checklist",
         emptyState: "Run first-batch setup or inventory refill to review owner-based first-launch handoffs here.",
-        cards: firstLaunchOpsQueue.handoffChecklist.map((item) => ({
-          key: item?.key || `${item?.ownerRole || "launch_ops"}_handoff`,
-          title: item?.ownerLabel ? `${item.ownerLabel} Handoff` : "First launch handoff",
-          summary: item?.summary || "Review this owner's first-launch handoff actions.",
-          tags: [
-            item?.ownerRole ? { label: "owner", value: item.ownerRole, strong: true } : null,
-            { label: "actions", value: Number(item?.actionCount || 0), strong: true },
-            { label: "stages", value: Array.isArray(item?.stageKeys) ? item.stageKeys.length : 0, strong: false }
-          ].filter(Boolean),
-          details: [
-            Array.isArray(item?.stageLabels) && item.stageLabels.length
-              ? `Stages: ${item.stageLabels.join(" | ")}`
-              : "",
-            ...(Array.isArray(item?.actions) ? item.actions.map((action) =>
-              `Action: ${action?.label || action?.key || "follow-up"} | stage=${action?.stageLabel || action?.stage || "-"}${action?.timing ? ` | timing=${action.timing}` : ""}`
-            ) : [])
-          ].filter(Boolean),
-          controls: (Array.isArray(item?.actions) ? item.actions : []).flatMap((action) =>
-            firstLaunchInventoryQueueControlList(action)
-          )
-        })).filter((item) => item.key || item.summary || item.controls.length)
+        cards: [
+          firstLaunchHandoffSummaryCard,
+          ...firstLaunchOpsQueue.handoffChecklist.map((item) => ({
+            key: item?.key || `${item?.ownerRole || "launch_ops"}_handoff`,
+            title: item?.ownerLabel ? `${item.ownerLabel} Handoff` : "First launch handoff",
+            summary: item?.summary || "Review this owner's first-launch handoff actions.",
+            tags: [
+              item?.ownerRole ? { label: "owner", value: item.ownerRole, strong: true } : null,
+              { label: "actions", value: Number(item?.actionCount || 0), strong: true },
+              { label: "stages", value: Array.isArray(item?.stageKeys) ? item.stageKeys.length : 0, strong: false }
+            ].filter(Boolean),
+            details: [
+              Array.isArray(item?.stageLabels) && item.stageLabels.length
+                ? `Stages: ${item.stageLabels.join(" | ")}`
+                : "",
+              ...(Array.isArray(item?.actions) ? item.actions.map((action) =>
+                `Action: ${action?.label || action?.key || "follow-up"} | stage=${action?.stageLabel || action?.stage || "-"}${action?.timing ? ` | timing=${action.timing}` : ""}`
+              ) : [])
+            ].filter(Boolean),
+            controls: (Array.isArray(item?.actions) ? item.actions : []).flatMap((action) =>
+              firstLaunchInventoryQueueControlList(action)
+            )
+          }))
+        ].filter((item) => item?.key || item?.summary || item?.controls?.length)
       }
     : null;
   const mainlineRecapCards = [
@@ -4795,6 +4841,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineEvidenceQueue,
     firstLaunchInventoryQueue,
     firstLaunchOpsQueue,
+    firstLaunchHandoffDownload,
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineForm,
@@ -11224,6 +11271,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "operations-handoff",
     params
   );
+  const firstLaunchHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline first launch handoff",
+    "developer-launch-mainline-first-launch-handoff.txt",
+    "first-launch-handoff",
+    params
+  );
   const rehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline rehearsal guide",
     "developer-launch-mainline-rehearsal-guide.txt",
@@ -11582,6 +11635,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(rehearsalGuideDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(productionHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stabilizationHandoffDownload, params));
@@ -12215,6 +12269,19 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  if (payload.firstLaunchHandoffText) {
+    const firstLaunchHandoff = payload.firstLaunchHandoffText
+      .split(/\r?\n/)
+      .map((line) => String(line || "").trimEnd())
+      .filter((line) => line !== "");
+    if (firstLaunchHandoff.length) {
+      lines.push("");
+      lines.push("First Launch Handoff:");
+      for (const line of firstLaunchHandoff.slice(1)) {
+        lines.push(`- ${line}`);
+      }
+    }
+  }
   if (payload.rehearsalGuideText) {
     const rehearsalGuide = payload.rehearsalGuideText
       .split(/\r?\n/)
@@ -12297,6 +12364,7 @@ function buildDeveloperLaunchMainlinePayload({
   const postLaunchSweepHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-sweep-handoff.txt`;
   const closeoutHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-closeout-handoff.txt`;
   const stabilizationHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-stabilization-handoff.txt`;
+  const firstLaunchHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-launch-handoff.txt`;
   const rehearsalGuideFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-rehearsal-guide.txt`;
   const payload = {
     generatedAt,
@@ -12309,6 +12377,7 @@ function buildDeveloperLaunchMainlinePayload({
     postLaunchSweepHandoffFileName,
     closeoutHandoffFileName,
     stabilizationHandoffFileName,
+    firstLaunchHandoffFileName,
     rehearsalGuideFileName,
     manifest: {
       generatedAt,
@@ -12414,6 +12483,13 @@ function buildDeveloperLaunchMainlinePayload({
     filters: payload.filters,
     publicBaseUrl
   });
+  payload.firstLaunchHandoffText = buildDeveloperLaunchMainlineFirstLaunchHandoffText({
+    generatedAt,
+    manifest: payload.manifest,
+    filters: payload.filters,
+    launchWorkflow,
+    publicBaseUrl
+  });
   payload.rehearsalGuideText = buildDeveloperLaunchMainlineRehearsalGuideText({
     generatedAt,
     manifest: payload.manifest,
@@ -12500,6 +12576,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
+    payload.firstLaunchHandoffText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.rehearsalGuideFileName || "developer-launch-mainline-rehearsal-guide.txt",
     payload.rehearsalGuideText || ""
   );
@@ -12514,7 +12595,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -12588,6 +12669,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.stabilizationHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "first-launch-handoff") {
+    return {
+      fileName: payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.firstLaunchHandoffText || ""
     };
   }
   if (normalizedFormat === "rehearsal-guide") {
@@ -13358,6 +13446,111 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
     "Primary Follow-Up: Launch stabilization review",
     "Stabilization Flow: confirm launch closeout review | verify daily handover docs | confirm steady-state ops signals | capture launch stabilization review"
   ];
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
+  generatedAt = "",
+  manifest = {},
+  filters = {},
+  launchWorkflow = {},
+  publicBaseUrl = ""
+} = {}) {
+  const project = manifest.project || {};
+  const workflowSummary = launchWorkflow?.workflowSummary || launchWorkflow?.manifest?.workflowSummary || {};
+  const authorizationRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
+  const firstBatchCardRecommendations = Array.isArray(authorizationRecommendations.firstBatchCardRecommendations)
+    ? authorizationRecommendations.firstBatchCardRecommendations
+    : [];
+  const firstOpsActions = Array.isArray(authorizationRecommendations.firstOpsActions)
+    ? authorizationRecommendations.firstOpsActions
+    : [];
+  const formatAction = (item = {}) => [
+    item.label || item.key || "action",
+    item.timing ? `timing=${item.timing}` : "",
+    item.summary || "",
+    item.workspaceAction?.label ? `workspace=${item.workspaceAction.label}` : "",
+    item.recommendedDownload?.label ? `download=${item.recommendedDownload.label}` : ""
+  ].filter(Boolean).join(" | ");
+  const matchingOpsActions = (keys = []) => firstOpsActions.filter((item) => keys.includes(item?.key));
+  const ownerHandoffs = [
+    {
+      owner: "Launch Ops",
+      actions: firstBatchCardRecommendations.map((item) =>
+        `${item.label || item.key || "Starter inventory"} | count=${item.count ?? 0} | current=${item.currentFresh ?? 0} | target=${item.targetCount ?? item.count ?? 0} | status=${String(item.inventoryStatus || "ready").toUpperCase()}`
+      ),
+      fallback: "Confirm starter inventory, card buffers, and launch batch visibility before handoff."
+    },
+    {
+      owner: "Release Manager",
+      actions: [
+        "Review launch workflow recheck",
+        "Confirm launch smoke kit and launch-mainline rehearsal guide are attached to the release lane."
+      ]
+    },
+    {
+      owner: "Support",
+      actions: matchingOpsActions(["card_redemption_watch", "starter_account_handoff"]).map(formatAction),
+      fallback: "Watch first card redemptions and keep starter account handoff ready for first-wave users."
+    },
+    {
+      owner: "QA",
+      actions: matchingOpsActions(["runtime_smoke"]).map(formatAction),
+      fallback: "Run first real sign-in smoke and confirm startup, login, token validation, and heartbeat."
+    },
+    {
+      owner: "Ops",
+      actions: matchingOpsActions(["session_review", "startup_rule_watch"]).map(formatAction),
+      fallback: "Watch early sessions, device state, notices, version gates, and first-wave runtime signals."
+    }
+  ];
+  const lines = [
+    "RockSolid Developer Launch Mainline First Launch Handoff",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Public Base URL: ${publicBaseUrl || "-"}`,
+    "",
+    "Purpose: give release duty, launch ops, support, QA, and operations one owner-based checklist for the first customer-facing launch window.",
+    "",
+    "First Batch Card Suggestions:"
+  ];
+
+  if (firstBatchCardRecommendations.length) {
+    for (const item of firstBatchCardRecommendations) {
+      lines.push(
+        `- ${item.label || item.key || "batch"} | count=${item.count ?? 0} | current=${item.currentFresh ?? 0} | target=${item.targetCount ?? item.count ?? 0} | status=${String(item.inventoryStatus || "ready").toUpperCase()} | grant=${item.grantType || "-"} | prefix=${item.prefix || "-"} | purpose=${item.purpose || "-"} | next=${item.nextAction || "-"}`
+      );
+    }
+  } else {
+    lines.push("- No first-batch card suggestions are available for this lane.");
+  }
+
+  lines.push("");
+  lines.push("First Ops Actions:");
+  if (firstOpsActions.length) {
+    for (const item of firstOpsActions) {
+      lines.push(`- ${formatAction(item)}`);
+    }
+  } else {
+    lines.push("- No first ops actions are available for this lane.");
+  }
+
+  lines.push("");
+  lines.push("Owner Handoffs:");
+  for (const group of ownerHandoffs) {
+    const actions = Array.isArray(group.actions) && group.actions.length
+      ? group.actions
+      : [group.fallback].filter(Boolean);
+    lines.push(`${group.owner}:`);
+    for (const action of actions) {
+      lines.push(`- ${action}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("Launch Window Flow: inventory recheck | launch workflow recheck | smoke kit | first card redemption watch | runtime smoke | session review | startup rule watch");
   return lines.join("\n");
 }
 

@@ -9542,7 +9542,10 @@ test("developer launch mainline action can create first launch batches and retur
       {
         key: "first_launch_handoff_checklist",
         title: "First Launch Handoff Checklist",
-        cards: actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => item?.key || null)
+        cards: [
+          "first_launch_handoff_summary",
+          ...actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => item?.key || null)
+        ]
       }
     );
     const firstLaunchHandoffCards = Object.fromEntries(
@@ -9550,6 +9553,45 @@ test("developer launch mainline action can create first launch batches and retur
         ? firstLaunchHandoffSection.cards.map((item) => [item?.key || null, item])
         : []
     );
+    const firstLaunchHandoffDownload = firstLaunchHandoffCards.first_launch_handoff_summary?.controls?.find((control) =>
+      control?.kind === "download"
+      && control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff"
+    )?.recommendedDownload || null;
+    assert.deepEqual(
+      firstLaunchHandoffDownload
+        ? {
+            label: firstLaunchHandoffDownload.label || null,
+            fileName: firstLaunchHandoffDownload.fileName || null,
+            hasHref: /^\/api\/developer\/launch-mainline\/download/.test(String(firstLaunchHandoffDownload.href || "")),
+            format: /format=first-launch-handoff/.test(String(firstLaunchHandoffDownload.href || "")),
+            productCode: /productCode=MAINLINE_SETUP/.test(String(firstLaunchHandoffDownload.href || ""))
+          }
+        : null,
+      {
+        label: "First launch handoff",
+        fileName: "launch-mainline-first-launch-handoff.txt",
+        hasHref: true,
+        format: true,
+        productCode: true
+      }
+    );
+    assert.ok(
+      Array.isArray(firstLaunchHandoffCards.first_launch_handoff_summary?.details)
+      && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
+      && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Stages: Inventory Handoff \| Launch Recheck \| First-Sale Watch \| Runtime Validation \| Runtime Ops Watch \| Support Handoff/i.test(String(detail || "")))
+    );
+    const firstLaunchHandoffDownloadResponse = await getText(
+      baseUrl,
+      firstLaunchHandoffDownload.href,
+      ownerSession.token
+    );
+    assert.match(firstLaunchHandoffDownloadResponse.contentType || "", /^text\/plain/);
+    assert.match(firstLaunchHandoffDownloadResponse.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-MAINLINE_SETUP-stable-.*-first-launch-handoff\.txt"/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /RockSolid Developer Launch Mainline First Launch Handoff/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /First Batch Card Suggestions:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Watch first card redemptions/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Verify first real sign-ins/);
     assert.deepEqual(
       firstLaunchHandoffCards.support_handoff
         ? {
@@ -9931,7 +9973,10 @@ test("developer launch mainline action can create first launch batches and retur
           ? [
               {
                 key: "first_launch_handoff_checklist",
-                cards: actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => item?.key || null)
+                cards: [
+                  "first_launch_handoff_summary",
+                  ...actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => item?.key || null)
+                ]
               }
             ]
           : []),

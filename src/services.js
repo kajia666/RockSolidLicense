@@ -4550,7 +4550,7 @@ function normalizeLaunchMainlineProductionCheck(item = null, fallbackTitle = "Pr
   };
 }
 
-function collectLaunchMainlineEvidenceChecks(productionGate = null, limit = 8) {
+function buildLaunchMainlineEvidenceQueue(productionGate = null, limit = 12) {
   const source = Array.isArray(productionGate)
     ? productionGate
     : Array.isArray(productionGate?.checks)
@@ -4558,14 +4558,31 @@ function collectLaunchMainlineEvidenceChecks(productionGate = null, limit = 8) {
       : Array.isArray(productionGate?.actionPlan)
         ? productionGate.actionPlan
         : [];
-  return source
-    .filter((item) => {
-      const status = String(item?.status || "").trim().toLowerCase();
-      return item?.setupAction?.operation && status && status !== "pass" && status !== "ready";
-    })
-    .slice(0, limit)
+  const items = source
+    .filter((item) => item?.setupAction?.operation)
     .map((item) => normalizeLaunchMainlineProductionCheck(item))
     .filter((item) => item?.key || item?.setupAction?.operation);
+  const remainingChecks = items.filter((item) => {
+    const status = String(item?.status || "").trim().toLowerCase();
+    return status && status !== "pass" && status !== "ready";
+  });
+  const completedChecks = items.filter((item) => {
+    const status = String(item?.status || "").trim().toLowerCase();
+    return status === "pass" || status === "ready";
+  });
+  const nextAction = remainingChecks[0] || null;
+  return {
+    totalCount: items.length,
+    completedCount: completedChecks.length,
+    remainingCount: remainingChecks.length,
+    nextAction,
+    summary: nextAction
+      ? `${completedChecks.length}/${items.length} production evidence checks are recorded. Next: ${nextAction.title || nextAction.label || nextAction.key || "record evidence"}.`
+      : `${completedChecks.length}/${items.length} production evidence checks are recorded.`,
+    items: items.slice(0, limit),
+    remainingChecks: remainingChecks.slice(0, limit),
+    completedChecks: completedChecks.slice(0, limit)
+  };
 }
 
 function parseProductionEndpoint(value) {
@@ -5606,11 +5623,13 @@ function buildLaunchMainlineProductionGatePayload({
     : attentionCount > 0
       ? "The lane is close, but HTTPS and token-key launch hygiene still deserve one more pass."
       : "Core production launch checks look aligned for this lane.";
-  const remainingEvidenceChecks = collectLaunchMainlineEvidenceChecks(checks, 12);
-  const nextEvidenceAction = remainingEvidenceChecks[0] || null;
+  const evidenceQueue = buildLaunchMainlineEvidenceQueue(checks, 12);
+  const remainingEvidenceChecks = evidenceQueue.remainingChecks;
+  const nextEvidenceAction = evidenceQueue.nextAction;
 
   return {
     checks,
+    evidenceQueue,
     remainingEvidenceChecks,
     nextEvidenceAction,
     ...buildLaunchMainlineGatePayload({
@@ -11588,6 +11607,17 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     : Array.isArray(mainlineSummary.productionGate?.actionPlan)
       ? mainlineSummary.productionGate.actionPlan
       : [];
+  const productionEvidenceQueue = mainlineSummary.productionGate?.evidenceQueue || null;
+  if (productionEvidenceQueue && typeof productionEvidenceQueue === "object") {
+    lines.push("");
+    lines.push("Production Evidence Queue:");
+    lines.push(
+      `- total=${productionEvidenceQueue.totalCount ?? 0}`
+      + ` | completed=${productionEvidenceQueue.completedCount ?? 0}`
+      + ` | remaining=${productionEvidenceQueue.remainingCount ?? 0}`
+      + ` | next=${productionEvidenceQueue.nextAction?.title || productionEvidenceQueue.nextAction?.label || productionEvidenceQueue.nextAction?.key || "-"}`
+    );
+  }
   const productionNextEvidenceAction = mainlineSummary.productionGate?.nextEvidenceAction || null;
   if (productionNextEvidenceAction?.key || productionNextEvidenceAction?.setupAction?.operation) {
     lines.push("");
@@ -22118,35 +22148,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         const productionGate = summary.productionGate && typeof summary.productionGate === "object"
           ? summary.productionGate
           : null;
-        const productionChecks = Array.isArray(productionGate?.checks)
-          ? productionGate.checks
-          : Array.isArray(productionGate?.actionPlan)
-            ? productionGate.actionPlan
-            : [];
-        const remainingProductionChecks = productionChecks
-          .filter((item) => {
-            const status = String(item?.status || "").trim().toLowerCase();
-            return status && status !== "pass" && status !== "ready";
-          })
-          .slice(0, 8)
-          .map((item) => ({
-            key: item?.key || null,
-            title: item?.title || item?.label || item?.key || "Production follow-up",
-            label: item?.label || item?.title || item?.key || "Production follow-up",
-            summary: item?.summary || "-",
-            status: item?.status || "review",
-            priority: item?.priority || null,
-            workspaceAction: item?.workspaceAction || null,
-            recommendedDownload: item?.recommendedDownload || null,
-            bootstrapAction: item?.bootstrapAction || null,
-            setupAction: item?.setupAction || null
-          }))
-          .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
-        const nextProductionAction = remainingProductionChecks.find((item) =>
-          item?.setupAction?.operation || item?.bootstrapAction?.key
-        ) || remainingProductionChecks.find((item) =>
-          item?.workspaceAction?.key || item?.recommendedDownload?.key
-        ) || remainingProductionChecks[0] || null;
+        const evidenceQueue = productionGate?.evidenceQueue && typeof productionGate.evidenceQueue === "object"
+          ? productionGate.evidenceQueue
+          : buildLaunchMainlineEvidenceQueue(productionGate, 12);
+        const remainingProductionChecks = Array.isArray(evidenceQueue.remainingChecks)
+          ? evidenceQueue.remainingChecks
+          : [];
+        const nextProductionAction = evidenceQueue.nextAction || remainingProductionChecks[0] || null;
         const productionGateSnapshot = productionGate
           ? {
               status: productionGate.status || "unknown",
@@ -22205,6 +22213,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           operation,
           summary: `${result.recordedEvidence.label} evidence recorded.${remainingSummary}`,
           productionGate: productionGateSnapshot,
+          evidenceQueue,
           remainingProductionChecks,
           nextProductionAction,
           primaryAction: summary.primaryAction || null,

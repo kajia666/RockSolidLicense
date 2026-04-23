@@ -6264,6 +6264,20 @@ test("developer launch mainline production gate blocks default launch secrets an
       launchMainline.mainlineSummary.productionGate.nextEvidenceAction?.key,
       launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks[0]?.key
     );
+    assert.equal(
+      launchMainline.mainlineSummary.productionGate.evidenceQueue?.nextAction?.key,
+      launchMainline.mainlineSummary.productionGate.nextEvidenceAction?.key
+    );
+    assert.equal(
+      launchMainline.mainlineSummary.productionGate.evidenceQueue?.remainingCount,
+      launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks.length
+    );
+    assert.equal(launchMainline.mainlineSummary.productionGate.evidenceQueue?.completedCount, 0);
+    assert.ok(Number(launchMainline.mainlineSummary.productionGate.evidenceQueue?.totalCount || 0) >= 8);
+    assert.equal(
+      launchMainline.mainlineSummary.productionGate.evidenceQueue?.items?.[0]?.setupAction?.operation,
+      "record_launch_rehearsal_run"
+    );
     assert.ok(launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks.every((item) =>
       item?.setupAction?.operation
       && item?.status !== "pass"
@@ -6448,6 +6462,8 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.match(launchMainline.summaryText || "", /backup and restore handoff/i);
     assert.match(launchMainline.summaryText || "", /Production Next Evidence Action:/);
     assert.match(launchMainline.summaryText || "", /record_launch_rehearsal_run/);
+    assert.match(launchMainline.summaryText || "", /Production Evidence Queue:/);
+    assert.match(launchMainline.summaryText || "", /completed=0/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -7561,6 +7577,21 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     assert.notEqual(actionResult.followUp.nextProductionAction.setupAction.operation, "record_launch_rehearsal_run");
     assert.ok(actionResult.followUp.remainingProductionChecks.some((item) =>
       item?.key === actionResult.followUp.nextProductionAction.key
+    ));
+    assert.ok(actionResult.followUp.evidenceQueue);
+    assert.ok(Number(actionResult.followUp.evidenceQueue.totalCount || 0) >= 8);
+    assert.ok(Number(actionResult.followUp.evidenceQueue.completedCount || 0) >= 1);
+    assert.equal(
+      actionResult.followUp.evidenceQueue.remainingCount,
+      actionResult.followUp.remainingProductionChecks.length
+    );
+    assert.equal(
+      actionResult.followUp.evidenceQueue.nextAction?.key,
+      actionResult.followUp.nextProductionAction.key
+    );
+    assert.ok(actionResult.followUp.evidenceQueue.completedChecks.some((item) =>
+      item?.key === "production_launch_rehearsal_run_recent"
+      && item?.setupAction?.operation === "record_launch_rehearsal_run"
     ));
     assert.ok(Array.isArray(actionResult.receipt?.mainlineFollowUpCards));
     assert.ok(actionResult.receipt.mainlineFollowUpCards.some((item) =>
@@ -13426,8 +13457,10 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Production Gate Checks/);
     assert.match(html, /Next Production Evidence/);
     assert.match(html, /mainline-next-evidence-box/);
+    assert.match(html, /currentMainlineProductionEvidenceQueue/);
     assert.match(html, /currentMainlineNextEvidenceAction/);
     assert.match(html, /renderNextProductionEvidenceAction/);
+    assert.match(html, /remainingEvidenceChecks/);
     assert.match(html, /production-checks-title/);
     assert.match(html, /production-checks-box/);
     assert.match(html, /Last Mainline Action/);

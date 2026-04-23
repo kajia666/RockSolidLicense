@@ -594,6 +594,24 @@
         return gate && typeof gate === "object" ? gate : {};
       }
 
+      function currentMainlineProductionEvidenceQueue() {
+        const gate = currentMainlineProductionGate();
+        const queue = gate.evidenceQueue && typeof gate.evidenceQueue === "object"
+          ? gate.evidenceQueue
+          : null;
+        if (queue) {
+          return queue;
+        }
+        const remainingEvidenceChecks = Array.isArray(gate.remainingEvidenceChecks) ? gate.remainingEvidenceChecks : [];
+        return {
+          totalCount: remainingEvidenceChecks.length,
+          completedCount: 0,
+          remainingCount: remainingEvidenceChecks.length,
+          nextAction: gate.nextEvidenceAction || remainingEvidenceChecks[0] || null,
+          remainingChecks: remainingEvidenceChecks
+        };
+      }
+
       function currentMainlineNextEvidenceAction() {
         const gate = currentMainlineProductionGate();
         const directAction = gate.nextEvidenceAction && typeof gate.nextEvidenceAction === "object"
@@ -739,13 +757,17 @@
 
       function renderNextProductionEvidenceAction() {
         const action = currentMainlineNextEvidenceAction();
+        const evidenceQueue = currentMainlineProductionEvidenceQueue();
         if (!action?.key && !action?.setupAction?.operation) {
           return '<div class="hint">Generate Launch Mainline to inspect the next production evidence action here.</div>';
         }
         const tags = [
           { label: "status", value: String(action.status || "review").toUpperCase(), strong: String(action.status || "").toLowerCase() === "block" },
           action.priority ? { label: "priority", value: action.priority, strong: true } : null,
-          action.setupAction?.operation ? { label: "operation", value: action.setupAction.operation, strong: true } : null
+          action.setupAction?.operation ? { label: "operation", value: action.setupAction.operation, strong: true } : null,
+          { label: "completed", value: Number(evidenceQueue.completedCount || 0), strong: false },
+          { label: "remaining", value: Number(evidenceQueue.remainingCount || 0), strong: Number(evidenceQueue.remainingCount || 0) > 0 },
+          { label: "total", value: Number(evidenceQueue.totalCount || 0), strong: false }
         ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
         const controls = [
           action.setupAction ? {

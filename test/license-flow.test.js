@@ -8693,6 +8693,96 @@ test("developer launch mainline action can restock low inventory and return duty
       )
     );
     assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary
+        ? {
+            primaryWorkspaceKey: actionResult.receipt.firstLaunchDutySummary.primaryWorkspaceAction?.key || null,
+            primaryDownloadKey: actionResult.receipt.firstLaunchDutySummary.primaryRecommendedDownload?.key || null,
+            workspaceKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.workspaceActions)
+              ? actionResult.receipt.firstLaunchDutySummary.workspaceActions.map((item) => item?.key || null)
+              : [],
+            downloadKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.recommendedDownloads)
+              ? actionResult.receipt.firstLaunchDutySummary.recommendedDownloads.map((item) => item?.key || null)
+              : []
+          }
+        : null,
+      (() => {
+        const workspaceKeys = [];
+        const downloadKeys = [];
+        const pushUnique = (list, value) => {
+          if (value && !list.includes(value)) {
+            list.push(value);
+          }
+        };
+        for (const item of Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.actions)
+          ? actionResult.receipt.firstLaunchOpsQueue.actions
+          : []) {
+          pushUnique(workspaceKeys, item?.workspaceAction?.key || null);
+          pushUnique(downloadKeys, item?.recommendedDownload?.key || null);
+        }
+        pushUnique(workspaceKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key || null);
+        pushUnique(downloadKeys, actionResult.receipt?.firstLaunchHandoffDownload?.key || null);
+        pushUnique(downloadKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.recommendedDownload?.key || null);
+        return {
+          primaryWorkspaceKey:
+            actionResult.receipt?.firstLaunchOpsQueue?.nextAction?.workspaceAction?.key
+            || actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key
+            || null,
+          primaryDownloadKey:
+            actionResult.receipt?.firstLaunchHandoffDownload?.key
+            || actionResult.receipt?.firstLaunchOpsQueue?.nextAction?.recommendedDownload?.key
+            || actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.recommendedDownload?.key
+            || null,
+          workspaceKeys,
+          downloadKeys
+        };
+      })()
+    );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary
+        ? {
+            primaryWorkspaceKey: actionResult.receipt.firstLaunchDutySummary.primaryWorkspaceAction?.key || null,
+            primaryDownloadKey: actionResult.receipt.firstLaunchDutySummary.primaryRecommendedDownload?.key || null,
+            workspaceKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.workspaceActions)
+              ? actionResult.receipt.firstLaunchDutySummary.workspaceActions.map((item) => item?.key || null)
+              : [],
+            downloadKeys: Array.isArray(actionResult.receipt.firstLaunchDutySummary.recommendedDownloads)
+              ? actionResult.receipt.firstLaunchDutySummary.recommendedDownloads.map((item) => item?.key || null)
+              : []
+          }
+        : null,
+      (() => {
+        const workspaceKeys = [];
+        const downloadKeys = [];
+        const pushUnique = (list, value) => {
+          if (value && !list.includes(value)) {
+            list.push(value);
+          }
+        };
+        for (const item of Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.actions)
+          ? actionResult.receipt.firstLaunchOpsQueue.actions
+          : []) {
+          pushUnique(workspaceKeys, item?.workspaceAction?.key || null);
+          pushUnique(downloadKeys, item?.recommendedDownload?.key || null);
+        }
+        pushUnique(workspaceKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key || null);
+        pushUnique(downloadKeys, actionResult.receipt?.firstLaunchHandoffDownload?.key || null);
+        pushUnique(downloadKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.recommendedDownload?.key || null);
+        return {
+          primaryWorkspaceKey:
+            actionResult.receipt?.firstLaunchOpsQueue?.nextAction?.workspaceAction?.key
+            || actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key
+            || null,
+          primaryDownloadKey:
+            actionResult.receipt?.firstLaunchHandoffDownload?.key
+            || actionResult.receipt?.firstLaunchOpsQueue?.nextAction?.recommendedDownload?.key
+            || actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.recommendedDownload?.key
+            || null,
+          workspaceKeys,
+          downloadKeys
+        };
+      })()
+    );
+    assert.deepEqual(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.stageGroups)
         ? actionResult.receipt.firstLaunchDutySummary.ops.stageGroups.map((item) => ({
             key: item?.key || null,
@@ -8842,6 +8932,12 @@ test("developer launch mainline action can restock low inventory and return duty
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
         /Stage path: Inventory Handoff -> Launch Recheck -> First-Sale Watch -> Runtime Validation -> Runtime Ops Watch -> Support Handoff/i.test(String(detail || ""))
       )
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
+        /Workspace actions:/i.test(String(detail || ""))
+      )
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
+        /Recommended downloads:/i.test(String(detail || ""))
+      )
     );
     assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.controls)
@@ -8908,6 +9004,8 @@ test("developer launch mainline action can restock low inventory and return duty
     assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Inventory Health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Production Evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Workspace actions:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Recommended downloads:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
   } finally {
     await app.close();
@@ -9967,6 +10065,8 @@ test("developer launch mainline action can create first launch batches and retur
       && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
       && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Stages: Inventory Handoff \| Launch Recheck \| First-Sale Watch \| Runtime Validation \| Runtime Ops Watch \| Support Handoff/i.test(String(detail || "")))
       && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Production evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/i.test(String(detail || "")))
+      && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Workspace actions:/i.test(String(detail || "")))
+      && firstLaunchHandoffCards.first_launch_handoff_summary.details.some((detail) => /Recommended downloads:/i.test(String(detail || "")))
     );
     assert.ok(
       Array.isArray(firstLaunchHandoffCards.first_launch_handoff_summary?.controls)
@@ -9986,6 +10086,8 @@ test("developer launch mainline action can create first launch batches and retur
     assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Inventory Health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Production Evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Workspace actions:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Recommended downloads:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Batch Card Suggestions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:/);
@@ -10263,6 +10365,8 @@ test("developer launch mainline action can create first launch batches and retur
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Owner path: Launch Ops -> Release Manager -> Support -> QA -> Ops/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Stage path: Inventory Handoff -> Launch Recheck -> First-Sale Watch -> Runtime Validation -> Runtime Ops Watch -> Support Handoff/i.test(String(detail || "")))
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Owners: Launch Ops:1 \| Release Manager:2 \| Support:2 \| QA:1 \| Ops:2/i.test(String(detail || "")))
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Workspace actions:/i.test(String(detail || "")))
+      && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Recommended downloads:/i.test(String(detail || "")))
     );
     assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.controls)

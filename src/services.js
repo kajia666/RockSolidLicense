@@ -4330,6 +4330,32 @@ function buildLaunchMainlineActionReceipt({
         firstLaunchHandoffDownloadParams
       )
     : null;
+  const firstLaunchWorkspaceActions = dedupeLaunchMainlineWorkspaceActions([
+    ...(Array.isArray(firstLaunchOpsQueue?.actions) ? firstLaunchOpsQueue.actions.map((item) => item?.workspaceAction || null) : []),
+    mainlineEvidenceQueue?.nextAction?.workspaceAction || followUp?.nextProductionAction?.workspaceAction || null
+  ]);
+  const firstLaunchRecommendedDownloads = dedupeLaunchMainlineRecommendedDownloads([
+    ...(Array.isArray(firstLaunchOpsQueue?.actions) ? firstLaunchOpsQueue.actions.map((item) => item?.recommendedDownload || null) : []),
+    firstLaunchHandoffDownload,
+    mainlineEvidenceQueue?.nextAction?.recommendedDownload || followUp?.nextProductionAction?.recommendedDownload || null
+  ]);
+  const firstLaunchPrimaryWorkspaceAction = firstLaunchOpsQueue?.nextAction?.workspaceAction
+    || mainlineEvidenceQueue?.nextAction?.workspaceAction
+    || followUp?.nextProductionAction?.workspaceAction
+    || firstLaunchWorkspaceActions[0]
+    || null;
+  const firstLaunchPrimaryRecommendedDownload = firstLaunchHandoffDownload
+    || firstLaunchOpsQueue?.nextAction?.recommendedDownload
+    || mainlineEvidenceQueue?.nextAction?.recommendedDownload
+    || followUp?.nextProductionAction?.recommendedDownload
+    || firstLaunchRecommendedDownloads[0]
+    || null;
+  const firstLaunchWorkspaceActionsDetail = firstLaunchWorkspaceActions.length
+    ? `Workspace actions: ${firstLaunchWorkspaceActions.map((item) => item?.label || item?.key || "workspace").join(" | ")}`
+    : "";
+  const firstLaunchRecommendedDownloadsDetail = firstLaunchRecommendedDownloads.length
+    ? `Recommended downloads: ${firstLaunchRecommendedDownloads.map((item) => item?.label || item?.key || "download").join(" | ")}`
+    : "";
   const firstLaunchHandoffSummaryCard = firstLaunchOpsQueue?.handoffChecklist?.length
     ? {
         key: "first_launch_handoff_summary",
@@ -4348,6 +4374,8 @@ function buildLaunchMainlineActionReceipt({
             ? `Stages: ${firstLaunchOpsQueue.stageGroups.map((item) => item.label || item.key).join(" | ")}`
             : "",
           mainlineEvidenceQueue ? formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production evidence") : "",
+          firstLaunchWorkspaceActionsDetail,
+          firstLaunchRecommendedDownloadsDetail,
           firstLaunchHandoffDownload?.href ? `Download: ${firstLaunchHandoffDownload.label || firstLaunchHandoffDownload.key} | ${firstLaunchHandoffDownload.href}` : ""
         ].filter(Boolean),
         controls: dedupeLaunchMainlineControls([
@@ -4645,6 +4673,53 @@ function buildLaunchMainlineActionReceipt({
       return true;
     });
   }
+  function dedupeLaunchMainlineWorkspaceActions(items = []) {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : [])
+      .map((item) => item && typeof item === "object"
+        ? {
+            key: item.key || null,
+            label: item.label || item.key || "workspace",
+            autofocus: item.autofocus || null,
+            params: item.params && typeof item.params === "object"
+              ? { ...item.params }
+              : item.params || null
+          }
+        : null)
+      .filter((item) => {
+        const dedupeKey = item?.key || "";
+        if (!dedupeKey || seen.has(dedupeKey)) {
+          return false;
+        }
+        seen.add(dedupeKey);
+        return true;
+      });
+  }
+  function dedupeLaunchMainlineRecommendedDownloads(items = []) {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : [])
+      .map((item) => item && typeof item === "object"
+        ? {
+            key: item.key || null,
+            label: item.label || item.key || "download",
+            source: item.source || null,
+            format: item.format || null,
+            fileName: item.fileName || null,
+            href: item.href || null,
+            params: item.params && typeof item.params === "object"
+              ? { ...item.params }
+              : item.params || null
+          }
+        : null)
+      .filter((item) => {
+        const dedupeKey = item?.key || item?.fileName || item?.href || "";
+        if (!dedupeKey || seen.has(dedupeKey)) {
+          return false;
+        }
+        seen.add(dedupeKey);
+        return true;
+      });
+  }
   const mapFirstLaunchActionSummary = (action = null) => ({
     key: action?.key || null,
     label: action?.label || action?.key || "action",
@@ -4793,6 +4868,10 @@ function buildLaunchMainlineActionReceipt({
             )
           }))
         },
+        primaryWorkspaceAction: firstLaunchPrimaryWorkspaceAction,
+        primaryRecommendedDownload: firstLaunchPrimaryRecommendedDownload,
+        workspaceActions: firstLaunchWorkspaceActions,
+        recommendedDownloads: firstLaunchRecommendedDownloads,
         nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,
         productionEvidence: firstLaunchProductionEvidence,
         productionNextAction: firstLaunchProductionEvidence?.nextAction || null,
@@ -4853,6 +4932,8 @@ function buildLaunchMainlineActionReceipt({
           firstLaunchOpsQueue.stageGroups.length
             ? `Stage path: ${firstLaunchOpsQueue.stageGroups.map((item) => item.label || item.key).join(" -> ")}`
             : "",
+          firstLaunchWorkspaceActionsDetail,
+          firstLaunchRecommendedDownloadsDetail,
           firstLaunchOpsQueue.ownerGroups.length
             ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
             : "",
@@ -13827,6 +13908,32 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
   const productionEvidenceQueue = mainlineSummary?.productionGate?.evidenceQueue && typeof mainlineSummary.productionGate.evidenceQueue === "object"
     ? mainlineSummary.productionGate.evidenceQueue
     : null;
+  const firstLaunchWorkspaceActions = [];
+  const seenFirstLaunchWorkspaceActions = new Set();
+  const pushFirstLaunchWorkspaceAction = (item = null) => {
+    const key = item?.key || "";
+    if (!key || seenFirstLaunchWorkspaceActions.has(key)) {
+      return;
+    }
+    seenFirstLaunchWorkspaceActions.add(key);
+    firstLaunchWorkspaceActions.push(item);
+  };
+  const firstLaunchRecommendedDownloads = [];
+  const seenFirstLaunchRecommendedDownloads = new Set();
+  const pushFirstLaunchRecommendedDownload = (item = null) => {
+    const key = item?.key || item?.fileName || item?.href || "";
+    if (!key || seenFirstLaunchRecommendedDownloads.has(key)) {
+      return;
+    }
+    seenFirstLaunchRecommendedDownloads.add(key);
+    firstLaunchRecommendedDownloads.push(item);
+  };
+  for (const item of firstOpsActions) {
+    pushFirstLaunchWorkspaceAction(item?.workspaceAction || null);
+    pushFirstLaunchRecommendedDownload(item?.recommendedDownload || null);
+  }
+  pushFirstLaunchWorkspaceAction(productionEvidenceQueue?.nextAction?.workspaceAction || null);
+  pushFirstLaunchRecommendedDownload(productionEvidenceQueue?.nextAction?.recommendedDownload || null);
   const dutyActionLabels = [
     "inventory recheck",
     "launch workflow recheck",
@@ -13850,6 +13957,8 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     ...(productionEvidenceQueue ? [`- ${formatLaunchProductionEvidenceLine(productionEvidenceQueue, "Production Evidence")}`] : []),
     `- First ops actions: ${firstOpsActions.length}`,
     `- Owner path: ${ownerHandoffs.map((item) => item.owner).join(" -> ")}`,
+    `- Workspace actions: ${firstLaunchWorkspaceActions.map((item) => item?.label || item?.key || "workspace").join(" | ") || "-"}`,
+    `- Recommended downloads: ${firstLaunchRecommendedDownloads.map((item) => item?.label || item?.key || "download").join(" | ") || "-"}`,
     `- Duty Chain: ${dutyActionLabels.join(" -> ")}`,
     "",
     "First Batch Card Suggestions:"

@@ -5280,7 +5280,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(releasePackage.mainlineFollowUp.workspaceActions.some((item) => item.key === "release"));
     assert.ok(Array.isArray(releasePackage.mainlineFollowUp.actionPlan));
     assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "clear_release_blockers"));
-    assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_summary"));
+    assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
     assert.ok(Array.isArray(releasePackage.mainlineFollowUp.recommendedDownloads));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "release_checklist"));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
@@ -5604,7 +5604,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.recommendedDownload?.key === "integration_env"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.workspaceAction?.key === "ops"));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "launch_day_ops_watch" && item.recommendedDownload?.source === "developer-ops"));
-    assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_summary"));
+    assert.ok(launchWorkflow.workflowSummary.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
     assert.equal(launchWorkflow.releasePackage.manifest.project.code, "RELPKG_ALPHA");
     assert.equal(launchWorkflow.integrationPackage.manifest.project.code, "RELPKG_ALPHA");
     assert.match(launchWorkflow.summaryText, /RockSolid Launch Workflow Package/);
@@ -5872,7 +5872,7 @@ test("developer release package export bundles integration, versions, and notice
       }));
       assert.ok(Array.isArray(launchReview.reviewSummary.recommendedDownloads));
       assert.ok(launchReview.reviewSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
-      assert.ok(launchReview.reviewSummary.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_summary"));
+      assert.ok(launchReview.reviewSummary.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
       assert.ok(launchReview.reviewSummary.workspaceActions?.some((item) => /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.label || "")));
       assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
       assert.match(launchReview.summaryText, /RockSolid Developer Launch Review/);
@@ -7795,7 +7795,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_rehearsal_guide" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
-    assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_summary"));
+    assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
     assert.match(smokeKit.summaryText || "", /Launch Mainline Gate:/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Primary Review Target:/);

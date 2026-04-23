@@ -2850,7 +2850,7 @@ function buildReleaseMainlineFollowUpPayload({
       status: "review",
       priority: "secondary",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
-      recommendedDownload: launchMainlineDownload
+      recommendedDownload: launchMainlineRehearsalGuideDownload
     });
   } else {
     if (normalizedStatus === "attention") {
@@ -2918,7 +2918,7 @@ function buildReleaseMainlineFollowUpPayload({
       status: normalizedStatus === "ready" ? "pass" : "review",
       priority: "secondary",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
-      recommendedDownload: launchMainlineDownload
+      recommendedDownload: launchMainlineRehearsalGuideDownload
     });
   }
 
@@ -6759,6 +6759,15 @@ function buildLaunchWorkflowSummaryPayload({
       channel
     }
   );
+  const launchMainlineRehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline rehearsal guide",
+    "launch-mainline-rehearsal-guide.txt",
+    "rehearsal-guide",
+    {
+      productCode: releasePackage?.manifest?.project?.code || null,
+      channel
+    }
+  );
   const recommendedDownloads = [
     {
       key: "launch_handoff_zip",
@@ -7133,7 +7142,7 @@ function buildLaunchWorkflowSummaryPayload({
     status: workflowStatus === "hold" ? "block" : workflowStatus === "attention" ? "review" : "pass",
     priority: "secondary",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
-    recommendedDownload: launchMainlineDownload
+    recommendedDownload: launchMainlineRehearsalGuideDownload
   }));
 
   const mainlineGate = buildLaunchMainlineGatePayload({
@@ -9092,7 +9101,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     status: workflowBlocked ? "block" : workflowNeedsReview || queueHasUrgent ? "review" : "pass",
     priority: "secondary",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
-    recommendedDownload: mainlineSummaryDownload
+    recommendedDownload: mainlineRehearsalGuideDownload
   }));
 
   for (const item of (Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : []).slice(0, 3)) {
@@ -10074,7 +10083,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       status: startupBlocked || !readyPaths.length ? "block" : blockingPaths.length || reviewPaths.length ? "review" : "pass",
       summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned while smoke validation runs.",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
-      recommendedDownload: launchMainlineSummaryDownload
+      recommendedDownload: launchMainlineRehearsalGuideDownload
     },
     primaryReviewTarget?.workspaceAction ? {
       key: "launch_smoke_primary_review",

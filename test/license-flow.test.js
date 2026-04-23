@@ -8531,6 +8531,186 @@ test("developer launch workflow can restock low launch inventory buffers", async
   }
 });
 
+test("developer launch mainline action can restock low inventory and return duty chain", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.restock.owner",
+        password: "LaunchMainlineRestockOwner123!",
+        displayName: "Launch Mainline Restock Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_RESTOCK",
+        name: "Mainline Restock App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: false,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.restock.owner",
+      password: "LaunchMainlineRestockOwner123!"
+    });
+
+    const policy = await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "MAINLINE_RESTOCK",
+        name: "Mainline Restock Duration",
+        durationDays: 30,
+        totalPoints: null,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "MAINLINE_RESTOCK",
+        policyId: policy.id,
+        count: 10,
+        prefix: "MAINLINEREDL",
+        notes: "Direct-card low stock seed"
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/cards/batch",
+      {
+        productCode: "MAINLINE_RESTOCK",
+        policyId: policy.id,
+        count: 20,
+        prefix: "MAINLINERERC",
+        notes: "Recharge low stock seed"
+      },
+      ownerSession.token
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_RESTOCK",
+        channel: "stable",
+        operation: "restock",
+        mode: "recommended"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "restock");
+    assert.equal(actionResult.result?.productCode, "MAINLINE_RESTOCK");
+    assert.equal(actionResult.result?.requestedMode, "recommended");
+    assert.equal(actionResult.result?.createdBatches?.length, 2);
+    assert.ok(actionResult.result.createdBatches.some((item) => item.mode === "direct_card" && item.refillCount === 40));
+    assert.ok(actionResult.result.createdBatches.some((item) => item.mode === "recharge" && item.refillCount === 80));
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.inventory
+        ? {
+            operation: actionResult.receipt.firstLaunchDutySummary.inventory.operation || null,
+            createdBatchCount: actionResult.receipt.firstLaunchDutySummary.inventory.createdBatchCount ?? null,
+            createdCardCount: actionResult.receipt.firstLaunchDutySummary.inventory.createdCardCount ?? null,
+            refillCardCount: actionResult.receipt.firstLaunchDutySummary.inventory.refillCardCount ?? null,
+            modes: actionResult.receipt.firstLaunchDutySummary.inventory.modes || []
+          }
+        : null,
+      {
+        operation: "restock",
+        createdBatchCount: 2,
+        createdCardCount: 120,
+        refillCardCount: 120,
+        modes: ["direct_card", "recharge"]
+      }
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.inventory?.refillPlan)
+        ? actionResult.receipt.firstLaunchDutySummary.inventory.refillPlan.map((item) => ({
+            mode: item?.mode || null,
+            beforeFresh: item?.beforeFresh ?? null,
+            refillCount: item?.refillCount ?? null,
+            targetCount: item?.targetCount ?? null,
+            batchCode: item?.batchCode || null
+          }))
+        : [],
+      actionResult.result.createdBatches.map((item) => ({
+        mode: item.mode,
+        beforeFresh: item.beforeFresh,
+        refillCount: item.refillCount,
+        targetCount: item.targetCount,
+        batchCode: item.batchCode
+      }))
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.dutyChain)
+        ? actionResult.receipt.firstLaunchDutySummary.dutyChain.map((item) => ({
+            key: item?.key || null,
+            kind: item?.kind || null,
+            ownerRole: item?.ownerRole || null
+          }))
+        : [],
+      [
+        { key: "restock", kind: "operation", ownerRole: "launch_ops" },
+        ...actionResult.receipt.firstLaunchOpsQueue.actions.map((item) => ({
+          key: item.key,
+          kind: "action",
+          ownerRole: item.ownerRole
+        })),
+        { key: "launch_mainline_first_launch_handoff", kind: "download", ownerRole: "launch_ops" },
+        {
+          key: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.key || null,
+          kind: "production_evidence",
+          ownerRole: "ops"
+        }
+      ].filter((item) => item.key)
+    );
+    assert.ok(
+      actionResult.receipt?.mainlineRecapCards?.some((item) =>
+        item?.key === "first_launch_duty_summary"
+        && Array.isArray(item.controls)
+        && item.controls.some((control) => control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff")
+      )
+    );
+
+    const firstLaunchHandoffDownload = actionResult.receipt?.firstLaunchHandoffDownload || null;
+    const firstLaunchHandoffDownloadResponse = await getText(
+      baseUrl,
+      firstLaunchHandoffDownload.href,
+      ownerSession.token
+    );
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer launch mainline action can bootstrap starter launch assets and return refreshed mainline", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

@@ -4601,6 +4601,18 @@ function buildLaunchMainlineActionReceipt({
           modes: (Array.isArray(firstLaunchInventoryQueue?.createdBatches) ? firstLaunchInventoryQueue.createdBatches : [])
             .map((item) => item?.mode || null)
             .filter(Boolean),
+          refillPlan: (Array.isArray(firstLaunchInventoryQueue?.createdBatches) ? firstLaunchInventoryQueue.createdBatches : [])
+            .map((item) => ({
+              key: item?.key || null,
+              mode: item?.mode || null,
+              label: item?.label || item?.key || item?.mode || "Launch batch",
+              batchCode: item?.batchCode || null,
+              beforeFresh: Number.isFinite(Number(item?.beforeFresh)) ? Number(item.beforeFresh) : null,
+              refillCount: Number(item?.refillCount || 0),
+              targetCount: Number.isFinite(Number(item?.targetCount)) ? Number(item.targetCount) : null,
+              count: Number(item?.count || 0)
+            }))
+            .filter((item) => item.mode || item.batchCode || item.refillCount > 0 || item.count > 0),
           nextAction: firstLaunchInventoryQueue?.nextAction || null
         },
         ops: {

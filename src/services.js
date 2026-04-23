@@ -3976,6 +3976,16 @@ function formatLaunchInventoryHealthLine(health = {}, label = "Inventory health"
   ].filter(Boolean).join(" | ");
 }
 
+function formatLaunchProductionEvidenceLine(evidenceQueue = {}, label = "Production Evidence") {
+  const nextAction = evidenceQueue?.nextAction && typeof evidenceQueue.nextAction === "object"
+    ? evidenceQueue.nextAction
+    : null;
+  return [
+    `${label}: remaining=${Number(evidenceQueue?.remainingCount || 0)} | completed=${Number(evidenceQueue?.completedCount || 0)} | next=${nextAction?.title || nextAction?.label || nextAction?.key || "-"}`,
+    `operation=${nextAction?.setupAction?.operation || "-"}`
+  ].join(" | ");
+}
+
 function buildLaunchMainlineActionReceipt({
   operation = "",
   result = null,
@@ -12656,6 +12666,7 @@ function buildDeveloperLaunchMainlinePayload({
     manifest: payload.manifest,
     filters: payload.filters,
     launchWorkflow,
+    mainlineSummary: payload.mainlineSummary,
     publicBaseUrl
   });
   payload.rehearsalGuideText = buildDeveloperLaunchMainlineRehearsalGuideText({
@@ -13622,6 +13633,7 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
   manifest = {},
   filters = {},
   launchWorkflow = {},
+  mainlineSummary = {},
   publicBaseUrl = ""
 } = {}) {
   const project = manifest.project || {};
@@ -13681,6 +13693,9 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     mode: item?.mode || item?.key || null,
     status: item?.inventoryStatus || "unknown"
   })));
+  const productionEvidenceQueue = mainlineSummary?.productionGate?.evidenceQueue && typeof mainlineSummary.productionGate.evidenceQueue === "object"
+    ? mainlineSummary.productionGate.evidenceQueue
+    : null;
   const dutyActionLabels = [
     "inventory recheck",
     "launch workflow recheck",
@@ -13701,6 +13716,7 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     "Launch Duty Summary:",
     `- First-batch inventory: ${firstBatchCardRecommendations.length} suggestion${firstBatchCardRecommendations.length === 1 ? "" : "s"} | targetCards=${totalSuggestedCards} | readyBatches=${readySuggestedBatches}`,
     `- ${formatLaunchInventoryHealthLine(firstBatchInventoryHealth, "Inventory Health")}`,
+    ...(productionEvidenceQueue ? [`- ${formatLaunchProductionEvidenceLine(productionEvidenceQueue, "Production Evidence")}`] : []),
     `- First ops actions: ${firstOpsActions.length}`,
     `- Owner path: ${ownerHandoffs.map((item) => item.owner).join(" -> ")}`,
     `- Duty Chain: ${dutyActionLabels.join(" -> ")}`,

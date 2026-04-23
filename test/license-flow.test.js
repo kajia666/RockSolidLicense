@@ -8724,6 +8724,7 @@ test("developer launch mainline action can restock low inventory and return duty
     );
     assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Inventory Health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Production Evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
   } finally {
     await app.close();
@@ -9793,6 +9794,7 @@ test("developer launch mainline action can create first launch batches and retur
     assert.match(firstLaunchHandoffDownloadResponse.body, /RockSolid Developer Launch Mainline First Launch Handoff/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Launch Duty Summary:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Inventory Health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Production Evidence: remaining=\d+ \| completed=\d+ \| next=.+ \| operation=record_/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Batch Card Suggestions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:/);

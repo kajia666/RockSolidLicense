@@ -4532,6 +4532,42 @@ function appendLaunchMainlineGateText(lines = [], gate = null, formatWorkspaceAc
   lines.push(`- recommendedDownload: ${gate.recommendedDownload?.label || gate.recommendedDownload?.key || "-"}`);
 }
 
+function normalizeLaunchMainlineProductionCheck(item = null, fallbackTitle = "Production follow-up") {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  return {
+    key: item?.key || null,
+    title: item?.title || item?.label || item?.key || fallbackTitle,
+    label: item?.label || item?.title || item?.key || fallbackTitle,
+    summary: item?.summary || "-",
+    status: item?.status || "review",
+    priority: item?.priority || null,
+    workspaceAction: item?.workspaceAction || null,
+    recommendedDownload: item?.recommendedDownload || null,
+    bootstrapAction: item?.bootstrapAction || null,
+    setupAction: item?.setupAction || null
+  };
+}
+
+function collectLaunchMainlineEvidenceChecks(productionGate = null, limit = 8) {
+  const source = Array.isArray(productionGate)
+    ? productionGate
+    : Array.isArray(productionGate?.checks)
+      ? productionGate.checks
+      : Array.isArray(productionGate?.actionPlan)
+        ? productionGate.actionPlan
+        : [];
+  return source
+    .filter((item) => {
+      const status = String(item?.status || "").trim().toLowerCase();
+      return item?.setupAction?.operation && status && status !== "pass" && status !== "ready";
+    })
+    .slice(0, limit)
+    .map((item) => normalizeLaunchMainlineProductionCheck(item))
+    .filter((item) => item?.key || item?.setupAction?.operation);
+}
+
 function parseProductionEndpoint(value) {
   const raw = String(value || "").trim();
   if (!raw) {
@@ -5570,9 +5606,13 @@ function buildLaunchMainlineProductionGatePayload({
     : attentionCount > 0
       ? "The lane is close, but HTTPS and token-key launch hygiene still deserve one more pass."
       : "Core production launch checks look aligned for this lane.";
+  const remainingEvidenceChecks = collectLaunchMainlineEvidenceChecks(checks, 12);
+  const nextEvidenceAction = remainingEvidenceChecks[0] || null;
 
   return {
     checks,
+    remainingEvidenceChecks,
+    nextEvidenceAction,
     ...buildLaunchMainlineGatePayload({
       status,
       headline,
@@ -11548,6 +11588,18 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     : Array.isArray(mainlineSummary.productionGate?.actionPlan)
       ? mainlineSummary.productionGate.actionPlan
       : [];
+  const productionNextEvidenceAction = mainlineSummary.productionGate?.nextEvidenceAction || null;
+  if (productionNextEvidenceAction?.key || productionNextEvidenceAction?.setupAction?.operation) {
+    lines.push("");
+    lines.push("Production Next Evidence Action:");
+    lines.push(
+      `- ${productionNextEvidenceAction.title || productionNextEvidenceAction.label || productionNextEvidenceAction.key || "step"}`
+      + ` | ${String(productionNextEvidenceAction.status || "review").toUpperCase()}`
+      + ` | ${productionNextEvidenceAction.summary || "-"}`
+      + `${productionNextEvidenceAction.setupAction ? ` | setup=${productionNextEvidenceAction.setupAction.label || productionNextEvidenceAction.setupAction.key || "-"}@${productionNextEvidenceAction.setupAction.mode || "recommended"}:${productionNextEvidenceAction.setupAction.operation || "first_batch_setup"}` : ""}`
+      + `${productionNextEvidenceAction.recommendedDownload ? ` | download=${productionNextEvidenceAction.recommendedDownload.label || productionNextEvidenceAction.recommendedDownload.key || "-"}` : ""}`
+    );
+  }
   if (productionGateChecks.length) {
     lines.push("");
     lines.push("Production Gate Checks:");

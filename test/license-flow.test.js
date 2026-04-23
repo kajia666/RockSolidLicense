@@ -6254,6 +6254,20 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.equal(launchMainline.mainlineSummary.productionGate?.status, "hold");
     assert.ok(Number(launchMainline.mainlineSummary.productionGate?.blockingCount || 0) >= 2);
     assert.equal(launchMainline.mainlineSummary.productionGate?.recommendedWorkspace?.key, "security");
+    assert.ok(Array.isArray(launchMainline.mainlineSummary.productionGate?.remainingEvidenceChecks));
+    assert.ok(launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks.length >= 1);
+    assert.equal(
+      launchMainline.mainlineSummary.productionGate.nextEvidenceAction?.setupAction?.operation,
+      "record_launch_rehearsal_run"
+    );
+    assert.equal(
+      launchMainline.mainlineSummary.productionGate.nextEvidenceAction?.key,
+      launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks[0]?.key
+    );
+    assert.ok(launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks.every((item) =>
+      item?.setupAction?.operation
+      && item?.status !== "pass"
+    ));
     assert.ok(
       Array.isArray(launchMainline.mainlineSummary.productionGate?.checks)
       && launchMainline.mainlineSummary.productionGate.checks.some((item) =>
@@ -6432,6 +6446,8 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.match(launchMainline.summaryText || "", /default admin password/i);
     assert.match(launchMainline.summaryText || "", /server token secret/i);
     assert.match(launchMainline.summaryText || "", /backup and restore handoff/i);
+    assert.match(launchMainline.summaryText || "", /Production Next Evidence Action:/);
+    assert.match(launchMainline.summaryText || "", /record_launch_rehearsal_run/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

@@ -10627,15 +10627,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.primaryAction || "", /^(review_next|complete_route_review)$/);
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionWorkspaceAction?.key, "launch-mainline");
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionDownload?.key, "launch_mainline_summary");
+    assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionGuideDownload?.key, "launch_mainline_rehearsal_guide");
+    assert.equal(exportSnapshot.routeReview?.continuation?.completionGuideDownload?.key, "launch_mainline_rehearsal_guide");
     assert.equal(exportSnapshot.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
     assert.equal(exportSnapshot.mainlineHandoff?.downloads?.summary?.key, "launch_mainline_summary");
+    assert.equal(exportSnapshot.mainlineHandoff?.downloads?.rehearsalGuide?.key, "launch_mainline_rehearsal_guide");
     assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.workspaceAction?.key, "launch-mainline");
     assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.downloads?.summary?.key, "launch_mainline_summary");
+    assert.equal(exportSnapshot.routeReview?.mainlineHandoff?.downloads?.rehearsalGuide?.key, "launch_mainline_rehearsal_guide");
     assert.ok(Array.isArray(exportSnapshot.routeReview?.actions));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-primary" && item.label === "Review Primary Match"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "review-next" && item.label === "Review Next Match"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "open-mainline" && item.label === "Open Launch Mainline"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-mainline" && item.label === "Download Launch Mainline Summary"));
+    assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-mainline-rehearsal" && item.label === "Download Launch Mainline Rehearsal Guide"));
     assert.ok(exportSnapshot.routeReview?.actions.some((item) => item.action === "download-remaining" && item.label === "Download Remaining Queue Summary"));
     assert.ok(Array.isArray(exportSnapshot.routeReview?.remainingMatches));
     assert.equal(exportSnapshot.routeReview?.remainingMatches?.[0]?.kind, "audit");
@@ -10647,6 +10652,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /Route Review Remaining Matches:/);
     assert.match(exportSnapshot.summaryText, /Launch Mainline Handoff:/);
     assert.match(exportSnapshot.summaryText, /Open Launch Mainline@summary/);
+    assert.match(exportSnapshot.summaryText, /Launch mainline rehearsal guide/i);
     assert.match(exportSnapshot.summaryText, /Top Reasons:/);
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);
@@ -14227,6 +14233,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /preparePrimaryRouteReviewFocus/);
     assert.match(html, /action === "open-mainline"/);
     assert.match(html, /action === "download-mainline"/);
+    assert.match(html, /action === "download-mainline-rehearsal"/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

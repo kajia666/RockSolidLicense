@@ -14711,6 +14711,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push("Launch Mainline Handoff:");
         lines.push(`- workspace=${routeReview.mainlineHandoff.workspaceAction.label || "-"}@${routeReview.mainlineHandoff.workspaceAction.autofocus || "-"}`);
         lines.push(`- summary=${routeReview.mainlineHandoff.downloads?.summary?.label || routeReview.mainlineHandoff.recommendedDownload?.label || "-"}`);
+        lines.push(`- rehearsal=${routeReview.mainlineHandoff.downloads?.rehearsalGuide?.label || "-"}`);
       }
     }
     appendSnapshotEscalationSummaryLines(lines, overview);
@@ -15232,6 +15233,12 @@ function buildDeveloperOpsMainlineHandoff(scope = {}) {
       "summary",
       params
     ),
+    rehearsalGuide: createLaunchMainlineDownloadShortcut(
+      "Launch mainline rehearsal guide",
+      "launch-mainline-rehearsal-guide.txt",
+      "rehearsal-guide",
+      params
+    ),
     checksums: createLaunchMainlineDownloadShortcut(
       "Launch mainline checksums",
       "launch-mainline-sha256.txt",
@@ -15317,6 +15324,13 @@ function buildDeveloperOpsRouteReviewActions(routeReview = {}) {
       { requiresToken: true }
     );
   }
+  if (routeReview.mainlineHandoff?.downloads?.rehearsalGuide?.fileName) {
+    pushAction(
+      "download-mainline-rehearsal",
+      "Download Launch Mainline Rehearsal Guide",
+      { requiresToken: true }
+    );
+  }
 
   const sectionDefinitions = [
     ["accounts", "accounts", "Accounts"],
@@ -15347,6 +15361,7 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
   const nextControlLabel = nextMatch?.recommendedControl?.label || "";
   const completionWorkspaceAction = routeReview.mainlineHandoff?.workspaceAction || null;
   const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
+  const completionGuideDownload = routeReview.mainlineHandoff?.downloads?.rehearsalGuide || null;
   if (nextMatch) {
     return {
       remainingCount,
@@ -15360,7 +15375,8 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
       nextDownload: routeReview.downloads?.next || null,
       remainingDownload: routeReview.downloads?.remaining || null,
       completionWorkspaceAction,
-      completionDownload
+      completionDownload,
+      completionGuideDownload
     };
   }
   return {
@@ -15375,7 +15391,8 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
     nextDownload: null,
     remainingDownload: routeReview.downloads?.remaining || null,
     completionWorkspaceAction,
-    completionDownload
+    completionDownload,
+    completionGuideDownload
   };
 }
 
@@ -15385,6 +15402,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
   const remainingDownload = routeReview.downloads?.remaining || buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope);
   const completionWorkspaceAction = routeReview.mainlineHandoff?.workspaceAction || null;
   const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
+  const completionGuideDownload = routeReview.mainlineHandoff?.downloads?.rehearsalGuide || null;
   queue.forEach((entry, index) => {
     if (!entry?.kind || !entry?.item || typeof entry.item !== "object") {
       return;
@@ -15408,7 +15426,8 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
       remainingDownload,
       nextMatch: nextMatch || null,
       completionWorkspaceAction,
-      completionDownload
+      completionDownload,
+      completionGuideDownload
     };
   });
   return continuations;

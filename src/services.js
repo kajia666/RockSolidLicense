@@ -4716,6 +4716,34 @@ function buildLaunchMainlineActionReceipt({
             key: item?.key || null,
             label: item?.label || item?.key || "owner",
             actionCount: item?.actionCount || 0
+          })),
+          stageGroups: firstLaunchOpsQueue.stageGroups.map((item) => ({
+            key: item?.key || null,
+            label: item?.label || item?.key || "stage",
+            ownerRole: item?.ownerRole || null,
+            ownerLabel: item?.ownerLabel || null,
+            actionCount: item?.actionCount || 0,
+            actions: Array.isArray(item?.actions)
+              ? item.actions.map((action) => ({
+                  key: action?.key || null,
+                  label: action?.label || action?.key || "action"
+                }))
+              : []
+          })),
+          handoffs: firstLaunchOpsQueue.handoffChecklist.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            ownerLabel: item?.ownerLabel || null,
+            actionCount: item?.actionCount || 0,
+            stageKeys: Array.isArray(item?.stageKeys) ? item.stageKeys : [],
+            stageLabels: Array.isArray(item?.stageLabels) ? item.stageLabels : [],
+            summary: item?.summary || "",
+            actions: Array.isArray(item?.actions)
+              ? item.actions.map((action) => ({
+                  key: action?.key || null,
+                  label: action?.label || action?.key || "action"
+                }))
+              : []
           }))
         },
         nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,

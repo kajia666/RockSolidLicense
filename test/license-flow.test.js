@@ -8692,6 +8692,40 @@ test("developer launch mainline action can restock low inventory and return duty
         && control?.workspaceAction?.key === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key
       )
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.stageGroups)
+        ? actionResult.receipt.firstLaunchDutySummary.ops.stageGroups.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.stageGroups)
+        ? actionResult.receipt.firstLaunchOpsQueue.stageGroups.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.handoffs)
+        ? actionResult.receipt.firstLaunchDutySummary.ops.handoffs.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            stageKeys: Array.isArray(item?.stageKeys) ? item.stageKeys : [],
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.handoffChecklist)
+        ? actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            stageKeys: Array.isArray(item?.stageKeys) ? item.stageKeys : [],
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : []
+    );
     assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
@@ -9955,6 +9989,40 @@ test("developer launch mainline action can create first launch batches and retur
         control?.kind === "workspace"
         && control?.workspaceAction?.key === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key
       )
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.stageGroups)
+        ? actionResult.receipt.firstLaunchDutySummary.ops.stageGroups.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.stageGroups)
+        ? actionResult.receipt.firstLaunchOpsQueue.stageGroups.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : []
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.ops?.handoffs)
+        ? actionResult.receipt.firstLaunchDutySummary.ops.handoffs.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            stageKeys: Array.isArray(item?.stageKeys) ? item.stageKeys : [],
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : [],
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.handoffChecklist)
+        ? actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            stageKeys: Array.isArray(item?.stageKeys) ? item.stageKeys : [],
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : []
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.dutyChain)

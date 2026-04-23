@@ -9646,6 +9646,43 @@ test("developer launch mainline action can create first launch batches and retur
         productionNextActionKey: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.key || null
       }
     );
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchDutySummary?.inventory
+        ? {
+            batchCodes: actionResult.receipt.firstLaunchDutySummary.inventory.batchCodes || [],
+            modes: actionResult.receipt.firstLaunchDutySummary.inventory.modes || [],
+            refillCardCount: actionResult.receipt.firstLaunchDutySummary.inventory.refillCardCount ?? null
+          }
+        : null,
+      {
+        batchCodes: actionResult.result.createdBatches.map((item) => item.batchCode),
+        modes: actionResult.result.createdBatches.map((item) => item.mode),
+        refillCardCount: 0
+      }
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.dutyChain)
+        ? actionResult.receipt.firstLaunchDutySummary.dutyChain.map((item) => ({
+            key: item?.key || null,
+            kind: item?.kind || null,
+            ownerRole: item?.ownerRole || null
+          }))
+        : [],
+      [
+        { key: "first_batch_setup", kind: "operation", ownerRole: "launch_ops" },
+        ...actionResult.receipt.firstLaunchOpsQueue.actions.map((item) => ({
+          key: item.key,
+          kind: "action",
+          ownerRole: item.ownerRole
+        })),
+        { key: "launch_mainline_first_launch_handoff", kind: "download", ownerRole: "launch_ops" },
+        {
+          key: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.key || null,
+          kind: "production_evidence",
+          ownerRole: "ops"
+        }
+      ].filter((item) => item.key)
+    );
     assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) => /Duty chain:/i.test(String(detail || "")))

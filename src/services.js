@@ -4592,7 +4592,15 @@ function buildLaunchMainlineActionReceipt({
           operation: firstLaunchInventoryQueue?.operation || null,
           createdBatchCount: firstLaunchInventoryQueue?.createdBatchCount || 0,
           createdCardCount: firstLaunchInventoryQueue?.createdCardCount || 0,
+          refillCardCount: (Array.isArray(firstLaunchInventoryQueue?.createdBatches) ? firstLaunchInventoryQueue.createdBatches : [])
+            .reduce((sum, item) => sum + Number(item?.refillCount || 0), 0),
           skippedCount: firstLaunchInventoryQueue?.skippedCount || 0,
+          batchCodes: (Array.isArray(firstLaunchInventoryQueue?.createdBatches) ? firstLaunchInventoryQueue.createdBatches : [])
+            .map((item) => item?.batchCode || null)
+            .filter(Boolean),
+          modes: (Array.isArray(firstLaunchInventoryQueue?.createdBatches) ? firstLaunchInventoryQueue.createdBatches : [])
+            .map((item) => item?.mode || null)
+            .filter(Boolean),
           nextAction: firstLaunchInventoryQueue?.nextAction || null
         },
         ops: {
@@ -4609,6 +4617,49 @@ function buildLaunchMainlineActionReceipt({
         nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,
         productionNextAction: mainlineEvidenceQueue?.nextAction || followUp?.nextProductionAction || null,
         handoffDownload: firstLaunchHandoffDownload || null,
+        dutyChain: [
+          {
+            key: normalizedOperation || "bootstrap",
+            kind: "operation",
+            label: operationLabel,
+            ownerRole: "launch_ops",
+            ownerLabel: "Launch Ops"
+          },
+          ...firstLaunchOpsQueue.actions.map((item) => ({
+            key: item?.key || null,
+            kind: "action",
+            label: item?.label || item?.key || "First launch action",
+            stage: item?.stage || null,
+            stageLabel: item?.stageLabel || null,
+            ownerRole: item?.ownerRole || "launch_ops",
+            ownerLabel: item?.ownerLabel || "Launch Ops",
+            timing: item?.timing || null,
+            workspaceAction: item?.workspaceAction || null,
+            recommendedDownload: item?.recommendedDownload || null
+          })),
+          firstLaunchHandoffDownload
+            ? {
+                key: firstLaunchHandoffDownload.key,
+                kind: "download",
+                label: firstLaunchHandoffDownload.label || "First launch handoff",
+                ownerRole: "launch_ops",
+                ownerLabel: "Launch Ops",
+                recommendedDownload: firstLaunchHandoffDownload
+              }
+            : null,
+          mainlineEvidenceQueue?.nextAction
+            ? {
+                key: mainlineEvidenceQueue.nextAction.key || mainlineEvidenceQueue.nextAction.setupAction?.operation || null,
+                kind: "production_evidence",
+                label: mainlineEvidenceQueue.nextAction.title || mainlineEvidenceQueue.nextAction.label || mainlineEvidenceQueue.nextAction.key || "Production evidence",
+                ownerRole: "ops",
+                ownerLabel: "Ops",
+                setupAction: mainlineEvidenceQueue.nextAction.setupAction || null,
+                workspaceAction: mainlineEvidenceQueue.nextAction.workspaceAction || null,
+                recommendedDownload: mainlineEvidenceQueue.nextAction.recommendedDownload || null
+              }
+            : null
+        ].filter((item) => item?.key),
         details: [
           `Duty chain: ${operationLabel} -> ${firstLaunchOpsQueue.nextAction?.label || firstLaunchOpsQueue.nextAction?.key || firstLaunchInventoryQueue?.nextAction?.label || firstLaunchInventoryQueue?.nextAction?.key || "first launch action"} -> ${firstLaunchHandoffDownload?.label || "First launch handoff"} -> ${mainlineEvidenceQueue?.nextAction?.title || followUp?.nextProductionAction?.title || mainlineEvidenceQueue?.nextAction?.key || followUp?.nextProductionAction?.key || "production evidence queue"}`,
           firstLaunchOpsQueue.ownerGroups.length

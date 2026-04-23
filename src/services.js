@@ -10872,8 +10872,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   ];
   const heroDownloads = [
     createLaunchMainlineDownloadShortcut("Download Launch Mainline JSON", "developer-launch-mainline.json", "json", params),
-    createLaunchMainlineDownloadShortcut("Download Launch Mainline Summary", "developer-launch-mainline-summary.txt", "summary", params),
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Rehearsal Guide", "developer-launch-mainline-rehearsal-guide.txt", "rehearsal-guide", params),
+    createLaunchMainlineDownloadShortcut("Download Launch Mainline Summary", "developer-launch-mainline-summary.txt", "summary", params),
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Checksums", "developer-launch-mainline-sha256.txt", "checksums", params),
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Zip", "developer-launch-mainline.zip", "zip", params)
   ].filter((item) => item?.key);

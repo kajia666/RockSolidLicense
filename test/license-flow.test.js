@@ -8338,8 +8338,8 @@ test("developer launch mainline action can bootstrap starter launch assets and r
             }))
           : []),
         { kind: "download", key: "launch_mainline_json" },
-        { kind: "download", key: "launch_mainline_summary" },
         { kind: "download", key: "launch_mainline_rehearsal_guide" },
+        { kind: "download", key: "launch_mainline_summary" },
         { kind: "download", key: "launch_mainline_checksums" },
         { kind: "download", key: "launch_mainline_zip" }
       ].filter((item) => item.key)
@@ -9003,8 +9003,8 @@ test("developer launch mainline action can create first launch batches and retur
             }))
           : []),
         { kind: "download", key: "launch_mainline_json" },
-        { kind: "download", key: "launch_mainline_summary" },
         { kind: "download", key: "launch_mainline_rehearsal_guide" },
+        { kind: "download", key: "launch_mainline_summary" },
         { kind: "download", key: "launch_mainline_checksums" },
         { kind: "download", key: "launch_mainline_zip" }
       ].filter((item) => item.key)

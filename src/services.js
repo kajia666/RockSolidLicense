@@ -4048,6 +4048,14 @@ function buildLaunchMainlineActionReceipt({
   const mainlineNextActions = Array.isArray(mainlineSummary.nextActions)
     ? mainlineSummary.nextActions.slice(0, 4)
     : [];
+  const mainlineEvidenceQueue = followUp?.evidenceQueue && typeof followUp.evidenceQueue === "object"
+    ? followUp.evidenceQueue
+    : (mainlineSummary.productionGate?.evidenceQueue && typeof mainlineSummary.productionGate.evidenceQueue === "object"
+        ? mainlineSummary.productionGate.evidenceQueue
+        : null);
+  const mainlineEvidenceQueueDetail = mainlineEvidenceQueue
+    ? `Evidence queue: completed=${mainlineEvidenceQueue.completedCount ?? 0} | remaining=${mainlineEvidenceQueue.remainingCount ?? 0} | total=${mainlineEvidenceQueue.totalCount ?? 0} | next=${mainlineEvidenceQueue.nextAction?.title || mainlineEvidenceQueue.nextAction?.label || mainlineEvidenceQueue.nextAction?.key || "-"}`
+    : "";
   const mainlineOverviewCards = (Array.isArray(mainlineSummary.overviewCards) ? mainlineSummary.overviewCards : [])
     .slice(0, 3)
     .map((item) => ({
@@ -4331,7 +4339,8 @@ function buildLaunchMainlineActionReceipt({
           : "",
         Array.isArray(mainlineNextActions) && mainlineNextActions.length
           ? `Next actions: ${mainlineNextActions.join(" | ")}`
-          : ""
+          : "",
+        mainlineEvidenceQueueDetail
       ].filter(Boolean),
       controls: mainlineFollowUpActions
     },
@@ -4408,6 +4417,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineRecommendedDownload,
     mainlineContinuation,
     mainlineNextActions,
+    mainlineEvidenceQueue,
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineForm,

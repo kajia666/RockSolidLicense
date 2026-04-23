@@ -7602,6 +7602,20 @@ test("developer launch mainline action can record a launch rehearsal run and ref
         && control.setupAction.operation !== "record_launch_rehearsal_run"
       )
     ));
+    assert.ok(actionResult.receipt?.mainlineEvidenceQueue);
+    assert.equal(
+      actionResult.receipt.mainlineEvidenceQueue.nextAction?.key,
+      actionResult.followUp.evidenceQueue.nextAction?.key
+    );
+    assert.equal(
+      actionResult.receipt.mainlineEvidenceQueue.remainingCount,
+      actionResult.followUp.evidenceQueue.remainingCount
+    );
+    assert.ok(actionResult.receipt.mainlineRecapCards.some((item) =>
+      item?.key === "mainline_status"
+      && Array.isArray(item.details)
+      && item.details.some((detail) => /Evidence queue:/i.test(String(detail || "")))
+    ));
     assert.ok(Array.isArray(actionResult.followUp.actions));
     assert.ok(actionResult.followUp.actions.some((item) =>
       item?.recommendedDownload?.key === "launch_mainline_rehearsal_guide"

@@ -9450,6 +9450,48 @@ test("developer launch mainline action can create first launch batches and retur
         { key: "ops", actionCount: 2 }
       ]
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchOpsQueue?.handoffChecklist)
+        ? actionResult.receipt.firstLaunchOpsQueue.handoffChecklist.map((item) => ({
+            key: item?.key || null,
+            ownerRole: item?.ownerRole || null,
+            stageKeys: Array.isArray(item?.stageKeys) ? item.stageKeys : [],
+            actionKeys: Array.isArray(item?.actions) ? item.actions.map((action) => action?.key || null) : []
+          }))
+        : [],
+      [
+        {
+          key: "launch_ops_handoff",
+          ownerRole: "launch_ops",
+          stageKeys: ["inventory_handoff"],
+          actionKeys: ["inventory_recheck"]
+        },
+        {
+          key: "release_manager_handoff",
+          ownerRole: "release_manager",
+          stageKeys: ["launch_recheck"],
+          actionKeys: ["launch_recheck", "launch_smoke_kit"]
+        },
+        {
+          key: "support_handoff",
+          ownerRole: "support",
+          stageKeys: ["first_sale_watch", "support_handoff"],
+          actionKeys: ["card_redemption_watch", "starter_account_handoff"]
+        },
+        {
+          key: "qa_handoff",
+          ownerRole: "qa",
+          stageKeys: ["runtime_validation"],
+          actionKeys: ["runtime_smoke"]
+        },
+        {
+          key: "ops_handoff",
+          ownerRole: "ops",
+          stageKeys: ["runtime_ops_watch"],
+          actionKeys: ["session_review", "startup_rule_watch"]
+        }
+      ]
+    );
     const firstLaunchOpsSection = Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
       ? actionResult.receipt.mainlineLastActionScreen.sections.find((item) => item?.key === "first_launch_ops_queue")
       : null;
@@ -9478,6 +9520,12 @@ test("developer launch mainline action can create first launch batches and retur
         && control?.workspaceAction?.key === "ops"
       )
     );
+    assert.ok(firstLaunchOpsSection?.cards?.find((item) =>
+      item?.key === "first_launch_ops_progress"
+      && Array.isArray(item?.details)
+      && item.details.some((detail) => /Handoff checklist:/i.test(String(detail || "")))
+      && item.details.some((detail) => /Support:2/i.test(String(detail || "")))
+    ));
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));

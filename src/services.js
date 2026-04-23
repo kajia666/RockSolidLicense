@@ -4209,8 +4209,30 @@ function buildLaunchMainlineActionReceipt({
     }
     return groups;
   };
+  const buildFirstLaunchOpsHandoffChecklist = (ownerGroups = []) => ownerGroups.map((group) => {
+    const actionsForOwner = Array.isArray(group?.actions) ? group.actions : [];
+    const stageKeys = [];
+    const stageLabels = [];
+    for (const action of actionsForOwner) {
+      if (action?.stage && !stageKeys.includes(action.stage)) {
+        stageKeys.push(action.stage);
+        stageLabels.push(action.stageLabel || action.stage);
+      }
+    }
+    return {
+      key: `${group?.key || "launch_ops"}_handoff`,
+      ownerRole: group?.key || "launch_ops",
+      ownerLabel: group?.label || "Launch Ops",
+      actionCount: Number(group?.actionCount || actionsForOwner.length || 0),
+      stageKeys,
+      stageLabels,
+      summary: `${group?.label || "Launch Ops"} owns ${Number(group?.actionCount || actionsForOwner.length || 0)} first-launch action${Number(group?.actionCount || actionsForOwner.length || 0) === 1 ? "" : "s"} across ${stageLabels.join(" + ") || "Launch Follow-Up"}.`,
+      actions: actionsForOwner
+    };
+  });
   const firstLaunchOpsStageGroups = buildFirstLaunchOpsStageGroups(firstLaunchOpsActions);
   const firstLaunchOpsOwnerGroups = buildFirstLaunchOpsOwnerGroups(firstLaunchOpsActions);
+  const firstLaunchOpsHandoffChecklist = buildFirstLaunchOpsHandoffChecklist(firstLaunchOpsOwnerGroups);
   const firstLaunchOpsQueue = isFirstLaunchInventoryOperation
     ? {
         operation: normalizedOperation,
@@ -4224,7 +4246,8 @@ function buildLaunchMainlineActionReceipt({
         nextAction: firstLaunchOpsActions[0] || null,
         actions: firstLaunchOpsActions,
         stageGroups: firstLaunchOpsStageGroups,
-        ownerGroups: firstLaunchOpsOwnerGroups
+        ownerGroups: firstLaunchOpsOwnerGroups,
+        handoffChecklist: firstLaunchOpsHandoffChecklist
       }
     : null;
   const mainlineSummary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
@@ -4590,6 +4613,9 @@ function buildLaunchMainlineActionReceipt({
             details: [
               firstLaunchOpsQueue.actions.length
                 ? `Queue: ${firstLaunchOpsQueue.actions.map((item) => item.label || item.key).join(" | ")}`
+                : "",
+              firstLaunchOpsQueue.handoffChecklist.length
+                ? `Handoff checklist: ${firstLaunchOpsQueue.handoffChecklist.map((item) => `${item.ownerLabel}:${item.actionCount}`).join(" | ")}`
                 : ""
             ].filter(Boolean),
             controls: firstLaunchInventoryQueueControlList(firstLaunchOpsQueue.nextAction)

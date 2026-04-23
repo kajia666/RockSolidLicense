@@ -16286,6 +16286,20 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
   const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
   const completionGuideDownload = routeReview.mainlineHandoff?.downloads?.rehearsalGuide || null;
   const completionFirstLaunchHandoffDownload = routeReview.mainlineHandoff?.downloads?.firstLaunchHandoff || null;
+  const completionSecondaryAction = completionFirstLaunchHandoffDownload?.key
+    ? "download-mainline-first-launch-handoff"
+    : completionGuideDownload?.key
+      ? "download-mainline-rehearsal"
+      : completionDownload?.key
+        ? "download-mainline"
+        : "download_route_review";
+  const completionSecondaryLabel = completionFirstLaunchHandoffDownload?.key
+    ? "Download First Launch Handoff"
+    : completionGuideDownload?.key
+      ? "Download Launch Mainline Rehearsal Guide"
+      : completionDownload?.key
+        ? "Download Launch Mainline Summary"
+        : "Download Routed Summary";
   if (nextMatch) {
     return {
       remainingCount,
@@ -16311,8 +16325,8 @@ function buildDeveloperOpsRouteReviewContinuation(routeReview = {}) {
     nextControlLabel: "",
     primaryAction: "complete_route_review",
     primaryLabel: "Complete Routed Review",
-    secondaryAction: "download_route_review",
-    secondaryLabel: "Download Routed Summary",
+    secondaryAction: completionSecondaryAction,
+    secondaryLabel: completionSecondaryLabel,
     nextDownload: null,
     remainingDownload: routeReview.downloads?.remaining || null,
     completionWorkspaceAction,
@@ -16330,6 +16344,30 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
   const completionDownload = routeReview.mainlineHandoff?.downloads?.summary || null;
   const completionGuideDownload = routeReview.mainlineHandoff?.downloads?.rehearsalGuide || null;
   const completionFirstLaunchHandoffDownload = routeReview.mainlineHandoff?.downloads?.firstLaunchHandoff || null;
+  const buildCompletionSecondaryAction = () => {
+    if (completionFirstLaunchHandoffDownload?.key) {
+      return {
+        action: "download-mainline-first-launch-handoff",
+        label: "Download First Launch Handoff"
+      };
+    }
+    if (completionGuideDownload?.key) {
+      return {
+        action: "download-mainline-rehearsal",
+        label: "Download Launch Mainline Rehearsal Guide"
+      };
+    }
+    if (completionDownload?.key) {
+      return {
+        action: "download-mainline",
+        label: "Download Launch Mainline Summary"
+      };
+    }
+    return {
+      action: "download_route_review",
+      label: "Download Routed Summary"
+    };
+  };
   queue.forEach((entry, index) => {
     if (!entry?.kind || !entry?.item || typeof entry.item !== "object") {
       return;
@@ -16340,6 +16378,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
     }
     const nextMatch = queue[index + 1] && typeof queue[index + 1] === "object" ? queue[index + 1] : null;
     const nextControlLabel = nextMatch?.recommendedControl?.label || "";
+    const completionSecondary = nextMatch ? null : buildCompletionSecondaryAction();
     continuations[key] = {
       remainingCount: nextMatch ? 1 : 0,
       queuedRemainingCount: Math.max(queue.length - index - 1, 0),
@@ -16347,8 +16386,8 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
       nextControlLabel,
       primaryAction: nextMatch ? "review_next" : "complete_route_review",
       primaryLabel: nextMatch ? "Continue Routed Review" : "Complete Routed Review",
-      secondaryAction: nextMatch ? (nextControlLabel ? "control_next" : "download_next") : "download_route_review",
-      secondaryLabel: nextMatch ? (nextControlLabel ? "Open Next Control" : "Download Next Match Summary") : "Download Routed Summary",
+      secondaryAction: nextMatch ? (nextControlLabel ? "control_next" : "download_next") : completionSecondary.action,
+      secondaryLabel: nextMatch ? (nextControlLabel ? "Open Next Control" : "Download Next Match Summary") : completionSecondary.label,
       nextDownload: nextMatch ? buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope, nextMatch, "next") : null,
       remainingDownload,
       nextMatch: nextMatch || null,

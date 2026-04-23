@@ -11339,6 +11339,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionDownload?.key, "launch_mainline_summary");
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionGuideDownload?.key, "launch_mainline_rehearsal_guide");
     assert.equal(exportSnapshot.routeReview?.continuations?.[nextContinuationKey]?.completionFirstLaunchHandoffDownload?.key, "launch_mainline_first_launch_handoff");
+    const completionContinuation = Object.values(exportSnapshot.routeReview?.continuations || {})
+      .find((item) => item?.primaryAction === "complete_route_review") || null;
+    assert.equal(completionContinuation?.secondaryAction, "download-mainline-first-launch-handoff");
+    assert.equal(completionContinuation?.secondaryLabel, "Download First Launch Handoff");
+    assert.equal(completionContinuation?.completionFirstLaunchHandoffDownload?.key, "launch_mainline_first_launch_handoff");
     assert.equal(exportSnapshot.routeReview?.continuation?.completionGuideDownload?.key, "launch_mainline_rehearsal_guide");
     assert.equal(exportSnapshot.routeReview?.continuation?.completionFirstLaunchHandoffDownload?.key, "launch_mainline_first_launch_handoff");
     assert.equal(exportSnapshot.mainlineHandoff?.workspaceAction?.key, "launch-mainline");

@@ -8682,6 +8682,17 @@ test("developer launch mainline action can restock low inventory and return duty
       }
     );
     assert.ok(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.productionEvidence?.controls)
+      && actionResult.receipt.firstLaunchDutySummary.productionEvidence.controls.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation
+      )
+      && actionResult.receipt.firstLaunchDutySummary.productionEvidence.controls.some((control) =>
+        control?.kind === "workspace"
+        && control?.workspaceAction?.key === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key
+      )
+    );
+    assert.ok(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.details)
       && actionResult.receipt.firstLaunchDutySummary.details.some((detail) =>
         /Inventory health: READY \| ready=2 \| low=0 \| missing=0 \| readyModes=direct_card,recharge/i.test(String(detail || ""))
@@ -9933,6 +9944,17 @@ test("developer launch mainline action can create first launch batches and retur
         nextActionKey: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.key || null,
         nextOperation: actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation || null
       }
+    );
+    assert.ok(
+      Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.productionEvidence?.controls)
+      && actionResult.receipt.firstLaunchDutySummary.productionEvidence.controls.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation
+      )
+      && actionResult.receipt.firstLaunchDutySummary.productionEvidence.controls.some((control) =>
+        control?.kind === "workspace"
+        && control?.workspaceAction?.key === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key
+      )
     );
     assert.deepEqual(
       Array.isArray(actionResult.receipt?.firstLaunchDutySummary?.dutyChain)

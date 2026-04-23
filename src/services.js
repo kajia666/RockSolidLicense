@@ -4660,7 +4660,10 @@ function buildLaunchMainlineActionReceipt({
           .filter(Boolean),
         completedKeys: (Array.isArray(mainlineEvidenceQueue?.completedChecks) ? mainlineEvidenceQueue.completedChecks : [])
           .map((item) => item?.key || item?.setupAction?.operation || null)
-          .filter(Boolean)
+          .filter(Boolean),
+        controls: dedupeLaunchMainlineControls(
+          firstLaunchInventoryQueueControlList(mainlineEvidenceQueue?.nextAction || followUp?.nextProductionAction || null)
+        )
       }
     : null;
   const firstLaunchDutySummary = firstLaunchOpsQueue

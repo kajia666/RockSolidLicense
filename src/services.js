@@ -4038,6 +4038,61 @@ function buildLaunchMainlineActionReceipt({
       setupAction: item?.setupAction || null
     }))
     .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
+  const isFirstLaunchInventoryOperation = normalizedOperation === "first_batch_setup" || normalizedOperation === "restock";
+  const firstLaunchInventoryCreatedBatches = (Array.isArray(result?.createdBatches) ? result.createdBatches : [])
+    .map((item) => ({
+      key: item?.key || item?.mode || item?.batchCode || null,
+      mode: item?.mode || null,
+      label: item?.label || item?.key || item?.mode || "Launch batch",
+      grantType: item?.grantType || null,
+      count: Number(item?.count || 0),
+      batchCode: item?.batchCode || null,
+      prefix: item?.prefix || null,
+      purpose: item?.purpose || null,
+      refillCount: Number(item?.refillCount || 0),
+      beforeFresh: Number.isFinite(Number(item?.beforeFresh)) ? Number(item.beforeFresh) : null,
+      targetCount: Number.isFinite(Number(item?.targetCount)) ? Number(item.targetCount) : null
+    }))
+    .filter((item) => item.key || item.batchCode || item.count > 0);
+  const firstLaunchInventoryStates = (Array.isArray(result?.inventoryStates) ? result.inventoryStates : [])
+    .map((item) => ({
+      key: item?.key || item?.mode || null,
+      mode: item?.mode || null,
+      label: item?.label || item?.key || item?.mode || "Inventory state",
+      status: item?.status || item?.inventoryStatus || "unknown",
+      freshCount: Number(item?.freshCount || 0),
+      targetCount: Number(item?.targetCount || 0),
+      refillCount: Number(item?.refillCount || 0)
+    }))
+    .filter((item) => item.key || item.label);
+  const firstLaunchInventorySkipped = (Array.isArray(result?.skipped) ? result.skipped : [])
+    .map((item) => ({
+      key: item?.key || item?.mode || item?.label || null,
+      mode: item?.mode || null,
+      label: item?.label || item?.key || item?.mode || "Skipped",
+      reason: item?.reason || item?.summary || null
+    }))
+    .filter((item) => item.key || item.label);
+  const firstLaunchInventoryNextActions = actions.slice(0, 5);
+  const firstLaunchInventoryQueue = isFirstLaunchInventoryOperation
+    ? {
+        operation: normalizedOperation,
+        requestedMode: result?.requestedMode || "recommended",
+        operationLabel,
+        summary: firstLaunchInventoryCreatedBatches.length
+          ? `${operationLabel} staged ${firstLaunchInventoryCreatedBatches.length} launch batch${firstLaunchInventoryCreatedBatches.length === 1 ? "" : "es"} with ${firstLaunchInventoryCreatedBatches.reduce((sum, item) => sum + Number(item.count || 0), 0)} fresh cards.`
+          : `${operationLabel} did not create new launch batches.`,
+        createdBatchCount: firstLaunchInventoryCreatedBatches.length,
+        createdCardCount: firstLaunchInventoryCreatedBatches.reduce((sum, item) => sum + Number(item.count || 0), 0),
+        skippedCount: firstLaunchInventorySkipped.length,
+        inventoryStateCount: firstLaunchInventoryStates.length,
+        createdBatches: firstLaunchInventoryCreatedBatches,
+        inventoryStates: firstLaunchInventoryStates,
+        skipped: firstLaunchInventorySkipped,
+        nextAction: firstLaunchInventoryNextActions[0] || null,
+        nextActions: firstLaunchInventoryNextActions
+      }
+    : null;
   const mainlineSummary = launchMainline?.mainlineSummary && typeof launchMainline.mainlineSummary === "object"
     ? launchMainline.mainlineSummary
     : {};
@@ -4298,6 +4353,91 @@ function buildLaunchMainlineActionReceipt({
     }
     return item?.key || item?.summary || item?.controls?.length;
   });
+  const firstLaunchInventoryQueueControlList = (item = null) => [
+    item?.workspaceAction ? {
+      kind: "workspace",
+      label: item.workspaceAction.label || item.label || item.title || item.key || "Open workspace",
+      workspaceAction: item.workspaceAction
+    } : null,
+    item?.recommendedDownload ? {
+      kind: "download",
+      label: item.recommendedDownload.label || item.label || item.title || item.key || "Download summary",
+      recommendedDownload: item.recommendedDownload
+    } : null,
+    item?.bootstrapAction ? {
+      kind: "bootstrap",
+      label: item.bootstrapAction.label || item.label || item.title || item.key || "Run bootstrap",
+      bootstrapAction: item.bootstrapAction
+    } : null,
+    item?.setupAction ? {
+      kind: "setup",
+      label: item.setupAction.label || item.label || item.title || item.key || "Run setup",
+      setupAction: item.setupAction
+    } : null
+  ].filter(Boolean);
+  const firstLaunchInventoryQueueSection = firstLaunchInventoryQueue
+    ? {
+        key: "first_launch_inventory_queue",
+        title: "First Launch Inventory Queue",
+        emptyState: "Run first-batch setup or inventory refill to review the launch inventory handoff here.",
+        cards: [
+          {
+            key: "first_launch_inventory_progress",
+            title: "First Launch Inventory Progress",
+            summary: firstLaunchInventoryQueue.summary,
+            tags: [
+              { label: "createdBatches", value: firstLaunchInventoryQueue.createdBatchCount, strong: true },
+              { label: "createdCards", value: firstLaunchInventoryQueue.createdCardCount, strong: true },
+              { label: "inventoryStates", value: firstLaunchInventoryQueue.inventoryStateCount, strong: false },
+              firstLaunchInventoryQueue.skippedCount
+                ? { label: "skipped", value: firstLaunchInventoryQueue.skippedCount, strong: false }
+                : null
+            ].filter(Boolean),
+            details: [
+              firstLaunchInventoryQueue.inventoryStates.length
+                ? `Inventory states: ${firstLaunchInventoryQueue.inventoryStates.map((item) => `${item.label}:${String(item.status || "unknown").toUpperCase()} ${item.freshCount}/${item.targetCount}`).join(" | ")}`
+                : "",
+              firstLaunchInventoryQueue.skipped.length
+                ? `Skipped: ${firstLaunchInventoryQueue.skipped.map((item) => `${item.label}${item.reason ? ` (${item.reason})` : ""}`).join(" | ")}`
+                : ""
+            ].filter(Boolean),
+            controls: []
+          },
+          {
+            key: "first_launch_inventory_next_action",
+            title: firstLaunchInventoryQueue.nextAction?.label || firstLaunchInventoryQueue.nextAction?.title || "Next first launch inventory action",
+            summary: firstLaunchInventoryQueue.nextAction?.summary || "Review the created first-launch batches before the next rollout handoff.",
+            tags: [
+              firstLaunchInventoryQueue.nextAction?.timing
+                ? { label: "timing", value: firstLaunchInventoryQueue.nextAction.timing, strong: true }
+                : null,
+              firstLaunchInventoryQueue.nextAction?.key
+                ? { label: "action", value: firstLaunchInventoryQueue.nextAction.key, strong: false }
+                : null
+            ].filter(Boolean),
+            details: [],
+            controls: firstLaunchInventoryQueueControlList(firstLaunchInventoryQueue.nextAction)
+          },
+          ...firstLaunchInventoryQueue.createdBatches.map((item) => ({
+            key: `first_launch_batch_${item.key}`,
+            title: item.label || item.batchCode || "First launch batch",
+            summary: item.purpose || "Created first-launch inventory batch.",
+            tags: [
+              item.mode ? { label: "mode", value: item.mode, strong: true } : null,
+              item.count ? { label: "count", value: item.count, strong: true } : null,
+              item.grantType ? { label: "grant", value: item.grantType, strong: false } : null,
+              item.prefix ? { label: "prefix", value: item.prefix, strong: false } : null
+            ].filter(Boolean),
+            details: [
+              item.batchCode ? `Batch: ${item.batchCode}` : "",
+              item.targetCount ? `Target: ${item.targetCount}` : "",
+              item.beforeFresh !== null ? `Before fresh: ${item.beforeFresh}` : ""
+            ].filter(Boolean),
+            controls: []
+          }))
+        ].filter((item) => item.key || item.summary || item.controls.length)
+      }
+    : null;
   const mainlineRecapCards = [
     {
       key: "result_status",
@@ -4340,7 +4480,10 @@ function buildLaunchMainlineActionReceipt({
         Array.isArray(mainlineNextActions) && mainlineNextActions.length
           ? `Next actions: ${mainlineNextActions.join(" | ")}`
           : "",
-        mainlineEvidenceQueueDetail
+        mainlineEvidenceQueueDetail,
+        firstLaunchInventoryQueue
+          ? `First launch inventory: batches=${firstLaunchInventoryQueue.createdBatchCount} | cards=${firstLaunchInventoryQueue.createdCardCount} | next=${firstLaunchInventoryQueue.nextAction?.label || firstLaunchInventoryQueue.nextAction?.key || "-"}`
+          : ""
       ].filter(Boolean),
       controls: mainlineFollowUpActions
     },
@@ -4374,13 +4517,14 @@ function buildLaunchMainlineActionReceipt({
         emptyState: "Run a launch-mainline action to review the unified recap here.",
         cards: mainlineRecapCards
       },
+      firstLaunchInventoryQueueSection,
       {
         key: "follow_up",
         title: "Continue Launch Mainline",
         emptyState: "Run a launch-mainline action to keep the next unified follow-up visible here.",
         cards: mainlineFollowUpCards
       }
-    ]
+    ].filter(Boolean)
   };
   const mainlineRouteFocus = launchMainline?.mainlineSummary?.routeFocus && typeof launchMainline.mainlineSummary.routeFocus === "object"
     ? launchMainline.mainlineSummary.routeFocus
@@ -4418,6 +4562,7 @@ function buildLaunchMainlineActionReceipt({
     mainlineContinuation,
     mainlineNextActions,
     mainlineEvidenceQueue,
+    firstLaunchInventoryQueue,
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineForm,

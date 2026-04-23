@@ -8929,6 +8929,18 @@ test("developer launch mainline action can bootstrap starter launch assets and r
             ? actionResult.receipt.mainlineRecapCards.map((item) => item?.key || null)
             : []
         },
+        ...(actionResult.receipt?.firstLaunchInventoryQueue
+          ? [
+              {
+                key: "first_launch_inventory_queue",
+                cards: [
+                  "first_launch_inventory_progress",
+                  "first_launch_inventory_next_action",
+                  ...actionResult.receipt.firstLaunchInventoryQueue.createdBatches.map((item) => `first_launch_batch_${item.key}`)
+                ]
+              }
+            ]
+          : []),
         {
           key: "follow_up",
           cards: Array.isArray(actionResult.receipt?.mainlineFollowUpCards)
@@ -9268,6 +9280,84 @@ test("developer launch mainline action can create first launch batches and retur
     assert.ok(Array.isArray(actionResult.receipt?.actions));
     assert.ok(actionResult.receipt?.actions?.length >= 1);
     assert.equal(actionResult.result?.createdBatches?.length, 2);
+    assert.deepEqual(
+      actionResult.receipt?.firstLaunchInventoryQueue
+        ? {
+            operation: actionResult.receipt.firstLaunchInventoryQueue.operation || null,
+            requestedMode: actionResult.receipt.firstLaunchInventoryQueue.requestedMode || null,
+            createdBatchCount: actionResult.receipt.firstLaunchInventoryQueue.createdBatchCount ?? null,
+            createdCardCount: actionResult.receipt.firstLaunchInventoryQueue.createdCardCount ?? null,
+            skippedCount: actionResult.receipt.firstLaunchInventoryQueue.skippedCount ?? null,
+            inventoryStateCount: actionResult.receipt.firstLaunchInventoryQueue.inventoryStateCount ?? null,
+            nextActionKey: actionResult.receipt.firstLaunchInventoryQueue.nextAction?.key || null
+          }
+        : null,
+      {
+        operation: "first_batch_setup",
+        requestedMode: "recommended",
+        createdBatchCount: actionResult.result.createdBatches.length,
+        createdCardCount: actionResult.result.createdBatches.reduce((sum, item) => sum + Number(item?.count || 0), 0),
+        skippedCount: 0,
+        inventoryStateCount: actionResult.result.inventoryStates.length,
+        nextActionKey: actionResult.followUp.primaryAction?.key
+      }
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.receipt?.firstLaunchInventoryQueue?.createdBatches)
+        ? actionResult.receipt.firstLaunchInventoryQueue.createdBatches.map((item) => ({
+            key: item?.key || null,
+            mode: item?.mode || null,
+            label: item?.label || null,
+            count: item?.count ?? null,
+            batchCode: item?.batchCode || null,
+            prefix: item?.prefix || null
+          }))
+        : [],
+      actionResult.result.createdBatches.map((item) => ({
+        key: item?.key || null,
+        mode: item?.mode || null,
+        label: item?.label || null,
+        count: item?.count ?? null,
+        batchCode: item?.batchCode || null,
+        prefix: item?.prefix || null
+      }))
+    );
+    assert.ok(
+      actionResult.receipt?.firstLaunchInventoryQueue?.nextActions?.some((item) =>
+        item?.key === "inventory_recheck"
+        && item?.workspaceAction?.key === "licenses"
+        && item?.recommendedDownload?.key
+      )
+    );
+    const firstLaunchInventorySection = Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+      ? actionResult.receipt.mainlineLastActionScreen.sections.find((item) => item?.key === "first_launch_inventory_queue")
+      : null;
+    assert.deepEqual(
+      firstLaunchInventorySection
+        ? {
+            key: firstLaunchInventorySection.key || null,
+            title: firstLaunchInventorySection.title || null,
+            cards: Array.isArray(firstLaunchInventorySection.cards)
+              ? firstLaunchInventorySection.cards.map((item) => item?.key || null)
+              : []
+          }
+        : null,
+      {
+        key: "first_launch_inventory_queue",
+        title: "First Launch Inventory Queue",
+        cards: [
+          "first_launch_inventory_progress",
+          "first_launch_inventory_next_action",
+          ...actionResult.result.createdBatches.map((item) => `first_launch_batch_${item.key}`)
+        ]
+      }
+    );
+    assert.ok(
+      firstLaunchInventorySection?.cards?.find((item) => item?.key === "first_launch_inventory_next_action")?.controls?.some((control) =>
+        control?.kind === "workspace"
+        && control?.workspaceAction?.key === actionResult.followUp.primaryAction?.workspaceAction?.key
+      )
+    );
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
@@ -9598,6 +9688,18 @@ test("developer launch mainline action can create first launch batches and retur
             ? actionResult.receipt.mainlineRecapCards.map((item) => item?.key || null)
             : []
         },
+        ...(actionResult.receipt?.firstLaunchInventoryQueue
+          ? [
+              {
+                key: "first_launch_inventory_queue",
+                cards: [
+                  "first_launch_inventory_progress",
+                  "first_launch_inventory_next_action",
+                  ...actionResult.receipt.firstLaunchInventoryQueue.createdBatches.map((item) => `first_launch_batch_${item.key}`)
+                ]
+              }
+            ]
+          : []),
         {
           key: "follow_up",
           cards: Array.isArray(actionResult.receipt?.mainlineFollowUpCards)

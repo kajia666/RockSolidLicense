@@ -2934,6 +2934,7 @@ function buildReleaseMainlineFollowUpPayload({
   if (normalizedStatus !== "hold") {
     recommendedDownloads.push(launchSummaryDownload, launchReviewDownload, launchSmokeKitDownload);
   }
+  const orderedRecommendedDownloads = frontloadLaunchMainlineRehearsalDownload(recommendedDownloads);
 
   const mainlineGate = buildLaunchMainlineGatePayload({
     status: normalizedStatus,
@@ -2943,7 +2944,7 @@ function buildReleaseMainlineFollowUpPayload({
     attentionCount: readiness.attentionChecks ?? deliveryChecklist.reviewItems ?? 0,
     recommendedWorkspace,
     actionPlan,
-    recommendedDownloads
+    recommendedDownloads: orderedRecommendedDownloads
   });
 
   return {
@@ -2954,7 +2955,7 @@ function buildReleaseMainlineFollowUpPayload({
     recommendedWorkspace,
     workspaceActions,
     actionPlan,
-    recommendedDownloads
+    recommendedDownloads: orderedRecommendedDownloads
   };
 }
 
@@ -6866,6 +6867,7 @@ function buildLaunchWorkflowSummaryPayload({
       }
     )
   ];
+  const orderedRecommendedDownloads = frontloadLaunchMainlineRehearsalDownload(recommendedDownloads);
   const nextActions = [];
   for (const item of Array.isArray(readiness.nextActions) ? readiness.nextActions.slice(0, 2) : []) {
     nextActions.push(item);
@@ -7168,7 +7170,7 @@ function buildLaunchWorkflowSummaryPayload({
     attentionCount: workflowChecklist.reviewItems ?? 0,
     recommendedWorkspace,
     actionPlan,
-    recommendedDownloads
+    recommendedDownloads: orderedRecommendedDownloads
   });
 
   return {
@@ -7205,8 +7207,8 @@ function buildLaunchWorkflowSummaryPayload({
     launchFirstBatchSetupAction: authReadiness.firstBatchSetupAction || null,
     launchFirstBatchSetupSummary: authReadiness.firstBatchSetupSummary || null,
     mainlineGate,
-    recommendedDownloads,
-    downloadSummary: recommendedDownloads.map((item) => item.label).join(" + "),
+    recommendedDownloads: orderedRecommendedDownloads,
+    downloadSummary: orderedRecommendedDownloads.map((item) => item.label).join(" + "),
     recommendedWorkspace,
     workspaceActions,
     actionPlan,
@@ -9255,6 +9257,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   for (const item of Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 3) : []) {
     pushRecommendedDownload(item);
   }
+  const orderedRecommendedDownloads = frontloadLaunchMainlineRehearsalDownload(recommendedDownloads);
 
   const preferredReviewTarget = visibleReviewTargets[0] || null;
   const recommendedWorkspace = (actionPlan.find((item) => item.priority === "primary" && item.workspaceAction)?.workspaceAction)
@@ -9295,7 +9298,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     attentionCount: reviewAttentionCount,
     recommendedWorkspace,
     actionPlan,
-    recommendedDownloads
+    recommendedDownloads: orderedRecommendedDownloads
   });
 
   return {
@@ -9308,7 +9311,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     actionPlan,
-    recommendedDownloads,
+    recommendedDownloads: orderedRecommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
   };
 }
@@ -10048,6 +10051,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         : remainingReviewDownload.params
     });
   }
+  const orderedRecommendedDownloads = frontloadLaunchMainlineRehearsalDownload(recommendedDownloads);
   for (const item of visibleReviewTargets) {
     pushWorkspaceAction(item.workspaceAction);
   }
@@ -10191,7 +10195,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     attentionCount: smokeAttentionCount,
     recommendedWorkspace,
     actionPlan,
-    recommendedDownloads
+    recommendedDownloads: orderedRecommendedDownloads
   });
 
   return {
@@ -10213,7 +10217,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     actionPlan,
-    recommendedDownloads
+    recommendedDownloads: orderedRecommendedDownloads
   };
 }
 

@@ -5285,6 +5285,10 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "release_checklist"));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide" && item.source === "developer-launch-mainline"));
+    assert.ok(
+      releasePackage.mainlineFollowUp.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
+      < releasePackage.mainlineFollowUp.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
+    );
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
@@ -5581,6 +5585,10 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide" && item.source === "developer-launch-mainline"));
+    assert.ok(
+      launchWorkflow.workflowSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
+      < launchWorkflow.workflowSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
+    );
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.equal(launchWorkflow.workflowSummary.launchBootstrapAction?.label, "Run Launch Bootstrap");
@@ -5849,6 +5857,10 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.fileName === "developer-ops-remaining-summary.txt"));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_rehearsal_guide" && item.source === "developer-launch-mainline"));
+    assert.ok(
+      launchReview.reviewSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
+      < launchReview.reviewSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
+    );
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
       assert.ok(launchReview.reviewSummary.reviewTargets.some((item) => item.workspaceAction?.key === "ops"));
@@ -7805,6 +7817,10 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.fileName === "developer-ops-remaining-summary.txt"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_rehearsal_guide" && item.source === "developer-launch-mainline"));
+    assert.ok(
+      smokeKit.smokeSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
+      < smokeKit.smokeSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
+    );
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));

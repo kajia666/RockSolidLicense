@@ -3949,6 +3949,8 @@ function buildLaunchMainlineActionReceipt({
     ? "Inventory Refill"
     : normalizedOperation === "first_batch_setup"
       ? "First Batch Setup"
+      : normalizedOperation === "record_launch_rehearsal_run"
+        ? "Record Launch Rehearsal Run"
       : normalizedOperation === "record_launch_stabilization_review"
         ? "Record Launch Stabilization Review"
       : normalizedOperation === "record_launch_closeout_review"
@@ -4558,6 +4560,13 @@ function queryLatestLaunchMainlineOperationsWalkthroughEvidence(db, options = {}
   });
 }
 
+function queryLatestLaunchMainlineLaunchRehearsalRunEvidence(db, options = {}) {
+  return queryLatestLaunchMainlineEvidence(db, {
+    ...options,
+    eventType: "product.launch-mainline.launch-rehearsal-run"
+  });
+}
+
 function queryLatestLaunchMainlineDeployVerificationEvidence(db, options = {}) {
   return queryLatestLaunchMainlineEvidence(db, {
     ...options,
@@ -4624,9 +4633,11 @@ function buildLaunchMainlineProductionGatePayload({
   cutoverHandoffDownload = null,
   recoveryDrillHandoffDownload = null,
   operationsHandoffDownload = null,
+  rehearsalGuideDownload = null,
   postLaunchSweepHandoffDownload = null,
   closeoutHandoffDownload = null,
   stabilizationHandoffDownload = null,
+  launchRehearsalRunEvidence = null,
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
   operationsWalkthroughEvidence = null,
@@ -4662,6 +4673,7 @@ function buildLaunchMainlineProductionGatePayload({
   const effectiveCutoverDownload = cutoverHandoffDownload || effectiveProductionDownload;
   const effectiveRecoveryDrillDownload = recoveryDrillHandoffDownload || effectiveProductionDownload;
   const effectiveOperationsDownload = operationsHandoffDownload || effectiveProductionDownload;
+  const effectiveRehearsalDownload = rehearsalGuideDownload || effectiveOperationsDownload || effectiveProductionDownload;
   const effectivePostLaunchSweepDownload = postLaunchSweepHandoffDownload || effectiveOperationsDownload || effectiveProductionDownload;
   const effectiveCloseoutDownload = closeoutHandoffDownload || effectivePostLaunchSweepDownload || effectiveOperationsDownload || effectiveProductionDownload;
   const effectiveStabilizationDownload = stabilizationHandoffDownload || effectiveCloseoutDownload || effectivePostLaunchSweepDownload || effectiveOperationsDownload || effectiveProductionDownload;
@@ -4810,6 +4822,13 @@ function buildLaunchMainlineProductionGatePayload({
     mode: "evidence",
     operation: "record_operations_walkthrough"
   });
+  const launchRehearsalRunRecordAction = createLaunchWorkflowSetupAction({
+    key: "launch_mainline_record_launch_rehearsal_run",
+    label: "Record Launch Rehearsal Run",
+    summary: "Capture a realistic end-to-end launch rehearsal run for this lane so the production gate can verify the dry-run evidence before rollout.",
+    mode: "evidence",
+    operation: "record_launch_rehearsal_run"
+  });
   const deployVerificationRecordAction = createLaunchWorkflowSetupAction({
     key: "launch_mainline_record_deploy_verification",
     label: "Record Deploy Verification",
@@ -4878,6 +4897,12 @@ function buildLaunchMainlineProductionGatePayload({
     ? Math.max(0, Math.floor((Date.now() - operationsWalkthroughRecordedMs) / 86400000))
     : null;
   const hasRecentOperationsWalkthroughDirect = operationsWalkthroughAgeDays !== null && operationsWalkthroughAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
+  const launchRehearsalRunRecordedAt = String(launchRehearsalRunEvidence?.createdAt || "").trim();
+  const launchRehearsalRunRecordedMs = launchRehearsalRunRecordedAt ? Date.parse(launchRehearsalRunRecordedAt) : Number.NaN;
+  const launchRehearsalRunAgeDays = Number.isFinite(launchRehearsalRunRecordedMs)
+    ? Math.max(0, Math.floor((Date.now() - launchRehearsalRunRecordedMs) / 86400000))
+    : null;
+  const hasRecentLaunchRehearsalRun = launchRehearsalRunAgeDays !== null && launchRehearsalRunAgeDays <= LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS;
   const cutoverWalkthroughRecordedAt = String(cutoverWalkthroughEvidence?.createdAt || "").trim();
   const cutoverWalkthroughRecordedMs = cutoverWalkthroughRecordedAt ? Date.parse(cutoverWalkthroughRecordedAt) : Number.NaN;
   const cutoverWalkthroughAgeDays = Number.isFinite(cutoverWalkthroughRecordedMs)
@@ -5105,6 +5130,33 @@ function buildLaunchMainlineProductionGatePayload({
 
   pushRecommendedDownload(effectiveProductionDownload);
   pushRecommendedDownload(mainlineSummaryDownload);
+  if (rehearsalGuideDownload) {
+    pushRecommendedDownload(rehearsalGuideDownload);
+    if (hasRecentLaunchRehearsalRun) {
+      addPassCheck(
+        "production_launch_rehearsal_run_recent",
+        "A recent launch rehearsal run is recorded",
+        `The latest launch rehearsal run for this lane was recorded at ${launchRehearsalRunRecordedAt} and is still within the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window.`,
+        opsWorkspace,
+        effectiveRehearsalDownload,
+        null,
+        launchRehearsalRunRecordAction
+      );
+    } else {
+      addStep(
+        "hold",
+        "production_launch_rehearsal_run_recent",
+        "Record a recent launch rehearsal run",
+        launchRehearsalRunRecordedAt
+          ? `The latest launch rehearsal run was recorded at ${launchRehearsalRunRecordedAt}, which is outside the ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS}-day readiness window. Record a fresh end-to-end rehearsal before widening rollout.`
+          : `No launch rehearsal run has been recorded for this lane in the last ${LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS} days. Record one after walking release, workflow, smoke, review, ops, and mainline together.`,
+        opsWorkspace,
+        effectiveRehearsalDownload,
+        null,
+        launchRehearsalRunRecordAction
+      );
+    }
+  }
   addPassCheck(
     "production_backup_restore_handoff",
     "Review the production backup and restore handoff",
@@ -10465,6 +10517,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   tokenKeySummary = null,
   publicBaseUrl = "",
   runtimeConfig = {},
+  launchRehearsalRunEvidence = null,
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
   operationsWalkthroughEvidence = null,
@@ -10773,9 +10826,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     cutoverHandoffDownload,
     recoveryDrillHandoffDownload,
     operationsHandoffDownload,
+    rehearsalGuideDownload,
     postLaunchSweepHandoffDownload,
     closeoutHandoffDownload,
     stabilizationHandoffDownload,
+    launchRehearsalRunEvidence,
     recoveryDrillEvidence,
     backupVerificationEvidence,
     operationsWalkthroughEvidence,
@@ -11577,6 +11632,7 @@ function buildDeveloperLaunchMainlinePayload({
   tokenKeySummary = null,
   publicBaseUrl = "",
   runtimeConfig = {},
+  launchRehearsalRunEvidence = null,
   recoveryDrillEvidence = null,
   backupVerificationEvidence = null,
   operationsWalkthroughEvidence = null,
@@ -11668,6 +11724,7 @@ function buildDeveloperLaunchMainlinePayload({
     tokenKeySummary,
     publicBaseUrl,
     runtimeConfig,
+    launchRehearsalRunEvidence,
     recoveryDrillEvidence,
     backupVerificationEvidence,
     operationsWalkthroughEvidence,
@@ -21446,6 +21503,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
         channel
       });
+      const launchRehearsalRunEvidence = queryLatestLaunchMainlineLaunchRehearsalRunEvidence(db, {
+        productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel
+      });
       const deployVerificationEvidence = queryLatestLaunchMainlineDeployVerificationEvidence(db, {
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
         channel
@@ -21489,6 +21550,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         tokenKeySummary,
         publicBaseUrl: options.publicBaseUrl || "",
         runtimeConfig: config,
+        launchRehearsalRunEvidence,
         recoveryDrillEvidence,
         backupVerificationEvidence,
         operationsWalkthroughEvidence,
@@ -21645,6 +21707,36 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           recordedEvidence: {
             key: "operations_walkthrough",
             label: "Operations walkthrough",
+            createdAt: recordedAt,
+            productCode: ownedProduct.code,
+            channel
+          }
+        };
+      } else if (operation === "record_launch_rehearsal_run") {
+        const session = requireDeveloperSession(db, token);
+        const ownedProduct = await requireDeveloperOwnedProductByCode(
+          db,
+          store,
+          session,
+          selector.productCode,
+          "ops.write"
+        );
+        const channel = normalizeChannel(selector.channel || body.channel, "stable");
+        const recordedAt = nowIso();
+        auditDeveloperSession(db, session, "product.launch-mainline.launch-rehearsal-run", "product", ownedProduct.id, {
+          productCode: ownedProduct.code,
+          channel,
+          launchRehearsalRunAt: recordedAt
+        });
+        result = {
+          productCode: ownedProduct.code,
+          channel,
+          message: `Launch rehearsal run recorded for ${ownedProduct.code} (${channel}).`,
+          before: { counts: {} },
+          after: { counts: {} },
+          recordedEvidence: {
+            key: "launch_rehearsal_run",
+            label: "Launch rehearsal run",
             createdAt: recordedAt,
             productCode: ownedProduct.code,
             channel
@@ -21894,7 +21986,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         throw new AppError(
           400,
           "INVALID_LAUNCH_MAINLINE_ACTION",
-          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_deploy_verification, record_health_verification, record_rollback_walkthrough, record_cutover_walkthrough, record_launch_day_readiness_review, record_post_launch_ops_sweep, record_launch_stabilization_review, or record_launch_closeout_review."
+          "operation must be bootstrap, first_batch_setup, restock, record_recovery_drill, record_backup_verification, record_operations_walkthrough, record_launch_rehearsal_run, record_deploy_verification, record_health_verification, record_rollback_walkthrough, record_cutover_walkthrough, record_launch_day_readiness_review, record_post_launch_ops_sweep, record_launch_stabilization_review, or record_launch_closeout_review."
         );
       }
 

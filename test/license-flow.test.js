@@ -7433,6 +7433,97 @@ test("developer launch mainline action can record a launch stabilization review 
   }
 });
 
+test("developer launch mainline action can record a launch rehearsal run and refresh production evidence", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineRehearsalAdmin123!",
+    serverTokenSecret: "mainline-rehearsal-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineRehearsalAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "launch.mainline.rehearsal.owner",
+        password: "LaunchMainlineRehearsalOwner123!",
+        displayName: "Launch Mainline Rehearsal Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_REHEARSAL",
+        name: "Mainline Rehearsal App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "launch.mainline.rehearsal.owner",
+      password: "LaunchMainlineRehearsalOwner123!"
+    });
+
+    const beforeMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_REHEARSAL&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+
+    assert.ok(
+      Array.isArray(beforeMainline.mainlineSummary.productionGate?.checks)
+      && beforeMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_rehearsal_run_recent"
+        && item?.status === "block"
+        && item?.setupAction?.operation === "record_launch_rehearsal_run"
+      )
+    );
+
+    const actionResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_REHEARSAL",
+        channel: "stable",
+        operation: "record_launch_rehearsal_run"
+      },
+      ownerSession.token
+    );
+
+    assert.equal(actionResult.operation, "record_launch_rehearsal_run");
+    assert.match(actionResult.message || "", /launch rehearsal run/i);
+    assert.equal(actionResult.result?.recordedEvidence?.key, "launch_rehearsal_run");
+    assert.ok(actionResult.result?.recordedEvidence?.createdAt);
+    assert.equal(actionResult.receipt?.operation, "record_launch_rehearsal_run");
+    assert.ok(Array.isArray(actionResult.receipt?.created));
+    assert.ok(actionResult.receipt.created.some((item) => item.key === "launch_rehearsal_run"));
+    assert.ok(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.checks)
+      && actionResult.launchMainline.mainlineSummary.productionGate.checks.some((item) =>
+        item?.key === "production_launch_rehearsal_run_recent"
+        && item?.status === "pass"
+      )
+    );
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("launch workflow routes login-path blockers to project authorization presets", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

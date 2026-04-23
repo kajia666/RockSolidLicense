@@ -99,6 +99,7 @@ Recommended smoke tests:
   - login
   - receive a token
   - heartbeat successfully
+- `/developer/launch-mainline` has fresh `Record Launch Rehearsal Run` evidence after one realistic release, smoke, review, ops, and mainline rehearsal.
 
 ## Phase 7: First-week operations
 

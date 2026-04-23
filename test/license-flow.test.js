@@ -297,6 +297,23 @@ async function signedTcpClientCall(tcpPort, action, path, appId, secret, payload
   });
 }
 
+test("launch readiness docs include the rehearsal-run evidence action", () => {
+  const docs = [
+    ["developer-launch-mainline.md", [/Record Launch Rehearsal Run/, /production_launch_rehearsal_run_recent/]],
+    ["launch-mainline-rehearsal.md", [/Record Launch Rehearsal Run/, /rehearsal-guide/]],
+    ["launch-timeline-playbook.md", [/Record Launch Rehearsal Run/]],
+    ["production-launch-checklist.md", [/Record Launch Rehearsal Run/]],
+    ["production-operations-runbook.md", [/Record Launch Rehearsal Run/]]
+  ];
+
+  for (const [docName, patterns] of docs) {
+    const docText = fs.readFileSync(path.join("docs", docName), "utf8");
+    for (const pattern of patterns) {
+      assert.match(docText, pattern, `${docName} should include ${pattern}`);
+    }
+  }
+});
+
 test("commercial license flow works end-to-end", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 

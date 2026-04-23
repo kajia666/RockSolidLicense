@@ -191,23 +191,26 @@ Exit condition:
 
 Once the lane has actually been rehearsed or observed, record evidence in `/developer/launch-mainline` in this order:
 
-1. `Record Recovery Drill`
-2. `Record Backup Verification`
-3. `Record Operations Walkthrough`
-4. `Record Deploy Verification`
-5. `Record Health Verification`
-6. `Record Rollback Walkthrough`
-7. `Record Cutover Walkthrough`
-8. `Record Launch Day Readiness Review`
-9. `Record First-Wave Ops Sweep`
-10. `Record Launch Closeout Review`
-11. `Record Launch Stabilization Review`
+1. `Record Launch Rehearsal Run`
+2. `Record Recovery Drill`
+3. `Record Backup Verification`
+4. `Record Operations Walkthrough`
+5. `Record Deploy Verification`
+6. `Record Health Verification`
+7. `Record Rollback Walkthrough`
+8. `Record Cutover Walkthrough`
+9. `Record Launch Day Readiness Review`
+10. `Record First-Wave Ops Sweep`
+11. `Record Launch Closeout Review`
+12. `Record Launch Stabilization Review`
 
 Why this order works:
 
 - the early entries prove the production path is recoverable
 - the middle entries prove the lane can actually be cut over safely
 - the final entries prove the lane was reviewed, closed out, and handed into steady-state operations
+
+The first entry is intentionally broad: `Record Launch Rehearsal Run` is the proof that the release, smoke, review, ops, and mainline lane was rehearsed as one chain before the narrower production evidence is treated as ready.
 
 If the later evidence is recorded before the earlier steps are genuinely rehearsed, the gate may look green while the lane is still operationally weak.
 
@@ -245,9 +248,10 @@ If you only hand one small pack to another teammate after rehearsal, use:
 3. launch review summary
 4. developer ops primary match summary
 5. launch mainline summary
-6. cutover-handoff
-7. post-launch-sweep-handoff
-8. closeout-handoff
-9. stabilization-handoff
+6. rehearsal-guide
+7. cutover-handoff
+8. post-launch-sweep-handoff
+9. closeout-handoff
+10. stabilization-handoff
 
 That pack is usually enough for QA, support, release duty, or launch-duty handoff without asking them to reconstruct the lane from memory.

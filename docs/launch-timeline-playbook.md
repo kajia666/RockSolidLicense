@@ -37,6 +37,7 @@ Checklist:
 9. Confirm certificate expiry is not close to the launch window.
 10. Avoid making non-essential policy or infrastructure changes after this point.
 11. Open `/developer/launch-mainline` and confirm the current lane already has the latest `production-handoff`, `cutover-handoff`, and `recovery-drill-handoff` available for tomorrow's shift.
+12. After one realistic end-to-end rehearsal has actually completed, use `Record Launch Rehearsal Run` in `/developer/launch-mainline` so the production gate has explicit rehearsal evidence before launch day.
 
 Recommended outcome:
 

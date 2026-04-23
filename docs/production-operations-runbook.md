@@ -91,13 +91,14 @@ When the service has just opened traffic, use `/developer/launch-mainline` as th
 
 The matching evidence path in `/developer/launch-mainline` should usually be recorded in the same order:
 
-1. `Record Cutover Walkthrough`
-2. `Record Launch Day Readiness Review`
-3. `Record First-Wave Ops Sweep`
-4. `Record Launch Closeout Review`
-5. `Record Launch Stabilization Review`
+1. `Record Launch Rehearsal Run`
+2. `Record Cutover Walkthrough`
+3. `Record Launch Day Readiness Review`
+4. `Record First-Wave Ops Sweep`
+5. `Record Launch Closeout Review`
+6. `Record Launch Stabilization Review`
 
-That sequence is useful because it keeps launch-day duty, launch closeout, and early steady-state handoff inside one verifiable chain instead of leaving the last mile to shift notes alone.
+That sequence is useful because it keeps the end-to-end rehearsal, launch-day duty, launch closeout, and early steady-state handoff inside one verifiable chain instead of leaving the last mile to shift notes alone.
 
 For logging, dashboard, and alert suggestions, also see:
 

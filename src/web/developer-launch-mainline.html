@@ -265,6 +265,13 @@
 
       <section class="wide">
         <article class="card">
+          <h2>Next Production Evidence</h2>
+          <div id="mainline-next-evidence-box" class="hint">Generate a launch mainline package to inspect the next production evidence action here.</div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="card">
           <h2 id="mainline-overview-title">Launch Mainline Overview</h2>
           <div id="mainline-overview-box" class="hint">Generate a launch mainline package to inspect the unified overall gate here.</div>
         </article>
@@ -582,6 +589,23 @@
         return currentMainlineSections().find((item) => String(item?.key || "").trim() === String(key || "").trim()) || null;
       }
 
+      function currentMainlineProductionGate() {
+        const gate = currentMainlineSummary().productionGate;
+        return gate && typeof gate === "object" ? gate : {};
+      }
+
+      function currentMainlineNextEvidenceAction() {
+        const gate = currentMainlineProductionGate();
+        const directAction = gate.nextEvidenceAction && typeof gate.nextEvidenceAction === "object"
+          ? gate.nextEvidenceAction
+          : null;
+        if (directAction?.key || directAction?.setupAction?.operation) {
+          return directAction;
+        }
+        const remaining = Array.isArray(gate.remainingEvidenceChecks) ? gate.remainingEvidenceChecks : [];
+        return remaining.find((item) => item?.setupAction?.operation) || null;
+      }
+
       function currentLastMainlineReceipt() {
         return lastMainlineActionResult?.receipt && typeof lastMainlineActionResult.receipt === "object"
           ? lastMainlineActionResult.receipt
@@ -713,6 +737,49 @@
         `;
       }
 
+      function renderNextProductionEvidenceAction() {
+        const action = currentMainlineNextEvidenceAction();
+        if (!action?.key && !action?.setupAction?.operation) {
+          return '<div class="hint">Generate Launch Mainline to inspect the next production evidence action here.</div>';
+        }
+        const tags = [
+          { label: "status", value: String(action.status || "review").toUpperCase(), strong: String(action.status || "").toLowerCase() === "block" },
+          action.priority ? { label: "priority", value: action.priority, strong: true } : null,
+          action.setupAction?.operation ? { label: "operation", value: action.setupAction.operation, strong: true } : null
+        ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+        const controls = [
+          action.setupAction ? {
+            kind: "setup",
+            label: action.setupAction.label || action.title || action.key || "Record evidence",
+            setupAction: action.setupAction
+          } : null,
+          action.workspaceAction ? {
+            kind: "workspace",
+            label: action.workspaceAction.label || action.title || action.key || "Open workspace",
+            workspaceAction: action.workspaceAction
+          } : null,
+          action.recommendedDownload ? {
+            kind: "download",
+            label: action.recommendedDownload.label || action.title || action.key || "Download handoff",
+            recommendedDownload: action.recommendedDownload
+          } : null
+        ].filter(Boolean);
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(action.title || action.label || action.key || "Next production evidence")}</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint">${esc(action.summary || "Record the next production evidence item before widening rollout.")}</div>
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-next-evidence-control-index="${controlIndex}">${esc(control.label || control.setupAction?.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const screen = currentMainlineLastActionScreen();
         const sections = Array.isArray(screen.sections) ? screen.sections : [];
@@ -833,6 +900,7 @@
           }
         }
         el("route-focus-box").innerHTML = renderRouteFocus();
+        el("mainline-next-evidence-box").innerHTML = renderNextProductionEvidenceAction();
         el("mainline-hero-controls-box").innerHTML = renderHeroControls();
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = page.summaryText || "No launch mainline summary yet.";
@@ -1015,6 +1083,7 @@
         el("mainline-actions-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the server-side action plan here.</div>';
         el("mainline-downloads-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>';
         el("stage-gates-box").innerHTML = '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
+        el("mainline-next-evidence-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the next production evidence action here.</div>';
         el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
         el("route-focus-box").innerHTML = renderRouteFocus();
         setOutput("Waiting for actions...");
@@ -1054,6 +1123,23 @@
         setOutput({ error: error.message });
       }));
       document.addEventListener("click", async (event) => {
+        const nextEvidenceControlButton = event.target.closest("[data-mainline-next-evidence-control-index]");
+        if (nextEvidenceControlButton) {
+          const controlIndex = Number(nextEvidenceControlButton.dataset.mainlineNextEvidenceControlIndex || -1);
+          const action = currentMainlineNextEvidenceAction();
+          const controls = [
+            action?.setupAction ? { setupAction: action.setupAction } : null,
+            action?.workspaceAction ? { workspaceAction: action.workspaceAction } : null,
+            action?.recommendedDownload ? { recommendedDownload: action.recommendedDownload } : null
+          ].filter(Boolean);
+          try {
+            await executeMainlineControl(controls[controlIndex] || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
         const routeFocusControlButton = event.target.closest("[data-mainline-route-focus-control-index]");
         if (routeFocusControlButton) {
           const controlIndex = Number(routeFocusControlButton.dataset.mainlineRouteFocusControlIndex || -1);

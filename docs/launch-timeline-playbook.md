@@ -14,6 +14,7 @@ Read this together with:
 - [production-operations-runbook.md](/D:/code/OnlineVerification/docs/production-operations-runbook.md)
 - [daily-operations-checklist.md](/D:/code/OnlineVerification/docs/daily-operations-checklist.md)
 - [incident-response-playbook.md](/D:/code/OnlineVerification/docs/incident-response-playbook.md)
+- [developer-launch-mainline.md](/D:/code/OnlineVerification/docs/developer-launch-mainline.md)
 
 ## T minus 1 day
 
@@ -35,6 +36,7 @@ Checklist:
 8. Confirm one test client can log in and send one heartbeat.
 9. Confirm certificate expiry is not close to the launch window.
 10. Avoid making non-essential policy or infrastructure changes after this point.
+11. Open `/developer/launch-mainline` and confirm the current lane already has the latest `production-handoff`, `cutover-handoff`, and `recovery-drill-handoff` available for tomorrow's shift.
 
 Recommended outcome:
 
@@ -59,6 +61,7 @@ Checklist:
 6. If PostgreSQL is enabled, check the newest dump timestamp too.
 7. Confirm the proxy and TLS layer are healthy.
 8. Confirm one admin login, one client login, and one heartbeat still succeed.
+9. Use the current `cutover-handoff` from `/developer/launch-mainline` as the launch-duty checklist instead of rebuilding deploy, verify, and rollback notes by hand.
 
 Do not start launch-day troubleshooting from user reports alone.
 
@@ -85,6 +88,8 @@ If something fails broadly:
 2. capture logs and health state
 3. use [incident-response-playbook.md](/D:/code/OnlineVerification/docs/incident-response-playbook.md)
 
+If traffic is healthy, keep the lane moving through the current `post-launch-sweep-handoff` so the first routed runtime review does not drift into an unstructured manual recheck.
+
 ## First 4 hours
 
 Focus:
@@ -99,6 +104,7 @@ Checklist:
 3. Confirm there is no unusual certificate, proxy, PostgreSQL, or Redis warning.
 4. Confirm no single project is failing due to feature toggles, notices, or version rules.
 5. Keep one person watching infrastructure and one person watching auth behavior if possible.
+6. Record the first-wave ops sweep in `/developer/launch-mainline` once the initial routed review has actually been completed.
 
 ## End of launch day
 
@@ -114,6 +120,7 @@ Checklist:
 3. Record the exact time and scope of any incident.
 4. Confirm fresh backup artifacts exist after launch traffic.
 5. Decide whether the launch can stay in the current topology for the rest of the week.
+6. Use the `closeout-handoff` and record the launch closeout review before handing the lane off to the next operating window.
 
 ## Day 2 to Day 7
 
@@ -130,6 +137,7 @@ Checklist:
 4. If PostgreSQL is enabled, review dump freshness daily too.
 5. Perform one restore drill during the first week if you did not already do one before launch.
 6. Avoid large storage migrations during the first week unless the current path is actually failing.
+7. Use the `stabilization-handoff` and record the launch stabilization review once the lane has had a quiet, steady-state observation window.
 
 ## Suggested rollout strategy
 

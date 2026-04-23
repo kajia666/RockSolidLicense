@@ -21,10 +21,12 @@ Supported download formats:
 - `json`
 - `summary`
 - `production-handoff`
+- `cutover-handoff`
 - `recovery-drill-handoff`
 - `operations-handoff`
 - `post-launch-sweep-handoff`
 - `closeout-handoff`
+- `stabilization-handoff`
 - `checksums`
 - `zip`
 
@@ -78,6 +80,10 @@ That post-launch review now also enters the gate itself. `Launch Mainline` will 
 It also exposes a dedicated `closeout-handoff` download for the end of the first-wave rollout. That package brings together launch-day readiness, the first-wave ops sweep, the remaining routed review queue, and the shift-handover material, so the operator can close out the rollout with one service-driven handoff instead of stitching the last mile together from several earlier artifacts.
 
 That closeout path now also enters the gate itself. `Launch Mainline` will block the lane when no recent launch closeout review evidence has been recorded inside the current 14-day readiness window, and the same `Production Gate Checks` card can now fire a service-driven `Record Launch Closeout Review` action. Recording that grouped closeout evidence also lifts the launch-day readiness review and first-wave ops sweep checks together, so the author has one final confirmation step after the rollout has actually been watched and handed off.
+
+It also exposes a dedicated `stabilization-handoff` download for the first steady-state handoff after launch day. That package brings together the shift-handover template, daily operations checklist, production operations runbook, incident-response references, and the core launch timeline material, so launch duty can hand the lane to the next operator without rebuilding the "what should we watch now?" bundle manually.
+
+That stabilization path now also enters the gate itself. `Launch Mainline` will block the lane when no recent launch stabilization review evidence has been recorded inside the current 14-day readiness window, and the same `Production Gate Checks` card can now fire a service-driven `Record Launch Stabilization Review` action. Recording that grouped stabilization evidence also lifts the closeout and first-wave post-launch review checks together, so the lane can move from "launch day is over" to "the first stable operating window has actually been handed off" without a separate manual checklist.
 
 ## Why it matters
 

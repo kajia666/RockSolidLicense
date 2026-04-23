@@ -4,6 +4,10 @@ Use this runbook after the first-launch checklist has already been completed.
 
 It is meant for day-one and early-production operations, where the main goal is to keep licensing, login, heartbeat, and token signing stable while the service starts taking real traffic.
 
+For the author-side launch control path that now feeds those same operations handoffs, also keep:
+
+- [developer-launch-mainline.md](/D:/code/OnlineVerification/docs/developer-launch-mainline.md)
+
 ## Read this together with
 
 - [production-launch-checklist.md](/D:/code/OnlineVerification/docs/production-launch-checklist.md)
@@ -71,6 +75,29 @@ Look for repeated patterns such as:
 - heartbeat failures after login succeeds
 - signature or timestamp validation failures
 - repeated device-block or network-rule denials that were not expected
+
+## First-wave launch duty handoff path
+
+When the service has just opened traffic, use `/developer/launch-mainline` as the short author-side control tower for the first operating window. The practical order is:
+
+1. `cutover-handoff`
+   Use this during deployment and immediate verify/rollback readiness.
+2. `post-launch-sweep-handoff`
+   Use this once real traffic exists and the first routed runtime review should begin.
+3. `closeout-handoff`
+   Use this at the end of launch day when the first-wave review has actually been completed.
+4. `stabilization-handoff`
+   Use this during the first quiet steady-state window when launch duty hands the lane over to normal daily operations.
+
+The matching evidence path in `/developer/launch-mainline` should usually be recorded in the same order:
+
+1. `Record Cutover Walkthrough`
+2. `Record Launch Day Readiness Review`
+3. `Record First-Wave Ops Sweep`
+4. `Record Launch Closeout Review`
+5. `Record Launch Stabilization Review`
+
+That sequence is useful because it keeps launch-day duty, launch closeout, and early steady-state handoff inside one verifiable chain instead of leaving the last mile to shift notes alone.
 
 For logging, dashboard, and alert suggestions, also see:
 

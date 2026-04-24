@@ -3663,11 +3663,29 @@ function createLaunchWorkflowOpsContinuationDownloadShortcut(workspaceAction, co
       }
     );
   }
+  const rawParams = workspaceAction.params && typeof workspaceAction.params === "object"
+    ? workspaceAction.params
+    : {};
+  const completionDownload = continuation.completionDownload && typeof continuation.completionDownload === "object"
+    ? continuation.completionDownload
+    : null;
+  if (completionDownload?.fileName) {
+    return createLaunchWorkflowDownloadShortcut(
+      completionDownload.key || "launch_mainline_summary",
+      completionDownload.fileName,
+      completionDownload.label || "Download Launch Mainline Summary",
+      {
+        source: completionDownload.source || "developer-launch-mainline",
+        format: completionDownload.format || "summary",
+        params: completionDownload.params && typeof completionDownload.params === "object"
+          ? { ...completionDownload.params }
+          : { ...rawParams },
+        ...(completionDownload.href ? { href: completionDownload.href } : {})
+      }
+    );
+  }
   const secondaryAction = String(continuation.secondaryAction || "").trim();
   if (secondaryAction === "download_route_review") {
-    const rawParams = workspaceAction.params && typeof workspaceAction.params === "object"
-      ? workspaceAction.params
-      : {};
     return createLaunchWorkflowDownloadShortcut(
       "ops_route_review_summary",
       "developer-ops-summary.txt",

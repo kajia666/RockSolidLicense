@@ -831,6 +831,17 @@
           created.account?.username ? tag(`account:${created.account.username}`, "ok") : "",
           created.entitlement?.username ? tag(`entitlement:${created.entitlement.username}`, "ok") : ""
         ].filter(Boolean).join("");
+        const normalizeSkippedReason = (item) => {
+          if (typeof item === "string") {
+            return item;
+          }
+          return item?.reason || item?.summary || item?.message || item?.description || item?.label || item?.key || "";
+        };
+        const skippedItems = (Array.isArray(result.skipped) && result.skipped.length
+          ? result.skipped
+          : (Array.isArray(result.receipt?.skipped) ? result.receipt.skipped : []))
+          .map(normalizeSkippedReason)
+          .filter(Boolean);
         const inventoryStates = Array.isArray(result.inventoryStates) ? result.inventoryStates.slice(0, 4) : [];
         return `
           <div class="hint" style="margin-top:12px;">
@@ -843,6 +854,7 @@
             <div class="hint" style="margin-top:8px;">${esc(result.message || "The latest launch quickstart action is ready for review.")}</div>
             ${transitions ? `<div style="margin-top:8px;">${transitions}</div>` : ""}
             ${createdBits ? `<div style="margin-top:8px;">${createdBits}</div>` : ""}
+            ${skippedItems.length ? `<div class="hint" style="margin-top:8px;">Quickstart skipped: ${esc(skippedItems.join(" | "))}</div>` : ""}
             ${inventoryStates.length ? `<div class="hint" style="margin-top:8px;">Inventory after action: ${esc(inventoryStates.map((item) => `${item.label || item.key || "batch"} ${item.freshCount ?? 0}/${item.targetCount ?? item.count ?? 0} (${String(item.status || item.inventoryStatus || "-").toUpperCase()})`).join(" | "))}</div>` : ""}
           </div>
         `;

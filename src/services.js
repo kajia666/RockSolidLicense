@@ -4104,6 +4104,26 @@ function buildLaunchMainlineActionReceipt({
       setupAction: item?.setupAction || null
     }))
     .filter((item) => item.key || item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction);
+  const skipped = (Array.isArray(result?.skipped) ? result.skipped : [])
+    .map((item, index) => {
+      if (typeof item === "string") {
+        return {
+          key: `skipped_${index + 1}`,
+          label: "Skipped",
+          reason: item
+        };
+      }
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      return {
+        key: item?.key || item?.mode || item?.label || `skipped_${index + 1}`,
+        mode: item?.mode || null,
+        label: item?.label || item?.title || item?.key || item?.mode || "Skipped",
+        reason: item?.reason || item?.summary || item?.message || item?.description || null
+      };
+    })
+    .filter((item) => item?.reason || item?.key || item?.label);
   const isFirstLaunchInventoryOperation = normalizedOperation === "first_batch_setup" || normalizedOperation === "restock";
   const firstLaunchInventoryCreatedBatches = (Array.isArray(result?.createdBatches) ? result.createdBatches : [])
     .map((item) => ({
@@ -5264,6 +5284,8 @@ function buildLaunchMainlineActionReceipt({
       title: "Applied changes",
       summary: transitions.length || created.length
         ? "Review the updated counts and created launch assets before continuing."
+        : skipped.length
+          ? "No count or asset changes were required; review skipped reasons before continuing."
         : "No count or asset changes were recorded for this action.",
       tags: [
         ...transitions.map((item) => ({
@@ -5275,9 +5297,14 @@ function buildLaunchMainlineActionReceipt({
           label: item?.key || item?.label || "created",
           value: item?.value || "-",
           strong: true
+        })),
+        ...skipped.slice(0, 5).map((item) => ({
+          label: item?.key || item?.label || "skipped",
+          value: item?.reason || item?.label || "-",
+          strong: false
         }))
       ],
-      details: [],
+      details: skipped.map((item) => `${item?.label || "Skipped"}: ${item?.reason || "-"}`),
       controls: []
     }
   ].filter(Boolean);
@@ -5329,6 +5356,8 @@ function buildLaunchMainlineActionReceipt({
     followUpSummary: followUp?.summary || result?.message || `${operationLabel} completed.`,
     transitions,
     created,
+    skipped,
+    skippedCount: skipped.length,
     primaryAction: followUp?.primaryAction || null,
     mainlineOverallGate,
     mainlinePrimaryAction,

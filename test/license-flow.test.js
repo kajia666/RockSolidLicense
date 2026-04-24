@@ -8296,6 +8296,25 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no fresh cards/i);
     assert.doesNotMatch(launchWorkflow.workflowSummary.authorizationMessage || "", /no entitlement policies/i);
 
+    const repeatBootstrap = await postJson(
+      baseUrl,
+      "/api/developer/license-quickstart/bootstrap",
+      { productCode: "BOOT_ALPHA" },
+      ownerSession.token
+    );
+    assert.equal(repeatBootstrap.productCode, "BOOT_ALPHA");
+    assert.match(repeatBootstrap.message || "", /already staged/i);
+    assert.ok(repeatBootstrap.skipped?.some((item) => /No quickstart bootstrap actions were needed/i.test(item)));
+    assert.equal(repeatBootstrap.receipt?.operation, "bootstrap");
+    assert.equal(repeatBootstrap.receipt?.skippedCount, 1);
+    assert.ok(repeatBootstrap.receipt?.skipped?.some((item) => item.reason === "No quickstart bootstrap actions were needed."));
+    assert.ok(repeatBootstrap.receipt?.mainlineEvidenceQueue?.nextAction?.setupAction?.operation);
+    assert.ok(repeatBootstrap.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
+    assert.ok(repeatBootstrap.receipt?.mainlineRecapCards?.some((item) =>
+      item?.key === "transition_summary"
+        && /No quickstart bootstrap actions were needed/i.test(item.details?.join(" ") || "")
+    ));
+
     const smokeKit = await getJson(
       baseUrl,
       "/api/developer/launch-smoke-kit?productCode=BOOT_ALPHA&channel=stable",
@@ -16208,6 +16227,7 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /Last Quickstart Action/);
     assert.match(html, /renderQuickstartResultRecap/);
     assert.match(html, /renderQuickstartCountTransition\("freshCards"/);
+    assert.match(html, /Quickstart skipped:/);
     assert.match(html, /reviewMode/);
     assert.match(html, /Route reason:/);
     assert.match(html, /Open this page from launch workflow or a routed workspace action/);

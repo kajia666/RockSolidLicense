@@ -16246,6 +16246,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /severity=/);
     assert.match(html, /next=/);
     assert.match(html, /Session Login/);
+    assert.match(html, /Launch Receipts/);
+    assert.match(html, /data-audit-event="product\.launch-mainline\.action"/);
+    assert.match(html, /data-audit-entity="product"/);
     assert.match(html, /license_key/);
     assert.match(html, /route-focus-box/);
     assert.match(html, /window\.location\.search/);

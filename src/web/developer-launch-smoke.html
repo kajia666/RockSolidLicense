@@ -304,6 +304,9 @@
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedOperation = (routeParams.get("operation") || "").trim();
+      const requestedActionKey = (routeParams.get("actionKey") || "").trim();
+      const requestedDownloadKey = (routeParams.get("downloadKey") || "").trim();
 
       let token = "";
       let profile = null;
@@ -416,7 +419,12 @@
         return {
           productId: requestedProductId,
           productCode: el("smoke-product-code").value.trim(),
-          channel: el("smoke-channel").value.trim() || "stable"
+          channel: el("smoke-channel").value.trim() || "stable",
+          routeTitle: requestedRouteTitle,
+          routeReason: requestedRouteReason,
+          operation: requestedOperation,
+          actionKey: requestedActionKey,
+          downloadKey: requestedDownloadKey
         };
       }
       function currentSmokeSummary() {
@@ -585,6 +593,9 @@
         const tags = [
           target.productCode ? renderTag(`project:${target.productCode}`, true) : "",
           renderTag(`channel:${target.channel}`, true),
+          target.operation ? renderTag(`operation:${target.operation}`, true) : "",
+          target.actionKey ? renderTag(`action:${target.actionKey}`) : "",
+          target.downloadKey ? renderTag(`download:${target.downloadKey}`) : "",
           requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""
         ].filter(Boolean).join("");
         const title = requestedRouteTitle || "Launch smoke handoff";
@@ -777,7 +788,12 @@
         const data = await api(`/api/developer/launch-smoke-kit${q({
           productId: target.productId,
           productCode: target.productCode,
-          channel: target.channel
+          channel: target.channel,
+          routeTitle: target.routeTitle,
+          routeReason: target.routeReason,
+          operation: target.operation,
+          actionKey: target.actionKey,
+          downloadKey: target.downloadKey
         })}`);
         smokeKit = data;
         if (
@@ -808,6 +824,11 @@
             productId: target.productId,
             productCode: target.productCode,
             channel: target.channel,
+            routeTitle: target.routeTitle,
+            routeReason: target.routeReason,
+            operation: target.operation,
+            actionKey: target.actionKey,
+            downloadKey: target.downloadKey,
             format
           })}`,
           fallbackFileName,
@@ -900,6 +921,11 @@
               productId: target.productId,
               productCode: target.productCode,
               channel: target.channel,
+              routeTitle: target.routeTitle,
+              routeReason: target.routeReason,
+              operation: target.operation,
+              actionKey: target.actionKey,
+              downloadKey: target.downloadKey,
               format: item.format || "summary"
             })}`,
             item.fileName || "developer-launch-smoke-kit-summary.txt",

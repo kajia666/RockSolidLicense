@@ -8382,12 +8382,18 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(repeatBootstrap.receipt?.handoffText || "", /Skipped:/);
     assert.match(repeatBootstrap.receipt?.handoffText || "", /No quickstart bootstrap actions were needed/i);
 
+    const smokeKitRouteQuery = "productCode=BOOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&actionKey=launch_smoke_record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&routeTitle=Continue+launch+smoke+sweep&routeReason=Continue+smoke+receipt+follow-up";
     const smokeKit = await getJson(
       baseUrl,
-      "/api/developer/launch-smoke-kit?productCode=BOOT_ALPHA&channel=stable",
+      `/api/developer/launch-smoke-kit?${smokeKitRouteQuery}`,
       ownerSession.token
     );
     assert.equal(smokeKit.manifest?.project?.code, "BOOT_ALPHA");
+    assert.equal(smokeKit.filters?.operation, "record_post_launch_ops_sweep");
+    assert.equal(smokeKit.filters?.actionKey, "launch_smoke_record_post_launch_ops_sweep");
+    assert.equal(smokeKit.filters?.downloadKey, "launch_smoke_summary");
+    assert.equal(smokeKit.filters?.routeTitle, "Continue launch smoke sweep");
+    assert.equal(smokeKit.filters?.routeReason, "Continue smoke receipt follow-up");
     assert.equal(smokeKit.smokeSummary?.startupRequest?.productCode, "BOOT_ALPHA");
     assert.equal(smokeKit.smokeSummary?.recommendedWorkspace?.key, "launch-smoke");
     assert.ok(Array.isArray(smokeKit.smokeSummary?.accountCandidates));
@@ -8475,7 +8481,19 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
+    assert.equal(smokeKit.smokeSummary?.routeFocus?.title, "Continue launch smoke sweep");
+    assert.equal(smokeKit.smokeSummary?.routeFocus?.summary, "Continue smoke receipt follow-up");
+    assert.ok(smokeKit.smokeSummary?.routeFocus?.tags?.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
+    assert.ok(smokeKit.smokeSummary?.routeFocus?.tags?.some((item) => item.label === "action" && item.value === "launch_smoke_record_post_launch_ops_sweep"));
+    assert.ok(smokeKit.smokeSummary?.routeFocus?.tags?.some((item) => item.label === "download" && item.value === "launch_smoke_summary"));
+    assert.ok(smokeKit.smokeSummary?.routeFocus?.controls?.some((item) => item.workspaceAction?.key === "launch-smoke"));
+    assert.ok(smokeKit.smokeSummary?.routeFocus?.controls?.some((item) => item.recommendedDownload?.key === "launch_smoke_kit_summary"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
+    assert.match(smokeKit.summaryText || "", /Launch Smoke Route Focus:/);
+    assert.match(smokeKit.summaryText || "", /Continue launch smoke sweep/);
+    assert.match(smokeKit.summaryText || "", /operation=record_post_launch_ops_sweep/);
+    assert.match(smokeKit.summaryText || "", /action=launch_smoke_record_post_launch_ops_sweep/);
+    assert.match(smokeKit.summaryText || "", /download=launch_smoke_summary/);
     assert.match(smokeKit.summaryText || "", /Launch Mainline Gate:/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Primary Review Target:/);
     assert.match(smokeKit.summaryText || "", /action=Open (Account|Entitlement|Session|Device) Control/);
@@ -8483,12 +8501,15 @@ test("developer license quickstart bootstrap can create starter launch assets in
 
     const smokeKitSummaryDownload = await getText(
       baseUrl,
-      "/api/developer/launch-smoke-kit/download?productCode=BOOT_ALPHA&channel=stable&format=summary",
+      `/api/developer/launch-smoke-kit/download?${smokeKitRouteQuery}&format=summary`,
       ownerSession.token
     );
     assert.equal(smokeKitSummaryDownload.status, 200);
     assert.match(smokeKitSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-smoke-kit-BOOT_ALPHA-stable-.*-summary\.txt"/);
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Paths:/);
+    assert.match(smokeKitSummaryDownload.body, /Launch Smoke Route Focus:/);
+    assert.match(smokeKitSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
+    assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -15564,6 +15585,12 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /Open Launch Workflow/);
     assert.match(html, /Open Launch Review/);
     assert.match(html, /Open Ops Workspace/);
+    assert.match(html, /requestedOperation/);
+    assert.match(html, /requestedActionKey/);
+    assert.match(html, /requestedDownloadKey/);
+    assert.match(html, /operation: target\.operation/);
+    assert.match(html, /actionKey: target\.actionKey/);
+    assert.match(html, /downloadKey: target\.downloadKey/);
     assert.match(html, /Run Launch Bootstrap/);
     assert.match(html, /Run First Batch Setup/);
     assert.match(html, /Run Inventory Refill/);

@@ -11050,6 +11050,29 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const cardLoginEnabled = featureConfig.allowCardLogin !== false;
   const cardRechargeEnabled = featureConfig.allowCardRecharge !== false;
   const startupBlocked = String(startupDecision.status || "").trim().toLowerCase() === "hold";
+  const compactSmokeRouteParams = (params = {}) => Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+  );
+  const routeProductCode = project.code || filters.productCode || null;
+  const routeChannel = manifest.channel || filters.channel || "stable";
+  const routedOperation = String(filters.operation || "").trim().toLowerCase();
+  const routedActionKey = String(filters.actionKey || "").trim();
+  const routedDownloadKey = String(filters.downloadKey || "").trim();
+  const routedRouteTitle = String(filters.routeTitle || "").trim();
+  const routedRouteReason = String(filters.routeReason || "").trim();
+  const routedParams = compactSmokeRouteParams({
+    operation: routedOperation,
+    actionKey: routedActionKey,
+    downloadKey: routedDownloadKey,
+    routeTitle: routedRouteTitle,
+    routeReason: routedRouteReason
+  });
+  const smokeRouteParams = compactSmokeRouteParams({
+    productCode: routeProductCode,
+    channel: routeChannel,
+    reviewMode: "matched",
+    ...routedParams
+  });
 
   const accountLoginReady = accountLoginEnabled && (registerEnabled || accountCandidates.length > 0);
   const directCardReady = cardLoginEnabled && directCardCandidates.length > 0;
@@ -11105,9 +11128,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const readyPaths = verificationPaths.filter((item) => item.ready && item.status !== "block");
   const reviewPaths = verificationPaths.filter((item) => item.status === "review");
 
+  const smokeWorkspaceAction = createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke", smokeRouteParams);
+  const reviewWorkspaceAction = createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review", smokeRouteParams);
+  const opsWorkspaceAction = createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", {
+    reviewMode: "matched",
+    ...routedParams
+  });
   const recommendedWorkspace = blockingPaths.length
     ? createLaunchWorkflowWorkspaceShortcut("licenses", "quickstart", "Open License Workspace")
-    : createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke");
+    : smokeWorkspaceAction;
   const workspaceActions = [];
   const seenWorkspaceActions = new Set();
   const pushWorkspaceAction = (action) => {
@@ -11123,16 +11152,17 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   };
   pushWorkspaceAction(recommendedWorkspace);
   pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"));
-  pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"));
-  pushWorkspaceAction(createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", { reviewMode: "matched" }));
+  pushWorkspaceAction(reviewWorkspaceAction);
+  pushWorkspaceAction(opsWorkspaceAction);
   const launchMainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline summary",
     "launch-mainline-summary.txt",
     "summary",
     {
-      productCode: project.code || filters.productCode || null,
-      channel: manifest.channel || filters.channel || "stable",
-      reviewMode: "matched"
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
     }
   );
   const launchMainlineRehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
@@ -11140,9 +11170,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     "launch-mainline-rehearsal-guide.txt",
     "rehearsal-guide",
     {
-      productCode: project.code || filters.productCode || null,
-      channel: manifest.channel || filters.channel || "stable",
-      reviewMode: "matched"
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
     }
   );
   const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
@@ -11150,9 +11181,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     "launch-mainline-sha256.txt",
     "checksums",
     {
-      productCode: project.code || filters.productCode || null,
-      channel: manifest.channel || filters.channel || "stable",
-      reviewMode: "matched"
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
     }
   );
   const launchMainlineZipDownload = createLaunchMainlineDownloadShortcut(
@@ -11160,18 +11192,20 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     "launch-mainline.zip",
     "zip",
     {
-      productCode: project.code || filters.productCode || null,
-      channel: manifest.channel || filters.channel || "stable",
-      reviewMode: "matched"
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
     }
   );
+  const launchSmokeKitSummaryDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke kit summary",
+    "launch-smoke-kit.txt",
+    "summary",
+    smokeRouteParams
+  );
   const recommendedDownloads = [
-    createLaunchWorkflowSmokeKitDownloadShortcut(
-      "Launch smoke kit summary",
-      "launch-smoke-kit.txt",
-      "summary",
-      { reviewMode: "matched" }
-    ),
+    launchSmokeKitSummaryDownload,
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineChecksumsDownload,
@@ -11651,12 +11685,43 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads
   });
+  const routeFocus = {
+    title: routedRouteTitle || (routeProductCode ? `Launch smoke handoff for ${routeProductCode}` : "Launch smoke handoff"),
+    summary: routedRouteReason || (routeProductCode
+      ? `Continue the internal smoke path for ${routeProductCode} on lane ${routeChannel} while preserving routed follow-up context.`
+      : "Use the launch smoke handoff to preserve smoke filters, runtime follow-up context, and smoke downloads."),
+    tags: [
+      routeProductCode ? { label: "project", value: routeProductCode, strong: true } : null,
+      routeChannel ? { label: "channel", value: routeChannel, strong: false } : null,
+      routedOperation ? { label: "operation", value: routedOperation, strong: true } : null,
+      routedActionKey ? { label: "action", value: routedActionKey, strong: false } : null,
+      routedDownloadKey ? { label: "download", value: routedDownloadKey, strong: false } : null
+    ].filter(Boolean),
+    controls: [
+      {
+        kind: "workspace",
+        label: smokeWorkspaceAction.label || "Open Launch Smoke",
+        workspaceAction: smokeWorkspaceAction
+      },
+      {
+        kind: "workspace",
+        label: reviewWorkspaceAction.label || "Open Launch Review",
+        workspaceAction: reviewWorkspaceAction
+      },
+      {
+        kind: "download",
+        label: "Download Smoke Summary",
+        recommendedDownload: launchSmokeKitSummaryDownload
+      }
+    ].filter((item) => item.workspaceAction || item.recommendedDownload)
+  };
 
   return {
     status,
     title: smokeTitle,
     message: smokeMessage,
     mainlineGate,
+    routeFocus,
     startupRequest,
     startupDecision,
     tokenKeySummary,
@@ -11707,6 +11772,25 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
   ];
 
   appendLaunchMainlineGateText(lines, smokeSummary.mainlineGate, formatWorkspaceActionText);
+
+  if (smokeSummary.routeFocus && typeof smokeSummary.routeFocus === "object") {
+    lines.push("");
+    lines.push("Launch Smoke Route Focus:");
+    lines.push(`- title: ${smokeSummary.routeFocus.title || "-"}`);
+    lines.push(`- summary: ${smokeSummary.routeFocus.summary || "-"}`);
+    if (Array.isArray(smokeSummary.routeFocus.tags) && smokeSummary.routeFocus.tags.length) {
+      lines.push(`- tags: ${smokeSummary.routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
+    }
+    if (Array.isArray(smokeSummary.routeFocus.controls) && smokeSummary.routeFocus.controls.length) {
+      for (const control of smokeSummary.routeFocus.controls) {
+        lines.push(
+          `- control: ${control?.label || control?.kind || "Action"}`
+          + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+        );
+      }
+    }
+  }
 
   if (Array.isArray(smokeSummary.verificationPaths) && smokeSummary.verificationPaths.length) {
     lines.push("");
@@ -11815,7 +11899,12 @@ function buildDeveloperLaunchSmokeKitPayload({
     },
     filters: {
       productCode: project.code || filters.productCode || null,
-      channel
+      channel,
+      operation: filters.operation ? String(filters.operation).trim().toLowerCase() : null,
+      actionKey: filters.actionKey || null,
+      downloadKey: filters.downloadKey || null,
+      routeTitle: filters.routeTitle || null,
+      routeReason: filters.routeReason || null
     },
     launchWorkflow,
     opsSnapshot,
@@ -24027,7 +24116,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         cards: Array.isArray(cardsPayload?.items) ? cardsPayload.items : [],
         filters: {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
-          channel
+          channel,
+          operation: selector.operation || null,
+          actionKey: selector.actionKey || null,
+          downloadKey: selector.downloadKey || null,
+          routeTitle: selector.routeTitle || null,
+          routeReason: selector.routeReason || null
         }
       });
       const session = requireDeveloperSession(db, token);

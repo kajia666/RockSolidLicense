@@ -12761,6 +12761,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptFollowUpsCsvDownload.body, /record_launch_rehearsal_run/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_mainline_operations_handoff/);
 
+    const launchReceiptNextFollowUpDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=launch-receipt-next-follow-up",
+      operatorSession.token
+    );
+    assert.equal(launchReceiptNextFollowUpDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchReceiptNextFollowUpDownload.contentDisposition || "", /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /RockSolid Developer Ops Launch Receipt Next Follow-up/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Priority: REVIEW/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Stage: production_evidence/);
+    assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Action Key: ${latestLaunchReceipt.productionEvidenceNextActionKey}`));
+    assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Operation To Record: ${latestLaunchReceipt.productionEvidenceNextOperation}`));
+    assert.match(launchReceiptNextFollowUpDownload.body, /Handoff File:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -12828,6 +12842,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /csv\/projects\.csv/);
     assert.match(checksumsDownload.body, /csv\/audit-logs\.csv/);
     assert.match(checksumsDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
+    assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
 
     const zipDownload = await getBinary(
       baseUrl,
@@ -12840,6 +12855,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /csv\/projects\.csv/);
     assert.match(zipText, /csv\/accounts\.csv/);
     assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
+    assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
     assert.match(zipText, /csv\/audit-logs\.csv/);
     assert.match(zipText, /SHA256SUMS\.txt/);
   } finally {
@@ -16270,8 +16286,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/audit-logs/);
     assert.match(html, /api\/developer\/ops\/export/);
     assert.match(html, /Download Summary/);
+    assert.match(html, /Download Next Follow-up/);
     assert.match(html, /Download Follow-up CSV/);
+    assert.match(html, /download-export-next-follow-up-btn/);
     assert.match(html, /download-export-follow-ups-btn/);
+    assert.match(html, /launch-receipt-next-follow-up/);
     assert.match(html, /launch-receipt-follow-ups/);
     assert.match(html, /Download Zip/);
     assert.match(html, /Receipt Follow-up Count/);

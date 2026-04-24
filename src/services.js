@@ -17027,6 +17027,46 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const overview = payload.overview || {};
+  const item = summary.launchReceiptNextFollowUp
+    || buildLaunchReceiptNextFollowUp(overview.launchReceiptFollowUps || []);
+  const lines = [
+    "RockSolid Developer Ops Launch Receipt Next Follow-up",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`,
+    `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(summary.launchReceiptFollowUpPriorities || {})}`,
+    ""
+  ];
+
+  if (!item) {
+    lines.push("No launch receipt follow-up is queued for this scoped snapshot.");
+    return lines.join("\n");
+  }
+
+  lines.push(`Priority: ${String(item.priority || "secondary").toUpperCase()}`);
+  lines.push(`Stage: ${item.stage || "-"}`);
+  lines.push(`Title: ${item.title || "-"}`);
+  lines.push(`Summary: ${item.summary || "-"}`);
+  lines.push(`Project Code: ${item.productCode || "-"}`);
+  lines.push(`Channel: ${item.channel || "-"}`);
+  lines.push(`Operation: ${item.operation || "-"}`);
+  lines.push(`Operation To Record: ${item.operationToRecord || "-"}`);
+  lines.push(`Action Key: ${item.actionKey || "-"}`);
+  lines.push(`Download Key: ${item.downloadKey || "-"}`);
+  lines.push(`Handoff File: ${item.handoffFileName || "-"}`);
+  lines.push(`Mainline Gate: ${item.mainlineGateStatus || "-"}`);
+  lines.push(`Created At: ${item.createdAt || "-"}`);
+  lines.push("");
+  lines.push("Operator Hand-off:");
+  lines.push(`- Next: ${formatLaunchReceiptNextFollowUp(item)}`);
+  lines.push("- Use the action key in Developer Ops or the download key in launch mainline handoff when you need the full artifact.");
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsSnapshotPayload({
   generatedAt = nowIso(),
   developer = null,
@@ -17180,6 +17220,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: payload.summaryFileName || "developer-ops-summary.txt",
       body: payload.summaryText || ""
+    },
+    {
+      path: "launch-receipt-next-follow-up.txt",
+      body: buildDeveloperOpsLaunchReceiptNextFollowUpText(payload)
     },
     {
       path: "csv/projects.csv",
@@ -17805,7 +17849,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-follow-ups"],
+    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-next-follow-up", "launch-receipt-follow-ups"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -17832,6 +17876,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-ops-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+
+  if (normalizedFormat === "launch-receipt-next-follow-up") {
+    return {
+      fileName: "developer-ops-launch-receipt-next-follow-up.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsLaunchReceiptNextFollowUpText(payload)
     };
   }
 

@@ -67,6 +67,8 @@ After `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` completes, 
 
 The direct `Launch Bootstrap`, `First Batch Setup`, and `Inventory Refill` API responses also include a launch-mainline-style `receipt`. That receipt carries the refreshed mainline handoff, production evidence queue, post-launch lifecycle summary, and, when inventory batches are created or refilled, the first-launch inventory queue, owner/stage duty handoff, first-launch duty summary, and `first-launch-handoff` download shortcut. Re-running `Launch Bootstrap` after the starter assets are already staged still returns the same handoff receipt plus explicit `skipped` / `skippedCount` reasons, so launch duty can distinguish "nothing changed because it is ready" from an initialization failure without opening another workspace. API callers can hand the result to launch duty without calling the mainline action endpoint first.
 
+The `Developer Launch Workflow`, `Developer Launch Review`, `Developer Launch Smoke`, and `Developer Projects` workspaces now also render that direct quickstart `receipt` inside their last-action panels. Launch duty can review the mainline gate, production evidence progress, post-launch lifecycle next action, inventory handoff, skipped reasons, and recap cards without jumping back into the dedicated mainline page.
+
 That same follow-up block can now also download a combined `launch review summary`. It merges the current launch-workflow recheck with the filtered developer-ops snapshot for the routed lane, so QA, support, or launch-duty teammates can review launch readiness and first-wave runtime signals from one handoff file.
 
 The same follow-up chain can now also download a `launch smoke kit` summary. That file packages:

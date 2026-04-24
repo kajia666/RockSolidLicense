@@ -1134,20 +1134,22 @@
       function renderLastLaunchFollowUp(result = null) {
         const followUp = result?.followUp;
         const actions = Array.isArray(followUp?.actions) ? followUp.actions : [];
-        if (!actions.length) {
+        const receiptRecap = renderQuickstartReceiptRecap(result);
+        if (!actions.length && !receiptRecap) {
           return "Run Launch Bootstrap or First Batch Setup here to keep the next launch-day follow-up visible in this workspace.";
         }
-        const operationLabel = result?.operationLabel || followUp.operationLabel || followUp.operation || "launch";
-        const summary = followUp.summary || result?.message || "Review the next launch-day follow-up actions.";
+        const operationLabel = result?.operationLabel || followUp?.operationLabel || followUp?.operation || result?.result?.receipt?.operationLabel || "launch";
+        const summary = followUp?.summary || result?.result?.receipt?.followUpSummary || result?.message || "Review the next launch-day follow-up actions.";
         return `
           <div>
             ${renderTag(`after:${operationLabel}`, true)}
-            ${followUp.primaryAction?.label ? renderTag(`next:${followUp.primaryAction.label}`, true) : ""}
+            ${followUp?.primaryAction?.label ? renderTag(`next:${followUp.primaryAction.label}`, true) : ""}
             ${result?.productCode ? renderTag(`project:${result.productCode}`, true) : ""}
             ${result?.channel ? renderTag(`channel:${result.channel}`, true) : ""}
           </div>
           <div class="hint" style="margin-top:10px;">${escapeHtml(result?.message || "Last launch action completed.")}</div>
           <div class="hint" style="margin-top:8px;">${escapeHtml(summary)}</div>
+          ${receiptRecap}
           ${actions.map((item, index) => `
             <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
               <div>${index + 1}. ${escapeHtml(`${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`)}</div>
@@ -1159,6 +1161,40 @@
               ` : ""}
             </div>
           `).join("")}
+        `;
+      }
+
+      function renderQuickstartReceiptRecap(result = null) {
+        const receipt = result?.receipt || result?.result?.receipt || null;
+        if (!receipt || typeof receipt !== "object") {
+          return "";
+        }
+        const evidence = receipt.mainlineEvidenceQueue && typeof receipt.mainlineEvidenceQueue === "object"
+          ? receipt.mainlineEvidenceQueue
+          : null;
+        const lifecycle = receipt.postLaunchLifecycleSummary && typeof receipt.postLaunchLifecycleSummary === "object"
+          ? receipt.postLaunchLifecycleSummary
+          : null;
+        const inventory = receipt.firstLaunchInventoryQueue && typeof receipt.firstLaunchInventoryQueue === "object"
+          ? receipt.firstLaunchInventoryQueue
+          : null;
+        const tags = [
+          receipt.mainlineOverallGate?.status ? renderTag(`gate:${String(receipt.mainlineOverallGate.status).toUpperCase()}`, true) : "",
+          evidence ? renderTag(`evidence:${evidence.completedCount ?? 0}/${evidence.totalCount ?? 0}`, Number(evidence.remainingCount || 0) === 0) : "",
+          lifecycle?.nextAction?.title || lifecycle?.nextAction?.key ? renderTag(`lifecycle:${lifecycle.nextAction.title || lifecycle.nextAction.key}`, true) : "",
+          inventory ? renderTag(`inventory:${inventory.createdBatchCount || 0} batches`, true) : "",
+          Number(receipt.skippedCount || 0) > 0 ? renderTag(`skipped:${receipt.skippedCount}`) : ""
+        ].filter(Boolean).join("");
+        const cards = Array.isArray(receipt.mainlineRecapCards) ? receipt.mainlineRecapCards.slice(0, 4) : [];
+        const skipped = Array.isArray(receipt.skipped) ? receipt.skipped.slice(0, 3) : [];
+        return `
+          <div class="hint" style="margin-top:10px;">
+            <strong>Launch Mainline Receipt Recap</strong>
+            ${tags ? `<div style="margin-top:8px;">${tags}</div>` : ""}
+            <div style="margin-top:8px;">${escapeHtml(receipt.summary || receipt.followUpSummary || "Launch mainline receipt refreshed.")}</div>
+            ${cards.length ? `<div style="margin-top:8px;">${cards.map((card) => `${escapeHtml(card.title || card.key || "Receipt card")}: ${escapeHtml(card.summary || "-")}`).join("<br>")}</div>` : ""}
+            ${skipped.length ? `<div style="margin-top:8px;">Skipped: ${escapeHtml(skipped.map((item) => item?.reason || item?.summary || item?.label || item?.key || "-").join(" | "))}</div>` : ""}
+          </div>
         `;
       }
 

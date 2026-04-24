@@ -15090,6 +15090,8 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /currentLaunchFirstBatchSetupAction/);
     assert.match(html, /currentLastLaunchActionResult/);
     assert.match(html, /currentLastLaunchFollowUp/);
+    assert.match(html, /Launch Mainline Receipt Recap/);
+    assert.match(html, /renderQuickstartReceiptRecap/);
     assert.match(html, /renderLastLaunchFollowUp/);
     assert.match(html, /launch-action-followup-box/);
     assert.match(html, /data-last-launch-workspace-index/);
@@ -15217,6 +15219,8 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /Open License Workspace/);
       assert.match(html, /review-followup-box/);
       assert.match(html, /renderLastReviewFollowUp/);
+      assert.match(html, /Launch Mainline Receipt Recap/);
+      assert.match(html, /renderQuickstartReceiptRecap/);
       assert.match(html, /currentPrimaryReviewTarget/);
       assert.match(html, /currentReviewTargets/);
       assert.match(html, /runLaunchReviewBootstrap/);
@@ -15271,6 +15275,8 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /runLaunchSmokeBootstrap/);
     assert.match(html, /runLaunchSmokeSetup/);
     assert.match(html, /renderLastSmokeFollowUp/);
+    assert.match(html, /Launch Mainline Receipt Recap/);
+    assert.match(html, /renderQuickstartReceiptRecap/);
     assert.match(html, /currentSmokeSummary/);
     assert.match(html, /currentActionPlan/);
     assert.match(html, /currentPrimarySmokeReviewTarget/);
@@ -15787,6 +15793,8 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /currentLastLaunchWorkflowActionResult/);
     assert.match(html, /currentLastLaunchWorkflowFollowUp/);
     assert.match(html, /renderProjectLastLaunchFollowUp/);
+    assert.match(html, /Launch Mainline Receipt Recap/);
+    assert.match(html, /renderQuickstartReceiptRecap/);
     assert.match(html, /detail-last-launch-action/);
     assert.match(html, /data-launch-last-action-workspace-index/);
     assert.match(html, /data-launch-last-action-download-index/);

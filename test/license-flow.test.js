@@ -12709,7 +12709,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptLifecycleFollowUp.downloadKey, latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey);
     assert.equal(launchReceiptLifecycleFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.match(launchReceiptLifecycleFollowUp.summary, /Post-launch lifecycle status/i);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptFollowUps, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
     assert.match(launchReceiptSnapshot.summaryText, /Latest Launch Receipts:/);
+    assert.match(launchReceiptSnapshot.summaryText, /Receipt Follow-up Count: 2/);
     assert.match(launchReceiptSnapshot.summaryText, /record_post_launch_ops_sweep/i);
     assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
@@ -16253,6 +16255,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /download-export-follow-ups-btn/);
     assert.match(html, /launch-receipt-follow-ups/);
     assert.match(html, /Download Zip/);
+    assert.match(html, /Receipt Follow-up Count/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
     assert.match(html, /Escalate First/);

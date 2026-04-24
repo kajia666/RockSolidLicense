@@ -16840,7 +16840,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Sessions: ${summary.sessions ?? 0}`,
     `Bindings: ${summary.bindings ?? 0}`,
     `Blocks: ${summary.blocks ?? 0}`,
-    `Audit Logs: ${summary.auditLogs ?? 0}`
+    `Audit Logs: ${summary.auditLogs ?? 0}`,
+    `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`
   ];
 
   if (overview && typeof overview === "object" && Object.keys(overview).length) {
@@ -17030,7 +17031,10 @@ function buildDeveloperOpsSnapshotPayload({
       sessions: normalizedSessions.length,
       bindings: normalizedBindings.length,
       blocks: normalizedBlocks.length,
-      auditLogs: normalizedAuditLogs.length
+      auditLogs: normalizedAuditLogs.length,
+      launchReceiptFollowUps: Array.isArray(overview.launchReceiptFollowUps)
+        ? overview.launchReceiptFollowUps.length
+        : 0
     },
     overview,
     mainlineHandoff: routeReview.mainlineHandoff,

@@ -4143,6 +4143,10 @@
           { label: "Frozen / Expired", value: `${metrics.frozenEntitlements ?? 0} / ${metrics.expiredEntitlements ?? 0}` },
           { label: "Active Sessions", value: metrics.activeSessions ?? 0 },
           { label: "Active Blocks", value: metrics.activeBlocks ?? 0 },
+          {
+            label: "Receipt Follow-up Count",
+            value: payload.summary?.launchReceiptFollowUps ?? launchReceiptFollowUps.length
+          },
           { label: "Latest Audit", value: formatTime(overview.latestAuditAt || payload.generatedAt) }
         ];
 

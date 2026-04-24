@@ -25347,12 +25347,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       if (options?.includeReceipt === false) {
         return resultPayload;
       }
+      const launchMainline = await this.developerLaunchMainlinePackage(token, {
+        productCode,
+        channel: body.channel || "stable",
+        reviewMode: body.reviewMode || "matched"
+      }, options);
       return {
         ...resultPayload,
         receipt: buildLaunchMainlineActionReceipt({
           operation: "first_batch_setup",
           result: resultPayload,
-          followUp
+          followUp,
+          launchMainline
         })
       };
     },
@@ -25550,12 +25556,18 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       if (options?.includeReceipt === false) {
         return resultPayload;
       }
+      const launchMainline = await this.developerLaunchMainlinePackage(token, {
+        productCode,
+        channel: body.channel || "stable",
+        reviewMode: body.reviewMode || "matched"
+      }, options);
       return {
         ...resultPayload,
         receipt: buildLaunchMainlineActionReceipt({
           operation: "restock",
           result: resultPayload,
-          followUp
+          followUp,
+          launchMainline
         })
       };
     },

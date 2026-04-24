@@ -8638,6 +8638,14 @@ test("developer license quickstart first-batch setup can create recommended laun
         item?.ownerRole === "support"
         && item?.actions?.some((action) => action?.key === "card_redemption_watch")
       ));
+      assert.ok(setup.receipt?.mainlineEvidenceQueue?.nextAction?.setupAction?.operation);
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.productionEvidence?.nextAction?.key);
+      assert.equal(
+        setup.receipt?.firstLaunchDutySummary?.productionEvidence?.nextAction?.key,
+        setup.receipt?.mainlineEvidenceQueue?.nextAction?.key
+      );
+      assert.ok(setup.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
+      assert.ok(setup.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
 
     const cards = await getJson(
       baseUrl,
@@ -8825,6 +8833,14 @@ test("developer launch workflow can restock low launch inventory buffers", async
         control?.kind === "download"
         && control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff"
       ));
+      assert.ok(restock.receipt?.mainlineEvidenceQueue?.nextAction?.setupAction?.operation);
+      assert.ok(restock.receipt?.firstLaunchDutySummary?.productionEvidence?.nextAction?.key);
+      assert.equal(
+        restock.receipt?.firstLaunchDutySummary?.productionEvidence?.nextAction?.key,
+        restock.receipt?.mainlineEvidenceQueue?.nextAction?.key
+      );
+      assert.ok(restock.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
+      assert.ok(restock.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
 
     const launchWorkflowAfterRestock = await getJson(
       baseUrl,

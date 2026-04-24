@@ -4747,8 +4747,10 @@ function buildLaunchMainlineActionReceipt({
       )
     )
   });
-  const firstLaunchWindowFlow = firstLaunchOpsQueue.actions.map((item) => mapFirstLaunchActionSummary(item));
-  const firstLaunchPrimaryHandoff = firstLaunchOpsQueue.handoffChecklist.length
+  const firstLaunchWindowFlow = Array.isArray(firstLaunchOpsQueue?.actions)
+    ? firstLaunchOpsQueue.actions.map((item) => mapFirstLaunchActionSummary(item))
+    : [];
+  const firstLaunchPrimaryHandoff = Array.isArray(firstLaunchOpsQueue?.handoffChecklist) && firstLaunchOpsQueue.handoffChecklist.length
     ? mapFirstLaunchHandoffSummary(firstLaunchOpsQueue.handoffChecklist[0])
     : null;
   const firstLaunchProductionEvidence = mainlineEvidenceQueue || followUp?.nextProductionAction
@@ -12230,6 +12232,158 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       setupAction: item.setupAction
     } : null
   ].filter(Boolean);
+  const dedupeLifecycleControls = (items = []) => {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      const controlKey = [
+        item?.kind || "",
+        item?.workspaceAction?.key || "",
+        item?.recommendedDownload?.key || "",
+        item?.bootstrapAction?.key || "",
+        item?.setupAction?.operation || item?.setupAction?.key || ""
+      ].join(":");
+      if (!controlKey || seen.has(controlKey)) {
+        return false;
+      }
+      seen.add(controlKey);
+      return true;
+    });
+  };
+  const mapPostLaunchLifecycleCheck = (item = null) => item && typeof item === "object"
+    ? {
+        key: item.key || null,
+        title: item.title || item.label || item.key || "check",
+        status: item.status || null,
+        summary: item.summary || "",
+        workspaceAction: item.workspaceAction || null,
+        recommendedDownload: item.recommendedDownload || null,
+        bootstrapAction: item.bootstrapAction || null,
+        setupAction: item.setupAction || null
+      }
+    : null;
+  const productionChecks = Array.isArray(productionGate?.checks)
+    ? productionGate.checks
+    : Array.isArray(productionGate?.actionPlan)
+      ? productionGate.actionPlan
+      : [];
+  const buildPostLaunchLifecyclePhase = ({
+    key = "",
+    label = "",
+    handoffKey = "",
+    evidenceKey = ""
+  } = {}) => {
+    const handoffCheck = mapPostLaunchLifecycleCheck(productionChecks.find((item) => item?.key === handoffKey) || null);
+    const evidenceCheck = mapPostLaunchLifecycleCheck(productionChecks.find((item) => item?.key === evidenceKey) || null);
+    const phaseStatus = [handoffCheck?.status, evidenceCheck?.status].some((item) => String(item || "").trim().toLowerCase() === "block")
+      ? "hold"
+      : [handoffCheck?.status, evidenceCheck?.status].some((item) => {
+          const normalized = String(item || "").trim().toLowerCase();
+          return normalized && normalized !== "pass";
+        })
+        ? "review"
+        : "ready";
+    const nextAction = [evidenceCheck, handoffCheck].find((item) =>
+      item && String(item.status || "").trim().toLowerCase() !== "pass"
+    ) || null;
+    const workspaceAction = ensureLaunchWorkflowWorkspaceHref(
+      nextAction?.workspaceAction || handoffCheck?.workspaceAction || evidenceCheck?.workspaceAction || productionGate?.recommendedWorkspace || null,
+      params
+    );
+    const recommendedDownload = ensureLaunchWorkflowDownloadHref(
+      nextAction?.recommendedDownload || handoffCheck?.recommendedDownload || evidenceCheck?.recommendedDownload || null,
+      params
+    );
+    const controls = dedupeLifecycleControls([
+      ...buildProductionEvidenceQueueControls(nextAction),
+      recommendedDownload ? ensureLaunchMainlineControlHrefs({
+        kind: "download",
+        label: recommendedDownload.label || label || key || "Download handoff",
+        recommendedDownload
+      }, params) : null
+    ].filter(Boolean));
+    return {
+      key,
+      label: label || key || "phase",
+      status: phaseStatus,
+      handoffCheck,
+      evidenceCheck,
+      nextAction,
+      workspaceAction,
+      recommendedDownload,
+      controls
+    };
+  };
+  const postLaunchLifecyclePhases = [
+    buildPostLaunchLifecyclePhase({
+      key: "operations",
+      label: "Operations Handoff",
+      handoffKey: "production_operations_handoff",
+      evidenceKey: "production_operations_walkthrough_recent"
+    }),
+    buildPostLaunchLifecyclePhase({
+      key: "post_launch_sweep",
+      label: "Post-Launch Sweep",
+      handoffKey: "production_post_launch_sweep_handoff",
+      evidenceKey: "production_post_launch_ops_sweep_recent"
+    }),
+    buildPostLaunchLifecyclePhase({
+      key: "launch_closeout",
+      label: "Launch Closeout",
+      handoffKey: "production_launch_closeout_handoff",
+      evidenceKey: "production_launch_closeout_review_recent"
+    }),
+    buildPostLaunchLifecyclePhase({
+      key: "stabilization",
+      label: "Stabilization",
+      handoffKey: "production_stabilization_handoff",
+      evidenceKey: "production_launch_stabilization_review_recent"
+    })
+  ];
+  const dedupePostLaunchLifecycleWorkspaceActions = (items = []) => {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      const key = item?.key || "";
+      if (!key || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  };
+  const dedupePostLaunchLifecycleRecommendedDownloads = (items = []) => {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      const key = item?.key || item?.fileName || item?.href || "";
+      if (!key || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  };
+  const postLaunchLifecycleWorkspaceActions = dedupePostLaunchLifecycleWorkspaceActions(
+    postLaunchLifecyclePhases.map((item) => item?.workspaceAction || null)
+  );
+  const postLaunchLifecycleRecommendedDownloads = dedupePostLaunchLifecycleRecommendedDownloads(
+    postLaunchLifecyclePhases.map((item) => item?.recommendedDownload || null)
+  );
+  const postLaunchLifecycle = {
+    status: postLaunchLifecyclePhases.some((item) => item?.status === "hold")
+      ? "hold"
+      : postLaunchLifecyclePhases.some((item) => item?.status === "review")
+        ? "review"
+        : "ready",
+    phaseCount: postLaunchLifecyclePhases.length,
+    readyCount: postLaunchLifecyclePhases.filter((item) => item?.status === "ready").length,
+    holdCount: postLaunchLifecyclePhases.filter((item) => item?.status === "hold").length,
+    reviewCount: postLaunchLifecyclePhases.filter((item) => item?.status === "review").length,
+    nextAction: postLaunchLifecyclePhases.find((item) => item?.nextAction)?.nextAction || null,
+    primaryWorkspaceAction: postLaunchLifecyclePhases.find((item) => item?.workspaceAction)?.workspaceAction || null,
+    primaryRecommendedDownload: postLaunchLifecyclePhases.find((item) => item?.recommendedDownload)?.recommendedDownload || null,
+    workspaceActions: postLaunchLifecycleWorkspaceActions,
+    recommendedDownloads: postLaunchLifecycleRecommendedDownloads,
+    phases: postLaunchLifecyclePhases
+  };
   const productionEvidenceQueue = productionGate?.evidenceQueue || buildLaunchMainlineEvidenceQueue(productionGate);
   const formatProductionEvidenceQueueList = (items = []) => {
     const labels = (Array.isArray(items) ? items : [])
@@ -12298,7 +12452,74 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       controls: buildProductionEvidenceQueueControls(item)
     }))
   ].filter((item) => item.key || item.summary || item.controls.length);
-  const productionCheckCards = (Array.isArray(productionGate?.checks) ? productionGate.checks : Array.isArray(productionGate?.actionPlan) ? productionGate.actionPlan : []).map((item) => {
+  const postLaunchLifecycleCards = [
+    {
+      key: "post_launch_lifecycle_progress",
+      title: "Post-Launch Lifecycle Progress",
+      summary: postLaunchLifecycle.status === "hold"
+        ? "Post-launch handoff still has blocking evidence gaps."
+        : postLaunchLifecycle.status === "review"
+          ? "Post-launch handoff still needs follow-up."
+          : "Post-launch handoff chain looks aligned.",
+      tags: [
+        { label: "ready", value: postLaunchLifecycle.readyCount, strong: true },
+        { label: "hold", value: postLaunchLifecycle.holdCount, strong: postLaunchLifecycle.holdCount > 0 },
+        { label: "review", value: postLaunchLifecycle.reviewCount, strong: false }
+      ],
+      details: [
+        `Path: ${postLaunchLifecycle.phases.map((item) => item.label || item.key || "phase").join(" -> ")}`,
+        `Statuses: ${postLaunchLifecycle.phases.map((item) => `${item.label || item.key}:${String(item.status || "unknown").toUpperCase()}`).join(" | ")}`,
+        `Workspace actions: ${postLaunchLifecycle.workspaceActions.map((item) => item?.label || item?.key || "workspace").join(" | ") || "-"}`,
+        `Recommended downloads: ${postLaunchLifecycle.recommendedDownloads.map((item) => item?.label || item?.key || "download").join(" | ") || "-"}`
+      ],
+      controls: dedupeLifecycleControls([
+        ...buildProductionEvidenceQueueControls(postLaunchLifecycle.nextAction),
+        postLaunchLifecycle.primaryRecommendedDownload ? ensureLaunchMainlineControlHrefs({
+          kind: "download",
+          label: postLaunchLifecycle.primaryRecommendedDownload.label || "Download post-launch handoff",
+          recommendedDownload: postLaunchLifecycle.primaryRecommendedDownload
+        }, params) : null
+      ].filter(Boolean))
+    },
+    {
+      key: "post_launch_lifecycle_next",
+      title: postLaunchLifecycle.nextAction
+        ? `Next post-launch action: ${postLaunchLifecycle.nextAction.title || postLaunchLifecycle.nextAction.key || "follow-up"}`
+        : "Next post-launch action",
+      summary: postLaunchLifecycle.nextAction?.summary || "All post-launch lifecycle phases are aligned.",
+      tags: [
+        postLaunchLifecycle.nextAction?.status
+          ? { label: "status", value: String(postLaunchLifecycle.nextAction.status).toUpperCase(), strong: true }
+          : null,
+        postLaunchLifecycle.nextAction?.setupAction?.operation
+          ? { label: "operation", value: postLaunchLifecycle.nextAction.setupAction.operation, strong: false }
+          : null
+      ].filter(Boolean),
+      details: [
+        postLaunchLifecycle.nextAction?.recommendedDownload
+          ? `Download: ${postLaunchLifecycle.nextAction.recommendedDownload.label || postLaunchLifecycle.nextAction.recommendedDownload.key}`
+          : ""
+      ].filter(Boolean),
+      controls: dedupeLifecycleControls(buildProductionEvidenceQueueControls(postLaunchLifecycle.nextAction))
+    },
+    ...postLaunchLifecycle.phases.map((item) => ({
+      key: `post_launch_lifecycle_${item.key}`,
+      title: item.label || item.key || "Post-launch phase",
+      summary: item.nextAction?.summary || item.evidenceCheck?.summary || item.handoffCheck?.summary || "-",
+      tags: [
+        { label: "status", value: String(item.status || "unknown").toUpperCase(), strong: true },
+        item.handoffCheck?.status ? { label: "handoff", value: String(item.handoffCheck.status).toUpperCase(), strong: false } : null,
+        item.evidenceCheck?.status ? { label: "evidence", value: String(item.evidenceCheck.status).toUpperCase(), strong: false } : null
+      ].filter(Boolean),
+      details: [
+        item.handoffCheck ? `Handoff: ${item.handoffCheck.title || item.handoffCheck.key || "handoff"} | ${String(item.handoffCheck.status || "unknown").toUpperCase()}` : "",
+        item.evidenceCheck ? `Evidence: ${item.evidenceCheck.title || item.evidenceCheck.key || "evidence"} | ${String(item.evidenceCheck.status || "unknown").toUpperCase()}` : "",
+        item.nextAction?.setupAction?.operation ? `Next operation: ${item.nextAction.setupAction.operation}` : ""
+      ].filter(Boolean),
+      controls: Array.isArray(item.controls) ? item.controls : []
+    }))
+  ].filter((item) => item.key || item.summary || item.controls.length);
+  const productionCheckCards = productionChecks.map((item) => {
     const controls = [
       item?.workspaceAction ? ensureLaunchMainlineControlHrefs({
         kind: "workspace",
@@ -12373,6 +12594,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: productionCheckCards
     },
     {
+      key: "post_launch_lifecycle",
+      title: "Post-Launch Lifecycle",
+      emptyState: "Generate a launch mainline package to inspect the post-launch handoff chain here.",
+      cards: postLaunchLifecycleCards
+    },
+    {
       key: "workspace_path",
       title: "Workspace Path",
       emptyState: "Generate a launch mainline package to inspect the routed workspace path here.",
@@ -12420,7 +12647,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   return {
     overallGate,
-    productionGate,
+    productionGate: {
+      ...productionGate,
+      postLaunchLifecycle
+    },
     releaseGate,
     workflowGate,
     reviewGate,
@@ -12556,6 +12786,25 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + `${productionNextEvidenceAction.setupAction ? ` | setup=${productionNextEvidenceAction.setupAction.label || productionNextEvidenceAction.setupAction.key || "-"}@${productionNextEvidenceAction.setupAction.mode || "recommended"}:${productionNextEvidenceAction.setupAction.operation || "first_batch_setup"}` : ""}`
       + `${productionNextEvidenceAction.recommendedDownload ? ` | download=${productionNextEvidenceAction.recommendedDownload.label || productionNextEvidenceAction.recommendedDownload.key || "-"}` : ""}`
     );
+  }
+  const postLaunchLifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || null;
+  if (postLaunchLifecycle && typeof postLaunchLifecycle === "object") {
+    lines.push("");
+    lines.push("Post-Launch Lifecycle:");
+    lines.push(
+      `- status=${String(postLaunchLifecycle.status || "unknown").toUpperCase()}`
+      + ` | ready=${postLaunchLifecycle.readyCount ?? 0}`
+      + ` | hold=${postLaunchLifecycle.holdCount ?? 0}`
+      + ` | review=${postLaunchLifecycle.reviewCount ?? 0}`
+      + ` | next=${postLaunchLifecycle.nextAction?.title || postLaunchLifecycle.nextAction?.label || postLaunchLifecycle.nextAction?.key || "-"}`
+    );
+    if (Array.isArray(postLaunchLifecycle.phases) && postLaunchLifecycle.phases.length) {
+      lines.push(
+        `- phases=${postLaunchLifecycle.phases.map((item) =>
+          `${item?.label || item?.key || "phase"}:${String(item?.status || "unknown").toUpperCase()}`
+        ).join(" | ")}`
+      );
+    }
   }
   if (productionGateChecks.length) {
     lines.push("");

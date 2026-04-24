@@ -6278,6 +6278,64 @@ test("developer launch mainline production gate blocks default launch secrets an
       launchMainline.mainlineSummary.productionGate.evidenceQueue?.items?.[0]?.setupAction?.operation,
       "record_launch_rehearsal_run"
     );
+    assert.deepEqual(
+      launchMainline.mainlineSummary.productionGate?.postLaunchLifecycle
+        ? {
+            status: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.status || null,
+            phaseCount: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.phaseCount ?? null,
+            readyCount: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.readyCount ?? null,
+            holdCount: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.holdCount ?? null,
+            reviewCount: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.reviewCount ?? null,
+            nextActionKey: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.nextAction?.key || null,
+            primaryWorkspaceKey: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.primaryWorkspaceAction?.key || null,
+            primaryDownloadKey: launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.primaryRecommendedDownload?.key || null,
+            phaseStatuses: Array.isArray(launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.phases)
+              ? launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.phases.map((item) => ({
+                  key: item?.key || null,
+                  status: item?.status || null,
+                  handoffKey: item?.handoffCheck?.key || null,
+                  evidenceKey: item?.evidenceCheck?.key || null
+                }))
+              : []
+          }
+        : null,
+      {
+        status: "hold",
+        phaseCount: 4,
+        readyCount: 0,
+        holdCount: 4,
+        reviewCount: 0,
+        nextActionKey: "production_operations_walkthrough_recent",
+        primaryWorkspaceKey: "ops",
+        primaryDownloadKey: "launch_mainline_operations_handoff",
+        phaseStatuses: [
+          {
+            key: "operations",
+            status: "hold",
+            handoffKey: "production_operations_handoff",
+            evidenceKey: "production_operations_walkthrough_recent"
+          },
+          {
+            key: "post_launch_sweep",
+            status: "hold",
+            handoffKey: "production_post_launch_sweep_handoff",
+            evidenceKey: "production_post_launch_ops_sweep_recent"
+          },
+          {
+            key: "launch_closeout",
+            status: "hold",
+            handoffKey: "production_launch_closeout_handoff",
+            evidenceKey: "production_launch_closeout_review_recent"
+          },
+          {
+            key: "stabilization",
+            status: "hold",
+            handoffKey: "production_stabilization_handoff",
+            evidenceKey: "production_launch_stabilization_review_recent"
+          }
+        ]
+      }
+    );
     const productionEvidenceQueueSection = Array.isArray(launchMainline.mainlineSummary.sections)
       ? launchMainline.mainlineSummary.sections.find((item) => item?.key === "production_evidence_queue")
       : null;
@@ -6351,6 +6409,40 @@ test("developer launch mainline production gate blocks default launch secrets an
         && control?.setupAction?.operation === "record_launch_rehearsal_run"
       ),
       true
+    );
+    const postLaunchLifecycleSection = Array.isArray(launchMainline.mainlineSummary.sections)
+      ? launchMainline.mainlineSummary.sections.find((item) => item?.key === "post_launch_lifecycle")
+      : null;
+    assert.deepEqual(
+      postLaunchLifecycleSection
+        ? {
+            key: postLaunchLifecycleSection.key || null,
+            title: postLaunchLifecycleSection.title || null,
+            cards: Array.isArray(postLaunchLifecycleSection.cards)
+              ? postLaunchLifecycleSection.cards.map((item) => item?.key || null)
+              : []
+          }
+        : null,
+      {
+        key: "post_launch_lifecycle",
+        title: "Post-Launch Lifecycle",
+        cards: [
+          "post_launch_lifecycle_progress",
+          "post_launch_lifecycle_next",
+          "post_launch_lifecycle_operations",
+          "post_launch_lifecycle_post_launch_sweep",
+          "post_launch_lifecycle_launch_closeout",
+          "post_launch_lifecycle_stabilization"
+        ]
+      }
+    );
+    assert.ok(
+      postLaunchLifecycleSection?.cards?.find((item) =>
+        item?.key === "post_launch_lifecycle_progress"
+        && Array.isArray(item?.details)
+        && item.details.some((detail) => /Path:/i.test(String(detail || "")))
+        && item.details.some((detail) => /Recommended downloads:/i.test(String(detail || "")))
+      )
     );
     assert.ok(launchMainline.mainlineSummary.productionGate.remainingEvidenceChecks.every((item) =>
       item?.setupAction?.operation
@@ -7344,6 +7436,20 @@ test("developer launch mainline action can record a first-wave ops sweep and ref
         && item?.status === "pass"
       )
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.postLaunchLifecycle?.phases)
+        ? actionResult.launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.phases.map((item) => ({
+            key: item?.key || null,
+            status: item?.status || null
+          }))
+        : [],
+      [
+        { key: "operations", status: "hold" },
+        { key: "post_launch_sweep", status: "ready" },
+        { key: "launch_closeout", status: "hold" },
+        { key: "stabilization", status: "hold" }
+      ]
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -7448,6 +7554,20 @@ test("developer launch mainline action can record a launch closeout review and r
         && item?.status === "pass"
       )
     );
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.postLaunchLifecycle?.phases)
+        ? actionResult.launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.phases.map((item) => ({
+            key: item?.key || null,
+            status: item?.status || null
+          }))
+        : [],
+      [
+        { key: "operations", status: "ready" },
+        { key: "post_launch_sweep", status: "ready" },
+        { key: "launch_closeout", status: "ready" },
+        { key: "stabilization", status: "hold" }
+      ]
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -7551,6 +7671,20 @@ test("developer launch mainline action can record a launch stabilization review 
         item?.key === "production_post_launch_ops_sweep_recent"
         && item?.status === "pass"
       )
+    );
+    assert.deepEqual(
+      Array.isArray(actionResult.launchMainline?.mainlineSummary?.productionGate?.postLaunchLifecycle?.phases)
+        ? actionResult.launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.phases.map((item) => ({
+            key: item?.key || null,
+            status: item?.status || null
+          }))
+        : [],
+      [
+        { key: "operations", status: "ready" },
+        { key: "post_launch_sweep", status: "ready" },
+        { key: "launch_closeout", status: "ready" },
+        { key: "stabilization", status: "ready" }
+      ]
     );
   } finally {
     await app.close();

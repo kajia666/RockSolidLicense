@@ -12884,7 +12884,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.fileName, "developer-ops-launch-receipt-next-follow-up.txt");
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /format=launch-receipt-next-follow-up/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /productCode=EXPORT_ALPHA/);
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.status, "review");
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpCount, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.stage, "production_evidence");
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.operation, "record_post_launch_ops_sweep");
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.firstLaunchHandoffDownload.key, "launch_mainline_first_launch_handoff");
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextSteps.some((item) => /Open Launch Mainline/i.test(item)));
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextSteps.some((item) => /Download next follow-up/i.test(item)));
     assert.match(launchReceiptSnapshot.summaryText, /Latest Launch Receipts:/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Readiness:/);
+    assert.match(launchReceiptSnapshot.summaryText, /- status: REVIEW/);
+    assert.match(launchReceiptSnapshot.summaryText, /- next: \[REVIEW\]\[production_evidence\]/);
+    assert.match(launchReceiptSnapshot.summaryText, /- workspace: Open Launch Mainline@summary/);
+    assert.match(launchReceiptSnapshot.summaryText, /- download: developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Follow-up Count: 2/);
     assert.match(
       launchReceiptSnapshot.summaryText,
@@ -12955,6 +12972,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Format: launch-receipt-next-follow-up/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Href: .*format=launch-receipt-next-follow-up/);
 
+    const initialLaunchOpsReadinessDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=initial-launch-ops-readiness",
+      operatorSession.token
+    );
+    assert.equal(initialLaunchOpsReadinessDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(initialLaunchOpsReadinessDownload.contentDisposition || "", /developer-ops-initial-launch-readiness\.txt/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /RockSolid Developer Ops Initial Launch Readiness/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Status: REVIEW/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Next Follow-up: \[REVIEW\]\[production_evidence\]/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Primary Workspace: Open Launch Mainline/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Primary Download: developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /First Launch Handoff: launch-mainline-first-launch-handoff\.txt/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -13023,6 +13054,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /csv\/audit-logs\.csv/);
     assert.match(checksumsDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
+    assert.match(checksumsDownload.body, /initial-launch-ops-readiness\.txt/);
 
     const zipDownload = await getBinary(
       baseUrl,
@@ -13036,6 +13068,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /csv\/accounts\.csv/);
     assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
+    assert.match(zipText, /initial-launch-ops-readiness\.txt/);
     assert.match(zipText, /csv\/audit-logs\.csv/);
     assert.match(zipText, /SHA256SUMS\.txt/);
   } finally {
@@ -16492,9 +16525,12 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/ops\/export/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Next Follow-up/);
+    assert.match(html, /Download Launch Readiness/);
     assert.match(html, /Download Follow-up CSV/);
     assert.match(html, /download-export-next-follow-up-btn/);
+    assert.match(html, /download-export-initial-launch-readiness-btn/);
     assert.match(html, /download-export-follow-ups-btn/);
+    assert.match(html, /initial-launch-ops-readiness/);
     assert.match(html, /launch-receipt-next-follow-up/);
     assert.match(html, /launch-receipt-follow-ups/);
     assert.match(html, /Download Zip/);

@@ -15789,6 +15789,90 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+  scope = {},
+  overview = {},
+  launchReceiptFollowUps = [],
+  launchReceiptFollowUpPriorities = {},
+  launchReceiptNextFollowUp = null,
+  mainlineHandoff = null
+} = {}) {
+  const followUps = Array.isArray(launchReceiptFollowUps) ? launchReceiptFollowUps : [];
+  const latestReceipt = Array.isArray(overview.latestLaunchReceipts) && overview.latestLaunchReceipts.length
+    ? overview.latestLaunchReceipts[0]
+    : null;
+  const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction
+    || mainlineHandoff?.workspaceAction
+    || null;
+  const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
+  const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
+  const status = !latestReceipt
+    ? "not_started"
+    : followUps.length
+      ? "review"
+      : "ready";
+  const nextSteps = [];
+  if (primaryWorkspaceAction?.label) {
+    nextSteps.push(`Open ${primaryWorkspaceAction.label}${primaryWorkspaceAction.autofocus ? ` at ${primaryWorkspaceAction.autofocus}` : ""}.`);
+  }
+  if (primaryDownload?.fileName) {
+    nextSteps.push(`Download next follow-up: ${primaryDownload.fileName}.`);
+  }
+  if (firstLaunchHandoffDownload?.fileName) {
+    nextSteps.push(`Keep first-launch handoff available: ${firstLaunchHandoffDownload.fileName}.`);
+  }
+  if (!nextSteps.length) {
+    nextSteps.push("Continue monitoring the Developer Ops snapshot and Launch Mainline after the next launch action.");
+  }
+  return {
+    status,
+    headline: !latestReceipt
+      ? "No launch receipt has been recorded yet"
+      : followUps.length
+        ? "First-launch operations still have follow-up work queued"
+        : "First-launch operations are ready for steady monitoring",
+    summary: !latestReceipt
+      ? "Run Launch Bootstrap, First Batch Setup, Inventory Refill, or another Launch Mainline action to create the first operations receipt."
+      : followUps.length
+        ? `${followUps.length} launch receipt follow-up${followUps.length === 1 ? "" : "s"} remain for this scoped ops snapshot.`
+        : "No launch receipt follow-up is queued for this scoped ops snapshot.",
+    projectCode: scope.productCode || latestReceipt?.productCode || null,
+    channel: latestReceipt?.channel || "stable",
+    followUpCount: followUps.length,
+    priorities: launchReceiptFollowUpPriorities || {},
+    latestReceipt: latestReceipt
+      ? {
+          operation: latestReceipt.operation || null,
+          operationLabel: latestReceipt.operationLabel || null,
+          productCode: latestReceipt.productCode || null,
+          channel: latestReceipt.channel || null,
+          handoffFileName: latestReceipt.handoffFileName || null,
+          mainlineGateStatus: latestReceipt.mainlineGateStatus || null,
+          evidenceRemainingCount: latestReceipt.productionEvidenceRemainingCount ?? null,
+          postLaunchLifecycleStatus: latestReceipt.postLaunchLifecycleStatus || null,
+          createdAt: latestReceipt.createdAt || latestReceipt.handoffGeneratedAt || null
+        }
+      : null,
+    nextFollowUp: launchReceiptNextFollowUp
+      ? {
+          key: launchReceiptNextFollowUp.key || null,
+          stage: launchReceiptNextFollowUp.stage || null,
+          priority: launchReceiptNextFollowUp.priority || null,
+          title: launchReceiptNextFollowUp.title || null,
+          summary: launchReceiptNextFollowUp.summary || null,
+          actionKey: launchReceiptNextFollowUp.actionKey || null,
+          operationToRecord: launchReceiptNextFollowUp.operationToRecord || null,
+          downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
+        }
+      : null,
+    primaryWorkspaceAction,
+    primaryDownload,
+    firstLaunchHandoffDownload,
+    nextSteps
+  };
+}
+
 function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -17494,6 +17578,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const launchReceiptNextFollowUpAction = launchReceiptNextFollowUp?.recommendedAction || null;
   const launchReceiptNextFollowUpWorkspace = launchReceiptNextFollowUpAction?.workspaceAction || null;
   const launchReceiptNextFollowUpDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
+  const initialLaunchOpsReadiness = summary.initialLaunchOpsReadiness || null;
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
   const lines = [
@@ -17526,6 +17611,25 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Next Follow-up Workspace: ${launchReceiptNextFollowUpWorkspace?.label || "-"}@${launchReceiptNextFollowUpWorkspace?.autofocus || "-"}`,
     `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"})`
   ];
+
+  if (initialLaunchOpsReadiness) {
+    lines.push("");
+    lines.push("Initial Launch Ops Readiness:");
+    lines.push(`- status: ${String(initialLaunchOpsReadiness.status || "unknown").toUpperCase()}`);
+    lines.push(`- headline: ${initialLaunchOpsReadiness.headline || "-"}`);
+    lines.push(`- summary: ${initialLaunchOpsReadiness.summary || "-"}`);
+    lines.push(`- followUps: ${initialLaunchOpsReadiness.followUpCount ?? 0}`);
+    lines.push(`- next: ${formatLaunchReceiptNextFollowUp(initialLaunchOpsReadiness.nextFollowUp)}`);
+    lines.push(`- workspace: ${initialLaunchOpsReadiness.primaryWorkspaceAction?.label || "-"}@${initialLaunchOpsReadiness.primaryWorkspaceAction?.autofocus || "-"}`);
+    lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"})`);
+    lines.push(`- firstLaunchHandoff: ${initialLaunchOpsReadiness.firstLaunchHandoffDownload?.fileName || "-"}`);
+    if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
+      lines.push("- nextSteps:");
+      for (const item of initialLaunchOpsReadiness.nextSteps) {
+        lines.push(`  - ${item}`);
+      }
+    }
+  }
 
   if (overview && typeof overview === "object" && Object.keys(overview).length) {
     lines.push("");
@@ -17689,6 +17793,45 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const lines = [
+    "RockSolid Developer Ops Initial Launch Readiness",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Status: ${String(readiness.status || "unknown").toUpperCase()}`,
+    `Headline: ${readiness.headline || "-"}`,
+    `Summary: ${readiness.summary || "-"}`,
+    `Follow-up Count: ${readiness.followUpCount ?? 0}`,
+    `Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(readiness.priorities || {})}`,
+    `Latest Receipt: ${readiness.latestReceipt?.operationLabel || readiness.latestReceipt?.operation || "-"} | gate=${readiness.latestReceipt?.mainlineGateStatus || "-"} | handoff=${readiness.latestReceipt?.handoffFileName || "-"}`,
+    `Next Follow-up: ${formatLaunchReceiptNextFollowUp(readiness.nextFollowUp)}`,
+    `Primary Workspace: ${readiness.primaryWorkspaceAction?.label || "-"} | focus=${readiness.primaryWorkspaceAction?.autofocus || "-"} | href=${readiness.primaryWorkspaceAction?.href || "-"}`,
+    `Primary Download: ${readiness.primaryDownload?.fileName || "-"} | format=${readiness.primaryDownload?.format || "-"} | href=${readiness.primaryDownload?.href || "-"}`,
+    `First Launch Handoff: ${readiness.firstLaunchHandoffDownload?.fileName || "-"} | href=${readiness.firstLaunchHandoffDownload?.href || "-"}`,
+    ""
+  ];
+  lines.push("Next Steps:");
+  const nextSteps = Array.isArray(readiness.nextSteps) ? readiness.nextSteps : [];
+  if (nextSteps.length) {
+    for (const item of nextSteps) {
+      lines.push(`- ${item}`);
+    }
+  } else {
+    lines.push("- Continue monitoring the scoped Developer Ops snapshot.");
+  }
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsSnapshotPayload({
   generatedAt = nowIso(),
   developer = null,
@@ -17765,6 +17908,14 @@ function buildDeveloperOpsSnapshotPayload({
         recommendedDownload: buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope)
       }
     : null;
+  const initialLaunchOpsReadiness = buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview,
+    launchReceiptFollowUps,
+    launchReceiptFollowUpPriorities,
+    launchReceiptNextFollowUp,
+    mainlineHandoff: routeReview.mainlineHandoff
+  });
 
   const payload = {
     generatedAt,
@@ -17783,7 +17934,8 @@ function buildDeveloperOpsSnapshotPayload({
       auditLogs: normalizedAuditLogs.length,
       launchReceiptFollowUps: launchReceiptFollowUps.length,
       launchReceiptFollowUpPriorities,
-      launchReceiptNextFollowUp
+      launchReceiptNextFollowUp,
+      initialLaunchOpsReadiness
     },
     overview,
     mainlineHandoff: routeReview.mainlineHandoff,
@@ -17853,6 +18005,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "launch-receipt-next-follow-up.txt",
       body: buildDeveloperOpsLaunchReceiptNextFollowUpText(payload)
+    },
+    {
+      path: "initial-launch-ops-readiness.txt",
+      body: buildDeveloperOpsInitialLaunchOpsReadinessText(payload)
     },
     {
       path: "csv/projects.csv",
@@ -18478,7 +18634,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-next-follow-up", "launch-receipt-follow-ups"],
+    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -18513,6 +18669,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-launch-receipt-next-follow-up.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsLaunchReceiptNextFollowUpText(payload)
+    };
+  }
+
+  if (normalizedFormat === "initial-launch-ops-readiness") {
+    return {
+      fileName: "developer-ops-initial-launch-readiness.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsInitialLaunchOpsReadinessText(payload)
     };
   }
 

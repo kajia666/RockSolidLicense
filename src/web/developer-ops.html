@@ -4146,6 +4146,15 @@
           `secondary=${resolveLaunchReceiptPriorityCount("secondary")}`,
           `other=${resolveLaunchReceiptPriorityCount("other")}`
         ].join(" / ");
+        const launchReceiptNextFollowUp = payload.summary?.launchReceiptNextFollowUp || launchReceiptFollowUps[0] || null;
+        const launchReceiptNextFollowUpText = launchReceiptNextFollowUp
+          ? [
+              normalizeLaunchReceiptPriority(launchReceiptNextFollowUp.priority).toUpperCase(),
+              launchReceiptNextFollowUp.stage || "-",
+              launchReceiptNextFollowUp.title || "-",
+              launchReceiptNextFollowUp.actionKey || launchReceiptNextFollowUp.downloadKey || "-"
+            ].join(" / ")
+          : "-";
         overviewFocusMap = new Map();
         const statusText = overview.status === "attention"
           ? "Needs attention"
@@ -4168,6 +4177,10 @@
           {
             label: "Receipt Follow-up Priorities",
             value: launchReceiptPriorityText
+          },
+          {
+            label: "Receipt Next Follow-up",
+            value: launchReceiptNextFollowUpText
           },
           { label: "Latest Audit", value: formatTime(overview.latestAuditAt || payload.generatedAt) }
         ];

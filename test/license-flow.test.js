@@ -5550,11 +5550,27 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseZipText, /rocksolid-release-package-RELPKG_ALPHA-stable-.*\.json/);
     assert.match(releaseZipText, /SHA256SUMS\.txt/);
 
+    const launchWorkflowRouteParams = new URLSearchParams({
+      productCode: "RELPKG_ALPHA",
+      channel: "stable",
+      operation: "record_post_launch_ops_sweep",
+      actionKey: "launch_mainline_record_post_launch_ops_sweep",
+      downloadKey: "launch_mainline_post_launch_sweep_handoff",
+      routeTitle: "Continue post-launch ops sweep",
+      routeReason: "Resume first-wave ops sweep from mainline"
+    });
     const launchWorkflow = await getJson(
       baseUrl,
-      "/api/developer/launch-workflow?productCode=RELPKG_ALPHA&channel=stable",
+      `/api/developer/launch-workflow?${launchWorkflowRouteParams.toString()}`,
       viewerSession.token
     );
+    assert.equal(launchWorkflow.filters.productCode, "RELPKG_ALPHA");
+    assert.equal(launchWorkflow.filters.channel, "stable");
+    assert.equal(launchWorkflow.filters.operation, "record_post_launch_ops_sweep");
+    assert.equal(launchWorkflow.filters.actionKey, "launch_mainline_record_post_launch_ops_sweep");
+    assert.equal(launchWorkflow.filters.downloadKey, "launch_mainline_post_launch_sweep_handoff");
+    assert.equal(launchWorkflow.filters.routeTitle, "Continue post-launch ops sweep");
+    assert.equal(launchWorkflow.filters.routeReason, "Resume first-wave ops sweep from mainline");
     assert.match(launchWorkflow.fileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-/);
     assert.match(launchWorkflow.summaryFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt$/);
     assert.match(launchWorkflow.checklistFileName, /^rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-checklist\.txt$/);
@@ -5571,6 +5587,14 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(launchWorkflow.workflowSummary.mainlineGate.recommendedWorkspace?.key, "integration");
     assert.ok(launchWorkflow.workflowSummary.mainlineGate.primaryAction?.key);
     assert.ok(launchWorkflow.workflowSummary.mainlineGate.recommendedDownload?.key);
+    assert.equal(launchWorkflow.workflowSummary.routeFocus.operation, "record_post_launch_ops_sweep");
+    assert.equal(launchWorkflow.workflowSummary.routeFocus.actionKey, "launch_mainline_record_post_launch_ops_sweep");
+    assert.equal(launchWorkflow.workflowSummary.routeFocus.downloadKey, "launch_mainline_post_launch_sweep_handoff");
+    assert.match(launchWorkflow.workflowSummary.routeFocus.title, /Continue post-launch ops sweep/);
+    assert.match(launchWorkflow.workflowSummary.routeFocus.summary, /Resume first-wave ops sweep from mainline/);
+    assert.ok(launchWorkflow.workflowSummary.routeFocus.tags.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
+    assert.ok(launchWorkflow.workflowSummary.routeFocus.controls.some((item) => item.workspaceAction?.key === "launch-mainline"));
+    assert.ok(launchWorkflow.workflowSummary.routeFocus.controls.some((item) => item.recommendedDownload?.key === "launch_mainline_post_launch_sweep_handoff"));
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.recommendedDownloads));
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.actionPlan));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.length >= 1);
@@ -5637,6 +5661,10 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /Authorization Status: BLOCK/);
     assert.match(launchWorkflow.summaryText, /Launch Mainline Gate:/);
     assert.match(launchWorkflow.summaryText, /- status: HOLD/);
+    assert.match(launchWorkflow.summaryText, /Launch Workflow Route Focus:/);
+    assert.match(launchWorkflow.summaryText, /Continue post-launch ops sweep/);
+    assert.match(launchWorkflow.summaryText, /operation=record_post_launch_ops_sweep/);
+    assert.match(launchWorkflow.summaryText, /download=launch_mainline_post_launch_sweep_handoff/);
     assert.match(launchWorkflow.summaryText, /Authorization Summary: modes=account\+register/);
     assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
     assert.match(launchWorkflow.summaryText, /Recommended Workspace:/);
@@ -5672,13 +5700,17 @@ test("developer release package export bundles integration, versions, and notice
 
     const launchSummaryDownload = await getText(
       baseUrl,
-      "/api/developer/launch-workflow/download?productCode=RELPKG_ALPHA&channel=stable&format=summary",
+      `/api/developer/launch-workflow/download?${launchWorkflowRouteParams.toString()}&format=summary`,
       viewerSession.token
     );
     assert.match(launchSummaryDownload.contentType || "", /^text\/plain/);
     assert.match(launchSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*\.txt"/);
     assert.match(launchSummaryDownload.body, /Workflow Status: HOLD/);
     assert.match(launchSummaryDownload.body, /Authorization Status: BLOCK/);
+    assert.match(launchSummaryDownload.body, /Launch Workflow Route Focus:/);
+    assert.match(launchSummaryDownload.body, /Continue post-launch ops sweep/);
+    assert.match(launchSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
+    assert.match(launchSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff/);
     assert.match(launchSummaryDownload.body, /Recommended handoff zip/);
     assert.match(launchSummaryDownload.body, /Combined launch workflow zip/);
 
@@ -15415,6 +15447,14 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /autofocus/);
     assert.match(html, /routeTitle/);
     assert.match(html, /routeReason/);
+    assert.match(html, /requestedOperation/);
+    assert.match(html, /requestedActionKey/);
+    assert.match(html, /requestedDownloadKey/);
+    assert.match(html, /operation: target\.operation/);
+    assert.match(html, /actionKey: target\.actionKey/);
+    assert.match(html, /downloadKey: target\.downloadKey/);
+    assert.match(html, /renderLaunchRouteFocus/);
+    assert.match(html, /Launch Workflow Route Focus/);
     assert.match(html, /Open Project Workspace/);
     assert.match(html, /Open Integration Package/);
     assert.match(html, /Open Release Check/);

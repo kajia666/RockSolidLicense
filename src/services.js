@@ -8120,6 +8120,7 @@ function buildLaunchWorkflowSummaryPayload({
   integrationPackage,
   authReadiness = {},
   workflowChecklist = {},
+  filters = {},
   fileName = "launch-workflow.json",
   summaryFileName = "launch-workflow.txt",
   checklistFileName = "launch-workflow-checklist.txt",
@@ -8135,6 +8136,102 @@ function buildLaunchWorkflowSummaryPayload({
   const tokenKeySummary = startupPreview.tokenKeySummary || {};
   const clientHardening = startupPreview.clientHardening || integrationPackage?.manifest?.clientHardening || {};
   const tokenKeyTotal = tokenKeySummary.totalKeys ?? integrationPackage?.manifest?.tokenKeys?.length ?? 0;
+  const compactRouteParams = (params = {}) => Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+  );
+  const routeProductCode = product?.code || releasePackage?.manifest?.project?.code || filters.productCode || null;
+  const routedOperation = String(filters.operation || "").trim().toLowerCase();
+  const routedActionKey = String(filters.actionKey || "").trim();
+  const routedDownloadKey = String(filters.downloadKey || "").trim();
+  const routedRouteTitle = String(filters.routeTitle || "").trim();
+  const routedRouteReason = String(filters.routeReason || "").trim();
+  const routedParams = compactRouteParams({
+    operation: routedOperation,
+    actionKey: routedActionKey,
+    downloadKey: routedDownloadKey,
+    routeTitle: routedRouteTitle,
+    routeReason: routedRouteReason
+  });
+  const routeQueryParams = compactRouteParams({
+    productCode: routeProductCode,
+    channel,
+    ...routedParams
+  });
+  const inferRouteDownloadFormat = (key = "") => {
+    const normalized = String(key || "").trim().toLowerCase();
+    if (normalized.includes("rehearsal_guide")) return "rehearsal-guide";
+    if (normalized.includes("production_handoff")) return "production-handoff";
+    if (normalized.includes("cutover_handoff")) return "cutover-handoff";
+    if (normalized.includes("recovery_drill_handoff")) return "recovery-drill-handoff";
+    if (normalized.includes("operations_handoff")) return "operations-handoff";
+    if (normalized.includes("post_launch_sweep_handoff")) return "post-launch-sweep-handoff";
+    if (normalized.includes("closeout_handoff")) return "closeout-handoff";
+    if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
+    if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
+    if (normalized.endsWith("_checksums") || normalized.includes("checksums")) return "checksums";
+    if (normalized.endsWith("_zip") || normalized.includes("zip")) return "zip";
+    if (normalized.includes("checklist")) return "checklist";
+    if (normalized.includes("json")) return "json";
+    return "summary";
+  };
+  const routeFocusDownload = routedDownloadKey
+    ? createLaunchWorkflowDownloadShortcut(
+        routedDownloadKey,
+        `${sanitizeExportNameSegment(routedDownloadKey, "launch-route")}.txt`,
+        routedRouteTitle || "Routed launch handoff download",
+        {
+          source: inferLaunchWorkflowDownloadSource(routedDownloadKey),
+          format: inferRouteDownloadFormat(routedDownloadKey),
+          params: routeQueryParams
+        }
+      )
+    : null;
+  const routeFocus = Object.keys(routedParams).length
+    ? {
+        key: "launch_workflow_route_focus",
+        title: routedRouteTitle || "Continue routed launch workflow",
+        summary: routedRouteReason || "Continue the routed launch handoff from the preserved operation context.",
+        operation: routedOperation || null,
+        actionKey: routedActionKey || null,
+        downloadKey: routedDownloadKey || null,
+        routeTitle: routedRouteTitle || null,
+        routeReason: routedRouteReason || null,
+        tags: [
+          routedOperation ? { label: "operation", value: routedOperation, strong: true } : null,
+          routedActionKey ? { label: "action", value: routedActionKey, strong: true } : null,
+          routedDownloadKey ? { label: "download", value: routedDownloadKey, strong: false } : null
+        ].filter(Boolean),
+        controls: [
+          {
+            kind: "workspace",
+            label: "Stay in Launch Workflow",
+            workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+              "launch",
+              "handoff",
+              "Stay in Launch Workflow",
+              routeQueryParams
+            )
+          },
+          {
+            kind: "workspace",
+            label: routedRouteTitle || "Open Launch Mainline",
+            workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+              "launch-mainline",
+              "summary",
+              "Open Launch Mainline",
+              routeQueryParams
+            )
+          },
+          routeFocusDownload
+            ? {
+                kind: "download",
+                label: routeFocusDownload.label || "Routed launch handoff download",
+                recommendedDownload: routeFocusDownload
+              }
+            : null
+        ].filter(Boolean)
+      }
+    : null;
   const workflowStatus = workflowChecklist.status || (
     readiness.status === "hold" || startupDecision.ready === false
       ? "hold"
@@ -8153,7 +8250,8 @@ function buildLaunchWorkflowSummaryPayload({
     "summary",
     {
       productCode: releasePackage?.manifest?.project?.code || null,
-      channel
+      channel,
+      ...routedParams
     }
   );
   const launchMainlineRehearsalGuideDownload = createLaunchMainlineDownloadShortcut(
@@ -8162,7 +8260,8 @@ function buildLaunchWorkflowSummaryPayload({
     "rehearsal-guide",
     {
       productCode: releasePackage?.manifest?.project?.code || null,
-      channel
+      channel,
+      ...routedParams
     }
   );
   const recommendedDownloads = [
@@ -8217,7 +8316,8 @@ function buildLaunchWorkflowSummaryPayload({
       "summary",
       {
         productCode: releasePackage?.manifest?.project?.code || null,
-        channel
+        channel,
+        ...routedParams
       }
     ),
     createLaunchMainlineDownloadShortcut(
@@ -8226,7 +8326,8 @@ function buildLaunchWorkflowSummaryPayload({
       "rehearsal-guide",
       {
         productCode: releasePackage?.manifest?.project?.code || null,
-        channel
+        channel,
+        ...routedParams
       }
     ),
     createLaunchMainlineDownloadShortcut(
@@ -8235,7 +8336,8 @@ function buildLaunchWorkflowSummaryPayload({
       "checksums",
       {
         productCode: releasePackage?.manifest?.project?.code || null,
-        channel
+        channel,
+        ...routedParams
       }
     ),
     createLaunchMainlineDownloadShortcut(
@@ -8244,7 +8346,8 @@ function buildLaunchWorkflowSummaryPayload({
       "zip",
       {
         productCode: releasePackage?.manifest?.project?.code || null,
-        channel
+        channel,
+        ...routedParams
       }
     )
   ];
@@ -8569,6 +8672,7 @@ function buildLaunchWorkflowSummaryPayload({
     authorizationSummary: authReadiness.summary || null,
     authorizationMessage: authReadiness.message || null,
     authorizationModeSummary: authReadiness.loginModeSummary || null,
+    routeFocus,
     authorizationInventory: authReadiness.inventory || {},
     authorizationLaunchRecommendations: authReadiness.launchRecommendations || {
       inventoryRecommendations: [],
@@ -8641,6 +8745,28 @@ function buildLaunchWorkflowPackageSummaryText(payload = {}) {
   ];
 
   appendLaunchMainlineGateText(lines, workflowSummary.mainlineGate, formatWorkspaceActionText);
+
+  if (workflowSummary.routeFocus && typeof workflowSummary.routeFocus === "object") {
+    lines.push("Launch Workflow Route Focus:");
+    lines.push(`- title: ${workflowSummary.routeFocus.title || "-"}`);
+    lines.push(`- summary: ${workflowSummary.routeFocus.summary || "-"}`);
+    lines.push(`- operation=${workflowSummary.routeFocus.operation || "-"}`);
+    lines.push(`- action=${workflowSummary.routeFocus.actionKey || "-"}`);
+    lines.push(`- download=${workflowSummary.routeFocus.downloadKey || "-"}`);
+    if (Array.isArray(workflowSummary.routeFocus.tags) && workflowSummary.routeFocus.tags.length) {
+      lines.push(`- tags: ${workflowSummary.routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
+    }
+    if (Array.isArray(workflowSummary.routeFocus.controls) && workflowSummary.routeFocus.controls.length) {
+      for (const control of workflowSummary.routeFocus.controls) {
+        lines.push(
+          `- control: ${control?.label || control?.kind || "Action"}`
+          + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+        );
+      }
+    }
+    lines.push("");
+  }
 
   const recommendedDownloads = Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads : [];
   const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
@@ -8856,7 +8982,8 @@ function buildLaunchWorkflowPackagePayload({
   channel = "stable",
   releasePackage,
   integrationPackage,
-  authReadiness = {}
+  authReadiness = {},
+  filters = {}
 }) {
   const normalizedChannel = normalizeChannel(channel);
   const timestampTag = buildExportTimestampTag(generatedAt);
@@ -8883,6 +9010,15 @@ function buildLaunchWorkflowPackagePayload({
     integrationPackage,
     authReadiness,
     workflowChecklist,
+    filters: {
+      productCode: product?.code || filters.productCode || null,
+      channel: normalizedChannel,
+      operation: filters.operation || null,
+      actionKey: filters.actionKey || null,
+      downloadKey: filters.downloadKey || null,
+      routeTitle: filters.routeTitle || null,
+      routeReason: filters.routeReason || null
+    },
     fileName,
     summaryFileName,
     checklistFileName,
@@ -8934,6 +9070,15 @@ function buildLaunchWorkflowPackagePayload({
     checklistFileName,
     handoffZipFileName,
     handoffChecksumsFileName,
+    filters: {
+      productCode: product?.code || filters.productCode || null,
+      channel: normalizedChannel,
+      operation: filters.operation || null,
+      actionKey: filters.actionKey || null,
+      downloadKey: filters.downloadKey || null,
+      routeTitle: filters.routeTitle || null,
+      routeReason: filters.routeReason || null
+    },
     manifest,
     authorizationReadiness: authReadiness,
     workflowSummary,
@@ -24036,7 +24181,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         channel: releasePackage?.manifest?.release?.channel || selector.channel || "stable",
         releasePackage,
         integrationPackage,
-        authReadiness
+        authReadiness,
+        filters: {
+          productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+          channel: releasePackage?.manifest?.release?.channel || selector.channel || "stable",
+          operation: selector.operation || null,
+          actionKey: selector.actionKey || null,
+          downloadKey: selector.downloadKey || null,
+          routeTitle: selector.routeTitle || null,
+          routeReason: selector.routeReason || null
+        }
       });
       const session = requireDeveloperSession(db, token);
       auditDeveloperSession(db, session, "product.launch-workflow.export", "product", project.id, {

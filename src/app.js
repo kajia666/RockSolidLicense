@@ -1238,7 +1238,12 @@ export function createApp(overrides = {}) {
           productCode: url.searchParams.get("productCode"),
           projectCode: url.searchParams.get("projectCode"),
           softwareCode: url.searchParams.get("softwareCode"),
-          channel: url.searchParams.get("channel")
+          channel: url.searchParams.get("channel"),
+          operation: url.searchParams.get("operation"),
+          actionKey: url.searchParams.get("actionKey"),
+          downloadKey: url.searchParams.get("downloadKey"),
+          routeTitle: url.searchParams.get("routeTitle"),
+          routeReason: url.searchParams.get("routeReason")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,
@@ -1253,7 +1258,12 @@ export function createApp(overrides = {}) {
           productCode: url.searchParams.get("productCode"),
           projectCode: url.searchParams.get("projectCode"),
           softwareCode: url.searchParams.get("softwareCode"),
-          channel: url.searchParams.get("channel")
+          channel: url.searchParams.get("channel"),
+          operation: url.searchParams.get("operation"),
+          actionKey: url.searchParams.get("actionKey"),
+          downloadKey: url.searchParams.get("downloadKey"),
+          routeTitle: url.searchParams.get("routeTitle"),
+          routeReason: url.searchParams.get("routeReason")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,

@@ -488,6 +488,11 @@
       const requestedProductCode = (routeParams.get("productCode") || "").trim();
       const requestedChannel = (routeParams.get("channel") || "").trim() || "stable";
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
+      const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
+      const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedOperation = (routeParams.get("operation") || "").trim();
+      const requestedActionKey = (routeParams.get("actionKey") || "").trim();
+      const requestedDownloadKey = (routeParams.get("downloadKey") || "").trim();
       let token = "";
       let actor = null;
       let projects = [];
@@ -570,7 +575,12 @@
       function currentReleaseTarget() {
         return {
           productCode: el("package-product-code").value.trim() || el("filter-product-code").value.trim(),
-          channel: el("package-channel").value.trim() || el("filter-channel").value.trim() || requestedChannel
+          channel: el("package-channel").value.trim() || el("filter-channel").value.trim() || requestedChannel,
+          routeTitle: requestedRouteTitle,
+          routeReason: requestedRouteReason,
+          operation: requestedOperation,
+          actionKey: requestedActionKey,
+          downloadKey: requestedDownloadKey
         };
       }
 
@@ -578,7 +588,38 @@
         const target = currentReleaseTarget();
         return {
           productCode: target.productCode,
-          channel: target.channel || "stable"
+          channel: target.channel || "stable",
+          routeTitle: target.routeTitle,
+          routeReason: target.routeReason,
+          operation: target.operation,
+          actionKey: target.actionKey,
+          downloadKey: target.downloadKey
+        };
+      }
+
+      function currentWorkflowTarget() {
+        return currentLaunchDownloadTarget();
+      }
+
+      function launchWorkflowDownloadQuery(format) {
+        const target = currentLaunchDownloadTarget();
+        return q({
+          productCode: target.productCode,
+          channel: target.channel,
+          format,
+          operation: target.operation,
+          actionKey: target.actionKey,
+          downloadKey: target.downloadKey,
+          routeTitle: target.routeTitle,
+          routeReason: target.routeReason
+        });
+      }
+
+      function currentRouteParamsForTarget(target = {}) {
+        return {
+          operation: target.operation,
+          actionKey: target.actionKey,
+          downloadKey: target.downloadKey
         };
       }
 
@@ -788,6 +829,7 @@
         const recommendedWorkspace = workflowSummary.recommendedWorkspace || {};
         const workspaceActions = Array.isArray(workflowSummary.workspaceActions) ? workflowSummary.workspaceActions : [];
         const actionPlan = Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : [];
+        const routeFocus = workflowSummary.routeFocus || null;
         const authorizationLaunchRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
         const inventoryRecommendations = Array.isArray(authorizationLaunchRecommendations.inventoryRecommendations)
           ? authorizationLaunchRecommendations.inventoryRecommendations
@@ -815,6 +857,7 @@
           <div class="split-line"><span>Recommended Workspace</span><span>${escapeHtml(recommendedWorkspace.label || "-")}</span></div>
           <div class="hint" style="margin-top:12px;">${escapeHtml(workflowSummary.message || "No launch workflow summary available.")}</div>
           ${recommendedWorkspace.reason ? `<div class="hint" style="margin-top:12px;">Recommended workspace reason: ${escapeHtml(recommendedWorkspace.reason)}</div>` : ""}
+          ${renderLaunchRouteFocus(routeFocus)}
           ${renderWorkspaceActionButtons(workspaceActions)}
           ${actionPlan.length ? `<div class="hint" style="margin-top:12px;">Action plan: ${escapeHtml(workflowSummary.actionPlanSummary || actionPlan.map((item) => item.title || item.key || "step").join(" -> "))}</div>` : ""}
           ${renderActionPlanCards(actionPlan)}
@@ -1011,6 +1054,12 @@
           : [];
       }
 
+      function currentRouteFocusControls() {
+        return Array.isArray(releasePackage?.workflowSummary?.routeFocus?.controls)
+          ? releasePackage.workflowSummary.routeFocus.controls
+          : [];
+      }
+
       function renderWorkspaceActionButtons(actions = []) {
         if (!actions.length) {
           return "";
@@ -1041,6 +1090,31 @@
                 data-recommended-download-index="${index}"
               >${escapeHtml(item.label || item.key || "Download asset")}</button>
             `).join("")}
+          </div>
+        `;
+      }
+
+      function renderLaunchRouteFocus(routeFocus = null) {
+        if (!routeFocus || typeof routeFocus !== "object") {
+          return "";
+        }
+        const tags = Array.isArray(routeFocus.tags) ? routeFocus.tags : [];
+        const controls = Array.isArray(routeFocus.controls) ? routeFocus.controls : [];
+        return `
+          <div class="hint" style="margin-top:12px;">
+            <strong>Launch Workflow Route Focus</strong>
+            <div style="margin-top:8px;">${escapeHtml(routeFocus.title || "Continue routed launch workflow")}</div>
+            <div style="margin-top:8px;">${escapeHtml(routeFocus.summary || "Continue the routed launch handoff from this preserved context.")}</div>
+            ${tags.length ? `<div style="margin-top:8px;">${tags.map((tag) => renderTag(`${tag.label || "tag"}:${tag.value ?? "-"}`, tag.strong)).join("")}</div>` : ""}
+            ${controls.length ? `
+              <div class="actions" style="margin-top:8px;">
+                ${controls.map((control, index) => control.workspaceAction
+                  ? `<button type="button" class="secondary" data-route-focus-workspace-index="${index}">${escapeHtml(control.label || control.workspaceAction.label || "Open workspace")}</button>`
+                  : control.recommendedDownload
+                    ? `<button type="button" data-route-focus-download-index="${index}">${escapeHtml(control.label || control.recommendedDownload.label || "Download file")}</button>`
+                    : "").join("")}
+              </div>
+            ` : ""}
           </div>
         `;
       }
@@ -1251,6 +1325,7 @@
         }
         const routed = buildWorkspaceRouteContext(action, routeContext);
         const actionParams = buildWorkspaceActionParams(action);
+        const currentRouteParams = currentRouteParamsForTarget(target);
         if (action.key === "project") {
           window.location.href = buildWorkspaceUrl("/developer/projects", {
             productId: currentReleaseProductId(target.productCode),
@@ -1259,6 +1334,7 @@
             autofocus: action.autofocus || "detail",
             routeTitle: routed.routeTitle,
             routeReason: routed.routeReason,
+            ...currentRouteParams,
             ...actionParams
           });
           return;
@@ -1271,6 +1347,7 @@
             autofocus: action.autofocus || "package",
             routeTitle: routed.routeTitle,
             routeReason: routed.routeReason,
+            ...currentRouteParams,
             ...actionParams
           });
           return;
@@ -1283,6 +1360,7 @@
             autofocus: action.autofocus || "package",
             routeTitle: routed.routeTitle,
             routeReason: routed.routeReason,
+            ...currentRouteParams,
             ...actionParams
           });
           return;
@@ -1295,6 +1373,7 @@
             autofocus: action.autofocus || "policy-control",
             routeTitle: routed.routeTitle,
             routeReason: routed.routeReason,
+            ...currentRouteParams,
             ...actionParams
           });
           return;
@@ -1307,6 +1386,7 @@
             autofocus: action.autofocus || "snapshot",
             routeTitle: routed.routeTitle,
             routeReason: routed.routeReason,
+            ...currentRouteParams,
             ...actionParams
             });
             return;
@@ -1319,6 +1399,7 @@
               autofocus: action.autofocus || "summary",
               routeTitle: routed.routeTitle,
               routeReason: routed.routeReason,
+              ...currentRouteParams,
               ...actionParams
             });
             return;
@@ -1331,6 +1412,7 @@
               autofocus: action.autofocus || "summary",
               routeTitle: routed.routeTitle,
               routeReason: routed.routeReason,
+              ...currentRouteParams,
               ...actionParams
             });
             return;
@@ -1343,6 +1425,7 @@
               autofocus: action.autofocus || "summary",
               routeTitle: routed.routeTitle,
               routeReason: routed.routeReason,
+              ...currentRouteParams,
               ...actionParams
             });
             return;
@@ -1354,6 +1437,7 @@
           autofocus: action.autofocus || "handoff",
           routeTitle: routed.routeTitle,
           routeReason: routed.routeReason,
+          ...currentRouteParams,
           ...actionParams
         });
       }
@@ -1364,7 +1448,16 @@
         }
         const target = currentLaunchDownloadTarget();
         const result = await downloadApiFile(
-          `/api/developer/launch-workflow/download${q({ productCode: target.productCode, channel: target.channel, format: `release-${format}` })}`,
+          `/api/developer/launch-workflow/download${q({
+            productCode: target.productCode,
+            channel: target.channel,
+            format: `release-${format}`,
+            operation: target.operation,
+            actionKey: target.actionKey,
+            downloadKey: target.downloadKey,
+            routeTitle: target.routeTitle,
+            routeReason: target.routeReason
+          })}`,
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -1377,7 +1470,16 @@
         }
         const target = currentLaunchDownloadTarget();
         const result = await downloadApiFile(
-          `/api/developer/launch-workflow/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
+          `/api/developer/launch-workflow/download${q({
+            productCode: target.productCode,
+            channel: target.channel,
+            format,
+            operation: target.operation,
+            actionKey: target.actionKey,
+            downloadKey: target.downloadKey,
+            routeTitle: target.routeTitle,
+            routeReason: target.routeReason
+          })}`,
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -1390,7 +1492,16 @@
         }
         const target = currentLaunchDownloadTarget();
         const result = await downloadApiFile(
-          `/api/developer/launch-workflow/download${q({ productCode: target.productCode, channel: target.channel, format: `integration-${format}` })}`,
+          `/api/developer/launch-workflow/download${q({
+            productCode: target.productCode,
+            channel: target.channel,
+            format: `integration-${format}`,
+            operation: target.operation,
+            actionKey: target.actionKey,
+            downloadKey: target.downloadKey,
+            routeTitle: target.routeTitle,
+            routeReason: target.routeReason
+          })}`,
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -1689,12 +1800,19 @@
       }
 
       async function generateReleasePackage() {
-        const productCode = el("package-product-code").value.trim();
-        const channel = el("package-channel").value.trim() || "stable";
-        if (!productCode) {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
           throw new Error("Enter a project code before generating a launch workflow package.");
         }
-        const data = await api(`/api/developer/launch-workflow${q({ productCode, channel })}`);
+        const data = await api(`/api/developer/launch-workflow${q({
+          productCode: target.productCode,
+          channel: target.channel,
+          operation: target.operation,
+          actionKey: target.actionKey,
+          downloadKey: target.downloadKey,
+          routeTitle: target.routeTitle,
+          routeReason: target.routeReason
+        })}`);
         releasePackage = data;
         renderReleaseReadiness();
         syncPermissions();
@@ -1919,7 +2037,11 @@
         }
         window.location.href = buildWorkspaceUrl("/developer/projects", {
           productId: currentReleaseProductId(target.productCode),
-          productCode: target.productCode
+          productCode: target.productCode,
+          channel: target.channel,
+          routeTitle: "Launch workflow handoff",
+          routeReason: `Continue project follow-up for ${target.productCode} on lane ${target.channel} from the launch workflow workspace.`,
+          ...currentRouteParamsForTarget(target)
         });
       });
 
@@ -2031,6 +2153,40 @@
       });
 
         el("release-readiness").addEventListener("click", async (event) => {
+          const routeFocusWorkspaceButton = event.target.closest("[data-route-focus-workspace-index]");
+          if (routeFocusWorkspaceButton) {
+            try {
+              const index = Number(routeFocusWorkspaceButton.dataset.routeFocusWorkspaceIndex);
+              const control = currentRouteFocusControls()[index];
+              navigateToWorkspaceAction(control?.workspaceAction, currentReleaseTarget(), {
+                title: control?.label || control?.workspaceAction?.label || "Launch Workflow Route Focus",
+                summary: releasePackage?.workflowSummary?.routeFocus?.summary || ""
+              });
+            } catch (error) {
+              setStatus(error.message, true);
+            }
+            return;
+          }
+
+          const routeFocusDownloadButton = event.target.closest("[data-route-focus-download-index]");
+          if (routeFocusDownloadButton) {
+            try {
+              const index = Number(routeFocusDownloadButton.dataset.routeFocusDownloadIndex);
+              const control = currentRouteFocusControls()[index];
+              const result = await downloadRecommendedWorkflowItem(control?.recommendedDownload);
+              setOutput({
+                routeFocusDownload: {
+                  key: control?.recommendedDownload?.key || null,
+                  fileName: result?.fileName || control?.recommendedDownload?.fileName || null
+                }
+              });
+            } catch (error) {
+              setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+              setOutput({ code: error.code || "REQUEST_FAILED", message: error.message });
+            }
+            return;
+          }
+
           const recommendationSetupButton = event.target.closest("[data-recommendation-setup-index]");
           if (recommendationSetupButton) {
             try {
@@ -2244,7 +2400,8 @@
           productCode: target.productCode,
           channel: target.channel,
           routeTitle: "Launch workflow handoff",
-          routeReason: `Continue integration follow-up for ${target.productCode} on lane ${target.channel} from the launch workflow workspace.`
+          routeReason: `Continue integration follow-up for ${target.productCode} on lane ${target.channel} from the launch workflow workspace.`,
+          ...currentRouteParamsForTarget(target)
         });
       });
 
@@ -2260,7 +2417,8 @@
           channel: target.channel,
           autofocus: "package",
           routeTitle: "Launch workflow handoff",
-          routeReason: `Continue release checks for ${target.productCode} on lane ${target.channel} from the launch workflow workspace.`
+          routeReason: `Continue release checks for ${target.productCode} on lane ${target.channel} from the launch workflow workspace.`,
+          ...currentRouteParamsForTarget(target)
         });
       });
 
@@ -2269,10 +2427,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "json" })}`,
+            `/api/developer/launch-workflow/download${launchWorkflowDownloadQuery("json")}`,
             releasePackage.fileName || "launch-workflow.json"
           );
           setStatus(`Launch workflow JSON downloaded: ${result.fileName}`);
@@ -2287,10 +2443,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "summary" })}`,
+            `/api/developer/launch-workflow/download${launchWorkflowDownloadQuery("summary")}`,
             releasePackage.summaryFileName || "launch-workflow.txt"
           );
           setStatus(`Launch workflow summary downloaded: ${result.fileName}`);
@@ -2305,10 +2459,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "checklist" })}`,
+            `/api/developer/launch-workflow/download${launchWorkflowDownloadQuery("checklist")}`,
             releasePackage.checklistFileName || "launch-workflow-checklist.txt"
           );
           setStatus(`Launch workflow checklist downloaded: ${result.fileName}`);
@@ -2323,10 +2475,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "checksums" })}`,
+            `/api/developer/launch-workflow/download${launchWorkflowDownloadQuery("checksums")}`,
             (releasePackage.fileName || "launch-workflow.json").replace(/\.json$/i, "-sha256.txt")
           );
           setStatus(`Launch workflow checksums downloaded: ${result.fileName}`);
@@ -2607,10 +2757,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/launch-workflow/download${q({ productCode, channel, format: "zip" })}`,
+            `/api/developer/launch-workflow/download${launchWorkflowDownloadQuery("zip")}`,
             (releasePackage.fileName || "launch-workflow.json").replace(/\.json$/i, ".zip")
           );
           setStatus(`Launch workflow zip archive downloaded: ${result.fileName}`);

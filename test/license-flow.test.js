@@ -16317,6 +16317,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Receipt Follow-up Count/);
     assert.match(html, /Receipt Follow-up Priorities/);
     assert.match(html, /Receipt Next Follow-up/);
+    assert.match(html, /Receipt Next Follow-up Action/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
     assert.match(html, /Escalate First/);

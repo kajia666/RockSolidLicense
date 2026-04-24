@@ -4156,6 +4156,14 @@
               launchReceiptNextFollowUp.actionKey || launchReceiptNextFollowUp.downloadKey || "-"
             ].join(" / ")
           : "-";
+        const launchReceiptNextFollowUpAction = launchReceiptNextFollowUp?.recommendedAction || null;
+        const launchReceiptNextFollowUpActionText = launchReceiptNextFollowUp
+          ? [
+              launchReceiptNextFollowUpAction?.key || launchReceiptNextFollowUp.actionKey || "-",
+              launchReceiptNextFollowUpAction?.operation || launchReceiptNextFollowUp.operationToRecord || launchReceiptNextFollowUp.operation || "-",
+              launchReceiptNextFollowUpAction?.source || "-"
+            ].join(" / ")
+          : "-";
         overviewFocusMap = new Map();
         const statusText = overview.status === "attention"
           ? "Needs attention"
@@ -4182,6 +4190,10 @@
           {
             label: "Receipt Next Follow-up",
             value: launchReceiptNextFollowUpText
+          },
+          {
+            label: "Receipt Next Follow-up Action",
+            value: launchReceiptNextFollowUpActionText
           },
           { label: "Latest Audit", value: formatTime(overview.latestAuditAt || payload.generatedAt) }
         ];

@@ -15245,6 +15245,29 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsLaunchReceiptNextFollowUpAction(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const key = item.actionKey || item.operationToRecord || item.downloadKey || "";
+  if (!key) {
+    return null;
+  }
+  return {
+    key,
+    source: "developer-ops-launch-receipt",
+    label: item.title || "Continue launch receipt follow-up",
+    stage: item.stage || null,
+    priority: normalizeLaunchReceiptFollowUpPriority(item.priority),
+    operation: item.operationToRecord || item.operation || null,
+    actionKey: item.actionKey || null,
+    downloadKey: item.downloadKey || null,
+    productCode: item.productCode || null,
+    channel: item.channel || null,
+    summary: item.summary || ""
+  };
+}
+
 function buildSnapshotTopCounts(items = [], selector, limit = 5) {
   const counts = new Map();
   for (const item of items) {
@@ -16902,6 +16925,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const summary = payload.summary || {};
   const launchReceiptFollowUpPriorities = summary.launchReceiptFollowUpPriorities || {};
   const launchReceiptNextFollowUp = summary.launchReceiptNextFollowUp || null;
+  const launchReceiptNextFollowUpAction = launchReceiptNextFollowUp?.recommendedAction || null;
   const launchReceiptNextFollowUpDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
@@ -16931,6 +16955,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`,
     `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUpPriorities)}`,
     `Receipt Next Follow-up: ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`,
+    `Receipt Next Follow-up Action: ${launchReceiptNextFollowUpAction?.key || "-"} (${launchReceiptNextFollowUpAction?.operation || "-"})`,
     `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"})`
   ];
 
@@ -17048,6 +17073,8 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   const overview = payload.overview || {};
   const item = summary.launchReceiptNextFollowUp
     || buildLaunchReceiptNextFollowUp(overview.launchReceiptFollowUps || []);
+  const recommendedAction = item?.recommendedAction
+    || buildDeveloperOpsLaunchReceiptNextFollowUpAction(item);
   const recommendedDownload = item?.recommendedDownload
     || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope);
   const lines = [
@@ -17077,6 +17104,9 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Handoff File: ${item.handoffFileName || "-"}`);
   lines.push(`Mainline Gate: ${item.mainlineGateStatus || "-"}`);
   lines.push(`Created At: ${item.createdAt || "-"}`);
+  lines.push(`Recommended Action: ${recommendedAction?.key || "-"}`);
+  lines.push(`Action Operation: ${recommendedAction?.operation || "-"}`);
+  lines.push(`Action Source: ${recommendedAction?.source || "-"}`);
   lines.push(`Download File: ${recommendedDownload?.fileName || "-"}`);
   lines.push(`Download Format: ${recommendedDownload?.format || "-"}`);
   lines.push(`Download Href: ${recommendedDownload?.href || "-"}`);
@@ -17159,6 +17189,7 @@ function buildDeveloperOpsSnapshotPayload({
   const launchReceiptNextFollowUp = launchReceiptNextFollowUpBase
     ? {
         ...launchReceiptNextFollowUpBase,
+        recommendedAction: buildDeveloperOpsLaunchReceiptNextFollowUpAction(launchReceiptNextFollowUpBase),
         recommendedDownload: buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope)
       }
     : null;

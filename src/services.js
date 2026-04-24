@@ -5543,6 +5543,98 @@ function buildLaunchMainlineActionReceipt({
   };
 }
 
+function buildLaunchReceiptAuditMetadata(receipt = null) {
+  if (!receipt || typeof receipt !== "object") {
+    return null;
+  }
+  const evidence = receipt.mainlineEvidenceQueue && typeof receipt.mainlineEvidenceQueue === "object"
+    ? receipt.mainlineEvidenceQueue
+    : null;
+  const inventory = receipt.firstLaunchInventoryQueue && typeof receipt.firstLaunchInventoryQueue === "object"
+    ? receipt.firstLaunchInventoryQueue
+    : null;
+  const opsQueue = receipt.firstLaunchOpsQueue && typeof receipt.firstLaunchOpsQueue === "object"
+    ? receipt.firstLaunchOpsQueue
+    : null;
+  const duty = receipt.firstLaunchDutySummary && typeof receipt.firstLaunchDutySummary === "object"
+    ? receipt.firstLaunchDutySummary
+    : null;
+  const lifecycle = receipt.postLaunchLifecycleSummary && typeof receipt.postLaunchLifecycleSummary === "object"
+    ? receipt.postLaunchLifecycleSummary
+    : null;
+  const gate = receipt.mainlineOverallGate && typeof receipt.mainlineOverallGate === "object"
+    ? receipt.mainlineOverallGate
+    : null;
+  return {
+    operation: receipt.operation || null,
+    operationLabel: receipt.operationLabel || null,
+    summary: receipt.summary || receipt.followUpSummary || "",
+    handoffFileName: receipt.handoffFileName || null,
+    handoffGeneratedAt: receipt.handoffGeneratedAt || null,
+    hasHandoffText: Boolean(receipt.handoffText),
+    skippedCount: Number(receipt.skippedCount || 0),
+    mainlineGate: gate
+      ? {
+          status: gate.status || "unknown",
+          headline: gate.headline || "",
+          blockingCount: Number(gate.blockingCount || 0),
+          attentionCount: Number(gate.attentionCount || 0),
+          primaryActionKey: gate.primaryAction?.key || null,
+          recommendedDownloadKey: gate.recommendedDownload?.key || null
+        }
+      : null,
+    productionEvidence: evidence
+      ? {
+          totalCount: Number(evidence.totalCount || 0),
+          completedCount: Number(evidence.completedCount || 0),
+          remainingCount: Number(evidence.remainingCount || 0),
+          nextActionKey: evidence.nextAction?.key || null,
+          nextActionTitle: evidence.nextAction?.title || evidence.nextAction?.label || null,
+          nextOperation: evidence.nextAction?.setupAction?.operation || null
+        }
+      : null,
+    firstLaunchInventory: inventory
+      ? {
+          operation: inventory.operation || null,
+          requestedMode: inventory.requestedMode || null,
+          createdBatchCount: Number(inventory.createdBatchCount || 0),
+          createdCardCount: Number(inventory.createdCardCount || 0),
+          inventoryStateCount: Number(inventory.inventoryStateCount || 0),
+          skippedCount: Number(inventory.skippedCount || 0),
+          nextActionKey: inventory.nextAction?.key || null
+        }
+      : null,
+    firstLaunchDuty: duty || opsQueue
+      ? {
+          summary: duty?.summary || opsQueue?.summary || "",
+          actionCount: Number(opsQueue?.actionCount || 0),
+          ownerCount: Array.isArray(opsQueue?.ownerGroups) ? opsQueue.ownerGroups.length : 0,
+          stageCount: Array.isArray(opsQueue?.stageGroups) ? opsQueue.stageGroups.length : 0,
+          handoffDownloadKey: duty?.handoffDownload?.key || receipt.firstLaunchHandoffDownload?.key || null,
+          primaryWorkspaceKey: duty?.primaryWorkspaceAction?.key || opsQueue?.nextAction?.workspaceAction?.key || null,
+          primaryDownloadKey: duty?.primaryRecommendedDownload?.key || opsQueue?.nextAction?.recommendedDownload?.key || null
+        }
+      : null,
+    postLaunchLifecycle: lifecycle
+      ? {
+          status: lifecycle.status || null,
+          nextActionKey: lifecycle.nextAction?.key || null,
+          primaryDownloadKey: lifecycle.primaryRecommendedDownload?.key || null
+        }
+      : null,
+    recapCardKeys: Array.isArray(receipt.mainlineRecapCards)
+      ? receipt.mainlineRecapCards.map((item) => item?.key || item?.title || null).filter(Boolean)
+      : []
+  };
+}
+
+function withLaunchReceiptAuditMetadata(metadata = {}, receipt = null) {
+  const launchReceipt = buildLaunchReceiptAuditMetadata(receipt);
+  return launchReceipt
+    ? { ...metadata, launchReceipt }
+    : metadata;
+}
+
 function mergeLaunchWorkflowReviewStatus(current = "pass", next = "pass") {
   const severity = {
     pass: 0,
@@ -23988,16 +24080,26 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         };
       };
       const followUp = result?.followUp || buildRecordedEvidenceFollowUp();
+      const message = result?.message || `Launch mainline action ${operation} completed for ${selector.productCode}.`;
+      const receipt = buildLaunchMainlineActionReceipt({
+        operation,
+        result,
+        followUp,
+        launchMainline
+      });
+      const actionAuditSession = requireDeveloperSession(db, token);
+      const actionAuditProduct = await getStoreActiveProductByCode(selector.productCode);
+      auditDeveloperSession(db, actionAuditSession, "product.launch-mainline.action", "product", actionAuditProduct.id, withLaunchReceiptAuditMetadata({
+        productCode: actionAuditProduct.code,
+        channel: result?.channel || launchMainline?.manifest?.channel || selector.channel || "stable",
+        operation,
+        message
+      }, receipt));
       return {
         operation,
-        message: result?.message || `Launch mainline action ${operation} completed for ${selector.productCode}.`,
+        message,
         followUp,
-        receipt: buildLaunchMainlineActionReceipt({
-          operation,
-          result,
-          followUp,
-          launchMainline
-        }),
+        receipt,
         result,
         launchMainline
       };
@@ -25301,23 +25403,6 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         operation: "bootstrap"
       });
 
-      auditDeveloperSession(db, session, "license.quickstart.bootstrap", "product", product.id, {
-        productCode,
-        createdPolicy: Boolean(created.policy),
-        createdCardBatch: Boolean(created.cardBatch),
-        createdCardBatches: Array.isArray(created.cardBatches) ? created.cardBatches.map((item) => item.batchCode) : [],
-        createdAccount: Boolean(created.account),
-        createdEntitlement: Boolean(created.entitlement),
-        policyId: created.policy?.id ?? null,
-        batchCode: created.cardBatch?.batchCode ?? null,
-        starterUsername: created.account?.username ?? null,
-        entitlementId: created.entitlement?.id ?? null,
-        entitlementUsername: created.entitlement?.username ?? null,
-        entitlementSeedBatchCode: created.entitlement?.seedBatchCode ?? null,
-        beforeStatus: before.authorization.status,
-        afterStatus: after.authorization.status
-      });
-
       const createdParts = [
         created.policy ? `policy:${created.policy.name}` : null,
         Array.isArray(created.cardBatches) && created.cardBatches.length
@@ -25356,7 +25441,24 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           ? `Launch quickstart bootstrap created ${createdParts.join(", ")} for ${productCode}.`
           : `Launch quickstart bootstrap completed for ${productCode}.`
       };
-      return buildBootstrapResponse(resultPayload);
+      const response = await buildBootstrapResponse(resultPayload);
+      auditDeveloperSession(db, session, "license.quickstart.bootstrap", "product", product.id, withLaunchReceiptAuditMetadata({
+        productCode,
+        createdPolicy: Boolean(created.policy),
+        createdCardBatch: Boolean(created.cardBatch),
+        createdCardBatches: Array.isArray(created.cardBatches) ? created.cardBatches.map((item) => item.batchCode) : [],
+        createdAccount: Boolean(created.account),
+        createdEntitlement: Boolean(created.entitlement),
+        policyId: created.policy?.id ?? null,
+        batchCode: created.cardBatch?.batchCode ?? null,
+        starterUsername: created.account?.username ?? null,
+        entitlementId: created.entitlement?.id ?? null,
+        entitlementUsername: created.entitlement?.username ?? null,
+        entitlementSeedBatchCode: created.entitlement?.seedBatchCode ?? null,
+        beforeStatus: before.authorization.status,
+        afterStatus: after.authorization.status
+      }, response.receipt));
+      return response;
     },
 
     async developerCreateLicenseQuickstartFirstBatches(token, body = {}, options = {}) {
@@ -25507,15 +25609,6 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         operation: "first_batch_setup"
       });
 
-      auditDeveloperSession(db, session, "license.quickstart.first_batch_setup", "product", product.id, {
-        productCode,
-        requestedMode,
-        createdBatchCodes: createdBatches.map((item) => item.batchCode),
-        skipped,
-        beforeFreshCards: before.freshCards.length,
-        afterFreshCards: after.freshCards.length
-      });
-
       const resultPayload = {
         productCode,
         productName: product.name,
@@ -25549,6 +25642,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           : `First-batch setup found no missing recommended card batches for ${productCode}.`
       };
       if (options?.includeReceipt === false) {
+        auditDeveloperSession(db, session, "license.quickstart.first_batch_setup", "product", product.id, {
+          productCode,
+          requestedMode,
+          createdBatchCodes: createdBatches.map((item) => item.batchCode),
+          skipped,
+          beforeFreshCards: before.freshCards.length,
+          afterFreshCards: after.freshCards.length
+        });
         return resultPayload;
       }
       const launchMainline = await this.developerLaunchMainlinePackage(token, {
@@ -25556,7 +25657,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         channel: body.channel || "stable",
         reviewMode: body.reviewMode || "matched"
       }, options);
-      return {
+      const response = {
         ...resultPayload,
         receipt: buildLaunchMainlineActionReceipt({
           operation: "first_batch_setup",
@@ -25565,6 +25666,15 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchMainline
         })
       };
+      auditDeveloperSession(db, session, "license.quickstart.first_batch_setup", "product", product.id, withLaunchReceiptAuditMetadata({
+        productCode,
+        requestedMode,
+        createdBatchCodes: createdBatches.map((item) => item.batchCode),
+        skipped,
+        beforeFreshCards: before.freshCards.length,
+        afterFreshCards: after.freshCards.length
+      }, response.receipt));
+      return response;
     },
 
     async developerRestockLicenseQuickstartBatches(token, body = {}, options = {}) {
@@ -25717,14 +25827,6 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         operation: "restock"
       });
 
-      auditDeveloperSession(db, session, "license.quickstart.restock", "product", product.id, {
-        productCode,
-        requestedMode,
-        createdBatchCodes: createdBatches.map((item) => item.batchCode),
-        beforeFreshCards: before.freshCards.length,
-        afterFreshCards: after.freshCards.length
-      });
-
       const resultPayload = {
         productCode,
         productName: product.name,
@@ -25758,6 +25860,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           : `Inventory refill found no low starter batches for ${productCode}.`
       };
       if (options?.includeReceipt === false) {
+        auditDeveloperSession(db, session, "license.quickstart.restock", "product", product.id, {
+          productCode,
+          requestedMode,
+          createdBatchCodes: createdBatches.map((item) => item.batchCode),
+          beforeFreshCards: before.freshCards.length,
+          afterFreshCards: after.freshCards.length
+        });
         return resultPayload;
       }
       const launchMainline = await this.developerLaunchMainlinePackage(token, {
@@ -25765,7 +25874,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         channel: body.channel || "stable",
         reviewMode: body.reviewMode || "matched"
       }, options);
-      return {
+      const response = {
         ...resultPayload,
         receipt: buildLaunchMainlineActionReceipt({
           operation: "restock",
@@ -25774,6 +25883,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchMainline
         })
       };
+      auditDeveloperSession(db, session, "license.quickstart.restock", "product", product.id, withLaunchReceiptAuditMetadata({
+        productCode,
+        requestedMode,
+        createdBatchCodes: createdBatches.map((item) => item.batchCode),
+        beforeFreshCards: before.freshCards.length,
+        afterFreshCards: after.freshCards.length
+      }, response.receipt));
+      return response;
     },
 
     async developerUpdateAccountStatus(token, accountId, body = {}) {

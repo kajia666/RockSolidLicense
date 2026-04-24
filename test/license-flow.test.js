@@ -8270,6 +8270,23 @@ test("developer license quickstart bootstrap can create starter launch assets in
       assert.match(bootstrap.receipt?.handoffText || "", /Production Evidence:/);
       assert.match(bootstrap.receipt?.handoffText || "", /Post Launch Lifecycle:/);
 
+    const bootstrapAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=BOOT_ALPHA&eventType=license.quickstart.bootstrap&limit=5",
+      ownerSession.token
+    );
+    const bootstrapAuditEntry = bootstrapAudit.items.find((entry) => entry.metadata?.productCode === "BOOT_ALPHA");
+    assert.ok(bootstrapAuditEntry);
+    assert.equal(bootstrapAuditEntry.metadata?.launchReceipt?.operation, "bootstrap");
+    assert.equal(bootstrapAuditEntry.metadata?.launchReceipt?.handoffFileName, bootstrap.receipt.handoffFileName);
+    assert.equal(bootstrapAuditEntry.metadata?.launchReceipt?.hasHandoffText, true);
+    assert.equal(bootstrapAuditEntry.metadata?.launchReceipt?.handoffText, undefined);
+    assert.equal(bootstrapAuditEntry.metadata?.launchReceipt?.mainlineGate?.status, bootstrap.receipt.mainlineOverallGate.status);
+    assert.equal(
+      bootstrapAuditEntry.metadata?.launchReceipt?.productionEvidence?.remainingCount,
+      bootstrap.receipt.mainlineEvidenceQueue.remainingCount
+    );
+
     const policies = await getJson(
       baseUrl,
       "/api/developer/policies?productCode=BOOT_ALPHA",
@@ -8691,6 +8708,20 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.match(setup.receipt?.handoffText || "", /Production Evidence:/);
       assert.match(setup.receipt?.handoffText || "", /Post Launch Lifecycle:/);
 
+    const setupAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=FIRSTBATCH&eventType=license.quickstart.first_batch_setup&limit=5",
+      ownerSession.token
+    );
+    const setupAuditEntry = setupAudit.items.find((entry) => entry.metadata?.productCode === "FIRSTBATCH");
+    assert.ok(setupAuditEntry);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.operation, "first_batch_setup");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.handoffFileName, setup.receipt.handoffFileName);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.hasHandoffText, true);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.handoffText, undefined);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchInventory?.createdBatchCount, setup.createdBatches.length);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.handoffDownloadKey, "launch_mainline_first_launch_handoff");
+
     const cards = await getJson(
       baseUrl,
       "/api/developer/cards?productCode=FIRSTBATCH",
@@ -8892,6 +8923,20 @@ test("developer launch workflow can restock low launch inventory buffers", async
       assert.match(restock.receipt?.handoffText || "", /First Launch Duty:/);
       assert.match(restock.receipt?.handoffText || "", /Production Evidence:/);
       assert.match(restock.receipt?.handoffText || "", /Post Launch Lifecycle:/);
+
+    const restockAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=RESTOCKAPP&eventType=license.quickstart.restock&limit=5",
+      ownerSession.token
+    );
+    const restockAuditEntry = restockAudit.items.find((entry) => entry.metadata?.productCode === "RESTOCKAPP");
+    assert.ok(restockAuditEntry);
+    assert.equal(restockAuditEntry.metadata?.launchReceipt?.operation, "restock");
+    assert.equal(restockAuditEntry.metadata?.launchReceipt?.handoffFileName, restock.receipt.handoffFileName);
+    assert.equal(restockAuditEntry.metadata?.launchReceipt?.hasHandoffText, true);
+    assert.equal(restockAuditEntry.metadata?.launchReceipt?.handoffText, undefined);
+    assert.equal(restockAuditEntry.metadata?.launchReceipt?.firstLaunchInventory?.createdCardCount, 120);
+    assert.equal(restockAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.handoffDownloadKey, "launch_mainline_first_launch_handoff");
 
     const launchWorkflowAfterRestock = await getJson(
       baseUrl,
@@ -9410,6 +9455,20 @@ test("developer launch mainline action can restock low inventory and return duty
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Post-Launch Lifecycle:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
+
+    const actionAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=MAINLINE_RESTOCK&eventType=product.launch-mainline.action&limit=5",
+      ownerSession.token
+    );
+    const actionAuditEntry = actionAudit.items.find((entry) => entry.metadata?.productCode === "MAINLINE_RESTOCK");
+    assert.ok(actionAuditEntry);
+    assert.equal(actionAuditEntry.metadata?.operation, "restock");
+    assert.equal(actionAuditEntry.metadata?.launchReceipt?.operation, "restock");
+    assert.equal(actionAuditEntry.metadata?.launchReceipt?.handoffFileName, actionResult.receipt.handoffFileName);
+    assert.equal(actionAuditEntry.metadata?.launchReceipt?.hasHandoffText, true);
+    assert.equal(actionAuditEntry.metadata?.launchReceipt?.handoffText, undefined);
+    assert.equal(actionAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.handoffDownloadKey, "launch_mainline_first_launch_handoff");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

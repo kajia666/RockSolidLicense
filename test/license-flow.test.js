@@ -12663,6 +12663,48 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /severity=/);
     assert.match(exportSnapshot.summaryText, /next=/);
 
+    const launchOpsAction = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "EXPORT_ALPHA",
+        channel: "stable",
+        operation: "record_post_launch_ops_sweep"
+      },
+      ownerSession.token
+    );
+    assert.equal(launchOpsAction.receipt?.operation, "record_post_launch_ops_sweep");
+    assert.match(launchOpsAction.receipt?.handoffFileName || "", /EXPORT_ALPHA-stable-record_post_launch_ops_sweep.*\.txt/i);
+
+    const launchReceiptSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_ALPHA&limit=20",
+      operatorSession.token
+    );
+    const latestLaunchReceipt = launchReceiptSnapshot.overview?.latestLaunchReceipts?.find((item) =>
+      item.operation === "record_post_launch_ops_sweep"
+    );
+    assert.ok(latestLaunchReceipt);
+    assert.equal(latestLaunchReceipt.productCode, "EXPORT_ALPHA");
+    assert.equal(latestLaunchReceipt.handoffFileName, launchOpsAction.receipt.handoffFileName);
+    assert.equal(latestLaunchReceipt.hasHandoffText, true);
+    assert.equal(latestLaunchReceipt.handoffText, undefined);
+    assert.equal(latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey, launchOpsAction.receipt.firstLaunchDutySummary?.handoffDownload?.key || null);
+    assert.equal(latestLaunchReceipt.postLaunchLifecycleStatus, launchOpsAction.receipt.postLaunchLifecycleSummary?.status || null);
+    assert.match(launchReceiptSnapshot.summaryText, /Latest Launch Receipts:/);
+    assert.match(launchReceiptSnapshot.summaryText, /record_post_launch_ops_sweep/i);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /launchReceiptOperation/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /record_post_launch_ops_sweep/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /rocksolid-launch-mainline-receipt-EXPORT_ALPHA-stable-record_post_launch_ops_sweep/i);
+
+    const launchReceiptSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=summary",
+      operatorSession.token
+    );
+    assert.match(launchReceiptSummaryDownload.body, /Latest Launch Receipts:/);
+    assert.match(launchReceiptSummaryDownload.body, /record_post_launch_ops_sweep/i);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -16280,6 +16322,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /action === "download-mainline"/);
     assert.match(html, /action === "download-mainline-rehearsal"/);
     assert.match(html, /action === "download-mainline-first-launch-handoff"/);
+    assert.match(html, /Latest Launch Receipts/);
+    assert.match(html, /latestLaunchReceipts/);
+    assert.match(html, /renderLatestLaunchReceipts/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

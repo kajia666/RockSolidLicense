@@ -14942,6 +14942,11 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       "productCode",
       "username",
       "reason",
+      "launchReceiptOperation",
+      "launchReceiptHandoffFileName",
+      "launchReceiptGateStatus",
+      "launchReceiptEvidenceRemaining",
+      "launchReceiptDutyDownloadKey",
       "createdAt",
       "metadataJson"
     ],
@@ -14955,6 +14960,11 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       item.metadata?.productCode ?? "",
       item.metadata?.username ?? "",
       item.metadata?.reason ?? "",
+      item.metadata?.launchReceipt?.operation ?? "",
+      item.metadata?.launchReceipt?.handoffFileName ?? "",
+      item.metadata?.launchReceipt?.mainlineGate?.status ?? "",
+      item.metadata?.launchReceipt?.productionEvidence?.remainingCount ?? "",
+      item.metadata?.launchReceipt?.firstLaunchDuty?.handoffDownloadKey ?? "",
       item.createdAt,
       JSON.stringify(item.metadata ?? {})
     ])
@@ -14989,6 +14999,51 @@ function latestSnapshotTimestamp(values = []) {
     latestMs = ms;
   }
   return latest;
+}
+
+function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
+  return auditLogs
+    .map((item) => {
+      const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+      const receipt = metadata.launchReceipt && typeof metadata.launchReceipt === "object"
+        ? metadata.launchReceipt
+        : null;
+      if (!receipt) {
+        return null;
+      }
+      return {
+        auditLogId: item.id || null,
+        eventType: item.eventType || null,
+        actorType: item.actorType || null,
+        actorId: item.actorId || null,
+        entityType: item.entityType || null,
+        entityId: item.entityId || null,
+        productCode: metadata.productCode || metadata.code || metadata.projectCode || metadata.softwareCode || null,
+        channel: metadata.channel || null,
+        operation: receipt.operation || null,
+        operationLabel: receipt.operationLabel || null,
+        summary: receipt.summary || "",
+        handoffFileName: receipt.handoffFileName || null,
+        handoffGeneratedAt: receipt.handoffGeneratedAt || null,
+        hasHandoffText: Boolean(receipt.hasHandoffText),
+        mainlineGateStatus: receipt.mainlineGate?.status || null,
+        mainlineGateHeadline: receipt.mainlineGate?.headline || null,
+        productionEvidenceRemainingCount: receipt.productionEvidence?.remainingCount ?? null,
+        productionEvidenceCompletedCount: receipt.productionEvidence?.completedCount ?? null,
+        productionEvidenceNextActionKey: receipt.productionEvidence?.nextActionKey || null,
+        productionEvidenceNextOperation: receipt.productionEvidence?.nextOperation || null,
+        firstLaunchInventoryCreatedBatchCount: receipt.firstLaunchInventory?.createdBatchCount ?? null,
+        firstLaunchInventoryCreatedCardCount: receipt.firstLaunchInventory?.createdCardCount ?? null,
+        firstLaunchDutyHandoffDownloadKey: receipt.firstLaunchDuty?.handoffDownloadKey || null,
+        firstLaunchDutyActionCount: receipt.firstLaunchDuty?.actionCount ?? null,
+        postLaunchLifecycleStatus: receipt.postLaunchLifecycle?.status || null,
+        postLaunchLifecycleNextActionKey: receipt.postLaunchLifecycle?.nextActionKey || null,
+        createdAt: item.createdAt || null
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => snapshotDateMs(right.createdAt || right.handoffGeneratedAt) - snapshotDateMs(left.createdAt || left.handoffGeneratedAt))
+    .slice(0, Math.max(1, Number(limit || 5)));
 }
 
 function buildSnapshotTopCounts(items = [], selector, limit = 5) {
@@ -16477,6 +16532,7 @@ function buildSnapshotOverview({
   const focusAccounts = buildSnapshotFocusAccounts(accounts, entitlements, sessions, 5);
   const focusSessions = buildSnapshotFocusSessions(sessions, 5);
   const focusDevices = buildSnapshotFocusDevices(bindings, blocks, sessions, 5);
+  const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5);
   const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
   const queueSummary = buildSnapshotQueueSummary(recommendedQueue);
 
@@ -16525,6 +16581,10 @@ function buildSnapshotOverview({
   if (topAuditEvents.length) {
     highlights.push(`Top audit events: ${topAuditEvents.slice(0, 3).map((item) => `${item.eventType} x${item.count}`).join(", ")}.`);
   }
+  if (latestLaunchReceipts.length) {
+    const latest = latestLaunchReceipts[0];
+    highlights.push(`Latest launch receipt: ${latest.operationLabel || latest.operation || "-"} for ${latest.productCode || "-"} (${latest.mainlineGateStatus || "unknown"}).`);
+  }
   if (topReasons.length) {
     highlights.push(`Common reasons: ${topReasons.slice(0, 3).map((item) => `${item.reason} x${item.count}`).join(", ")}.`);
   }
@@ -16555,6 +16615,7 @@ function buildSnapshotOverview({
     topReasons,
     focusUsernames,
     focusFingerprints,
+    latestLaunchReceipts,
     queueSummary,
     recommendedQueue,
     focusAccounts,
@@ -16677,6 +16738,12 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Top Audit Events:");
       for (const item of overview.topAuditEvents) {
         lines.push(`- ${item.eventType || "-"} x${item.count ?? 0}`);
+      }
+    }
+    if (Array.isArray(overview.latestLaunchReceipts) && overview.latestLaunchReceipts.length) {
+      lines.push("Latest Launch Receipts:");
+      for (const item of overview.latestLaunchReceipts) {
+        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | handoff=${item.handoffFileName || "-"}`);
       }
     }
     if (Array.isArray(overview.topReasons) && overview.topReasons.length) {

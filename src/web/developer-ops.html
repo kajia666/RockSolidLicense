@@ -2491,6 +2491,39 @@
         }).join("")}</div>`;
       }
 
+      function renderLatestLaunchReceipts(items = []) {
+        const entries = Array.isArray(items) ? items.slice(0, 5) : [];
+        if (!entries.length) {
+          return `<div class="hint">No launch receipt summaries are visible in this snapshot yet.</div>`;
+        }
+        return entries.map((item) => {
+          const tags = [
+            item.productCode ? renderTag(`project:${item.productCode}`, true) : "",
+            item.channel ? renderTag(`channel:${item.channel}`) : "",
+            item.operation ? renderTag(`op:${item.operation}`) : "",
+            item.mainlineGateStatus ? renderTag(`gate:${String(item.mainlineGateStatus).toUpperCase()}`, true) : "",
+            item.productionEvidenceRemainingCount !== null && item.productionEvidenceRemainingCount !== undefined
+              ? renderTag(`evidenceRemaining:${item.productionEvidenceRemainingCount}`)
+              : "",
+            item.postLaunchLifecycleStatus ? renderTag(`lifecycle:${item.postLaunchLifecycleStatus}`) : ""
+          ].filter(Boolean).join("");
+          const details = [
+            `handoff=${esc(item.handoffFileName || "-")}`,
+            `duty=${esc(item.firstLaunchDutyHandoffDownloadKey || "-")}`,
+            `next=${esc(item.productionEvidenceNextActionKey || item.postLaunchLifecycleNextActionKey || "-")}`,
+            `at=${esc(formatTime(item.createdAt || item.handoffGeneratedAt))}`
+          ].join(" | ");
+          return `
+            <div class="snapshot-recap">
+              <strong>${esc(item.operationLabel || item.operation || "Launch receipt")}</strong>
+              <div class="audit-meta">${tags || renderTag("launch-receipt")}</div>
+              <div class="hint">${details}</div>
+              ${item.summary ? `<div class="hint">${esc(item.summary)}</div>` : ""}
+            </div>
+          `;
+        }).join("");
+      }
+
       function applyRecommendedControl(control = {}) {
         const type = String(control?.type || "").trim();
         if (!type) {
@@ -3988,6 +4021,7 @@
         const focusAccounts = Array.isArray(overview.focusAccounts) ? overview.focusAccounts : [];
         const focusSessions = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
         const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
+        const latestLaunchReceipts = Array.isArray(overview.latestLaunchReceipts) ? overview.latestLaunchReceipts : [];
         overviewFocusMap = new Map();
         const statusText = overview.status === "attention"
           ? "Needs attention"
@@ -4015,6 +4049,10 @@
           <div>
             <div class="hint">Top audit events</div>
             <div class="audit-meta">${renderOverviewTags(topAuditEvents, "eventType", "event")}</div>
+          </div>
+          <div>
+            <div class="hint">Latest Launch Receipts</div>
+            ${renderLatestLaunchReceipts(latestLaunchReceipts)}
           </div>
           <div>
             <div class="hint">Top products</div>

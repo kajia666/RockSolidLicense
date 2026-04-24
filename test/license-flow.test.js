@@ -7568,6 +7568,50 @@ test("developer launch mainline action can record a launch closeout review and r
         { key: "stabilization", status: "hold" }
       ]
     );
+    assert.deepEqual(
+      actionResult.receipt?.postLaunchLifecycleSummary
+        ? {
+            status: actionResult.receipt.postLaunchLifecycleSummary.status || null,
+            nextActionKey: actionResult.receipt.postLaunchLifecycleSummary.nextAction?.key || null,
+            primaryWorkspaceKey: actionResult.receipt.postLaunchLifecycleSummary.primaryWorkspaceAction?.key || null,
+            primaryDownloadKey: actionResult.receipt.postLaunchLifecycleSummary.primaryRecommendedDownload?.key || null,
+            phaseStatuses: Array.isArray(actionResult.receipt.postLaunchLifecycleSummary.phases)
+              ? actionResult.receipt.postLaunchLifecycleSummary.phases.map((item) => ({
+                  key: item?.key || null,
+                  status: item?.status || null
+                }))
+              : []
+          }
+        : null,
+      {
+        status: "hold",
+        nextActionKey: "production_launch_stabilization_review_recent",
+        primaryWorkspaceKey: "ops",
+        primaryDownloadKey: "launch_mainline_stabilization_handoff",
+        phaseStatuses: [
+          { key: "operations", status: "ready" },
+          { key: "post_launch_sweep", status: "ready" },
+          { key: "launch_closeout", status: "ready" },
+          { key: "stabilization", status: "hold" }
+        ]
+      }
+    );
+    assert.ok(
+      Array.isArray(actionResult.receipt?.mainlineRecapCards)
+      && actionResult.receipt.mainlineRecapCards.some((item) =>
+        item?.key === "post_launch_lifecycle_summary"
+        && Array.isArray(item.details)
+        && item.details.some((detail) => /Path:/i.test(String(detail || "")))
+        && item.details.some((detail) => /Recommended downloads:/i.test(String(detail || "")))
+        && Array.isArray(item.controls)
+        && item.controls.some((control) =>
+          control?.setupAction?.operation === "record_launch_stabilization_review"
+        )
+        && item.controls.some((control) =>
+          control?.recommendedDownload?.key === "launch_mainline_stabilization_handoff"
+        )
+      )
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -7685,6 +7729,47 @@ test("developer launch mainline action can record a launch stabilization review 
         { key: "launch_closeout", status: "ready" },
         { key: "stabilization", status: "ready" }
       ]
+    );
+    assert.deepEqual(
+      actionResult.receipt?.postLaunchLifecycleSummary
+        ? {
+            status: actionResult.receipt.postLaunchLifecycleSummary.status || null,
+            nextActionKey: actionResult.receipt.postLaunchLifecycleSummary.nextAction?.key || null,
+            primaryWorkspaceKey: actionResult.receipt.postLaunchLifecycleSummary.primaryWorkspaceAction?.key || null,
+            primaryDownloadKey: actionResult.receipt.postLaunchLifecycleSummary.primaryRecommendedDownload?.key || null,
+            phaseStatuses: Array.isArray(actionResult.receipt.postLaunchLifecycleSummary.phases)
+              ? actionResult.receipt.postLaunchLifecycleSummary.phases.map((item) => ({
+                  key: item?.key || null,
+                  status: item?.status || null
+                }))
+              : []
+          }
+        : null,
+      {
+        status: "ready",
+        nextActionKey: null,
+        primaryWorkspaceKey: "ops",
+        primaryDownloadKey: "launch_mainline_stabilization_handoff",
+        phaseStatuses: [
+          { key: "operations", status: "ready" },
+          { key: "post_launch_sweep", status: "ready" },
+          { key: "launch_closeout", status: "ready" },
+          { key: "stabilization", status: "ready" }
+        ]
+      }
+    );
+    assert.ok(
+      Array.isArray(actionResult.receipt?.mainlineRecapCards)
+      && actionResult.receipt.mainlineRecapCards.some((item) =>
+        item?.key === "post_launch_lifecycle_summary"
+        && Array.isArray(item.details)
+        && item.details.some((detail) => /Path:/i.test(String(detail || "")))
+        && item.details.some((detail) => /Statuses:/i.test(String(detail || "")))
+        && Array.isArray(item.controls)
+        && item.controls.some((control) =>
+          control?.recommendedDownload?.key === "launch_mainline_stabilization_handoff"
+        )
+      )
     );
   } finally {
     await app.close();
@@ -9128,6 +9213,32 @@ test("developer launch mainline action can restock low inventory and return duty
         && item.controls.some((control) => control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff")
       )
     );
+    assert.deepEqual(
+      actionResult.receipt?.postLaunchLifecycleSummary
+        ? {
+            status: actionResult.receipt.postLaunchLifecycleSummary.status || null,
+            nextActionKey: actionResult.receipt.postLaunchLifecycleSummary.nextAction?.key || null,
+            primaryDownloadKey: actionResult.receipt.postLaunchLifecycleSummary.primaryRecommendedDownload?.key || null
+          }
+        : null,
+      {
+        status: "hold",
+        nextActionKey: "production_operations_walkthrough_recent",
+        primaryDownloadKey: "launch_mainline_operations_handoff"
+      }
+    );
+    assert.ok(
+      actionResult.receipt?.mainlineRecapCards?.some((item) =>
+        item?.key === "post_launch_lifecycle_summary"
+        && Array.isArray(item.details)
+        && item.details.some((detail) => /Path:/i.test(String(detail || "")))
+        && item.details.some((detail) => /Recommended downloads:/i.test(String(detail || "")))
+        && Array.isArray(item.controls)
+        && item.controls.some((control) =>
+          control?.recommendedDownload?.key === "launch_mainline_operations_handoff"
+        )
+      )
+    );
 
     const firstLaunchHandoffDownload = actionResult.receipt?.firstLaunchHandoffDownload || null;
     const firstLaunchHandoffDownloadResponse = await getText(
@@ -9470,6 +9581,7 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       Array.isArray(actionResult.receipt?.mainlineRecapCards)
         ? actionResult.receipt.mainlineRecapCards.filter((item) =>
             item?.key !== "first_launch_duty_summary"
+            && item?.key !== "post_launch_lifecycle_summary"
           ).map((item) => ({
             key: item?.key || null,
             controls: Array.isArray(item?.controls)
@@ -10531,6 +10643,32 @@ test("developer launch mainline action can create first launch batches and retur
         && item.controls.some((control) => control?.setupAction?.operation === actionResult.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation)
       )
     );
+    assert.deepEqual(
+      actionResult.receipt?.postLaunchLifecycleSummary
+        ? {
+            status: actionResult.receipt.postLaunchLifecycleSummary.status || null,
+            nextActionKey: actionResult.receipt.postLaunchLifecycleSummary.nextAction?.key || null,
+            primaryDownloadKey: actionResult.receipt.postLaunchLifecycleSummary.primaryRecommendedDownload?.key || null
+          }
+        : null,
+      {
+        status: "hold",
+        nextActionKey: "production_operations_walkthrough_recent",
+        primaryDownloadKey: "launch_mainline_operations_handoff"
+      }
+    );
+    assert.ok(
+      actionResult.receipt?.mainlineRecapCards?.some((item) =>
+        item?.key === "post_launch_lifecycle_summary"
+        && Array.isArray(item.details)
+        && item.details.some((detail) => /Path:/i.test(String(detail || "")))
+        && item.details.some((detail) => /Recommended downloads:/i.test(String(detail || "")))
+        && Array.isArray(item.controls)
+        && item.controls.some((control) =>
+          control?.recommendedDownload?.key === "launch_mainline_operations_handoff"
+        )
+      )
+    );
     assert.equal(actionResult.launchMainline?.manifest?.project?.code, "MAINLINE_SETUP");
     assert.ok(actionResult.launchMainline?.mainlineSummary?.overallGate);
     assert.ok(actionResult.launchMainline?.mainlineSummary?.recommendedDownloads?.some((item) => item.key === "launch_summary"));
@@ -10786,6 +10924,7 @@ test("developer launch mainline action can create first launch batches and retur
       Array.isArray(actionResult.receipt?.mainlineRecapCards)
         ? actionResult.receipt.mainlineRecapCards.filter((item) =>
             item?.key !== "first_launch_duty_summary"
+            && item?.key !== "post_launch_lifecycle_summary"
           ).map((item) => ({
             key: item?.key || null,
             controls: Array.isArray(item?.controls)

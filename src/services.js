@@ -4390,6 +4390,93 @@ function buildLaunchMainlineActionReceipt({
         ].filter(Boolean))
       }
     : null;
+  const postLaunchLifecycle = mainlineSummary.productionGate?.postLaunchLifecycle && typeof mainlineSummary.productionGate.postLaunchLifecycle === "object"
+    ? mainlineSummary.productionGate.postLaunchLifecycle
+    : null;
+  const postLaunchLifecyclePhases = Array.isArray(postLaunchLifecycle?.phases)
+    ? postLaunchLifecycle.phases.map((item) => ({
+        key: item?.key || null,
+        label: item?.label || item?.key || "phase",
+        status: item?.status || null,
+        handoffCheck: item?.handoffCheck || null,
+        evidenceCheck: item?.evidenceCheck || null,
+        nextAction: item?.nextAction || null,
+        workspaceAction: item?.workspaceAction || null,
+        recommendedDownload: item?.recommendedDownload || null,
+        controls: Array.isArray(item?.controls)
+          ? item.controls
+          : dedupeLaunchMainlineControls(firstLaunchInventoryQueueControlList(item?.nextAction || null))
+      }))
+    : [];
+  const postLaunchLifecycleWorkspaceActions = Array.isArray(postLaunchLifecycle?.workspaceActions)
+    ? postLaunchLifecycle.workspaceActions.filter((item) => item && typeof item === "object")
+    : [];
+  const postLaunchLifecycleRecommendedDownloads = Array.isArray(postLaunchLifecycle?.recommendedDownloads)
+    ? postLaunchLifecycle.recommendedDownloads.filter((item) => item && typeof item === "object")
+    : [];
+  const postLaunchLifecycleWorkspaceActionsDetail = postLaunchLifecycleWorkspaceActions.length
+    ? `Workspace actions: ${postLaunchLifecycleWorkspaceActions.map((item) => item?.label || item?.key || "workspace").join(" | ")}`
+    : "";
+  const postLaunchLifecycleRecommendedDownloadsDetail = postLaunchLifecycleRecommendedDownloads.length
+    ? `Recommended downloads: ${postLaunchLifecycleRecommendedDownloads.map((item) => item?.label || item?.key || "download").join(" | ")}`
+    : "";
+  const postLaunchLifecycleControls = dedupeLaunchMainlineControls([
+    postLaunchLifecycle?.primaryWorkspaceAction
+      ? {
+          kind: "workspace",
+          label: postLaunchLifecycle.primaryWorkspaceAction.label || "Open post-launch workspace",
+          workspaceAction: postLaunchLifecycle.primaryWorkspaceAction
+        }
+      : null,
+    postLaunchLifecycle?.primaryRecommendedDownload
+      ? {
+          kind: "download",
+          label: postLaunchLifecycle.primaryRecommendedDownload.label || "Download post-launch handoff",
+          recommendedDownload: postLaunchLifecycle.primaryRecommendedDownload
+        }
+      : null,
+    ...firstLaunchInventoryQueueControlList(postLaunchLifecycle?.nextAction || null)
+  ].filter(Boolean));
+  const postLaunchLifecycleSummary = postLaunchLifecycle
+    ? {
+        key: "post_launch_lifecycle_summary",
+        title: "Post-Launch Lifecycle Summary",
+        status: postLaunchLifecycle.status || "review",
+        summary: postLaunchLifecycle.nextAction
+          ? `${operationLabel} refreshed post-launch lifecycle with ${Number(postLaunchLifecycle.readyCount || 0)}/${Number(postLaunchLifecycle.phaseCount || postLaunchLifecyclePhases.length || 0)} phases ready and ${postLaunchLifecycle.nextAction.title || postLaunchLifecycle.nextAction.label || postLaunchLifecycle.nextAction.key || "the next follow-up"} queued next.`
+          : `${operationLabel} left all ${Number(postLaunchLifecycle.phaseCount || postLaunchLifecyclePhases.length || 0)} post-launch lifecycle phases aligned.`,
+        tags: [
+          { label: "status", value: String(postLaunchLifecycle.status || "review").toUpperCase(), strong: true },
+          { label: "ready", value: Number(postLaunchLifecycle.readyCount || 0), strong: true },
+          { label: "hold", value: Number(postLaunchLifecycle.holdCount || 0), strong: Number(postLaunchLifecycle.holdCount || 0) > 0 },
+          { label: "review", value: Number(postLaunchLifecycle.reviewCount || 0), strong: false }
+        ],
+        phaseCount: Number(postLaunchLifecycle.phaseCount || postLaunchLifecyclePhases.length || 0),
+        readyCount: Number(postLaunchLifecycle.readyCount || 0),
+        holdCount: Number(postLaunchLifecycle.holdCount || 0),
+        reviewCount: Number(postLaunchLifecycle.reviewCount || 0),
+        nextAction: postLaunchLifecycle.nextAction || null,
+        primaryWorkspaceAction: postLaunchLifecycle.primaryWorkspaceAction || null,
+        primaryRecommendedDownload: postLaunchLifecycle.primaryRecommendedDownload || null,
+        workspaceActions: postLaunchLifecycleWorkspaceActions,
+        recommendedDownloads: postLaunchLifecycleRecommendedDownloads,
+        phases: postLaunchLifecyclePhases,
+        details: [
+          postLaunchLifecyclePhases.length
+            ? `Path: ${postLaunchLifecyclePhases.map((item) => item.label || item.key || "phase").join(" -> ")}`
+            : "",
+          postLaunchLifecyclePhases.length
+            ? `Statuses: ${postLaunchLifecyclePhases.map((item) => `${item.label || item.key || "phase"}:${String(item.status || "unknown").toUpperCase()}`).join(" | ")}`
+            : "",
+          postLaunchLifecycle.nextAction
+            ? `Next action: ${postLaunchLifecycle.nextAction.title || postLaunchLifecycle.nextAction.label || postLaunchLifecycle.nextAction.key || "follow-up"}`
+            : "Next action: All post-launch lifecycle phases are aligned.",
+          postLaunchLifecycleWorkspaceActionsDetail,
+          postLaunchLifecycleRecommendedDownloadsDetail
+        ].filter(Boolean),
+        controls: postLaunchLifecycleControls
+      }
+    : null;
   const mainlineOverviewCards = (Array.isArray(mainlineSummary.overviewCards) ? mainlineSummary.overviewCards : [])
     .slice(0, 3)
     .map((item) => ({
@@ -5153,6 +5240,7 @@ function buildLaunchMainlineActionReceipt({
       controls: mainlineFollowUpActions
     },
     firstLaunchDutySummary,
+    postLaunchLifecycleSummary,
     {
       key: "transition_summary",
       title: "Applied changes",
@@ -5234,6 +5322,7 @@ function buildLaunchMainlineActionReceipt({
     firstLaunchOpsQueue,
     firstLaunchHandoffDownload,
     firstLaunchDutySummary,
+    postLaunchLifecycleSummary,
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineForm,
@@ -12367,6 +12456,16 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const postLaunchLifecycleRecommendedDownloads = dedupePostLaunchLifecycleRecommendedDownloads(
     postLaunchLifecyclePhases.map((item) => item?.recommendedDownload || null)
   );
+  const nextPostLaunchLifecyclePhase = postLaunchLifecyclePhases.find((item) =>
+    item?.nextAction || item?.status !== "ready"
+  ) || null;
+  const fallbackPostLaunchLifecyclePhase = [...postLaunchLifecyclePhases]
+    .reverse()
+    .find((item) => item?.workspaceAction || item?.recommendedDownload) || null;
+  const primaryPostLaunchLifecyclePhase = nextPostLaunchLifecyclePhase
+    || fallbackPostLaunchLifecyclePhase
+    || postLaunchLifecyclePhases.find((item) => item?.workspaceAction || item?.recommendedDownload)
+    || null;
   const postLaunchLifecycle = {
     status: postLaunchLifecyclePhases.some((item) => item?.status === "hold")
       ? "hold"
@@ -12377,9 +12476,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     readyCount: postLaunchLifecyclePhases.filter((item) => item?.status === "ready").length,
     holdCount: postLaunchLifecyclePhases.filter((item) => item?.status === "hold").length,
     reviewCount: postLaunchLifecyclePhases.filter((item) => item?.status === "review").length,
-    nextAction: postLaunchLifecyclePhases.find((item) => item?.nextAction)?.nextAction || null,
-    primaryWorkspaceAction: postLaunchLifecyclePhases.find((item) => item?.workspaceAction)?.workspaceAction || null,
-    primaryRecommendedDownload: postLaunchLifecyclePhases.find((item) => item?.recommendedDownload)?.recommendedDownload || null,
+    nextAction: nextPostLaunchLifecyclePhase?.nextAction || null,
+    primaryWorkspaceAction: primaryPostLaunchLifecyclePhase?.workspaceAction || null,
+    primaryRecommendedDownload: primaryPostLaunchLifecyclePhase?.recommendedDownload || null,
     workspaceActions: postLaunchLifecycleWorkspaceActions,
     recommendedDownloads: postLaunchLifecycleRecommendedDownloads,
     phases: postLaunchLifecyclePhases

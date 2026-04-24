@@ -5308,6 +5308,39 @@ test("developer release package export bundles integration, versions, and notice
     );
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
+    const releaseRouteParams = new URLSearchParams({
+      productCode: "RELPKG_ALPHA",
+      channel: "stable",
+      operation: "record_post_launch_ops_sweep",
+      actionKey: "release_route_post_launch_ops_sweep",
+      downloadKey: "launch_mainline_post_launch_sweep_handoff",
+      routeTitle: "Continue release ops sweep",
+      routeReason: "Resume release ops sweep from the package handoff"
+    });
+    const routedReleasePackage = await getJson(
+      baseUrl,
+      `/api/developer/release-package?${releaseRouteParams.toString()}`,
+      viewerSession.token
+    );
+    assert.equal(routedReleasePackage.filters.productCode, "RELPKG_ALPHA");
+    assert.equal(routedReleasePackage.filters.channel, "stable");
+    assert.equal(routedReleasePackage.filters.operation, "record_post_launch_ops_sweep");
+    assert.equal(routedReleasePackage.filters.actionKey, "release_route_post_launch_ops_sweep");
+    assert.equal(routedReleasePackage.filters.downloadKey, "launch_mainline_post_launch_sweep_handoff");
+    assert.equal(routedReleasePackage.filters.routeTitle, "Continue release ops sweep");
+    assert.equal(routedReleasePackage.filters.routeReason, "Resume release ops sweep from the package handoff");
+    assert.equal(routedReleasePackage.manifest.release.filters.operation, "record_post_launch_ops_sweep");
+    assert.equal(routedReleasePackage.manifest.release.routeFocus.operation, "record_post_launch_ops_sweep");
+    assert.equal(routedReleasePackage.manifest.release.routeFocus.actionKey, "release_route_post_launch_ops_sweep");
+    assert.equal(routedReleasePackage.manifest.release.routeFocus.downloadKey, "launch_mainline_post_launch_sweep_handoff");
+    assert.ok(routedReleasePackage.manifest.release.routeFocus.controls.some((item) => item.workspaceAction?.key === "launch-mainline" && item.workspaceAction.params?.operation === "record_post_launch_ops_sweep"));
+    assert.ok(routedReleasePackage.manifest.release.routeFocus.controls.some((item) => item.recommendedDownload?.key === "launch_mainline_post_launch_sweep_handoff" && item.recommendedDownload.params?.downloadKey === "launch_mainline_post_launch_sweep_handoff"));
+    assert.equal(routedReleasePackage.mainlineFollowUp.routeFocus.operation, "record_post_launch_ops_sweep");
+    assert.ok(routedReleasePackage.mainlineFollowUp.workspaceActions.some((item) => item.key === "launch-mainline" && item.params?.downloadKey === "launch_mainline_post_launch_sweep_handoff"));
+    assert.match(routedReleasePackage.summaryText, /Release Route Focus:/);
+    assert.match(routedReleasePackage.summaryText, /operation=record_post_launch_ops_sweep/);
+    assert.match(routedReleasePackage.summaryText, /action=release_route_post_launch_ops_sweep/);
+    assert.match(routedReleasePackage.summaryText, /download=launch_mainline_post_launch_sweep_handoff/);
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
     assert.equal(releasePackage.manifest.release.mainlineFollowUp.status, "hold");
@@ -5389,6 +5422,16 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releaseSummaryDownload.body, /Release Readiness: HOLD/);
     assert.match(releaseSummaryDownload.body, /Release Mainline Follow-up:/);
     assert.match(releaseSummaryDownload.body, /Launch Mainline Gate:/);
+    const releaseRouteSummaryParams = new URLSearchParams(releaseRouteParams);
+    releaseRouteSummaryParams.set("format", "summary");
+    const releaseRouteSummaryDownload = await getText(
+      baseUrl,
+      `/api/developer/release-package/download?${releaseRouteSummaryParams.toString()}`,
+      viewerSession.token
+    );
+    assert.match(releaseRouteSummaryDownload.body, /Release Route Focus:/);
+    assert.match(releaseRouteSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
+    assert.match(releaseRouteSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff/);
 
     const releaseChecklistDownload = await getText(
       baseUrl,
@@ -16812,7 +16855,11 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /requestedAutofocus/);
     assert.match(html, /requestedRouteTitle/);
     assert.match(html, /requestedRouteReason/);
+    assert.match(html, /requestedOperation/);
+    assert.match(html, /requestedActionKey/);
+    assert.match(html, /requestedDownloadKey/);
     assert.match(html, /currentReleaseAutofocusTarget/);
+    assert.match(html, /currentReleaseRouteContextParams/);
     assert.match(html, /currentReleaseRouteFocus/);
     assert.match(html, /renderReleaseRouteFocus/);
     assert.match(html, /focusReleaseAutofocusTarget/);
@@ -16820,6 +16867,8 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /release-route-focus-box/);
     assert.match(html, /Route reason:/);
     assert.match(html, /data-release-route-focus-action/);
+    assert.match(html, /operation: target\.operation/);
+    assert.match(html, /downloadKey: target\.downloadKey/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

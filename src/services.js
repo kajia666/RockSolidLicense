@@ -1982,6 +1982,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
   const deliverySummary = release.deliverySummary || {};
   const deliveryChecklist = release.deliveryChecklist || {};
   const mainlineFollowUp = release.mainlineFollowUp || {};
+  const routeFocus = release.routeFocus || {};
   const versionManifest = release.versionManifest || {};
   const activeNotices = release.activeNotices || {};
   const readiness = release.readiness || {};
@@ -2059,6 +2060,28 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push("Recommended Next Actions:");
     for (const item of nextActions) {
       lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
+
+  if (routeFocus.title || routeFocus.operation || routeFocus.actionKey || routeFocus.downloadKey) {
+    lines.push("Release Route Focus:");
+    lines.push(`- title: ${routeFocus.title || "-"}`);
+    lines.push(`- summary: ${routeFocus.summary || "-"}`);
+    lines.push(`- operation=${routeFocus.operation || "-"}`);
+    lines.push(`- action=${routeFocus.actionKey || "-"}`);
+    lines.push(`- download=${routeFocus.downloadKey || "-"}`);
+    if (Array.isArray(routeFocus.tags) && routeFocus.tags.length) {
+      lines.push(`- tags: ${routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
+    }
+    if (Array.isArray(routeFocus.controls) && routeFocus.controls.length) {
+      for (const control of routeFocus.controls) {
+        lines.push(
+          `- control: ${control?.label || control?.kind || "Action"}`
+          + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+        );
+      }
     }
     lines.push("");
   }
@@ -2558,11 +2581,15 @@ function buildReleaseMainlineFollowUpPayload({
   releaseStartupPreview = null,
   fileName = "release-package.json",
   summaryFileName = "release-package.txt",
-  checklistFileName = "release-package-checklist.txt"
+  checklistFileName = "release-package-checklist.txt",
+  routeParams = {},
+  routeFocus = null
 }) {
+  const routedParams = compactRouteParams(routeParams);
   const params = {
     productCode: product?.code || null,
-    channel
+    channel,
+    ...routedParams
   };
   const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
   const findCheck = (key) => checks.find((item) => item?.key === key) || null;
@@ -2686,6 +2713,12 @@ function buildReleaseMainlineFollowUpPayload({
       setupAction
     });
   };
+  const createRoutedWorkspaceShortcut = (key, autofocus = "", label = "") => createLaunchWorkflowWorkspaceShortcut(
+    key,
+    autofocus,
+    label,
+    params
+  );
 
   const projectBlocked = projectStatusCheck?.blocking === true;
   const startupBlocked = startupDecision.ready === false || startupGateCheck?.blocking === true;
@@ -2701,7 +2734,7 @@ function buildReleaseMainlineFollowUpPayload({
   const authorizationNeedsAttention = authReadiness.status === "block" || authReadiness.status === "review";
   const normalizedStatus = String(readiness.status || deliveryChecklist.status || "unknown").toLowerCase() || "unknown";
   const authorizationWorkspaceAction = authorizationNeedsAttention
-    ? createLaunchWorkflowWorkspaceShortcut(
+    ? createRoutedWorkspaceShortcut(
         authReadiness.workspaceKey || "licenses",
         authReadiness.workspaceAutofocus || "policy-control",
         authReadiness.workspaceLabel
@@ -2711,43 +2744,43 @@ function buildReleaseMainlineFollowUpPayload({
 
   let recommendedWorkspace = null;
   if (projectBlocked) {
-    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    recommendedWorkspace = createRoutedWorkspaceShortcut(
       "project",
       "detail",
       "Open Project Workspace"
     );
   } else if (startupBlocked) {
-    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    recommendedWorkspace = createRoutedWorkspaceShortcut(
       "integration",
       "startup",
       "Open Integration Workspace"
     );
   } else if (blockingNotice || normalizedStatus === "hold") {
-    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    recommendedWorkspace = createRoutedWorkspaceShortcut(
       "release",
       releaseAutofocus,
       "Open Release Workspace"
     );
   } else if (integrationNeedsAttention) {
-    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    recommendedWorkspace = createRoutedWorkspaceShortcut(
       "integration",
       "startup",
       "Open Integration Workspace"
     );
   } else if (releaseNeedsAttention) {
-    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    recommendedWorkspace = createRoutedWorkspaceShortcut(
       "release",
       releaseAutofocus,
       "Open Release Workspace"
     );
   } else if (String(readiness.status || "").toLowerCase() === "attention") {
-    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    recommendedWorkspace = createRoutedWorkspaceShortcut(
       "launch",
       "handoff",
       "Open Launch Workflow"
     );
   } else {
-    recommendedWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    recommendedWorkspace = createRoutedWorkspaceShortcut(
       "launch-review",
       "summary",
       "Open Launch Review"
@@ -2759,22 +2792,26 @@ function buildReleaseMainlineFollowUpPayload({
     readiness.message || deliverySummary.summary || "Continue the release mainline from the recommended workspace."
   );
   pushWorkspaceAction(
-    createLaunchWorkflowWorkspaceShortcut("release", releaseAutofocus, "Open Release Workspace"),
+    createRoutedWorkspaceShortcut("release", releaseAutofocus, "Open Release Workspace"),
     "Keep release rules, notices, and packaged artifacts aligned while you work through this lane."
   );
   pushWorkspaceAction(
-    createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+    createRoutedWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
     "Use Launch Workflow as the combined handoff view once the release lane is staged."
+  );
+  pushWorkspaceAction(
+    createRoutedWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
+    "Use Launch Mainline as the unified handoff view when release, workflow, review, and smoke need to stay aligned."
   );
   if (!projectBlocked) {
     pushWorkspaceAction(
-      createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      createRoutedWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
       "Use Launch Review to recheck launch readiness against first-wave runtime signals."
     );
   }
   if (integrationNeedsAttention || startupBlocked || String(readiness.status || "").toLowerCase() !== "ready") {
     pushWorkspaceAction(
-      createLaunchWorkflowWorkspaceShortcut("integration", "startup", "Open Integration Workspace"),
+      createRoutedWorkspaceShortcut("integration", "startup", "Open Integration Workspace"),
       "Use Integration when startup, hardening, or token verification settings still need work."
     );
   }
@@ -2815,7 +2852,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Refresh the release package so the handoff summary and packaged assets reflect the latest rules, notices, and startup state.",
       status: "review",
       priority: "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("release", releaseAutofocus, "Open Release Workspace"),
+      workspaceAction: createRoutedWorkspaceShortcut("release", releaseAutofocus, "Open Release Workspace"),
       recommendedDownload: releaseSummaryDownload
     });
     pushActionPlan({
@@ -2824,7 +2861,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Once release blockers clear, reopen Launch Workflow before moving into first-wave validation.",
       status: "review",
       priority: "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+      workspaceAction: createRoutedWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
       recommendedDownload: launchSummaryDownload
     });
     if (authorizationNeedsAttention) {
@@ -2849,7 +2886,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Use the aggregated launch-mainline handoff to recheck release, workflow, review, and smoke together after the blocker pass.",
       status: "review",
       priority: "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
+      workspaceAction: createRoutedWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
       recommendedDownload: launchMainlineRehearsalGuideDownload
     });
   } else {
@@ -2890,7 +2927,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Use Launch Workflow to keep release, startup, authorization, and handoff context aligned for this channel.",
       status: normalizedStatus === "ready" ? "pass" : "review",
       priority: normalizedStatus === "ready" ? "primary" : "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
+      workspaceAction: createRoutedWorkspaceShortcut("launch", "handoff", "Open Launch Workflow"),
       recommendedDownload: launchSummaryDownload
     });
     pushActionPlan({
@@ -2899,7 +2936,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Launch Review combines launch readiness with the first scoped ops slice so release duty can recheck the lane before it goes wider.",
       status: "review",
       priority: normalizedStatus === "ready" ? "primary" : "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
+      workspaceAction: createRoutedWorkspaceShortcut("launch-review", "summary", "Open Launch Review"),
       recommendedDownload: launchReviewDownload
     });
     pushActionPlan({
@@ -2908,7 +2945,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Hand the startup request, candidate internal credentials, and smoke-test path to the team running first-wave validation.",
       status: "review",
       priority: "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
+      workspaceAction: createRoutedWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: launchSmokeKitDownload
     });
     pushActionPlan({
@@ -2917,7 +2954,7 @@ function buildReleaseMainlineFollowUpPayload({
       summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned for this lane.",
       status: normalizedStatus === "ready" ? "pass" : "review",
       priority: "secondary",
-      workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
+      workspaceAction: createRoutedWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
       recommendedDownload: launchMainlineRehearsalGuideDownload
     });
   }
@@ -2951,11 +2988,107 @@ function buildReleaseMainlineFollowUpPayload({
     status: normalizedStatus,
     title,
     message,
+    routeFocus,
     mainlineGate,
     recommendedWorkspace,
     workspaceActions,
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads
+  };
+}
+
+function buildReleasePackageRouteFocus({
+  product,
+  channel = "stable",
+  filters = {},
+  releaseAutofocus = "package"
+} = {}) {
+  const routeProductCode = product?.code || filters.productCode || null;
+  const routedOperation = String(filters.operation || "").trim().toLowerCase();
+  const routedActionKey = String(filters.actionKey || "").trim();
+  const routedDownloadKey = String(filters.downloadKey || "").trim();
+  const routedRouteTitle = String(filters.routeTitle || "").trim();
+  const routedRouteReason = String(filters.routeReason || "").trim();
+  const routedParams = compactRouteParams({
+    operation: routedOperation,
+    actionKey: routedActionKey,
+    downloadKey: routedDownloadKey,
+    routeTitle: routedRouteTitle,
+    routeReason: routedRouteReason
+  });
+  if (!Object.keys(routedParams).length) {
+    return null;
+  }
+  const routeQueryParams = compactRouteParams({
+    productCode: routeProductCode,
+    channel,
+    ...routedParams
+  });
+  const routeFocusDownload = routedDownloadKey
+    ? createLaunchWorkflowDownloadShortcut(
+        routedDownloadKey,
+        `${sanitizeExportNameSegment(routedDownloadKey, "release-route")}.txt`,
+        routedRouteTitle || "Routed release handoff download",
+        {
+          source: inferLaunchWorkflowDownloadSource(routedDownloadKey),
+          format: inferRouteDownloadFormat(routedDownloadKey),
+          params: routeQueryParams
+        }
+      )
+    : null;
+  return {
+    key: "release_package_route_focus",
+    title: routedRouteTitle || "Continue routed release package",
+    summary: routedRouteReason || "Continue the routed release handoff from the preserved operation context.",
+    operation: routedOperation || null,
+    actionKey: routedActionKey || null,
+    downloadKey: routedDownloadKey || null,
+    routeTitle: routedRouteTitle || null,
+    routeReason: routedRouteReason || null,
+    tags: [
+      routedOperation ? { label: "operation", value: routedOperation, strong: true } : null,
+      routedActionKey ? { label: "action", value: routedActionKey, strong: true } : null,
+      routedDownloadKey ? { label: "download", value: routedDownloadKey, strong: false } : null
+    ].filter(Boolean),
+    controls: [
+      {
+        kind: "workspace",
+        label: "Stay in Release Workspace",
+        workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+          "release",
+          releaseAutofocus,
+          "Stay in Release Workspace",
+          routeQueryParams
+        )
+      },
+      {
+        kind: "workspace",
+        label: "Open Launch Workflow",
+        workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+          "launch",
+          "handoff",
+          "Open Launch Workflow",
+          routeQueryParams
+        )
+      },
+      {
+        kind: "workspace",
+        label: routedRouteTitle || "Open Launch Mainline",
+        workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+          "launch-mainline",
+          "summary",
+          "Open Launch Mainline",
+          routeQueryParams
+        )
+      },
+      routeFocusDownload
+        ? {
+            kind: "download",
+            label: routeFocusDownload.label || "Routed release handoff download",
+            recommendedDownload: routeFocusDownload
+          }
+        : null
+    ].filter(Boolean)
   };
 }
 
@@ -2969,7 +3102,8 @@ function buildReleasePackagePayload({
   activeNoticeRows = [],
   integrationPackage,
   authReadiness = {},
-  releaseStartupPreview = null
+  releaseStartupPreview = null,
+  filters = {}
 }) {
   const normalizedChannel = normalizeChannel(channel);
   const timestampTag = buildExportTimestampTag(generatedAt);
@@ -3031,6 +3165,28 @@ function buildReleasePackagePayload({
     deliverySummary,
     releaseStartupPreview
   });
+  const routedParams = compactRouteParams({
+    operation: String(filters.operation || "").trim().toLowerCase(),
+    actionKey: filters.actionKey || "",
+    downloadKey: filters.downloadKey || "",
+    routeTitle: filters.routeTitle || "",
+    routeReason: filters.routeReason || ""
+  });
+  const filterPayload = {
+    productCode: product.code,
+    channel: normalizedChannel,
+    operation: routedParams.operation || null,
+    actionKey: routedParams.actionKey || null,
+    downloadKey: routedParams.downloadKey || null,
+    routeTitle: routedParams.routeTitle || null,
+    routeReason: routedParams.routeReason || null
+  };
+  const releaseRouteFocus = buildReleasePackageRouteFocus({
+    product,
+    channel: normalizedChannel,
+    filters: filterPayload,
+    releaseAutofocus: pickLaunchWorkflowReleaseAutofocus(readiness)
+  });
   const mainlineFollowUp = buildReleaseMainlineFollowUpPayload({
     product,
     channel: normalizedChannel,
@@ -3041,7 +3197,9 @@ function buildReleasePackagePayload({
     releaseStartupPreview,
     fileName,
     summaryFileName,
-    checklistFileName
+    checklistFileName,
+    routeParams: routedParams,
+    routeFocus: releaseRouteFocus
   });
   const manifest = {
     generatedAt,
@@ -3062,6 +3220,8 @@ function buildReleasePackagePayload({
     },
     release: {
       channel: normalizedChannel,
+      filters: filterPayload,
+      routeFocus: releaseRouteFocus,
       versionManifest,
       startupPreview: releaseStartupPreview,
       readiness,
@@ -3100,6 +3260,7 @@ function buildReleasePackagePayload({
     fileName,
     summaryFileName,
     checklistFileName,
+    filters: filterPayload,
     manifest,
     deliverySummary,
     deliveryChecklist,
@@ -3316,6 +3477,30 @@ function inferLaunchWorkflowDownloadSource(key = "", source = "") {
     return "developer-launch-workflow";
   }
   return "";
+}
+
+function compactRouteParams(params = {}) {
+  return Object.fromEntries(
+    Object.entries(params || {}).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+  );
+}
+
+function inferRouteDownloadFormat(key = "") {
+  const normalized = String(key || "").trim().toLowerCase();
+  if (normalized.includes("rehearsal_guide")) return "rehearsal-guide";
+  if (normalized.includes("production_handoff")) return "production-handoff";
+  if (normalized.includes("cutover_handoff")) return "cutover-handoff";
+  if (normalized.includes("recovery_drill_handoff")) return "recovery-drill-handoff";
+  if (normalized.includes("operations_handoff")) return "operations-handoff";
+  if (normalized.includes("post_launch_sweep_handoff")) return "post-launch-sweep-handoff";
+  if (normalized.includes("closeout_handoff")) return "closeout-handoff";
+  if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
+  if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
+  if (normalized.endsWith("_checksums") || normalized.includes("checksums")) return "checksums";
+  if (normalized.endsWith("_zip") || normalized.includes("zip")) return "zip";
+  if (normalized.includes("checklist")) return "checklist";
+  if (normalized.includes("json")) return "json";
+  return "summary";
 }
 
 function buildLaunchWorkflowDownloadHref(source = "", format = "", params = null) {
@@ -24106,7 +24291,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         activeNoticeRows,
         integrationPackage,
         authReadiness,
-        releaseStartupPreview
+        releaseStartupPreview,
+        filters: {
+          productCode: product.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+          channel,
+          operation: selector.operation || null,
+          actionKey: selector.actionKey || null,
+          downloadKey: selector.downloadKey || null,
+          routeTitle: selector.routeTitle || null,
+          routeReason: selector.routeReason || null
+        }
       });
       auditDeveloperSession(db, session, "product.release-package.export", "product", product.id, {
         code: product.code,

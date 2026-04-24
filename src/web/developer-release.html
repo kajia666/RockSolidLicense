@@ -472,6 +472,9 @@
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim().toLowerCase();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedOperation = (routeParams.get("operation") || "").trim();
+      const requestedActionKey = (routeParams.get("actionKey") || "").trim();
+      const requestedDownloadKey = (routeParams.get("downloadKey") || "").trim();
       let token = "";
       let actor = null;
       let projects = [];
@@ -698,7 +701,31 @@
       function currentReleaseTarget() {
         return {
           productCode: el("package-product-code").value.trim() || el("filter-product-code").value.trim(),
-          channel: el("package-channel").value.trim() || el("filter-channel").value.trim() || requestedChannel
+          channel: el("package-channel").value.trim() || el("filter-channel").value.trim() || requestedChannel,
+          routeTitle: requestedRouteTitle,
+          routeReason: requestedRouteReason,
+          operation: requestedOperation,
+          actionKey: requestedActionKey,
+          downloadKey: requestedDownloadKey
+        };
+      }
+
+      function currentReleaseRouteContextParams(target = currentReleaseTarget()) {
+        return {
+          operation: target.operation,
+          actionKey: target.actionKey,
+          downloadKey: target.downloadKey,
+          routeTitle: target.routeTitle,
+          routeReason: target.routeReason
+        };
+      }
+
+      function currentReleaseRequestParams(target = currentReleaseTarget(), extra = {}) {
+        return {
+          productCode: target.productCode,
+          channel: target.channel || requestedChannel,
+          ...currentReleaseRouteContextParams(target),
+          ...extra
         };
       }
 
@@ -763,6 +790,7 @@
           productCode: target.productCode,
           channel: target.channel || requestedChannel,
           autofocus: action.autofocus || "",
+          ...currentReleaseRouteContextParams(target),
           routeTitle: requestedRouteTitle || fallbackTitle,
           routeReason: action.reason || requestedRouteReason || fallbackReason || `Continue ${target.productCode} release follow-up.`
         };
@@ -782,10 +810,7 @@
         if (!target.productCode) {
           throw new Error("Enter a project code before downloading linked release material.");
         }
-        const params = {
-          productCode: target.productCode,
-          channel: target.channel || requestedChannel
-        };
+        const params = currentReleaseRequestParams(target);
         Object.entries(shortcut.params || {}).forEach(([key, value]) => {
           if (value !== null && value !== undefined && String(value).trim() !== "") {
             params[key] = value;
@@ -841,7 +866,7 @@
         }
         const target = currentReleaseTarget();
         const result = await downloadApiFile(
-          `/api/developer/release-package/download${q({ productCode: target.productCode, channel: target.channel, format })}`,
+          `/api/developer/release-package/download${q(currentReleaseRequestParams(target, { format }))}`,
           fallbackFileName
         );
         setStatus(`${label} downloaded: ${result.fileName}`);
@@ -953,7 +978,7 @@
         const canDownload = Boolean(releasePackage) && !el("download-release-package-summary-btn").disabled;
         const actions = Array.isArray(focus.actions) ? focus.actions : [];
         el("release-route-focus-box").innerHTML = `
-          <div>${escapeHtml(focus.title || "Release route focus")} ${requestedRouteTitle ? `<span class="tag ok">${escapeHtml(`from:${requestedRouteTitle}`)}</span>` : ""} ${hasProduct ? `<span class="tag ok">${escapeHtml(`channel:${target.channel || requestedChannel}`)}</span>` : ""} ${requestedAutofocus ? `<span class="tag">${escapeHtml(`focus:${requestedAutofocus}`)}</span>` : ""}</div>
+          <div>${escapeHtml(focus.title || "Release route focus")} ${requestedRouteTitle ? `<span class="tag ok">${escapeHtml(`from:${requestedRouteTitle}`)}</span>` : ""} ${hasProduct ? `<span class="tag ok">${escapeHtml(`channel:${target.channel || requestedChannel}`)}</span>` : ""} ${requestedAutofocus ? `<span class="tag">${escapeHtml(`focus:${requestedAutofocus}`)}</span>` : ""} ${requestedOperation ? `<span class="tag ok">${escapeHtml(`operation:${requestedOperation}`)}</span>` : ""} ${requestedActionKey ? `<span class="tag">${escapeHtml(`action:${requestedActionKey}`)}</span>` : ""} ${requestedDownloadKey ? `<span class="tag">${escapeHtml(`download:${requestedDownloadKey}`)}</span>` : ""}</div>
           ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${escapeHtml(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${escapeHtml(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project first.`)}</div>
           ${actions.length ? `
@@ -1512,12 +1537,11 @@
       }
 
       async function generateReleasePackage() {
-        const productCode = el("package-product-code").value.trim();
-        const channel = el("package-channel").value.trim() || "stable";
-        if (!productCode) {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
           throw new Error("Enter a project code before generating a release package.");
         }
-        const data = await api(`/api/developer/release-package${q({ productCode, channel })}`);
+        const data = await api(`/api/developer/release-package${q(currentReleaseRequestParams(target))}`);
         releasePackage = data;
         renderReleaseReadiness();
         syncPermissions();
@@ -1633,6 +1657,8 @@
         window.location.href = buildWorkspaceUrl("/developer/projects", {
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,
+          channel: target.channel,
+          ...currentReleaseRouteContextParams(target),
           routeTitle: requestedRouteTitle || currentReleaseRouteFocus().title || "Release workspace handoff",
           routeReason: requestedRouteReason || `Continue ${target.productCode} from the release workspace.`
         });
@@ -1649,6 +1675,7 @@
           productCode: target.productCode,
           channel: target.channel,
           autofocus: "handoff",
+          ...currentReleaseRouteContextParams(target),
           routeTitle: requestedRouteTitle || currentReleaseRouteFocus().title || "Release workspace handoff",
           routeReason: requestedRouteReason || `Review the combined launch workflow for ${target.productCode} after the release check.`
         });
@@ -1664,6 +1691,7 @@
           productId: currentReleaseProductId(target.productCode),
           productCode: target.productCode,
           channel: target.channel,
+          ...currentReleaseRouteContextParams(target),
           routeTitle: requestedRouteTitle || currentReleaseRouteFocus().title || "Release workspace handoff",
           routeReason: requestedRouteReason || `Continue integration follow-up for ${target.productCode} after the release review.`
         });
@@ -1876,10 +1904,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "json" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "json" }))}`,
             releasePackage.fileName || "release-package.json"
           );
           setStatus(`Release package JSON downloaded: ${result.fileName}`);
@@ -1894,10 +1920,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "summary" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "summary" }))}`,
             releasePackage.summaryFileName || "release-package.txt"
           );
           setStatus(`Release package summary downloaded: ${result.fileName}`);
@@ -1912,10 +1936,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "checklist" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "checklist" }))}`,
             releasePackage.checklistFileName || "release-package-checklist.txt"
           );
           setStatus(`Release package checklist downloaded: ${result.fileName}`);
@@ -1930,10 +1952,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "env" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "env" }))}`,
             releasePackage.snippets?.envFileName || "project.env"
           );
           setStatus(`Release package env template downloaded: ${result.fileName}`);
@@ -1948,10 +1968,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "host-config" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "host-config" }))}`,
             releasePackage.snippets?.hostConfigFileName || "rocksolid_host_config.env"
           );
           setStatus(`Release package host config downloaded: ${result.fileName}`);
@@ -1966,10 +1984,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "cmake" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "cmake" }))}`,
             releasePackage.snippets?.cmakeFileName || "CMakeLists.txt"
           );
           setStatus(`Release package CMake template downloaded: ${result.fileName}`);
@@ -1984,10 +2000,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-guide" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "vs2022-guide" }))}`,
             releasePackage.snippets?.vs2022GuideFileName || "rocksolid_vs2022_quickstart.md"
           );
           setStatus(`Release package VS2022 quickstart downloaded: ${result.fileName}`);
@@ -2002,10 +2016,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-sln" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "vs2022-sln" }))}`,
             releasePackage.snippets?.vs2022SolutionFileName || "rocksolid_host_consumer.sln"
           );
           setStatus(`Release package VS2022 solution downloaded: ${result.fileName}`);
@@ -2020,10 +2032,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "vs2022" }))}`,
             releasePackage.snippets?.vs2022ProjectFileName || "rocksolid_host_consumer.vcxproj"
           );
           setStatus(`Release package VS2022 project downloaded: ${result.fileName}`);
@@ -2038,10 +2048,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-filters" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "vs2022-filters" }))}`,
             releasePackage.snippets?.vs2022FiltersFileName || "rocksolid_host_consumer.vcxproj.filters"
           );
           setStatus(`Release package VS2022 filters downloaded: ${result.fileName}`);
@@ -2056,10 +2064,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "cpp" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "cpp" }))}`,
             releasePackage.snippets?.cppFileName || "project.cpp"
           );
           setStatus(`Release package C++ quickstart downloaded: ${result.fileName}`);
@@ -2074,10 +2080,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-props" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "vs2022-props" }))}`,
             releasePackage.snippets?.vs2022PropsFileName || "RockSolidSDK.props"
           );
           setStatus(`Release package VS2022 props downloaded: ${result.fileName}`);
@@ -2092,10 +2096,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "vs2022-local-props" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "vs2022-local-props" }))}`,
             releasePackage.snippets?.vs2022LocalPropsFileName || "RockSolidSDK.local.props"
           );
           setStatus(`Release package VS2022 local props downloaded: ${result.fileName}`);
@@ -2110,10 +2112,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "host-skeleton" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "host-skeleton" }))}`,
             releasePackage.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"
           );
           setStatus(`Release package host skeleton downloaded: ${result.fileName}`);
@@ -2128,10 +2128,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "checksums" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "checksums" }))}`,
             (releasePackage.fileName || "release-package.json").replace(/\.json$/i, "-sha256.txt")
           );
           setStatus(`Release package checksums downloaded: ${result.fileName}`);
@@ -2146,10 +2144,8 @@
           if (!releasePackage) {
             return;
           }
-          const productCode = el("package-product-code").value.trim();
-          const channel = el("package-channel").value.trim() || "stable";
           const result = await downloadApiFile(
-            `/api/developer/release-package/download${q({ productCode, channel, format: "zip" })}`,
+            `/api/developer/release-package/download${q(currentReleaseRequestParams(currentReleaseTarget(), { format: "zip" }))}`,
             (releasePackage.fileName || "release-package.json").replace(/\.json$/i, ".zip")
           );
           setStatus(`Release package zip archive downloaded: ${result.fileName}`);

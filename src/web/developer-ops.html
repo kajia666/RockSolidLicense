@@ -2525,6 +2525,39 @@
         }).join("");
       }
 
+      function renderLaunchReceiptFollowUps(items = []) {
+        const entries = Array.isArray(items) ? items.slice(0, 6) : [];
+        if (!entries.length) {
+          return `<div class="hint">No launch receipt follow-ups are queued in this snapshot yet.</div>`;
+        }
+        return entries.map((item) => {
+          const tags = [
+            item.priority ? renderTag(String(item.priority).toUpperCase(), item.priority === "primary" || item.priority === "review") : "",
+            item.stage ? renderTag(item.stage, true) : "",
+            item.productCode ? renderTag(`project:${item.productCode}`) : "",
+            item.channel ? renderTag(`channel:${item.channel}`) : "",
+            item.mainlineGateStatus ? renderTag(`gate:${String(item.mainlineGateStatus).toUpperCase()}`) : "",
+            item.evidenceRemainingCount !== null && item.evidenceRemainingCount !== undefined
+              ? renderTag(`evidenceRemaining:${item.evidenceRemainingCount}`)
+              : ""
+          ].filter(Boolean).join("");
+          const details = [
+            `action=${esc(item.actionKey || "-")}`,
+            `operation=${esc(item.operationToRecord || item.operation || "-")}`,
+            `download=${esc(item.downloadKey || "-")}`,
+            `handoff=${esc(item.handoffFileName || "-")}`
+          ].join(" | ");
+          return `
+            <div class="snapshot-recap">
+              <strong>${esc(item.title || "Launch receipt follow-up")}</strong>
+              <div class="audit-meta">${tags || renderTag("launch-receipt-follow-up")}</div>
+              <div class="hint">${details}</div>
+              ${item.summary ? `<div class="hint">${esc(item.summary)}</div>` : ""}
+            </div>
+          `;
+        }).join("");
+      }
+
       function applyRecommendedControl(control = {}) {
         const type = String(control?.type || "").trim();
         if (!type) {
@@ -4023,6 +4056,7 @@
         const focusSessions = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
         const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
         const latestLaunchReceipts = Array.isArray(overview.latestLaunchReceipts) ? overview.latestLaunchReceipts : [];
+        const launchReceiptFollowUps = Array.isArray(overview.launchReceiptFollowUps) ? overview.launchReceiptFollowUps : [];
         overviewFocusMap = new Map();
         const statusText = overview.status === "attention"
           ? "Needs attention"
@@ -4054,6 +4088,10 @@
           <div>
             <div class="hint">Latest Launch Receipts</div>
             ${renderLatestLaunchReceipts(latestLaunchReceipts)}
+          </div>
+          <div>
+            <div class="hint">Launch Receipt Follow-ups</div>
+            ${renderLaunchReceiptFollowUps(launchReceiptFollowUps)}
           </div>
           <div>
             <div class="hint">Top products</div>

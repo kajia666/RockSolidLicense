@@ -16339,6 +16339,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Receipt Next Follow-up/);
     assert.match(html, /Receipt Next Follow-up Action/);
     assert.match(html, /Receipt Next Follow-up Workspace/);
+    assert.match(html, /renderLaunchReceiptNextFollowUpActions/);
+    assert.match(html, /data-launch-receipt-next-follow-up-action="open-workspace"/);
+    assert.match(html, /data-workspace-href/);
+    assert.match(html, /data-download-href/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
     assert.match(html, /Escalate First/);

@@ -2572,6 +2572,47 @@
         }).join("");
       }
 
+      function renderLaunchReceiptNextFollowUpActions(item = null) {
+        if (!item || typeof item !== "object") {
+          return "";
+        }
+        const priority = String(item.priority || "secondary").toLowerCase();
+        const priorityLabel = ["primary", "review", "secondary"].includes(priority) ? priority : "other";
+        const recommendedAction = item.recommendedAction || {};
+        const workspaceAction = recommendedAction.workspaceAction || null;
+        const recommendedDownload = item.recommendedDownload || null;
+        const bits = [
+          `priority=${priorityLabel.toUpperCase()}`,
+          item.stage ? `stage=${item.stage}` : "",
+          recommendedAction.operation || item.operationToRecord || item.operation
+            ? `operation=${recommendedAction.operation || item.operationToRecord || item.operation}`
+            : "",
+          workspaceAction?.href ? "workspace=ready" : "",
+          recommendedDownload?.href ? "download=ready" : ""
+        ].filter(Boolean);
+        const actionAttrs = [
+          workspaceAction?.href ? `data-workspace-href="${esc(workspaceAction.href)}"` : "",
+          workspaceAction?.label ? `data-workspace-label="${esc(workspaceAction.label)}"` : "",
+          recommendedDownload?.href ? `data-download-href="${esc(recommendedDownload.href)}"` : "",
+          recommendedDownload?.fileName ? `data-download-file-name="${esc(recommendedDownload.fileName)}"` : "",
+          recommendedDownload?.label ? `data-download-label="${esc(recommendedDownload.label)}"` : ""
+        ].filter(Boolean).join(" ");
+        return `
+          <div class="snapshot-recap">
+            <div class="snapshot-recap-head">
+              <strong>Next Launch Receipt Follow-up</strong>
+              <span class="tag ${priorityLabel === "review" ? "warning" : "medium"}">${esc(priorityLabel.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(item.title || "Continue launch receipt follow-up")}</div>
+            <div class="hint">${esc(bits.join(" | ") || "workspace handoff pending")}</div>
+            <div class="snapshot-recap-actions">
+              <button type="button" class="snapshot-inline-button" data-launch-receipt-next-follow-up-action="open-workspace" ${actionAttrs} ${workspaceAction?.href ? "" : "disabled"}>${esc(workspaceAction?.label || "Open Next Workspace")}</button>
+              <button type="button" class="snapshot-inline-button" data-launch-receipt-next-follow-up-action="download-next-follow-up" ${actionAttrs} ${(token && recommendedDownload?.href) ? "" : "disabled"}>${esc(recommendedDownload?.label || "Download Next Follow-up")}</button>
+            </div>
+          </div>
+        `;
+      }
+
       function launchReceiptDownloadFormat(downloadKey = "") {
         const normalized = String(downloadKey || "").trim().toLowerCase();
         if (!normalized) {
@@ -2628,6 +2669,34 @@
           return;
         }
         throw { code: "UNSUPPORTED_FOLLOW_UP", message: `Unsupported launch receipt follow-up action: ${normalizedAction || "-"}` };
+      }
+
+      async function handleLaunchReceiptNextFollowUpAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        if (normalizedAction === "open-workspace") {
+          const href = String(data.workspaceHref || "").trim();
+          if (!href) {
+            throw { code: "MISSING_WORKSPACE", message: "No workspace handoff is available for the next launch receipt follow-up." };
+          }
+          window.location.href = href;
+          return;
+        }
+        if (normalizedAction === "download-next-follow-up") {
+          const href = String(data.downloadHref || "").trim();
+          if (!href) {
+            throw { code: "MISSING_DOWNLOAD", message: "No next launch receipt follow-up download is available." };
+          }
+          const result = await downloadApiFile(
+            href,
+            data.downloadFileName || "developer-ops-launch-receipt-next-follow-up.txt",
+            data.downloadLabel || "Launch receipt next follow-up"
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Launch receipt next follow-up downloaded: ${result.fileName}`);
+          return;
+        }
+        throw { code: "UNSUPPORTED_NEXT_FOLLOW_UP", message: `Unsupported next launch receipt follow-up action: ${normalizedAction || "-"}` };
       }
 
       function applyRecommendedControl(control = {}) {
@@ -4212,6 +4281,7 @@
         box.innerHTML = `
           <div class="hint">Generated ${esc(formatTime(payload.generatedAt))}${payload.fileName ? ` | ${esc(payload.fileName)}` : ""}${lastExportDownload?.fileName ? ` | last download ${esc(lastExportDownload.fileName)}` : ""}</div>
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
+          ${renderLaunchReceiptNextFollowUpActions(launchReceiptNextFollowUp)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           ${renderPreparedFocus()}
           ${renderDeveloperMutationRecap()}
@@ -4347,6 +4417,14 @@
         bindRows("#snapshot-overview [data-launch-receipt-follow-up-action]", async (data) => {
           try {
             await handleLaunchReceiptFollowUpAction(data.launchReceiptFollowUpAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-launch-receipt-next-follow-up-action]", async (data) => {
+          try {
+            await handleLaunchReceiptNextFollowUpAction(data.launchReceiptNextFollowUpAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });

@@ -23338,11 +23338,15 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         result = await this.developerCreateLicenseQuickstartFirstBatches(token, {
           productCode: selector.productCode,
           mode: body.mode || "recommended"
+        }, {
+          includeReceipt: false
         });
       } else if (operation === "restock") {
         result = await this.developerRestockLicenseQuickstartBatches(token, {
           productCode: selector.productCode,
           mode: body.mode || "recommended"
+        }, {
+          includeReceipt: false
         });
       } else if (operation === "record_recovery_drill") {
         const session = requireDeveloperSession(db, token);
@@ -25151,7 +25155,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    async developerCreateLicenseQuickstartFirstBatches(token, body = {}) {
+    async developerCreateLicenseQuickstartFirstBatches(token, body = {}, options = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -25308,7 +25312,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         afterFreshCards: after.freshCards.length
       });
 
-      return {
+      const resultPayload = {
         productCode,
         productName: product.name,
         modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
@@ -25340,9 +25344,20 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           ? `First-batch setup created ${createdBatches.map((item) => item.batchCode).join(", ")} for ${productCode}.`
           : `First-batch setup found no missing recommended card batches for ${productCode}.`
       };
+      if (options?.includeReceipt === false) {
+        return resultPayload;
+      }
+      return {
+        ...resultPayload,
+        receipt: buildLaunchMainlineActionReceipt({
+          operation: "first_batch_setup",
+          result: resultPayload,
+          followUp
+        })
+      };
     },
 
-    async developerRestockLicenseQuickstartBatches(token, body = {}) {
+    async developerRestockLicenseQuickstartBatches(token, body = {}, options = {}) {
       const session = requireDeveloperSession(db, token);
       requireDeveloperPermission(
         session,
@@ -25500,7 +25515,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         afterFreshCards: after.freshCards.length
       });
 
-      return {
+      const resultPayload = {
         productCode,
         productName: product.name,
         modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
@@ -25531,6 +25546,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         message: createdBatches.length
           ? `Inventory refill created ${createdBatches.map((item) => item.batchCode).join(", ")} for ${productCode}.`
           : `Inventory refill found no low starter batches for ${productCode}.`
+      };
+      if (options?.includeReceipt === false) {
+        return resultPayload;
+      }
+      return {
+        ...resultPayload,
+        receipt: buildLaunchMainlineActionReceipt({
+          operation: "restock",
+          result: resultPayload,
+          followUp
+        })
       };
     },
 

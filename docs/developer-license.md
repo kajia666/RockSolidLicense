@@ -65,6 +65,8 @@ After `Launch Bootstrap`, `First Batch Setup`, or `Inventory Refill` completes, 
 - download the matching launch workflow summary/checklist or filtered ops summary without first navigating into another workspace
 - keep the most recent launch initialization result attached to the same routed project instead of re-deriving the next step manually
 
+The direct `First Batch Setup` and `Inventory Refill` API responses also include a launch-mainline-style `receipt`. That receipt carries the first-launch inventory queue, owner/stage duty handoff, first-launch duty summary, and `first-launch-handoff` download shortcut, so API callers can hand the result to launch duty without calling the mainline action endpoint first.
+
 That same follow-up block can now also download a combined `launch review summary`. It merges the current launch-workflow recheck with the filtered developer-ops snapshot for the routed lane, so QA, support, or launch-duty teammates can review launch readiness and first-wave runtime signals from one handoff file.
 
 The same follow-up chain can now also download a `launch smoke kit` summary. That file packages:

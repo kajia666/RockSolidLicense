@@ -31,6 +31,7 @@ Supported download formats:
 - `post-launch-sweep-handoff`
 - `closeout-handoff`
 - `stabilization-handoff`
+- `first-launch-handoff`
 - `checksums`
 - `zip`
 

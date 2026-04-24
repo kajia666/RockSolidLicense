@@ -8623,6 +8623,21 @@ test("developer license quickstart first-batch setup can create recommended laun
         setup.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.key,
         "launch_mainline_rehearsal_guide"
       );
+      assert.equal(setup.receipt?.operation, "first_batch_setup");
+      assert.equal(setup.receipt?.firstLaunchInventoryQueue?.createdBatchCount, setup.createdBatches.length);
+      assert.equal(
+        setup.receipt?.firstLaunchInventoryQueue?.createdCardCount,
+        setup.createdBatches.reduce((sum, item) => sum + Number(item?.count || 0), 0)
+      );
+      assert.equal(setup.receipt?.firstLaunchDutySummary?.handoffDownload?.key, "launch_mainline_first_launch_handoff");
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.controls?.some((control) =>
+        control?.kind === "download"
+        && control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff"
+      ));
+      assert.ok(setup.receipt?.firstLaunchOpsQueue?.handoffChecklist?.some((item) =>
+        item?.ownerRole === "support"
+        && item?.actions?.some((action) => action?.key === "card_redemption_watch")
+      ));
 
     const cards = await getJson(
       baseUrl,
@@ -8796,6 +8811,20 @@ test("developer launch workflow can restock low launch inventory buffers", async
         restock.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.key,
         "launch_mainline_rehearsal_guide"
       );
+      assert.equal(restock.receipt?.operation, "restock");
+      assert.equal(restock.receipt?.firstLaunchInventoryQueue?.createdBatchCount, restock.createdBatches.length);
+      assert.equal(
+        restock.receipt?.firstLaunchInventoryQueue?.createdCardCount,
+        restock.createdBatches.reduce((sum, item) => sum + Number(item?.count || 0), 0)
+      );
+      assert.equal(restock.receipt?.firstLaunchDutySummary?.handoffDownload?.key, "launch_mainline_first_launch_handoff");
+      assert.ok(restock.receipt?.firstLaunchDutySummary?.details?.some((detail) =>
+        /Inventory health: READY \| ready=2 \| low=0 \| missing=0/i.test(String(detail || ""))
+      ));
+      assert.ok(restock.receipt?.firstLaunchDutySummary?.controls?.some((control) =>
+        control?.kind === "download"
+        && control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff"
+      ));
 
     const launchWorkflowAfterRestock = await getJson(
       baseUrl,

@@ -15031,19 +15031,95 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
         productionEvidenceRemainingCount: receipt.productionEvidence?.remainingCount ?? null,
         productionEvidenceCompletedCount: receipt.productionEvidence?.completedCount ?? null,
         productionEvidenceNextActionKey: receipt.productionEvidence?.nextActionKey || null,
+        productionEvidenceNextActionTitle: receipt.productionEvidence?.nextActionTitle || null,
         productionEvidenceNextOperation: receipt.productionEvidence?.nextOperation || null,
         firstLaunchInventoryCreatedBatchCount: receipt.firstLaunchInventory?.createdBatchCount ?? null,
         firstLaunchInventoryCreatedCardCount: receipt.firstLaunchInventory?.createdCardCount ?? null,
         firstLaunchDutyHandoffDownloadKey: receipt.firstLaunchDuty?.handoffDownloadKey || null,
+        firstLaunchDutyPrimaryWorkspaceKey: receipt.firstLaunchDuty?.primaryWorkspaceKey || null,
+        firstLaunchDutyPrimaryDownloadKey: receipt.firstLaunchDuty?.primaryDownloadKey || null,
         firstLaunchDutyActionCount: receipt.firstLaunchDuty?.actionCount ?? null,
         postLaunchLifecycleStatus: receipt.postLaunchLifecycle?.status || null,
         postLaunchLifecycleNextActionKey: receipt.postLaunchLifecycle?.nextActionKey || null,
+        postLaunchLifecyclePrimaryDownloadKey: receipt.postLaunchLifecycle?.primaryDownloadKey || null,
         createdAt: item.createdAt || null
       };
     })
     .filter(Boolean)
     .sort((left, right) => snapshotDateMs(right.createdAt || right.handoffGeneratedAt) - snapshotDateMs(left.createdAt || left.handoffGeneratedAt))
     .slice(0, Math.max(1, Number(limit || 5)));
+}
+
+function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 6) {
+  const followUps = [];
+  const pushFollowUp = (receipt = {}, stage = "", payload = {}) => {
+    if (!stage || !payload.title) {
+      return;
+    }
+    const actionKey = payload.actionKey || null;
+    const downloadKey = payload.downloadKey || null;
+    const key = [
+      receipt.auditLogId || receipt.operation || "launch-receipt",
+      stage,
+      actionKey || downloadKey || payload.operationToRecord || "follow-up"
+    ].filter(Boolean).join(":");
+    followUps.push({
+      key,
+      stage,
+      priority: payload.priority || "secondary",
+      title: payload.title,
+      summary: payload.summary || "",
+      receiptAuditLogId: receipt.auditLogId || null,
+      productCode: receipt.productCode || null,
+      channel: receipt.channel || null,
+      operation: receipt.operation || null,
+      operationLabel: receipt.operationLabel || null,
+      actionKey,
+      operationToRecord: payload.operationToRecord || null,
+      downloadKey,
+      handoffFileName: receipt.handoffFileName || null,
+      mainlineGateStatus: receipt.mainlineGateStatus || null,
+      evidenceRemainingCount: receipt.productionEvidenceRemainingCount ?? null,
+      postLaunchLifecycleStatus: receipt.postLaunchLifecycleStatus || null,
+      createdAt: receipt.createdAt || receipt.handoffGeneratedAt || null
+    });
+  };
+
+  for (const [index, receipt] of latestLaunchReceipts.entries()) {
+    if (!receipt || typeof receipt !== "object") {
+      continue;
+    }
+    if (receipt.firstLaunchDutyHandoffDownloadKey) {
+      pushFollowUp(receipt, "first_launch_handoff", {
+        priority: index === 0 ? "primary" : "secondary",
+        title: "Download first-launch handoff",
+        summary: `Use this first-wave handoff after ${receipt.operationLabel || receipt.operation || "the latest launch action"} so launch duty can continue without rebuilding receipt context.`,
+        actionKey: receipt.firstLaunchDutyPrimaryWorkspaceKey || null,
+        downloadKey: receipt.firstLaunchDutyHandoffDownloadKey
+      });
+    }
+    if (Number(receipt.productionEvidenceRemainingCount || 0) > 0) {
+      pushFollowUp(receipt, "production_evidence", {
+        priority: "review",
+        title: receipt.productionEvidenceNextActionTitle || "Continue production evidence",
+        summary: `${receipt.productionEvidenceRemainingCount} production evidence checks remain for this launch receipt.`,
+        actionKey: receipt.productionEvidenceNextActionKey || null,
+        operationToRecord: receipt.productionEvidenceNextOperation || null,
+        downloadKey: receipt.firstLaunchDutyPrimaryDownloadKey || receipt.firstLaunchDutyHandoffDownloadKey || null
+      });
+    }
+    if (receipt.postLaunchLifecycleNextActionKey) {
+      pushFollowUp(receipt, "post_launch_lifecycle", {
+        priority: receipt.postLaunchLifecycleStatus === "ready" ? "secondary" : "review",
+        title: "Continue post-launch lifecycle",
+        summary: `Post-launch lifecycle status is ${receipt.postLaunchLifecycleStatus || "unknown"}; continue with the next recorded launch lifecycle action.`,
+        actionKey: receipt.postLaunchLifecycleNextActionKey,
+        downloadKey: receipt.postLaunchLifecyclePrimaryDownloadKey || receipt.firstLaunchDutyHandoffDownloadKey || null
+      });
+    }
+  }
+
+  return followUps.slice(0, Math.max(1, Number(limit || 6)));
 }
 
 function buildSnapshotTopCounts(items = [], selector, limit = 5) {
@@ -16533,6 +16609,7 @@ function buildSnapshotOverview({
   const focusSessions = buildSnapshotFocusSessions(sessions, 5);
   const focusDevices = buildSnapshotFocusDevices(bindings, blocks, sessions, 5);
   const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5);
+  const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6);
   const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
   const queueSummary = buildSnapshotQueueSummary(recommendedQueue);
 
@@ -16585,6 +16662,9 @@ function buildSnapshotOverview({
     const latest = latestLaunchReceipts[0];
     highlights.push(`Latest launch receipt: ${latest.operationLabel || latest.operation || "-"} for ${latest.productCode || "-"} (${latest.mainlineGateStatus || "unknown"}).`);
   }
+  if (launchReceiptFollowUps.length) {
+    highlights.push(`Launch receipt follow-ups: ${launchReceiptFollowUps.slice(0, 3).map((item) => `${item.title} for ${item.productCode || "-"}`).join(", ")}.`);
+  }
   if (topReasons.length) {
     highlights.push(`Common reasons: ${topReasons.slice(0, 3).map((item) => `${item.reason} x${item.count}`).join(", ")}.`);
   }
@@ -16616,6 +16696,7 @@ function buildSnapshotOverview({
     focusUsernames,
     focusFingerprints,
     latestLaunchReceipts,
+    launchReceiptFollowUps,
     queueSummary,
     recommendedQueue,
     focusAccounts,
@@ -16744,6 +16825,12 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Latest Launch Receipts:");
       for (const item of overview.latestLaunchReceipts) {
         lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | handoff=${item.handoffFileName || "-"}`);
+      }
+    }
+    if (Array.isArray(overview.launchReceiptFollowUps) && overview.launchReceiptFollowUps.length) {
+      lines.push("Launch Receipt Follow-ups:");
+      for (const item of overview.launchReceiptFollowUps) {
+        lines.push(`- [${item.priority || "-"}][${item.stage || "-"}] ${item.title || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | action=${item.actionKey || "-"} | operation=${item.operationToRecord || "-"} | download=${item.downloadKey || "-"} | handoff=${item.handoffFileName || "-"} | ${item.summary || "-"}`);
       }
     }
     if (Array.isArray(overview.topReasons) && overview.topReasons.length) {

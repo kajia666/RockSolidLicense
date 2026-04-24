@@ -12691,8 +12691,29 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.handoffText, undefined);
     assert.equal(latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey, launchOpsAction.receipt.firstLaunchDutySummary?.handoffDownload?.key || null);
     assert.equal(latestLaunchReceipt.postLaunchLifecycleStatus, launchOpsAction.receipt.postLaunchLifecycleSummary?.status || null);
+    const launchReceiptEvidenceFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
+      item.operation === "record_post_launch_ops_sweep" && item.stage === "production_evidence"
+    );
+    assert.ok(launchReceiptEvidenceFollowUp);
+    assert.equal(launchReceiptEvidenceFollowUp.productCode, "EXPORT_ALPHA");
+    assert.equal(launchReceiptEvidenceFollowUp.actionKey, latestLaunchReceipt.productionEvidenceNextActionKey);
+    assert.equal(launchReceiptEvidenceFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(launchReceiptEvidenceFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.match(launchReceiptEvidenceFollowUp.summary, /production evidence checks remain/i);
+    const launchReceiptLifecycleFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
+      item.operation === "record_post_launch_ops_sweep" && item.stage === "post_launch_lifecycle"
+    );
+    assert.ok(launchReceiptLifecycleFollowUp);
+    assert.equal(launchReceiptLifecycleFollowUp.productCode, "EXPORT_ALPHA");
+    assert.equal(launchReceiptLifecycleFollowUp.actionKey, latestLaunchReceipt.postLaunchLifecycleNextActionKey);
+    assert.equal(launchReceiptLifecycleFollowUp.downloadKey, latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey);
+    assert.equal(launchReceiptLifecycleFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.match(launchReceiptLifecycleFollowUp.summary, /Post-launch lifecycle status/i);
     assert.match(launchReceiptSnapshot.summaryText, /Latest Launch Receipts:/);
     assert.match(launchReceiptSnapshot.summaryText, /record_post_launch_ops_sweep/i);
+    assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
+    assert.match(launchReceiptSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
+    assert.match(launchReceiptSnapshot.summaryText, /download=launch_mainline_operations_handoff/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launchReceiptOperation/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /record_post_launch_ops_sweep/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /rocksolid-launch-mainline-receipt-EXPORT_ALPHA-stable-record_post_launch_ops_sweep/i);

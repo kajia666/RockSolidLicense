@@ -9810,6 +9810,24 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     lines.push(`- ${reviewSummary.recommendedWorkspace.label || reviewSummary.recommendedWorkspace.key || "-"}`);
     lines.push(`- reason: ${reviewSummary.recommendedWorkspace.reason || reviewSummary.message || "-"}`);
   }
+  if (reviewSummary.routeFocus && typeof reviewSummary.routeFocus === "object") {
+    lines.push("");
+    lines.push("Launch Review Route Focus:");
+    lines.push(`- title: ${reviewSummary.routeFocus.title || "-"}`);
+    lines.push(`- summary: ${reviewSummary.routeFocus.summary || "-"}`);
+    if (Array.isArray(reviewSummary.routeFocus.tags) && reviewSummary.routeFocus.tags.length) {
+      lines.push(`- tags: ${reviewSummary.routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
+    }
+    if (Array.isArray(reviewSummary.routeFocus.controls) && reviewSummary.routeFocus.controls.length) {
+      for (const control of reviewSummary.routeFocus.controls) {
+        lines.push(
+          `- control: ${control?.label || control?.kind || "Action"}`
+          + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+        );
+      }
+    }
+  }
   if (Array.isArray(reviewSummary.actionPlan) && reviewSummary.actionPlan.length) {
     lines.push("");
     lines.push("Launch Review Action Plan:");
@@ -10008,13 +10026,28 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const workflowChecklist = launchWorkflow?.workflowChecklist || {};
   const opsOverview = opsSnapshot?.overview || {};
   const reviewMode = String(filters.reviewMode || "matched").trim().toLowerCase() || "matched";
+  const routeProductCode = launchWorkflow?.manifest?.project?.code || filters.productCode || null;
+  const routeChannel = launchWorkflow?.manifest?.channel || filters.channel || "stable";
+  const routedOperation = String(filters.operation || "").trim().toLowerCase();
+  const routedActionKey = String(filters.actionKey || "").trim();
+  const routedDownloadKey = String(filters.downloadKey || "").trim();
+  const routedRouteTitle = String(filters.routeTitle || "").trim();
+  const routedRouteReason = String(filters.routeReason || "").trim();
+  const routedParams = compactFocusParams({
+    operation: routedOperation,
+    actionKey: routedActionKey,
+    downloadKey: routedDownloadKey,
+    routeTitle: routedRouteTitle,
+    routeReason: routedRouteReason
+  });
   const scopedOpsParams = {
     reviewMode,
     ...(filters.username ? { username: filters.username } : {}),
     ...(filters.search ? { search: filters.search } : {}),
     ...(filters.eventType ? { eventType: filters.eventType } : {}),
     ...(filters.actorType ? { actorType: filters.actorType } : {}),
-    ...(filters.entityType ? { entityType: filters.entityType } : {})
+    ...(filters.entityType ? { entityType: filters.entityType } : {}),
+    ...routedParams
   };
   const stayAction = createLaunchWorkflowWorkspaceShortcut(
     "launch-review",
@@ -10646,6 +10679,40 @@ function buildDeveloperLaunchReviewSummaryPayload({
     || workflowSummary.recommendedWorkspace
     || opsWorkspaceAction
     || stayAction;
+  const routeFocus = {
+    title: routedRouteTitle || (routeProductCode ? `Launch review handoff for ${routeProductCode}` : "Launch review handoff"),
+    summary: routedRouteReason || (routeProductCode
+      ? `Recheck ${routeProductCode} on lane ${routeChannel} with the routed launch review and ops filters intact.`
+      : "Use the launch review handoff to preserve review filters, ops scope, and follow-up downloads."),
+    tags: [
+      routeProductCode ? { label: "project", value: routeProductCode, strong: true } : null,
+      routeChannel ? { label: "channel", value: routeChannel, strong: false } : null,
+      reviewMode ? { label: "reviewMode", value: reviewMode, strong: false } : null,
+      filters.eventType ? { label: "event", value: filters.eventType, strong: false } : null,
+      filters.actorType ? { label: "actor", value: filters.actorType, strong: false } : null,
+      filters.entityType ? { label: "entity", value: filters.entityType, strong: false } : null,
+      routedOperation ? { label: "operation", value: routedOperation, strong: true } : null,
+      routedActionKey ? { label: "action", value: routedActionKey, strong: false } : null,
+      routedDownloadKey ? { label: "download", value: routedDownloadKey, strong: false } : null
+    ].filter(Boolean),
+    controls: [
+      {
+        kind: "workspace",
+        label: stayAction.label || "Stay in Launch Review",
+        workspaceAction: stayAction
+      },
+      {
+        kind: "workspace",
+        label: opsWorkspaceAction.label || "Open Ops Workspace",
+        workspaceAction: opsWorkspaceAction
+      },
+      {
+        kind: "download",
+        label: "Download Review Summary",
+        recommendedDownload: reviewDownload
+      }
+    ].filter((item) => item.workspaceAction || item.recommendedDownload)
+  };
   const reviewStatus = workflowBlocked
     ? "block"
     : workflowNeedsReview || queueHasUrgent
@@ -10687,6 +10754,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     title: reviewHeadline,
     message: reviewMessage,
     mainlineGate,
+    routeFocus,
     recommendedWorkspace,
     workspaceActions,
     primaryReviewTarget,

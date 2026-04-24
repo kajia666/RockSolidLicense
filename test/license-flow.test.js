@@ -5910,12 +5910,24 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
       assert.ok(launchReview.reviewSummary.workspaceActions?.some((item) => /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.label || "")));
       assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
+      assert.equal(launchReview.reviewSummary.routeFocus?.title, "Continue launch review sweep");
+      assert.equal(launchReview.reviewSummary.routeFocus?.summary, "Continue review receipt follow-up");
+      assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
+      assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "action" && item.value === "launch_review_record_post_launch_ops_sweep"));
+      assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "download" && item.value === "launch_review_post_launch_sweep_handoff"));
+      assert.ok(launchReview.reviewSummary.routeFocus?.controls?.some((item) => item.workspaceAction?.key === "ops"));
+      assert.ok(launchReview.reviewSummary.routeFocus?.controls?.some((item) => item.recommendedDownload?.key === "launch_review_summary"));
       assert.match(launchReview.summaryText, /RockSolid Developer Launch Review/);
       assert.match(launchReview.summaryText, /Launch Mainline Gate:/);
       assert.match(launchReview.summaryText, /RockSolid Launch Workflow Package/);
       assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
       assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
       assert.match(launchReview.summaryText, /Launch Review Focus Targets:/);
+      assert.match(launchReview.summaryText, /Launch Review Route Focus:/);
+      assert.match(launchReview.summaryText, /Continue launch review sweep/);
+      assert.match(launchReview.summaryText, /operation=record_post_launch_ops_sweep/);
+      assert.match(launchReview.summaryText, /action=launch_review_record_post_launch_ops_sweep/);
+      assert.match(launchReview.summaryText, /download=launch_review_post_launch_sweep_handoff/);
       assert.match(launchReview.summaryText, /action=Open (Account|Entitlement|Session|Device) Control/);
       assert.match(
         launchReview.summaryText,
@@ -5935,6 +5947,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Ops Actor Filter: account/);
       assert.match(launchReviewSummaryDownload.body, /Launch Workflow Summary:/);
       assert.match(launchReviewSummaryDownload.body, /Ops Snapshot Summary:/);
+      assert.match(launchReviewSummaryDownload.body, /Launch Review Route Focus:/);
+      assert.match(launchReviewSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
+      assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff/);
 
       const launchMainlineRouteQuery = "productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&operation=record_post_launch_ops_sweep&actionKey=launch_mainline_record_post_launch_ops_sweep&downloadKey=launch_mainline_post_launch_sweep_handoff&routeTitle=Continue+post-launch+sweep&routeReason=Continue+routed+receipt+follow-up";
       const launchMainline = await getJson(
@@ -15491,6 +15506,12 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /Open Launch Workflow/);
       assert.match(html, /Open Ops Workspace/);
       assert.match(html, /Open License Workspace/);
+      assert.match(html, /requestedOperation/);
+      assert.match(html, /requestedActionKey/);
+      assert.match(html, /requestedDownloadKey/);
+      assert.match(html, /operation: target\.operation/);
+      assert.match(html, /actionKey: target\.actionKey/);
+      assert.match(html, /downloadKey: target\.downloadKey/);
       assert.match(html, /review-followup-box/);
       assert.match(html, /renderLastReviewFollowUp/);
       assert.match(html, /Launch Mainline Receipt Recap/);

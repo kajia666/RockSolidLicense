@@ -292,6 +292,9 @@
       const requestedAutofocus = (routeParams.get("autofocus") || "").trim();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedOperation = (routeParams.get("operation") || "").trim();
+      const requestedActionKey = (routeParams.get("actionKey") || "").trim();
+      const requestedDownloadKey = (routeParams.get("downloadKey") || "").trim();
       const requestedUsername = (routeParams.get("username") || "").trim();
       const requestedSearch = (routeParams.get("search") || "").trim();
       const requestedEventType = (routeParams.get("eventType") || "").trim();
@@ -414,7 +417,12 @@
           actorType: el("review-actor-type").value.trim(),
           entityType: el("review-entity-type").value.trim(),
           limit: el("review-limit").value.trim(),
-          reviewMode: el("review-mode").value.trim() || "matched"
+          reviewMode: el("review-mode").value.trim() || "matched",
+          routeTitle: requestedRouteTitle,
+          routeReason: requestedRouteReason,
+          operation: requestedOperation,
+          actionKey: requestedActionKey,
+          downloadKey: requestedDownloadKey
         };
       }
       function currentReviewSummary() {
@@ -601,7 +609,10 @@
           target.eventType ? renderTag(`event:${target.eventType}`) : "",
           target.actorType ? renderTag(`actor:${target.actorType}`) : "",
           target.entityType ? renderTag(`entity:${target.entityType}`) : "",
-          target.username ? renderTag(`username:${target.username}`) : ""
+          target.username ? renderTag(`username:${target.username}`) : "",
+          target.operation ? renderTag(`operation:${target.operation}`, true) : "",
+          target.actionKey ? renderTag(`action:${target.actionKey}`) : "",
+          target.downloadKey ? renderTag(`download:${target.downloadKey}`) : ""
         ].filter(Boolean).join("");
         el("route-focus-box").innerHTML = `
           <div><strong>${esc(title)}</strong></div>
@@ -796,7 +807,12 @@
           actorType: target.actorType,
           entityType: target.entityType,
           limit: target.limit,
-          reviewMode: target.reviewMode
+          reviewMode: target.reviewMode,
+          routeTitle: target.routeTitle,
+          routeReason: target.routeReason,
+          operation: target.operation,
+          actionKey: target.actionKey,
+          downloadKey: target.downloadKey
         })}`);
         const nextProductCode = String(data?.manifest?.project?.code || target.productCode || "").trim().toUpperCase();
         const nextChannel = String(data?.manifest?.channel || target.channel || "stable").trim().toLowerCase();
@@ -909,6 +925,11 @@
             entityType: target.entityType,
             limit: target.limit,
             reviewMode: target.reviewMode,
+            routeTitle: target.routeTitle,
+            routeReason: target.routeReason,
+            operation: target.operation,
+            actionKey: target.actionKey,
+            downloadKey: target.downloadKey,
             format
           })}`,
           fallbackFileName,

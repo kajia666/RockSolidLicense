@@ -6045,6 +6045,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Production Stabilization Handoff:/);
       assert.match(launchMainline.summaryText, /Launch stabilization review/);
       assert.match(launchMainline.summaryText, /daily-operations-checklist\.md/);
+      assert.match(launchMainline.summaryText, /Post-Launch Lifecycle:/);
+      assert.match(launchMainline.summaryText, /Lifecycle Phase Statuses:/);
+      assert.match(launchMainline.summaryText, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
       assert.match(launchMainline.summaryText, /Launch Mainline Rehearsal Guide:/);
       assert.match(launchMainline.summaryText, /Phase 1: Release And Workflow Precheck/);
       assert.match(launchMainline.summaryText, /Record Launch Rehearsal Run/);
@@ -6070,6 +6073,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Production Post-Launch Sweep Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Launch Closeout Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Stabilization Handoff:/);
+      assert.match(launchMainlineSummaryDownload.body, /Post-Launch Lifecycle:/);
+      assert.match(launchMainlineSummaryDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
       assert.match(launchMainlineSummaryDownload.body, /Launch Mainline Rehearsal Guide:/);
 
       const productionHandoffDownload = await getText(
@@ -6124,6 +6129,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(operationsHandoffDownload.body, /docs\/production-operations-runbook\.md/);
       assert.match(operationsHandoffDownload.body, /docs\/incident-response-playbook\.md/);
       assert.match(operationsHandoffDownload.body, /docs\/shift-handover-template\.md/);
+      assert.match(operationsHandoffDownload.body, /Post-Launch Lifecycle:/);
+      assert.match(operationsHandoffDownload.body, /Lifecycle Phase Statuses:/);
+      assert.match(operationsHandoffDownload.body, /Next Lifecycle Action:/);
+      assert.match(operationsHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
 
       const postLaunchSweepHandoffDownload = await getText(
         baseUrl,
@@ -6136,6 +6145,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(postLaunchSweepHandoffDownload.body, /Continue Routed Review/);
       assert.match(postLaunchSweepHandoffDownload.body, /Remaining routed review queue/);
       assert.match(postLaunchSweepHandoffDownload.body, /developer-ops-summary/);
+      assert.match(postLaunchSweepHandoffDownload.body, /Post-Launch Lifecycle:/);
+      assert.match(postLaunchSweepHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline post-launch sweep handoff/i);
 
       const closeoutHandoffDownload = await getText(
         baseUrl,
@@ -6148,6 +6159,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(closeoutHandoffDownload.body, /Launch closeout review/);
       assert.match(closeoutHandoffDownload.body, /first-wave ops sweep/i);
       assert.match(closeoutHandoffDownload.body, /shift-handover-template\.md/);
+      assert.match(closeoutHandoffDownload.body, /Post-Launch Lifecycle:/);
+      assert.match(closeoutHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline closeout handoff/i);
 
       const stabilizationHandoffDownload = await getText(
         baseUrl,
@@ -6160,6 +6173,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(stabilizationHandoffDownload.body, /Launch stabilization review/);
       assert.match(stabilizationHandoffDownload.body, /shift-handover-template\.md/);
       assert.match(stabilizationHandoffDownload.body, /daily-operations-checklist\.md/);
+      assert.match(stabilizationHandoffDownload.body, /Post-Launch Lifecycle:/);
+      assert.match(stabilizationHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline stabilization handoff/i);
 
       const rehearsalGuideDownload = await getText(
         baseUrl,
@@ -6630,6 +6645,51 @@ test("developer launch mainline production gate blocks default launch secrets an
     assert.match(launchMainline.summaryText || "", /record_launch_rehearsal_run/);
     assert.match(launchMainline.summaryText || "", /Production Evidence Queue:/);
     assert.match(launchMainline.summaryText || "", /completed=0/);
+    assert.match(launchMainline.summaryText || "", /Post-Launch Lifecycle:/);
+    assert.match(launchMainline.summaryText || "", /Lifecycle Phase Statuses:/);
+    assert.match(launchMainline.summaryText || "", /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
+
+    const launchMainlineSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=MAINLINE_PROD&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(launchMainlineSummaryDownload.body, /Post-Launch Lifecycle:/);
+    assert.match(launchMainlineSummaryDownload.body, /Lifecycle Phase Statuses:/);
+    assert.match(launchMainlineSummaryDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
+
+    const operationsHandoffDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=MAINLINE_PROD&channel=stable&reviewMode=matched&format=operations-handoff",
+      ownerSession.token
+    );
+    assert.match(operationsHandoffDownload.body, /Post-Launch Lifecycle:/);
+    assert.match(operationsHandoffDownload.body, /Next Lifecycle Action:/);
+    assert.match(operationsHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
+
+    const postLaunchSweepHandoffDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=MAINLINE_PROD&channel=stable&reviewMode=matched&format=post-launch-sweep-handoff",
+      ownerSession.token
+    );
+    assert.match(postLaunchSweepHandoffDownload.body, /Post-Launch Lifecycle:/);
+    assert.match(postLaunchSweepHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline post-launch sweep handoff/i);
+
+    const closeoutHandoffDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=MAINLINE_PROD&channel=stable&reviewMode=matched&format=closeout-handoff",
+      ownerSession.token
+    );
+    assert.match(closeoutHandoffDownload.body, /Post-Launch Lifecycle:/);
+    assert.match(closeoutHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline closeout handoff/i);
+
+    const stabilizationHandoffDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=MAINLINE_PROD&channel=stable&reviewMode=matched&format=stabilization-handoff",
+      ownerSession.token
+    );
+    assert.match(stabilizationHandoffDownload.body, /Post-Launch Lifecycle:/);
+    assert.match(stabilizationHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline stabilization handoff/i);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -9252,6 +9312,8 @@ test("developer launch mainline action can restock low inventory and return duty
     assert.match(firstLaunchHandoffDownloadResponse.body, /Workspace actions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Recommended downloads:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Post-Launch Lifecycle:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -10335,6 +10397,8 @@ test("developer launch mainline action can create first launch batches and retur
     assert.match(firstLaunchHandoffDownloadResponse.body, /Workspace actions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Recommended downloads:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Duty Chain:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Post-Launch Lifecycle:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Batch Card Suggestions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Watch first card redemptions/);

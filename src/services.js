@@ -12775,6 +12775,44 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
 }
 
+function appendPostLaunchLifecycleTextLines(lines = [], mainlineSummary = {}) {
+  const lifecycle = mainlineSummary?.productionGate?.postLaunchLifecycle;
+  if (!lifecycle || typeof lifecycle !== "object") {
+    return false;
+  }
+  const phases = Array.isArray(lifecycle.phases) ? lifecycle.phases : [];
+  const workspaceActions = Array.isArray(lifecycle.workspaceActions) ? lifecycle.workspaceActions : [];
+  const recommendedDownloads = Array.isArray(lifecycle.recommendedDownloads) ? lifecycle.recommendedDownloads : [];
+  const labelList = (items = [], fallback = "-") => {
+    const labels = (Array.isArray(items) ? items : [])
+      .map((item) => item?.label || item?.title || item?.key || null)
+      .filter(Boolean);
+    return labels.length ? labels.join(" | ") : fallback;
+  };
+  lines.push("");
+  lines.push("Post-Launch Lifecycle:");
+  lines.push(
+    `- status=${String(lifecycle.status || "unknown").toUpperCase()}`
+    + ` | ready=${lifecycle.readyCount ?? 0}`
+    + ` | hold=${lifecycle.holdCount ?? 0}`
+    + ` | review=${lifecycle.reviewCount ?? 0}`
+    + ` | next=${lifecycle.nextAction?.title || lifecycle.nextAction?.label || lifecycle.nextAction?.key || "-"}`
+  );
+  if (phases.length) {
+    lines.push(
+      `- Lifecycle Phase Statuses: ${phases.map((item) =>
+        `${item?.label || item?.key || "phase"}:${String(item?.status || "unknown").toUpperCase()}`
+      ).join(" | ")}`
+    );
+  }
+  lines.push(`- Next Lifecycle Action: ${lifecycle.nextAction?.title || lifecycle.nextAction?.label || lifecycle.nextAction?.key || "All post-launch lifecycle phases are aligned."}`);
+  lines.push(`- Primary Lifecycle Workspace: ${lifecycle.primaryWorkspaceAction?.label || lifecycle.primaryWorkspaceAction?.key || "-"}`);
+  lines.push(`- Primary Lifecycle Download: ${lifecycle.primaryRecommendedDownload?.label || lifecycle.primaryRecommendedDownload?.key || "-"}`);
+  lines.push(`- Lifecycle Workspace Actions: ${labelList(workspaceActions)}`);
+  lines.push(`- Lifecycle Recommended Downloads: ${labelList(recommendedDownloads)}`);
+  return true;
+}
+
 function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -12886,25 +12924,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + `${productionNextEvidenceAction.recommendedDownload ? ` | download=${productionNextEvidenceAction.recommendedDownload.label || productionNextEvidenceAction.recommendedDownload.key || "-"}` : ""}`
     );
   }
-  const postLaunchLifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || null;
-  if (postLaunchLifecycle && typeof postLaunchLifecycle === "object") {
-    lines.push("");
-    lines.push("Post-Launch Lifecycle:");
-    lines.push(
-      `- status=${String(postLaunchLifecycle.status || "unknown").toUpperCase()}`
-      + ` | ready=${postLaunchLifecycle.readyCount ?? 0}`
-      + ` | hold=${postLaunchLifecycle.holdCount ?? 0}`
-      + ` | review=${postLaunchLifecycle.reviewCount ?? 0}`
-      + ` | next=${postLaunchLifecycle.nextAction?.title || postLaunchLifecycle.nextAction?.label || postLaunchLifecycle.nextAction?.key || "-"}`
-    );
-    if (Array.isArray(postLaunchLifecycle.phases) && postLaunchLifecycle.phases.length) {
-      lines.push(
-        `- phases=${postLaunchLifecycle.phases.map((item) =>
-          `${item?.label || item?.key || "phase"}:${String(item?.status || "unknown").toUpperCase()}`
-        ).join(" | ")}`
-      );
-    }
-  }
+  appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   if (productionGateChecks.length) {
     lines.push("");
     lines.push("Production Gate Checks:");
@@ -13201,25 +13221,29 @@ function buildDeveloperLaunchMainlinePayload({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
-    publicBaseUrl
+    publicBaseUrl,
+    mainlineSummary: payload.mainlineSummary
   });
   payload.postLaunchSweepHandoffText = buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
-    publicBaseUrl
+    publicBaseUrl,
+    mainlineSummary: payload.mainlineSummary
   });
   payload.closeoutHandoffText = buildDeveloperLaunchMainlineCloseoutHandoffText({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
-    publicBaseUrl
+    publicBaseUrl,
+    mainlineSummary: payload.mainlineSummary
   });
   payload.stabilizationHandoffText = buildDeveloperLaunchMainlineStabilizationHandoffText({
     generatedAt,
     manifest: payload.manifest,
     filters: payload.filters,
-    publicBaseUrl
+    publicBaseUrl,
+    mainlineSummary: payload.mainlineSummary
   });
   payload.firstLaunchHandoffText = buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     generatedAt,
@@ -14050,7 +14074,8 @@ function buildDeveloperLaunchMainlineOperationsHandoffText({
   generatedAt = "",
   manifest = {},
   filters = {},
-  publicBaseUrl = ""
+  publicBaseUrl = "",
+  mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
   const operationsDocs = [
@@ -14081,6 +14106,7 @@ function buildDeveloperLaunchMainlineOperationsHandoffText({
     `Primary Signals: ${operationsSignals.join(" | ")}`,
     "Focus Areas: launch health | login failures | heartbeat failures | backup freshness | alert routing | shift handover"
   ];
+  appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
 
@@ -14088,7 +14114,8 @@ function buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
   generatedAt = "",
   manifest = {},
   filters = {},
-  publicBaseUrl = ""
+  publicBaseUrl = "",
+  mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
   const sweepSignals = [
@@ -14111,6 +14138,7 @@ function buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
     "Secondary Follow-Up: Remaining routed review queue",
     "Sweep Flow: confirm cutover | continue routed review | hand off remaining queue | capture first-wave ops sweep evidence"
   ];
+  appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
 
@@ -14118,7 +14146,8 @@ function buildDeveloperLaunchMainlineCloseoutHandoffText({
   generatedAt = "",
   manifest = {},
   filters = {},
-  publicBaseUrl = ""
+  publicBaseUrl = "",
+  mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
   const closeoutDocs = [
@@ -14147,6 +14176,7 @@ function buildDeveloperLaunchMainlineCloseoutHandoffText({
     "Primary Follow-Up: Launch closeout review",
     "Closeout Flow: confirm launch day readiness evidence | confirm first-wave ops sweep | hand off remaining routed review queue | capture launch closeout review"
   ];
+  appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
 
@@ -14154,7 +14184,8 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
   generatedAt = "",
   manifest = {},
   filters = {},
-  publicBaseUrl = ""
+  publicBaseUrl = "",
+  mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
   const stabilizationDocs = [
@@ -14185,6 +14216,7 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
     "Primary Follow-Up: Launch stabilization review",
     "Stabilization Flow: confirm launch closeout review | verify daily handover docs | confirm steady-state ops signals | capture launch stabilization review"
   ];
+  appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
 
@@ -14307,10 +14339,11 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     `- Owner path: ${ownerHandoffs.map((item) => item.owner).join(" -> ")}`,
     `- Workspace actions: ${firstLaunchWorkspaceActions.map((item) => item?.label || item?.key || "workspace").join(" | ") || "-"}`,
     `- Recommended downloads: ${firstLaunchRecommendedDownloads.map((item) => item?.label || item?.key || "download").join(" | ") || "-"}`,
-    `- Duty Chain: ${dutyActionLabels.join(" -> ")}`,
-    "",
-    "First Batch Card Suggestions:"
+    `- Duty Chain: ${dutyActionLabels.join(" -> ")}`
   ];
+  appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
+  lines.push("");
+  lines.push("First Batch Card Suggestions:");
 
   if (firstBatchCardRecommendations.length) {
     for (const item of firstBatchCardRecommendations) {

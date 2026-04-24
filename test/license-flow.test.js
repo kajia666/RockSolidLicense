@@ -5798,9 +5798,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchZipText, /integration\/host-skeleton\/RELPKG_ALPHA-host-skeleton\.cpp/);
       assert.match(launchZipText, /SHA256SUMS\.txt/);
 
+      const launchReviewRouteQuery = "productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&operation=record_post_launch_ops_sweep&actionKey=launch_review_record_post_launch_ops_sweep&downloadKey=launch_review_post_launch_sweep_handoff&routeTitle=Continue+launch+review+sweep&routeReason=Continue+review+receipt+follow-up";
       const launchReview = await getJson(
         baseUrl,
-        "/api/developer/launch-review?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched",
+        `/api/developer/launch-review?${launchReviewRouteQuery}`,
         viewerSession.token
       );
       assert.match(launchReview.fileName, /^rocksolid-developer-launch-review-RELPKG_ALPHA-stable-/);
@@ -5808,6 +5809,11 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchReview.filters.eventType, "session.login");
       assert.equal(launchReview.filters.actorType, "account");
       assert.equal(launchReview.filters.reviewMode, "matched");
+      assert.equal(launchReview.filters.operation, "record_post_launch_ops_sweep");
+      assert.equal(launchReview.filters.actionKey, "launch_review_record_post_launch_ops_sweep");
+      assert.equal(launchReview.filters.downloadKey, "launch_review_post_launch_sweep_handoff");
+      assert.equal(launchReview.filters.routeTitle, "Continue launch review sweep");
+      assert.equal(launchReview.filters.routeReason, "Continue review receipt follow-up");
       assert.equal(launchReview.launchWorkflow.manifest.project.code, "RELPKG_ALPHA");
       assert.equal(launchReview.opsSnapshot.scope.eventType, "session.login");
       assert.equal(launchReview.opsSnapshot.scope.actorType, "account");
@@ -5919,7 +5925,7 @@ test("developer release package export bundles integration, versions, and notice
 
       const launchReviewSummaryDownload = await getText(
         baseUrl,
-        "/api/developer/launch-review/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=summary",
+        `/api/developer/launch-review/download?${launchReviewRouteQuery}&format=summary`,
         viewerSession.token
       );
       assert.match(launchReviewSummaryDownload.contentType || "", /^text\/plain/);
@@ -5930,9 +5936,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Launch Workflow Summary:/);
       assert.match(launchReviewSummaryDownload.body, /Ops Snapshot Summary:/);
 
+      const launchMainlineRouteQuery = "productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&operation=record_post_launch_ops_sweep&actionKey=launch_mainline_record_post_launch_ops_sweep&downloadKey=launch_mainline_post_launch_sweep_handoff&routeTitle=Continue+post-launch+sweep&routeReason=Continue+routed+receipt+follow-up";
       const launchMainline = await getJson(
         baseUrl,
-        "/api/developer/launch-mainline?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched",
+        `/api/developer/launch-mainline?${launchMainlineRouteQuery}`,
         viewerSession.token
       );
       assert.match(launchMainline.fileName, /^rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-/);
@@ -5979,6 +5986,17 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchMainline.mainlineSummary.continuation?.workspaceAction?.key, "ops");
       assert.match(launchMainline.mainlineSummary.continuation?.workspaceAction?.params?.routeAction || "", /^(review_next|complete_route_review)$/);
       assert.match(launchMainline.mainlineSummary.continuation?.recommendedDownload?.format || "", /^(route-review-next|summary)$/);
+      assert.equal(launchMainline.filters.operation, "record_post_launch_ops_sweep");
+      assert.equal(launchMainline.filters.actionKey, "launch_mainline_record_post_launch_ops_sweep");
+      assert.equal(launchMainline.filters.downloadKey, "launch_mainline_post_launch_sweep_handoff");
+      assert.ok(launchMainline.mainlineSummary.routeFocus?.tags?.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
+      assert.ok(launchMainline.mainlineSummary.routeFocus?.tags?.some((item) => item.label === "action" && item.value === "launch_mainline_record_post_launch_ops_sweep"));
+      assert.ok(launchMainline.mainlineSummary.routeFocus?.tags?.some((item) => item.label === "download" && item.value === "launch_mainline_post_launch_sweep_handoff"));
+      assert.ok(launchMainline.mainlineSummary.routeFocus?.controls?.some((item) =>
+        item.label === "Run Routed Operation"
+        && item.setupAction?.operation === "record_post_launch_ops_sweep"
+        && item.setupAction?.key === "launch_mainline_record_post_launch_ops_sweep"
+      ));
       assert.ok(launchMainline.mainlineSummary.actionPlan.some((item) => item.key === "launch_mainline_route_continuation" && item.workspaceAction?.key === "ops"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === launchMainline.mainlineSummary.continuation?.recommendedDownload?.key));
       assert.equal(
@@ -6022,6 +6040,12 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Mainline Hero Controls:/);
       assert.match(launchMainline.summaryText, /Open Release Workspace/);
       assert.match(launchMainline.summaryText, /Download Launch Mainline Summary/);
+      assert.match(launchMainline.summaryText, /Mainline Route Focus:/);
+      assert.match(launchMainline.summaryText, /Continue post-launch sweep/);
+      assert.match(launchMainline.summaryText, /operation=record_post_launch_ops_sweep/);
+      assert.match(launchMainline.summaryText, /action=launch_mainline_record_post_launch_ops_sweep/);
+      assert.match(launchMainline.summaryText, /download=launch_mainline_post_launch_sweep_handoff/);
+      assert.match(launchMainline.summaryText, /Run Routed Operation/);
       assert.match(launchMainline.summaryText, /Mainline Next Actions:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
       assert.match(launchMainline.summaryText, /Production:/);
@@ -6055,7 +6079,7 @@ test("developer release package export bundles integration, versions, and notice
 
       const launchMainlineSummaryDownload = await getText(
         baseUrl,
-        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=summary",
+        `/api/developer/launch-mainline/download?${launchMainlineRouteQuery}&format=summary`,
         viewerSession.token
       );
       assert.match(launchMainlineSummaryDownload.contentType || "", /^text\/plain/);
@@ -6064,6 +6088,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Primary Mainline Action:/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Hero Controls:/);
       assert.match(launchMainlineSummaryDownload.body, /Download Launch Mainline Zip/);
+      assert.match(launchMainlineSummaryDownload.body, /Mainline Route Focus:/);
+      assert.match(launchMainlineSummaryDownload.body, /Continue post-launch sweep/);
+      assert.match(launchMainlineSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
+      assert.match(launchMainlineSummaryDownload.body, /Run Routed Operation/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
       assert.match(launchMainlineSummaryDownload.body, /Production Handoff:/);

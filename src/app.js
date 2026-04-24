@@ -1276,7 +1276,12 @@ export function createApp(overrides = {}) {
           actorType: url.searchParams.get("actorType"),
           entityType: url.searchParams.get("entityType"),
           limit: url.searchParams.get("limit"),
-          reviewMode: url.searchParams.get("reviewMode")
+          reviewMode: url.searchParams.get("reviewMode"),
+          operation: url.searchParams.get("operation"),
+          actionKey: url.searchParams.get("actionKey"),
+          downloadKey: url.searchParams.get("downloadKey"),
+          routeTitle: url.searchParams.get("routeTitle"),
+          routeReason: url.searchParams.get("routeReason")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,
@@ -1298,7 +1303,12 @@ export function createApp(overrides = {}) {
           actorType: url.searchParams.get("actorType"),
           entityType: url.searchParams.get("entityType"),
           limit: url.searchParams.get("limit"),
-          reviewMode: url.searchParams.get("reviewMode")
+          reviewMode: url.searchParams.get("reviewMode"),
+          operation: url.searchParams.get("operation"),
+          actionKey: url.searchParams.get("actionKey"),
+          downloadKey: url.searchParams.get("downloadKey"),
+          routeTitle: url.searchParams.get("routeTitle"),
+          routeReason: url.searchParams.get("routeReason")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,
@@ -1351,7 +1361,12 @@ export function createApp(overrides = {}) {
           eventType: url.searchParams.get("eventType"),
           actorType: url.searchParams.get("actorType"),
           entityType: url.searchParams.get("entityType"),
-          reviewMode: url.searchParams.get("reviewMode")
+          reviewMode: url.searchParams.get("reviewMode"),
+          operation: url.searchParams.get("operation"),
+          actionKey: url.searchParams.get("actionKey"),
+          downloadKey: url.searchParams.get("downloadKey"),
+          routeTitle: url.searchParams.get("routeTitle"),
+          routeReason: url.searchParams.get("routeReason")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,
@@ -1372,7 +1387,12 @@ export function createApp(overrides = {}) {
           eventType: url.searchParams.get("eventType"),
           actorType: url.searchParams.get("actorType"),
           entityType: url.searchParams.get("entityType"),
-          reviewMode: url.searchParams.get("reviewMode")
+          reviewMode: url.searchParams.get("reviewMode"),
+          operation: url.searchParams.get("operation"),
+          actionKey: url.searchParams.get("actionKey"),
+          downloadKey: url.searchParams.get("downloadKey"),
+          routeTitle: url.searchParams.get("routeTitle"),
+          routeReason: url.searchParams.get("routeReason")
         }, {
           publicBaseUrl: url.origin,
           publicHost: url.hostname,

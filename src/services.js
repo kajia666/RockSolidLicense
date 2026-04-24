@@ -10731,7 +10731,12 @@ function buildDeveloperLaunchReviewPayload({
       eventType: filters.eventType || null,
       actorType: filters.actorType || null,
       entityType: filters.entityType || null,
-      reviewMode: filters.reviewMode || null
+      reviewMode: filters.reviewMode || null,
+      operation: filters.operation || null,
+      actionKey: filters.actionKey || null,
+      downloadKey: filters.downloadKey || null,
+      routeTitle: filters.routeTitle || null,
+      routeReason: filters.routeReason || null
     },
     launchWorkflow,
     opsSnapshot,
@@ -11887,8 +11892,36 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     ...(filters.entityType ? { entityType: filters.entityType } : {}),
     ...(filters.reviewMode ? { reviewMode: filters.reviewMode } : {}),
     ...(filters.username ? { username: filters.username } : {}),
-    ...(filters.search ? { search: filters.search } : {})
+    ...(filters.search ? { search: filters.search } : {}),
+    ...(filters.operation ? { operation: String(filters.operation).trim().toLowerCase() } : {}),
+    ...(filters.actionKey ? { actionKey: filters.actionKey } : {}),
+    ...(filters.downloadKey ? { downloadKey: filters.downloadKey } : {}),
+    ...(filters.routeTitle ? { routeTitle: filters.routeTitle } : {}),
+    ...(filters.routeReason ? { routeReason: filters.routeReason } : {})
   };
+  const routedOperation = String(filters.operation || "").trim().toLowerCase();
+  const routedActionKey = String(filters.actionKey || "").trim();
+  const routedDownloadKey = String(filters.downloadKey || "").trim();
+  const routedRouteTitle = String(filters.routeTitle || "").trim();
+  const routedRouteReason = String(filters.routeReason || "").trim();
+  const routedOperationTags = [
+    routedOperation ? { label: "operation", value: routedOperation, strong: true } : null,
+    routedActionKey ? { label: "action", value: routedActionKey, strong: false } : null,
+    routedDownloadKey ? { label: "download", value: routedDownloadKey, strong: false } : null
+  ].filter(Boolean);
+  const routedOperationControl = routedOperation
+    ? {
+        kind: "setup",
+        label: "Run Routed Operation",
+        setupAction: {
+          key: routedActionKey || `routed_${routedOperation}`,
+          label: routedRouteTitle || "Run Routed Operation",
+          summary: routedRouteReason || "Run the operation routed into Launch Mainline.",
+          mode: "evidence",
+          operation: routedOperation
+        }
+      }
+    : null;
   const compactOpsFocusParams = (kind = "", item = {}) => {
     if (!item || typeof item !== "object") {
       return {};
@@ -12530,12 +12563,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     }
   ];
   const routeFocus = {
-    title: params.productCode
+    title: routedRouteTitle || (params.productCode
       ? `Launch mainline handoff for ${params.productCode}`
-      : "Launch mainline handoff",
-    summary: params.productCode
+      : "Launch mainline handoff"),
+    summary: routedRouteReason || (params.productCode
       ? `Keep ${params.productCode} on the unified launch-mainline path across release, workflow, review, smoke, and ops before widening rollout.`
-      : "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops.",
+      : "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops."),
     tags: [
       params.productCode
         ? { label: "project", value: params.productCode, strong: true }
@@ -12546,8 +12579,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       params.reviewMode
         ? { label: "reviewMode", value: params.reviewMode, strong: false }
         : null
-    ].filter(Boolean),
+    ].filter(Boolean).concat(routedOperationTags),
     controls: [
+      routedOperationControl,
       recommendedWorkspace
         ? ensureLaunchMainlineControlHrefs({
             kind: "workspace",
@@ -13168,6 +13202,24 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       );
     }
   }
+  if (mainlineSummary.routeFocus && typeof mainlineSummary.routeFocus === "object") {
+    lines.push("Mainline Route Focus:");
+    lines.push(`- title: ${mainlineSummary.routeFocus.title || "-"}`);
+    lines.push(`- summary: ${mainlineSummary.routeFocus.summary || "-"}`);
+    if (Array.isArray(mainlineSummary.routeFocus.tags) && mainlineSummary.routeFocus.tags.length) {
+      lines.push(`- tags: ${mainlineSummary.routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
+    }
+    if (Array.isArray(mainlineSummary.routeFocus.controls) && mainlineSummary.routeFocus.controls.length) {
+      for (const control of mainlineSummary.routeFocus.controls) {
+        lines.push(
+          `- control: ${control?.label || control?.kind || "Action"}`
+          + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+          + `${control?.setupAction ? ` | setup=${control.setupAction.label || control.setupAction.key || "-"}@${control.setupAction.mode || "recommended"}:${control.setupAction.operation || "-"}` : ""}`
+        );
+      }
+    }
+  }
   if (Array.isArray(mainlineSummary.nextActions) && mainlineSummary.nextActions.length) {
     lines.push("Mainline Next Actions:");
     for (const item of mainlineSummary.nextActions) {
@@ -13445,7 +13497,12 @@ function buildDeveloperLaunchMainlinePayload({
       eventType: filters.eventType || null,
       actorType: filters.actorType || null,
       entityType: filters.entityType || null,
-      reviewMode: filters.reviewMode || null
+      reviewMode: filters.reviewMode || null,
+      operation: filters.operation ? String(filters.operation).trim().toLowerCase() : null,
+      actionKey: filters.actionKey || null,
+      downloadKey: filters.downloadKey || null,
+      routeTitle: filters.routeTitle || null,
+      routeReason: filters.routeReason || null
     },
     releasePackage,
     launchWorkflow,
@@ -23858,7 +23915,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           eventType: selector.eventType || null,
           actorType: selector.actorType || null,
           entityType: selector.entityType || null,
-          reviewMode: selector.reviewMode || null
+          reviewMode: selector.reviewMode || null,
+          operation: selector.operation || null,
+          actionKey: selector.actionKey || null,
+          downloadKey: selector.downloadKey || null,
+          routeTitle: selector.routeTitle || null,
+          routeReason: selector.routeReason || null
         }
       });
       const session = requireDeveloperSession(db, token);
@@ -23998,7 +24060,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           eventType: selector.eventType || null,
           actorType: selector.actorType || null,
           entityType: selector.entityType || null,
-          reviewMode: selector.reviewMode || null
+          reviewMode: selector.reviewMode || null,
+          operation: selector.operation || null,
+          actionKey: selector.actionKey || null,
+          downloadKey: selector.downloadKey || null,
+          routeTitle: selector.routeTitle || null,
+          routeReason: selector.routeReason || null
         }
       });
       const session = requireDeveloperSession(db, token);

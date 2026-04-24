@@ -16352,6 +16352,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Launch Receipt Follow-ups/);
     assert.match(html, /launchReceiptFollowUps/);
     assert.match(html, /renderLaunchReceiptFollowUps/);
+    assert.match(html, /data-launch-receipt-follow-up-action/);
+    assert.match(html, /Open Mainline/);
+    assert.match(html, /Download Handoff/);
+    assert.match(html, /launchReceiptDownloadFormat/);
+    assert.match(html, /handleLaunchReceiptFollowUpAction/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

@@ -2547,15 +2547,85 @@
             `download=${esc(item.downloadKey || "-")}`,
             `handoff=${esc(item.handoffFileName || "-")}`
           ].join(" | ");
+          const actionAttrs = [
+            item.productCode ? `data-product-code="${esc(item.productCode)}"` : "",
+            item.channel ? `data-channel="${esc(item.channel)}"` : "",
+            item.actionKey ? `data-action-key="${esc(item.actionKey)}"` : "",
+            item.operationToRecord ? `data-operation-to-record="${esc(item.operationToRecord)}"` : "",
+            item.downloadKey ? `data-download-key="${esc(item.downloadKey)}"` : "",
+            item.title ? `data-title="${esc(item.title)}"` : ""
+          ].filter(Boolean).join(" ");
           return `
             <div class="snapshot-recap">
               <strong>${esc(item.title || "Launch receipt follow-up")}</strong>
               <div class="audit-meta">${tags || renderTag("launch-receipt-follow-up")}</div>
               <div class="hint">${details}</div>
               ${item.summary ? `<div class="hint">${esc(item.summary)}</div>` : ""}
+              <div class="snapshot-recap-actions">
+                <button type="button" class="snapshot-inline-button" data-launch-receipt-follow-up-action="open" ${actionAttrs}>Open Mainline</button>
+                ${item.downloadKey ? `<button type="button" class="snapshot-inline-button" data-launch-receipt-follow-up-action="download" ${actionAttrs} ${token ? "" : "disabled"}>Download Handoff</button>` : ""}
+              </div>
             </div>
           `;
         }).join("");
+      }
+
+      function launchReceiptDownloadFormat(downloadKey = "") {
+        const normalized = String(downloadKey || "").trim().toLowerCase();
+        if (!normalized) {
+          return "";
+        }
+        if (normalized === "launch_mainline_json") {
+          return "json";
+        }
+        if (normalized === "launch_mainline_zip") {
+          return "zip";
+        }
+        if (normalized === "launch_mainline_checksums") {
+          return "checksums";
+        }
+        if (normalized === "launch_mainline_summary") {
+          return "summary";
+        }
+        if (normalized.startsWith("launch_mainline_")) {
+          return normalized.replace(/^launch_mainline_/, "").replace(/_/g, "-");
+        }
+        return normalized.replace(/_/g, "-");
+      }
+
+      async function handleLaunchReceiptFollowUpAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
+        const channel = String(data.channel || requestedChannel || "stable").trim() || "stable";
+        if (!productCode) {
+          throw { code: "MISSING_PROJECT", message: "Select or route a project before continuing launch receipt follow-up." };
+        }
+        if (normalizedAction === "open") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+            productCode,
+            channel,
+            autofocus: "summary",
+            routeTitle: data.title || "Launch Receipt Follow-up",
+            routeReason: data.actionKey || data.operationToRecord || "Continue launch receipt follow-up",
+            ...(data.operationToRecord ? { operation: data.operationToRecord } : {})
+          });
+          return;
+        }
+        if (normalizedAction === "download") {
+          const format = launchReceiptDownloadFormat(data.downloadKey || "");
+          if (!format) {
+            throw { code: "MISSING_DOWNLOAD", message: "No launch receipt handoff download is available for this follow-up." };
+          }
+          const result = await downloadApiFile(
+            `/api/developer/launch-mainline/download${q({ productCode, channel, format })}`,
+            `${productCode}-${channel}-${format}.txt`
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Launch receipt handoff downloaded: ${result.fileName}`);
+          return;
+        }
+        throw { code: "UNSUPPORTED_FOLLOW_UP", message: `Unsupported launch receipt follow-up action: ${normalizedAction || "-"}` };
       }
 
       function applyRecommendedControl(control = {}) {
@@ -4208,6 +4278,14 @@
           } catch (error) {
             setStatus(`${error.code}: ${error.message}`, true);
             setOutput({ code:error.code, message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-launch-receipt-follow-up-action]", async (data) => {
+          try {
+            await handleLaunchReceiptFollowUpAction(data.launchReceiptFollowUpAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
           }
         });
       }

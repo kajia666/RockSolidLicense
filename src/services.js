@@ -4004,6 +4004,120 @@ function formatLaunchProductionEvidenceLine(evidenceQueue = {}, label = "Product
   ].join(" | ");
 }
 
+function buildLaunchMainlineActionReceiptHandoffText({
+  generatedAt = "",
+  operation = "",
+  operationLabel = "",
+  result = null,
+  followUp = null,
+  transitions = [],
+  created = [],
+  skipped = [],
+  mainlineOverallGate = null,
+  mainlinePrimaryAction = null,
+  mainlineRecommendedDownload = null,
+  mainlineEvidenceQueue = null,
+  firstLaunchInventoryQueue = null,
+  firstLaunchOpsQueue = null,
+  firstLaunchHandoffDownload = null,
+  firstLaunchDutySummary = null,
+  postLaunchLifecycleSummary = null,
+  mainlineRecapCards = [],
+  actions = []
+} = {}) {
+  const lines = [
+    "Launch Mainline Receipt Recap:",
+    `Generated At: ${generatedAt || "-"}`,
+    `Operation: ${operationLabel || operation || "-"}`,
+    `Project: ${result?.productCode || "-"}`,
+    `Channel: ${result?.channel || "stable"}`,
+    `Message: ${result?.message || `${operationLabel || operation || "Launch action"} completed.`}`,
+    `Follow-up: ${followUp?.summary || "-"}`
+  ];
+
+  lines.push("");
+  lines.push("Mainline Gate:");
+  lines.push(`- status: ${String(mainlineOverallGate?.status || "unknown").toUpperCase()}`);
+  lines.push(`- headline: ${mainlineOverallGate?.headline || "-"}`);
+  lines.push(`- primaryAction: ${mainlinePrimaryAction?.title || mainlinePrimaryAction?.label || mainlinePrimaryAction?.key || followUp?.primaryAction?.label || "-"}`);
+  lines.push(`- recommendedDownload: ${mainlineRecommendedDownload?.label || mainlineRecommendedDownload?.key || "-"}`);
+
+  if (mainlineEvidenceQueue) {
+    lines.push("");
+    lines.push("Production Evidence:");
+    lines.push(`- ${formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production Evidence")}`);
+    lines.push(`- total=${mainlineEvidenceQueue.totalCount ?? 0} | completed=${mainlineEvidenceQueue.completedCount ?? 0} | remaining=${mainlineEvidenceQueue.remainingCount ?? 0}`);
+  }
+
+  if (postLaunchLifecycleSummary) {
+    lines.push("");
+    lines.push("Post Launch Lifecycle:");
+    lines.push(`- status: ${postLaunchLifecycleSummary.status || "-"}`);
+    lines.push(`- summary: ${postLaunchLifecycleSummary.summary || "-"}`);
+    lines.push(`- nextAction: ${postLaunchLifecycleSummary.nextAction?.title || postLaunchLifecycleSummary.nextAction?.label || postLaunchLifecycleSummary.nextAction?.key || "-"}`);
+    lines.push(`- recommendedDownload: ${postLaunchLifecycleSummary.primaryRecommendedDownload?.label || postLaunchLifecycleSummary.primaryRecommendedDownload?.key || "-"}`);
+  }
+
+  if (firstLaunchInventoryQueue) {
+    lines.push("");
+    lines.push("First Launch Inventory:");
+    lines.push(`- ${firstLaunchInventoryQueue.summary || "-"}`);
+    lines.push(`- createdBatches=${firstLaunchInventoryQueue.createdBatchCount || 0} | createdCards=${firstLaunchInventoryQueue.createdCardCount || 0} | states=${firstLaunchInventoryQueue.inventoryStateCount || 0}`);
+    for (const item of Array.isArray(firstLaunchInventoryQueue.createdBatches) ? firstLaunchInventoryQueue.createdBatches.slice(0, 8) : []) {
+      lines.push(`- batch=${item.batchCode || "-"} | mode=${item.mode || "-"} | count=${item.count || 0} | prefix=${item.prefix || "-"}`);
+    }
+  }
+
+  if (firstLaunchDutySummary || firstLaunchOpsQueue) {
+    lines.push("");
+    lines.push("First Launch Duty:");
+    lines.push(`- summary: ${firstLaunchDutySummary?.summary || firstLaunchOpsQueue?.summary || "-"}`);
+    lines.push(`- actions=${firstLaunchOpsQueue?.actionCount || 0} | owners=${Array.isArray(firstLaunchOpsQueue?.ownerGroups) ? firstLaunchOpsQueue.ownerGroups.length : 0}`);
+    lines.push(`- handoffDownload: ${firstLaunchDutySummary?.handoffDownload?.label || firstLaunchHandoffDownload?.label || firstLaunchDutySummary?.handoffDownload?.key || firstLaunchHandoffDownload?.key || "-"}`);
+    for (const item of Array.isArray(firstLaunchOpsQueue?.handoffChecklist) ? firstLaunchOpsQueue.handoffChecklist.slice(0, 8) : []) {
+      lines.push(`- owner=${item.ownerLabel || item.ownerRole || "-"} | actions=${item.actionCount || 0} | stages=${Array.isArray(item.stageLabels) ? item.stageLabels.join(" + ") : "-"}`);
+    }
+  }
+
+  if (transitions.length || created.length || skipped.length) {
+    lines.push("");
+    lines.push("Applied Changes:");
+    for (const item of transitions) {
+      lines.push(`- ${item.label || item.key}: ${item.from ?? 0}->${item.to ?? 0}`);
+    }
+    for (const item of created) {
+      lines.push(`- created ${item.label || item.key}: ${item.value || "-"}`);
+    }
+    if (skipped.length) {
+      lines.push("Skipped:");
+      for (const item of skipped) {
+        lines.push(`- ${item.reason || item.label || item.key || "-"}`);
+      }
+    }
+  }
+
+  if (Array.isArray(mainlineRecapCards) && mainlineRecapCards.length) {
+    lines.push("");
+    lines.push("Recap Cards:");
+    for (const card of mainlineRecapCards.slice(0, 8)) {
+      lines.push(`- ${card?.title || card?.key || "Receipt card"}: ${card?.summary || "-"}`);
+      for (const detail of Array.isArray(card?.details) ? card.details.slice(0, 3) : []) {
+        lines.push(`  - ${detail}`);
+      }
+    }
+  }
+
+  if (Array.isArray(actions) && actions.length) {
+    lines.push("");
+    lines.push("Next Actions:");
+    for (const item of actions.slice(0, 8)) {
+      lines.push(`- ${item.label || item.key || "follow-up"} | timing=${item.timing || "-"} | ${item.summary || "-"}`);
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 function buildLaunchMainlineActionReceipt({
   operation = "",
   result = null,
@@ -5348,6 +5462,41 @@ function buildLaunchMainlineActionReceipt({
     lastActionScreen: mainlineView.lastActionScreen,
     summaryText: launchMainline?.summaryText || ""
   };
+  const handoffGeneratedAt = nowIso();
+  const handoffScopeTag = sanitizeExportNameSegment(
+    result?.productCode || launchMainline?.manifest?.project?.code || mainlineSummary.form?.productCode || "launch-mainline",
+    "launch-mainline"
+  );
+  const handoffChannelTag = sanitizeExportNameSegment(
+    result?.channel || launchMainline?.manifest?.channel || mainlineSummary.form?.channel || "stable",
+    "stable"
+  );
+  const handoffOperationTag = sanitizeExportNameSegment(normalizedOperation || "bootstrap", "bootstrap");
+  const handoffFileName = `rocksolid-launch-mainline-receipt-${handoffScopeTag}-${handoffChannelTag}-${handoffOperationTag}-${buildExportTimestampTag(handoffGeneratedAt)}.txt`;
+  const handoffText = buildLaunchMainlineActionReceiptHandoffText({
+    generatedAt: handoffGeneratedAt,
+    operation: normalizedOperation || "bootstrap",
+    operationLabel,
+    result: {
+      ...result,
+      channel: result?.channel || launchMainline?.manifest?.channel || mainlineSummary.form?.channel || "stable"
+    },
+    followUp,
+    transitions,
+    created,
+    skipped,
+    mainlineOverallGate,
+    mainlinePrimaryAction,
+    mainlineRecommendedDownload,
+    mainlineEvidenceQueue,
+    firstLaunchInventoryQueue,
+    firstLaunchOpsQueue,
+    firstLaunchHandoffDownload,
+    firstLaunchDutySummary,
+    postLaunchLifecycleSummary,
+    mainlineRecapCards,
+    actions
+  });
   return {
     operation: normalizedOperation || "bootstrap",
     operationLabel,
@@ -5358,6 +5507,9 @@ function buildLaunchMainlineActionReceipt({
     created,
     skipped,
     skippedCount: skipped.length,
+    handoffFileName,
+    handoffText,
+    handoffGeneratedAt,
     primaryAction: followUp?.primaryAction || null,
     mainlineOverallGate,
     mainlinePrimaryAction,

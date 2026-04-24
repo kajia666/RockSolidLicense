@@ -8264,6 +8264,11 @@ test("developer license quickstart bootstrap can create starter launch assets in
       assert.ok(bootstrap.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
       assert.ok(bootstrap.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
       assert.ok(bootstrap.receipt?.mainlineRecapCards?.some((item) => item?.key === "post_launch_lifecycle_summary"));
+      assert.match(bootstrap.receipt?.handoffFileName || "", /BOOT_ALPHA-stable-bootstrap.*\.txt/i);
+      assert.match(bootstrap.receipt?.handoffText || "", /Launch Mainline Receipt Recap:/);
+      assert.match(bootstrap.receipt?.handoffText || "", /Operation: Launch Bootstrap/);
+      assert.match(bootstrap.receipt?.handoffText || "", /Production Evidence:/);
+      assert.match(bootstrap.receipt?.handoffText || "", /Post Launch Lifecycle:/);
 
     const policies = await getJson(
       baseUrl,
@@ -8314,6 +8319,8 @@ test("developer license quickstart bootstrap can create starter launch assets in
       item?.key === "transition_summary"
         && /No quickstart bootstrap actions were needed/i.test(item.details?.join(" ") || "")
     ));
+    assert.match(repeatBootstrap.receipt?.handoffText || "", /Skipped:/);
+    assert.match(repeatBootstrap.receipt?.handoffText || "", /No quickstart bootstrap actions were needed/i);
 
     const smokeKit = await getJson(
       baseUrl,
@@ -8675,6 +8682,14 @@ test("developer license quickstart first-batch setup can create recommended laun
       );
       assert.ok(setup.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
       assert.ok(setup.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
+      assert.match(setup.receipt?.handoffFileName || "", /FIRSTBATCH-stable-first_batch_setup.*\.txt/i);
+      assert.match(setup.receipt?.handoffText || "", /Launch Mainline Receipt Recap:/);
+      assert.match(setup.receipt?.handoffText || "", /Operation: First Batch Setup/);
+      assert.match(setup.receipt?.handoffText || "", /First Launch Inventory:/);
+      assert.match(setup.receipt?.handoffText || "", /First Launch Duty:/);
+      assert.match(setup.receipt?.handoffText || "", /First launch handoff/i);
+      assert.match(setup.receipt?.handoffText || "", /Production Evidence:/);
+      assert.match(setup.receipt?.handoffText || "", /Post Launch Lifecycle:/);
 
     const cards = await getJson(
       baseUrl,
@@ -8870,6 +8885,13 @@ test("developer launch workflow can restock low launch inventory buffers", async
       );
       assert.ok(restock.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
       assert.ok(restock.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
+      assert.match(restock.receipt?.handoffFileName || "", /RESTOCKAPP-stable-restock.*\.txt/i);
+      assert.match(restock.receipt?.handoffText || "", /Launch Mainline Receipt Recap:/);
+      assert.match(restock.receipt?.handoffText || "", /Operation: Inventory Refill/);
+      assert.match(restock.receipt?.handoffText || "", /First Launch Inventory:/);
+      assert.match(restock.receipt?.handoffText || "", /First Launch Duty:/);
+      assert.match(restock.receipt?.handoffText || "", /Production Evidence:/);
+      assert.match(restock.receipt?.handoffText || "", /Post Launch Lifecycle:/);
 
     const launchWorkflowAfterRestock = await getJson(
       baseUrl,

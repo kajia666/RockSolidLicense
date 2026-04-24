@@ -15789,6 +15789,98 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsInitialLaunchOpsGate({
+  status = "not_started",
+  latestReceipt = null,
+  followUps = [],
+  launchReceiptNextFollowUp = null,
+  primaryWorkspaceAction = null,
+  primaryDownload = null,
+  firstLaunchHandoffDownload = null
+} = {}) {
+  const normalizedFollowUps = Array.isArray(followUps) ? followUps : [];
+  const toGateItem = (item = {}, fallbackStage = "") => ({
+    key: item.key || `${fallbackStage || "launch"}:${item.actionKey || item.downloadKey || item.operationToRecord || item.operation || "follow-up"}`,
+    stage: item.stage || fallbackStage || null,
+    priority: normalizeLaunchReceiptFollowUpPriority(item.priority),
+    title: item.title || "Launch operations follow-up",
+    summary: item.summary || "",
+    actionKey: item.actionKey || null,
+    operation: item.operationToRecord || item.operation || null,
+    downloadKey: item.downloadKey || null,
+    handoffFileName: item.handoffFileName || null,
+    productCode: item.productCode || latestReceipt?.productCode || null,
+    channel: item.channel || latestReceipt?.channel || "stable"
+  });
+  const blockers = [];
+  const warnings = [];
+  if (!latestReceipt) {
+    blockers.push({
+      key: "missing_launch_receipt",
+      stage: "launch_receipt",
+      priority: "primary",
+      title: "Record a first launch receipt",
+      summary: "No launch receipt is available for this scoped Developer Ops snapshot.",
+      actionKey: null,
+      operation: null,
+      downloadKey: firstLaunchHandoffDownload?.key || null,
+      handoffFileName: firstLaunchHandoffDownload?.fileName || null,
+      productCode: null,
+      channel: "stable"
+    });
+  }
+  for (const item of normalizedFollowUps) {
+    const gateItem = toGateItem(item);
+    if (gateItem.priority === "primary" || gateItem.priority === "review") {
+      blockers.push(gateItem);
+    } else {
+      warnings.push(gateItem);
+    }
+  }
+  const requiredActions = blockers.map((item) => ({
+    key: item.actionKey || item.operation || item.downloadKey || item.key,
+    label: item.title || "Resolve launch operations blocker",
+    stage: item.stage || null,
+    priority: item.priority || "primary",
+    actionKey: item.actionKey || null,
+    operation: item.operation || null,
+    downloadKey: item.downloadKey || null,
+    productCode: item.productCode || null,
+    channel: item.channel || "stable",
+    handoffFileName: item.handoffFileName || null
+  }));
+  const nextAction = primaryWorkspaceAction
+    ? {
+        key: primaryWorkspaceAction.key || null,
+        label: primaryWorkspaceAction.label || null,
+        href: primaryWorkspaceAction.href || null,
+        autofocus: primaryWorkspaceAction.autofocus || null,
+        operation: primaryWorkspaceAction.params?.operation || launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || null,
+        actionKey: primaryWorkspaceAction.params?.actionKey || launchReceiptNextFollowUp?.actionKey || null,
+        downloadKey: primaryWorkspaceAction.params?.downloadKey || launchReceiptNextFollowUp?.downloadKey || null
+      }
+    : null;
+  const canEnterInitialLaunch = status === "ready" && blockers.length === 0;
+  return {
+    name: "initial_launch_ops",
+    status,
+    decision: canEnterInitialLaunch ? "go" : "hold",
+    severity: blockers.length ? "blocker" : warnings.length ? "warning" : "clear",
+    canEnterInitialLaunch,
+    blockerCount: blockers.length,
+    warningCount: warnings.length,
+    requiredActionCount: requiredActions.length,
+    blockers,
+    warnings,
+    requiredActions,
+    nextAction,
+    primaryDownload,
+    firstLaunchHandoffDownload,
+    latestReceiptOperation: latestReceipt?.operation || null,
+    latestReceiptHandoffFileName: latestReceipt?.handoffFileName || null
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   scope = {},
   overview = {},
@@ -15824,6 +15916,15 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   if (!nextSteps.length) {
     nextSteps.push("Continue monitoring the Developer Ops snapshot and Launch Mainline after the next launch action.");
   }
+  const gate = buildDeveloperOpsInitialLaunchOpsGate({
+    status,
+    latestReceipt,
+    followUps,
+    launchReceiptNextFollowUp,
+    primaryWorkspaceAction,
+    primaryDownload,
+    firstLaunchHandoffDownload
+  });
   return {
     status,
     headline: !latestReceipt
@@ -15869,6 +15970,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryWorkspaceAction,
     primaryDownload,
     firstLaunchHandoffDownload,
+    gate,
     nextSteps
   };
 }
@@ -17613,9 +17715,14 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   ];
 
   if (initialLaunchOpsReadiness) {
+    const gate = initialLaunchOpsReadiness.gate || {};
     lines.push("");
     lines.push("Initial Launch Ops Readiness:");
     lines.push(`- status: ${String(initialLaunchOpsReadiness.status || "unknown").toUpperCase()}`);
+    lines.push(`- gate: ${String(gate.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${gate.canEnterInitialLaunch === true})`);
+    lines.push(`- blockers: ${gate.blockerCount ?? (Array.isArray(gate.blockers) ? gate.blockers.length : 0)}`);
+    lines.push(`- warnings: ${gate.warningCount ?? (Array.isArray(gate.warnings) ? gate.warnings.length : 0)}`);
+    lines.push(`- requiredActions: ${gate.requiredActionCount ?? (Array.isArray(gate.requiredActions) ? gate.requiredActions.length : 0)}`);
     lines.push(`- headline: ${initialLaunchOpsReadiness.headline || "-"}`);
     lines.push(`- summary: ${initialLaunchOpsReadiness.summary || "-"}`);
     lines.push(`- followUps: ${initialLaunchOpsReadiness.followUpCount ?? 0}`);
@@ -17804,11 +17911,18 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
     mainlineHandoff: payload.mainlineHandoff || null
   });
+  const gate = readiness.gate || {};
   const lines = [
     "RockSolid Developer Ops Initial Launch Readiness",
     `Generated At: ${payload.generatedAt || ""}`,
     `Project Filter: ${scope.productCode || "-"}`,
     `Status: ${String(readiness.status || "unknown").toUpperCase()}`,
+    `Gate Decision: ${String(gate.decision || "unknown").toUpperCase()}`,
+    `Can Enter Initial Launch: ${gate.canEnterInitialLaunch === true ? "yes" : "no"}`,
+    `Gate Severity: ${String(gate.severity || "unknown").toUpperCase()}`,
+    `Gate Blockers: ${gate.blockerCount ?? (Array.isArray(gate.blockers) ? gate.blockers.length : 0)}`,
+    `Gate Warnings: ${gate.warningCount ?? (Array.isArray(gate.warnings) ? gate.warnings.length : 0)}`,
+    `Required Action Count: ${gate.requiredActionCount ?? (Array.isArray(gate.requiredActions) ? gate.requiredActions.length : 0)}`,
     `Headline: ${readiness.headline || "-"}`,
     `Summary: ${readiness.summary || "-"}`,
     `Follow-up Count: ${readiness.followUpCount ?? 0}`,
@@ -17820,6 +17934,36 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     `First Launch Handoff: ${readiness.firstLaunchHandoffDownload?.fileName || "-"} | href=${readiness.firstLaunchHandoffDownload?.href || "-"}`,
     ""
   ];
+  lines.push("Blockers:");
+  const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];
+  if (blockers.length) {
+    for (const item of blockers) {
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Required Actions:");
+  const requiredActions = Array.isArray(gate.requiredActions) ? gate.requiredActions : [];
+  if (requiredActions.length) {
+    for (const item of requiredActions) {
+      lines.push(`- ${item.label || item.key || "-"} | stage=${item.stage || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Warnings:");
+  const warnings = Array.isArray(gate.warnings) ? gate.warnings : [];
+  if (warnings.length) {
+    for (const item of warnings) {
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
   lines.push("Next Steps:");
   const nextSteps = Array.isArray(readiness.nextSteps) ? readiness.nextSteps : [];
   if (nextSteps.length) {

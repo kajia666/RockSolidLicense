@@ -15161,6 +15161,21 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
   return followUps.slice(0, Math.max(1, Number(limit || 6)));
 }
 
+function buildLaunchReceiptFollowUpPrioritySummary(items = []) {
+  const summary = { primary: 0, review: 0, secondary: 0, other: 0, total: 0 };
+  for (const item of Array.isArray(items) ? items : []) {
+    const priority = String(item?.priority || "secondary").trim().toLowerCase();
+    const bucket = ["primary", "review", "secondary"].includes(priority) ? priority : "other";
+    summary[bucket] += 1;
+    summary.total += 1;
+  }
+  return summary;
+}
+
+function formatLaunchReceiptFollowUpPrioritySummary(summary = {}) {
+  return `primary=${summary.primary ?? 0} | review=${summary.review ?? 0} | secondary=${summary.secondary ?? 0} | other=${summary.other ?? 0}`;
+}
+
 function buildSnapshotTopCounts(items = [], selector, limit = 5) {
   const counts = new Map();
   for (const item of items) {
@@ -16816,6 +16831,7 @@ function appendSnapshotEscalationSummaryLines(lines = [], overview = {}) {
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
+  const launchReceiptFollowUpPriorities = summary.launchReceiptFollowUpPriorities || {};
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
   const lines = [
@@ -16841,7 +16857,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Bindings: ${summary.bindings ?? 0}`,
     `Blocks: ${summary.blocks ?? 0}`,
     `Audit Logs: ${summary.auditLogs ?? 0}`,
-    `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`
+    `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`,
+    `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUpPriorities)}`
   ];
 
   if (overview && typeof overview === "object" && Object.keys(overview).length) {
@@ -17016,6 +17033,10 @@ function buildDeveloperOpsSnapshotPayload({
     blocks: normalizedBlocks,
     auditLogs: normalizedAuditLogs
   });
+  const launchReceiptFollowUps = Array.isArray(overview.launchReceiptFollowUps)
+    ? overview.launchReceiptFollowUps
+    : [];
+  const launchReceiptFollowUpPriorities = buildLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUps);
 
   const payload = {
     generatedAt,
@@ -17032,9 +17053,8 @@ function buildDeveloperOpsSnapshotPayload({
       bindings: normalizedBindings.length,
       blocks: normalizedBlocks.length,
       auditLogs: normalizedAuditLogs.length,
-      launchReceiptFollowUps: Array.isArray(overview.launchReceiptFollowUps)
-        ? overview.launchReceiptFollowUps.length
-        : 0
+      launchReceiptFollowUps: launchReceiptFollowUps.length,
+      launchReceiptFollowUpPriorities
     },
     overview,
     mainlineHandoff: routeReview.mainlineHandoff,

@@ -12710,8 +12710,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptLifecycleFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.match(launchReceiptLifecycleFollowUp.summary, /Post-launch lifecycle status/i);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptFollowUps, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
+    const expectedLaunchReceiptPrioritySummary = launchReceiptSnapshot.overview.launchReceiptFollowUps.reduce((counts, item) => {
+      const priority = ["primary", "review", "secondary"].includes(item.priority) ? item.priority : "other";
+      counts[priority] += 1;
+      counts.total += 1;
+      return counts;
+    }, { primary: 0, review: 0, secondary: 0, other: 0, total: 0 });
+    assert.deepEqual(launchReceiptSnapshot.summary.launchReceiptFollowUpPriorities, expectedLaunchReceiptPrioritySummary);
     assert.match(launchReceiptSnapshot.summaryText, /Latest Launch Receipts:/);
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Follow-up Count: 2/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      new RegExp(
+        `Receipt Follow-up Priorities: primary=${expectedLaunchReceiptPrioritySummary.primary} \\| review=${expectedLaunchReceiptPrioritySummary.review} \\| secondary=${expectedLaunchReceiptPrioritySummary.secondary} \\| other=${expectedLaunchReceiptPrioritySummary.other}`
+      )
+    );
     assert.match(launchReceiptSnapshot.summaryText, /record_post_launch_ops_sweep/i);
     assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
@@ -16256,6 +16269,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /launch-receipt-follow-ups/);
     assert.match(html, /Download Zip/);
     assert.match(html, /Receipt Follow-up Count/);
+    assert.match(html, /Receipt Follow-up Priorities/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
     assert.match(html, /Escalate First/);

@@ -4128,6 +4128,24 @@
         const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
         const latestLaunchReceipts = Array.isArray(overview.latestLaunchReceipts) ? overview.latestLaunchReceipts : [];
         const launchReceiptFollowUps = Array.isArray(overview.launchReceiptFollowUps) ? overview.launchReceiptFollowUps : [];
+        const launchReceiptFollowUpPriorities = payload.summary?.launchReceiptFollowUpPriorities || {};
+        const normalizeLaunchReceiptPriority = (priority) => {
+          const value = String(priority || "secondary").toLowerCase();
+          return ["primary", "review", "secondary"].includes(value) ? value : "other";
+        };
+        const resolveLaunchReceiptPriorityCount = (priority) => {
+          const summaryValue = Number(launchReceiptFollowUpPriorities[priority]);
+          if (Number.isFinite(summaryValue)) {
+            return summaryValue;
+          }
+          return launchReceiptFollowUps.filter((item) => normalizeLaunchReceiptPriority(item?.priority) === priority).length;
+        };
+        const launchReceiptPriorityText = [
+          `primary=${resolveLaunchReceiptPriorityCount("primary")}`,
+          `review=${resolveLaunchReceiptPriorityCount("review")}`,
+          `secondary=${resolveLaunchReceiptPriorityCount("secondary")}`,
+          `other=${resolveLaunchReceiptPriorityCount("other")}`
+        ].join(" / ");
         overviewFocusMap = new Map();
         const statusText = overview.status === "attention"
           ? "Needs attention"
@@ -4146,6 +4164,10 @@
           {
             label: "Receipt Follow-up Count",
             value: payload.summary?.launchReceiptFollowUps ?? launchReceiptFollowUps.length
+          },
+          {
+            label: "Receipt Follow-up Priorities",
+            value: launchReceiptPriorityText
           },
           { label: "Latest Audit", value: formatTime(overview.latestAuditAt || payload.generatedAt) }
         ];

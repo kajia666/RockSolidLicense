@@ -12729,6 +12729,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSummaryDownload.body, /Latest Launch Receipts:/);
     assert.match(launchReceiptSummaryDownload.body, /record_post_launch_ops_sweep/i);
 
+    const launchReceiptFollowUpsCsvDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=launch-receipt-follow-ups",
+      operatorSession.token
+    );
+    assert.equal(launchReceiptFollowUpsCsvDownload.contentType, "text/csv; charset=utf-8");
+    assert.match(launchReceiptFollowUpsCsvDownload.contentDisposition || "", /developer-ops-launch-receipt-follow-ups\.csv/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /"stage","priority","title"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /record_launch_rehearsal_run/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_mainline_operations_handoff/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -16238,6 +16249,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/audit-logs/);
     assert.match(html, /api\/developer\/ops\/export/);
     assert.match(html, /Download Summary/);
+    assert.match(html, /Download Follow-up CSV/);
+    assert.match(html, /download-export-follow-ups-btn/);
+    assert.match(html, /launch-receipt-follow-ups/);
     assert.match(html, /Download Zip/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);

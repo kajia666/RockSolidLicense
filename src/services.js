@@ -17721,7 +17721,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining"],
+    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-follow-ups"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -17748,6 +17748,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-ops-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+
+  if (normalizedFormat === "launch-receipt-follow-ups") {
+    return {
+      fileName: "developer-ops-launch-receipt-follow-ups.csv",
+      contentType: "text/csv; charset=utf-8",
+      body: payload.csv?.launchReceiptFollowUps || buildDeveloperOpsLaunchReceiptFollowUpsCsv(payload.overview?.launchReceiptFollowUps || [])
     };
   }
 

@@ -139,6 +139,7 @@
             <button class="secondary" id="preview-export-btn">Preview Snapshot</button>
             <button class="secondary" id="download-export-json-btn">Download JSON</button>
             <button class="secondary" id="download-export-summary-btn">Download Summary</button>
+            <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
           </div>
@@ -4762,6 +4763,7 @@
       el("preview-export-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Scoped ops snapshot refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-json-btn").addEventListener("click", async () => { try { await handleExportDownload("json", "developer-ops.json", "Ops snapshot JSON"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("save-account-btn").addEventListener("click", async () => { try { await act(`/api/developer/accounts/${encodeURIComponent(el("account-id").value.trim())}/status`, { status: el("account-status").value }, "Account status updated."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

@@ -15245,6 +15245,27 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  return createLaunchWorkflowWorkspaceShortcut(
+    "launch-mainline",
+    "summary",
+    "Open Launch Mainline",
+    {
+      productCode: item.productCode || "",
+      channel: item.channel || "stable",
+      reviewMode: "matched",
+      operation: item.operationToRecord || item.operation || "",
+      actionKey: item.actionKey || "",
+      downloadKey: item.downloadKey || "",
+      routeTitle: item.title || "Launch receipt follow-up",
+      routeReason: item.summary || "Continue the next launch receipt follow-up."
+    }
+  );
+}
+
 function buildDeveloperOpsLaunchReceiptNextFollowUpAction(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -15262,6 +15283,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpAction(item = null) {
     operation: item.operationToRecord || item.operation || null,
     actionKey: item.actionKey || null,
     downloadKey: item.downloadKey || null,
+    workspaceAction: buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item),
     productCode: item.productCode || null,
     channel: item.channel || null,
     summary: item.summary || ""
@@ -16926,6 +16948,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const launchReceiptFollowUpPriorities = summary.launchReceiptFollowUpPriorities || {};
   const launchReceiptNextFollowUp = summary.launchReceiptNextFollowUp || null;
   const launchReceiptNextFollowUpAction = launchReceiptNextFollowUp?.recommendedAction || null;
+  const launchReceiptNextFollowUpWorkspace = launchReceiptNextFollowUpAction?.workspaceAction || null;
   const launchReceiptNextFollowUpDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
@@ -16956,6 +16979,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUpPriorities)}`,
     `Receipt Next Follow-up: ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`,
     `Receipt Next Follow-up Action: ${launchReceiptNextFollowUpAction?.key || "-"} (${launchReceiptNextFollowUpAction?.operation || "-"})`,
+    `Receipt Next Follow-up Workspace: ${launchReceiptNextFollowUpWorkspace?.label || "-"}@${launchReceiptNextFollowUpWorkspace?.autofocus || "-"}`,
     `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"})`
   ];
 
@@ -17075,6 +17099,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
     || buildLaunchReceiptNextFollowUp(overview.launchReceiptFollowUps || []);
   const recommendedAction = item?.recommendedAction
     || buildDeveloperOpsLaunchReceiptNextFollowUpAction(item);
+  const recommendedWorkspace = recommendedAction?.workspaceAction || null;
   const recommendedDownload = item?.recommendedDownload
     || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope);
   const lines = [
@@ -17107,6 +17132,9 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Recommended Action: ${recommendedAction?.key || "-"}`);
   lines.push(`Action Operation: ${recommendedAction?.operation || "-"}`);
   lines.push(`Action Source: ${recommendedAction?.source || "-"}`);
+  lines.push(`Workspace Action: ${recommendedWorkspace?.label || "-"}`);
+  lines.push(`Workspace Autofocus: ${recommendedWorkspace?.autofocus || "-"}`);
+  lines.push(`Workspace Href: ${recommendedWorkspace?.href || "-"}`);
   lines.push(`Download File: ${recommendedDownload?.fileName || "-"}`);
   lines.push(`Download Format: ${recommendedDownload?.format || "-"}`);
   lines.push(`Download Href: ${recommendedDownload?.href || "-"}`);

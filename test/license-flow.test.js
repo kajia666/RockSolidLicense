@@ -12727,6 +12727,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.downloadKey, launchReceiptSnapshot.summary.launchReceiptNextFollowUp.downloadKey);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.source, "developer-ops-launch-receipt");
+    assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.key, "launch-mainline");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.autofocus, "summary");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.productCode, "EXPORT_ALPHA");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.channel, "stable");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /\/developer\/launch-mainline\?/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /productCode=EXPORT_ALPHA/);
+    assert.match(
+      launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href,
+      new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
+    );
     assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.key, "ops_launch_receipt_next_follow_up");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.format, "launch-receipt-next-follow-up");
@@ -12746,6 +12758,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReceiptSnapshot.summaryText,
       new RegExp(`Receipt Next Follow-up Action: ${latestLaunchReceipt.productionEvidenceNextActionKey} \\(${latestLaunchReceipt.productionEvidenceNextOperation}\\)`)
     );
+    assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up Workspace: Open Launch Mainline@summary/);
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up Download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\)/);
     assert.match(launchReceiptSnapshot.summaryText, /record_post_launch_ops_sweep/i);
     assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
@@ -12793,6 +12806,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Recommended Action: ${latestLaunchReceipt.productionEvidenceNextActionKey}`));
     assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Action Operation: ${latestLaunchReceipt.productionEvidenceNextOperation}`));
     assert.match(launchReceiptNextFollowUpDownload.body, /Action Source: developer-ops-launch-receipt/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Workspace Action: Open Launch Mainline/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Workspace Href: .*\/developer\/launch-mainline\?/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Workspace Href: .*productCode=EXPORT_ALPHA/);
+    assert.match(
+      launchReceiptNextFollowUpDownload.body,
+      new RegExp(`Workspace Href: .*operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
+    );
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Format: launch-receipt-next-follow-up/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Href: .*format=launch-receipt-next-follow-up/);
 
@@ -16318,6 +16338,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Receipt Follow-up Priorities/);
     assert.match(html, /Receipt Next Follow-up/);
     assert.match(html, /Receipt Next Follow-up Action/);
+    assert.match(html, /Receipt Next Follow-up Workspace/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
     assert.match(html, /Escalate First/);

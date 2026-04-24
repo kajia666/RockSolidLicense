@@ -469,7 +469,7 @@
         );
       }
       function renderQuickstartReceiptRecap(result = null) {
-        const receipt = result?.receipt || result?.result?.receipt || null;
+        const receipt = currentQuickstartReceipt(result);
         if (!receipt || typeof receipt !== "object") {
           return "";
         }
@@ -496,10 +496,24 @@
             <strong>Launch Mainline Receipt Recap</strong>
             ${tags ? `<div class="audit-meta" style="margin-top: 8px;">${tags}</div>` : ""}
             <div style="margin-top: 8px;">${esc(receipt.summary || receipt.followUpSummary || "Launch mainline receipt refreshed.")}</div>
+            ${receipt.handoffText ? `<div class="actions" style="margin-top: 8px;"><button type="button" class="secondary" data-smoke-receipt-handoff="1">Download Receipt Handoff</button></div>` : ""}
             ${cards.length ? `<div style="margin-top: 8px;">${cards.map((card) => `${esc(card.title || card.key || "Receipt card")}: ${esc(card.summary || "-")}`).join("<br>")}</div>` : ""}
             ${skipped.length ? `<div style="margin-top: 8px;">Skipped: ${esc(skipped.map((item) => item?.reason || item?.summary || item?.label || item?.key || "-").join(" | "))}</div>` : ""}
           </div>
         `;
+      }
+      function currentQuickstartReceipt(result = null) {
+        const source = result || currentLastSmokeActionResult();
+        return source?.receipt || source?.result?.receipt || null;
+      }
+      function downloadQuickstartReceiptHandoff(result = null) {
+        const receipt = currentQuickstartReceipt(result);
+        if (!receipt?.handoffText) {
+          throw new Error("Run a launch quickstart action before downloading the receipt handoff.");
+        }
+        const fileName = receipt.handoffFileName || "launch-mainline-receipt-handoff.txt";
+        downloadBlob(fileName, new Blob([receipt.handoffText], { type: "text/plain;charset=utf-8" }));
+        return { fileName };
       }
       function renderLastSmokeFollowUp(result = null) {
         const followUp = result?.followUp;
@@ -1406,6 +1420,18 @@
             });
           } catch (error) {
             setStatus(error.message, true);
+          }
+          return;
+        }
+        const receiptHandoffButton = event.target.closest("[data-smoke-receipt-handoff]");
+        if (receiptHandoffButton) {
+          try {
+            const result = downloadQuickstartReceiptHandoff(currentLastSmokeActionResult());
+            setStatus(`Receipt handoff downloaded: ${result.fileName}`);
+            setOutput({ quickstartReceiptHandoff: result });
+          } catch (error) {
+            setStatus(error.message, true);
+            setOutput({ code: "RECEIPT_HANDOFF_UNAVAILABLE", message: error.message });
           }
           return;
         }

@@ -15114,6 +15114,9 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /currentLastLaunchFollowUp/);
     assert.match(html, /Launch Mainline Receipt Recap/);
     assert.match(html, /renderQuickstartReceiptRecap/);
+    assert.match(html, /Download Receipt Handoff/);
+    assert.match(html, /downloadQuickstartReceiptHandoff/);
+    assert.match(html, /data-last-launch-receipt-handoff/);
     assert.match(html, /renderLastLaunchFollowUp/);
     assert.match(html, /launch-action-followup-box/);
     assert.match(html, /data-last-launch-workspace-index/);
@@ -15243,6 +15246,9 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /renderLastReviewFollowUp/);
       assert.match(html, /Launch Mainline Receipt Recap/);
       assert.match(html, /renderQuickstartReceiptRecap/);
+      assert.match(html, /Download Receipt Handoff/);
+      assert.match(html, /downloadQuickstartReceiptHandoff/);
+      assert.match(html, /data-review-receipt-handoff/);
       assert.match(html, /currentPrimaryReviewTarget/);
       assert.match(html, /currentReviewTargets/);
       assert.match(html, /runLaunchReviewBootstrap/);
@@ -15299,6 +15305,9 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /renderLastSmokeFollowUp/);
     assert.match(html, /Launch Mainline Receipt Recap/);
     assert.match(html, /renderQuickstartReceiptRecap/);
+    assert.match(html, /Download Receipt Handoff/);
+    assert.match(html, /downloadQuickstartReceiptHandoff/);
+    assert.match(html, /data-smoke-receipt-handoff/);
     assert.match(html, /currentSmokeSummary/);
     assert.match(html, /currentActionPlan/);
     assert.match(html, /currentPrimarySmokeReviewTarget/);
@@ -15817,6 +15826,9 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /renderProjectLastLaunchFollowUp/);
     assert.match(html, /Launch Mainline Receipt Recap/);
     assert.match(html, /renderQuickstartReceiptRecap/);
+    assert.match(html, /Download Receipt Handoff/);
+    assert.match(html, /downloadQuickstartReceiptHandoff/);
+    assert.match(html, /data-launch-receipt-handoff/);
     assert.match(html, /detail-last-launch-action/);
     assert.match(html, /data-launch-last-action-workspace-index/);
     assert.match(html, /data-launch-last-action-download-index/);

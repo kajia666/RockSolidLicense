@@ -12722,6 +12722,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.priority, "review");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.actionKey, latestLaunchReceipt.productionEvidenceNextActionKey);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.key, "ops_launch_receipt_next_follow_up");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.format, "launch-receipt-next-follow-up");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.fileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /format=launch-receipt-next-follow-up/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /productCode=EXPORT_ALPHA/);
     assert.match(launchReceiptSnapshot.summaryText, /Latest Launch Receipts:/);
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Follow-up Count: 2/);
     assert.match(
@@ -12731,6 +12737,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       )
     );
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up: \[REVIEW\]\[production_evidence\]/);
+    assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up Download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\)/);
     assert.match(launchReceiptSnapshot.summaryText, /record_post_launch_ops_sweep/i);
     assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
@@ -12774,6 +12781,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Action Key: ${latestLaunchReceipt.productionEvidenceNextActionKey}`));
     assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Operation To Record: ${latestLaunchReceipt.productionEvidenceNextOperation}`));
     assert.match(launchReceiptNextFollowUpDownload.body, /Handoff File:/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Download Format: launch-receipt-next-follow-up/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Download Href: .*format=launch-receipt-next-follow-up/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

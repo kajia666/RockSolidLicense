@@ -15232,6 +15232,19 @@ function formatLaunchReceiptNextFollowUp(item = null) {
   ].join(" | ");
 }
 
+function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_launch_receipt_next_follow_up",
+    "developer-ops-launch-receipt-next-follow-up.txt",
+    "Launch receipt next follow-up",
+    {
+      source: "developer-ops",
+      format: "launch-receipt-next-follow-up",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildSnapshotTopCounts(items = [], selector, limit = 5) {
   const counts = new Map();
   for (const item of items) {
@@ -16889,6 +16902,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const summary = payload.summary || {};
   const launchReceiptFollowUpPriorities = summary.launchReceiptFollowUpPriorities || {};
   const launchReceiptNextFollowUp = summary.launchReceiptNextFollowUp || null;
+  const launchReceiptNextFollowUpDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
   const lines = [
@@ -16916,7 +16930,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Audit Logs: ${summary.auditLogs ?? 0}`,
     `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`,
     `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUpPriorities)}`,
-    `Receipt Next Follow-up: ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`
+    `Receipt Next Follow-up: ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`,
+    `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"})`
   ];
 
   if (overview && typeof overview === "object" && Object.keys(overview).length) {
@@ -17033,6 +17048,8 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   const overview = payload.overview || {};
   const item = summary.launchReceiptNextFollowUp
     || buildLaunchReceiptNextFollowUp(overview.launchReceiptFollowUps || []);
+  const recommendedDownload = item?.recommendedDownload
+    || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope);
   const lines = [
     "RockSolid Developer Ops Launch Receipt Next Follow-up",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -17060,6 +17077,9 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Handoff File: ${item.handoffFileName || "-"}`);
   lines.push(`Mainline Gate: ${item.mainlineGateStatus || "-"}`);
   lines.push(`Created At: ${item.createdAt || "-"}`);
+  lines.push(`Download File: ${recommendedDownload?.fileName || "-"}`);
+  lines.push(`Download Format: ${recommendedDownload?.format || "-"}`);
+  lines.push(`Download Href: ${recommendedDownload?.href || "-"}`);
   lines.push("");
   lines.push("Operator Hand-off:");
   lines.push(`- Next: ${formatLaunchReceiptNextFollowUp(item)}`);
@@ -17135,7 +17155,13 @@ function buildDeveloperOpsSnapshotPayload({
     ? overview.launchReceiptFollowUps
     : [];
   const launchReceiptFollowUpPriorities = buildLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUps);
-  const launchReceiptNextFollowUp = buildLaunchReceiptNextFollowUp(launchReceiptFollowUps);
+  const launchReceiptNextFollowUpBase = buildLaunchReceiptNextFollowUp(launchReceiptFollowUps);
+  const launchReceiptNextFollowUp = launchReceiptNextFollowUpBase
+    ? {
+        ...launchReceiptNextFollowUpBase,
+        recommendedDownload: buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope)
+      }
+    : null;
 
   const payload = {
     generatedAt,

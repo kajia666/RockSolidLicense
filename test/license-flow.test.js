@@ -12714,6 +12714,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.summaryText, /download=launch_mainline_operations_handoff/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"stage","priority","title"/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /record_launch_rehearsal_run/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch_mainline_operations_handoff/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launchReceiptOperation/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /record_post_launch_ops_sweep/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /rocksolid-launch-mainline-receipt-EXPORT_ALPHA-stable-record_post_launch_ops_sweep/i);
@@ -12792,6 +12795,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(checksumsDownload.contentType, "text/plain; charset=utf-8");
     assert.match(checksumsDownload.body, /csv\/projects\.csv/);
     assert.match(checksumsDownload.body, /csv\/audit-logs\.csv/);
+    assert.match(checksumsDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
 
     const zipDownload = await getBinary(
       baseUrl,
@@ -12803,6 +12807,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     const zipText = zipDownload.body.toString("latin1");
     assert.match(zipText, /csv\/projects\.csv/);
     assert.match(zipText, /csv\/accounts\.csv/);
+    assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(zipText, /csv\/audit-logs\.csv/);
     assert.match(zipText, /SHA256SUMS\.txt/);
   } finally {

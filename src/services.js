@@ -14971,6 +14971,45 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
   );
 }
 
+function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
+  return buildCsvDocument(
+    [
+      "stage",
+      "priority",
+      "title",
+      "productCode",
+      "channel",
+      "operation",
+      "operationToRecord",
+      "actionKey",
+      "downloadKey",
+      "handoffFileName",
+      "mainlineGateStatus",
+      "evidenceRemainingCount",
+      "postLaunchLifecycleStatus",
+      "summary",
+      "createdAt"
+    ],
+    (Array.isArray(items) ? items : []).map((item) => [
+      item.stage,
+      item.priority,
+      item.title,
+      item.productCode,
+      item.channel,
+      item.operation,
+      item.operationToRecord,
+      item.actionKey,
+      item.downloadKey,
+      item.handoffFileName,
+      item.mainlineGateStatus,
+      item.evidenceRemainingCount,
+      item.postLaunchLifecycleStatus,
+      item.summary,
+      item.createdAt
+    ])
+  );
+}
+
 function normalizeSnapshotStatus(value) {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -16966,6 +17005,16 @@ function buildDeveloperOpsSnapshotPayload({
     routeReview.continuation = routeReview.continuations[primaryContinuationKey];
   }
   routeReview.actions = buildDeveloperOpsRouteReviewActions(routeReview);
+  const overview = buildSnapshotOverview({
+    generatedAt,
+    projects: normalizedProjects,
+    accounts: normalizedAccounts,
+    entitlements: normalizedEntitlements,
+    sessions: normalizedSessions,
+    bindings: normalizedBindings,
+    blocks: normalizedBlocks,
+    auditLogs: normalizedAuditLogs
+  });
 
   const payload = {
     generatedAt,
@@ -16983,16 +17032,7 @@ function buildDeveloperOpsSnapshotPayload({
       blocks: normalizedBlocks.length,
       auditLogs: normalizedAuditLogs.length
     },
-    overview: buildSnapshotOverview({
-      generatedAt,
-      projects: normalizedProjects,
-      accounts: normalizedAccounts,
-      entitlements: normalizedEntitlements,
-      sessions: normalizedSessions,
-      bindings: normalizedBindings,
-      blocks: normalizedBlocks,
-      auditLogs: normalizedAuditLogs
-    }),
+    overview,
     mainlineHandoff: routeReview.mainlineHandoff,
     routeReview,
     projects: normalizedProjects,
@@ -17033,7 +17073,8 @@ function buildDeveloperOpsSnapshotPayload({
       sessions: buildDeveloperOpsSessionsCsv(normalizedSessions),
       bindings: buildDeveloperOpsBindingsCsv(normalizedBindings),
       blocks: buildDeveloperOpsBlocksCsv(normalizedBlocks),
-      auditLogs: buildDeveloperOpsAuditLogsCsv(normalizedAuditLogs)
+      auditLogs: buildDeveloperOpsAuditLogsCsv(normalizedAuditLogs),
+      launchReceiptFollowUps: buildDeveloperOpsLaunchReceiptFollowUpsCsv(overview.launchReceiptFollowUps)
     },
     notes: [
       "This export is scoped to the current developer actor and their assigned projects.",
@@ -17083,6 +17124,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "csv/audit-logs.csv",
       body: payload.csv?.auditLogs || ""
+    },
+    {
+      path: "csv/launch-receipt-follow-ups.csv",
+      body: payload.csv?.launchReceiptFollowUps || ""
     }
   ];
 }

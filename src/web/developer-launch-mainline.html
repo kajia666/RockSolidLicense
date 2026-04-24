@@ -338,6 +338,9 @@
       const requestedEntityType = (routeParams.get("entityType") || "").trim();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedOperation = (routeParams.get("operation") || "").trim();
+      const requestedActionKey = (routeParams.get("actionKey") || "").trim();
+      const requestedDownloadKey = (routeParams.get("downloadKey") || "").trim();
 
       function el(id) {
         return document.getElementById(id);
@@ -440,8 +443,56 @@
         };
       }
 
-      function fallbackMainlineRouteFocus() {
+      function buildRoutedMainlineOperationTags() {
+        return [
+          requestedOperation ? { label: "operation", value: requestedOperation, strong: true } : null,
+          requestedActionKey ? { label: "action", value: requestedActionKey, strong: false } : null,
+          requestedDownloadKey ? { label: "download", value: requestedDownloadKey, strong: false } : null
+        ].filter(Boolean);
+      }
+
+      function buildRoutedMainlineOperationControl() {
+        if (!requestedOperation) {
+          return null;
+        }
         return {
+          kind: "setup",
+          label: "Run Routed Operation",
+          setupAction: {
+            key: requestedActionKey || `routed_${requestedOperation}`,
+            label: requestedRouteTitle || "Run Routed Operation",
+            summary: requestedRouteReason || "Run the operation routed into Launch Mainline.",
+            mode: "evidence",
+            operation: requestedOperation
+          }
+        };
+      }
+
+      function extendRoutedMainlineRouteFocus(routeFocus = null) {
+        const base = routeFocus && typeof routeFocus === "object" ? routeFocus : {};
+        const tags = Array.isArray(base.tags) ? [...base.tags] : [];
+        const existingTagKeys = new Set(tags.map((tag) => String(tag?.label || "").trim().toLowerCase()).filter(Boolean));
+        for (const tag of buildRoutedMainlineOperationTags()) {
+          const key = String(tag.label || "").trim().toLowerCase();
+          if (key && !existingTagKeys.has(key)) {
+            existingTagKeys.add(key);
+            tags.push(tag);
+          }
+        }
+        const controls = Array.isArray(base.controls) ? [...base.controls] : [];
+        const routedControl = buildRoutedMainlineOperationControl();
+        if (routedControl && !controls.some((item) => item?.label === routedControl.label || item?.setupAction?.operation === requestedOperation)) {
+          controls.unshift(routedControl);
+        }
+        return {
+          ...base,
+          tags,
+          controls
+        };
+      }
+
+      function fallbackMainlineRouteFocus() {
+        return extendRoutedMainlineRouteFocus({
           title: requestedRouteTitle || "Launch mainline handoff",
           summary: requestedRouteReason || "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops.",
           tags: requestedProductCode
@@ -452,7 +503,7 @@
               ]
             : [],
           controls: []
-        };
+        });
       }
 
       function fallbackMainlineForm() {
@@ -575,9 +626,10 @@
 
       function currentMainlineRouteFocus() {
         const page = currentMainlinePage();
-        return page.routeFocus && typeof page.routeFocus === "object"
+        const routeFocus = page.routeFocus && typeof page.routeFocus === "object"
           ? page.routeFocus
           : fallbackMainlineRouteFocus();
+        return extendRoutedMainlineRouteFocus(routeFocus);
       }
 
       function currentMainlineSections() {

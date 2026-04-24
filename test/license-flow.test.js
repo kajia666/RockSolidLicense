@@ -15406,6 +15406,11 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /currentMainlineForm/);
     assert.match(html, /applyMainlineForm/);
     assert.match(html, /currentMainlineRouteFocus/);
+    assert.match(html, /requestedOperation/);
+    assert.match(html, /requestedActionKey/);
+    assert.match(html, /requestedDownloadKey/);
+    assert.match(html, /buildRoutedMainlineOperationControl/);
+    assert.match(html, /Run Routed Operation/);
     assert.match(html, /mainlineHeroControls/);
     assert.match(html, /currentMainlineSections/);
     assert.match(html, /mainlineScreen/);

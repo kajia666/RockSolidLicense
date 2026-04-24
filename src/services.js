@@ -23333,6 +23333,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       if (operation === "bootstrap") {
         result = await this.developerBootstrapLicenseQuickstart(token, {
           productCode: selector.productCode
+        }, {
+          includeReceipt: false
         });
       } else if (operation === "first_batch_setup") {
         result = await this.developerCreateLicenseQuickstartFirstBatches(token, {
@@ -24784,7 +24786,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       };
     },
 
-    async developerBootstrapLicenseQuickstart(token, body = {}) {
+    async developerBootstrapLicenseQuickstart(token, body = {}, options = {}) {
       const session = requireDeveloperSession(db, token);
       requireField(body, "productCode");
 
@@ -24874,6 +24876,25 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         && !cardRechargeEnabled
         && before.activeEntitlements <= 0;
       const needsBootstrapAccount = needsStarterAccount || (needsStarterEntitlement && before.activeAccounts.length <= 0);
+      const buildBootstrapResponse = async (resultPayload) => {
+        if (options?.includeReceipt === false) {
+          return resultPayload;
+        }
+        const launchMainline = await this.developerLaunchMainlinePackage(token, {
+          productCode,
+          channel: body.channel || "stable",
+          reviewMode: body.reviewMode || "matched"
+        }, options);
+        return {
+          ...resultPayload,
+          receipt: buildLaunchMainlineActionReceipt({
+            operation: "bootstrap",
+            result: resultPayload,
+            followUp: resultPayload?.followUp || null,
+            launchMainline
+          })
+        };
+      };
 
       if (!needsPolicy && !needsCards && !needsBootstrapAccount && !needsStarterEntitlement) {
         const followUp = buildLaunchQuickstartFollowUpPlan({
@@ -24882,7 +24903,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchRecommendations: before.authorization?.launchRecommendations,
           operation: "bootstrap"
         });
-        return {
+        const resultPayload = {
           productCode,
           productName: product.name,
           modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
@@ -24909,6 +24930,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           followUp,
           message: `Launch quickstart is already staged for ${productCode}.`
         };
+        return buildBootstrapResponse(resultPayload);
       }
 
       const created = {};
@@ -25124,7 +25146,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         created.entitlement ? `entitlement:${created.entitlement.username}` : null
       ].filter(Boolean);
 
-      return {
+      const resultPayload = {
         productCode,
         productName: product.name,
         modeSummary: buildLaunchAuthorizationModeSummary(featureConfig),
@@ -25153,6 +25175,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           ? `Launch quickstart bootstrap created ${createdParts.join(", ")} for ${productCode}.`
           : `Launch quickstart bootstrap completed for ${productCode}.`
       };
+      return buildBootstrapResponse(resultPayload);
     },
 
     async developerCreateLicenseQuickstartFirstBatches(token, body = {}, options = {}) {

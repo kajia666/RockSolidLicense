@@ -8258,6 +8258,12 @@ test("developer license quickstart bootstrap can create starter launch assets in
         "launch_mainline_rehearsal_guide"
       );
       assert.match(bootstrap.followUp.summary, /Next:/);
+      assert.equal(bootstrap.receipt?.operation, "bootstrap");
+      assert.ok(/^launch_mainline_/.test(bootstrap.receipt?.mainlineRecommendedDownload?.key || ""));
+      assert.ok(bootstrap.receipt?.mainlineEvidenceQueue?.nextAction?.setupAction?.operation);
+      assert.ok(bootstrap.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
+      assert.ok(bootstrap.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
+      assert.ok(bootstrap.receipt?.mainlineRecapCards?.some((item) => item?.key === "post_launch_lifecycle_summary"));
 
     const policies = await getJson(
       baseUrl,
@@ -8483,6 +8489,10 @@ test("developer license quickstart bootstrap can seed an internal starter entitl
         bootstrap.followUp.actions.find((item) => item.key === "launch_recheck")?.recommendedDownload?.key,
         "launch_mainline_rehearsal_guide"
       );
+      assert.equal(bootstrap.receipt?.operation, "bootstrap");
+      assert.ok(bootstrap.receipt?.mainlineEvidenceQueue?.nextAction?.setupAction?.operation);
+      assert.ok(bootstrap.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
+      assert.ok(bootstrap.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
 
     const entitlements = await getJson(
       baseUrl,

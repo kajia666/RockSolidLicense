@@ -13546,6 +13546,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-first-launch-handoff\.txt.*format=first-launch-handoff/);
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-sha256\.txt.*format=checksums/);
 
+    const stabilizationHandoffDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=stabilization-handoff",
+      operatorSession.token
+    );
+    assert.equal(stabilizationHandoffDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(stabilizationHandoffDownload.contentDisposition || "", /developer-ops-stabilization-handoff\.txt/);
+    assert.match(stabilizationHandoffDownload.body, /RockSolid Developer Ops Stabilization Handoff/);
+    assert.match(stabilizationHandoffDownload.body, /Version: initial-launch-stabilization-handoff\/v1/);
+    assert.match(stabilizationHandoffDownload.body, /Latest Operator: record_post_launch_ops_sweep/);
+    assert.match(stabilizationHandoffDownload.body, new RegExp(`Next Action: ${latestLaunchReceipt.productionEvidenceNextOperation}`));
+    assert.match(stabilizationHandoffDownload.body, /Files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(stabilizationHandoffDownload.body, /Checklist:/);
+
     const handoffIndexDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=handoff-index",
@@ -13564,6 +13578,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /launch-mainline-first-launch-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /Included Files:/);
     assert.match(handoffIndexDownload.body, /initial-launch-ops-readiness\.txt/);
+    assert.match(handoffIndexDownload.body, /stabilization-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(handoffIndexDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
 
@@ -13825,6 +13840,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /handoff-index\.txt/);
     assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(checksumsDownload.body, /initial-launch-ops-readiness\.txt/);
+    assert.match(checksumsDownload.body, /stabilization-handoff\.txt/);
 
     const zipDownload = await getBinary(
       baseUrl,
@@ -13840,6 +13856,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /handoff-index\.txt/);
     assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
     assert.match(zipText, /initial-launch-ops-readiness\.txt/);
+    assert.match(zipText, /stabilization-handoff\.txt/);
     assert.match(zipText, /csv\/audit-logs\.csv/);
     assert.match(zipText, /SHA256SUMS\.txt/);
   } finally {
@@ -17317,8 +17334,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Download Follow-up CSV/);
     assert.match(html, /download-export-next-follow-up-btn/);
     assert.match(html, /download-export-initial-launch-readiness-btn/);
+    assert.match(html, /download-export-stabilization-handoff-btn/);
     assert.match(html, /download-export-follow-ups-btn/);
     assert.match(html, /initial-launch-ops-readiness/);
+    assert.match(html, /stabilization-handoff/);
     assert.match(html, /launch-receipt-next-follow-up/);
     assert.match(html, /launch-receipt-follow-ups/);
     assert.match(html, /Download Zip/);

@@ -141,6 +141,7 @@
             <button class="secondary" id="download-export-summary-btn">Download Summary</button>
             <button class="secondary" id="download-export-next-follow-up-btn">Download Next Follow-up</button>
             <button class="secondary" id="download-export-initial-launch-readiness-btn">Download Launch Readiness</button>
+            <button class="secondary" id="download-export-stabilization-handoff-btn">Download Stabilization Handoff</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
@@ -5373,6 +5374,7 @@
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-next-follow-up-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-next-follow-up", "developer-ops-launch-receipt-next-follow-up.txt", "Launch receipt next follow-up"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-initial-launch-readiness-btn").addEventListener("click", async () => { try { await handleExportDownload("initial-launch-ops-readiness", "developer-ops-initial-launch-readiness.txt", "Initial launch ops readiness"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-stabilization-handoff-btn").addEventListener("click", async () => { try { await handleExportDownload("stabilization-handoff", "developer-ops-stabilization-handoff.txt", "Stabilization handoff"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

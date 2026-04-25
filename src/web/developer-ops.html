@@ -1151,6 +1151,7 @@
         if (serverDescriptor?.fileName) {
           return {
             label: serverDescriptor.label || "Primary match summary",
+            format: serverDescriptor.format || "route-review-primary",
             fileName: serverDescriptor.fileName,
             params: serverDescriptor.params && typeof serverDescriptor.params === "object"
               ? { ...serverDescriptor.params }
@@ -1164,6 +1165,7 @@
         const item = primary.item || {};
         const descriptor = {
           label: "Primary match summary",
+          format: "route-review-primary",
           fileName: "developer-ops-primary-summary.txt",
           params: {
             ...baseFilters,
@@ -1228,6 +1230,7 @@
         if (serverDescriptor?.fileName) {
           return {
             label: serverDescriptor.label || "Next match summary",
+            format: serverDescriptor.format || "route-review-next",
             fileName: serverDescriptor.fileName,
             params: serverDescriptor.params && typeof serverDescriptor.params === "object"
               ? { ...serverDescriptor.params }
@@ -1241,6 +1244,7 @@
         const item = next.item || {};
         const descriptor = {
           label: "Next match summary",
+          format: "route-review-next",
           fileName: "developer-ops-next-summary.txt",
           params: {
             ...baseFilters,
@@ -1305,6 +1309,7 @@
         if (serverDescriptor?.fileName) {
           return {
             label: serverDescriptor.label || "Remaining routed review summary",
+            format: serverDescriptor.format || "route-review-remaining",
             fileName: serverDescriptor.fileName,
             params: serverDescriptor.params && typeof serverDescriptor.params === "object"
               ? { ...serverDescriptor.params }
@@ -1316,6 +1321,7 @@
         }
         return {
           label: "Remaining routed review summary",
+          format: "route-review-remaining",
           fileName: "developer-ops-remaining-summary.txt",
           params: {
             ...filters(),
@@ -2184,7 +2190,7 @@
           if (!descriptor) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No routed primary match is available yet." };
           }
-          await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
+          await handleExportDownload(descriptor.format || "route-review-primary", descriptor.fileName, descriptor.label, descriptor.params);
           return;
         }
         if (normalizedAction === "download-next") {
@@ -2192,7 +2198,7 @@
           if (!descriptor) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match is available yet." };
           }
-          await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
+          await handleExportDownload(descriptor.format || "route-review-next", descriptor.fileName, descriptor.label, descriptor.params);
           return;
         }
         if (normalizedAction === "download-remaining") {
@@ -2200,7 +2206,7 @@
           if (!descriptor) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No routed review queue is available yet." };
           }
-          await handleExportDownload("summary", descriptor.fileName, descriptor.label, descriptor.params);
+          await handleExportDownload(descriptor.format || "route-review-remaining", descriptor.fileName, descriptor.label, descriptor.params);
           return;
         }
         if (normalizedAction.startsWith("download-")) {
@@ -4145,7 +4151,7 @@
           if (!continuation?.nextDownload) {
             throw { code: "MISSING_ROUTE_FOCUS", message: "No additional routed match summary is available for follow-up review." };
           }
-          await handleExportDownload("summary", continuation.nextDownload.fileName, continuation.nextDownload.label, continuation.nextDownload.params);
+          await handleExportDownload(continuation.nextDownload.format || "route-review-next", continuation.nextDownload.fileName, continuation.nextDownload.label, continuation.nextDownload.params);
           return;
         }
         if (action === "complete_route_review") {

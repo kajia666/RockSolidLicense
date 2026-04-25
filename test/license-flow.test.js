@@ -16877,6 +16877,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Primary entitlement summary/);
     assert.match(html, /Primary session summary/);
     assert.match(html, /Primary device summary/);
+    assert.match(html, /descriptor\.format \|\| "route-review-primary"/);
+    assert.match(html, /descriptor\.format \|\| "route-review-next"/);
+    assert.match(html, /descriptor\.format \|\| "route-review-remaining"/);
+    assert.match(html, /continuation\.nextDownload\.format \|\| "route-review-next"/);
     assert.match(html, /developer-ops-primary-account-summary\.txt/);
     assert.match(html, /developer-ops-primary-entitlement-summary\.txt/);
     assert.match(html, /developer-ops-primary-session-summary\.txt/);

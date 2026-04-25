@@ -4075,6 +4075,62 @@
         `;
       }
 
+      function renderStabilizationHandoff(initialLaunchOpsReadiness = {}) {
+        const item = initialLaunchOpsReadiness?.stabilizationHandoff;
+        if (!item || typeof item !== "object") {
+          return "";
+        }
+        const latestReceipt = item.latestLaunchReceipt || {};
+        const latestOperator = item.latestOperatorActionReceipt || {};
+        const nextAction = item.nextAction || {};
+        const files = item.files || {};
+        const status = String(item.status || "unknown").toLowerCase();
+        const postLaunchStatus = latestReceipt.postLaunchLifecycleStatus || latestReceipt.postLaunchStatus || "";
+        const tags = [
+          item.version ? renderTag(item.version) : "",
+          item.status ? renderTag(`status:${String(item.status).toUpperCase()}`) : "",
+          item.decision ? renderTag(`decision:${String(item.decision).toUpperCase()}`) : "",
+          postLaunchStatus ? renderTag(`post:${String(postLaunchStatus).toUpperCase()}`) : ""
+        ].filter(Boolean).join("");
+        const receiptDetails = [
+          `latestReceipt=${esc(latestReceipt.operation || "-")}`,
+          `handoff=${esc(latestReceipt.handoffFileName || "-")}`,
+          `postLaunch=${esc(postLaunchStatus || "-")}`
+        ].join(" | ");
+        const operatorDetails = [
+          `latestOperator=${esc(latestOperator.operation || "-")}`,
+          `audit=${esc(latestOperator.auditLogId || "-")}`,
+          `next=${esc(latestOperator.nextOperation || nextAction.operation || "-")}`
+        ].join(" | ");
+        const nextDetails = [
+          `nextAction=${esc(nextAction.operation || "-")}`,
+          `download=${esc(nextAction.downloadFileName || nextAction.downloadKey || "-")}`,
+          `workspace=${esc(nextAction.workspaceHref || "-")}`
+        ].join(" | ");
+        const fileDetails = [
+          `readiness=${esc(files.readiness || "-")}`,
+          `handoffIndex=${esc(files.handoffIndex || "-")}`,
+          `nextFollowUp=${esc(files.nextFollowUp || "-")}`,
+          `postLaunchIndex=${esc(files.postLaunchIndex || "-")}`
+        ].join(" | ");
+        const checklist = Array.isArray(item.checklist) ? item.checklist.slice(0, 5) : [];
+        return `
+          <div class="snapshot-recap stabilization-handoff">
+            <div class="snapshot-recap-head">
+              <strong>Initial Launch Stabilization Handoff</strong>
+              <span class="tag ${status === "ready" ? "ok" : "warning"}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">Closeout, operator receipt, next follow-up, and post-launch file evidence consolidated for the first stabilization handoff review.</div>
+            <div class="audit-meta">${tags || renderTag("stabilization-handoff")}</div>
+            <div class="snapshot-focus-meta">${receiptDetails}</div>
+            <div class="snapshot-focus-meta">${operatorDetails}</div>
+            <div class="snapshot-focus-meta">${nextDetails}</div>
+            <div class="snapshot-focus-meta">${fileDetails}</div>
+            ${checklist.length ? `<ul class="snapshot-list">${checklist.map((entry) => `<li>${esc(entry)}</li>`).join("")}</ul>` : ""}
+          </div>
+        `;
+      }
+
       function focusQuickControlsCard() {
         const card = el("quick-controls-card");
         if (!card) {
@@ -4429,6 +4485,7 @@
           ? initialLaunchOpsReadiness.operatorActionReceipts
           : [];
         const latestOperatorActionReceipt = initialLaunchOpsReadiness.latestOperatorActionReceipt || operatorActionReceipts[0] || null;
+        const stabilizationHandoff = initialLaunchOpsReadiness.stabilizationHandoff || null;
         const normalizeLaunchReceiptPriority = (priority) => {
           const value = String(priority || "secondary").toLowerCase();
           return ["primary", "review", "secondary"].includes(value) ? value : "other";
@@ -4513,6 +4570,14 @@
             label: "Latest Operator Receipt",
             value: latestOperatorActionReceipt?.operation || "-"
           },
+          {
+            label: "Stabilization Status",
+            value: stabilizationHandoff?.status || "-"
+          },
+          {
+            label: "Stabilization Next Action",
+            value: stabilizationHandoff?.nextAction?.operation || "-"
+          },
           { label: "Latest Audit", value: formatTime(overview.latestAuditAt || payload.generatedAt) }
         ];
 
@@ -4522,6 +4587,7 @@
           ${renderLaunchReceiptNextFollowUpActions(launchReceiptNextFollowUp)}
           ${renderLastOperatorActionResult()}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
+          ${renderStabilizationHandoff(initialLaunchOpsReadiness)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           ${renderPreparedFocus()}
           ${renderDeveloperMutationRecap()}

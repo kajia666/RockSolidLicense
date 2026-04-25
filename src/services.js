@@ -13786,6 +13786,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   const initialLaunchContract = traceability.initialLaunchOpsContract || null;
   const initialLaunchOperatorHeadline = traceability.initialLaunchOperatorHeadline || null;
   const initialLaunchOperatorNextAction = traceability.initialLaunchOperatorNextAction || null;
+  const initialLaunchOperatorActionManifest = traceability.initialLaunchOperatorActionManifest || null;
   lines.push("");
   lines.push("Post-Launch Handoff Traceability:");
   lines.push(
@@ -13813,6 +13814,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   appendInitialLaunchContractTraceabilityTextLines(lines, initialLaunchContract, opsFiles);
   appendInitialLaunchOperatorHeadlineTextLines(lines, initialLaunchOperatorHeadline);
   appendInitialLaunchOperatorNextActionTextLines(lines, initialLaunchOperatorNextAction);
+  appendInitialLaunchOperatorActionManifestTextLines(lines, initialLaunchOperatorActionManifest);
   return true;
 }
 
@@ -13872,6 +13874,26 @@ function appendInitialLaunchOperatorNextActionTextLines(lines = [], operatorNext
   lines.push(`- ${labels.action}: ${operatorNextAction.kind || "-"} | stage=${operatorNextAction.stage || "-"} | operation=${operatorNextAction.operation || "-"} | action=${operatorNextAction.actionKey || "-"}`);
   lines.push(`- ${labels.workspace}: ${workspaceAction.label || "-"}@${workspaceAction.autofocus || "-"} | href=${workspaceAction.href || "-"}`);
   lines.push(`- ${labels.download}: ${download.fileName || "-"} (${download.format || "-"}) | href=${download.href || "-"}`);
+  return true;
+}
+
+function appendInitialLaunchOperatorActionManifestTextLines(lines = [], manifest = null, {
+  title = "Initial Launch Operator Action Manifest:",
+  labelCase = "title"
+} = {}) {
+  if (!Array.isArray(lines) || !manifest || typeof manifest !== "object") {
+    return false;
+  }
+  const labels = labelCase === "lower"
+    ? { manifest: "manifest", primaryAction: "primaryAction", files: "files" }
+    : { manifest: "Manifest", primaryAction: "Primary Action", files: "Files" };
+  const primaryAction = Array.isArray(manifest.actions) && manifest.actions.length ? manifest.actions[0] : {};
+  const files = manifest.files || {};
+  lines.push("");
+  lines.push(title);
+  lines.push(`- ${labels.manifest}: ${manifest.version || "-"} | primary=${manifest.primaryActionKey || "-"} | actions=${manifest.actionCount ?? (Array.isArray(manifest.actions) ? manifest.actions.length : 0)}`);
+  lines.push(`- ${labels.primaryAction}: stage=${primaryAction.stage || "-"} | operation=${primaryAction.operation || "-"} | action=${primaryAction.actionKey || "-"}`);
+  lines.push(`- ${labels.files}: readiness=${files.initialLaunchOpsReadiness || "-"} | handoffIndex=${files.handoffIndex || "-"} | nextFollowUp=${files.launchReceiptNextFollowUp || "-"}`);
   return true;
 }
 
@@ -15365,6 +15387,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   const initialLaunchOpsContract = opsSnapshot.summary?.initialLaunchOpsReadiness?.contract || null;
   const initialLaunchOperatorHeadline = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorHeadline || null;
   const initialLaunchOperatorNextAction = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorNextAction || null;
+  const initialLaunchOperatorActionManifest = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorActionManifest || null;
   return {
     latestLaunchReceipt: latestLaunchReceipt
       ? {
@@ -15407,6 +15430,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
     initialLaunchOpsContract,
     initialLaunchOperatorHeadline,
     initialLaunchOperatorNextAction,
+    initialLaunchOperatorActionManifest,
     opsFiles: {
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
@@ -15487,6 +15511,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   appendInitialLaunchContractTraceabilityTextLines(lines, traceability.initialLaunchOpsContract || null, opsFiles);
   appendInitialLaunchOperatorHeadlineTextLines(lines, traceability.initialLaunchOperatorHeadline || null);
   appendInitialLaunchOperatorNextActionTextLines(lines, traceability.initialLaunchOperatorNextAction || null);
+  appendInitialLaunchOperatorActionManifestTextLines(lines, traceability.initialLaunchOperatorActionManifest || null);
 
   lines.push("");
   lines.push("Recommended Downloads:");
@@ -16606,6 +16631,44 @@ function buildDeveloperOpsInitialLaunchOperatorNextAction({
   };
 }
 
+function buildDeveloperOpsInitialLaunchOperatorActionManifest({
+  contract = {},
+  operatorHeadline = {},
+  operatorNextAction = null,
+  latestReceipt = null
+} = {}) {
+  const files = contract.files || {};
+  const action = operatorNextAction && typeof operatorNextAction === "object" ? operatorNextAction : null;
+  return {
+    version: "initial-launch-operator-actions/v1",
+    generatedFor: "initial_launch_operator",
+    projectCode: contract.projectCode || latestReceipt?.productCode || null,
+    channel: contract.channel || latestReceipt?.channel || "stable",
+    status: contract.status || operatorHeadline.status || null,
+    decision: contract.decision || action?.decision || null,
+    decisionLabel: contract.label || action?.decisionLabel || operatorHeadline.decisionLabel || null,
+    primaryActionKey: action?.kind || null,
+    actionCount: action ? 1 : 0,
+    actions: action ? [action] : [],
+    entrypoints: {
+      workspaceHref: action?.workspaceAction?.href || operatorHeadline.workspaceHref || null,
+      downloadHref: action?.download?.href || null,
+      readinessFile: files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
+      handoffIndexFile: files.handoffIndex || "handoff-index.txt"
+    },
+    files: {
+      initialLaunchOpsReadiness: files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
+      handoffIndex: files.handoffIndex || "handoff-index.txt",
+      launchReceiptNextFollowUp: files.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt"
+    },
+    traceability: {
+      latestReceiptOperation: contract.latestLaunchReceipt?.operation || latestReceipt?.operation || null,
+      latestReceiptHandoffFileName: contract.latestLaunchReceipt?.handoffFileName || latestReceipt?.handoffFileName || null,
+      primaryBlockerStage: operatorHeadline.primaryBlockerStage || action?.stage || null
+    }
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   scope = {},
   overview = {},
@@ -16729,6 +16792,12 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     traceability
   });
+  const operatorActionManifest = buildDeveloperOpsInitialLaunchOperatorActionManifest({
+    contract,
+    operatorHeadline,
+    operatorNextAction,
+    latestReceipt
+  });
   return {
     status,
     headline: !latestReceipt
@@ -16781,6 +16850,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     contract,
     operatorHeadline,
     operatorNextAction,
+    operatorActionManifest,
     traceability,
     nextSteps
   };
@@ -18571,6 +18641,9 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     appendInitialLaunchOperatorNextActionTextLines(lines, initialLaunchOpsReadiness.operatorNextAction || null, {
       labelCase: "lower"
     });
+    appendInitialLaunchOperatorActionManifestTextLines(lines, initialLaunchOpsReadiness.operatorActionManifest || null, {
+      labelCase: "lower"
+    });
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {
@@ -18808,6 +18881,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   }
   appendInitialLaunchOperatorNextActionTextLines(lines, readiness.operatorNextAction || null, {
     title: "Operator Next Action:"
+  });
+  appendInitialLaunchOperatorActionManifestTextLines(lines, readiness.operatorActionManifest || null, {
+    title: "Operator Action Manifest:"
   });
   lines.push("Blockers:");
   const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];

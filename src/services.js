@@ -3529,6 +3529,18 @@ function inferLaunchWorkflowDownloadSource(key = "", source = "") {
   if (normalizedKey.startsWith("ops_")) {
     return "developer-ops";
   }
+  if (normalizedKey === "launch_review_ops_summary") {
+    return "developer-ops";
+  }
+  if (/^launch_smoke_(accounts|entitlements|sessions|audit)_summary$/.test(normalizedKey)) {
+    return "developer-ops";
+  }
+  if (normalizedKey.startsWith("launch_review_")) {
+    return "developer-launch-review";
+  }
+  if (normalizedKey.startsWith("launch_smoke_kit_")) {
+    return "developer-launch-smoke-kit";
+  }
   if (normalizedKey.startsWith("launch_")) {
     return "developer-launch-workflow";
   }

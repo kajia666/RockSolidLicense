@@ -5383,6 +5383,90 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(readinessRouteDownload?.source, "developer-launch-mainline");
     assert.equal(readinessRouteDownload?.format, "initial-launch-ops-readiness");
     assert.match(readinessRouteDownload?.href || "", /format=initial-launch-ops-readiness/);
+    const reviewRouteParams = new URLSearchParams({
+      productCode: "RELPKG_ALPHA",
+      channel: "stable",
+      operation: "review_launch_lane",
+      actionKey: "release_route_launch_review",
+      downloadKey: "launch_review_summary",
+      routeTitle: "Continue launch review handoff",
+      routeReason: "Resume launch review from the release package handoff"
+    });
+    const reviewRoutedReleasePackage = await getJson(
+      baseUrl,
+      `/api/developer/release-package?${reviewRouteParams.toString()}`,
+      viewerSession.token
+    );
+    const reviewRouteDownload = reviewRoutedReleasePackage.manifest.release.routeFocus.controls
+      .find((item) => item.recommendedDownload?.key === "launch_review_summary")
+      ?.recommendedDownload;
+    assert.equal(reviewRouteDownload?.source, "developer-launch-review");
+    assert.match(reviewRouteDownload?.href || "", /\/api\/developer\/launch-review\/download\?/);
+    const smokeRouteParams = new URLSearchParams({
+      productCode: "RELPKG_ALPHA",
+      channel: "stable",
+      operation: "run_smoke_lane",
+      actionKey: "release_route_launch_smoke",
+      downloadKey: "launch_smoke_kit_summary",
+      routeTitle: "Continue launch smoke handoff",
+      routeReason: "Resume launch smoke from the release package handoff"
+    });
+    const smokeRoutedReleasePackage = await getJson(
+      baseUrl,
+      `/api/developer/release-package?${smokeRouteParams.toString()}`,
+      viewerSession.token
+    );
+    const smokeRouteDownload = smokeRoutedReleasePackage.manifest.release.routeFocus.controls
+      .find((item) => item.recommendedDownload?.key === "launch_smoke_kit_summary")
+      ?.recommendedDownload;
+    assert.equal(smokeRouteDownload?.source, "developer-launch-smoke-kit");
+    assert.match(smokeRouteDownload?.href || "", /\/api\/developer\/launch-smoke-kit\/download\?/);
+    const reviewOpsRouteParams = new URLSearchParams({
+      productCode: "RELPKG_ALPHA",
+      channel: "stable",
+      operation: "review_ops_lane",
+      actionKey: "release_route_launch_review_ops",
+      downloadKey: "launch_review_ops_summary",
+      routeTitle: "Continue launch review ops handoff",
+      routeReason: "Resume launch review ops summary from the release package handoff"
+    });
+    const reviewOpsRoutedReleasePackage = await getJson(
+      baseUrl,
+      `/api/developer/release-package?${reviewOpsRouteParams.toString()}`,
+      viewerSession.token
+    );
+    const reviewOpsRouteDownload = reviewOpsRoutedReleasePackage.manifest.release.routeFocus.controls
+      .find((item) => item.recommendedDownload?.key === "launch_review_ops_summary")
+      ?.recommendedDownload;
+    assert.equal(reviewOpsRouteDownload?.source, "developer-ops");
+    assert.match(reviewOpsRouteDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
+    const smokeOpsRouteCases = [
+      ["accounts", "launch_smoke_accounts_summary"],
+      ["entitlements", "launch_smoke_entitlements_summary"],
+      ["sessions", "launch_smoke_sessions_summary"],
+      ["audit", "launch_smoke_audit_summary"]
+    ];
+    for (const [operationSuffix, downloadKey] of smokeOpsRouteCases) {
+      const smokeOpsRouteParams = new URLSearchParams({
+        productCode: "RELPKG_ALPHA",
+        channel: "stable",
+        operation: `review_smoke_${operationSuffix}`,
+        actionKey: `release_route_launch_smoke_${operationSuffix}`,
+        downloadKey,
+        routeTitle: `Continue launch smoke ${operationSuffix} handoff`,
+        routeReason: `Resume launch smoke ${operationSuffix} summary from the release package handoff`
+      });
+      const smokeOpsRoutedReleasePackage = await getJson(
+        baseUrl,
+        `/api/developer/release-package?${smokeOpsRouteParams.toString()}`,
+        viewerSession.token
+      );
+      const smokeOpsRouteDownload = smokeOpsRoutedReleasePackage.manifest.release.routeFocus.controls
+        .find((item) => item.recommendedDownload?.key === downloadKey)
+        ?.recommendedDownload;
+      assert.equal(smokeOpsRouteDownload?.source, "developer-ops");
+      assert.match(smokeOpsRouteDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
+    }
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
     assert.equal(releasePackage.manifest.release.mainlineFollowUp.status, "hold");

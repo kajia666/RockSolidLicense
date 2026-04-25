@@ -13775,6 +13775,41 @@ function appendPostLaunchLifecycleTextLines(lines = [], mainlineSummary = {}) {
   return true;
 }
 
+function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability = null) {
+  if (!Array.isArray(lines) || !traceability || typeof traceability !== "object") {
+    return false;
+  }
+  const latestReceipt = traceability.latestLaunchReceipt || {};
+  const nextFollowUp = traceability.nextFollowUp || {};
+  const lifecycle = traceability.postLaunchLifecycle || {};
+  const opsFiles = traceability.opsFiles || {};
+  lines.push("");
+  lines.push("Post-Launch Handoff Traceability:");
+  lines.push(
+    `- Latest Launch Receipt: ${latestReceipt.operation || "-"}`
+    + ` | handoff=${latestReceipt.handoffFileName || "-"}`
+    + ` | gate=${latestReceipt.mainlineGateStatus || "-"}`
+    + ` | evidenceNext=${latestReceipt.productionEvidenceNextOperation || "-"}`
+    + ` | lifecycleNext=${latestReceipt.postLaunchLifecycleNextOperation || lifecycle.nextOperation || "-"}`
+  );
+  lines.push(
+    `- Next Follow-up: ${nextFollowUp.title || nextFollowUp.key || "-"}`
+    + ` | stage=${nextFollowUp.stage || "-"}`
+    + ` | operation=${nextFollowUp.operationToRecord || "-"}`
+    + ` | download=${nextFollowUp.downloadKey || "-"}`
+  );
+  lines.push(
+    `- Post-Launch Lifecycle: status=${String(lifecycle.status || "unknown").toUpperCase()}`
+    + ` | primaryDownload=${lifecycle.primaryDownloadKey || "-"}`
+    + ` | format=${lifecycle.primaryDownloadFormat || "-"}`
+    + ` | file=${lifecycle.primaryDownloadFileName || "-"}`
+  );
+  lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "-"}`);
+  lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "-"}`);
+  lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
+  return true;
+}
+
 function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -13911,6 +13946,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     );
   }
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
+  appendPostLaunchHandoffTraceabilityTextLines(lines, payload.postLaunchHandoffTraceability);
   if (productionGateChecks.length) {
     lines.push("");
     lines.push("Production Gate Checks:");

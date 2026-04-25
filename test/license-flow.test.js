@@ -13425,6 +13425,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineTraceability.postLaunchHandoffTraceability.postLaunchLifecycle.primaryDownloadKey,
       latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey
     );
+    const launchMainlineTraceabilitySummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=summary",
+      operatorSession.token
+    );
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Post-Launch Handoff Traceability:/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Latest Launch Receipt: record_post_launch_ops_sweep/);
+    assert.ok(launchMainlineTraceabilitySummaryDownload.body.includes(latestLaunchReceipt.handoffFileName));
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      new RegExp(`evidenceNext=${latestLaunchReceipt.productionEvidenceNextOperation}`)
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      new RegExp(`lifecycleNext=${latestLaunchReceipt.postLaunchLifecycleNextOperation}`)
+    );
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

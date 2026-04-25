@@ -1986,6 +1986,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
   const versionManifest = release.versionManifest || {};
   const activeNotices = release.activeNotices || {};
   const readiness = release.readiness || {};
+  const initialLaunchOpsReadiness = release.initialLaunchOpsReadiness || mainlineFollowUp.initialLaunchOpsReadiness || null;
   const clientHardening = release.startupPreview?.clientHardening || manifest.integration?.clientHardening || {};
   const noticeItems = Array.isArray(activeNotices.items) ? activeNotices.items : [];
   const formatWorkspaceActionParams = (params = null) => {
@@ -2092,6 +2093,7 @@ function buildReleasePackageSummaryText(manifest = {}) {
     lines.push(`- Title: ${mainlineFollowUp.title || "-"}`);
     lines.push(`- Message: ${mainlineFollowUp.message || "-"}`);
     appendLaunchMainlineGateText(lines, mainlineFollowUp.mainlineGate, formatWorkspaceActionText);
+    appendInitialLaunchOpsReadinessTextLines(lines, initialLaunchOpsReadiness, mainlineFollowUp.initialLaunchOpsReadinessDownload);
     if (mainlineFollowUp.recommendedWorkspace) {
       lines.push(`- Recommended Workspace: ${formatWorkspaceActionText(mainlineFollowUp.recommendedWorkspace)}`);
     }
@@ -2670,6 +2672,16 @@ function buildReleaseMainlineFollowUpPayload({
     "summary",
     params
   );
+  const initialLaunchOpsReadinessDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_initial_launch_readiness",
+    "developer-ops-initial-launch-readiness.txt",
+    "Initial launch ops readiness",
+    {
+      source: "developer-ops",
+      format: "initial-launch-ops-readiness",
+      params
+    }
+  );
   const workspaceActions = [];
   const seenWorkspaceActions = new Set();
   const pushWorkspaceAction = (action, reason = "") => {
@@ -2741,6 +2753,28 @@ function buildReleaseMainlineFollowUpPayload({
           || ((authReadiness.workspaceKey || "licenses") === "project" ? "Open Project Workspace" : "Open License Workspace")
       )
     : null;
+  const initialLaunchOpsWorkspaceAction = createRoutedWorkspaceShortcut(
+    "ops",
+    "snapshot",
+    "Open Ops Workspace"
+  );
+  const initialLaunchOpsReadiness = buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope: {
+      productCode: product?.code || null,
+      auditLimit: params.limit || 60
+    },
+    overview: {},
+    launchReceiptFollowUps: [],
+    launchReceiptFollowUpPriorities: {},
+    launchReceiptNextFollowUp: null,
+    mainlineHandoff: {
+      workspaceAction: initialLaunchOpsWorkspaceAction
+    }
+  });
+  initialLaunchOpsReadiness.primaryDownload = initialLaunchOpsReadiness.primaryDownload || initialLaunchOpsReadinessDownload;
+  if (initialLaunchOpsReadiness.gate) {
+    initialLaunchOpsReadiness.gate.primaryDownload = initialLaunchOpsReadiness.gate.primaryDownload || initialLaunchOpsReadinessDownload;
+  }
 
   let recommendedWorkspace = null;
   if (projectBlocked) {
@@ -2821,6 +2855,10 @@ function buildReleaseMainlineFollowUpPayload({
       authReadiness.message || "Use the license workspace to finish starter policies, accounts, and launch inventory."
     );
   }
+  pushWorkspaceAction(
+    initialLaunchOpsWorkspaceAction,
+    "Use Developer Ops to check the initial launch operations gate, blockers, and first follow-up download before launch day."
+  );
 
   let title = "Release lane needs one more pass";
   let message = readiness.message || deliverySummary.summary || "Use the release workspace to keep this lane aligned before handoff.";
@@ -2881,6 +2919,15 @@ function buildReleaseMainlineFollowUpPayload({
       });
     }
     pushActionPlan({
+      key: "initial_launch_ops_readiness",
+      title: "Check initial launch operations readiness",
+      summary: initialLaunchOpsReadiness.summary || "Review Developer Ops initial launch readiness before handing this lane to launch duty.",
+      status: initialLaunchOpsReadiness.gate?.canEnterInitialLaunch ? "pass" : "block",
+      priority: "secondary",
+      workspaceAction: initialLaunchOpsWorkspaceAction,
+      recommendedDownload: initialLaunchOpsReadinessDownload
+    });
+    pushActionPlan({
       key: "launch_mainline_overview",
       title: "Review the unified launch mainline handoff",
       summary: "Use the aggregated launch-mainline handoff to recheck release, workflow, review, and smoke together after the blocker pass.",
@@ -2921,6 +2968,15 @@ function buildReleaseMainlineFollowUpPayload({
         setupAction: authReadiness.firstBatchSetupAction || null
       });
     }
+    pushActionPlan({
+      key: "initial_launch_ops_readiness",
+      title: "Check initial launch operations readiness",
+      summary: initialLaunchOpsReadiness.summary || "Review Developer Ops initial launch readiness before widening rollout.",
+      status: initialLaunchOpsReadiness.gate?.canEnterInitialLaunch ? "pass" : "review",
+      priority: normalizedStatus === "ready" && !authorizationNeedsAttention ? "primary" : "secondary",
+      workspaceAction: initialLaunchOpsWorkspaceAction,
+      recommendedDownload: initialLaunchOpsReadinessDownload
+    });
     pushActionPlan({
       key: "launch_handoff",
       title: "Confirm the combined launch lane before rollout",
@@ -2963,6 +3019,7 @@ function buildReleaseMainlineFollowUpPayload({
     releaseSummaryDownload,
     releaseChecklistDownload,
     releaseZipDownload,
+    initialLaunchOpsReadinessDownload,
     launchMainlineDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineChecksumsDownload,
@@ -2990,6 +3047,8 @@ function buildReleaseMainlineFollowUpPayload({
     message,
     routeFocus,
     mainlineGate,
+    initialLaunchOpsReadiness,
+    initialLaunchOpsReadinessDownload,
     recommendedWorkspace,
     workspaceActions,
     actionPlan,
@@ -3228,6 +3287,7 @@ function buildReleasePackagePayload({
       deliverySummary,
       deliveryChecklist,
       authorizationReadiness: authReadiness,
+      initialLaunchOpsReadiness: mainlineFollowUp.initialLaunchOpsReadiness || null,
       mainlineFollowUp,
       activeNotices: {
         total: activeNotices.length,
@@ -5921,6 +5981,33 @@ function appendLaunchMainlineGateText(lines = [], gate = null, formatWorkspaceAc
   lines.push(`- workspace: ${formatWorkspace(gate.recommendedWorkspace)}`);
   lines.push(`- primaryAction: ${gate.primaryAction?.title || gate.primaryAction?.label || gate.primaryAction?.key || "-"}`);
   lines.push(`- recommendedDownload: ${gate.recommendedDownload?.label || gate.recommendedDownload?.key || "-"}`);
+}
+
+function appendInitialLaunchOpsReadinessTextLines(lines = [], readiness = null, download = null) {
+  if (!Array.isArray(lines) || !readiness || typeof readiness !== "object") {
+    return;
+  }
+  const gate = readiness.gate || {};
+  const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];
+  const warnings = Array.isArray(gate.warnings) ? gate.warnings : [];
+  const requiredActions = Array.isArray(gate.requiredActions) ? gate.requiredActions : [];
+  const primaryDownload = download || gate.primaryDownload || readiness.primaryDownload || null;
+  lines.push("");
+  lines.push("Initial Launch Ops Gate:");
+  lines.push(`- status: ${String(readiness.status || gate.status || "unknown").toUpperCase()}`);
+  lines.push(`- decision: ${String(gate.decision || "unknown").toUpperCase()}`);
+  lines.push(`- canEnterInitialLaunch: ${gate.canEnterInitialLaunch === true}`);
+  lines.push(`- blockers: ${gate.blockerCount ?? blockers.length}`);
+  lines.push(`- warnings: ${gate.warningCount ?? warnings.length}`);
+  lines.push(`- requiredActions: ${gate.requiredActionCount ?? requiredActions.length}`);
+  lines.push(`- nextAction: ${gate.nextAction?.label || gate.nextAction?.key || readiness.nextFollowUp?.title || "-"}`);
+  lines.push(`- download: ${primaryDownload?.label || primaryDownload?.fileName || primaryDownload?.key || "-"}`);
+  if (blockers.length) {
+    lines.push("- blockerList:");
+    for (const item of blockers.slice(0, 3)) {
+      lines.push(`  - [${item.stage || "-"}] ${item.title || item.key || "blocker"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"}`);
+    }
+  }
 }
 
 function normalizeLaunchMainlineProductionCheck(item = null, fallbackTitle = "Production follow-up") {
@@ -12539,6 +12626,24 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   );
   const opsPrimaryDownload = createOpsMainlineDownload(opsRouteReview.downloads?.primary || null);
   const opsRemainingDownload = createOpsMainlineDownload(opsRouteReview.downloads?.remaining || null);
+  const initialLaunchOpsReadiness = opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const initialLaunchOpsGate = initialLaunchOpsReadiness?.gate || null;
+  const initialLaunchOpsWorkspaceAction = createLaunchWorkflowWorkspaceShortcut(
+    "ops",
+    "snapshot",
+    "Open Ops Workspace",
+    params
+  );
+  const initialLaunchOpsReadinessDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_initial_launch_readiness",
+    "developer-ops-initial-launch-readiness.txt",
+    "Initial launch ops readiness",
+    {
+      source: "developer-ops",
+      format: "initial-launch-ops-readiness",
+      params
+    }
+  );
   const productionHandoffDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline production handoff",
     "developer-launch-mainline-production-handoff.txt",
@@ -12671,6 +12776,28 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     actionPlan: opsActionPlan,
     recommendedDownloads: [opsPrimaryDownload, opsRemainingDownload, opsSummaryDownload].filter(Boolean)
   });
+  const initialLaunchOpsMainlineGate = initialLaunchOpsGate
+    ? buildLaunchMainlineGatePayload({
+        status: initialLaunchOpsGate.canEnterInitialLaunch ? "ready" : "hold",
+        headline: initialLaunchOpsReadiness?.headline || "Initial launch operations readiness",
+        summary: initialLaunchOpsReadiness?.summary || "Review the initial launch operations gate before widening rollout.",
+        blockingCount: Number(initialLaunchOpsGate.blockerCount || 0),
+        attentionCount: Number(initialLaunchOpsGate.warningCount || 0),
+        recommendedWorkspace: initialLaunchOpsWorkspaceAction,
+        actionPlan: [
+          createLaunchWorkflowActionPlanStep({
+            key: "initial_launch_ops_readiness",
+            title: initialLaunchOpsReadiness?.headline || "Check initial launch operations readiness",
+            summary: initialLaunchOpsReadiness?.summary || "Review Developer Ops initial launch readiness before launch day.",
+            status: initialLaunchOpsGate.canEnterInitialLaunch ? "pass" : "block",
+            priority: "primary",
+            workspaceAction: initialLaunchOpsWorkspaceAction,
+            recommendedDownload: initialLaunchOpsReadinessDownload
+          })
+        ],
+        recommendedDownloads: [initialLaunchOpsReadinessDownload].filter(Boolean)
+      })
+    : null;
   const productionGate = buildLaunchMainlineProductionGatePayload({
     config: runtimeConfig,
     health: systemHealth,
@@ -12764,6 +12891,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       label: "Developer Ops",
       gate: opsGate,
       summaryDownload: opsSummaryDownload
+    },
+    {
+      key: "initial_launch_ops",
+      label: "Initial Launch Ops",
+      gate: initialLaunchOpsMainlineGate,
+      summaryDownload: initialLaunchOpsReadinessDownload
     }
   ];
   const stages = stageDefinitions
@@ -13567,6 +13700,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     reviewGate,
     smokeGate,
     opsGate,
+    initialLaunchOpsReadiness,
+    initialLaunchOpsGate,
+    initialLaunchOpsMainlineGate,
+    initialLaunchOpsReadinessDownload,
     continuation,
     stages,
     overviewCards,
@@ -13652,6 +13789,11 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     ""
   ];
   appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
+  appendInitialLaunchOpsReadinessTextLines(
+    lines,
+    mainlineSummary.initialLaunchOpsReadiness,
+    mainlineSummary.initialLaunchOpsReadinessDownload
+  );
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
   lines.push(`Mainline Recommended Download: ${mainlineSummary.recommendedDownload?.label || mainlineSummary.recommendedDownload?.key || "-"}`);
   if (mainlineSummary.continuation) {
@@ -13721,7 +13863,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     ["Workflow", mainlineSummary.workflowGate],
     ["Review", mainlineSummary.reviewGate],
     ["Smoke", mainlineSummary.smokeGate],
-    ["Ops", mainlineSummary.opsGate]
+    ["Ops", mainlineSummary.opsGate],
+    ["Initial Launch Ops", mainlineSummary.initialLaunchOpsMainlineGate]
   ];
   for (const [label, gate] of stageRows) {
     lines.push(`- ${label}: ${String(gate?.status || "unknown").toUpperCase()} | ${gate?.headline || "-"} | workspace=${formatWorkspaceActionText(gate?.recommendedWorkspace)}`);

@@ -223,6 +223,7 @@
       let actor = null;
       let snapshot = emptySnapshot();
       let lastExportDownload = null;
+      let lastOperatorActionResult = null;
       let preparedFocus = null;
       let lastMutation = null;
       let routeReviewDisplayMode = "all";
@@ -2790,6 +2791,11 @@
           throw { code: "MISSING_PROJECT", message: "Select or route a project before continuing the initial operator action." };
         }
         if (normalizedAction === "open-mainline") {
+          lastOperatorActionResult = buildLaunchReceiptOperatorActionResult(normalizedAction, data, {
+            status: "routed",
+            message: "Opening Launch Mainline for the initial operator action."
+          });
+          renderSnapshotOverview();
           window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
             productCode,
             channel,
@@ -2812,6 +2818,11 @@
             data.operatorDownloadFileName || `${productCode}-${channel}-${format}.txt`
           );
           lastExportDownload = result;
+          lastOperatorActionResult = buildLaunchReceiptOperatorActionResult(normalizedAction, data, {
+            status: "downloaded",
+            fileName: result.fileName,
+            message: `Downloaded ${result.fileName}.`
+          });
           renderSnapshotOverview();
           setStatus(`Initial operator handoff downloaded: ${result.fileName}`);
           return;
@@ -3970,6 +3981,58 @@
         `;
       }
 
+      function buildLaunchReceiptOperatorActionResult(action = "", data = {}, extra = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const label = normalizedAction === "open-mainline"
+          ? "Open Operator Mainline"
+          : normalizedAction === "download-handoff"
+            ? "Download Operator Handoff"
+            : "Operator Action";
+        return {
+          action: normalizedAction,
+          label,
+          status: String(extra.status || "ready").trim().toLowerCase() || "ready",
+          message: String(extra.message || "").trim(),
+          productCode: String(data.productCode || el("filter-product-code")?.value || requestedProductCode || "").trim(),
+          channel: String(data.channel || requestedChannel || "stable").trim() || "stable",
+          operation: String(data.operatorOperation || "").trim(),
+          actionKey: String(data.operatorActionKey || "").trim(),
+          downloadKey: String(data.operatorDownloadKey || "").trim(),
+          downloadFileName: String(extra.fileName || data.operatorDownloadFileName || "").trim(),
+          workspaceAutofocus: String(data.operatorWorkspaceAutofocus || "summary").trim() || "summary",
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      function renderLastOperatorActionResult() {
+        if (!lastOperatorActionResult) {
+          return "";
+        }
+        const item = lastOperatorActionResult;
+        const status = String(item.status || "ready").toLowerCase();
+        const statusClass = status === "downloaded" || status === "routed" ? "ok" : "warning";
+        const details = [
+          item.productCode ? `project=${item.productCode}` : "",
+          item.channel ? `channel=${item.channel}` : "",
+          item.operation ? `operation=${item.operation}` : "",
+          item.actionKey ? `action=${item.actionKey}` : "",
+          item.downloadFileName || item.downloadKey ? `download=${item.downloadFileName || item.downloadKey}` : "",
+          item.workspaceAutofocus ? `workspace=${item.workspaceAutofocus}` : ""
+        ].filter(Boolean).join(" | ");
+        return `
+          <div class="snapshot-recap operator-action-confirmation" data-operator-action-confirmation="latest">
+            <div class="snapshot-recap-head">
+              <strong>Last Operator Action</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+              <span class="tag">${esc(formatTime(item.timestamp))}</span>
+            </div>
+            <div>${esc(item.label || "Operator Action")}</div>
+            ${item.message ? `<div class="hint">${esc(item.message)}</div>` : ""}
+            <div class="hint">${esc(details || "Operator action captured for this Ops session.")}</div>
+          </div>
+        `;
+      }
+
       function focusQuickControlsCard() {
         const card = el("quick-controls-card");
         if (!card) {
@@ -4402,6 +4465,7 @@
           <div class="hint">Generated ${esc(formatTime(payload.generatedAt))}${payload.fileName ? ` | ${esc(payload.fileName)}` : ""}${lastExportDownload?.fileName ? ` | last download ${esc(lastExportDownload.fileName)}` : ""}</div>
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
           ${renderLaunchReceiptNextFollowUpActions(launchReceiptNextFollowUp)}
+          ${renderLastOperatorActionResult()}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           ${renderPreparedFocus()}
           ${renderDeveloperMutationRecap()}
@@ -4926,6 +4990,7 @@
         actor = null;
         snapshot = emptySnapshot();
         lastExportDownload = null;
+        lastOperatorActionResult = null;
         preparedFocus = null;
         lastMutation = null;
         routeReviewDisplayMode = (requestedReviewMode === "matched" || currentRequestedRouteReviewAction()) ? "matched" : "all";

@@ -13383,6 +13383,49 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/launch-receipt-next-follow-up\.txt/);
 
+    const launchMainlineTraceability = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched",
+      operatorSession.token
+    );
+    assert.ok(launchMainlineTraceability.postLaunchHandoffTraceability);
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.operation,
+      "record_post_launch_ops_sweep"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.handoffFileName,
+      latestLaunchReceipt.handoffFileName
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.productionEvidenceNextOperation,
+      latestLaunchReceipt.productionEvidenceNextOperation
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.postLaunchLifecycleNextOperation,
+      latestLaunchReceipt.postLaunchLifecycleNextOperation
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.opsFiles.handoffIndex,
+      "ops/handoff-index.txt"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.opsFiles.initialLaunchOpsReadiness,
+      "ops/initial-launch-ops-readiness.txt"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.opsFiles.launchReceiptNextFollowUp,
+      "ops/launch-receipt-next-follow-up.txt"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.operationToRecord,
+      latestLaunchReceipt.productionEvidenceNextOperation
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.postLaunchLifecycle.primaryDownloadKey,
+      latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey
+    );
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

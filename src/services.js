@@ -14240,6 +14240,7 @@ function buildDeveloperLaunchMainlinePayload({
     publicBaseUrl,
     mainlineSummary: payload.mainlineSummary
   });
+  payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
   payload.firstLaunchHandoffText = buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     generatedAt,
@@ -15250,6 +15251,71 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
   return lines.join("\n");
 }
 
+function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
+  const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
+  const mainlineSummary = payload.mainlineSummary || {};
+  const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
+  const latestLaunchReceipt = Array.isArray(opsSnapshot.overview?.latestLaunchReceipts) && opsSnapshot.overview.latestLaunchReceipts.length
+    ? opsSnapshot.overview.latestLaunchReceipts[0]
+    : null;
+  const launchReceiptNextFollowUp = opsSnapshot.summary?.launchReceiptNextFollowUp
+    || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
+    || null;
+  return {
+    latestLaunchReceipt: latestLaunchReceipt
+      ? {
+          auditLogId: latestLaunchReceipt.auditLogId || null,
+          operation: latestLaunchReceipt.operation || null,
+          operationLabel: latestLaunchReceipt.operationLabel || null,
+          productCode: latestLaunchReceipt.productCode || null,
+          channel: latestLaunchReceipt.channel || null,
+          handoffFileName: latestLaunchReceipt.handoffFileName || null,
+          mainlineGateStatus: latestLaunchReceipt.mainlineGateStatus || null,
+          productionEvidenceNextActionKey: latestLaunchReceipt.productionEvidenceNextActionKey || null,
+          productionEvidenceNextOperation: latestLaunchReceipt.productionEvidenceNextOperation || null,
+          postLaunchLifecycleStatus: latestLaunchReceipt.postLaunchLifecycleStatus || null,
+          postLaunchLifecycleNextActionKey: latestLaunchReceipt.postLaunchLifecycleNextActionKey || null,
+          postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null,
+          postLaunchLifecyclePrimaryDownloadKey: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
+          postLaunchLifecyclePrimaryDownloadFormat: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
+          postLaunchLifecyclePrimaryDownloadFileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null
+        }
+      : null,
+    nextFollowUp: launchReceiptNextFollowUp
+      ? {
+          key: launchReceiptNextFollowUp.key || null,
+          stage: launchReceiptNextFollowUp.stage || null,
+          priority: launchReceiptNextFollowUp.priority || null,
+          title: launchReceiptNextFollowUp.title || null,
+          actionKey: launchReceiptNextFollowUp.actionKey || null,
+          operationToRecord: launchReceiptNextFollowUp.operationToRecord || launchReceiptNextFollowUp.operation || null,
+          downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
+        }
+      : null,
+    postLaunchLifecycle: {
+      status: lifecycle.status || latestLaunchReceipt?.postLaunchLifecycleStatus || null,
+      nextOperation: latestLaunchReceipt?.postLaunchLifecycleNextOperation || lifecycle.nextAction?.setupAction?.operation || null,
+      primaryDownloadKey: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadKey || lifecycle.primaryRecommendedDownload?.key || null,
+      primaryDownloadFormat: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFormat || lifecycle.primaryRecommendedDownload?.format || null,
+      primaryDownloadFileName: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFileName || lifecycle.primaryRecommendedDownload?.fileName || null
+    },
+    opsFiles: {
+      summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
+      handoffIndex: "ops/handoff-index.txt",
+      initialLaunchOpsReadiness: "ops/initial-launch-ops-readiness.txt",
+      launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt"
+    },
+    packageFiles: {
+      postLaunchHandoffIndex: payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
+      operationsHandoff: payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
+      postLaunchSweepHandoff: payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
+      closeoutHandoff: payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt",
+      stabilizationHandoff: payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt"
+    }
+  };
+}
+
 function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -15258,22 +15324,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
   const phases = Array.isArray(lifecycle.phases) ? lifecycle.phases : [];
   const recommendedDownloads = Array.isArray(lifecycle.recommendedDownloads) ? lifecycle.recommendedDownloads : [];
-  const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
-  const latestLaunchReceipt = Array.isArray(opsSnapshot.overview?.latestLaunchReceipts) && opsSnapshot.overview.latestLaunchReceipts.length
-    ? opsSnapshot.overview.latestLaunchReceipts[0]
-    : null;
-  const launchReceiptNextFollowUp = opsSnapshot.summary?.launchReceiptNextFollowUp
-    || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
-    || null;
+  const traceability = payload.postLaunchHandoffTraceability || buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
+  const latestLaunchReceipt = traceability.latestLaunchReceipt || null;
+  const launchReceiptNextFollowUp = traceability.nextFollowUp || null;
+  const opsFiles = traceability.opsFiles || {};
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
     ["Post-launch sweep handoff", payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt"],
     ["Closeout handoff", payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt"],
     ["Stabilization handoff", payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt"],
     ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
-    ["Ops handoff index", "ops/handoff-index.txt"],
-    ["Launch receipt next follow-up", "ops/launch-receipt-next-follow-up.txt"],
-    ["Initial launch ops readiness", payload.initialLaunchOpsReadinessFileName || "developer-launch-mainline-initial-launch-ops-readiness.txt"]
+    ["Ops handoff index", opsFiles.handoffIndex || "ops/handoff-index.txt"],
+    ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
+    ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"]
   ];
   const lines = [
     "RockSolid Developer Launch Mainline Post-Launch Handoff Index",
@@ -15311,9 +15374,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | evidenceNext=${latestLaunchReceipt?.productionEvidenceNextOperation || "-"}`
     + ` | lifecycleNext=${latestLaunchReceipt?.postLaunchLifecycleNextOperation || "-"}`
   );
-  lines.push(`- Ops Handoff Index: ops/handoff-index.txt`);
-  lines.push(`- Initial Launch Ops Readiness: ops/initial-launch-ops-readiness.txt`);
-  lines.push(`- Launch Receipt Next Follow-up: ops/launch-receipt-next-follow-up.txt | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
+  lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "ops/handoff-index.txt"}`);
+  lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
+  lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
 
   lines.push("");
   lines.push("Recommended Downloads:");

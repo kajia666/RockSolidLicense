@@ -18230,6 +18230,83 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsHandoffIndexText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const gate = readiness.gate || {};
+  const followUpQueue = Array.isArray(readiness.followUpQueue) ? readiness.followUpQueue : [];
+  const recommendedDownloads = Array.isArray(readiness.recommendedDownloads) ? readiness.recommendedDownloads : [];
+  const includedFiles = [
+    payload.fileName || "developer-ops.json",
+    payload.summaryFileName || "developer-ops-summary.txt",
+    "handoff-index.txt",
+    "launch-receipt-next-follow-up.txt",
+    "initial-launch-ops-readiness.txt",
+    "csv/projects.csv",
+    "csv/accounts.csv",
+    "csv/entitlements.csv",
+    "csv/sessions.csv",
+    "csv/device-bindings.csv",
+    "csv/device-blocks.csv",
+    "csv/audit-logs.csv",
+    "csv/launch-receipt-follow-ups.csv"
+  ];
+  const lines = [
+    "RockSolid Developer Ops Launch Handoff Index",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Audit Event Filter: ${scope.eventType || "-"}`,
+    `Initial Launch Ops Readiness: ${String(readiness.status || "unknown").toUpperCase()}`,
+    `Gate Decision: ${String(gate.decision || "unknown").toUpperCase()}`,
+    `Can Enter Initial Launch: ${gate.canEnterInitialLaunch === true ? "yes" : "no"}`,
+    `Next Follow-up: ${formatLaunchReceiptNextFollowUp(readiness.nextFollowUp || summary.launchReceiptNextFollowUp || null)}`,
+    `Primary Workspace: ${readiness.primaryWorkspaceAction?.label || "-"} | href=${readiness.primaryWorkspaceAction?.href || "-"}`,
+    `Primary Download: ${readiness.primaryDownload?.fileName || "-"} | format=${readiness.primaryDownload?.format || "-"} | href=${readiness.primaryDownload?.href || "-"}`,
+    ""
+  ];
+
+  lines.push("Follow-up Queue:");
+  if (followUpQueue.length) {
+    for (const item of followUpQueue) {
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operationToRecord || item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"} | handoff=${item.handoffFileName || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+
+  lines.push("");
+  lines.push("Recommended Downloads:");
+  if (recommendedDownloads.length) {
+    for (const item of recommendedDownloads) {
+      lines.push(`- ${item.label || item.key || "-"} | file=${item.fileName || "-"} | format=${item.format || "-"} | href=${item.href || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+
+  lines.push("");
+  lines.push("Included Files:");
+  for (const filePath of includedFiles) {
+    lines.push(`- ${filePath}`);
+  }
+
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push("- Open this handoff index first when reviewing an exported Ops zip offline.");
+  lines.push("- Use initial-launch-ops-readiness.txt for the current gate and launch duty decision.");
+  lines.push("- Use launch-receipt-next-follow-up.txt for the next recorded Launch Mainline operation.");
+  lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsSnapshotPayload({
   generatedAt = nowIso(),
   developer = null,
@@ -18399,6 +18476,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: payload.summaryFileName || "developer-ops-summary.txt",
       body: payload.summaryText || ""
+    },
+    {
+      path: "handoff-index.txt",
+      body: buildDeveloperOpsHandoffIndexText(payload)
     },
     {
       path: "launch-receipt-next-follow-up.txt",
@@ -19032,7 +19113,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -19059,6 +19140,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-ops-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+
+  if (normalizedFormat === "handoff-index") {
+    return {
+      fileName: "developer-ops-handoff-index.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsHandoffIndexText(payload)
     };
   }
 

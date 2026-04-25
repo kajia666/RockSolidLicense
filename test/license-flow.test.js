@@ -13307,6 +13307,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-first-launch-handoff\.txt.*format=first-launch-handoff/);
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-sha256\.txt.*format=checksums/);
 
+    const handoffIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=handoff-index",
+      operatorSession.token
+    );
+    assert.equal(handoffIndexDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(handoffIndexDownload.contentDisposition || "", /developer-ops-handoff-index\.txt/);
+    assert.match(handoffIndexDownload.body, /RockSolid Developer Ops Launch Handoff Index/);
+    assert.match(handoffIndexDownload.body, /Initial Launch Ops Readiness: REVIEW/);
+    assert.match(handoffIndexDownload.body, /Next Follow-up: \[REVIEW\]\[production_evidence\]/);
+    assert.match(handoffIndexDownload.body, /Follow-up Queue:/);
+    assert.match(handoffIndexDownload.body, new RegExp(`\\[production_evidence\\].*operation=${latestLaunchReceipt.productionEvidenceNextOperation}`));
+    assert.match(handoffIndexDownload.body, new RegExp(`\\[post_launch_lifecycle\\].*operation=${latestLaunchReceipt.postLaunchLifecycleNextOperation}`));
+    assert.match(handoffIndexDownload.body, /Recommended Downloads:/);
+    assert.match(handoffIndexDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(handoffIndexDownload.body, /launch-mainline-first-launch-handoff\.txt/);
+    assert.match(handoffIndexDownload.body, /Included Files:/);
+    assert.match(handoffIndexDownload.body, /initial-launch-ops-readiness\.txt/);
+    assert.match(handoffIndexDownload.body, /launch-receipt-next-follow-up\.txt/);
+    assert.match(handoffIndexDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -13374,6 +13395,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /csv\/projects\.csv/);
     assert.match(checksumsDownload.body, /csv\/audit-logs\.csv/);
     assert.match(checksumsDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
+    assert.match(checksumsDownload.body, /handoff-index\.txt/);
     assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(checksumsDownload.body, /initial-launch-ops-readiness\.txt/);
 
@@ -13388,6 +13410,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /csv\/projects\.csv/);
     assert.match(zipText, /csv\/accounts\.csv/);
     assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
+    assert.match(zipText, /handoff-index\.txt/);
     assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
     assert.match(zipText, /initial-launch-ops-readiness\.txt/);
     assert.match(zipText, /csv\/audit-logs\.csv/);

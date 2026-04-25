@@ -5817,6 +5817,32 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.routeFocus.tags.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
     assert.ok(launchWorkflow.workflowSummary.routeFocus.controls.some((item) => item.workspaceAction?.key === "launch-mainline"));
     assert.ok(launchWorkflow.workflowSummary.routeFocus.controls.some((item) => item.recommendedDownload?.key === "launch_mainline_post_launch_sweep_handoff"));
+    const launchWorkflowRouteDownloadCases = [
+      ["launch_mainline_initial_launch_ops_readiness", "developer-launch-mainline", "initial-launch-ops-readiness"],
+      ["ops_route_next_summary", "developer-ops", "route-review-next"]
+    ];
+    for (const [downloadKey, expectedSource, expectedFormat] of launchWorkflowRouteDownloadCases) {
+      const workflowRouteParams = new URLSearchParams({
+        productCode: "RELPKG_ALPHA",
+        channel: "stable",
+        operation: "record_post_launch_ops_sweep",
+        actionKey: `launch_workflow_route_${downloadKey}`,
+        downloadKey,
+        routeTitle: `Continue ${downloadKey}`,
+        routeReason: `Resume ${downloadKey} from launch workflow`
+      });
+      const routedWorkflow = await getJson(
+        baseUrl,
+        `/api/developer/launch-workflow?${workflowRouteParams.toString()}`,
+        viewerSession.token
+      );
+      const workflowRouteDownload = routedWorkflow.workflowSummary.routeFocus.controls
+        .find((item) => item.recommendedDownload?.key === downloadKey)
+        ?.recommendedDownload;
+      assert.equal(workflowRouteDownload?.source, expectedSource);
+      assert.equal(workflowRouteDownload?.format, expectedFormat);
+      assert.match(workflowRouteDownload?.href || "", new RegExp(`format=${expectedFormat}`));
+    }
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.recommendedDownloads));
     assert.ok(Array.isArray(launchWorkflow.workflowSummary.actionPlan));
     assert.ok(launchWorkflow.workflowSummary.actionPlan.length >= 1);

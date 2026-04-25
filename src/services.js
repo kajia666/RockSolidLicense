@@ -8444,23 +8444,6 @@ function buildLaunchWorkflowSummaryPayload({
     channel,
     ...routedParams
   });
-  const inferRouteDownloadFormat = (key = "") => {
-    const normalized = String(key || "").trim().toLowerCase();
-    if (normalized.includes("rehearsal_guide")) return "rehearsal-guide";
-    if (normalized.includes("production_handoff")) return "production-handoff";
-    if (normalized.includes("cutover_handoff")) return "cutover-handoff";
-    if (normalized.includes("recovery_drill_handoff")) return "recovery-drill-handoff";
-    if (normalized.includes("operations_handoff")) return "operations-handoff";
-    if (normalized.includes("post_launch_sweep_handoff")) return "post-launch-sweep-handoff";
-    if (normalized.includes("closeout_handoff")) return "closeout-handoff";
-    if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
-    if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
-    if (normalized.endsWith("_checksums") || normalized.includes("checksums")) return "checksums";
-    if (normalized.endsWith("_zip") || normalized.includes("zip")) return "zip";
-    if (normalized.includes("checklist")) return "checklist";
-    if (normalized.includes("json")) return "json";
-    return "summary";
-  };
   const routeFocusDownload = routedDownloadKey
     ? createLaunchWorkflowDownloadShortcut(
         routedDownloadKey,

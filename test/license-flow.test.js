@@ -15973,6 +15973,9 @@ test("developer launch smoke page is served from the dedicated route", async () 
     assert.match(html, /operation: target\.operation/);
     assert.match(html, /actionKey: target\.actionKey/);
     assert.match(html, /downloadKey: target\.downloadKey/);
+    assert.match(html, /fallbackFormats\[item\.key\]/);
+    assert.match(html, /launch_handoff_zip: "handoff-zip"/);
+    assert.match(html, /ops_route_next_summary: "route-review-next"/);
     assert.match(html, /Run Launch Bootstrap/);
     assert.match(html, /Run First Batch Setup/);
     assert.match(html, /Run Inventory Refill/);

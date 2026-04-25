@@ -915,6 +915,21 @@
         if (!item?.source) {
           throw new Error("Generate Launch Smoke Kit first so the recommended downloads can be resolved.");
         }
+        const fallbackFormats = {
+          launch_smoke_kit_summary: "summary",
+          launch_review_summary: "summary",
+          launch_review_ops_summary: "summary",
+          launch_mainline_summary: "summary",
+          launch_handoff_zip: "handoff-zip",
+          launch_handoff_checksums: "handoff-checksums",
+          launch_workflow_zip: "zip",
+          launch_summary: "summary",
+          launch_checklist: "checklist",
+          ops_primary_session_summary: "route-review-primary",
+          ops_route_next_summary: "route-review-next",
+          ops_remaining_summary: "route-review-remaining"
+        };
+        const requestedFormat = String(item.format || fallbackFormats[item.key] || "summary").trim() || "summary";
         if (item.source === "developer-launch-smoke-kit") {
           return downloadApiFile(
             `/api/developer/launch-smoke-kit/download${q({
@@ -926,7 +941,7 @@
               operation: target.operation,
               actionKey: target.actionKey,
               downloadKey: target.downloadKey,
-              format: item.format || "summary"
+              format: requestedFormat
             })}`,
             item.fileName || "developer-launch-smoke-kit-summary.txt",
             item.label || "Launch smoke kit summary"
@@ -938,7 +953,7 @@
               productId: target.productId,
               productCode: target.productCode,
               channel: target.channel,
-              format: item.format || "summary",
+              format: requestedFormat,
               ...(item.params && typeof item.params === "object" ? item.params : {})
             })}`,
             item.fileName || "developer-launch-review-summary.txt",
@@ -951,7 +966,7 @@
               productId: target.productId,
               productCode: target.productCode,
               channel: target.channel,
-              format: item.format || "summary",
+              format: requestedFormat,
               ...(item.params && typeof item.params === "object" ? item.params : {})
             })}`,
             item.fileName || "developer-launch-mainline-summary.txt",
@@ -964,7 +979,7 @@
               productId: target.productId,
               productCode: target.productCode,
               channel: target.channel,
-              format: item.format || "summary"
+              format: requestedFormat
             })}`,
             item.fileName || "launch-workflow.txt",
             item.label || "Launch workflow summary"
@@ -975,7 +990,7 @@
             `/api/developer/ops/export/download${q({
               productId: target.productId,
               productCode: target.productCode,
-              format: item.format || "summary",
+              format: requestedFormat,
               ...(item.params && typeof item.params === "object" ? item.params : {})
             })}`,
             item.fileName || "developer-ops-summary.txt",

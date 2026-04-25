@@ -13916,6 +13916,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "-"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "-"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
+  lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "-"}`);
   appendInitialLaunchContractTraceabilityTextLines(lines, initialLaunchContract, opsFiles);
   appendInitialLaunchOperatorHeadlineTextLines(lines, initialLaunchOperatorHeadline);
   appendInitialLaunchOperatorNextActionTextLines(lines, initialLaunchOperatorNextAction);
@@ -14541,6 +14542,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     "ops/initial-launch-ops-readiness.txt",
     payload.opsSnapshot ? buildDeveloperOpsInitialLaunchOpsReadinessText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/stabilization-handoff.txt",
+    payload.opsSnapshot ? buildDeveloperOpsStabilizationHandoffText(payload.opsSnapshot) : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -15540,7 +15546,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
       initialLaunchOpsReadiness: "ops/initial-launch-ops-readiness.txt",
-      launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt"
+      launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
+      stabilizationHandoff: "ops/stabilization-handoff.txt"
     },
     packageFiles: {
       postLaunchHandoffIndex: payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
@@ -15572,7 +15579,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
     ["Ops handoff index", opsFiles.handoffIndex || "ops/handoff-index.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
-    ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"]
+    ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
+    ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
   ];
   const lines = [
     "RockSolid Developer Launch Mainline Post-Launch Handoff Index",
@@ -15613,6 +15621,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "ops/handoff-index.txt"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
+  lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"}`);
   appendInitialLaunchContractTraceabilityTextLines(lines, traceability.initialLaunchOpsContract || null, opsFiles);
   appendInitialLaunchOperatorHeadlineTextLines(lines, traceability.initialLaunchOperatorHeadline || null);
   appendInitialLaunchOperatorNextActionTextLines(lines, traceability.initialLaunchOperatorNextAction || null);

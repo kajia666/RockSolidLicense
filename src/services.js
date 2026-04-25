@@ -16377,6 +16377,78 @@ function buildDeveloperOpsInitialLaunchGoNoGo({
   };
 }
 
+function buildDeveloperOpsInitialLaunchContract({
+  scope = {},
+  status = "not_started",
+  latestReceipt = null,
+  launchReceiptNextFollowUp = null,
+  primaryWorkspaceAction = null,
+  primaryDownload = null,
+  gate = {},
+  goNoGo = {},
+  traceability = {},
+  followUpQueue = []
+} = {}) {
+  const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];
+  const blockingStages = Array.from(new Set(blockers.map((item) => item.stage).filter(Boolean)));
+  const nextRequiredAction = {
+    stage: launchReceiptNextFollowUp?.stage || goNoGo.primaryBlockerStage || null,
+    priority: launchReceiptNextFollowUp?.priority || null,
+    title: launchReceiptNextFollowUp?.title || null,
+    actionKey: launchReceiptNextFollowUp?.actionKey || goNoGo.nextActionKey || null,
+    operation: goNoGo.nextOperation || launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || null,
+    downloadKey: goNoGo.nextDownloadKey || launchReceiptNextFollowUp?.downloadKey || null,
+    downloadFileName: goNoGo.nextDownloadFileName || primaryDownload?.fileName || null,
+    workspaceKey: primaryWorkspaceAction?.key || null,
+    workspaceLabel: primaryWorkspaceAction?.label || null,
+    workspaceHref: primaryWorkspaceAction?.href || null,
+    handoffFileName: launchReceiptNextFollowUp?.handoffFileName || latestReceipt?.handoffFileName || null
+  };
+  const opsFiles = traceability.opsFiles || {};
+  const launchMainlineFiles = traceability.launchMainlineFiles || {};
+  return {
+    version: "initial-launch-ops/v1",
+    generatedFor: "developer-ops",
+    projectCode: scope.productCode || latestReceipt?.productCode || null,
+    channel: latestReceipt?.channel || launchReceiptNextFollowUp?.channel || "stable",
+    status,
+    decision: goNoGo.decision || (gate.canEnterInitialLaunch === true ? "go" : "no_go"),
+    label: goNoGo.label || (gate.canEnterInitialLaunch === true ? "GO" : "NO-GO"),
+    canEnterInitialLaunch: goNoGo.canEnterInitialLaunch === true,
+    severity: goNoGo.severity || gate.severity || "unknown",
+    gate: {
+      decision: gate.decision || null,
+      severity: gate.severity || null,
+      blockerCount: gate.blockerCount ?? blockers.length,
+      warningCount: gate.warningCount ?? (Array.isArray(gate.warnings) ? gate.warnings.length : 0),
+      requiredActionCount: gate.requiredActionCount ?? (Array.isArray(gate.requiredActions) ? gate.requiredActions.length : 0)
+    },
+    latestLaunchReceipt: latestReceipt
+      ? {
+          operation: latestReceipt.operation || null,
+          operationLabel: latestReceipt.operationLabel || null,
+          handoffFileName: latestReceipt.handoffFileName || null,
+          mainlineGateStatus: latestReceipt.mainlineGateStatus || null,
+          productionEvidenceNextOperation: latestReceipt.productionEvidenceNextOperation || null,
+          postLaunchLifecycleNextOperation: latestReceipt.postLaunchLifecycleNextOperation || null
+        }
+      : null,
+    nextRequiredAction,
+    followUpQueueCount: Array.isArray(followUpQueue) ? followUpQueue.length : 0,
+    blockingStages,
+    files: {
+      developerOpsJson: "developer-ops.json",
+      summary: "developer-ops-summary.txt",
+      handoffIndex: opsFiles.handoffIndex || "handoff-index.txt",
+      initialLaunchOpsReadiness: opsFiles.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
+      launchReceiptNextFollowUp: opsFiles.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt",
+      launchReceiptFollowUpsCsv: opsFiles.launchReceiptFollowUpsCsv || "csv/launch-receipt-follow-ups.csv",
+      auditLogsCsv: opsFiles.auditLogsCsv || "csv/audit-logs.csv",
+      launchMainlinePostLaunchHandoffIndex: launchMainlineFiles.postLaunchHandoffIndex || "post-launch-handoff-index"
+    }
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   scope = {},
   overview = {},
@@ -16462,6 +16534,29 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     firstLaunchHandoffDownload
   });
+  const goNoGo = buildDeveloperOpsInitialLaunchGoNoGo({
+    status,
+    latestReceipt,
+    launchReceiptNextFollowUp,
+    primaryDownload,
+    gate
+  });
+  const traceability = buildDeveloperOpsInitialLaunchOpsTraceability({
+    latestReceipt,
+    launchReceiptNextFollowUp
+  });
+  const contract = buildDeveloperOpsInitialLaunchContract({
+    scope,
+    status,
+    latestReceipt,
+    launchReceiptNextFollowUp,
+    primaryWorkspaceAction,
+    primaryDownload,
+    gate,
+    goNoGo,
+    traceability,
+    followUpQueue
+  });
   return {
     status,
     headline: !latestReceipt
@@ -16510,17 +16605,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     firstLaunchHandoffDownload,
     gate,
-    goNoGo: buildDeveloperOpsInitialLaunchGoNoGo({
-      status,
-      latestReceipt,
-      launchReceiptNextFollowUp,
-      primaryDownload,
-      gate
-    }),
-    traceability: buildDeveloperOpsInitialLaunchOpsTraceability({
-      latestReceipt,
-      launchReceiptNextFollowUp
-    }),
+    goNoGo,
+    contract,
+    traceability,
     nextSteps
   };
 }
@@ -18290,6 +18377,15 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push(`- nextDownload: ${goNoGo.nextDownloadFileName || "-"}`);
       lines.push(`- traceability: latestReceipt=${goNoGo.traceability?.latestReceiptOperation || "-"} | handoff=${goNoGo.traceability?.latestReceiptHandoffFileName || "-"} | opsIndex=${goNoGo.traceability?.opsHandoffIndex || "-"}`);
     }
+    const contract = initialLaunchOpsReadiness.contract || null;
+    if (contract) {
+      lines.push("");
+      lines.push("Initial Launch Contract:");
+      lines.push(`- version: ${contract.version || "-"} | decision=${contract.label || String(contract.decision || "unknown").toUpperCase()} | status=${contract.status || "-"}`);
+      lines.push(`- scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
+      lines.push(`- nextRequiredAction: stage=${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"}`);
+      lines.push(`- files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {
@@ -18507,6 +18603,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     `First Launch Handoff: ${readiness.firstLaunchHandoffDownload?.fileName || "-"} | href=${readiness.firstLaunchHandoffDownload?.href || "-"}`,
     ""
   ];
+  const contract = readiness.contract || null;
+  if (contract) {
+    lines.push("Contract:");
+    lines.push(`- Version: ${contract.version || "-"}`);
+    lines.push(`- Decision: ${contract.label || String(contract.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${contract.canEnterInitialLaunch === true})`);
+    lines.push(`- Scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
+    lines.push(`- Next Required Action: ${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"}`);
+    lines.push(`- Files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
+    lines.push("");
+  }
   lines.push("Blockers:");
   const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];
   if (blockers.length) {

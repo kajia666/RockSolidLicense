@@ -5304,11 +5304,23 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(Array.isArray(releasePackage.mainlineFollowUp.actionPlan));
     assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "clear_release_blockers"));
     assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "initial_launch_ops_readiness" && item.workspaceAction?.key === "ops"));
-    assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "initial_launch_ops_readiness" && item.recommendedDownload?.format === "initial-launch-ops-readiness"));
+    assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) =>
+      item.key === "initial_launch_ops_readiness"
+      && item.recommendedDownload?.key === "launch_mainline_initial_launch_ops_readiness"
+      && item.recommendedDownload?.source === "developer-launch-mainline"
+      && item.recommendedDownload?.format === "initial-launch-ops-readiness"
+      && /\/api\/developer\/launch-mainline\/download\?/.test(String(item.recommendedDownload?.href || ""))
+      && /format=initial-launch-ops-readiness/.test(String(item.recommendedDownload?.href || ""))
+    ));
     assert.ok(releasePackage.mainlineFollowUp.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
     assert.ok(Array.isArray(releasePackage.mainlineFollowUp.recommendedDownloads));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "release_checklist"));
-    assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "ops_initial_launch_readiness" && item.source === "developer-ops"));
+    assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) =>
+      item.key === "launch_mainline_initial_launch_ops_readiness"
+      && item.source === "developer-launch-mainline"
+      && item.format === "initial-launch-ops-readiness"
+      && /format=initial-launch-ops-readiness/.test(String(item.href || ""))
+    ));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
     assert.ok(releasePackage.mainlineFollowUp.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide" && item.source === "developer-launch-mainline"));
     assert.ok(
@@ -5411,7 +5423,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Launch Mainline Gate:/);
     assert.match(releasePackage.summaryText, /Initial Launch Ops Gate:/);
     assert.match(releasePackage.summaryText, /- decision: HOLD/);
-    assert.match(releasePackage.summaryText, /- download: Initial launch ops readiness/);
+    assert.match(releasePackage.summaryText, /- download: Launch mainline initial launch ops readiness/);
     assert.match(releasePackage.summaryText, /- status: HOLD/);
     assert.match(releasePackage.summaryText, /hostConfig=host-config\/rocksolid_host_config\.env/);
     assert.match(releasePackage.summaryText, /cmake=cmake-consumer\/CMakeLists\.txt/);
@@ -6135,6 +6147,15 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_closeout_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_stabilization_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide"));
+      assert.equal(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.key, "launch_mainline_initial_launch_ops_readiness");
+      assert.equal(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.source, "developer-launch-mainline");
+      assert.equal(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.format, "initial-launch-ops-readiness");
+      assert.match(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.href || "", /\/api\/developer\/launch-mainline\/download\?/);
+      assert.match(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.href || "", /format=initial-launch-ops-readiness/);
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) =>
+        item.key === "launch_mainline_initial_launch_ops_readiness"
+        && item.source === "developer-launch-mainline"
+      ));
       assert.ok(
         launchMainline.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
         < launchMainline.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
@@ -16897,7 +16918,9 @@ test("developer release package mainline follow-up carries launch authorization 
     );
     assert.ok(
       secondReleasePackage.mainlineFollowUp.recommendedDownloads.some((item) =>
-        item.key === "ops_initial_launch_readiness" && item.format === "initial-launch-ops-readiness"
+        item.key === "launch_mainline_initial_launch_ops_readiness"
+        && item.source === "developer-launch-mainline"
+        && item.format === "initial-launch-ops-readiness"
       )
     );
     assert.match(secondReleasePackage.summaryText, /Initial Launch Ops Gate:/);

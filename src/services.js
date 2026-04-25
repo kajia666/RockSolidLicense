@@ -2672,15 +2672,11 @@ function buildReleaseMainlineFollowUpPayload({
     "summary",
     params
   );
-  const initialLaunchOpsReadinessDownload = createLaunchWorkflowDownloadShortcut(
-    "ops_initial_launch_readiness",
-    "developer-ops-initial-launch-readiness.txt",
-    "Initial launch ops readiness",
-    {
-      source: "developer-ops",
-      format: "initial-launch-ops-readiness",
-      params
-    }
+  const initialLaunchOpsReadinessDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline initial launch ops readiness",
+    "launch-mainline-initial-launch-ops-readiness.txt",
+    "initial-launch-ops-readiness",
+    params
   );
   const workspaceActions = [];
   const seenWorkspaceActions = new Set();
@@ -4002,6 +3998,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_stabilization_handoff"
         : normalizedFormat === "first-launch-handoff"
           ? "launch_mainline_first_launch_handoff"
+        : normalizedFormat === "initial-launch-ops-readiness"
+          ? "launch_mainline_initial_launch_ops_readiness"
         : "launch_mainline_summary",
     fileName,
     label,
@@ -12634,15 +12632,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "Open Ops Workspace",
     params
   );
-  const initialLaunchOpsReadinessDownload = createLaunchWorkflowDownloadShortcut(
-    "ops_initial_launch_readiness",
-    "developer-ops-initial-launch-readiness.txt",
-    "Initial launch ops readiness",
-    {
-      source: "developer-ops",
-      format: "initial-launch-ops-readiness",
-      params
-    }
+  const initialLaunchOpsReadinessDownload = createLaunchMainlineDownloadShortcut(
+    "Launch mainline initial launch ops readiness",
+    "launch-mainline-initial-launch-ops-readiness.txt",
+    "initial-launch-ops-readiness",
+    params
   );
   const productionHandoffDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline production handoff",

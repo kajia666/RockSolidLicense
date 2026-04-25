@@ -17414,6 +17414,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /initialLaunchOperatorNextOperation/);
     assert.match(html, /initialLaunchOperatorNextDownloadFileName/);
     assert.match(html, /Initial Operator Next/);
+    assert.match(html, /handleLaunchReceiptOperatorAction/);
+    assert.match(html, /data-launch-receipt-operator-action="open-mainline"/);
+    assert.match(html, /data-launch-receipt-operator-action="download-handoff"/);
+    assert.match(html, /data-operator-operation/);
     assert.match(html, /Launch Receipt Follow-ups/);
     assert.match(html, /launchReceiptFollowUps/);
     assert.match(html, /renderLaunchReceiptFollowUps/);

@@ -2553,11 +2553,24 @@
           `download=${esc(item.initialLaunchOperatorNextDownloadFileName || item.initialLaunchOperatorNextDownloadKey || "-")}`,
           `workspace=${esc(item.initialLaunchOperatorWorkspaceKey || "-")}@${esc(item.initialLaunchOperatorWorkspaceAutofocus || "-")}`
         ].join(" | ");
+        const actionAttrs = [
+          item.productCode ? `data-product-code="${esc(item.productCode)}"` : "",
+          item.channel ? `data-channel="${esc(item.channel)}"` : "",
+          item.initialLaunchOperatorNextOperation ? `data-operator-operation="${esc(item.initialLaunchOperatorNextOperation)}"` : "",
+          item.initialLaunchOperatorNextActionKey ? `data-operator-action-key="${esc(item.initialLaunchOperatorNextActionKey)}"` : "",
+          item.initialLaunchOperatorNextDownloadKey ? `data-operator-download-key="${esc(item.initialLaunchOperatorNextDownloadKey)}"` : "",
+          item.initialLaunchOperatorNextDownloadFileName ? `data-operator-download-file-name="${esc(item.initialLaunchOperatorNextDownloadFileName)}"` : "",
+          item.initialLaunchOperatorWorkspaceAutofocus ? `data-operator-workspace-autofocus="${esc(item.initialLaunchOperatorWorkspaceAutofocus)}"` : ""
+        ].filter(Boolean).join(" ");
         return `
           <div class="hint">
             <strong>Initial Operator Next</strong>
             <div class="audit-meta">${tags || renderTag("initial-operator")}</div>
             <div>${details}</div>
+            <div class="snapshot-recap-actions" style="margin-top:8px;">
+              <button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="open-mainline" ${actionAttrs}>Open Operator Mainline</button>
+              <button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="download-handoff" ${actionAttrs} ${(token && (item.initialLaunchOperatorNextDownloadKey || item.initialLaunchOperatorNextDownloadFileName)) ? "" : "disabled"}>Download Operator Handoff</button>
+            </div>
           </div>
         `;
       }
@@ -2732,6 +2745,78 @@
           return;
         }
         throw { code: "UNSUPPORTED_NEXT_FOLLOW_UP", message: `Unsupported next launch receipt follow-up action: ${normalizedAction || "-"}` };
+      }
+
+      function launchReceiptOperatorDownloadFormat(data = {}) {
+        const normalizedKey = String(data.operatorDownloadKey || "").trim().toLowerCase();
+        if (normalizedKey === "ops_launch_receipt_next_follow_up" || normalizedKey === "launch_receipt_next_follow_up") {
+          return "launch-receipt-next-follow-up";
+        }
+        const fromKey = launchReceiptDownloadFormat(data.operatorDownloadKey || "");
+        if (fromKey) {
+          return fromKey;
+        }
+        const fileName = String(data.operatorDownloadFileName || "").trim().toLowerCase();
+        if (fileName.includes("launch-receipt-next-follow-up")) {
+          return "launch-receipt-next-follow-up";
+        }
+        if (fileName.includes("rehearsal-guide")) {
+          return "rehearsal-guide";
+        }
+        if (fileName.includes("first-launch-handoff")) {
+          return "first-launch-handoff";
+        }
+        if (fileName.includes("operations-handoff")) {
+          return "operations-handoff";
+        }
+        if (fileName.includes("post-launch-sweep-handoff")) {
+          return "post-launch-sweep-handoff";
+        }
+        if (fileName.includes("closeout-handoff")) {
+          return "closeout-handoff";
+        }
+        if (fileName.includes("stabilization-handoff")) {
+          return "stabilization-handoff";
+        }
+        return "";
+      }
+
+      async function handleLaunchReceiptOperatorAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
+        const channel = String(data.channel || requestedChannel || "stable").trim() || "stable";
+        const operation = String(data.operatorOperation || "").trim();
+        if (!productCode) {
+          throw { code: "MISSING_PROJECT", message: "Select or route a project before continuing the initial operator action." };
+        }
+        if (normalizedAction === "open-mainline") {
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+            productCode,
+            channel,
+            autofocus: data.operatorWorkspaceAutofocus || "summary",
+            routeTitle: "Initial Operator Next",
+            routeReason: operation || data.operatorActionKey || "Continue initial launch operator action",
+            ...(operation ? { operation } : {}),
+            ...(data.operatorActionKey ? { actionKey: data.operatorActionKey } : {}),
+            ...(data.operatorDownloadKey ? { downloadKey: data.operatorDownloadKey } : {})
+          });
+          return;
+        }
+        if (normalizedAction === "download-handoff") {
+          const format = launchReceiptOperatorDownloadFormat(data);
+          if (!format) {
+            throw { code: "MISSING_DOWNLOAD", message: "No initial operator handoff download is available." };
+          }
+          const result = await downloadApiFile(
+            `/api/developer/launch-mainline/download${q({ productCode, channel, format })}`,
+            data.operatorDownloadFileName || `${productCode}-${channel}-${format}.txt`
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Initial operator handoff downloaded: ${result.fileName}`);
+          return;
+        }
+        throw { code: "UNSUPPORTED_OPERATOR_ACTION", message: `Unsupported initial operator action: ${normalizedAction || "-"}` };
       }
 
       function applyRecommendedControl(control = {}) {
@@ -4460,6 +4545,14 @@
         bindRows("#snapshot-overview [data-launch-receipt-next-follow-up-action]", async (data) => {
           try {
             await handleLaunchReceiptNextFollowUpAction(data.launchReceiptNextFollowUpAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-launch-receipt-operator-action]", async (data) => {
+          try {
+            await handleLaunchReceiptOperatorAction(data.launchReceiptOperatorAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });

@@ -16339,6 +16339,44 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
   };
 }
 
+function buildDeveloperOpsInitialLaunchGoNoGo({
+  status = "not_started",
+  latestReceipt = null,
+  launchReceiptNextFollowUp = null,
+  primaryDownload = null,
+  gate = {}
+} = {}) {
+  const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];
+  const warnings = Array.isArray(gate.warnings) ? gate.warnings : [];
+  const primaryBlocker = blockers[0] || null;
+  const nextAction = gate.nextAction || null;
+  const canEnterInitialLaunch = gate.canEnterInitialLaunch === true;
+  return {
+    decision: canEnterInitialLaunch ? "go" : "no_go",
+    label: canEnterInitialLaunch ? "GO" : "NO-GO",
+    status,
+    severity: gate.severity || (blockers.length ? "blocker" : warnings.length ? "warning" : "clear"),
+    canEnterInitialLaunch,
+    blockerCount: gate.blockerCount ?? blockers.length,
+    warningCount: gate.warningCount ?? warnings.length,
+    requiredActionCount: gate.requiredActionCount ?? (Array.isArray(gate.requiredActions) ? gate.requiredActions.length : 0),
+    primaryBlockerStage: primaryBlocker?.stage || null,
+    primaryBlockerTitle: primaryBlocker?.title || null,
+    primaryBlockerSummary: primaryBlocker?.summary || null,
+    nextActionKey: nextAction?.actionKey || launchReceiptNextFollowUp?.actionKey || null,
+    nextOperation: nextAction?.operation || launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || null,
+    nextDownloadKey: nextAction?.downloadKey || launchReceiptNextFollowUp?.downloadKey || primaryDownload?.key || null,
+    nextDownloadFileName: primaryDownload?.fileName || null,
+    traceability: {
+      latestReceiptOperation: latestReceipt?.operation || null,
+      latestReceiptHandoffFileName: latestReceipt?.handoffFileName || null,
+      opsHandoffIndex: "handoff-index.txt",
+      initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
+      launchReceiptNextFollowUp: "launch-receipt-next-follow-up.txt"
+    }
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   scope = {},
   overview = {},
@@ -16472,6 +16510,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     firstLaunchHandoffDownload,
     gate,
+    goNoGo: buildDeveloperOpsInitialLaunchGoNoGo({
+      status,
+      latestReceipt,
+      launchReceiptNextFollowUp,
+      primaryDownload,
+      gate
+    }),
     traceability: buildDeveloperOpsInitialLaunchOpsTraceability({
       latestReceipt,
       launchReceiptNextFollowUp
@@ -18235,6 +18280,16 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     lines.push(`- workspace: ${initialLaunchOpsReadiness.primaryWorkspaceAction?.label || "-"}@${initialLaunchOpsReadiness.primaryWorkspaceAction?.autofocus || "-"}`);
     lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"})`);
     lines.push(`- firstLaunchHandoff: ${initialLaunchOpsReadiness.firstLaunchHandoffDownload?.fileName || "-"}`);
+    const goNoGo = initialLaunchOpsReadiness.goNoGo || null;
+    if (goNoGo) {
+      lines.push("");
+      lines.push("Initial Launch Go/No-Go:");
+      lines.push(`- decision: ${goNoGo.label || String(goNoGo.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${goNoGo.canEnterInitialLaunch === true})`);
+      lines.push(`- primaryBlocker: ${goNoGo.primaryBlockerStage || "-"}`);
+      lines.push(`- nextOperation: ${goNoGo.nextOperation || "-"}`);
+      lines.push(`- nextDownload: ${goNoGo.nextDownloadFileName || "-"}`);
+      lines.push(`- traceability: latestReceipt=${goNoGo.traceability?.latestReceiptOperation || "-"} | handoff=${goNoGo.traceability?.latestReceiptHandoffFileName || "-"} | opsIndex=${goNoGo.traceability?.opsHandoffIndex || "-"}`);
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {

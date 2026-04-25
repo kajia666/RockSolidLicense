@@ -2748,6 +2748,50 @@
         throw { code: "UNSUPPORTED_NEXT_FOLLOW_UP", message: `Unsupported next launch receipt follow-up action: ${normalizedAction || "-"}` };
       }
 
+      async function handleStabilizationHandoffAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
+        const channel = String(data.channel || requestedChannel || "stable").trim() || "stable";
+        const operation = String(data.stabilizationOperation || "").trim();
+        const actionKey = String(data.stabilizationActionKey || "").trim();
+        if (normalizedAction === "open-workspace") {
+          const href = String(data.stabilizationWorkspaceHref || "").trim();
+          if (href) {
+            window.location.href = href;
+            return;
+          }
+          if (!productCode) {
+            throw { code: "MISSING_PROJECT", message: "Select or route a project before opening the stabilization handoff workspace." };
+          }
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+            productCode,
+            channel,
+            autofocus: "summary",
+            routeTitle: "Initial Launch Stabilization Handoff",
+            routeReason: operation || actionKey || "Review stabilization handoff",
+            ...(operation ? { operation } : {}),
+            ...(actionKey ? { actionKey } : {}),
+            downloadKey: "launch_mainline_stabilization_handoff"
+          });
+          return;
+        }
+        if (normalizedAction === "download-handoff") {
+          if (!productCode) {
+            throw { code: "MISSING_PROJECT", message: "Select or route a project before downloading the stabilization handoff." };
+          }
+          const format = String(data.stabilizationDownloadFormat || "stabilization-handoff").trim() || "stabilization-handoff";
+          const result = await downloadApiFile(
+            `/api/developer/launch-mainline/download${q({ productCode, channel, format })}`,
+            data.stabilizationDownloadFileName || `${productCode}-${channel}-${format}.txt`
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Stabilization handoff downloaded: ${result.fileName}`);
+          return;
+        }
+        throw { code: "UNSUPPORTED_STABILIZATION_HANDOFF", message: `Unsupported stabilization handoff action: ${normalizedAction || "-"}` };
+      }
+
       function launchReceiptOperatorDownloadFormat(data = {}) {
         const normalizedKey = String(data.operatorDownloadKey || "").trim().toLowerCase();
         if (normalizedKey === "ops_launch_receipt_next_follow_up" || normalizedKey === "launch_receipt_next_follow_up") {
@@ -4084,6 +4128,32 @@
         const latestOperator = item.latestOperatorActionReceipt || {};
         const nextAction = item.nextAction || {};
         const files = item.files || {};
+        const productCode = String(item.projectCode || latestOperator.productCode || latestReceipt.productCode || requestedProductCode || "").trim();
+        const channel = String(item.channel || latestOperator.channel || latestReceipt.channel || requestedChannel || "stable").trim() || "stable";
+        const nextOperation = nextAction.operation || latestOperator.nextOperation || latestReceipt.postLaunchLifecycleNextOperation || latestReceipt.productionEvidenceNextOperation || "";
+        const workspaceHref = String(nextAction.workspaceHref || "").trim() || (productCode
+          ? buildWorkspaceUrl("/developer/launch-mainline", {
+              productCode,
+              channel,
+              autofocus: "summary",
+              routeTitle: "Initial Launch Stabilization Handoff",
+              routeReason: nextOperation || nextAction.actionKey || "Review stabilization handoff",
+              ...(nextOperation ? { operation: nextOperation } : {}),
+              ...(nextAction.actionKey ? { actionKey: nextAction.actionKey } : {}),
+              downloadKey: "launch_mainline_stabilization_handoff"
+            })
+          : "");
+        const stabilizationDownloadFormat = "stabilization-handoff";
+        const stabilizationDownloadFileName = `${productCode || "developer"}-${channel}-${stabilizationDownloadFormat}.txt`;
+        const actionAttrs = [
+          productCode ? `data-product-code="${esc(productCode)}"` : "",
+          channel ? `data-channel="${esc(channel)}"` : "",
+          workspaceHref ? `data-stabilization-workspace-href="${esc(workspaceHref)}"` : "",
+          nextOperation ? `data-stabilization-operation="${esc(nextOperation)}"` : "",
+          nextAction.actionKey ? `data-stabilization-action-key="${esc(nextAction.actionKey)}"` : "",
+          `data-stabilization-download-format="${esc(stabilizationDownloadFormat)}"`,
+          `data-stabilization-download-file-name="${esc(stabilizationDownloadFileName)}"`
+        ].filter(Boolean).join(" ");
         const status = String(item.status || "unknown").toLowerCase();
         const postLaunchStatus = latestReceipt.postLaunchLifecycleStatus || latestReceipt.postLaunchStatus || "";
         const tags = [
@@ -4126,6 +4196,10 @@
             <div class="snapshot-focus-meta">${operatorDetails}</div>
             <div class="snapshot-focus-meta">${nextDetails}</div>
             <div class="snapshot-focus-meta">${fileDetails}</div>
+            <div class="snapshot-recap-actions">
+              <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="open-workspace" ${actionAttrs} ${workspaceHref ? "" : "disabled"}>Open Stabilization Workspace</button>
+              <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="download-handoff" ${actionAttrs} ${(token && productCode) ? "" : "disabled"}>Download Stabilization Handoff</button>
+            </div>
             ${checklist.length ? `<ul class="snapshot-list">${checklist.map((entry) => `<li>${esc(entry)}</li>`).join("")}</ul>` : ""}
           </div>
         `;
@@ -4731,6 +4805,14 @@
         bindRows("#snapshot-overview [data-launch-receipt-next-follow-up-action]", async (data) => {
           try {
             await handleLaunchReceiptNextFollowUpAction(data.launchReceiptNextFollowUpAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-stabilization-handoff-action]", async (data) => {
+          try {
+            await handleStabilizationHandoffAction(data.stabilizationHandoffAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });

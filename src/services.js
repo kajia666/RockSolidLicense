@@ -266,13 +266,14 @@ function withTransaction(db, action) {
 }
 
 function audit(db, actorType, actorId, eventType, entityType, entityId, metadata = {}) {
+  const auditLogId = generateId("audit");
   run(
     db,
     `
       INSERT INTO audit_logs (id, actor_type, actor_id, event_type, entity_type, entity_id, metadata_json, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    generateId("audit"),
+    auditLogId,
     actorType,
     actorId,
     eventType,
@@ -281,6 +282,7 @@ function audit(db, actorType, actorId, eventType, entityType, entityId, metadata
     JSON.stringify(metadata),
     nowIso()
   );
+  return auditLogId;
 }
 
 function requireField(body, field, message) {
@@ -20618,7 +20620,7 @@ function buildAdminOpsExportDownloadAsset(payload, format = "json") {
 
 function auditDeveloperSession(db, session, eventType, entityType, entityId, metadata = {}) {
   const actorType = session.actor_scope === "member" ? "developer_member" : "developer";
-  audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
+  return audit(db, actorType, session.actor_id, eventType, entityType, entityId, {
     developerId: session.developer_id,
     actorType: session.actor_scope,
     actorUsername: session.username,
@@ -32438,6 +32440,99 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         developerId: null,
         productCodes: scopedProductCodes
       });
+    },
+
+    async developerConfirmOpsStabilizationHandoff(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only confirm stabilization handoff reviews for your assigned projects."
+      );
+      requireField(body, "productCode");
+
+      const productCode = readProductCodeInput(body);
+      const product = await getStoreActiveProductByCode(productCode);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product.id,
+          owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+        },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only confirm stabilization handoff reviews for your assigned projects."
+      );
+
+      const channel = normalizeChannel(body.channel, "stable");
+      const rawDecision = String(body.decision ?? "confirmed").trim().toLowerCase();
+      const decision = rawDecision.replace(/[^a-z0-9._-]/g, "_") || "confirmed";
+      const confirmedAt = nowIso();
+      const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
+      const handoffFileName = "developer-ops-stabilization-handoff.txt";
+      const traceability = {
+        eventType: "developer.ops.stabilization-handoff.confirm",
+        entityType: "developer_ops_stabilization_handoff",
+        opsFiles: {
+          handoffIndex: "handoff-index.txt",
+          initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
+          launchReceiptNextFollowUp: "launch-receipt-next-follow-up.txt",
+          stabilizationHandoff: "stabilization-handoff.txt",
+          launchReceiptFollowUpsCsv: "csv/launch-receipt-follow-ups.csv",
+          auditLogsCsv: "csv/audit-logs.csv"
+        },
+        launchMainlineFiles: {
+          postLaunchHandoffIndex: "post-launch-handoff-index",
+          stabilizationHandoff: "ops/stabilization-handoff.txt",
+          summary: "summary",
+          checksums: "checksums",
+          zip: "zip"
+        }
+      };
+      const confirmedBy = {
+        actorType: session.actor_scope === "member" ? "developer_member" : "developer",
+        actorScope: session.actor_scope,
+        actorId: session.actor_id,
+        username: session.username,
+        role: session.member_role ?? "owner"
+      };
+      const auditLogId = auditDeveloperSession(
+        db,
+        session,
+        traceability.eventType,
+        traceability.entityType,
+        product.id,
+        {
+          productCode: product.code,
+          channel,
+          decision,
+          status: "confirmed",
+          confirmedAt,
+          handoffFileName,
+          note,
+          opsFiles: traceability.opsFiles,
+          launchMainlineFiles: traceability.launchMainlineFiles
+        }
+      );
+
+      return {
+        version: "developer-ops-stabilization-handoff-confirmation/v1",
+        status: "confirmed",
+        productCode: product.code,
+        productId: product.id,
+        channel,
+        decision,
+        note,
+        confirmedAt,
+        confirmedBy,
+        handoffFileName,
+        handoffFormat: "stabilization-handoff",
+        traceability,
+        auditLogId,
+        message: `Stabilization handoff confirmed for ${product.code} (${channel}).`
+      };
     },
 
     async developerExportOpsSnapshot(token, filters = {}) {

@@ -2806,6 +2806,31 @@
           setStatus(`Stabilization handoff downloaded: ${result.fileName}`);
           return;
         }
+        if (normalizedAction === "confirm-handoff") {
+          if (!productCode) {
+            throw { code: "MISSING_PROJECT", message: "Select or route a project before confirming the stabilization handoff." };
+          }
+          const confirmation = await api("/api/developer/ops/stabilization-handoff/confirm", {
+            method: "POST",
+            body: {
+              productCode,
+              channel,
+              decision: "confirmed",
+              note: operation || actionKey || "confirmed_from_developer_ops"
+            }
+          });
+          lastStabilizationHandoffResult = buildStabilizationHandoffActionResult(normalizedAction, data, {
+            status: confirmation.status || "confirmed",
+            message: confirmation.message || "Stabilization handoff confirmed.",
+            auditLogId: confirmation.auditLogId,
+            confirmedAt: confirmation.confirmedAt,
+            decision: confirmation.decision
+          });
+          setOutput(confirmation);
+          await refreshOps(false);
+          setStatus(`Stabilization handoff confirmed: audit ${confirmation.auditLogId || "-"}`);
+          return;
+        }
         throw { code: "UNSUPPORTED_STABILIZATION_HANDOFF", message: `Unsupported stabilization handoff action: ${normalizedAction || "-"}` };
       }
 
@@ -4100,7 +4125,9 @@
           ? "Open Stabilization Workspace"
           : normalizedAction === "download-handoff"
             ? "Download Stabilization Handoff"
-            : "Stabilization Handoff Action";
+            : normalizedAction === "confirm-handoff"
+              ? "Confirm Stabilization Handoff"
+              : "Stabilization Handoff Action";
         return {
           action: normalizedAction,
           label,
@@ -4113,6 +4140,9 @@
           downloadFormat: String(data.stabilizationDownloadFormat || "stabilization-handoff").trim() || "stabilization-handoff",
           downloadFileName: String(extra.fileName || data.stabilizationDownloadFileName || "").trim(),
           workspaceHref: String(data.stabilizationWorkspaceHref || "").trim(),
+          decision: String(extra.decision || "").trim(),
+          auditLogId: String(extra.auditLogId || "").trim(),
+          confirmedAt: String(extra.confirmedAt || "").trim(),
           timestamp: new Date().toISOString()
         };
       }
@@ -4123,14 +4153,17 @@
         }
         const item = lastStabilizationHandoffResult;
         const status = String(item.status || "ready").toLowerCase();
-        const statusClass = status === "downloaded" || status === "routed" ? "ok" : "warning";
+        const statusClass = status === "downloaded" || status === "routed" || status === "confirmed" ? "ok" : "warning";
         const details = [
           item.productCode ? `project=${item.productCode}` : "",
           item.channel ? `channel=${item.channel}` : "",
           item.operation ? `operation=${item.operation}` : "",
           item.actionKey ? `action=${item.actionKey}` : "",
           item.downloadFileName || item.downloadFormat ? `download=${item.downloadFileName || item.downloadFormat}` : "",
-          item.workspaceHref ? `workspace=${item.workspaceHref}` : ""
+          item.workspaceHref ? `workspace=${item.workspaceHref}` : "",
+          item.decision ? `decision=${item.decision}` : "",
+          item.auditLogId ? `auditLogId=${item.auditLogId}` : "",
+          item.confirmedAt ? `confirmedAt=${formatTime(item.confirmedAt)}` : ""
         ].filter(Boolean).join(" | ");
         return `
           <div class="snapshot-recap stabilization-handoff-confirmation" data-stabilization-handoff-confirmation="latest">
@@ -4268,6 +4301,7 @@
             <div class="snapshot-recap-actions">
               <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="open-workspace" ${actionAttrs} ${workspaceHref ? "" : "disabled"}>Open Stabilization Workspace</button>
               <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="download-handoff" ${actionAttrs} ${(token && productCode) ? "" : "disabled"}>Download Stabilization Handoff</button>
+              <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="confirm-handoff" ${actionAttrs} ${(token && productCode) ? "" : "disabled"}>Confirm Stabilization Handoff</button>
             </div>
             ${checklist.length ? `<ul class="snapshot-list">${checklist.map((entry) => `<li>${esc(entry)}</li>`).join("")}</ul>` : ""}
           </div>

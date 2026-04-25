@@ -13560,6 +13560,41 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(stabilizationHandoffDownload.body, /Files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
     assert.match(stabilizationHandoffDownload.body, /Checklist:/);
 
+    const stabilizationConfirmation = await postJson(
+      baseUrl,
+      "/api/developer/ops/stabilization-handoff/confirm",
+      {
+        productCode: "EXPORT_ALPHA",
+        channel: "stable",
+        decision: "confirmed",
+        note: "handoff reviewed by ops"
+      },
+      operatorSession.token
+    );
+    assert.equal(stabilizationConfirmation.version, "developer-ops-stabilization-handoff-confirmation/v1");
+    assert.equal(stabilizationConfirmation.status, "confirmed");
+    assert.equal(stabilizationConfirmation.productCode, "EXPORT_ALPHA");
+    assert.equal(stabilizationConfirmation.channel, "stable");
+    assert.equal(stabilizationConfirmation.decision, "confirmed");
+    assert.equal(stabilizationConfirmation.handoffFileName, "developer-ops-stabilization-handoff.txt");
+    assert.equal(stabilizationConfirmation.confirmedBy.actorType, "developer_member");
+    assert.equal(stabilizationConfirmation.confirmedBy.username, "ops.export.operator");
+    assert.equal(stabilizationConfirmation.traceability.opsFiles.stabilizationHandoff, "stabilization-handoff.txt");
+    assert.equal(stabilizationConfirmation.traceability.launchMainlineFiles.stabilizationHandoff, "ops/stabilization-handoff.txt");
+    assert.ok(stabilizationConfirmation.auditLogId);
+
+    const stabilizationConfirmationAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=EXPORT_ALPHA&eventType=developer.ops.stabilization-handoff.confirm&limit=5",
+      operatorSession.token
+    );
+    assert.ok(stabilizationConfirmationAudit.items.some((item) =>
+      item.id === stabilizationConfirmation.auditLogId
+        && item.entity_type === "developer_ops_stabilization_handoff"
+        && item.metadata?.decision === "confirmed"
+        && item.metadata?.handoffFileName === "developer-ops-stabilization-handoff.txt"
+    ));
+
     const handoffIndexDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=handoff-index",
@@ -17335,6 +17370,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/device-bindings/);
     assert.match(html, /api\/developer\/audit-logs/);
     assert.match(html, /api\/developer\/ops\/export/);
+    assert.match(html, /api\/developer\/ops\/stabilization-handoff\/confirm/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Next Follow-up/);
     assert.match(html, /Download Launch Readiness/);
@@ -17357,6 +17393,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-launch-receipt-next-follow-up-action="open-workspace"/);
     assert.match(html, /data-workspace-href/);
     assert.match(html, /data-download-href/);
+    assert.match(html, /data-stabilization-handoff-action="confirm-handoff"/);
+    assert.match(html, /Confirm Stabilization Handoff/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
     assert.match(html, /Escalate First/);

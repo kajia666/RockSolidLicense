@@ -1916,6 +1916,15 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/developer/ops/stabilization-handoff/confirm") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerConfirmOpsStabilizationHandoff(getBearerToken(req), body)
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/accounts") {
         sendJson(res, 200, {
           ok: true,

@@ -224,6 +224,7 @@
       let snapshot = emptySnapshot();
       let lastExportDownload = null;
       let lastOperatorActionResult = null;
+      let lastStabilizationHandoffResult = null;
       let preparedFocus = null;
       let lastMutation = null;
       let routeReviewDisplayMode = "all";
@@ -2757,12 +2758,22 @@
         if (normalizedAction === "open-workspace") {
           const href = String(data.stabilizationWorkspaceHref || "").trim();
           if (href) {
+            lastStabilizationHandoffResult = buildStabilizationHandoffActionResult(normalizedAction, data, {
+              status: "routed",
+              message: "Opening the stabilization handoff workspace."
+            });
+            renderSnapshotOverview();
             window.location.href = href;
             return;
           }
           if (!productCode) {
             throw { code: "MISSING_PROJECT", message: "Select or route a project before opening the stabilization handoff workspace." };
           }
+          lastStabilizationHandoffResult = buildStabilizationHandoffActionResult(normalizedAction, data, {
+            status: "routed",
+            message: "Opening Launch Mainline for the stabilization handoff."
+          });
+          renderSnapshotOverview();
           window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
             productCode,
             channel,
@@ -2785,6 +2796,11 @@
             data.stabilizationDownloadFileName || `${productCode}-${channel}-${format}.txt`
           );
           lastExportDownload = result;
+          lastStabilizationHandoffResult = buildStabilizationHandoffActionResult(normalizedAction, data, {
+            status: "downloaded",
+            fileName: result.fileName,
+            message: `Downloaded ${result.fileName}.`
+          });
           renderSnapshotOverview();
           setStatus(`Stabilization handoff downloaded: ${result.fileName}`);
           return;
@@ -4077,6 +4093,58 @@
         `;
       }
 
+      function buildStabilizationHandoffActionResult(action = "", data = {}, extra = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const label = normalizedAction === "open-workspace"
+          ? "Open Stabilization Workspace"
+          : normalizedAction === "download-handoff"
+            ? "Download Stabilization Handoff"
+            : "Stabilization Handoff Action";
+        return {
+          action: normalizedAction,
+          label,
+          status: String(extra.status || "ready").trim().toLowerCase() || "ready",
+          message: String(extra.message || "").trim(),
+          productCode: String(data.productCode || el("filter-product-code")?.value || requestedProductCode || "").trim(),
+          channel: String(data.channel || requestedChannel || "stable").trim() || "stable",
+          operation: String(data.stabilizationOperation || "").trim(),
+          actionKey: String(data.stabilizationActionKey || "").trim(),
+          downloadFormat: String(data.stabilizationDownloadFormat || "stabilization-handoff").trim() || "stabilization-handoff",
+          downloadFileName: String(extra.fileName || data.stabilizationDownloadFileName || "").trim(),
+          workspaceHref: String(data.stabilizationWorkspaceHref || "").trim(),
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      function renderLastStabilizationHandoffResult() {
+        if (!lastStabilizationHandoffResult) {
+          return "";
+        }
+        const item = lastStabilizationHandoffResult;
+        const status = String(item.status || "ready").toLowerCase();
+        const statusClass = status === "downloaded" || status === "routed" ? "ok" : "warning";
+        const details = [
+          item.productCode ? `project=${item.productCode}` : "",
+          item.channel ? `channel=${item.channel}` : "",
+          item.operation ? `operation=${item.operation}` : "",
+          item.actionKey ? `action=${item.actionKey}` : "",
+          item.downloadFileName || item.downloadFormat ? `download=${item.downloadFileName || item.downloadFormat}` : "",
+          item.workspaceHref ? `workspace=${item.workspaceHref}` : ""
+        ].filter(Boolean).join(" | ");
+        return `
+          <div class="snapshot-recap stabilization-handoff-confirmation" data-stabilization-handoff-confirmation="latest">
+            <div class="snapshot-recap-head">
+              <strong>Last Stabilization Handoff Action</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+              <span class="tag">${esc(formatTime(item.timestamp))}</span>
+            </div>
+            <div>${esc(item.label || "Stabilization Handoff Action")}</div>
+            ${item.message ? `<div class="hint">${esc(item.message)}</div>` : ""}
+            <div class="hint">${esc(details || "Stabilization handoff action captured for this Ops session.")}</div>
+          </div>
+        `;
+      }
+
       function renderOperatorActionReceipts(initialLaunchOpsReadiness = {}) {
         const entries = Array.isArray(initialLaunchOpsReadiness?.operatorActionReceipts)
           ? initialLaunchOpsReadiness.operatorActionReceipts.slice(0, 5)
@@ -4660,6 +4728,7 @@
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
           ${renderLaunchReceiptNextFollowUpActions(launchReceiptNextFollowUp)}
           ${renderLastOperatorActionResult()}
+          ${renderLastStabilizationHandoffResult()}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderStabilizationHandoff(initialLaunchOpsReadiness)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
@@ -5195,6 +5264,7 @@
         snapshot = emptySnapshot();
         lastExportDownload = null;
         lastOperatorActionResult = null;
+        lastStabilizationHandoffResult = null;
         preparedFocus = null;
         lastMutation = null;
         routeReviewDisplayMode = (requestedReviewMode === "matched" || currentRequestedRouteReviewAction()) ? "matched" : "all";

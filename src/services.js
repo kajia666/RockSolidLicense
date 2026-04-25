@@ -15661,6 +15661,11 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       "launchReceiptGateStatus",
       "launchReceiptEvidenceRemaining",
       "launchReceiptDutyDownloadKey",
+      "launchReceiptPostLaunchStatus",
+      "launchReceiptPostLaunchNextOperation",
+      "launchReceiptPostLaunchPrimaryDownloadKey",
+      "launchReceiptPostLaunchPrimaryDownloadFormat",
+      "launchReceiptPostLaunchPrimaryDownloadFileName",
       "createdAt",
       "metadataJson"
     ],
@@ -15679,6 +15684,11 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       item.metadata?.launchReceipt?.mainlineGate?.status ?? "",
       item.metadata?.launchReceipt?.productionEvidence?.remainingCount ?? "",
       item.metadata?.launchReceipt?.firstLaunchDuty?.handoffDownloadKey ?? "",
+      item.metadata?.launchReceipt?.postLaunchLifecycle?.status ?? "",
+      item.metadata?.launchReceipt?.postLaunchLifecycle?.nextOperation ?? "",
+      item.metadata?.launchReceipt?.postLaunchLifecycle?.primaryDownloadKey ?? "",
+      item.metadata?.launchReceipt?.postLaunchLifecycle?.primaryDownloadFormat ?? "",
+      item.metadata?.launchReceipt?.postLaunchLifecycle?.primaryDownloadFileName ?? "",
       item.createdAt,
       JSON.stringify(item.metadata ?? {})
     ])

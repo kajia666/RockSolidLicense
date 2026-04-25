@@ -14300,6 +14300,16 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/handoff-index.txt",
+    payload.opsSnapshot ? buildDeveloperOpsHandoffIndexText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-receipt-next-follow-up.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchReceiptNextFollowUpText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/initial-launch-ops-readiness.txt",
     payload.opsSnapshot ? buildDeveloperOpsInitialLaunchOpsReadinessText(payload.opsSnapshot) : ""
   );
@@ -15248,12 +15258,21 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
   const phases = Array.isArray(lifecycle.phases) ? lifecycle.phases : [];
   const recommendedDownloads = Array.isArray(lifecycle.recommendedDownloads) ? lifecycle.recommendedDownloads : [];
+  const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
+  const latestLaunchReceipt = Array.isArray(opsSnapshot.overview?.latestLaunchReceipts) && opsSnapshot.overview.latestLaunchReceipts.length
+    ? opsSnapshot.overview.latestLaunchReceipts[0]
+    : null;
+  const launchReceiptNextFollowUp = opsSnapshot.summary?.launchReceiptNextFollowUp
+    || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
+    || null;
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
     ["Post-launch sweep handoff", payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt"],
     ["Closeout handoff", payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt"],
     ["Stabilization handoff", payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt"],
     ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
+    ["Ops handoff index", "ops/handoff-index.txt"],
+    ["Launch receipt next follow-up", "ops/launch-receipt-next-follow-up.txt"],
     ["Initial launch ops readiness", payload.initialLaunchOpsReadinessFileName || "developer-launch-mainline-initial-launch-ops-readiness.txt"]
   ];
   const lines = [
@@ -15282,6 +15301,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   } else {
     lines.push("- none");
   }
+
+  lines.push("");
+  lines.push("Traceability:");
+  lines.push(
+    `- Latest Launch Receipt: ${latestLaunchReceipt?.operation || "-"}`
+    + ` | handoff=${latestLaunchReceipt?.handoffFileName || "-"}`
+    + ` | gate=${latestLaunchReceipt?.mainlineGateStatus || "-"}`
+    + ` | evidenceNext=${latestLaunchReceipt?.productionEvidenceNextOperation || "-"}`
+    + ` | lifecycleNext=${latestLaunchReceipt?.postLaunchLifecycleNextOperation || "-"}`
+  );
+  lines.push(`- Ops Handoff Index: ops/handoff-index.txt`);
+  lines.push(`- Initial Launch Ops Readiness: ops/initial-launch-ops-readiness.txt`);
+  lines.push(`- Launch Receipt Next Follow-up: ops/launch-receipt-next-follow-up.txt | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
 
   lines.push("");
   lines.push("Recommended Downloads:");

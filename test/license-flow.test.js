@@ -13358,6 +13358,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(handoffIndexDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
 
+    const launchMainlinePostLaunchIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      operatorSession.token
+    );
+    assert.equal(launchMainlinePostLaunchIndexDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /RockSolid Developer Launch Mainline Post-Launch Handoff Index/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Traceability:/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Latest Launch Receipt: record_post_launch_ops_sweep/);
+    assert.ok(launchMainlinePostLaunchIndexDownload.body.includes(latestLaunchReceipt.handoffFileName));
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
+    );
+    const launchMainlineTraceabilityChecksums = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=checksums",
+      operatorSession.token
+    );
+    assert.match(launchMainlineTraceabilityChecksums.body, /ops\/handoff-index\.txt/);
+    assert.match(launchMainlineTraceabilityChecksums.body, /ops\/launch-receipt-next-follow-up\.txt/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

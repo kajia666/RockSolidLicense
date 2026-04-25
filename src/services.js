@@ -16089,6 +16089,47 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     || null;
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
+  const followUpQueue = followUps
+    .map((item) => ({
+      key: item.key || null,
+      stage: item.stage || null,
+      priority: normalizeLaunchReceiptFollowUpPriority(item.priority),
+      title: item.title || null,
+      summary: item.summary || "",
+      productCode: item.productCode || latestReceipt?.productCode || null,
+      channel: item.channel || latestReceipt?.channel || "stable",
+      actionKey: item.actionKey || null,
+      operation: item.operation || null,
+      operationToRecord: item.operationToRecord || item.operation || null,
+      downloadKey: item.downloadKey || null,
+      handoffFileName: item.handoffFileName || latestReceipt?.handoffFileName || null
+    }))
+    .filter((item) => item.stage || item.actionKey || item.operationToRecord || item.downloadKey);
+  const recommendedDownloads = [];
+  const seenRecommendedDownloads = new Set();
+  for (const download of [
+    primaryDownload,
+    firstLaunchHandoffDownload,
+    mainlineHandoff?.downloads?.checksums,
+    mainlineHandoff?.downloads?.zip
+  ]) {
+    if (!download || typeof download !== "object") {
+      continue;
+    }
+    const dedupeKey = download.key || download.href || download.fileName;
+    if (!dedupeKey || seenRecommendedDownloads.has(dedupeKey)) {
+      continue;
+    }
+    seenRecommendedDownloads.add(dedupeKey);
+    recommendedDownloads.push({
+      key: download.key || null,
+      label: download.label || download.title || download.key || null,
+      fileName: download.fileName || null,
+      format: download.format || null,
+      href: download.href || null,
+      source: download.source || null
+    });
+  }
   const status = !latestReceipt
     ? "not_started"
     : followUps.length
@@ -16132,6 +16173,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     channel: latestReceipt?.channel || "stable",
     followUpCount: followUps.length,
     priorities: launchReceiptFollowUpPriorities || {},
+    followUpQueue,
+    recommendedDownloads,
     latestReceipt: latestReceipt
       ? {
           operation: latestReceipt.operation || null,
@@ -18150,6 +18193,26 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   if (warnings.length) {
     for (const item of warnings) {
       lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Follow-up Queue:");
+  const followUpQueue = Array.isArray(readiness.followUpQueue) ? readiness.followUpQueue : [];
+  if (followUpQueue.length) {
+    for (const item of followUpQueue) {
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operationToRecord || item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"} | handoff=${item.handoffFileName || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Recommended Downloads:");
+  const recommendedDownloads = Array.isArray(readiness.recommendedDownloads) ? readiness.recommendedDownloads : [];
+  if (recommendedDownloads.length) {
+    for (const item of recommendedDownloads) {
+      lines.push(`- ${item.label || item.key || "-"} | file=${item.fileName || "-"} | format=${item.format || "-"} | href=${item.href || "-"}`);
     }
   } else {
     lines.push("- none");

@@ -13153,6 +13153,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.operation, "record_post_launch_ops_sweep");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.ok(Array.isArray(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue));
+    assert.equal(
+      launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.length,
+      launchReceiptSnapshot.overview.launchReceiptFollowUps.length
+    );
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.some((item) =>
+      item.stage === "production_evidence"
+        && item.operationToRecord === latestLaunchReceipt.productionEvidenceNextOperation
+        && item.downloadKey === latestLaunchReceipt.firstLaunchDutyPrimaryDownloadKey
+    ));
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.some((item) =>
+      item.stage === "post_launch_lifecycle"
+        && item.operationToRecord === latestLaunchReceipt.postLaunchLifecycleNextOperation
+        && item.downloadKey === latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey
+    ));
+    assert.ok(Array.isArray(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads));
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
+      item.key === "ops_launch_receipt_next_follow_up" && item.format === "launch-receipt-next-follow-up"
+    ));
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
+      item.key === "launch_mainline_first_launch_handoff" && item.format === "first-launch-handoff"
+    ));
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
+      item.key === "launch_mainline_checksums" && item.format === "checksums"
+    ));
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
@@ -13274,6 +13299,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /Primary Workspace: Open Launch Mainline/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Primary Download: developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(initialLaunchOpsReadinessDownload.body, /First Launch Handoff: launch-mainline-first-launch-handoff\.txt/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Follow-up Queue:/);
+    assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[production_evidence\\].*operation=${latestLaunchReceipt.productionEvidenceNextOperation}.*download=${latestLaunchReceipt.firstLaunchDutyPrimaryDownloadKey || "-"}`));
+    assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[post_launch_lifecycle\\].*operation=${latestLaunchReceipt.postLaunchLifecycleNextOperation}.*download=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`));
+    assert.match(initialLaunchOpsReadinessDownload.body, /Recommended Downloads:/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt.*format=launch-receipt-next-follow-up/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-first-launch-handoff\.txt.*format=first-launch-handoff/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-sha256\.txt.*format=checksums/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

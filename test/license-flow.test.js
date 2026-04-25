@@ -5461,6 +5461,34 @@ test("developer release package export bundles integration, versions, and notice
     assert.equal(receiptNextRouteDownload?.format, "launch-receipt-next-follow-up");
     assert.match(receiptNextRouteDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
     assert.match(receiptNextRouteDownload?.href || "", /format=launch-receipt-next-follow-up/);
+    const opsRouteReviewDownloadCases = [
+      ["primary_session", "ops_primary_session_summary", "route-review-primary"],
+      ["next", "ops_route_next_summary", "route-review-next"],
+      ["remaining", "ops_remaining_summary", "route-review-remaining"]
+    ];
+    for (const [operationSuffix, downloadKey, expectedFormat] of opsRouteReviewDownloadCases) {
+      const opsRouteReviewParams = new URLSearchParams({
+        productCode: "RELPKG_ALPHA",
+        channel: "stable",
+        operation: `review_ops_${operationSuffix}`,
+        actionKey: `release_route_ops_${operationSuffix}`,
+        downloadKey,
+        routeTitle: `Continue ops ${operationSuffix} route review`,
+        routeReason: `Resume ops ${operationSuffix} route review from the release package handoff`
+      });
+      const opsRouteReviewPackage = await getJson(
+        baseUrl,
+        `/api/developer/release-package?${opsRouteReviewParams.toString()}`,
+        viewerSession.token
+      );
+      const opsRouteReviewDownload = opsRouteReviewPackage.manifest.release.routeFocus.controls
+        .find((item) => item.recommendedDownload?.key === downloadKey)
+        ?.recommendedDownload;
+      assert.equal(opsRouteReviewDownload?.source, "developer-ops");
+      assert.equal(opsRouteReviewDownload?.format, expectedFormat);
+      assert.match(opsRouteReviewDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
+      assert.match(opsRouteReviewDownload?.href || "", new RegExp(`format=${expectedFormat}`));
+    }
     const smokeOpsRouteCases = [
       ["accounts", "launch_smoke_accounts_summary"],
       ["entitlements", "launch_smoke_entitlements_summary"],

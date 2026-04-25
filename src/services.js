@@ -3566,6 +3566,9 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
+  if (normalized === "ops_primary_summary" || /^ops_primary_(account|entitlement|session|device)_summary$/.test(normalized)) return "route-review-primary";
+  if (normalized === "ops_route_next_summary") return "route-review-next";
+  if (normalized === "ops_remaining_summary") return "route-review-remaining";
   if (normalized.endsWith("_checksums") || normalized.includes("checksums")) return "checksums";
   if (normalized.endsWith("_zip") || normalized.includes("zip")) return "zip";
   if (normalized.includes("checklist")) return "checklist";

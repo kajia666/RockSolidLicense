@@ -4282,6 +4282,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
   firstLaunchHandoffDownload = null,
   firstLaunchDutySummary = null,
   postLaunchLifecycleSummary = null,
+  initialLaunchOperatorActionReceipt = null,
   mainlineRecapCards = [],
   actions = []
 } = {}) {
@@ -4307,6 +4308,24 @@ function buildLaunchMainlineActionReceiptHandoffText({
     lines.push("Production Evidence:");
     lines.push(`- ${formatLaunchProductionEvidenceLine(mainlineEvidenceQueue, "Production Evidence")}`);
     lines.push(`- total=${mainlineEvidenceQueue.totalCount ?? 0} | completed=${mainlineEvidenceQueue.completedCount ?? 0} | remaining=${mainlineEvidenceQueue.remainingCount ?? 0}`);
+  }
+
+  if (initialLaunchOperatorActionReceipt) {
+    lines.push("");
+    lines.push("Initial Launch Operator Actions:");
+    lines.push(
+      `- manifest: ${initialLaunchOperatorActionReceipt.version || "-"}`
+      + ` | primary=${initialLaunchOperatorActionReceipt.primaryActionKey || "-"}`
+      + ` | actions=${initialLaunchOperatorActionReceipt.actionCount ?? 0}`
+    );
+    lines.push(
+      `- next: stage=${initialLaunchOperatorActionReceipt.nextStage || "-"}`
+      + ` | operation=${initialLaunchOperatorActionReceipt.nextOperation || "-"}`
+      + ` | action=${initialLaunchOperatorActionReceipt.nextActionKey || "-"}`
+      + ` | download=${initialLaunchOperatorActionReceipt.nextDownloadFileName || initialLaunchOperatorActionReceipt.nextDownloadKey || "-"}`
+    );
+    lines.push(`- workspace: ${initialLaunchOperatorActionReceipt.workspaceKey || "-"}@${initialLaunchOperatorActionReceipt.workspaceAutofocus || "-"} | href=${initialLaunchOperatorActionReceipt.workspaceHref || "-"}`);
+    lines.push(`- files: readiness=${initialLaunchOperatorActionReceipt.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${initialLaunchOperatorActionReceipt.files?.handoffIndex || "-"} | nextFollowUp=${initialLaunchOperatorActionReceipt.files?.launchReceiptNextFollowUp || "-"}`);
   }
 
   if (postLaunchLifecycleSummary) {
@@ -4987,6 +5006,63 @@ function buildLaunchMainlineActionReceipt({
       params: item?.params || null
     }))
     .filter((item) => item.key);
+  const initialLaunchOperatorActionManifest = (() => {
+    const traceabilityManifest = launchMainline?.postLaunchHandoffTraceability?.initialLaunchOperatorActionManifest;
+    if (traceabilityManifest && typeof traceabilityManifest === "object") {
+      return traceabilityManifest;
+    }
+    const summaryManifest = mainlineSummary.initialLaunchOpsReadiness?.operatorActionManifest;
+    if (summaryManifest && typeof summaryManifest === "object") {
+      return summaryManifest;
+    }
+    const opsManifest = launchMainline?.opsSnapshot?.summary?.initialLaunchOpsReadiness?.operatorActionManifest;
+    if (opsManifest && typeof opsManifest === "object") {
+      return opsManifest;
+    }
+    return null;
+  })();
+  const initialLaunchOperatorActions = Array.isArray(initialLaunchOperatorActionManifest?.actions)
+    ? initialLaunchOperatorActionManifest.actions
+    : [];
+  const initialLaunchOperatorPrimaryAction = initialLaunchOperatorActions[0] || null;
+  const initialLaunchOperatorFallbackAction = mainlineEvidenceQueue?.nextAction || followUp?.nextProductionAction || null;
+  const initialLaunchOperatorWorkspaceAction = initialLaunchOperatorPrimaryAction?.workspaceAction
+    || initialLaunchOperatorFallbackAction?.workspaceAction
+    || null;
+  const initialLaunchOperatorDownload = initialLaunchOperatorPrimaryAction?.download
+    || initialLaunchOperatorPrimaryAction?.recommendedDownload
+    || initialLaunchOperatorFallbackAction?.recommendedDownload
+    || null;
+  const initialLaunchOperatorActionReceipt = initialLaunchOperatorActionManifest
+    ? {
+        source: "launch_mainline_action_receipt",
+        version: initialLaunchOperatorActionManifest.version || null,
+        generatedFor: initialLaunchOperatorActionManifest.generatedFor || null,
+        projectCode: initialLaunchOperatorActionManifest.projectCode || result?.productCode || launchMainline?.manifest?.project?.code || mainlineSummary.form?.productCode || null,
+        channel: initialLaunchOperatorActionManifest.channel || result?.channel || launchMainline?.manifest?.channel || mainlineSummary.form?.channel || "stable",
+        status: initialLaunchOperatorActionManifest.status || null,
+        decision: initialLaunchOperatorActionManifest.decision || null,
+        decisionLabel: initialLaunchOperatorActionManifest.decisionLabel || null,
+        primaryActionKey: initialLaunchOperatorActionManifest.primaryActionKey || initialLaunchOperatorPrimaryAction?.kind || null,
+        actionCount: Number(initialLaunchOperatorActionManifest.actionCount ?? initialLaunchOperatorActions.length ?? 0),
+        nextStage: initialLaunchOperatorPrimaryAction?.stage || (initialLaunchOperatorFallbackAction ? "production_evidence" : null),
+        nextActionKey: initialLaunchOperatorPrimaryAction?.actionKey || initialLaunchOperatorFallbackAction?.key || null,
+        nextOperation: initialLaunchOperatorPrimaryAction?.operation || initialLaunchOperatorFallbackAction?.setupAction?.operation || null,
+        nextDownloadKey: initialLaunchOperatorPrimaryAction?.downloadKey || initialLaunchOperatorDownload?.key || null,
+        nextDownloadFileName: initialLaunchOperatorDownload?.fileName || null,
+        workspaceKey: initialLaunchOperatorWorkspaceAction?.key || null,
+        workspaceAutofocus: initialLaunchOperatorWorkspaceAction?.autofocus || null,
+        workspaceHref: initialLaunchOperatorWorkspaceAction?.href || initialLaunchOperatorActionManifest.entrypoints?.workspaceHref || null,
+        files: {
+          initialLaunchOpsReadiness: initialLaunchOperatorActionManifest.files?.initialLaunchOpsReadiness || initialLaunchOperatorActionManifest.entrypoints?.readinessFile || null,
+          handoffIndex: initialLaunchOperatorActionManifest.files?.handoffIndex || initialLaunchOperatorActionManifest.entrypoints?.handoffIndexFile || null,
+          launchReceiptNextFollowUp: initialLaunchOperatorActionManifest.files?.launchReceiptNextFollowUp || null
+        },
+        traceability: initialLaunchOperatorActionManifest.traceability && typeof initialLaunchOperatorActionManifest.traceability === "object"
+          ? { ...initialLaunchOperatorActionManifest.traceability }
+          : {}
+      }
+    : null;
   const mainlineActions = (Array.isArray(mainlineSummary.actionPlan) ? mainlineSummary.actionPlan : [])
     .slice(0, 4)
     .map((item) => ({
@@ -5754,6 +5830,7 @@ function buildLaunchMainlineActionReceipt({
     firstLaunchHandoffDownload,
     firstLaunchDutySummary,
     postLaunchLifecycleSummary,
+    initialLaunchOperatorActionReceipt,
     mainlineRecapCards,
     actions
   });
@@ -5782,6 +5859,8 @@ function buildLaunchMainlineActionReceipt({
     firstLaunchHandoffDownload,
     firstLaunchDutySummary,
     postLaunchLifecycleSummary,
+    initialLaunchOperatorActionManifest,
+    initialLaunchOperatorActionReceipt,
     mainlineRecapCards,
     mainlineOverviewCards,
     mainlineForm,
@@ -5830,6 +5909,9 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
     : null;
   const lifecyclePrimaryDownload = lifecycle?.primaryRecommendedDownload && typeof lifecycle.primaryRecommendedDownload === "object"
     ? lifecycle.primaryRecommendedDownload
+    : null;
+  const initialLaunchOperator = receipt.initialLaunchOperatorActionReceipt && typeof receipt.initialLaunchOperatorActionReceipt === "object"
+    ? receipt.initialLaunchOperatorActionReceipt
     : null;
   const gate = receipt.mainlineOverallGate && typeof receipt.mainlineOverallGate === "object"
     ? receipt.mainlineOverallGate
@@ -5899,6 +5981,29 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           primaryDownloadKey: lifecyclePrimaryDownload?.key || null,
           primaryDownloadFormat: lifecyclePrimaryDownload?.format || null,
           primaryDownloadFileName: lifecyclePrimaryDownload?.fileName || null
+      }
+      : null,
+    initialLaunchOperator: initialLaunchOperator
+      ? {
+          version: initialLaunchOperator.version || null,
+          source: initialLaunchOperator.source || null,
+          decision: initialLaunchOperator.decision || null,
+          decisionLabel: initialLaunchOperator.decisionLabel || null,
+          status: initialLaunchOperator.status || null,
+          primaryActionKey: initialLaunchOperator.primaryActionKey || null,
+          actionCount: Number(initialLaunchOperator.actionCount || 0),
+          nextStage: initialLaunchOperator.nextStage || null,
+          nextActionKey: initialLaunchOperator.nextActionKey || null,
+          nextOperation: initialLaunchOperator.nextOperation || null,
+          nextDownloadKey: initialLaunchOperator.nextDownloadKey || null,
+          nextDownloadFileName: initialLaunchOperator.nextDownloadFileName || null,
+          workspaceKey: initialLaunchOperator.workspaceKey || null,
+          workspaceAutofocus: initialLaunchOperator.workspaceAutofocus || null,
+          files: {
+            initialLaunchOpsReadiness: initialLaunchOperator.files?.initialLaunchOpsReadiness || null,
+            handoffIndex: initialLaunchOperator.files?.handoffIndex || null,
+            launchReceiptNextFollowUp: initialLaunchOperator.files?.launchReceiptNextFollowUp || null
+          }
         }
       : null,
     recapCardKeys: Array.isArray(receipt.mainlineRecapCards)
@@ -15980,6 +16085,10 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       "launchReceiptPostLaunchPrimaryDownloadKey",
       "launchReceiptPostLaunchPrimaryDownloadFormat",
       "launchReceiptPostLaunchPrimaryDownloadFileName",
+      "launchReceiptInitialOperatorDecision",
+      "launchReceiptInitialOperatorPrimaryActionKey",
+      "launchReceiptInitialOperatorNextOperation",
+      "launchReceiptInitialOperatorNextDownloadFileName",
       "createdAt",
       "metadataJson"
     ],
@@ -16003,6 +16112,10 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       item.metadata?.launchReceipt?.postLaunchLifecycle?.primaryDownloadKey ?? "",
       item.metadata?.launchReceipt?.postLaunchLifecycle?.primaryDownloadFormat ?? "",
       item.metadata?.launchReceipt?.postLaunchLifecycle?.primaryDownloadFileName ?? "",
+      item.metadata?.launchReceipt?.initialLaunchOperator?.decision ?? "",
+      item.metadata?.launchReceipt?.initialLaunchOperator?.primaryActionKey ?? "",
+      item.metadata?.launchReceipt?.initialLaunchOperator?.nextOperation ?? "",
+      item.metadata?.launchReceipt?.initialLaunchOperator?.nextDownloadFileName ?? "",
       item.createdAt,
       JSON.stringify(item.metadata ?? {})
     ])
@@ -16129,6 +16242,17 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
         postLaunchLifecyclePrimaryDownloadKey: receipt.postLaunchLifecycle?.primaryDownloadKey || null,
         postLaunchLifecyclePrimaryDownloadFormat: receipt.postLaunchLifecycle?.primaryDownloadFormat || null,
         postLaunchLifecyclePrimaryDownloadFileName: receipt.postLaunchLifecycle?.primaryDownloadFileName || null,
+        initialLaunchOperatorDecision: receipt.initialLaunchOperator?.decision || null,
+        initialLaunchOperatorStatus: receipt.initialLaunchOperator?.status || null,
+        initialLaunchOperatorPrimaryActionKey: receipt.initialLaunchOperator?.primaryActionKey || null,
+        initialLaunchOperatorActionCount: receipt.initialLaunchOperator?.actionCount ?? null,
+        initialLaunchOperatorNextStage: receipt.initialLaunchOperator?.nextStage || null,
+        initialLaunchOperatorNextActionKey: receipt.initialLaunchOperator?.nextActionKey || null,
+        initialLaunchOperatorNextOperation: receipt.initialLaunchOperator?.nextOperation || null,
+        initialLaunchOperatorNextDownloadKey: receipt.initialLaunchOperator?.nextDownloadKey || null,
+        initialLaunchOperatorNextDownloadFileName: receipt.initialLaunchOperator?.nextDownloadFileName || null,
+        initialLaunchOperatorWorkspaceKey: receipt.initialLaunchOperator?.workspaceKey || null,
+        initialLaunchOperatorWorkspaceAutofocus: receipt.initialLaunchOperator?.workspaceAutofocus || null,
         createdAt: item.createdAt || null
       };
     })
@@ -18685,7 +18809,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.latestLaunchReceipts) && overview.latestLaunchReceipts.length) {
       lines.push("Latest Launch Receipts:");
       for (const item of overview.latestLaunchReceipts) {
-        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | handoff=${item.handoffFileName || "-"}`);
+        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
       }
     }
     if (Array.isArray(overview.launchReceiptFollowUps) && overview.launchReceiptFollowUps.length) {

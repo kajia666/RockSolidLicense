@@ -13094,6 +13094,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.equal(launchOpsAction.receipt?.operation, "record_post_launch_ops_sweep");
     assert.match(launchOpsAction.receipt?.handoffFileName || "", /EXPORT_ALPHA-stable-record_post_launch_ops_sweep.*\.txt/i);
+    assert.ok(launchOpsAction.receipt?.initialLaunchOperatorActionReceipt);
+    assert.equal(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.source, "launch_mainline_action_receipt");
+    assert.equal(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.decision, "no_go");
+    assert.equal(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.primaryActionKey, "launch_mainline_follow_up");
+    assert.equal(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.actionCount, 1);
+    assert.equal(
+      launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextOperation,
+      launchOpsAction.receipt.mainlineEvidenceQueue.nextAction.setupAction.operation
+    );
+    assert.match(launchOpsAction.receipt.handoffText || "", /Initial Launch Operator Actions:/);
+    assert.match(
+      launchOpsAction.receipt.handoffText || "",
+      new RegExp(`operation=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextOperation}`)
+    );
 
     const launchReceiptSnapshot = await getJson(
       baseUrl,
@@ -13108,6 +13122,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.handoffFileName, launchOpsAction.receipt.handoffFileName);
     assert.equal(latestLaunchReceipt.hasHandoffText, true);
     assert.equal(latestLaunchReceipt.handoffText, undefined);
+    assert.equal(latestLaunchReceipt.initialLaunchOperatorDecision, "no_go");
+    assert.equal(latestLaunchReceipt.initialLaunchOperatorPrimaryActionKey, "launch_mainline_follow_up");
+    assert.equal(latestLaunchReceipt.initialLaunchOperatorActionCount, 1);
+    assert.equal(latestLaunchReceipt.initialLaunchOperatorNextOperation, launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextOperation);
+    assert.equal(
+      latestLaunchReceipt.initialLaunchOperatorNextDownloadFileName,
+      launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadFileName
+    );
     assert.equal(latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey, launchOpsAction.receipt.firstLaunchDutySummary?.handoffDownload?.key || null);
     assert.equal(latestLaunchReceipt.postLaunchLifecycleStatus, launchOpsAction.receipt.postLaunchLifecycleSummary?.status || null);
     assert.equal(

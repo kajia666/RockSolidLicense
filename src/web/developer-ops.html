@@ -2528,10 +2528,38 @@
               <strong>${esc(item.operationLabel || item.operation || "Launch receipt")}</strong>
               <div class="audit-meta">${tags || renderTag("launch-receipt")}</div>
               <div class="hint">${details}</div>
+              ${renderLaunchReceiptOperatorSummary(item)}
               ${item.summary ? `<div class="hint">${esc(item.summary)}</div>` : ""}
             </div>
           `;
         }).join("");
+      }
+
+      function renderLaunchReceiptOperatorSummary(item = null) {
+        if (!item?.initialLaunchOperatorNextOperation && !item?.initialLaunchOperatorPrimaryActionKey) {
+          return "";
+        }
+        const tags = [
+          item.initialLaunchOperatorDecision ? renderTag(`decision:${String(item.initialLaunchOperatorDecision).toUpperCase()}`, true) : "",
+          item.initialLaunchOperatorStatus ? renderTag(`status:${String(item.initialLaunchOperatorStatus).toUpperCase()}`) : "",
+          item.initialLaunchOperatorPrimaryActionKey ? renderTag(`primary:${item.initialLaunchOperatorPrimaryActionKey}`, true) : "",
+          item.initialLaunchOperatorActionCount !== null && item.initialLaunchOperatorActionCount !== undefined
+            ? renderTag(`actions:${item.initialLaunchOperatorActionCount}`)
+            : ""
+        ].filter(Boolean).join("");
+        const details = [
+          `operation=${esc(item.initialLaunchOperatorNextOperation || "-")}`,
+          `action=${esc(item.initialLaunchOperatorNextActionKey || "-")}`,
+          `download=${esc(item.initialLaunchOperatorNextDownloadFileName || item.initialLaunchOperatorNextDownloadKey || "-")}`,
+          `workspace=${esc(item.initialLaunchOperatorWorkspaceKey || "-")}@${esc(item.initialLaunchOperatorWorkspaceAutofocus || "-")}`
+        ].join(" | ");
+        return `
+          <div class="hint">
+            <strong>Initial Operator Next</strong>
+            <div class="audit-meta">${tags || renderTag("initial-operator")}</div>
+            <div>${details}</div>
+          </div>
+        `;
       }
 
       function renderLaunchReceiptFollowUps(items = []) {

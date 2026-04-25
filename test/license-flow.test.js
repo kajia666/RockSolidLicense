@@ -13080,6 +13080,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.handoffText, undefined);
     assert.equal(latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey, launchOpsAction.receipt.firstLaunchDutySummary?.handoffDownload?.key || null);
     assert.equal(latestLaunchReceipt.postLaunchLifecycleStatus, launchOpsAction.receipt.postLaunchLifecycleSummary?.status || null);
+    assert.equal(
+      latestLaunchReceipt.postLaunchLifecycleNextOperation,
+      launchOpsAction.receipt.postLaunchLifecycleSummary?.nextAction?.setupAction?.operation || null
+    );
+    assert.equal(
+      latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat,
+      launchOpsAction.receipt.postLaunchLifecycleSummary?.primaryRecommendedDownload?.format || null
+    );
+    assert.equal(
+      latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName,
+      launchOpsAction.receipt.postLaunchLifecycleSummary?.primaryRecommendedDownload?.fileName || null
+    );
     const launchReceiptEvidenceFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.operation === "record_post_launch_ops_sweep" && item.stage === "production_evidence"
     );
@@ -13095,6 +13107,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchReceiptLifecycleFollowUp);
     assert.equal(launchReceiptLifecycleFollowUp.productCode, "EXPORT_ALPHA");
     assert.equal(launchReceiptLifecycleFollowUp.actionKey, latestLaunchReceipt.postLaunchLifecycleNextActionKey);
+    assert.equal(launchReceiptLifecycleFollowUp.operationToRecord, latestLaunchReceipt.postLaunchLifecycleNextOperation);
     assert.equal(launchReceiptLifecycleFollowUp.downloadKey, latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey);
     assert.equal(launchReceiptLifecycleFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.match(launchReceiptLifecycleFollowUp.summary, /Post-launch lifecycle status/i);

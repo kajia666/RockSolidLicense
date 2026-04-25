@@ -5822,6 +5822,15 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
   const lifecycle = receipt.postLaunchLifecycleSummary && typeof receipt.postLaunchLifecycleSummary === "object"
     ? receipt.postLaunchLifecycleSummary
     : null;
+  const lifecycleNextAction = lifecycle?.nextAction && typeof lifecycle.nextAction === "object"
+    ? lifecycle.nextAction
+    : null;
+  const lifecyclePrimaryWorkspace = lifecycle?.primaryWorkspaceAction && typeof lifecycle.primaryWorkspaceAction === "object"
+    ? lifecycle.primaryWorkspaceAction
+    : null;
+  const lifecyclePrimaryDownload = lifecycle?.primaryRecommendedDownload && typeof lifecycle.primaryRecommendedDownload === "object"
+    ? lifecycle.primaryRecommendedDownload
+    : null;
   const gate = receipt.mainlineOverallGate && typeof receipt.mainlineOverallGate === "object"
     ? receipt.mainlineOverallGate
     : null;
@@ -5878,8 +5887,18 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
     postLaunchLifecycle: lifecycle
       ? {
           status: lifecycle.status || null,
-          nextActionKey: lifecycle.nextAction?.key || null,
-          primaryDownloadKey: lifecycle.primaryRecommendedDownload?.key || null
+          phaseCount: Number(lifecycle.phaseCount || 0),
+          readyCount: Number(lifecycle.readyCount || 0),
+          holdCount: Number(lifecycle.holdCount || 0),
+          reviewCount: Number(lifecycle.reviewCount || 0),
+          nextActionKey: lifecycleNextAction?.key || null,
+          nextActionTitle: lifecycleNextAction?.title || lifecycleNextAction?.label || null,
+          nextOperation: lifecycleNextAction?.setupAction?.operation || null,
+          primaryWorkspaceKey: lifecyclePrimaryWorkspace?.key || lifecycleNextAction?.workspaceAction?.key || null,
+          primaryWorkspaceAutofocus: lifecyclePrimaryWorkspace?.autofocus || lifecycleNextAction?.workspaceAction?.autofocus || null,
+          primaryDownloadKey: lifecyclePrimaryDownload?.key || null,
+          primaryDownloadFormat: lifecyclePrimaryDownload?.format || null,
+          primaryDownloadFileName: lifecyclePrimaryDownload?.fileName || null
         }
       : null,
     recapCardKeys: Array.isArray(receipt.mainlineRecapCards)
@@ -15774,8 +15793,18 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
         firstLaunchDutyPrimaryDownloadKey: receipt.firstLaunchDuty?.primaryDownloadKey || null,
         firstLaunchDutyActionCount: receipt.firstLaunchDuty?.actionCount ?? null,
         postLaunchLifecycleStatus: receipt.postLaunchLifecycle?.status || null,
+        postLaunchLifecyclePhaseCount: receipt.postLaunchLifecycle?.phaseCount ?? null,
+        postLaunchLifecycleReadyCount: receipt.postLaunchLifecycle?.readyCount ?? null,
+        postLaunchLifecycleHoldCount: receipt.postLaunchLifecycle?.holdCount ?? null,
+        postLaunchLifecycleReviewCount: receipt.postLaunchLifecycle?.reviewCount ?? null,
         postLaunchLifecycleNextActionKey: receipt.postLaunchLifecycle?.nextActionKey || null,
+        postLaunchLifecycleNextActionTitle: receipt.postLaunchLifecycle?.nextActionTitle || null,
+        postLaunchLifecycleNextOperation: receipt.postLaunchLifecycle?.nextOperation || null,
+        postLaunchLifecyclePrimaryWorkspaceKey: receipt.postLaunchLifecycle?.primaryWorkspaceKey || null,
+        postLaunchLifecyclePrimaryWorkspaceAutofocus: receipt.postLaunchLifecycle?.primaryWorkspaceAutofocus || null,
         postLaunchLifecyclePrimaryDownloadKey: receipt.postLaunchLifecycle?.primaryDownloadKey || null,
+        postLaunchLifecyclePrimaryDownloadFormat: receipt.postLaunchLifecycle?.primaryDownloadFormat || null,
+        postLaunchLifecyclePrimaryDownloadFileName: receipt.postLaunchLifecycle?.primaryDownloadFileName || null,
         createdAt: item.createdAt || null
       };
     })
@@ -15846,8 +15875,9 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       pushFollowUp(receipt, "post_launch_lifecycle", {
         priority: receipt.postLaunchLifecycleStatus === "ready" ? "secondary" : "review",
         title: "Continue post-launch lifecycle",
-        summary: `Post-launch lifecycle status is ${receipt.postLaunchLifecycleStatus || "unknown"}; continue with the next recorded launch lifecycle action.`,
+        summary: `Post-launch lifecycle status is ${receipt.postLaunchLifecycleStatus || "unknown"}; continue with ${receipt.postLaunchLifecycleNextOperation || "the next recorded launch lifecycle action"}.`,
         actionKey: receipt.postLaunchLifecycleNextActionKey,
+        operationToRecord: receipt.postLaunchLifecycleNextOperation || null,
         downloadKey: receipt.postLaunchLifecyclePrimaryDownloadKey || receipt.firstLaunchDutyHandoffDownloadKey || null
       });
     }

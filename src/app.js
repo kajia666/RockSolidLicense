@@ -1902,6 +1902,20 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/ops/first-wave/recommendations") {
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerFirstWaveRecommendations(getBearerToken(req), {
+            productCode: url.searchParams.get("productCode"),
+            projectCode: url.searchParams.get("projectCode"),
+            softwareCode: url.searchParams.get("softwareCode"),
+            channel: url.searchParams.get("channel"),
+            limit: url.searchParams.get("limit")
+          })
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/ops/export/download") {
         const data = await services.developerExportOpsSnapshot(getBearerToken(req), {
           productCode: url.searchParams.get("productCode"),

@@ -85,6 +85,7 @@
           <div class="pill">Route: <code>/developer/ops</code></div>
           <div class="pill">Scoped APIs: <code>/api/developer/accounts</code> to <code>/api/developer/audit-logs</code></div>
           <div class="pill">Snapshot Export: <code>/api/developer/ops/export</code> and <code>/download</code></div>
+          <div class="pill">First-Wave Recommendations: <code>/api/developer/ops/first-wave/recommendations</code></div>
         </div>
         <div class="stats" id="stats-box"></div>
       </section>
@@ -137,6 +138,7 @@
           <h2>Ops Snapshot Export</h2>
           <div class="actions">
             <button class="secondary" id="preview-export-btn">Preview Snapshot</button>
+            <button class="secondary" id="load-first-wave-recommendations-btn">Preview First-Wave Recommendations</button>
             <button class="secondary" id="download-export-json-btn">Download JSON</button>
             <button class="secondary" id="download-export-summary-btn">Download Summary</button>
             <button class="secondary" id="download-export-next-follow-up-btn">Download Next Follow-up</button>
@@ -149,6 +151,8 @@
           <div class="hint">Generate a scoped ops handoff bundle with projects, accounts, entitlements, sessions, bindings, blocks, audit logs, and SHA-256 checksums.</div>
           <div class="status" id="snapshot-overview-status">Sign in and refresh a scoped snapshot to populate the latest handoff overview.</div>
           <div class="snapshot-box" id="snapshot-overview"></div>
+          <div class="status" id="first-wave-recommendations-status">Load first-wave recommendations for the selected project to review inventory, card issuance, and launch-day operations.</div>
+          <div class="snapshot-box" id="first-wave-recommendations-box"></div>
         </article>
 
         <article class="card" id="quick-controls-card">
@@ -224,6 +228,7 @@
       let actor = null;
       let snapshot = emptySnapshot();
       let lastExportDownload = null;
+      let lastFirstWaveRecommendations = null;
       let lastOperatorActionResult = null;
       let lastStabilizationHandoffResult = null;
       let preparedFocus = null;
@@ -2536,6 +2541,56 @@
             </div>
           `;
         }).join("");
+      }
+
+      function renderFirstWaveRecommendations() {
+        const statusBox = el("first-wave-recommendations-status");
+        const box = el("first-wave-recommendations-box");
+        const payload = lastFirstWaveRecommendations;
+        if (!payload || typeof payload !== "object") {
+          statusBox.textContent = "Load first-wave recommendations for the selected project to review inventory, card issuance, and launch-day operations.";
+          statusBox.className = "status";
+          box.innerHTML = `<div class="hint">No first-wave recommendation preview yet.</div>`;
+          return;
+        }
+
+        const inventory = payload.inventory || {};
+        const firstCards = payload.firstCards || {};
+        const firstRoundOps = payload.firstRoundOps || {};
+        const traceability = payload.traceability || {};
+        const status = String(payload.status || firstRoundOps.status || inventory.status || "review").toLowerCase();
+        statusBox.textContent = `First-wave recommendations loaded for ${payload.productCode || "-"} | inventory=${inventory.status || "-"} | cards=${firstCards.status || "-"} | ops=${firstRoundOps.status || "-"}`;
+        statusBox.className = status === "ready" ? "status" : "status warn";
+        const cards = [
+          { label: "Inventory Status", value: inventory.status || "-" },
+          { label: "Fresh Cards", value: inventory.freshCardCount ?? 0 },
+          { label: "Recommended Cards", value: firstCards.recommendedCardCount ?? inventory.targetCardCount ?? 0 },
+          { label: "Issued Batches", value: firstCards.issuedBatchCount ?? 0 },
+          { label: "Ops Status", value: firstRoundOps.status || "-" },
+          { label: "Audit", value: payload.auditLogId || "-" }
+        ];
+        const states = Array.isArray(inventory.states) ? inventory.states : [];
+        const actions = Array.isArray(firstRoundOps.actions) ? firstRoundOps.actions : [];
+        box.innerHTML = `
+          <div class="hint">Generated ${esc(formatTime(payload.generatedAt))}${traceability.opsSnapshotFileName ? ` | snapshot=${esc(traceability.opsSnapshotFileName)}` : ""}</div>
+          <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
+          <div class="snapshot-recap">
+            <strong>Inventory Recommendation</strong>
+            <div class="audit-meta">${renderTag(inventory.action?.operation || "monitor")}${renderTag(inventory.status || "unknown")}</div>
+            <div class="hint">${esc(inventory.action?.reason || payload.message || "-")}</div>
+            <div class="hint">Endpoint: ${esc(inventory.action?.method || "-")} ${esc(inventory.action?.endpoint || "-")}</div>
+          </div>
+          <div class="snapshot-recap">
+            <strong>First Card Issuance</strong>
+            <div class="hint">recommended=${esc(firstCards.recommendedCardCount ?? 0)} | issuedFresh=${esc(firstCards.issuedFreshCardCount ?? 0)} | issuedBatches=${esc(firstCards.issuedBatchCount ?? 0)}</div>
+            <ul class="snapshot-list">${states.length ? states.map((item) => `<li><strong>${esc(item.label || item.mode || "-")}</strong> ${esc(item.status || "-")} | prefix=${esc(item.prefix || "-")} | fresh=${esc(item.freshCount ?? 0)}/${esc(item.targetCount ?? 0)}</li>`).join("") : "<li>No card inventory states are available.</li>"}</ul>
+          </div>
+          <div class="snapshot-recap">
+            <strong>First Round Ops Actions</strong>
+            <div class="hint">primary=${esc(firstRoundOps.primaryAction?.title || firstRoundOps.primaryAction?.operation || "-")}</div>
+            <ul class="snapshot-list">${actions.length ? actions.slice(0, 6).map((item) => `<li><strong>${esc(item.stage || "-")}</strong> ${esc(item.title || item.operation || "-")} | action=${esc(item.actionKey || "-")} | operation=${esc(item.operation || "-")} | download=${esc(item.downloadKey || "-")}</li>`).join("") : "<li>No first-round ops action is queued.</li>"}</ul>
+          </div>
+        `;
       }
 
       function renderLaunchReceiptOperatorSummary(item = null) {
@@ -5280,6 +5335,7 @@
         renderOpsRouteFocus();
         renderRouteReview();
         renderSnapshotOverview();
+        renderFirstWaveRecommendations();
         renderAccounts();
         renderEntitlements();
         renderSessions();
@@ -5304,12 +5360,34 @@
         return snapshot;
       }
 
+      async function loadFirstWaveRecommendations(showOutput = true) {
+        const currentFilters = filters();
+        const productCode = currentFilters.productCode || requestedProductCode || "";
+        if (!productCode) {
+          const error = new Error("Select or route a project code before loading first-wave recommendations.");
+          error.code = "PRODUCT_CODE_REQUIRED";
+          throw error;
+        }
+        const data = await api(`/api/developer/ops/first-wave/recommendations${q({
+          productCode,
+          channel: requestedChannel,
+          limit: currentFilters.limit
+        })}`);
+        lastFirstWaveRecommendations = data;
+        renderFirstWaveRecommendations();
+        if (showOutput) {
+          setOutput(data);
+        }
+        return data;
+      }
+
       function clearSession() {
         token = "";
         profile = null;
         actor = null;
         snapshot = emptySnapshot();
         lastExportDownload = null;
+        lastFirstWaveRecommendations = null;
         lastOperatorActionResult = null;
         lastStabilizationHandoffResult = null;
         preparedFocus = null;
@@ -5416,6 +5494,7 @@
         });
       });
       el("preview-export-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Scoped ops snapshot refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("load-first-wave-recommendations-btn").addEventListener("click", async () => { try { const data = await loadFirstWaveRecommendations(); setStatus(`First-wave recommendations loaded for ${data.productCode}.`); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-json-btn").addEventListener("click", async () => { try { await handleExportDownload("json", "developer-ops.json", "Ops snapshot JSON"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-next-follow-up-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-next-follow-up", "developer-ops-launch-receipt-next-follow-up.txt", "Launch receipt next follow-up"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

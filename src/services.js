@@ -17241,6 +17241,281 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   };
 }
 
+function buildDeveloperOpsFirstWaveAction({
+  operation = "monitor",
+  productCode = "",
+  channel = "stable",
+  reason = ""
+} = {}) {
+  const normalizedOperation = String(operation || "monitor").trim().toLowerCase();
+  if (normalizedOperation === "first_batch_setup") {
+    return {
+      operation: "first_batch_setup",
+      label: "Run First Batch Setup",
+      method: "POST",
+      endpoint: "/api/developer/license-quickstart/first-batches",
+      body: {
+        productCode,
+        channel,
+        mode: "recommended"
+      },
+      reason: reason || "Starter launch inventory is missing.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+        "licenses",
+        "first-batch",
+        "Open License Inventory",
+        { productCode, channel }
+      )
+    };
+  }
+  if (normalizedOperation === "restock") {
+    return {
+      operation: "restock",
+      label: "Run Inventory Refill",
+      method: "POST",
+      endpoint: "/api/developer/license-quickstart/restock",
+      body: {
+        productCode,
+        channel,
+        mode: "recommended"
+      },
+      reason: reason || "Starter launch inventory is below the first-wave buffer.",
+      workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+        "licenses",
+        "restock",
+        "Open License Inventory",
+        { productCode, channel }
+      )
+    };
+  }
+  return {
+    operation: "monitor",
+    label: "Monitor First-Wave Inventory",
+    method: "GET",
+    endpoint: "/api/developer/ops/export",
+    query: {
+      productCode,
+      channel
+    },
+    reason: reason || "Starter launch inventory is ready; keep monitoring first sales and runtime signals.",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+      "ops",
+      "snapshot",
+      "Open Developer Ops",
+      { productCode, channel }
+    )
+  };
+}
+
+function buildDeveloperOpsFirstWaveInventoryStatePayload(item = {}) {
+  return {
+    key: item.key || null,
+    mode: item.mode || null,
+    label: item.label || item.key || item.mode || "Launch inventory",
+    grantType: item.grantType || null,
+    prefix: item.prefix || null,
+    purpose: item.purpose || null,
+    status: item.inventoryStatus || "unknown",
+    targetCount: Number(item.targetCount || 0),
+    freshCount: Number(item.freshCount || 0),
+    refillThreshold: Number(item.refillThreshold || 0),
+    refillCount: Number(item.refillCount || 0),
+    policyId: item.policyId || null,
+    nextAction: item.nextAction || null
+  };
+}
+
+function buildDeveloperOpsFirstWaveRecommendationsPayload({
+  generatedAt = nowIso(),
+  product = {},
+  channel = "stable",
+  inventoryStates = [],
+  cards = [],
+  opsSnapshot = null
+} = {}) {
+  const productCode = product?.code || opsSnapshot?.scope?.productCode || "";
+  const states = Array.isArray(inventoryStates)
+    ? inventoryStates.map((item) => buildDeveloperOpsFirstWaveInventoryStatePayload(item))
+    : [];
+  const missingStates = states.filter((item) => item.status === "missing");
+  const lowStates = states.filter((item) => item.status === "low");
+  const readyStates = states.filter((item) => item.status === "ready");
+  const targetCardCount = states.reduce((sum, item) => sum + Number(item.targetCount || 0), 0);
+  const freshCardCount = states.reduce((sum, item) => sum + Number(item.freshCount || 0), 0);
+  const refillCardCount = states.reduce((sum, item) => sum + Number(item.refillCount || 0), 0);
+  const inventoryStatus = !states.length
+    ? "not_applicable"
+    : missingStates.length
+      ? "missing"
+      : lowStates.length
+        ? "low"
+        : "ready";
+  const inventoryActionOperation = inventoryStatus === "missing"
+    ? "first_batch_setup"
+    : inventoryStatus === "low"
+      ? "restock"
+      : "monitor";
+  const inventoryAction = buildDeveloperOpsFirstWaveAction({
+    operation: inventoryActionOperation,
+    productCode,
+    channel,
+    reason: inventoryStatus === "missing"
+      ? `${missingStates.length} starter launch batch${missingStates.length === 1 ? "" : "es"} are missing.`
+      : inventoryStatus === "low"
+        ? `${lowStates.length} starter launch batch${lowStates.length === 1 ? "" : "es"} are below the refill buffer.`
+        : "Starter launch inventory is ready for first-wave monitoring."
+  });
+
+  const cardItems = Array.isArray(cards) ? cards : [];
+  const issuedBatchCodes = new Set();
+  for (const state of states) {
+    const prefix = String(state.prefix || "").trim().toUpperCase();
+    if (!prefix) {
+      continue;
+    }
+    for (const card of cardItems) {
+      if (normalizeCardControlStatus(card?.status || "active") !== "active") {
+        continue;
+      }
+      if (!isFreshCardInventoryStatus(card?.usageStatus ?? card?.displayStatus)) {
+        continue;
+      }
+      const batchCode = String(card?.batchCode || "").trim().toUpperCase();
+      const cardKey = String(card?.cardKey || card?.maskedKey || "").trim().toUpperCase();
+      if (batchCode.startsWith(prefix) || cardKey.startsWith(prefix)) {
+        issuedBatchCodes.add(batchCode || prefix);
+      }
+    }
+  }
+
+  const readiness = opsSnapshot?.summary?.initialLaunchOpsReadiness && typeof opsSnapshot.summary.initialLaunchOpsReadiness === "object"
+    ? opsSnapshot.summary.initialLaunchOpsReadiness
+    : {};
+  const latestLaunchReceipt = Array.isArray(opsSnapshot?.overview?.latestLaunchReceipts)
+    ? opsSnapshot.overview.latestLaunchReceipts[0] || null
+    : null;
+  const firstRoundActions = (Array.isArray(readiness.followUpQueue) ? readiness.followUpQueue : [])
+    .map((item) => ({
+      key: item?.key || null,
+      stage: item?.stage || null,
+      priority: item?.priority || null,
+      title: item?.title || item?.key || "First-wave follow-up",
+      summary: item?.summary || "",
+      actionKey: item?.actionKey || null,
+      operation: item?.operationToRecord || item?.operation || null,
+      downloadKey: item?.downloadKey || null,
+      handoffFileName: item?.handoffFileName || null
+    }))
+    .filter((item) => item.stage || item.actionKey || item.operation || item.downloadKey);
+  const firstRoundStatus = latestLaunchReceipt
+    ? (readiness.status || (firstRoundActions.length ? "review" : "ready"))
+    : "not_started";
+  const fallbackFirstRoundAction = latestLaunchReceipt
+    ? {
+        key: "monitor_first_wave",
+        stage: "first_wave_monitoring",
+        priority: "secondary",
+        title: "Continue first-wave monitoring",
+        summary: "No launch receipt follow-up is queued; continue watching scoped Developer Ops signals.",
+        actionKey: "open_ops_snapshot",
+        operation: "monitor",
+        downloadKey: readiness.firstLaunchHandoffDownload?.key || null,
+        handoffFileName: readiness.latestReceipt?.handoffFileName || null
+      }
+    : {
+        key: "run_first_batch_setup",
+        stage: "inventory_setup",
+        priority: "primary",
+        title: "Run first batch setup",
+        summary: "Create the starter direct-card and recharge batches before first sale or handoff.",
+        actionKey: "launch_first_batch_setup",
+        operation: "first_batch_setup",
+        downloadKey: null,
+        handoffFileName: null
+      };
+
+  return {
+    version: "developer-ops-first-wave-recommendations/v1",
+    generatedAt,
+    productCode,
+    productId: product?.id || null,
+    productName: product?.name || "",
+    channel,
+    status: inventoryStatus === "ready" && firstRoundStatus === "ready" ? "ready" : "review",
+    inventory: {
+      status: inventoryStatus,
+      readyCount: readyStates.length,
+      lowCount: lowStates.length,
+      missingCount: missingStates.length,
+      recommendedBatchCount: states.length,
+      targetCardCount,
+      freshCardCount,
+      refillCardCount,
+      action: inventoryAction,
+      states
+    },
+    firstCards: {
+      status: inventoryStatus === "not_applicable"
+        ? "not_applicable"
+        : inventoryStatus === "missing"
+          ? "pending"
+          : inventoryStatus,
+      recommendedBatchCount: states.length,
+      recommendedCardCount: targetCardCount,
+      issuedBatchCount: issuedBatchCodes.size,
+      issuedFreshCardCount: freshCardCount,
+      action: inventoryAction,
+      batches: states.map((item) => ({
+        key: item.key,
+        mode: item.mode,
+        label: item.label,
+        prefix: item.prefix,
+        targetCount: item.targetCount,
+        freshCount: item.freshCount,
+        status: item.status
+      }))
+    },
+    firstRoundOps: {
+      status: firstRoundStatus,
+      actionCount: firstRoundActions.length,
+      primaryAction: firstRoundActions[0] || fallbackFirstRoundAction,
+      actions: firstRoundActions.length ? firstRoundActions : [fallbackFirstRoundAction],
+      readiness: {
+        status: readiness.status || null,
+        headline: readiness.headline || null,
+        followUpCount: readiness.followUpCount ?? firstRoundActions.length,
+        gateDecision: readiness.gate?.decision || null,
+        canEnterInitialLaunch: readiness.gate?.canEnterInitialLaunch === true,
+        nextFollowUp: readiness.nextFollowUp || null
+      }
+    },
+    traceability: {
+      opsSnapshotFileName: opsSnapshot?.fileName || null,
+      opsSummaryFileName: opsSnapshot?.summaryFileName || null,
+      latestLaunchReceipt: latestLaunchReceipt
+        ? {
+            auditLogId: latestLaunchReceipt.auditLogId || null,
+            operation: latestLaunchReceipt.operation || null,
+            operationLabel: latestLaunchReceipt.operationLabel || null,
+            handoffFileName: latestLaunchReceipt.handoffFileName || null,
+            firstLaunchInventoryCreatedBatchCount: latestLaunchReceipt.firstLaunchInventoryCreatedBatchCount ?? null,
+            firstLaunchInventoryCreatedCardCount: latestLaunchReceipt.firstLaunchInventoryCreatedCardCount ?? null,
+            firstLaunchDutyHandoffDownloadKey: latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey || null,
+            postLaunchLifecycleStatus: latestLaunchReceipt.postLaunchLifecycleStatus || null,
+            postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null
+          }
+        : null,
+      initialLaunchOpsReadinessStatus: readiness.status || null,
+      firstLaunchHandoffDownload: readiness.firstLaunchHandoffDownload || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff || null
+    },
+    message: inventoryStatus === "missing"
+      ? `First-wave setup still needs ${missingStates.length} starter launch batch${missingStates.length === 1 ? "" : "es"} for ${productCode}.`
+      : inventoryStatus === "low"
+        ? `First-wave inventory is low for ${productCode}; refill before widening rollout.`
+        : `First-wave inventory is ready for ${productCode}; continue launch-day ops monitoring.`
+  };
+}
+
 function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -32673,6 +32948,73 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         traceability,
         auditLogId,
         message: `Stabilization handoff confirmed for ${product.code} (${channel}).`
+      };
+    },
+
+    async developerFirstWaveRecommendations(token, filters = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.read",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only view first-wave operations recommendations for your assigned projects."
+      );
+
+      const productCode = readProductCodeInput(filters);
+      const channel = normalizeChannel(filters.channel, "stable");
+      const limit = Math.min(Math.max(Number(filters.limit ?? 60), 1), 200);
+      const product = await requireDeveloperOwnedProductByCode(
+        db,
+        store,
+        session,
+        productCode,
+        "ops.read"
+      );
+
+      const [policiesPayload, cardsPayload, opsSnapshot] = await Promise.all([
+        this.developerListPolicies(token, { productCode }),
+        this.developerListCards(token, { productCode }),
+        this.developerExportOpsSnapshot(token, {
+          productCode,
+          limit
+        })
+      ]);
+      const policyItems = Array.isArray(policiesPayload) ? policiesPayload : [];
+      const activePolicies = policyItems.filter((item) => normalizeProductStatus(item?.status || "active") === "active");
+      const cardItems = Array.isArray(cardsPayload?.items) ? cardsPayload.items : [];
+      const inventoryStates = buildLaunchRecommendedCardInventoryStates(product, activePolicies, cardItems);
+      const payload = buildDeveloperOpsFirstWaveRecommendationsPayload({
+        product,
+        channel,
+        inventoryStates,
+        cards: cardItems,
+        opsSnapshot
+      });
+      const auditLogId = auditDeveloperSession(
+        db,
+        session,
+        "developer.ops.first-wave.recommendations",
+        "developer_ops_first_wave_recommendations",
+        product.id,
+        {
+          productCode,
+          channel,
+          inventoryStatus: payload.inventory.status,
+          firstCardStatus: payload.firstCards.status,
+          firstRoundOpsStatus: payload.firstRoundOps.status,
+          missingCount: payload.inventory.missingCount,
+          lowCount: payload.inventory.lowCount,
+          readyCount: payload.inventory.readyCount,
+          freshCardCount: payload.inventory.freshCardCount,
+          recommendedCardCount: payload.firstCards.recommendedCardCount,
+          latestLaunchReceiptOperation: payload.traceability.latestLaunchReceipt?.operation || null,
+          opsSnapshotFileName: payload.traceability.opsSnapshotFileName || null
+        }
+      );
+
+      return {
+        ...payload,
+        auditLogId
       };
     },
 

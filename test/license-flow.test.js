@@ -12794,6 +12794,155 @@ test("developer operators can manage scoped authorization operations for assigne
   }
 });
 
+test("developer first-wave recommendations summarize launch inventory, card issuance, and ops actions", async () => {
+  const { app, baseUrl, tempDir } = await startServer();
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "Pass123!abc"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "first.wave.owner",
+        password: "FirstWaveOwner123!",
+        displayName: "First Wave Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "FIRSTWAVE",
+        name: "First Wave",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "FIRSTWAVE_BETA",
+        name: "First Wave Beta",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "first.wave.owner",
+      password: "FirstWaveOwner123!"
+    });
+
+    await postJson(
+      baseUrl,
+      "/api/developer/policies",
+      {
+        productCode: "FIRSTWAVE",
+        name: "First Wave Starter",
+        durationDays: 30,
+        maxDevices: 1
+      },
+      ownerSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/members",
+      {
+        username: "first.wave.operator",
+        password: "FirstWaveOperator123!",
+        displayName: "First Wave Operator",
+        role: "operator",
+        productCodes: ["FIRSTWAVE"]
+      },
+      ownerSession.token
+    );
+
+    const operatorSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "first.wave.operator",
+      password: "FirstWaveOperator123!"
+    });
+
+    const beforeSetup = await getJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=20",
+      operatorSession.token
+    );
+    assert.equal(beforeSetup.version, "developer-ops-first-wave-recommendations/v1");
+    assert.equal(beforeSetup.productCode, "FIRSTWAVE");
+    assert.equal(beforeSetup.channel, "stable");
+    assert.equal(beforeSetup.inventory.status, "missing");
+    assert.equal(beforeSetup.inventory.action.operation, "first_batch_setup");
+    assert.equal(beforeSetup.inventory.missingCount, 2);
+    assert.equal(beforeSetup.firstCards.action.operation, "first_batch_setup");
+    assert.equal(beforeSetup.firstCards.recommendedCardCount, 150);
+    assert.equal(beforeSetup.firstRoundOps.status, "not_started");
+    assert.equal(beforeSetup.firstRoundOps.primaryAction.operation, "first_batch_setup");
+    assert.ok(beforeSetup.auditLogId);
+
+    const setup = await postJson(
+      baseUrl,
+      "/api/developer/license-quickstart/first-batches",
+      {
+        productCode: "FIRSTWAVE",
+        mode: "recommended"
+      },
+      ownerSession.token
+    );
+    assert.equal(setup.createdBatches.length, 2);
+
+    const afterSetup = await getJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=20",
+      operatorSession.token
+    );
+    assert.equal(afterSetup.inventory.status, "ready");
+    assert.equal(afterSetup.inventory.action.operation, "monitor");
+    assert.equal(afterSetup.inventory.freshCardCount, 150);
+    assert.equal(afterSetup.firstCards.status, "ready");
+    assert.equal(afterSetup.firstCards.issuedBatchCount, 2);
+    assert.equal(afterSetup.firstRoundOps.status, "review");
+    assert.ok(Array.isArray(afterSetup.firstRoundOps.actions));
+    assert.ok(afterSetup.firstRoundOps.actions.length >= 1);
+    assert.ok(afterSetup.firstRoundOps.actions.some((item) => item.stage === "first_launch_handoff"));
+    assert.equal(afterSetup.traceability.latestLaunchReceipt.operation, "first_batch_setup");
+    assert.equal(afterSetup.traceability.latestLaunchReceipt.firstLaunchInventoryCreatedCardCount, 150);
+    assert.ok(afterSetup.traceability.opsSnapshotFileName);
+    assert.ok(afterSetup.auditLogId);
+
+    const recommendationAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=FIRSTWAVE&eventType=developer.ops.first-wave.recommendations&limit=5",
+      operatorSession.token
+    );
+    assert.ok(recommendationAudit.items.some((item) =>
+      item.id === afterSetup.auditLogId
+      && item.metadata?.productCode === "FIRSTWAVE"
+      && item.metadata?.inventoryStatus === "ready"
+      && item.metadata?.firstRoundOpsStatus === "review"
+    ));
+
+    const forbidden = await getJsonExpectError(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE_BETA",
+      operatorSession.token
+    );
+    assert.equal(forbidden.status, 403);
+    assert.equal(forbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("developer ops export bundles scoped data and downloadable assets", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -17403,7 +17552,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/device-bindings/);
     assert.match(html, /api\/developer\/audit-logs/);
     assert.match(html, /api\/developer\/ops\/export/);
+    assert.match(html, /api\/developer\/ops\/first-wave\/recommendations/);
     assert.match(html, /api\/developer\/ops\/stabilization-handoff\/confirm/);
+    assert.match(html, /Preview First-Wave Recommendations/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Next Follow-up/);
     assert.match(html, /Download Launch Readiness/);
@@ -17593,6 +17744,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Download Handoff/);
     assert.match(html, /launchReceiptDownloadFormat/);
     assert.match(html, /handleLaunchReceiptFollowUpAction/);
+    assert.match(html, /renderFirstWaveRecommendations/);
+    assert.match(html, /loadFirstWaveRecommendations/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

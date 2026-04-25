@@ -4033,6 +4033,48 @@
         `;
       }
 
+      function renderOperatorActionReceipts(initialLaunchOpsReadiness = {}) {
+        const entries = Array.isArray(initialLaunchOpsReadiness?.operatorActionReceipts)
+          ? initialLaunchOpsReadiness.operatorActionReceipts.slice(0, 5)
+          : [];
+        if (!entries.length) {
+          return "";
+        }
+        return `
+          <div class="snapshot-recap operator-action-receipt">
+            <div class="snapshot-recap-head">
+              <strong>Initial Launch Operator Action Receipts</strong>
+              <span class="tag ok">receipts:${esc(initialLaunchOpsReadiness.operatorActionReceiptCount ?? entries.length)}</span>
+            </div>
+            <div class="hint">Backend evidence captured from launch-mainline action audit logs for launch duty handoff and first-wave operations review.</div>
+            <div class="snapshot-focus-list">
+              ${entries.map((item) => {
+                const tags = [
+                  item.source ? renderTag(item.source) : "",
+                  item.decision ? renderTag(`decision:${String(item.decision).toUpperCase()}`, true) : "",
+                  item.status ? renderTag(`status:${String(item.status).toUpperCase()}`) : "",
+                  item.primaryActionKey ? renderTag(`primary:${item.primaryActionKey}`, true) : ""
+                ].filter(Boolean).join("");
+                const details = [
+                  `operation=${esc(item.operation || "-")}`,
+                  `next=${esc(item.nextOperation || "-")}`,
+                  `download=${esc(item.nextDownloadFileName || item.nextDownloadKey || "-")}`,
+                  `audit=${esc(item.auditLogId || "-")}`,
+                  `at=${esc(formatTime(item.createdAt || item.handoffGeneratedAt))}`
+                ].join(" | ");
+                return `
+                  <div class="snapshot-focus-item">
+                    <div class="snapshot-focus-head"><strong>${esc(item.operationLabel || item.operation || "Operator action receipt")}</strong></div>
+                    <div class="audit-meta">${tags || renderTag("operator-action-receipt")}</div>
+                    <div class="snapshot-focus-meta">${details}</div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `;
+      }
+
       function focusQuickControlsCard() {
         const card = el("quick-controls-card");
         if (!card) {
@@ -4382,6 +4424,11 @@
         const latestLaunchReceipts = Array.isArray(overview.latestLaunchReceipts) ? overview.latestLaunchReceipts : [];
         const launchReceiptFollowUps = Array.isArray(overview.launchReceiptFollowUps) ? overview.launchReceiptFollowUps : [];
         const launchReceiptFollowUpPriorities = payload.summary?.launchReceiptFollowUpPriorities || {};
+        const initialLaunchOpsReadiness = payload.summary?.initialLaunchOpsReadiness || {};
+        const operatorActionReceipts = Array.isArray(initialLaunchOpsReadiness.operatorActionReceipts)
+          ? initialLaunchOpsReadiness.operatorActionReceipts
+          : [];
+        const latestOperatorActionReceipt = initialLaunchOpsReadiness.latestOperatorActionReceipt || operatorActionReceipts[0] || null;
         const normalizeLaunchReceiptPriority = (priority) => {
           const value = String(priority || "secondary").toLowerCase();
           return ["primary", "review", "secondary"].includes(value) ? value : "other";
@@ -4458,6 +4505,14 @@
             label: "Receipt Next Follow-up Workspace",
             value: launchReceiptNextFollowUpWorkspaceText
           },
+          {
+            label: "Operator Receipt Count",
+            value: initialLaunchOpsReadiness.operatorActionReceiptCount ?? operatorActionReceipts.length
+          },
+          {
+            label: "Latest Operator Receipt",
+            value: latestOperatorActionReceipt?.operation || "-"
+          },
           { label: "Latest Audit", value: formatTime(overview.latestAuditAt || payload.generatedAt) }
         ];
 
@@ -4466,6 +4521,7 @@
           <div class="snapshot-grid">${cards.map((item) => `<div class="snapshot-stat"><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
           ${renderLaunchReceiptNextFollowUpActions(launchReceiptNextFollowUp)}
           ${renderLastOperatorActionResult()}
+          ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           ${renderPreparedFocus()}
           ${renderDeveloperMutationRecap()}

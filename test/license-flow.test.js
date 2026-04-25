@@ -17441,6 +17441,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /renderLastOperatorActionResult/);
     assert.match(html, /Last Operator Action/);
     assert.match(html, /operator-action-confirmation/);
+    assert.match(html, /renderOperatorActionReceipts/);
+    assert.match(html, /Initial Launch Operator Action Receipts/);
+    assert.match(html, /operator-action-receipt/);
+    assert.match(html, /operatorActionReceipts/);
+    assert.match(html, /latestOperatorActionReceipt/);
     assert.match(html, /Launch Receipt Follow-ups/);
     assert.match(html, /launchReceiptFollowUps/);
     assert.match(html, /renderLaunchReceiptFollowUps/);

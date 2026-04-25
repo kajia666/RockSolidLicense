@@ -13221,6 +13221,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.primaryDownload.fileName, "developer-ops-launch-receipt-next-follow-up.txt");
     assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextSteps.some((item) => /Open Launch Mainline/i.test(item)));
     assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextSteps.some((item) => /Download next follow-up/i.test(item)));
+    const initialLaunchOpsTraceability = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.traceability;
+    assert.ok(initialLaunchOpsTraceability);
+    assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.operation, "record_post_launch_ops_sweep");
+    assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.productionEvidenceNextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(initialLaunchOpsTraceability.nextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(initialLaunchOpsTraceability.opsFiles.handoffIndex, "handoff-index.txt");
+    assert.equal(initialLaunchOpsTraceability.opsFiles.initialLaunchOpsReadiness, "initial-launch-ops-readiness.txt");
+    assert.equal(initialLaunchOpsTraceability.opsFiles.launchReceiptNextFollowUp, "launch-receipt-next-follow-up.txt");
+    assert.equal(initialLaunchOpsTraceability.launchMainlineFiles.postLaunchHandoffIndex, "post-launch-handoff-index");
     assert.match(launchReceiptSnapshot.summaryText, /Latest Launch Receipts:/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Readiness:/);
     assert.match(launchReceiptSnapshot.summaryText, /- status: REVIEW/);
@@ -13230,6 +13240,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /- next: \[REVIEW\]\[production_evidence\]/);
     assert.match(launchReceiptSnapshot.summaryText, /- workspace: Open Launch Mainline@summary/);
     assert.match(launchReceiptSnapshot.summaryText, /- download: developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:/);
+    assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
+    assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));
+    assert.match(launchReceiptSnapshot.summaryText, /opsIndex=handoff-index\.txt/);
+    assert.match(launchReceiptSnapshot.summaryText, /nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(launchReceiptSnapshot.summaryText, /postLaunchIndex=post-launch-handoff-index/);
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Follow-up Count: 2/);
     assert.match(
       launchReceiptSnapshot.summaryText,

@@ -16287,6 +16287,58 @@ function buildDeveloperOpsInitialLaunchOpsGate({
   };
 }
 
+function buildDeveloperOpsInitialLaunchOpsTraceability({
+  latestReceipt = null,
+  launchReceiptNextFollowUp = null
+} = {}) {
+  return {
+    latestLaunchReceipt: latestReceipt
+      ? {
+          auditLogId: latestReceipt.auditLogId || null,
+          operation: latestReceipt.operation || null,
+          operationLabel: latestReceipt.operationLabel || null,
+          productCode: latestReceipt.productCode || null,
+          channel: latestReceipt.channel || null,
+          handoffFileName: latestReceipt.handoffFileName || null,
+          mainlineGateStatus: latestReceipt.mainlineGateStatus || null,
+          productionEvidenceNextActionKey: latestReceipt.productionEvidenceNextActionKey || null,
+          productionEvidenceNextOperation: latestReceipt.productionEvidenceNextOperation || null,
+          postLaunchLifecycleStatus: latestReceipt.postLaunchLifecycleStatus || null,
+          postLaunchLifecycleNextActionKey: latestReceipt.postLaunchLifecycleNextActionKey || null,
+          postLaunchLifecycleNextOperation: latestReceipt.postLaunchLifecycleNextOperation || null,
+          postLaunchLifecyclePrimaryDownloadKey: latestReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
+          postLaunchLifecyclePrimaryDownloadFormat: latestReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
+          postLaunchLifecyclePrimaryDownloadFileName: latestReceipt.postLaunchLifecyclePrimaryDownloadFileName || null
+        }
+      : null,
+    nextFollowUp: launchReceiptNextFollowUp
+      ? {
+          key: launchReceiptNextFollowUp.key || null,
+          stage: launchReceiptNextFollowUp.stage || null,
+          priority: launchReceiptNextFollowUp.priority || null,
+          title: launchReceiptNextFollowUp.title || null,
+          actionKey: launchReceiptNextFollowUp.actionKey || null,
+          operationToRecord: launchReceiptNextFollowUp.operationToRecord || launchReceiptNextFollowUp.operation || null,
+          downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
+        }
+      : null,
+    opsFiles: {
+      handoffIndex: "handoff-index.txt",
+      initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
+      launchReceiptNextFollowUp: "launch-receipt-next-follow-up.txt",
+      launchReceiptFollowUpsCsv: "csv/launch-receipt-follow-ups.csv",
+      auditLogsCsv: "csv/audit-logs.csv"
+    },
+    launchMainlineFiles: {
+      postLaunchHandoffIndex: "post-launch-handoff-index",
+      summary: "summary",
+      checksums: "checksums",
+      zip: "zip"
+    }
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   scope = {},
   overview = {},
@@ -16420,6 +16472,10 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     firstLaunchHandoffDownload,
     gate,
+    traceability: buildDeveloperOpsInitialLaunchOpsTraceability({
+      latestReceipt,
+      launchReceiptNextFollowUp
+    }),
     nextSteps
   };
 }
@@ -18184,6 +18240,19 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       for (const item of initialLaunchOpsReadiness.nextSteps) {
         lines.push(`  - ${item}`);
       }
+    }
+    const traceability = initialLaunchOpsReadiness.traceability || null;
+    if (traceability) {
+      const latestLaunchReceipt = traceability.latestLaunchReceipt || {};
+      const nextFollowUp = traceability.nextFollowUp || {};
+      const opsFiles = traceability.opsFiles || {};
+      const launchMainlineFiles = traceability.launchMainlineFiles || {};
+      lines.push("");
+      lines.push("Initial Launch Ops Traceability:");
+      lines.push(`- latestReceipt=${latestLaunchReceipt.operation || "-"} | handoff=${latestLaunchReceipt.handoffFileName || "-"} | evidenceNext=${latestLaunchReceipt.productionEvidenceNextOperation || "-"} | lifecycleNext=${latestLaunchReceipt.postLaunchLifecycleNextOperation || "-"}`);
+      lines.push(`- nextFollowUp=${opsFiles.launchReceiptNextFollowUp || "-"} | operation=${nextFollowUp.operationToRecord || "-"} | action=${nextFollowUp.actionKey || "-"}`);
+      lines.push(`- opsIndex=${opsFiles.handoffIndex || "-"} | readiness=${opsFiles.initialLaunchOpsReadiness || "-"} | followUpsCsv=${opsFiles.launchReceiptFollowUpsCsv || "-"}`);
+      lines.push(`- postLaunchIndex=${launchMainlineFiles.postLaunchHandoffIndex || "-"} | checksums=${launchMainlineFiles.checksums || "-"} | zip=${launchMainlineFiles.zip || "-"}`);
     }
   }
 

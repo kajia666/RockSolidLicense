@@ -13441,6 +13441,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlinePostLaunchIndexDownload.body,
       new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Contract:/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Contract Version: initial-launch-ops\/v1/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Contract Decision: NO-GO \(canEnterInitialLaunch=false\)/);
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      new RegExp(`Contract Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      /Contract Files: readiness=ops\/initial-launch-ops-readiness\.txt \| handoffIndex=ops\/handoff-index\.txt \| nextFollowUp=ops\/launch-receipt-next-follow-up\.txt/
+    );
     const launchMainlineTraceabilityChecksums = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=checksums",
@@ -13491,6 +13502,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineTraceability.postLaunchHandoffTraceability.postLaunchLifecycle.primaryDownloadKey,
       latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey
     );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOpsContract.version,
+      "initial-launch-ops/v1"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOpsContract.decision,
+      "no_go"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOpsContract.nextRequiredAction.operation,
+      latestLaunchReceipt.productionEvidenceNextOperation
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOpsContract.files.initialLaunchOpsReadiness,
+      "initial-launch-ops-readiness.txt"
+    );
     const launchMainlineTraceabilitySummaryDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=summary",
@@ -13509,6 +13536,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       new RegExp(`lifecycleNext=${latestLaunchReceipt.postLaunchLifecycleNextOperation}`)
+    );
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Contract:/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Contract Version: initial-launch-ops\/v1/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Contract Decision: NO-GO \(canEnterInitialLaunch=false\)/);
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      new RegExp(`Contract Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
 
     const forbiddenExport = await getJsonExpectError(

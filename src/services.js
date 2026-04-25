@@ -13783,6 +13783,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   const nextFollowUp = traceability.nextFollowUp || {};
   const lifecycle = traceability.postLaunchLifecycle || {};
   const opsFiles = traceability.opsFiles || {};
+  const initialLaunchContract = traceability.initialLaunchOpsContract || null;
   lines.push("");
   lines.push("Post-Launch Handoff Traceability:");
   lines.push(
@@ -13807,6 +13808,34 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "-"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "-"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
+  appendInitialLaunchContractTraceabilityTextLines(lines, initialLaunchContract, opsFiles);
+  return true;
+}
+
+function appendInitialLaunchContractTraceabilityTextLines(lines = [], contract = null, opsFiles = {}) {
+  if (!Array.isArray(lines) || !contract || typeof contract !== "object") {
+    return false;
+  }
+  const files = contract.files || {};
+  const nextRequiredAction = contract.nextRequiredAction || {};
+  const toOpsFile = (value, fallback) => {
+    const fileName = value || fallback || "";
+    if (!fileName) {
+      return "-";
+    }
+    return fileName.startsWith("ops/") ? fileName : `ops/${fileName}`;
+  };
+  lines.push("");
+  lines.push("Initial Launch Contract:");
+  lines.push(`- Contract Version: ${contract.version || "-"}`);
+  lines.push(`- Contract Decision: ${contract.label || String(contract.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${contract.canEnterInitialLaunch === true})`);
+  lines.push(`- Contract Scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
+  lines.push(`- Contract Next Required Action: ${nextRequiredAction.stage || "-"} | operation=${nextRequiredAction.operation || "-"} | download=${nextRequiredAction.downloadFileName || "-"}`);
+  lines.push(
+    `- Contract Files: readiness=${toOpsFile(opsFiles.initialLaunchOpsReadiness, files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt")}`
+    + ` | handoffIndex=${toOpsFile(opsFiles.handoffIndex, files.handoffIndex || "handoff-index.txt")}`
+    + ` | nextFollowUp=${toOpsFile(opsFiles.launchReceiptNextFollowUp, files.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt")}`
+  );
   return true;
 }
 
@@ -15297,6 +15326,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   const launchReceiptNextFollowUp = opsSnapshot.summary?.launchReceiptNextFollowUp
     || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
     || null;
+  const initialLaunchOpsContract = opsSnapshot.summary?.initialLaunchOpsReadiness?.contract || null;
   return {
     latestLaunchReceipt: latestLaunchReceipt
       ? {
@@ -15336,6 +15366,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       primaryDownloadFormat: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFormat || lifecycle.primaryRecommendedDownload?.format || null,
       primaryDownloadFileName: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFileName || lifecycle.primaryRecommendedDownload?.fileName || null
     },
+    initialLaunchOpsContract,
     opsFiles: {
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
@@ -15413,6 +15444,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "ops/handoff-index.txt"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
+  appendInitialLaunchContractTraceabilityTextLines(lines, traceability.initialLaunchOpsContract || null, opsFiles);
 
   lines.push("");
   lines.push("Recommended Downloads:");

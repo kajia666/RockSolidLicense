@@ -3544,6 +3544,7 @@ function compactRouteParams(params = {}) {
 function inferRouteDownloadFormat(key = "") {
   const normalized = String(key || "").trim().toLowerCase();
   if (normalized.includes("rehearsal_guide")) return "rehearsal-guide";
+  if (normalized.includes("initial_launch_ops_readiness") || normalized.includes("initial-launch-ops-readiness")) return "initial-launch-ops-readiness";
   if (normalized.includes("production_handoff")) return "production-handoff";
   if (normalized.includes("cutover_handoff")) return "cutover-handoff";
   if (normalized.includes("recovery_drill_handoff")) return "recovery-drill-handoff";

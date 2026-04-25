@@ -5362,6 +5362,27 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(routedReleasePackage.summaryText, /operation=record_post_launch_ops_sweep/);
     assert.match(routedReleasePackage.summaryText, /action=release_route_post_launch_ops_sweep/);
     assert.match(routedReleasePackage.summaryText, /download=launch_mainline_post_launch_sweep_handoff/);
+    const readinessRouteParams = new URLSearchParams({
+      productCode: "RELPKG_ALPHA",
+      channel: "stable",
+      operation: "record_post_launch_ops_sweep",
+      actionKey: "release_route_initial_launch_ops_readiness",
+      downloadKey: "launch_mainline_initial_launch_ops_readiness",
+      routeTitle: "Continue initial launch ops readiness",
+      routeReason: "Resume initial launch readiness from the release package handoff"
+    });
+    const readinessRoutedReleasePackage = await getJson(
+      baseUrl,
+      `/api/developer/release-package?${readinessRouteParams.toString()}`,
+      viewerSession.token
+    );
+    const readinessRouteDownload = readinessRoutedReleasePackage.manifest.release.routeFocus.controls
+      .find((item) => item.recommendedDownload?.key === "launch_mainline_initial_launch_ops_readiness")
+      ?.recommendedDownload;
+    assert.equal(readinessRoutedReleasePackage.mainlineFollowUp.routeFocus.downloadKey, "launch_mainline_initial_launch_ops_readiness");
+    assert.equal(readinessRouteDownload?.source, "developer-launch-mainline");
+    assert.equal(readinessRouteDownload?.format, "initial-launch-ops-readiness");
+    assert.match(readinessRouteDownload?.href || "", /format=initial-launch-ops-readiness/);
     assert.equal(releasePackage.manifest.release.activeNotices.total, 1);
     assert.equal(releasePackage.manifest.release.activeNotices.blockingTotal, 1);
     assert.equal(releasePackage.manifest.release.mainlineFollowUp.status, "hold");

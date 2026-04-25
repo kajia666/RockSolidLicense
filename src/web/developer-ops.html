@@ -4226,10 +4226,12 @@
         if (!item || typeof item !== "object") {
           return "";
         }
+        const stabilizationHandoff = item;
         const latestReceipt = item.latestLaunchReceipt || {};
         const latestOperator = item.latestOperatorActionReceipt || {};
         const nextAction = item.nextAction || {};
         const files = item.files || {};
+        const confirmation = stabilizationHandoff.confirmation || null;
         const productCode = String(item.projectCode || latestOperator.productCode || latestReceipt.productCode || requestedProductCode || "").trim();
         const channel = String(item.channel || latestOperator.channel || latestReceipt.channel || requestedChannel || "stable").trim() || "stable";
         const nextOperation = nextAction.operation || latestOperator.nextOperation || latestReceipt.postLaunchLifecycleNextOperation || latestReceipt.productionEvidenceNextOperation || "";
@@ -4285,6 +4287,15 @@
           `nextFollowUp=${esc(files.nextFollowUp || "-")}`,
           `postLaunchIndex=${esc(files.postLaunchIndex || "-")}`
         ].join(" | ");
+        const confirmationDetails = confirmation
+          ? [
+              `Confirmation audit=${esc(confirmation.auditLogId || "-")}`,
+              `status=${esc(confirmation.status || "-")}`,
+              `decision=${esc(confirmation.decision || "-")}`,
+              `by=${esc(confirmation.confirmedBy?.username || "-")}`,
+              `at=${esc(formatTime(confirmation.confirmedAt))}`
+            ].join(" | ")
+          : "";
         const checklist = Array.isArray(item.checklist) ? item.checklist.slice(0, 5) : [];
         return `
           <div class="snapshot-recap stabilization-handoff">
@@ -4298,6 +4309,7 @@
             <div class="snapshot-focus-meta">${operatorDetails}</div>
             <div class="snapshot-focus-meta">${nextDetails}</div>
             <div class="snapshot-focus-meta">${fileDetails}</div>
+            ${confirmationDetails ? `<div class="snapshot-focus-meta">${confirmationDetails}</div>` : ""}
             <div class="snapshot-recap-actions">
               <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="open-workspace" ${actionAttrs} ${workspaceHref ? "" : "disabled"}>Open Stabilization Workspace</button>
               <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="download-handoff" ${actionAttrs} ${(token && productCode) ? "" : "disabled"}>Download Stabilization Handoff</button>

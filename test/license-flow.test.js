@@ -13595,6 +13595,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         && item.metadata?.handoffFileName === "developer-ops-stabilization-handoff.txt"
     ));
 
+    const confirmedOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_ALPHA&limit=20",
+      operatorSession.token
+    );
+    const stabilizationConfirmationEvidence = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.stabilizationHandoff.confirmation;
+    assert.ok(stabilizationConfirmationEvidence);
+    assert.equal(stabilizationConfirmationEvidence.auditLogId, stabilizationConfirmation.auditLogId);
+    assert.equal(stabilizationConfirmationEvidence.status, "confirmed");
+    assert.equal(stabilizationConfirmationEvidence.decision, "confirmed");
+    assert.equal(stabilizationConfirmationEvidence.handoffFileName, "developer-ops-stabilization-handoff.txt");
+    assert.equal(stabilizationConfirmationEvidence.confirmedBy.username, "ops.export.operator");
+    assert.equal(
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.stabilizationHandoffConfirmation.auditLogId,
+      stabilizationConfirmation.auditLogId
+    );
+    assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Handoff Confirmation:/);
+    assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${stabilizationConfirmation.auditLogId}`));
+
     const handoffIndexDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=handoff-index",
@@ -13631,6 +13650,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Stabilization Handoff: ops\/stabilization-handoff\.txt/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, new RegExp(`Stabilization Confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
       new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
@@ -13712,6 +13732,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "ops/stabilization-handoff.txt"
     );
     assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.stabilizationHandoffConfirmation.auditLogId,
+      stabilizationConfirmation.auditLogId
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.stabilizationHandoffConfirmation.status,
+      "confirmed"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.stabilizationHandoffConfirmation.confirmedBy.username,
+      "ops.export.operator"
+    );
+    assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.operationToRecord,
       latestLaunchReceipt.productionEvidenceNextOperation
     );
@@ -13783,6 +13815,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Stabilization Handoff: ops\/stabilization-handoff\.txt/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, new RegExp(`Stabilization Confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       new RegExp(`evidenceNext=${latestLaunchReceipt.productionEvidenceNextOperation}`)
@@ -17395,6 +17428,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-download-href/);
     assert.match(html, /data-stabilization-handoff-action="confirm-handoff"/);
     assert.match(html, /Confirm Stabilization Handoff/);
+    assert.match(html, /stabilizationHandoff\.confirmation/);
+    assert.match(html, /Confirmation audit=/);
     assert.match(html, /filter-entity-type/);
     assert.match(html, /snapshot-overview/);
     assert.match(html, /Escalate First/);

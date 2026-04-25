@@ -13330,6 +13330,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchOperatorActionReceiptEvidence.primaryActionKey, "launch_mainline_follow_up");
     assert.equal(initialLaunchOperatorActionReceiptEvidence.nextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(initialLaunchOperatorActionReceiptEvidence.nextDownloadFileName, latestLaunchReceipt.initialLaunchOperatorNextDownloadFileName);
+    const initialLaunchStabilizationHandoff = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.stabilizationHandoff;
+    assert.ok(initialLaunchStabilizationHandoff);
+    assert.equal(initialLaunchStabilizationHandoff.version, "initial-launch-stabilization-handoff/v1");
+    assert.equal(initialLaunchStabilizationHandoff.generatedFor, "post_launch_stabilization");
+    assert.equal(initialLaunchStabilizationHandoff.projectCode, "EXPORT_ALPHA");
+    assert.equal(initialLaunchStabilizationHandoff.channel, "stable");
+    assert.equal(initialLaunchStabilizationHandoff.latestLaunchReceipt.operation, "record_post_launch_ops_sweep");
+    assert.equal(initialLaunchStabilizationHandoff.latestLaunchReceipt.postLaunchLifecycleStatus, latestLaunchReceipt.postLaunchLifecycleStatus);
+    assert.equal(initialLaunchStabilizationHandoff.latestOperatorActionReceipt.operation, "record_post_launch_ops_sweep");
+    assert.equal(initialLaunchStabilizationHandoff.latestOperatorActionReceipt.auditLogId, latestLaunchReceipt.auditLogId);
+    assert.equal(initialLaunchStabilizationHandoff.nextAction.operation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(initialLaunchStabilizationHandoff.nextAction.downloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.equal(initialLaunchStabilizationHandoff.files.postLaunchIndex, "post-launch-handoff-index");
+    assert.ok(initialLaunchStabilizationHandoff.checklist.some((item) => /stabilization/i.test(item)));
     const initialLaunchOpsTraceability = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.traceability;
     assert.ok(initialLaunchOpsTraceability);
     assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.operation, "record_post_launch_ops_sweep");
@@ -13386,6 +13400,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Action Receipts:/);
     assert.match(launchReceiptSnapshot.summaryText, /source=developer_ops_audit_log/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_post_launch_ops_sweep/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Stabilization Handoff:/);
+    assert.match(launchReceiptSnapshot.summaryText, /version=initial-launch-stabilization-handoff\/v1/);
+    assert.match(launchReceiptSnapshot.summaryText, /latestOperator=record_post_launch_ops_sweep/);
+    assert.match(launchReceiptSnapshot.summaryText, /postLaunchStatus=/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:/);
     assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
     assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));
@@ -13516,6 +13534,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`- Primary Action: stage=production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
     assert.match(initialLaunchOpsReadinessDownload.body, /- Files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Stabilization Handoff:/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Version: initial-launch-stabilization-handoff\/v1/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Latest Operator: record_post_launch_ops_sweep/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Post-Launch: status=/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Follow-up Queue:/);
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[production_evidence\\].*operation=${latestLaunchReceipt.productionEvidenceNextOperation}.*download=${latestLaunchReceipt.firstLaunchDutyPrimaryDownloadKey || "-"}`));
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[post_launch_lifecycle\\].*operation=${latestLaunchReceipt.postLaunchLifecycleNextOperation}.*download=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`));

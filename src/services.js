@@ -14108,6 +14108,7 @@ function buildDeveloperLaunchMainlinePayload({
   const postLaunchSweepHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-sweep-handoff.txt`;
   const closeoutHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-closeout-handoff.txt`;
   const stabilizationHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-stabilization-handoff.txt`;
+  const postLaunchHandoffIndexFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-handoff-index.txt`;
   const firstLaunchHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-launch-handoff.txt`;
   const rehearsalGuideFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-rehearsal-guide.txt`;
   const initialLaunchOpsReadinessFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-initial-launch-ops-readiness.txt`;
@@ -14122,6 +14123,7 @@ function buildDeveloperLaunchMainlinePayload({
     postLaunchSweepHandoffFileName,
     closeoutHandoffFileName,
     stabilizationHandoffFileName,
+    postLaunchHandoffIndexFileName,
     firstLaunchHandoffFileName,
     rehearsalGuideFileName,
     initialLaunchOpsReadinessFileName,
@@ -14238,6 +14240,7 @@ function buildDeveloperLaunchMainlinePayload({
     publicBaseUrl,
     mainlineSummary: payload.mainlineSummary
   });
+  payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
   payload.firstLaunchHandoffText = buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     generatedAt,
     manifest: payload.manifest,
@@ -14337,6 +14340,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
+    payload.postLaunchHandoffIndexText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
     payload.firstLaunchHandoffText || ""
   );
@@ -14356,7 +14364,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -14437,6 +14445,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.stabilizationHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "post-launch-handoff-index") {
+    return {
+      fileName: payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: payload.postLaunchHandoffIndexText || buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload)
     };
   }
   if (normalizedFormat === "first-launch-handoff") {
@@ -15222,6 +15237,75 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
     "Stabilization Flow: confirm launch closeout review | verify daily handover docs | confirm steady-state ops signals | capture launch stabilization review"
   ];
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
+  return lines.join("\n");
+}
+
+function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const mainlineSummary = payload.mainlineSummary || {};
+  const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
+  const phases = Array.isArray(lifecycle.phases) ? lifecycle.phases : [];
+  const recommendedDownloads = Array.isArray(lifecycle.recommendedDownloads) ? lifecycle.recommendedDownloads : [];
+  const handoffFiles = [
+    ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
+    ["Post-launch sweep handoff", payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt"],
+    ["Closeout handoff", payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt"],
+    ["Stabilization handoff", payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt"],
+    ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
+    ["Initial launch ops readiness", payload.initialLaunchOpsReadinessFileName || "developer-launch-mainline-initial-launch-ops-readiness.txt"]
+  ];
+  const lines = [
+    "RockSolid Developer Launch Mainline Post-Launch Handoff Index",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Post-Launch Lifecycle: ${String(lifecycle.status || "unknown").toUpperCase()}`,
+    `Lifecycle Counts: ready=${lifecycle.readyCount ?? 0} | hold=${lifecycle.holdCount ?? 0} | review=${lifecycle.reviewCount ?? 0}`,
+    `Next Lifecycle Action: ${lifecycle.nextAction?.title || lifecycle.nextAction?.label || lifecycle.nextAction?.key || "All post-launch lifecycle phases are aligned."}`,
+    `Primary Lifecycle Download: ${lifecycle.primaryRecommendedDownload?.label || lifecycle.primaryRecommendedDownload?.key || "-"}`,
+    ""
+  ];
+
+  lines.push("Lifecycle Phase Statuses:");
+  if (phases.length) {
+    for (const item of phases) {
+      lines.push(
+        `- ${item?.label || item?.key || "phase"}: ${String(item?.status || "unknown").toUpperCase()}`
+        + ` | handoff=${String(item?.handoffCheck?.status || "unknown").toUpperCase()}`
+        + ` | evidence=${String(item?.evidenceCheck?.status || "unknown").toUpperCase()}`
+        + ` | next=${item?.nextAction?.title || item?.nextAction?.label || item?.nextAction?.key || "-"}`
+      );
+    }
+  } else {
+    lines.push("- none");
+  }
+
+  lines.push("");
+  lines.push("Recommended Downloads:");
+  if (recommendedDownloads.length) {
+    for (const item of recommendedDownloads) {
+      lines.push(`- ${item?.label || item?.key || "download"} | file=${item?.fileName || "-"} | format=${item?.format || "-"} | href=${item?.href || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+
+  lines.push("");
+  lines.push("Included Handoff Files:");
+  for (const [label, fileName] of handoffFiles) {
+    lines.push(`- ${label}: ${fileName}`);
+  }
+
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push("- Open operations-handoff first to verify monitoring, alert, and shift handover coverage.");
+  lines.push("- Use post-launch-sweep-handoff for first-wave runtime sweep evidence.");
+  lines.push("- Use closeout-handoff after first-wave sweep is captured.");
+  lines.push("- Use stabilization-handoff when daily operations and steady-state signals are ready to hand over.");
+  lines.push("- Keep recovery-drill-handoff and initial-launch-ops-readiness available while the lane is still HOLD or REVIEW.");
   return lines.join("\n");
 }
 

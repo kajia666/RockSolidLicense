@@ -6532,6 +6532,26 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(stabilizationHandoffDownload.body, /Post-Launch Lifecycle:/);
       assert.match(stabilizationHandoffDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline stabilization handoff/i);
 
+      const postLaunchHandoffIndexDownload = await getText(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=post-launch-handoff-index",
+        viewerSession.token
+      );
+      assert.match(postLaunchHandoffIndexDownload.contentType || "", /^text\/plain/);
+      assert.match(postLaunchHandoffIndexDownload.contentDisposition || "", /attachment; filename=\"rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-post-launch-handoff-index\.txt\"/);
+      assert.match(postLaunchHandoffIndexDownload.body, /RockSolid Developer Launch Mainline Post-Launch Handoff Index/);
+      assert.match(postLaunchHandoffIndexDownload.body, /Post-Launch Lifecycle: HOLD/);
+      assert.match(postLaunchHandoffIndexDownload.body, /Lifecycle Phase Statuses:/);
+      assert.match(postLaunchHandoffIndexDownload.body, /Next Lifecycle Action:/);
+      assert.match(postLaunchHandoffIndexDownload.body, /Recommended Downloads:/);
+      assert.match(postLaunchHandoffIndexDownload.body, /Launch mainline operations handoff/);
+      assert.match(postLaunchHandoffIndexDownload.body, /Launch mainline stabilization handoff/);
+      assert.match(postLaunchHandoffIndexDownload.body, /Included Handoff Files:/);
+      assert.match(postLaunchHandoffIndexDownload.body, /operations-handoff\.txt/);
+      assert.match(postLaunchHandoffIndexDownload.body, /post-launch-sweep-handoff\.txt/);
+      assert.match(postLaunchHandoffIndexDownload.body, /closeout-handoff\.txt/);
+      assert.match(postLaunchHandoffIndexDownload.body, /stabilization-handoff\.txt/);
+
       const rehearsalGuideDownload = await getText(
         baseUrl,
         "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=rehearsal-guide",
@@ -6554,6 +6574,11 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineChecksumsDownload.contentDisposition || "", /attachment; filename=\"rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-sha256\.txt\"/);
       assert.match(launchMainlineChecksumsDownload.body, /rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-rehearsal-guide\.txt/);
       assert.match(launchMainlineChecksumsDownload.body, /ops\/initial-launch-ops-readiness\.txt/);
+      assert.match(launchMainlineChecksumsDownload.body, /post-launch-handoff-index\.txt/);
+      assert.match(launchMainlineChecksumsDownload.body, /operations-handoff\.txt/);
+      assert.match(launchMainlineChecksumsDownload.body, /post-launch-sweep-handoff\.txt/);
+      assert.match(launchMainlineChecksumsDownload.body, /closeout-handoff\.txt/);
+      assert.match(launchMainlineChecksumsDownload.body, /stabilization-handoff\.txt/);
 
       const launchMainlineZipDownload = await getBinary(
         baseUrl,
@@ -6565,6 +6590,11 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchMainlineZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
       const launchMainlineZipText = launchMainlineZipDownload.body.toString("latin1");
       assert.match(launchMainlineZipText, /ops\/initial-launch-ops-readiness\.txt/);
+      assert.match(launchMainlineZipText, /post-launch-handoff-index\.txt/);
+      assert.match(launchMainlineZipText, /operations-handoff\.txt/);
+      assert.match(launchMainlineZipText, /post-launch-sweep-handoff\.txt/);
+      assert.match(launchMainlineZipText, /closeout-handoff\.txt/);
+      assert.match(launchMainlineZipText, /stabilization-handoff\.txt/);
 
       const forbidden = await getJsonExpectError(
         baseUrl,

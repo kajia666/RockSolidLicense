@@ -13315,6 +13315,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchOperatorActionManifest.actions[0].download.fileName, "developer-ops-launch-receipt-next-follow-up.txt");
     assert.equal(initialLaunchOperatorActionManifest.files.initialLaunchOpsReadiness, "initial-launch-ops-readiness.txt");
     assert.equal(initialLaunchOperatorActionManifest.traceability.latestReceiptOperation, "record_post_launch_ops_sweep");
+    assert.ok(Array.isArray(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.operatorActionReceipts));
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.operatorActionReceiptCount, 1);
+    assert.equal(
+      launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestOperatorActionReceipt.operation,
+      "record_post_launch_ops_sweep"
+    );
+    const initialLaunchOperatorActionReceiptEvidence = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.operatorActionReceipts[0];
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.source, "developer_ops_audit_log");
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.auditLogId, latestLaunchReceipt.auditLogId);
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.productCode, "EXPORT_ALPHA");
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.channel, "stable");
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.decision, "no_go");
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.primaryActionKey, "launch_mainline_follow_up");
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.nextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.nextDownloadFileName, latestLaunchReceipt.initialLaunchOperatorNextDownloadFileName);
     const initialLaunchOpsTraceability = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.traceability;
     assert.ok(initialLaunchOpsTraceability);
     assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.operation, "record_post_launch_ops_sweep");
@@ -13368,6 +13383,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`- primaryAction: stage=production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
     assert.match(launchReceiptSnapshot.summaryText, /- files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Action Receipts:/);
+    assert.match(launchReceiptSnapshot.summaryText, /source=developer_ops_audit_log/);
+    assert.match(launchReceiptSnapshot.summaryText, /operation=record_post_launch_ops_sweep/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:/);
     assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
     assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));

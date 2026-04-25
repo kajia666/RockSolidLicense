@@ -16793,6 +16793,50 @@ function buildDeveloperOpsInitialLaunchOperatorActionManifest({
   };
 }
 
+function buildDeveloperOpsInitialLaunchOperatorActionReceipts(latestLaunchReceipts = [], limit = 5) {
+  const receipts = [];
+  for (const item of Array.isArray(latestLaunchReceipts) ? latestLaunchReceipts : []) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const hasOperatorEvidence = item.initialLaunchOperatorDecision
+      || item.initialLaunchOperatorPrimaryActionKey
+      || item.initialLaunchOperatorNextOperation
+      || item.initialLaunchOperatorNextDownloadFileName;
+    if (!hasOperatorEvidence) {
+      continue;
+    }
+    receipts.push({
+      source: "developer_ops_audit_log",
+      auditLogId: item.auditLogId || null,
+      eventType: item.eventType || null,
+      actorType: item.actorType || null,
+      actorId: item.actorId || null,
+      productCode: item.productCode || null,
+      channel: item.channel || "stable",
+      operation: item.operation || null,
+      operationLabel: item.operationLabel || null,
+      decision: item.initialLaunchOperatorDecision || null,
+      status: item.initialLaunchOperatorStatus || null,
+      primaryActionKey: item.initialLaunchOperatorPrimaryActionKey || null,
+      actionCount: Number(item.initialLaunchOperatorActionCount || 0),
+      nextStage: item.initialLaunchOperatorNextStage || null,
+      nextActionKey: item.initialLaunchOperatorNextActionKey || null,
+      nextOperation: item.initialLaunchOperatorNextOperation || null,
+      nextDownloadKey: item.initialLaunchOperatorNextDownloadKey || null,
+      nextDownloadFileName: item.initialLaunchOperatorNextDownloadFileName || null,
+      workspaceKey: item.initialLaunchOperatorWorkspaceKey || null,
+      workspaceAutofocus: item.initialLaunchOperatorWorkspaceAutofocus || null,
+      handoffFileName: item.handoffFileName || null,
+      handoffGeneratedAt: item.handoffGeneratedAt || null,
+      createdAt: item.createdAt || item.handoffGeneratedAt || null
+    });
+  }
+  return receipts
+    .sort((left, right) => snapshotDateMs(right.createdAt || right.handoffGeneratedAt) - snapshotDateMs(left.createdAt || left.handoffGeneratedAt))
+    .slice(0, Math.max(1, Number(limit || 5)));
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   scope = {},
   overview = {},
@@ -16805,6 +16849,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const latestReceipt = Array.isArray(overview.latestLaunchReceipts) && overview.latestLaunchReceipts.length
     ? overview.latestLaunchReceipts[0]
     : null;
+  const operatorActionReceipts = buildDeveloperOpsInitialLaunchOperatorActionReceipts(overview.latestLaunchReceipts, 5);
   const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction
     || mainlineHandoff?.workspaceAction
     || null;
@@ -16975,6 +17020,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operatorHeadline,
     operatorNextAction,
     operatorActionManifest,
+    operatorActionReceiptCount: operatorActionReceipts.length,
+    operatorActionReceipts,
+    latestOperatorActionReceipt: operatorActionReceipts[0] || null,
     traceability,
     nextSteps
   };
@@ -18768,6 +18816,21 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     appendInitialLaunchOperatorActionManifestTextLines(lines, initialLaunchOpsReadiness.operatorActionManifest || null, {
       labelCase: "lower"
     });
+    if (Array.isArray(initialLaunchOpsReadiness.operatorActionReceipts) && initialLaunchOpsReadiness.operatorActionReceipts.length) {
+      lines.push("");
+      lines.push("Initial Launch Operator Action Receipts:");
+      for (const item of initialLaunchOpsReadiness.operatorActionReceipts) {
+        lines.push(
+          `- source=${item.source || "-"}`
+          + ` | audit=${item.auditLogId || "-"}`
+          + ` | operation=${item.operation || "-"}`
+          + ` | decision=${item.decision || "-"}`
+          + ` | action=${item.primaryActionKey || "-"}`
+          + ` | next=${item.nextOperation || "-"}`
+          + ` | download=${item.nextDownloadFileName || item.nextDownloadKey || "-"}`
+        );
+      }
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {

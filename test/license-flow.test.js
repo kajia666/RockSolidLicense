@@ -13253,6 +13253,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchContract.files.handoffIndex, "handoff-index.txt");
     assert.equal(initialLaunchContract.files.launchReceiptNextFollowUp, "launch-receipt-next-follow-up.txt");
     assert.equal(initialLaunchContract.files.launchMainlinePostLaunchHandoffIndex, "post-launch-handoff-index");
+    const initialLaunchOperatorHeadline = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.operatorHeadline;
+    assert.ok(initialLaunchOperatorHeadline);
+    assert.equal(initialLaunchOperatorHeadline.decisionLabel, "NO-GO");
+    assert.equal(initialLaunchOperatorHeadline.status, "review");
+    assert.equal(initialLaunchOperatorHeadline.primaryBlockerStage, "production_evidence");
+    assert.equal(initialLaunchOperatorHeadline.nextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(initialLaunchOperatorHeadline.nextDownloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.match(initialLaunchOperatorHeadline.workspaceHref, /\/developer\/launch-mainline\?/);
+    assert.equal(initialLaunchOperatorHeadline.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.equal(initialLaunchOperatorHeadline.files.readiness, "initial-launch-ops-readiness.txt");
+    assert.equal(initialLaunchOperatorHeadline.files.handoffIndex, "handoff-index.txt");
     const initialLaunchOpsTraceability = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.traceability;
     assert.ok(initialLaunchOpsTraceability);
     assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.operation, "record_post_launch_ops_sweep");
@@ -13285,6 +13296,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`- nextRequiredAction: stage=production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
     assert.match(launchReceiptSnapshot.summaryText, /- files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Headline:/);
+    assert.match(launchReceiptSnapshot.summaryText, /- headline: NO-GO \| status=review \| blocker=production_evidence/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      new RegExp(`- next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt`)
+    );
+    assert.match(launchReceiptSnapshot.summaryText, /- handoff: .* \| readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:/);
     assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
     assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));
@@ -13395,6 +13413,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /- Decision: NO-GO \(canEnterInitialLaunch=false\)/);
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`- Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`));
     assert.match(initialLaunchOpsReadinessDownload.body, /- Files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Operator Headline:/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Headline: NO-GO \| status=review \| blocker=production_evidence/);
+    assert.match(
+      initialLaunchOpsReadinessDownload.body,
+      new RegExp(`- Next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt`)
+    );
     assert.match(initialLaunchOpsReadinessDownload.body, /Follow-up Queue:/);
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[production_evidence\\].*operation=${latestLaunchReceipt.productionEvidenceNextOperation}.*download=${latestLaunchReceipt.firstLaunchDutyPrimaryDownloadKey || "-"}`));
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[post_launch_lifecycle\\].*operation=${latestLaunchReceipt.postLaunchLifecycleNextOperation}.*download=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`));
@@ -13451,6 +13475,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
       /Contract Files: readiness=ops\/initial-launch-ops-readiness\.txt \| handoffIndex=ops\/handoff-index\.txt \| nextFollowUp=ops\/launch-receipt-next-follow-up\.txt/
+    );
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Operator Headline:/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Headline: NO-GO \| status=review \| blocker=production_evidence/);
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      new RegExp(`Next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt`)
     );
     const launchMainlineTraceabilityChecksums = await getText(
       baseUrl,
@@ -13518,6 +13548,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOpsContract.files.initialLaunchOpsReadiness,
       "initial-launch-ops-readiness.txt"
     );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOperatorHeadline.decisionLabel,
+      "NO-GO"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOperatorHeadline.nextOperation,
+      latestLaunchReceipt.productionEvidenceNextOperation
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOperatorHeadline.files.readiness,
+      "initial-launch-ops-readiness.txt"
+    );
     const launchMainlineTraceabilitySummaryDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=summary",
@@ -13543,6 +13585,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       new RegExp(`Contract Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
+    );
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Operator Headline:/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Headline: NO-GO \| status=review \| blocker=production_evidence/);
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      new RegExp(`Next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt`)
     );
 
     const forbiddenExport = await getJsonExpectError(

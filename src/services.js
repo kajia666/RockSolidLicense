@@ -13784,6 +13784,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   const lifecycle = traceability.postLaunchLifecycle || {};
   const opsFiles = traceability.opsFiles || {};
   const initialLaunchContract = traceability.initialLaunchOpsContract || null;
+  const initialLaunchOperatorHeadline = traceability.initialLaunchOperatorHeadline || null;
   lines.push("");
   lines.push("Post-Launch Handoff Traceability:");
   lines.push(
@@ -13809,6 +13810,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "-"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
   appendInitialLaunchContractTraceabilityTextLines(lines, initialLaunchContract, opsFiles);
+  appendInitialLaunchOperatorHeadlineTextLines(lines, initialLaunchOperatorHeadline);
   return true;
 }
 
@@ -13836,6 +13838,18 @@ function appendInitialLaunchContractTraceabilityTextLines(lines = [], contract =
     + ` | handoffIndex=${toOpsFile(opsFiles.handoffIndex, files.handoffIndex || "handoff-index.txt")}`
     + ` | nextFollowUp=${toOpsFile(opsFiles.launchReceiptNextFollowUp, files.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt")}`
   );
+  return true;
+}
+
+function appendInitialLaunchOperatorHeadlineTextLines(lines = [], operatorHeadline = null) {
+  if (!Array.isArray(lines) || !operatorHeadline || typeof operatorHeadline !== "object") {
+    return false;
+  }
+  lines.push("");
+  lines.push("Initial Launch Operator Headline:");
+  lines.push(`- Headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
+  lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+  lines.push(`- Handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
   return true;
 }
 
@@ -15327,6 +15341,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
     || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
     || null;
   const initialLaunchOpsContract = opsSnapshot.summary?.initialLaunchOpsReadiness?.contract || null;
+  const initialLaunchOperatorHeadline = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorHeadline || null;
   return {
     latestLaunchReceipt: latestLaunchReceipt
       ? {
@@ -15367,6 +15382,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       primaryDownloadFileName: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFileName || lifecycle.primaryRecommendedDownload?.fileName || null
     },
     initialLaunchOpsContract,
+    initialLaunchOperatorHeadline,
     opsFiles: {
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
@@ -15445,6 +15461,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
   appendInitialLaunchContractTraceabilityTextLines(lines, traceability.initialLaunchOpsContract || null, opsFiles);
+  appendInitialLaunchOperatorHeadlineTextLines(lines, traceability.initialLaunchOperatorHeadline || null);
 
   lines.push("");
   lines.push("Recommended Downloads:");
@@ -16481,6 +16498,35 @@ function buildDeveloperOpsInitialLaunchContract({
   };
 }
 
+function buildDeveloperOpsInitialLaunchOperatorHeadline({
+  contract = {},
+  goNoGo = {},
+  latestReceipt = null,
+  primaryWorkspaceAction = null
+} = {}) {
+  const files = contract.files || {};
+  const nextRequiredAction = contract.nextRequiredAction || {};
+  const decisionLabel = contract.label || goNoGo.label || String(contract.decision || goNoGo.decision || "unknown").toUpperCase();
+  const status = contract.status || goNoGo.status || "unknown";
+  const primaryBlockerStage = goNoGo.primaryBlockerStage || (Array.isArray(contract.blockingStages) && contract.blockingStages.length ? contract.blockingStages[0] : null);
+  return {
+    decisionLabel,
+    status,
+    canEnterInitialLaunch: contract.canEnterInitialLaunch === true || goNoGo.canEnterInitialLaunch === true,
+    primaryBlockerStage,
+    headline: `${decisionLabel} | status=${status || "-"} | blocker=${primaryBlockerStage || "-"}`,
+    nextOperation: nextRequiredAction.operation || goNoGo.nextOperation || null,
+    nextDownloadFileName: nextRequiredAction.downloadFileName || goNoGo.nextDownloadFileName || null,
+    workspaceHref: nextRequiredAction.workspaceHref || primaryWorkspaceAction?.href || null,
+    handoffFileName: nextRequiredAction.handoffFileName || latestReceipt?.handoffFileName || null,
+    files: {
+      readiness: files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
+      handoffIndex: files.handoffIndex || "handoff-index.txt",
+      launchReceiptNextFollowUp: files.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt"
+    }
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   scope = {},
   overview = {},
@@ -16589,6 +16635,12 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     traceability,
     followUpQueue
   });
+  const operatorHeadline = buildDeveloperOpsInitialLaunchOperatorHeadline({
+    contract,
+    goNoGo,
+    latestReceipt,
+    primaryWorkspaceAction
+  });
   return {
     status,
     headline: !latestReceipt
@@ -16639,6 +16691,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     gate,
     goNoGo,
     contract,
+    operatorHeadline,
     traceability,
     nextSteps
   };
@@ -18418,6 +18471,14 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push(`- nextRequiredAction: stage=${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"}`);
       lines.push(`- files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
     }
+    const operatorHeadline = initialLaunchOpsReadiness.operatorHeadline || null;
+    if (operatorHeadline) {
+      lines.push("");
+      lines.push("Initial Launch Operator Headline:");
+      lines.push(`- headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
+      lines.push(`- next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+      lines.push(`- handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {
@@ -18643,6 +18704,14 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
     lines.push(`- Next Required Action: ${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"}`);
     lines.push(`- Files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
+    lines.push("");
+  }
+  const operatorHeadline = readiness.operatorHeadline || null;
+  if (operatorHeadline) {
+    lines.push("Operator Headline:");
+    lines.push(`- Headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
+    lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+    lines.push(`- Handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
     lines.push("");
   }
   lines.push("Blockers:");

@@ -16283,6 +16283,12 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /currentMainlineProductionEvidenceQueue/);
     assert.match(html, /currentMainlineNextEvidenceAction/);
     assert.match(html, /renderNextProductionEvidenceAction/);
+    assert.match(html, /Initial Launch Operator Actions/);
+    assert.match(html, /mainline-operator-action-manifest-box/);
+    assert.match(html, /currentMainlineOperatorActionManifest/);
+    assert.match(html, /renderOperatorActionManifestActions/);
+    assert.match(html, /initialLaunchOperatorActionManifest/);
+    assert.match(html, /operatorActionManifest/);
     assert.match(html, /remainingEvidenceChecks/);
     assert.match(html, /production-checks-title/);
     assert.match(html, /production-checks-box/);
@@ -16320,6 +16326,7 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.doesNotMatch(html, /item\.source === "developer-ops"/);
     assert.match(html, /data-mainline-hero-control-index/);
     assert.match(html, /data-mainline-next-evidence-control-index/);
+    assert.match(html, /data-mainline-operator-action-index/);
     assert.match(html, /data-mainline-section-control-index/);
     assert.match(html, /data-mainline-receipt-card-control-index/);
   } finally {

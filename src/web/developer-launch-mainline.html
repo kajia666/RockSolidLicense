@@ -268,6 +268,10 @@
           <h2>Next Production Evidence</h2>
           <div id="mainline-next-evidence-box" class="hint">Generate a launch mainline package to inspect the next production evidence action here.</div>
         </article>
+        <article class="card">
+          <h2>Initial Launch Operator Actions</h2>
+          <div id="mainline-operator-action-manifest-box" class="hint">Generate a launch mainline package to inspect initial launch operator actions here.</div>
+        </article>
       </section>
 
       <section class="wide">
@@ -676,6 +680,22 @@
         return remaining.find((item) => item?.setupAction?.operation) || null;
       }
 
+      function currentMainlineOperatorActionManifest() {
+        const traceabilityManifest = currentMainline?.postLaunchHandoffTraceability?.initialLaunchOperatorActionManifest;
+        if (traceabilityManifest && typeof traceabilityManifest === "object") {
+          return traceabilityManifest;
+        }
+        const summaryManifest = currentMainlineSummary().initialLaunchOpsReadiness?.operatorActionManifest;
+        if (summaryManifest && typeof summaryManifest === "object") {
+          return summaryManifest;
+        }
+        const opsManifest = currentMainline?.opsSnapshot?.summary?.initialLaunchOpsReadiness?.operatorActionManifest;
+        if (opsManifest && typeof opsManifest === "object") {
+          return opsManifest;
+        }
+        return null;
+      }
+
       function currentLastMainlineReceipt() {
         return lastMainlineActionResult?.receipt && typeof lastMainlineActionResult.receipt === "object"
           ? lastMainlineActionResult.receipt
@@ -854,6 +874,78 @@
         `;
       }
 
+      function operatorActionControls(action = null) {
+        if (!action || typeof action !== "object") {
+          return [];
+        }
+        return [
+          action.workspaceAction ? {
+            kind: "workspace",
+            label: action.workspaceAction.label || action.title || action.key || "Open launch mainline",
+            workspaceAction: action.workspaceAction
+          } : null,
+          action.download ? {
+            kind: "download",
+            label: action.download.label || action.download.fileName || action.download.key || "Download operator handoff",
+            recommendedDownload: action.download
+          } : null
+        ].filter(Boolean);
+      }
+
+      function renderOperatorActionManifestActions() {
+        const manifest = currentMainlineOperatorActionManifest();
+        const actions = Array.isArray(manifest?.actions) ? manifest.actions : [];
+        if (!manifest?.version && !actions.length) {
+          return '<div class="hint">Generate Launch Mainline to inspect initial launch operator actions here.</div>';
+        }
+        const tags = [
+          manifest?.decision ? { label: "decision", value: String(manifest.decision).toUpperCase(), strong: String(manifest.decision).toLowerCase() === "no_go" } : null,
+          manifest?.status ? { label: "status", value: String(manifest.status).toUpperCase(), strong: false } : null,
+          manifest?.primaryActionKey ? { label: "primary", value: manifest.primaryActionKey, strong: true } : null,
+          { label: "actions", value: Number(manifest?.actionCount ?? actions.length), strong: actions.length > 0 },
+          manifest?.projectCode ? { label: "project", value: manifest.projectCode, strong: false } : null,
+          manifest?.channel ? { label: "channel", value: manifest.channel, strong: false } : null
+        ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+        if (!actions.length) {
+          return `
+            <div class="item">
+              <div class="item-head">
+                <div class="item-title">${esc(manifest?.decisionLabel || "Initial launch operator manifest")}</div>
+                <div class="audit-meta">${tags}</div>
+              </div>
+              <div class="hint">No operator action is required for this lane right now.</div>
+            </div>
+          `;
+        }
+        return `
+          <div class="list">
+            ${actions.map((action, actionIndex) => {
+              const controls = operatorActionControls(action);
+              const actionTags = [
+                action?.stage ? { label: "stage", value: action.stage, strong: true } : null,
+                action?.priority ? { label: "priority", value: action.priority, strong: false } : null,
+                action?.operation ? { label: "operation", value: action.operation, strong: true } : null,
+                action?.download?.fileName ? { label: "file", value: action.download.fileName, strong: false } : null
+              ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+              return `
+                <div class="item">
+                  <div class="item-head">
+                    <div class="item-title">${esc(action?.title || action?.actionKey || action?.kind || "Initial launch operator action")}</div>
+                    <div class="audit-meta">${actionTags || tags}</div>
+                  </div>
+                  <div class="hint">${esc(action?.summary || manifest?.decisionLabel || "Continue the initial launch operator handoff from this action.")}</div>
+                  ${controls.length ? `
+                    <div class="actions">
+                      ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-operator-action-index="${actionIndex}" data-mainline-operator-action-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.kind || "Action")}</button>`).join("")}
+                    </div>
+                  ` : ""}
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `;
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const screen = currentMainlineLastActionScreen();
         const sections = Array.isArray(screen.sections) ? screen.sections : [];
@@ -975,6 +1067,7 @@
         }
         el("route-focus-box").innerHTML = renderRouteFocus();
         el("mainline-next-evidence-box").innerHTML = renderNextProductionEvidenceAction();
+        el("mainline-operator-action-manifest-box").innerHTML = renderOperatorActionManifestActions();
         el("mainline-hero-controls-box").innerHTML = renderHeroControls();
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = page.summaryText || "No launch mainline summary yet.";
@@ -1158,6 +1251,7 @@
         el("mainline-downloads-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the unified downloads here.</div>';
         el("stage-gates-box").innerHTML = '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
         el("mainline-next-evidence-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the next production evidence action here.</div>';
+        el("mainline-operator-action-manifest-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect initial launch operator actions here.</div>';
         el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
         el("route-focus-box").innerHTML = renderRouteFocus();
         setOutput("Waiting for actions...");
@@ -1197,6 +1291,22 @@
         setOutput({ error: error.message });
       }));
       document.addEventListener("click", async (event) => {
+        const operatorActionButton = event.target.closest("[data-mainline-operator-action-index]");
+        if (operatorActionButton) {
+          const actionIndex = Number(operatorActionButton.dataset.mainlineOperatorActionIndex || -1);
+          const controlIndex = Number(operatorActionButton.dataset.mainlineOperatorActionControlIndex || -1);
+          const manifest = currentMainlineOperatorActionManifest();
+          const actions = Array.isArray(manifest?.actions) ? manifest.actions : [];
+          const action = actions[actionIndex] || null;
+          const controls = operatorActionControls(action);
+          try {
+            await executeMainlineControl(controls[controlIndex] || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
         const nextEvidenceControlButton = event.target.closest("[data-mainline-next-evidence-control-index]");
         if (nextEvidenceControlButton) {
           const controlIndex = Number(nextEvidenceControlButton.dataset.mainlineNextEvidenceControlIndex || -1);

@@ -14097,6 +14097,7 @@ function buildDeveloperLaunchMainlinePayload({
   const stabilizationHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-stabilization-handoff.txt`;
   const firstLaunchHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-launch-handoff.txt`;
   const rehearsalGuideFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-rehearsal-guide.txt`;
+  const initialLaunchOpsReadinessFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-initial-launch-ops-readiness.txt`;
   const payload = {
     generatedAt,
     fileName,
@@ -14110,6 +14111,7 @@ function buildDeveloperLaunchMainlinePayload({
     stabilizationHandoffFileName,
     firstLaunchHandoffFileName,
     rehearsalGuideFileName,
+    initialLaunchOpsReadinessFileName,
     manifest: {
       generatedAt,
       channel,
@@ -14282,6 +14284,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/initial-launch-ops-readiness.txt",
+    payload.opsSnapshot ? buildDeveloperOpsInitialLaunchOpsReadinessText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",
     payload.productionHandoffText || ""
   );
@@ -14336,7 +14343,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -14361,6 +14368,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-launch-mainline-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "initial-launch-ops-readiness") {
+    return {
+      fileName: payload.initialLaunchOpsReadinessFileName || "developer-launch-mainline-initial-launch-ops-readiness.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsInitialLaunchOpsReadinessText(payload.opsSnapshot || {})
     };
   }
   if (normalizedFormat === "production-handoff") {

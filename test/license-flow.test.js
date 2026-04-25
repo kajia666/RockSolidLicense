@@ -6221,6 +6221,17 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
       assert.match(launchMainlineSummaryDownload.body, /Launch Mainline Rehearsal Guide:/);
 
+      const initialLaunchOpsReadinessDownload = await getText(
+        baseUrl,
+        `/api/developer/launch-mainline/download?${launchMainlineRouteQuery}&format=initial-launch-ops-readiness`,
+        viewerSession.token
+      );
+      assert.match(initialLaunchOpsReadinessDownload.contentType || "", /^text\/plain/);
+      assert.match(initialLaunchOpsReadinessDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-initial-launch-ops-readiness\.txt"/);
+      assert.match(initialLaunchOpsReadinessDownload.body, /RockSolid Developer Ops Initial Launch Readiness/);
+      assert.match(initialLaunchOpsReadinessDownload.body, /Gate Decision: HOLD/);
+      assert.match(initialLaunchOpsReadinessDownload.body, /Can Enter Initial Launch: no/);
+
       const productionHandoffDownload = await getText(
         baseUrl,
         "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=production-handoff",
@@ -6341,6 +6352,18 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineChecksumsDownload.contentType || "", /^text\/plain/);
       assert.match(launchMainlineChecksumsDownload.contentDisposition || "", /attachment; filename=\"rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-sha256\.txt\"/);
       assert.match(launchMainlineChecksumsDownload.body, /rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*-rehearsal-guide\.txt/);
+      assert.match(launchMainlineChecksumsDownload.body, /ops\/initial-launch-ops-readiness\.txt/);
+
+      const launchMainlineZipDownload = await getBinary(
+        baseUrl,
+        "/api/developer/launch-mainline/download?productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&format=zip",
+        viewerSession.token
+      );
+      assert.match(launchMainlineZipDownload.contentType || "", /^application\/zip/);
+      assert.match(launchMainlineZipDownload.contentDisposition || "", /attachment; filename=\"rocksolid-developer-launch-mainline-RELPKG_ALPHA-stable-.*\.zip\"/);
+      assert.equal(launchMainlineZipDownload.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+      const launchMainlineZipText = launchMainlineZipDownload.body.toString("latin1");
+      assert.match(launchMainlineZipText, /ops\/initial-launch-ops-readiness\.txt/);
 
       const forbidden = await getJsonExpectError(
         baseUrl,

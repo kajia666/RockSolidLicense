@@ -5440,6 +5440,27 @@ test("developer release package export bundles integration, versions, and notice
       ?.recommendedDownload;
     assert.equal(reviewOpsRouteDownload?.source, "developer-ops");
     assert.match(reviewOpsRouteDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
+    const receiptNextRouteParams = new URLSearchParams({
+      productCode: "RELPKG_ALPHA",
+      channel: "stable",
+      operation: "record_post_launch_ops_sweep",
+      actionKey: "release_route_launch_receipt_next_follow_up",
+      downloadKey: "ops_launch_receipt_next_follow_up",
+      routeTitle: "Continue launch receipt next follow-up",
+      routeReason: "Resume the launch receipt next follow-up from the release package handoff"
+    });
+    const receiptNextRoutedReleasePackage = await getJson(
+      baseUrl,
+      `/api/developer/release-package?${receiptNextRouteParams.toString()}`,
+      viewerSession.token
+    );
+    const receiptNextRouteDownload = receiptNextRoutedReleasePackage.manifest.release.routeFocus.controls
+      .find((item) => item.recommendedDownload?.key === "ops_launch_receipt_next_follow_up")
+      ?.recommendedDownload;
+    assert.equal(receiptNextRouteDownload?.source, "developer-ops");
+    assert.equal(receiptNextRouteDownload?.format, "launch-receipt-next-follow-up");
+    assert.match(receiptNextRouteDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
+    assert.match(receiptNextRouteDownload?.href || "", /format=launch-receipt-next-follow-up/);
     const smokeOpsRouteCases = [
       ["accounts", "launch_smoke_accounts_summary"],
       ["entitlements", "launch_smoke_entitlements_summary"],

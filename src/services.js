@@ -3565,6 +3565,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("closeout_handoff")) return "closeout-handoff";
   if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
+  if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized.endsWith("_checksums") || normalized.includes("checksums")) return "checksums";
   if (normalized.endsWith("_zip") || normalized.includes("zip")) return "zip";
   if (normalized.includes("checklist")) return "checklist";

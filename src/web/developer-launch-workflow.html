@@ -1508,7 +1508,7 @@
         return result;
       }
 
-        async function downloadLaunchOpsAsset(item) {
+        async function downloadLaunchOpsAsset(item, requestedFormat = String(item?.format || "summary").trim() || "summary") {
           if (!item?.key) {
             throw new Error("Generate a launch workflow package before downloading launch ops assets.");
           }
@@ -1516,7 +1516,7 @@
         const result = await downloadApiFile(
           `/api/developer/ops/export/download${q({
             productCode: target.productCode,
-            format: item.format || "summary",
+            format: requestedFormat,
             ...(item.params && typeof item.params === "object" ? item.params : {})
           })}`,
           item.fileName || "developer-ops-summary.txt"
@@ -1525,7 +1525,7 @@
           return result;
         }
 
-        async function downloadLaunchReviewAsset(item) {
+        async function downloadLaunchReviewAsset(item, requestedFormat = String(item?.format || "summary").trim() || "summary") {
           if (!item?.key) {
             throw new Error("Generate a launch workflow package before downloading launch review assets.");
           }
@@ -1534,7 +1534,7 @@
             `/api/developer/launch-review/download${q({
               productCode: target.productCode,
               channel: target.channel,
-              format: item.format || "summary",
+              format: requestedFormat,
               reviewMode: "matched",
               ...(item.params && typeof item.params === "object" ? item.params : {})
             })}`,
@@ -1548,18 +1548,40 @@
           if (!item?.key) {
             throw new Error("Generate a launch workflow package before downloading recommended files.");
           }
+        const fallbackFormats = {
+          launch_smoke_kit_summary: "summary",
+          launch_review_summary: "summary",
+          launch_review_ops_summary: "summary",
+          launch_mainline_summary: "summary",
+          launch_mainline_rehearsal_guide: "rehearsal-guide",
+          launch_mainline_zip: "zip",
+          launch_mainline_checksums: "checksums",
+          launch_mainline_initial_launch_ops_readiness: "initial-launch-ops-readiness",
+          launch_mainline_operations_handoff: "operations-handoff",
+          launch_mainline_post_launch_sweep_handoff: "post-launch-sweep-handoff",
+          launch_mainline_closeout_handoff: "closeout-handoff",
+          launch_mainline_stabilization_handoff: "stabilization-handoff",
+          ops_primary_summary: "route-review-primary",
+          ops_primary_account_summary: "route-review-primary",
+          ops_primary_entitlement_summary: "route-review-primary",
+          ops_primary_session_summary: "route-review-primary",
+          ops_primary_device_summary: "route-review-primary",
+          ops_route_next_summary: "route-review-next",
+          ops_remaining_summary: "route-review-remaining"
+        };
+        const requestedFormat = String(item.format || fallbackFormats[item.key] || "summary").trim() || "summary";
         if (item.source === "developer-ops") {
-          return downloadLaunchOpsAsset(item);
+          return downloadLaunchOpsAsset(item, requestedFormat);
         }
         if (item.source === "developer-launch-review") {
-          return downloadLaunchReviewAsset(item);
+          return downloadLaunchReviewAsset(item, requestedFormat);
         }
         if (item.source === "developer-launch-mainline") {
           return downloadApiFile(
             `/api/developer/launch-mainline/download${q({
               productCode: currentWorkflowTarget()?.productCode,
               channel: currentWorkflowTarget()?.channel,
-              format: item.format || "summary",
+              format: requestedFormat,
               ...(item.params && typeof item.params === "object" ? item.params : {})
             })}`,
             item.fileName || "developer-launch-mainline-summary.txt",
@@ -1571,7 +1593,7 @@
             `/api/developer/launch-smoke-kit/download${q({
               productCode: currentWorkflowTarget()?.productCode,
               channel: currentWorkflowTarget()?.channel,
-              format: item.format || "summary",
+              format: requestedFormat,
               ...(item.params && typeof item.params === "object" ? item.params : {})
             })}`,
             item.fileName || "developer-launch-smoke-kit-summary.txt",

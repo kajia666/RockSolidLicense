@@ -15795,6 +15795,10 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /operation: target\.operation/);
     assert.match(html, /actionKey: target\.actionKey/);
     assert.match(html, /downloadKey: target\.downloadKey/);
+    assert.match(html, /fallbackFormats\[item\.key\]/);
+    assert.match(html, /format: requestedFormat,\s+\.\.\.\(item\.params && typeof item\.params === "object" \? item\.params : \{\}\)/);
+    assert.match(html, /launch_mainline_rehearsal_guide: "rehearsal-guide"/);
+    assert.match(html, /ops_route_next_summary: "route-review-next"/);
     assert.match(html, /renderLaunchRouteFocus/);
     assert.match(html, /Launch Workflow Route Focus/);
     assert.match(html, /Open Project Workspace/);
@@ -15915,6 +15919,9 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /operation: target\.operation/);
       assert.match(html, /actionKey: target\.actionKey/);
       assert.match(html, /downloadKey: target\.downloadKey/);
+      assert.match(html, /downloadLaunchReview\(\s*requestedFormat/);
+      assert.match(html, /format: requestedFormat,\s+\.\.\.\(item\.params && typeof item\.params === "object" \? item\.params : \{\}\)/);
+      assert.match(html, /ops_route_next_summary: "route-review-next"/);
       assert.match(html, /review-followup-box/);
       assert.match(html, /renderLastReviewFollowUp/);
       assert.match(html, /Launch Mainline Receipt Recap/);
@@ -17189,6 +17196,9 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /data-release-route-focus-action/);
     assert.match(html, /operation: target\.operation/);
     assert.match(html, /downloadKey: target\.downloadKey/);
+    assert.match(html, /fallbackFormats\[shortcut\.key\]/);
+    assert.match(html, /launch_mainline_rehearsal_guide: "rehearsal-guide"/);
+    assert.match(html, /ops_route_next_summary: "route-review-next"/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

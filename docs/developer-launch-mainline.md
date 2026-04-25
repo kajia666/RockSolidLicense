@@ -24,6 +24,7 @@ Supported download formats:
 
 - `json`
 - `summary`
+- `initial-launch-ops-readiness`
 - `production-handoff`
 - `cutover-handoff`
 - `recovery-drill-handoff`

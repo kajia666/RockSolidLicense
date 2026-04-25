@@ -232,6 +232,7 @@
 - [开发者授权策略与卡密工作台](docs/developer-license.md)
 - [开发者授权运营台](docs/developer-ops.md)
 - [开发者发版工作台](docs/developer-release.md)
+- [项目计划、总体规划和开发进度](docs/project-roadmap-progress.md)
 
 补一句定位说明：这里的“开发者接入中心 / 发版中心 / 上线工作台”都是给软件作者自己和他的开发、测试、发布同事使用的后台工作台，不是给终端用户下载最终加密后软件的页面。正常流程仍然是软件作者接入 SDK、保护并构建自己的软件，然后再把最终客户端分发给自己的用户。
 
@@ -703,6 +704,7 @@ cl /EHsc /std:c++17 ^
 ## 重点文档
 
 - [architecture.md](docs/architecture.md)
+- [project-roadmap-progress.md](docs/project-roadmap-progress.md)
 - [tcp-protocol.md](docs/tcp-protocol.md)
 - [client-auth-modes.md](docs/client-auth-modes.md)
 - [client-unbind.md](docs/client-unbind.md)

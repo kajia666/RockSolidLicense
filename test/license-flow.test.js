@@ -13807,6 +13807,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReceiptSnapshot.summaryText,
       new RegExp(`- primaryAction: stage=production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      new RegExp(
+        `- primaryAction: stage=production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| action=${latestLaunchReceipt.productionEvidenceNextActionKey}`
+        + ` \\| workspace=Open Launch Mainline@summary \\| workspaceHref=.*\\/developer\\/launch-mainline\\?.*operation=${latestLaunchReceipt.productionEvidenceNextOperation}.*`
+        + ` \\| download=developer-ops-launch-receipt-next-follow-up\\.txt \\| downloadFormat=launch-receipt-next-follow-up \\| downloadHref=.*\\/api\\/developer\\/ops\\/export\\/download\\?.*format=launch-receipt-next-follow-up`
+      )
+    );
     assert.match(launchReceiptSnapshot.summaryText, /- files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Action Receipts:/);
     assert.match(launchReceiptSnapshot.summaryText, /source=developer_ops_audit_log/);

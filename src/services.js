@@ -14156,11 +14156,22 @@ function appendInitialLaunchOperatorActionManifestTextLines(lines = [], manifest
     ? { manifest: "manifest", primaryAction: "primaryAction", files: "files" }
     : { manifest: "Manifest", primaryAction: "Primary Action", files: "Files" };
   const primaryAction = Array.isArray(manifest.actions) && manifest.actions.length ? manifest.actions[0] : {};
+  const workspaceAction = primaryAction.workspaceAction || {};
+  const primaryDownload = primaryAction.download || primaryAction.recommendedDownload || {};
   const files = manifest.files || {};
   lines.push("");
   lines.push(title);
   lines.push(`- ${labels.manifest}: ${manifest.version || "-"} | primary=${manifest.primaryActionKey || "-"} | actions=${manifest.actionCount ?? (Array.isArray(manifest.actions) ? manifest.actions.length : 0)}`);
-  lines.push(`- ${labels.primaryAction}: stage=${primaryAction.stage || "-"} | operation=${primaryAction.operation || "-"} | action=${primaryAction.actionKey || "-"}`);
+  lines.push(
+    `- ${labels.primaryAction}: stage=${primaryAction.stage || "-"}`
+    + ` | operation=${primaryAction.operation || "-"}`
+    + ` | action=${primaryAction.actionKey || "-"}`
+    + ` | workspace=${workspaceAction.label || workspaceAction.key || "-"}@${workspaceAction.autofocus || "-"}`
+    + ` | workspaceHref=${workspaceAction.href || manifest.entrypoints?.workspaceHref || "-"}`
+    + ` | download=${primaryDownload.fileName || primaryDownload.key || "-"}`
+    + ` | downloadFormat=${primaryDownload.format || "-"}`
+    + ` | downloadHref=${primaryDownload.href || manifest.entrypoints?.downloadHref || "-"}`
+  );
   lines.push(`- ${labels.files}: readiness=${files.initialLaunchOpsReadiness || "-"} | handoffIndex=${files.handoffIndex || "-"} | nextFollowUp=${files.launchReceiptNextFollowUp || "-"}`);
   return true;
 }

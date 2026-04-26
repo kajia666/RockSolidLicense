@@ -248,6 +248,8 @@
       const requestedReviewMode = (routeParams.get("reviewMode") || "").trim().toLowerCase();
       const requestedRouteTitle = (routeParams.get("routeTitle") || "").trim();
       const requestedRouteReason = (routeParams.get("routeReason") || "").trim();
+      const requestedSource = (routeParams.get("source") || "").trim().toLowerCase();
+      const requestedHandoff = (routeParams.get("handoff") || "").trim().toLowerCase();
       const requestedUsername = (routeParams.get("username") || "").trim();
       const requestedSearch = (routeParams.get("search") || "").trim();
       const requestedEventType = (routeParams.get("eventType") || "").trim();
@@ -329,6 +331,15 @@
       }
       function currentRequestedRouteReviewAction() {
         return requestedRouteAction;
+      }
+      function isLaunchSmokeFirstWaveHandoff() {
+        return requestedSource === "launch-smoke" && requestedHandoff === "first-wave";
+      }
+      function currentRouteHandoffParams() {
+        return {
+          source: requestedSource,
+          handoff: requestedHandoff
+        };
       }
       function formatControlRouteReviewActionLabel(actionKey = "") {
         const normalized = String(actionKey || "").trim().toLowerCase();
@@ -488,8 +499,10 @@
           };
         }
         return {
-          title: "Ops snapshot focus",
-          summary: "Use the scoped snapshot to confirm first sign-ins, early queue signals, and post-launch follow-up for the routed lane.",
+          title: isLaunchSmokeFirstWaveHandoff() ? "Launch smoke first-wave watch" : "Ops snapshot focus",
+          summary: isLaunchSmokeFirstWaveHandoff()
+            ? "Continue from launch smoke with first-wave confirmation evidence and the scoped handoff index already prepared."
+            : "Use the scoped snapshot to confirm first sign-ins, early queue signals, and post-launch follow-up for the routed lane.",
           actions: [
             { key: "refresh-snapshot", label: "Refresh Snapshot" },
             { key: "scroll-target", label: "Scroll To Snapshot" },
@@ -1362,6 +1375,7 @@
           autofocus: action.autofocus || "summary",
           routeTitle: requestedRouteTitle || fallbackTitle || currentOpsRouteFocus().title || "Developer Ops",
           routeReason: requestedRouteReason || fallbackReason || currentOpsRouteFocus().summary || "",
+          ...currentRouteHandoffParams(),
           ...(action.params && typeof action.params === "object" ? action.params : {})
         };
         if (action.key === "launch-mainline") {
@@ -1844,7 +1858,8 @@
       function buildOpsRouteContext(fallbackTitle = "", fallbackReason = "") {
         return {
           routeTitle: String(requestedRouteTitle || fallbackTitle || currentOpsRouteFocus().title || "Developer Ops").trim(),
-          routeReason: String(requestedRouteReason || fallbackReason || currentOpsRouteFocus().summary || "").trim()
+          routeReason: String(requestedRouteReason || fallbackReason || currentOpsRouteFocus().summary || "").trim(),
+          ...currentRouteHandoffParams()
         };
       }
 
@@ -1857,8 +1872,9 @@
         const directFocus = buildRequestedRouteFocus();
         const routeActionLabel = formatRouteReviewActionLabel(currentRequestedRouteReviewAction());
         box.innerHTML = `
-          <div>${renderTag(focus.title || "Ops route focus", hasProduct)} ${requestedRouteTitle ? renderTag(`from:${requestedRouteTitle}`, true) : ""} ${requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
+          <div>${renderTag(focus.title || "Ops route focus", hasProduct)} ${requestedRouteTitle ? renderTag(`from:${requestedRouteTitle}`, true) : ""} ${requestedAutofocus ? renderTag(`focus:${requestedAutofocus}`) : ""} ${requestedSource ? renderTag(`source:${requestedSource}`) : ""} ${requestedHandoff ? renderTag(`handoff:${requestedHandoff}`) : ""} ${renderTag(`channel:${target.channel || requestedChannel}`, true)}</div>
           ${requestedRouteReason ? `<div class="hint" style="margin-top:8px;">${esc(`Route reason: ${requestedRouteReason}`)}</div>` : ""}
+          ${(requestedSource || requestedHandoff) ? `<div class="hint" style="margin-top:8px;">${esc(`Route handoff: source=${requestedSource || "-"} | handoff=${requestedHandoff || "-"}`)}</div>` : ""}
           ${directFocus?.kind ? `<div class="hint" style="margin-top:8px;">${esc(`Direct review target: ${formatRouteReviewPrimaryTitle(directFocus)} | ${formatRouteReviewPrimarySummary(directFocus)}`)}</div>` : ""}
           ${routeActionLabel ? `<div class="hint" style="margin-top:8px;">${esc(`Route review action: ${routeActionLabel}`)}</div>` : ""}
           <div class="hint" style="margin-top:10px;">${esc(hasProduct ? `${focus.summary} Current project: ${target.productCode}.` : `${focus.summary} Enter or route a project code first.`)}</div>
@@ -2277,7 +2293,9 @@
             channel: target.channel,
             autofocus: "detail",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            source: routed.source,
+            handoff: routed.handoff
           });
           return;
         }
@@ -2288,7 +2306,9 @@
             channel: target.channel,
             autofocus: "handoff",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            source: routed.source,
+            handoff: routed.handoff
           });
           return;
         }
@@ -2299,7 +2319,9 @@
             channel: target.channel,
             autofocus: "quickstart",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            source: routed.source,
+            handoff: routed.handoff
           });
           return;
         }
@@ -2310,7 +2332,9 @@
             channel: target.channel,
             autofocus: "summary",
             routeTitle: routed.routeTitle,
-            routeReason: routed.routeReason
+            routeReason: routed.routeReason,
+            source: routed.source,
+            handoff: routed.handoff
           });
           return;
         }

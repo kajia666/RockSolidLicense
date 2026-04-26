@@ -10572,12 +10572,17 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const routedOperation = String(filters.operation || "").trim().toLowerCase();
   const routedActionKey = String(filters.actionKey || "").trim();
   const routedDownloadKey = String(filters.downloadKey || "").trim();
+  const routedSource = String(filters.source || "").trim().toLowerCase();
+  const routedHandoff = String(filters.handoff || "").trim().toLowerCase();
   const routedRouteTitle = String(filters.routeTitle || "").trim();
   const routedRouteReason = String(filters.routeReason || "").trim();
+  const isLaunchSmokeFirstWaveHandoff = routedSource === "launch-smoke" && routedHandoff === "first-wave";
   const routedParams = compactFocusParams({
     operation: routedOperation,
     actionKey: routedActionKey,
     downloadKey: routedDownloadKey,
+    source: routedSource,
+    handoff: routedHandoff,
     routeTitle: routedRouteTitle,
     routeReason: routedRouteReason
   });
@@ -11221,13 +11226,19 @@ function buildDeveloperLaunchReviewSummaryPayload({
     || opsWorkspaceAction
     || stayAction;
   const routeFocus = {
-    title: routedRouteTitle || (routeProductCode ? `Launch review handoff for ${routeProductCode}` : "Launch review handoff"),
-    summary: routedRouteReason || (routeProductCode
+    title: routedRouteTitle || (isLaunchSmokeFirstWaveHandoff
+      ? (routeProductCode ? `Launch smoke first-wave handoff for ${routeProductCode}` : "Launch smoke first-wave handoff")
+      : (routeProductCode ? `Launch review handoff for ${routeProductCode}` : "Launch review handoff")),
+    summary: routedRouteReason || (isLaunchSmokeFirstWaveHandoff
+      ? "Continue from launch smoke with first-wave confirmation evidence, the Developer Ops handoff index, and scoped review filters already aligned."
+      : routeProductCode
       ? `Recheck ${routeProductCode} on lane ${routeChannel} with the routed launch review and ops filters intact.`
       : "Use the launch review handoff to preserve review filters, ops scope, and follow-up downloads."),
     tags: [
       routeProductCode ? { label: "project", value: routeProductCode, strong: true } : null,
       routeChannel ? { label: "channel", value: routeChannel, strong: false } : null,
+      routedSource ? { label: "source", value: routedSource, strong: isLaunchSmokeFirstWaveHandoff } : null,
+      routedHandoff ? { label: "handoff", value: routedHandoff, strong: isLaunchSmokeFirstWaveHandoff } : null,
       reviewMode ? { label: "reviewMode", value: reviewMode, strong: false } : null,
       filters.eventType ? { label: "event", value: filters.eventType, strong: false } : null,
       filters.actorType ? { label: "actor", value: filters.actorType, strong: false } : null,
@@ -11344,6 +11355,8 @@ function buildDeveloperLaunchReviewPayload({
       operation: filters.operation || null,
       actionKey: filters.actionKey || null,
       downloadKey: filters.downloadKey || null,
+      source: filters.source || null,
+      handoff: filters.handoff || null,
       routeTitle: filters.routeTitle || null,
       routeReason: filters.routeReason || null
     },
@@ -26898,6 +26911,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           operation: selector.operation || null,
           actionKey: selector.actionKey || null,
           downloadKey: selector.downloadKey || null,
+          source: selector.source || null,
+          handoff: selector.handoff || null,
           routeTitle: selector.routeTitle || null,
           routeReason: selector.routeReason || null
         }

@@ -1300,6 +1300,8 @@ export function createApp(overrides = {}) {
           operation: url.searchParams.get("operation"),
           actionKey: url.searchParams.get("actionKey"),
           downloadKey: url.searchParams.get("downloadKey"),
+          source: url.searchParams.get("source"),
+          handoff: url.searchParams.get("handoff"),
           routeTitle: url.searchParams.get("routeTitle"),
           routeReason: url.searchParams.get("routeReason")
         }, {
@@ -1327,6 +1329,8 @@ export function createApp(overrides = {}) {
           operation: url.searchParams.get("operation"),
           actionKey: url.searchParams.get("actionKey"),
           downloadKey: url.searchParams.get("downloadKey"),
+          source: url.searchParams.get("source"),
+          handoff: url.searchParams.get("handoff"),
           routeTitle: url.searchParams.get("routeTitle"),
           routeReason: url.searchParams.get("routeReason")
         }, {

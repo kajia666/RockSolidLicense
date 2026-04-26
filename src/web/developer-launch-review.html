@@ -295,6 +295,8 @@
       const requestedOperation = (routeParams.get("operation") || "").trim();
       const requestedActionKey = (routeParams.get("actionKey") || "").trim();
       const requestedDownloadKey = (routeParams.get("downloadKey") || "").trim();
+      const requestedSource = (routeParams.get("source") || "").trim().toLowerCase();
+      const requestedHandoff = (routeParams.get("handoff") || "").trim().toLowerCase();
       const requestedUsername = (routeParams.get("username") || "").trim();
       const requestedSearch = (routeParams.get("search") || "").trim();
       const requestedEventType = (routeParams.get("eventType") || "").trim();
@@ -422,7 +424,9 @@
           routeReason: requestedRouteReason,
           operation: requestedOperation,
           actionKey: requestedActionKey,
-          downloadKey: requestedDownloadKey
+          downloadKey: requestedDownloadKey,
+          source: requestedSource,
+          handoff: requestedHandoff
         };
       }
       function currentReviewSummary() {
@@ -597,8 +601,11 @@
         el("review-mode").value = requestedReviewMode === "all" ? "all" : "matched";
       }
       function renderRouteFocus() {
-        const title = requestedRouteTitle || "Launch review handoff";
-        const reason = requestedRouteReason || (requestedProductCode
+        const isLaunchSmokeFirstWaveHandoff = requestedSource === "launch-smoke" && requestedHandoff === "first-wave";
+        const title = requestedRouteTitle || (isLaunchSmokeFirstWaveHandoff ? "Launch smoke first-wave handoff" : "Launch review handoff");
+        const reason = requestedRouteReason || (isLaunchSmokeFirstWaveHandoff
+          ? "Continue from launch smoke with first-wave evidence already confirmed; review Launch Review, the Ops handoff index, and Developer Ops watch without rebuilding filters."
+          : requestedProductCode
           ? `Recheck ${requestedProductCode} on lane ${requestedChannel} after launch initialization or early launch-day follow-up.`
           : "Open this page from Launch Workflow, Projects, or Licenses to preserve the selected lane and review filters.");
         const target = currentReviewTarget();
@@ -606,6 +613,8 @@
           target.productCode ? renderTag(`project:${target.productCode}`, true) : "",
           renderTag(`channel:${target.channel}`, true),
           target.reviewMode ? renderTag(`review:${target.reviewMode}`, true) : "",
+          target.source ? renderTag(`source:${target.source}`, isLaunchSmokeFirstWaveHandoff) : "",
+          target.handoff ? renderTag(`handoff:${target.handoff}`, isLaunchSmokeFirstWaveHandoff) : "",
           target.eventType ? renderTag(`event:${target.eventType}`) : "",
           target.actorType ? renderTag(`actor:${target.actorType}`) : "",
           target.entityType ? renderTag(`entity:${target.entityType}`) : "",
@@ -812,7 +821,9 @@
           routeReason: target.routeReason,
           operation: target.operation,
           actionKey: target.actionKey,
-          downloadKey: target.downloadKey
+          downloadKey: target.downloadKey,
+          source: target.source,
+          handoff: target.handoff
         })}`);
         const nextProductCode = String(data?.manifest?.project?.code || target.productCode || "").trim().toUpperCase();
         const nextChannel = String(data?.manifest?.channel || target.channel || "stable").trim().toLowerCase();
@@ -930,6 +941,8 @@
             operation: target.operation,
             actionKey: target.actionKey,
             downloadKey: target.downloadKey,
+            source: target.source,
+            handoff: target.handoff,
             format
           })}`,
           fallbackFileName,
@@ -1054,6 +1067,8 @@
           autofocus: action.autofocus || "summary",
           routeTitle: routedTitle,
           routeReason: routedReason,
+          source: target.source,
+          handoff: target.handoff,
           ...actionParams
         };
         if (action.key === "project") {
@@ -1098,6 +1113,8 @@
           productCode: target.productCode,
           channel: target.channel,
           autofocus: "launch",
+          source: target.source,
+          handoff: target.handoff,
           routeTitle: requestedRouteTitle || "Launch review handoff",
           routeReason: requestedRouteReason || `Continue launch review follow-up for ${target.productCode} from the launch review workspace.`
         });
@@ -1110,6 +1127,8 @@
           productCode: target.productCode,
           channel: target.channel,
           autofocus: "quickstart",
+          source: target.source,
+          handoff: target.handoff,
           routeTitle: requestedRouteTitle || "Launch review handoff",
           routeReason: requestedRouteReason || `Review launch authorization and starter inventory for ${target.productCode} from the launch review workspace.`
         });
@@ -1122,6 +1141,8 @@
           productCode: target.productCode,
           channel: target.channel,
           autofocus: "summary",
+          source: target.source,
+          handoff: target.handoff,
           routeTitle: requestedRouteTitle || "Launch review handoff",
           routeReason: requestedRouteReason || `Continue lane-level launch recheck for ${target.productCode} from the launch review workspace.`
         });
@@ -1134,6 +1155,8 @@
           productCode: target.productCode,
           channel: target.channel,
           autofocus: "snapshot",
+          source: target.source,
+          handoff: target.handoff,
           routeTitle: requestedRouteTitle || "Launch review handoff",
           routeReason: requestedRouteReason || `Continue routed launch-day ops review for ${target.productCode} from the launch review workspace.`,
           username: target.username,

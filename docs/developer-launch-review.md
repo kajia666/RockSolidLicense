@@ -55,6 +55,8 @@ That primary target now also downloads a tighter `Primary match summary`, instea
 
 Each target can route directly into the matching scoped `Developer Ops` section with the same review filters preserved.
 
+When the route comes from the command-line `launch:smoke` preflight, Launch Review now treats `source=launch-smoke` and `handoff=first-wave` as preserved handoff context. Those tags appear in the route-focus card, the exported summary, the JSON payload filters, and the next Developer Ops workspace action so the first-wave review can continue without manually rebuilding the source trail.
+
 Those routed target links now also carry the first matched object itself when possible. So when launch review says "Review matched accounts" or "Review matched sessions", `/developer/ops` can open with a direct review target already prepared instead of only dropping the author into a broad section and asking them to find the first object again.
 
 Those same target links now also carry a routed review action such as `Review Accounts`, `Review Sessions`, or `Review Audit`. So the handoff into `/developer/ops` no longer stops at "open the right page"; it can land in the narrower routed review slice and immediately start the matching review step for the current launch lane.

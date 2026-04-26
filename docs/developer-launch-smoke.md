@@ -49,6 +49,8 @@ When the preflight passes, the JSON output includes a `handoff` block. That bloc
 - `handoff.downloads.opsHandoffIndex` points to the Developer Ops handoff index.
 - `handoff.operatorChecklist` lists the next four launch-duty actions in order: open Launch Review, verify first-wave confirmation evidence, download the Ops handoff index, and continue the Developer Ops watch.
 
+The two workspace routes intentionally carry `source=launch-smoke` and `handoff=first-wave`. `/developer/launch-review` and `/developer/ops` both read those parameters as first-class route-focus context, display them in the handoff card, and keep them on the next workspace links so the launch-duty teammate does not need to re-enter where the review came from.
+
 In local ephemeral mode these entries use routes only because the temporary app shuts down after the script exits. In remote `--base-url` mode they also include absolute `href` values.
 
 To run the same write-path preflight against an already running staging API, pass a base URL and explicit write consent:

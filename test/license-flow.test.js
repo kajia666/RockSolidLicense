@@ -6078,7 +6078,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchZipText, /integration\/host-skeleton\/RELPKG_ALPHA-host-skeleton\.cpp/);
       assert.match(launchZipText, /SHA256SUMS\.txt/);
 
-      const launchReviewRouteQuery = "productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&operation=record_post_launch_ops_sweep&actionKey=launch_review_record_post_launch_ops_sweep&downloadKey=launch_review_post_launch_sweep_handoff&routeTitle=Continue+launch+review+sweep&routeReason=Continue+review+receipt+follow-up";
+      const launchReviewRouteQuery = "productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&operation=record_post_launch_ops_sweep&actionKey=launch_review_record_post_launch_ops_sweep&downloadKey=launch_review_post_launch_sweep_handoff&source=launch-smoke&handoff=first-wave&routeTitle=Continue+launch+review+sweep&routeReason=Continue+review+receipt+follow-up";
       const launchReview = await getJson(
         baseUrl,
         `/api/developer/launch-review?${launchReviewRouteQuery}`,
@@ -6092,6 +6092,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchReview.filters.operation, "record_post_launch_ops_sweep");
       assert.equal(launchReview.filters.actionKey, "launch_review_record_post_launch_ops_sweep");
       assert.equal(launchReview.filters.downloadKey, "launch_review_post_launch_sweep_handoff");
+      assert.equal(launchReview.filters.source, "launch-smoke");
+      assert.equal(launchReview.filters.handoff, "first-wave");
       assert.equal(launchReview.filters.routeTitle, "Continue launch review sweep");
       assert.equal(launchReview.filters.routeReason, "Continue review receipt follow-up");
       assert.equal(launchReview.launchWorkflow.manifest.project.code, "RELPKG_ALPHA");
@@ -6195,6 +6197,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
       assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "action" && item.value === "launch_review_record_post_launch_ops_sweep"));
       assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "download" && item.value === "launch_review_post_launch_sweep_handoff"));
+      assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "source" && item.value === "launch-smoke"));
+      assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "handoff" && item.value === "first-wave"));
       assert.ok(launchReview.reviewSummary.routeFocus?.controls?.some((item) => item.workspaceAction?.key === "ops"));
       assert.ok(launchReview.reviewSummary.routeFocus?.controls?.some((item) => item.recommendedDownload?.key === "launch_review_summary"));
       assert.match(launchReview.summaryText, /RockSolid Developer Launch Review/);
@@ -6208,6 +6212,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /operation=record_post_launch_ops_sweep/);
       assert.match(launchReview.summaryText, /action=launch_review_record_post_launch_ops_sweep/);
       assert.match(launchReview.summaryText, /download=launch_review_post_launch_sweep_handoff/);
+      assert.match(launchReview.summaryText, /source=launch-smoke/);
+      assert.match(launchReview.summaryText, /handoff=first-wave/);
       assert.match(launchReview.summaryText, /action=Open (Account|Entitlement|Session|Device) Control/);
       assert.match(
         launchReview.summaryText,
@@ -6230,6 +6236,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Launch Review Route Focus:/);
       assert.match(launchReviewSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff/);
+      assert.match(launchReviewSummaryDownload.body, /source=launch-smoke/);
+      assert.match(launchReviewSummaryDownload.body, /handoff=first-wave/);
 
       const launchMainlineRouteQuery = "productCode=RELPKG_ALPHA&channel=stable&eventType=session.login&actorType=account&reviewMode=matched&operation=record_post_launch_ops_sweep&actionKey=launch_mainline_record_post_launch_ops_sweep&downloadKey=launch_mainline_post_launch_sweep_handoff&routeTitle=Continue+post-launch+sweep&routeReason=Continue+routed+receipt+follow-up";
       const launchMainline = await getJson(
@@ -16788,9 +16796,14 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /requestedOperation/);
       assert.match(html, /requestedActionKey/);
       assert.match(html, /requestedDownloadKey/);
+      assert.match(html, /requestedSource/);
+      assert.match(html, /requestedHandoff/);
+      assert.match(html, /Launch smoke first-wave handoff/);
       assert.match(html, /operation: target\.operation/);
       assert.match(html, /actionKey: target\.actionKey/);
       assert.match(html, /downloadKey: target\.downloadKey/);
+      assert.match(html, /source: target\.source/);
+      assert.match(html, /handoff: target\.handoff/);
       assert.match(html, /downloadLaunchReview\(\s*requestedFormat/);
       assert.match(html, /format: requestedFormat,\s+\.\.\.\(item\.params && typeof item\.params === "object" \? item\.params : \{\}\)/);
       assert.match(html, /ops_route_next_summary: "route-review-next"/);
@@ -17788,6 +17801,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /requestedEventType/);
     assert.match(html, /requestedActorType/);
     assert.match(html, /requestedEntityType/);
+    assert.match(html, /requestedSource/);
+    assert.match(html, /requestedHandoff/);
+    assert.match(html, /Launch smoke first-wave watch/);
+    assert.match(html, /Route handoff:/);
     assert.match(html, /requestedFocusKind/);
     assert.match(html, /Route filters:/);
     assert.match(html, /Direct review target:/);

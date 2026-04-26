@@ -13400,11 +13400,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextOperation,
       launchOpsAction.receipt.mainlineEvidenceQueue.nextAction.setupAction.operation
     );
+    assert.ok(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadFileName);
+    assert.ok(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadFormat);
+    assert.ok(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadSource);
     assert.match(launchOpsAction.receipt.handoffText || "", /Initial Launch Operator Actions:/);
     assert.match(
       launchOpsAction.receipt.handoffText || "",
       new RegExp(`operation=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextOperation}`)
     );
+    assert.ok((launchOpsAction.receipt.handoffText || "").includes(`download=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadFileName}`));
+    assert.ok((launchOpsAction.receipt.handoffText || "").includes(`format=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadFormat}`));
+    assert.ok((launchOpsAction.receipt.handoffText || "").includes(`source=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadSource}`));
+    assert.ok((launchOpsAction.receipt.handoffText || "").includes(`href=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadHref}`));
 
     const launchReceiptSnapshot = await getJson(
       baseUrl,

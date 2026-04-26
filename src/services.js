@@ -4325,6 +4325,9 @@ function buildLaunchMainlineActionReceiptHandoffText({
       + ` | operation=${initialLaunchOperatorActionReceipt.nextOperation || "-"}`
       + ` | action=${initialLaunchOperatorActionReceipt.nextActionKey || "-"}`
       + ` | download=${initialLaunchOperatorActionReceipt.nextDownloadFileName || initialLaunchOperatorActionReceipt.nextDownloadKey || "-"}`
+      + ` | format=${initialLaunchOperatorActionReceipt.nextDownloadFormat || "-"}`
+      + ` | source=${initialLaunchOperatorActionReceipt.nextDownloadSource || "-"}`
+      + ` | href=${initialLaunchOperatorActionReceipt.nextDownloadHref || "-"}`
     );
     lines.push(`- workspace: ${initialLaunchOperatorActionReceipt.workspaceKey || "-"}@${initialLaunchOperatorActionReceipt.workspaceAutofocus || "-"} | href=${initialLaunchOperatorActionReceipt.workspaceHref || "-"}`);
     lines.push(`- files: readiness=${initialLaunchOperatorActionReceipt.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${initialLaunchOperatorActionReceipt.files?.handoffIndex || "-"} | nextFollowUp=${initialLaunchOperatorActionReceipt.files?.launchReceiptNextFollowUp || "-"}`);
@@ -5052,6 +5055,8 @@ function buildLaunchMainlineActionReceipt({
         nextOperation: initialLaunchOperatorPrimaryAction?.operation || initialLaunchOperatorFallbackAction?.setupAction?.operation || null,
         nextDownloadKey: initialLaunchOperatorPrimaryAction?.downloadKey || initialLaunchOperatorDownload?.key || null,
         nextDownloadFileName: initialLaunchOperatorDownload?.fileName || null,
+        nextDownloadFormat: initialLaunchOperatorDownload?.format || null,
+        nextDownloadSource: initialLaunchOperatorDownload?.source || null,
         nextDownloadHref: initialLaunchOperatorDownload?.href || initialLaunchOperatorActionManifest.entrypoints?.downloadHref || null,
         workspaceKey: initialLaunchOperatorWorkspaceAction?.key || null,
         workspaceAutofocus: initialLaunchOperatorWorkspaceAction?.autofocus || null,

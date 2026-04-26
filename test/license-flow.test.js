@@ -12918,6 +12918,30 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.ok(afterSetup.traceability.opsSnapshotFileName);
     assert.ok(afterSetup.auditLogId);
 
+    const handoffDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=summary&limit=20",
+      operatorSession.token
+    );
+    assert.equal(handoffDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(handoffDownload.contentDisposition || "", /first-wave-recommendations.*\.txt/);
+    assert.match(handoffDownload.body, /RockSolid Developer Ops First-Wave Recommendations/);
+    assert.match(handoffDownload.body, /Project Code: FIRSTWAVE/);
+    assert.match(handoffDownload.body, /Inventory Recommendation:/);
+    assert.match(handoffDownload.body, /First Card Issuance:/);
+    assert.match(handoffDownload.body, /First Round Ops Actions:/);
+    assert.match(handoffDownload.body, /Traceability:/);
+    assert.match(handoffDownload.body, /latestReceipt=first_batch_setup/);
+
+    const firstWaveChecksums = await getText(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=checksums&limit=20",
+      operatorSession.token
+    );
+    assert.equal(firstWaveChecksums.contentType, "text/plain; charset=utf-8");
+    assert.match(firstWaveChecksums.body, /first-wave-recommendations\.json/);
+    assert.match(firstWaveChecksums.body, /first-wave-recommendations\.txt/);
+
     const recommendationAudit = await getJson(
       baseUrl,
       "/api/developer/audit-logs?productCode=FIRSTWAVE&eventType=developer.ops.first-wave.recommendations&limit=5",
@@ -17555,6 +17579,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations/);
     assert.match(html, /api\/developer\/ops\/stabilization-handoff\/confirm/);
     assert.match(html, /Preview First-Wave Recommendations/);
+    assert.match(html, /Download First-Wave Handoff/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Next Follow-up/);
     assert.match(html, /Download Launch Readiness/);
@@ -17746,6 +17771,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /handleLaunchReceiptFollowUpAction/);
     assert.match(html, /renderFirstWaveRecommendations/);
     assert.match(html, /loadFirstWaveRecommendations/);
+    assert.match(html, /downloadFirstWaveRecommendations/);
+    assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

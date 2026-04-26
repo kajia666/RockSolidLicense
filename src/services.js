@@ -17516,6 +17516,127 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
   };
 }
 
+function buildDeveloperOpsFirstWaveRecommendationsBaseName(payload = {}) {
+  const productCode = String(payload.productCode || "project").trim().toLowerCase() || "project";
+  const channel = String(payload.channel || "stable").trim().toLowerCase() || "stable";
+  return `developer-ops-first-wave-recommendations-${productCode}-${channel}`;
+}
+
+function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
+  const inventory = payload.inventory || {};
+  const firstCards = payload.firstCards || {};
+  const firstRoundOps = payload.firstRoundOps || {};
+  const traceability = payload.traceability || {};
+  const latestReceipt = traceability.latestLaunchReceipt || {};
+  const lines = [
+    "RockSolid Developer Ops First-Wave Recommendations",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${payload.productCode || "-"}`,
+    `Project Name: ${payload.productName || "-"}`,
+    `Channel: ${payload.channel || "stable"}`,
+    `Status: ${payload.status || "review"}`,
+    `Audit: ${payload.auditLogId || "-"}`,
+    "",
+    "Inventory Recommendation:",
+    `- status=${inventory.status || "-"} | ready=${inventory.readyCount ?? 0} | low=${inventory.lowCount ?? 0} | missing=${inventory.missingCount ?? 0} | fresh=${inventory.freshCardCount ?? 0} | target=${inventory.targetCardCount ?? 0} | refill=${inventory.refillCardCount ?? 0} | action=${inventory.action?.operation || "-"}`,
+    `- reason=${inventory.action?.reason || payload.message || "-"}`,
+    `- endpoint=${inventory.action?.method || "-"} ${inventory.action?.endpoint || "-"}`
+  ];
+
+  const states = Array.isArray(inventory.states) ? inventory.states : [];
+  if (states.length) {
+    lines.push("- batches:");
+    for (const state of states) {
+      lines.push(`  - ${state.label || state.mode || state.key || "Launch inventory"} | status=${state.status || "-"} | prefix=${state.prefix || "-"} | fresh=${state.freshCount ?? 0}/${state.targetCount ?? 0} | refill=${state.refillCount ?? 0}`);
+    }
+  }
+
+  lines.push(
+    "",
+    "First Card Issuance:",
+    `- status=${firstCards.status || "-"} | recommended=${firstCards.recommendedCardCount ?? 0} | issuedFresh=${firstCards.issuedFreshCardCount ?? 0} | issuedBatches=${firstCards.issuedBatchCount ?? 0}`,
+    `- action=${firstCards.action?.operation || inventory.action?.operation || "-"}`
+  );
+  const batches = Array.isArray(firstCards.batches) ? firstCards.batches : [];
+  for (const batch of batches) {
+    lines.push(`- batch=${batch.mode || batch.key || "-"} | status=${batch.status || "-"} | prefix=${batch.prefix || "-"} | fresh=${batch.freshCount ?? 0}/${batch.targetCount ?? 0}`);
+  }
+
+  lines.push(
+    "",
+    "First Round Ops Actions:",
+    `- status=${firstRoundOps.status || "-"} | queued=${firstRoundOps.actionCount ?? 0} | primary=${firstRoundOps.primaryAction?.title || firstRoundOps.primaryAction?.operation || "-"}`
+  );
+  const actions = Array.isArray(firstRoundOps.actions) ? firstRoundOps.actions : [];
+  for (const action of actions) {
+    lines.push(`- [${action.stage || action.key || "first_wave"}] ${action.title || "First-wave action"} | action=${action.actionKey || "-"} | operation=${action.operation || "-"} | download=${action.downloadKey || action.handoffFileName || "-"}`);
+    if (action.summary) {
+      lines.push(`  summary=${action.summary}`);
+    }
+  }
+
+  lines.push(
+    "",
+    "Traceability:",
+    `- latestReceipt=${latestReceipt.operation || "-"} | handoff=${latestReceipt.handoffFileName || traceability.firstLaunchHandoffDownload?.fileName || "-"} | inventoryCards=${latestReceipt.firstLaunchInventoryCreatedCardCount ?? inventory.freshCardCount ?? 0}`,
+    `- opsSnapshot=${traceability.opsSnapshotFileName || "-"} | summary=${traceability.opsSummaryFileName || "-"}`,
+    `- firstLaunchHandoff=${traceability.firstLaunchHandoffDownload?.fileName || traceability.firstLaunchHandoffDownload?.key || "-"} | readiness=${traceability.initialLaunchOpsReadinessStatus || "-"}`,
+    "",
+    "Operator Order:",
+    "- If inventory action is first_batch_setup or restock, run that before widening rollout.",
+    "- Attach this first-wave handoff to the launch-day duty note.",
+    "- Use the Developer Ops snapshot for runtime signals, audit proof, and follow-up ownership."
+  );
+
+  return lines.join("\n");
+}
+
+function buildDeveloperOpsFirstWaveRecommendationFiles(payload = {}) {
+  return [
+    {
+      path: "first-wave-recommendations.json",
+      body: JSON.stringify(payload, null, 2)
+    },
+    {
+      path: "first-wave-recommendations.txt",
+      body: buildDeveloperOpsFirstWaveRecommendationsText(payload)
+    }
+  ];
+}
+
+function buildDeveloperOpsFirstWaveRecommendationsDownloadAsset(payload, format = "summary") {
+  const normalizedFormat = normalizeDownloadFormat(
+    format,
+    ["json", "summary", "checksums"],
+    "summary",
+    "INVALID_DEVELOPER_FIRST_WAVE_RECOMMENDATIONS_FORMAT",
+    "Developer first-wave recommendations format"
+  );
+  const baseName = buildDeveloperOpsFirstWaveRecommendationsBaseName(payload);
+
+  if (normalizedFormat === "checksums") {
+    return {
+      fileName: `${baseName}-sha256.txt`,
+      contentType: "text/plain; charset=utf-8",
+      body: buildChecksumManifestText(buildDeveloperOpsFirstWaveRecommendationFiles(payload))
+    };
+  }
+
+  if (normalizedFormat === "summary") {
+    return {
+      fileName: `${baseName}.txt`,
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsFirstWaveRecommendationsText(payload)
+    };
+  }
+
+  return {
+    fileName: `${baseName}.json`,
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify(payload, null, 2)
+  };
+}
+
 function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -33140,6 +33261,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
     developerOpsExportDownloadAsset(payload, format = "json") {
       return buildDeveloperOpsExportDownloadAsset(payload, format);
+    },
+
+    developerFirstWaveRecommendationsDownloadAsset(payload, format = "summary") {
+      return buildDeveloperOpsFirstWaveRecommendationsDownloadAsset(payload, format);
     },
 
     rotateTokenKey(token) {

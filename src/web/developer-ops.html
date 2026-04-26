@@ -139,6 +139,7 @@
           <div class="actions">
             <button class="secondary" id="preview-export-btn">Preview Snapshot</button>
             <button class="secondary" id="load-first-wave-recommendations-btn">Preview First-Wave Recommendations</button>
+            <button class="secondary" id="download-first-wave-recommendations-btn">Download First-Wave Handoff</button>
             <button class="secondary" id="download-export-json-btn">Download JSON</button>
             <button class="secondary" id="download-export-summary-btn">Download Summary</button>
             <button class="secondary" id="download-export-next-follow-up-btn">Download Next Follow-up</button>
@@ -5381,6 +5382,29 @@
         return data;
       }
 
+      async function downloadFirstWaveRecommendations(format = "summary") {
+        const currentFilters = filters();
+        const productCode = currentFilters.productCode || requestedProductCode || "";
+        if (!productCode) {
+          const error = new Error("Select or route a project code before downloading first-wave recommendations.");
+          error.code = "PRODUCT_CODE_REQUIRED";
+          throw error;
+        }
+        const result = await downloadApiFile(
+          `/api/developer/ops/first-wave/recommendations/download${q({
+            productCode,
+            channel: requestedChannel,
+            limit: currentFilters.limit,
+            format
+          })}`,
+          "developer-ops-first-wave-recommendations.txt"
+        );
+        lastExportDownload = result;
+        renderSnapshotOverview();
+        setStatus(`First-wave handoff downloaded: ${result.fileName}`);
+        return result;
+      }
+
       function clearSession() {
         token = "";
         profile = null;
@@ -5495,6 +5519,7 @@
       });
       el("preview-export-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Scoped ops snapshot refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("load-first-wave-recommendations-btn").addEventListener("click", async () => { try { const data = await loadFirstWaveRecommendations(); setStatus(`First-wave recommendations loaded for ${data.productCode}.`); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-first-wave-recommendations-btn").addEventListener("click", async () => { try { const result = await downloadFirstWaveRecommendations("summary"); setOutput(result); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-json-btn").addEventListener("click", async () => { try { await handleExportDownload("json", "developer-ops.json", "Ops snapshot JSON"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-next-follow-up-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-next-follow-up", "developer-ops-launch-receipt-next-follow-up.txt", "Launch receipt next follow-up"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

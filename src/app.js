@@ -1916,6 +1916,21 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/developer/ops/first-wave/recommendations/download") {
+        const data = await services.developerFirstWaveRecommendations(getBearerToken(req), {
+          productCode: url.searchParams.get("productCode"),
+          projectCode: url.searchParams.get("projectCode"),
+          softwareCode: url.searchParams.get("softwareCode"),
+          channel: url.searchParams.get("channel"),
+          limit: url.searchParams.get("limit")
+        });
+        sendAttachment(
+          res,
+          services.developerFirstWaveRecommendationsDownloadAsset(data, url.searchParams.get("format"))
+        );
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/ops/export/download") {
         const data = await services.developerExportOpsSnapshot(getBearerToken(req), {
           productCode: url.searchParams.get("productCode"),

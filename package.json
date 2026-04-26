@@ -11,6 +11,7 @@
     "dev": "node --watch src/server.js",
     "db:postgres:init": "node scripts/render-postgres-init.mjs",
     "db:postgres:check": "node scripts/render-postgres-init.mjs --check",
+    "launch:smoke": "node scripts/launch-smoke.mjs",
     "test": "node --test --test-concurrency=1 --test-isolation=none"
   }
 }

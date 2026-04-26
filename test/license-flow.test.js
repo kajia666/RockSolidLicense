@@ -13871,8 +13871,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       )
     );
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"stage","priority","title"/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch_mainline_operations_handoff/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /\/api\/developer\/launch-mainline\/download\?/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /\/api\/developer\/ops\/export\/download\?.*format=launch-receipt-next-follow-up/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, new RegExp(`downloadKey=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`));
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launchReceiptOperation/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launchReceiptPostLaunchStatus/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, new RegExp(latestLaunchReceipt.postLaunchLifecycleStatus));
@@ -13903,8 +13907,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptFollowUpsCsvDownload.contentType, "text/csv; charset=utf-8");
     assert.match(launchReceiptFollowUpsCsvDownload.contentDisposition || "", /developer-ops-launch-receipt-follow-ups\.csv/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"stage","priority","title"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /record_launch_rehearsal_run/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_mainline_operations_handoff/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /\/api\/developer\/launch-mainline\/download\?/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /\/api\/developer\/ops\/export\/download\?.*format=launch-receipt-next-follow-up/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, new RegExp(`downloadKey=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`));
 
     const launchReceiptNextFollowUpDownload = await getText(
       baseUrl,

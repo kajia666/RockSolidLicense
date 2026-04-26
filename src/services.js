@@ -16455,6 +16455,10 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "operationToRecord",
       "actionKey",
       "downloadKey",
+      "downloadFileName",
+      "downloadFormat",
+      "downloadHref",
+      "downloadSource",
       "handoffFileName",
       "mainlineGateStatus",
       "evidenceRemainingCount",
@@ -16472,6 +16476,10 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       item.operationToRecord,
       item.actionKey,
       item.downloadKey,
+      item.downloadFileName || item.recommendedDownload?.fileName,
+      item.downloadFormat || item.recommendedDownload?.format,
+      item.downloadHref || item.recommendedDownload?.href,
+      item.downloadSource || item.recommendedDownload?.source,
       item.handoffFileName,
       item.mainlineGateStatus,
       item.evidenceRemainingCount,
@@ -20638,6 +20646,10 @@ function buildDeveloperOpsSnapshotPayload({
     launchReceiptNextFollowUp,
     mainlineHandoff: routeReview.mainlineHandoff
   });
+  const launchReceiptFollowUpsForExport = Array.isArray(initialLaunchOpsReadiness?.followUpQueue)
+    && initialLaunchOpsReadiness.followUpQueue.length
+    ? initialLaunchOpsReadiness.followUpQueue
+    : launchReceiptFollowUps;
 
   const payload = {
     generatedAt,
@@ -20701,7 +20713,7 @@ function buildDeveloperOpsSnapshotPayload({
       bindings: buildDeveloperOpsBindingsCsv(normalizedBindings),
       blocks: buildDeveloperOpsBlocksCsv(normalizedBlocks),
       auditLogs: buildDeveloperOpsAuditLogsCsv(normalizedAuditLogs),
-      launchReceiptFollowUps: buildDeveloperOpsLaunchReceiptFollowUpsCsv(overview.launchReceiptFollowUps)
+      launchReceiptFollowUps: buildDeveloperOpsLaunchReceiptFollowUpsCsv(launchReceiptFollowUpsForExport)
     },
     notes: [
       "This export is scoped to the current developer actor and their assigned projects.",

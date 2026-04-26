@@ -23,9 +23,15 @@ const DEFAULT_DEVELOPER_PASSWORD = "LaunchSmokeOwner123!";
 function parseArgs(argv) {
   const options = {
     json: false,
+    baseUrl: null,
+    allowLiveWrites: false,
     productCode: "LAUNCH_SMOKE",
     channel: "stable",
-    limit: "20"
+    limit: "20",
+    adminUsername: null,
+    adminPassword: null,
+    developerUsername: null,
+    developerPassword: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -34,25 +40,64 @@ function parseArgs(argv) {
       options.json = true;
       continue;
     }
+    if (arg === "--allow-live-writes") {
+      options.allowLiveWrites = true;
+      continue;
+    }
 
     const [name, inlineValue] = arg.split("=", 2);
     const value = inlineValue ?? argv[index + 1];
+    if (name === "--base-url") {
+      options.baseUrl = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
     if (name === "--product-code") {
-      options.productCode = value;
+      options.productCode = requireArgValue(name, value, inlineValue);
       if (inlineValue === undefined) {
         index += 1;
       }
       continue;
     }
     if (name === "--channel") {
-      options.channel = value;
+      options.channel = requireArgValue(name, value, inlineValue);
       if (inlineValue === undefined) {
         index += 1;
       }
       continue;
     }
     if (name === "--limit") {
-      options.limit = value;
+      options.limit = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--admin-username") {
+      options.adminUsername = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--admin-password") {
+      options.adminPassword = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--developer-username") {
+      options.developerUsername = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--developer-password") {
+      options.developerPassword = requireArgValue(name, value, inlineValue);
       if (inlineValue === undefined) {
         index += 1;
       }
@@ -62,15 +107,69 @@ function parseArgs(argv) {
     throw new Error(`Unknown option: ${arg}`);
   }
 
+  options.baseUrl = normalizeBaseUrl(options.baseUrl);
   options.productCode = String(options.productCode || "").trim().toUpperCase();
   options.channel = String(options.channel || "stable").trim().toLowerCase();
   options.limit = String(options.limit || "20").trim();
+  options.adminUsername = readOptionOrEnv(options.adminUsername, "RSL_SMOKE_ADMIN_USERNAME");
+  options.adminPassword = readOptionOrEnv(options.adminPassword, "RSL_SMOKE_ADMIN_PASSWORD");
+  options.developerUsername = readOptionOrEnv(options.developerUsername, "RSL_SMOKE_DEVELOPER_USERNAME");
+  options.developerPassword = readOptionOrEnv(options.developerPassword, "RSL_SMOKE_DEVELOPER_PASSWORD");
+
+  if (options.baseUrl) {
+    ensure(options.allowLiveWrites, "Remote launch smoke creates a developer, product, policy, first batches, and handoff confirmation. Pass --allow-live-writes to run against --base-url.");
+    ensure(options.adminUsername, "Remote launch smoke requires --admin-username or RSL_SMOKE_ADMIN_USERNAME.");
+    ensure(options.adminPassword, "Remote launch smoke requires --admin-password or RSL_SMOKE_ADMIN_PASSWORD.");
+    ensure(options.developerUsername, "Remote launch smoke requires --developer-username or RSL_SMOKE_DEVELOPER_USERNAME.");
+    ensure(options.developerPassword, "Remote launch smoke requires --developer-password or RSL_SMOKE_DEVELOPER_PASSWORD.");
+  } else {
+    options.adminUsername ??= DEFAULT_ADMIN_USERNAME;
+    options.adminPassword ??= DEFAULT_ADMIN_PASSWORD;
+    options.developerUsername ??= DEFAULT_DEVELOPER_USERNAME;
+    options.developerPassword ??= DEFAULT_DEVELOPER_PASSWORD;
+  }
 
   ensure(/^[A-Z0-9_-]{2,64}$/.test(options.productCode), "Product code must be 2-64 characters using A-Z, 0-9, _ or -.");
   ensure(/^[a-z0-9_-]{2,32}$/.test(options.channel), "Channel must be 2-32 characters using a-z, 0-9, _ or -.");
+  ensure(/^[A-Za-z0-9._@-]{3,80}$/.test(options.adminUsername), "Admin username must be 3-80 characters using letters, numbers, dot, underscore, at, or dash.");
+  ensure(/^[A-Za-z0-9._@-]{3,80}$/.test(options.developerUsername), "Developer username must be 3-80 characters using letters, numbers, dot, underscore, at, or dash.");
+  ensure(String(options.adminPassword).length >= 8, "Admin password must be at least 8 characters.");
+  ensure(String(options.developerPassword).length >= 8, "Developer password must be at least 8 characters.");
   ensure(/^\d+$/.test(options.limit) && Number(options.limit) >= 1 && Number(options.limit) <= 200, "Limit must be an integer from 1 to 200.");
 
   return options;
+}
+
+function requireArgValue(name, value, inlineValue) {
+  const missingValue = value === undefined
+    || value === null
+    || String(value).trim() === ""
+    || (inlineValue === undefined && String(value).startsWith("--"));
+  ensure(!missingValue, `${name} requires a value.`);
+  return value;
+}
+
+function readOptionOrEnv(value, envName) {
+  const resolved = value ?? process.env[envName] ?? null;
+  return resolved === null ? null : String(resolved).trim();
+}
+
+function normalizeBaseUrl(value) {
+  if (!value) {
+    return null;
+  }
+  const raw = String(value).trim();
+  let parsed = null;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("--base-url must be a valid http:// or https:// URL.");
+  }
+  ensure(parsed.protocol === "http:" || parsed.protocol === "https:", "--base-url must use http:// or https://.");
+  parsed.hash = "";
+  parsed.search = "";
+  parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+  return parsed.toString().replace(/\/$/, "");
 }
 
 function ensure(condition, message, details = null) {
@@ -178,7 +277,7 @@ function makeStepRunner(checks) {
   };
 }
 
-async function createSmokeApp(tempDir) {
+async function createSmokeApp(tempDir, options) {
   const { createApp } = await import("../src/app.js");
   return createApp({
     host: "127.0.0.1",
@@ -189,8 +288,8 @@ async function createSmokeApp(tempDir) {
     licensePrivateKeyPath: path.join(tempDir, "license_private.pem"),
     licensePublicKeyPath: path.join(tempDir, "license_public.pem"),
     licenseKeyringPath: path.join(tempDir, "license_keyring.json"),
-    adminUsername: DEFAULT_ADMIN_USERNAME,
-    adminPassword: DEFAULT_ADMIN_PASSWORD,
+    adminUsername: options.adminUsername,
+    adminPassword: options.adminPassword,
     serverTokenSecret: "launch-smoke-secret"
   });
 }
@@ -198,9 +297,9 @@ async function createSmokeApp(tempDir) {
 async function runLaunchSmoke(options) {
   const checks = [];
   const step = makeStepRunner(checks);
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rocksolid-launch-smoke-"));
+  const tempDir = options.baseUrl ? null : fs.mkdtempSync(path.join(os.tmpdir(), "rocksolid-launch-smoke-"));
   let app = null;
-  let baseUrl = null;
+  let baseUrl = options.baseUrl;
   let adminToken = null;
   let developerToken = null;
   let afterSetup = null;
@@ -208,22 +307,24 @@ async function runLaunchSmoke(options) {
   let opsSnapshot = null;
 
   try {
-    app = await createSmokeApp(tempDir);
-    await app.listen();
-    const httpAddress = app.server.address();
-    baseUrl = `http://127.0.0.1:${httpAddress.port}`;
+    if (!baseUrl) {
+      app = await createSmokeApp(tempDir, options);
+      await app.listen();
+      const httpAddress = app.server.address();
+      baseUrl = `http://127.0.0.1:${httpAddress.port}`;
+    }
 
     await step("admin.login", async () => {
       const session = await requestJson(baseUrl, "/api/admin/login", {
         method: "POST",
         body: {
-          username: DEFAULT_ADMIN_USERNAME,
-          password: DEFAULT_ADMIN_PASSWORD
+          username: options.adminUsername,
+          password: options.adminPassword
         }
       });
       ensure(session.token, "Admin login did not return a token.");
       adminToken = session.token;
-      return { username: DEFAULT_ADMIN_USERNAME };
+      return { username: options.adminUsername };
     });
 
     const developer = await step("developer.create", async () => {
@@ -231,8 +332,8 @@ async function runLaunchSmoke(options) {
         method: "POST",
         token: adminToken,
         body: {
-          username: DEFAULT_DEVELOPER_USERNAME,
-          password: DEFAULT_DEVELOPER_PASSWORD,
+          username: options.developerUsername,
+          password: options.developerPassword,
           displayName: "Launch Smoke Owner"
         }
       });
@@ -282,13 +383,13 @@ async function runLaunchSmoke(options) {
       const session = await requestJson(baseUrl, "/api/developer/login", {
         method: "POST",
         body: {
-          username: DEFAULT_DEVELOPER_USERNAME,
-          password: DEFAULT_DEVELOPER_PASSWORD
+          username: options.developerUsername,
+          password: options.developerPassword
         }
       });
       ensure(session.token, "Developer login did not return a token.");
       developerToken = session.token;
-      return { username: DEFAULT_DEVELOPER_USERNAME };
+      return { username: options.developerUsername };
     });
 
     const commonQuery = {
@@ -441,7 +542,7 @@ async function runLaunchSmoke(options) {
     return {
       status: "pass",
       generatedAt: new Date().toISOString(),
-      mode: "ephemeral-in-memory",
+      mode: options.baseUrl ? "remote-live-writes" : "ephemeral-in-memory",
       summary: {
         productCode: options.productCode,
         channel: options.channel,
@@ -470,7 +571,9 @@ async function runLaunchSmoke(options) {
     if (app) {
       await app.close();
     }
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    if (tempDir) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   }
 }
 

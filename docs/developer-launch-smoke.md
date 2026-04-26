@@ -33,6 +33,29 @@ The page consumes:
 - `GET /api/developer/launch-smoke-kit`
 - `GET /api/developer/launch-smoke-kit/download`
 
+The repository also includes a command-line launch smoke preflight:
+
+```powershell
+npm.cmd --silent run launch:smoke -- --json --product-code SMOKE_ALPHA
+```
+
+By default this command starts an ephemeral in-memory app, creates a smoke developer, creates a smoke project and policy, runs first batch setup, downloads the first-wave recommendation summary and checksums, confirms the first-wave handoff, and verifies the Developer Ops handoff index. This is the safest preflight for local or CI use because it does not touch persistent data.
+
+To run the same write-path preflight against an already running staging API, pass a base URL and explicit write consent:
+
+```powershell
+npm.cmd --silent run launch:smoke -- --json `
+  --base-url https://staging.example.com `
+  --allow-live-writes `
+  --admin-username admin@example.com `
+  --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD `
+  --developer-username launch.smoke.owner `
+  --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `
+  --product-code SMOKE_ALPHA
+```
+
+Remote mode intentionally requires `--allow-live-writes` because it creates a developer, product, policy, first-batch card inventory, and a first-wave handoff confirmation. Use it for staging or a deliberately scoped production pilot project, not against an existing customer project.
+
 It also preserves routed project and lane context from nearby workspaces such as:
 
 - `/developer/projects`

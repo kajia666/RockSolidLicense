@@ -1,6 +1,6 @@
 # Project Roadmap, Overall Plan, and Development Progress
 
-Updated: 2026-04-25
+Updated: 2026-04-26
 
 This document is the rolling project control sheet for RockSolidLicense. It answers three recurring questions:
 
@@ -46,7 +46,7 @@ Work should continue in short backend/API-first slices. Each slice should end wi
    Keep full tests deferred until the remaining route/download and first-wave action gaps are smaller, but run grouped tests around release package, launch mainline actions, developer ops export, and launch workflow/review/smoke handoff.
 
 5. Prepare staging launch rehearsal.
-   Use a real server-like environment, non-default secrets, HTTPS, persistent storage, backup/restore rehearsal, and one test software-author project.
+   Use a real server-like environment, non-default secrets, HTTPS, persistent storage, backup/restore rehearsal, and one test software-author project. The command-line `launch:smoke` preflight can now run locally against an ephemeral in-memory app or against a staging `--base-url` with explicit `--allow-live-writes`.
 
 ## Overall Project Plan
 
@@ -208,7 +208,7 @@ Minimum remaining work before a controlled pilot:
 3. Run full test suite once the current backend/API slices settle.
 4. Prepare staging environment with non-default secrets and public HTTPS.
 5. Run one complete staging rehearsal:
-   release package -> launch workflow -> bootstrap -> first batch setup -> launch review -> launch smoke -> launch mainline -> developer ops -> post-launch sweep.
+   release package -> launch workflow -> bootstrap -> first batch setup -> launch review -> `launch:smoke --base-url` -> launch smoke workspace -> launch mainline -> developer ops -> post-launch sweep.
 6. Verify backup/restore and recovery drill.
 7. Create first pilot software-author project and first batch of test cards/accounts.
 8. Prepare support and escalation notes for first users.

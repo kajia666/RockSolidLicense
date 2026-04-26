@@ -14098,6 +14098,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
     + ` | primaryDownload=${lifecycle.primaryDownloadKey || "-"}`
     + ` | format=${lifecycle.primaryDownloadFormat || "-"}`
     + ` | file=${lifecycle.primaryDownloadFileName || "-"}`
+    + ` | href=${lifecycle.primaryDownloadHref || "-"}`
   );
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "-"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "-"}`);
@@ -15780,6 +15781,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   const initialLaunchOperatorHeadline = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorHeadline || null;
   const initialLaunchOperatorNextAction = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorNextAction || null;
   const initialLaunchOperatorActionManifest = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorActionManifest || null;
+  const lifecyclePrimaryDownload = lifecycle.primaryRecommendedDownload && typeof lifecycle.primaryRecommendedDownload === "object"
+    ? lifecycle.primaryRecommendedDownload
+    : null;
   const stabilizationHandoffConfirmation = buildStabilizationHandoffConfirmationPayload(
     opsSnapshot.summary?.initialLaunchOpsReadiness?.stabilizationHandoff?.confirmation
       || opsSnapshot.summary?.initialLaunchOpsReadiness?.traceability?.stabilizationHandoffConfirmation
@@ -15825,9 +15829,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
     postLaunchLifecycle: {
       status: lifecycle.status || latestLaunchReceipt?.postLaunchLifecycleStatus || null,
       nextOperation: latestLaunchReceipt?.postLaunchLifecycleNextOperation || lifecycle.nextAction?.setupAction?.operation || null,
-      primaryDownloadKey: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadKey || lifecycle.primaryRecommendedDownload?.key || null,
-      primaryDownloadFormat: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFormat || lifecycle.primaryRecommendedDownload?.format || null,
-      primaryDownloadFileName: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFileName || lifecycle.primaryRecommendedDownload?.fileName || null
+      primaryDownloadKey: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadKey || lifecyclePrimaryDownload?.key || null,
+      primaryDownloadFormat: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFormat || lifecyclePrimaryDownload?.format || null,
+      primaryDownloadFileName: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFileName || lifecyclePrimaryDownload?.fileName || null,
+      primaryDownloadHref: lifecyclePrimaryDownload?.href || null,
+      primaryDownloadSource: lifecyclePrimaryDownload?.source || null
     },
     initialLaunchOpsContract,
     initialLaunchOperatorHeadline,
@@ -15910,6 +15916,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | gate=${latestLaunchReceipt?.mainlineGateStatus || "-"}`
     + ` | evidenceNext=${latestLaunchReceipt?.productionEvidenceNextOperation || "-"}`
     + ` | lifecycleNext=${latestLaunchReceipt?.postLaunchLifecycleNextOperation || "-"}`
+  );
+  lines.push(
+    `- Post-Launch Lifecycle: status=${String(traceability.postLaunchLifecycle?.status || "unknown").toUpperCase()}`
+    + ` | primaryDownload=${traceability.postLaunchLifecycle?.primaryDownloadKey || "-"}`
+    + ` | format=${traceability.postLaunchLifecycle?.primaryDownloadFormat || "-"}`
+    + ` | file=${traceability.postLaunchLifecycle?.primaryDownloadFileName || "-"}`
+    + ` | href=${traceability.postLaunchLifecycle?.primaryDownloadHref || lifecycle.primaryRecommendedDownload?.href || "-"}`
   );
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "ops/handoff-index.txt"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);

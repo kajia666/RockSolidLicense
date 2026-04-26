@@ -4285,6 +4285,33 @@
         `;
       }
 
+      function renderFirstWaveHandoffConfirmation(item = null) {
+        if (!item || typeof item !== "object") {
+          return "";
+        }
+        const source = item.sourceRecommendation || {};
+        const status = String(item.status || "confirmed").toLowerCase();
+        const statusClass = status === "confirmed" ? "ok" : "warning";
+        const details = [
+          `audit=${esc(item.auditLogId || "-")}`,
+          `decision=${esc(item.decision || "-")}`,
+          `by=${esc(item.confirmedBy?.username || "-")}`,
+          `file=${esc(item.handoffFileName || "-")}`,
+          `inventory=${esc(source.inventoryStatus || "-")}`,
+          `cards=${esc(source.firstCardStatus || "-")}`,
+          `ops=${esc(source.firstRoundOpsStatus || "-")}`
+        ].join(" | ");
+        return `
+          <div class="snapshot-recap first-wave-handoff-confirmation" data-first-wave-handoff-confirmation="latest">
+            <div class="snapshot-recap-head">
+              <strong>First-Wave Snapshot Confirmation</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${details}</div>
+          </div>
+        `;
+      }
+
       function renderStabilizationHandoff(initialLaunchOpsReadiness = {}) {
         const item = initialLaunchOpsReadiness?.stabilizationHandoff;
         if (!item || typeof item !== "object") {
@@ -4731,9 +4758,11 @@
         const focusSessions = Array.isArray(overview.focusSessions) ? overview.focusSessions : [];
         const focusDevices = Array.isArray(overview.focusDevices) ? overview.focusDevices : [];
         const latestLaunchReceipts = Array.isArray(overview.latestLaunchReceipts) ? overview.latestLaunchReceipts : [];
+        const latestFirstWaveHandoffConfirmations = Array.isArray(overview.latestFirstWaveHandoffConfirmations) ? overview.latestFirstWaveHandoffConfirmations : [];
         const launchReceiptFollowUps = Array.isArray(overview.launchReceiptFollowUps) ? overview.launchReceiptFollowUps : [];
         const launchReceiptFollowUpPriorities = payload.summary?.launchReceiptFollowUpPriorities || {};
         const initialLaunchOpsReadiness = payload.summary?.initialLaunchOpsReadiness || {};
+        const firstWaveHandoffConfirmation = initialLaunchOpsReadiness.firstWaveHandoffConfirmation || latestFirstWaveHandoffConfirmations[0] || null;
         const operatorActionReceipts = Array.isArray(initialLaunchOpsReadiness.operatorActionReceipts)
           ? initialLaunchOpsReadiness.operatorActionReceipts
           : [];
@@ -4824,6 +4853,10 @@
             value: latestOperatorActionReceipt?.operation || "-"
           },
           {
+            label: "First-Wave Handoff",
+            value: firstWaveHandoffConfirmation?.status || "-"
+          },
+          {
             label: "Stabilization Status",
             value: stabilizationHandoff?.status || "-"
           },
@@ -4841,6 +4874,7 @@
           ${renderLastOperatorActionResult()}
           ${renderLastStabilizationHandoffResult()}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
+          ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderStabilizationHandoff(initialLaunchOpsReadiness)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           ${renderPreparedFocus()}

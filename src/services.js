@@ -16366,6 +16366,87 @@ function buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs = [], li
     .slice(0, Math.max(1, Number(limit || 5)));
 }
 
+function buildFirstWaveHandoffConfirmationPayload(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const confirmedBy = item.confirmedBy && typeof item.confirmedBy === "object"
+    ? item.confirmedBy
+    : {
+        actorType: item.actorType || null,
+        actorScope: metadata.actorType || null,
+        actorId: item.actorId || null,
+        username: metadata.actorUsername || null,
+        role: metadata.actorRole || null
+      };
+  const sourceRecommendation = item.sourceRecommendation && typeof item.sourceRecommendation === "object"
+    ? item.sourceRecommendation
+    : {
+        inventoryStatus: metadata.inventoryStatus || null,
+        firstCardStatus: metadata.firstCardStatus || null,
+        firstRoundOpsStatus: metadata.firstRoundOpsStatus || null,
+        latestLaunchReceiptOperation: metadata.latestLaunchReceiptOperation || null,
+        recommendedCardCount: metadata.recommendedCardCount ?? null,
+        issuedFreshCardCount: metadata.issuedFreshCardCount ?? null
+      };
+  return {
+    auditLogId: item.auditLogId || item.id || null,
+    eventType: item.eventType || "developer.ops.first-wave.handoff.confirm",
+    entityType: item.entityType || "developer_ops_first_wave_handoff",
+    entityId: item.entityId || null,
+    productCode: item.productCode || metadata.productCode || null,
+    channel: item.channel || metadata.channel || "stable",
+    status: item.status || metadata.status || "confirmed",
+    decision: item.decision || metadata.decision || "confirmed",
+    handoffFileName: item.handoffFileName || metadata.handoffFileName || "developer-ops-first-wave-recommendations.txt",
+    handoffFormat: item.handoffFormat || metadata.handoffFormat || "first-wave-recommendations",
+    confirmedAt: item.confirmedAt || metadata.confirmedAt || item.createdAt || null,
+    confirmedBy,
+    note: item.note || metadata.note || "",
+    sourceRecommendation,
+    downloads: item.downloads || metadata.downloads || null,
+    createdAt: item.createdAt || null
+  };
+}
+
+function buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs = [], limit = 5) {
+  return auditLogs
+    .map((item) => {
+      const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+      const eventType = item?.eventType || item?.event_type || "";
+      const entityType = item?.entityType || item?.entity_type || "";
+      if (
+        eventType !== "developer.ops.first-wave.handoff.confirm"
+        && entityType !== "developer_ops_first_wave_handoff"
+      ) {
+        return null;
+      }
+      return buildFirstWaveHandoffConfirmationPayload({
+        id: item.id || null,
+        eventType,
+        actorType: item.actorType || item.actor_type || null,
+        actorId: item.actorId || item.actor_id || null,
+        entityType,
+        entityId: item.entityId || item.entity_id || null,
+        metadata,
+        productCode: metadata.productCode || null,
+        channel: metadata.channel || "stable",
+        status: metadata.status || "confirmed",
+        decision: metadata.decision || "confirmed",
+        handoffFileName: metadata.handoffFileName || "developer-ops-first-wave-recommendations.txt",
+        handoffFormat: metadata.handoffFormat || "first-wave-recommendations",
+        confirmedAt: metadata.confirmedAt || item.createdAt || item.created_at || null,
+        note: metadata.note || "",
+        downloads: metadata.downloads || null,
+        createdAt: item.createdAt || item.created_at || null
+      });
+    })
+    .filter(Boolean)
+    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt))
+    .slice(0, Math.max(1, Number(limit || 5)));
+}
+
 function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 6) {
   const followUps = [];
   const pushFollowUp = (receipt = {}, stage = "", payload = {}) => {
@@ -16618,7 +16699,8 @@ function buildDeveloperOpsInitialLaunchOpsGate({
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
-  stabilizationHandoffConfirmation = null
+  stabilizationHandoffConfirmation = null,
+  firstWaveHandoffConfirmation = null
 } = {}) {
   return {
     latestLaunchReceipt: latestReceipt
@@ -16653,6 +16735,7 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
         }
       : null,
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),
+    firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     opsFiles: {
       handoffIndex: "handoff-index.txt",
       initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
@@ -17041,6 +17124,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const stabilizationHandoffConfirmations = Array.isArray(overview.latestStabilizationHandoffConfirmations)
     ? overview.latestStabilizationHandoffConfirmations
     : [];
+  const firstWaveHandoffConfirmations = Array.isArray(overview.latestFirstWaveHandoffConfirmations)
+    ? overview.latestFirstWaveHandoffConfirmations
+    : [];
   const stabilizationHandoffConfirmation = stabilizationHandoffConfirmations.find((item) => {
     if (!item || typeof item !== "object") {
       return false;
@@ -17049,6 +17135,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     const channelMatches = !latestReceipt?.channel || item.channel === latestReceipt.channel;
     return productMatches && channelMatches;
   }) || stabilizationHandoffConfirmations[0] || null;
+  const firstWaveHandoffConfirmation = firstWaveHandoffConfirmations.find((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    const targetProductCode = latestReceipt?.productCode || scope.productCode || "";
+    const targetChannel = latestReceipt?.channel || item.channel || "stable";
+    const productMatches = !targetProductCode || item.productCode === targetProductCode;
+    const channelMatches = !targetChannel || item.channel === targetChannel;
+    return productMatches && channelMatches;
+  }) || firstWaveHandoffConfirmations[0] || null;
   const operatorActionReceipts = buildDeveloperOpsInitialLaunchOperatorActionReceipts(overview.latestLaunchReceipts, 5);
   const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction
     || mainlineHandoff?.workspaceAction
@@ -17133,7 +17229,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const traceability = buildDeveloperOpsInitialLaunchOpsTraceability({
     latestReceipt,
     launchReceiptNextFollowUp,
-    stabilizationHandoffConfirmation
+    stabilizationHandoffConfirmation,
+    firstWaveHandoffConfirmation
   });
   const contract = buildDeveloperOpsInitialLaunchContract({
     scope,
@@ -17236,6 +17333,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operatorActionReceipts,
     latestOperatorActionReceipt: operatorActionReceipts[0] || null,
     stabilizationHandoff,
+    firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     traceability,
     nextSteps
   };
@@ -19182,6 +19280,7 @@ function buildSnapshotOverview({
   const focusDevices = buildSnapshotFocusDevices(bindings, blocks, sessions, 5);
   const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5);
   const latestStabilizationHandoffConfirmations = buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs, 5);
+  const latestFirstWaveHandoffConfirmations = buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs, 5);
   const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6);
   const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
   const queueSummary = buildSnapshotQueueSummary(recommendedQueue);
@@ -19239,6 +19338,10 @@ function buildSnapshotOverview({
     const latest = latestStabilizationHandoffConfirmations[0];
     highlights.push(`Latest stabilization handoff confirmation: ${latest.status || "confirmed"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
   }
+  if (latestFirstWaveHandoffConfirmations.length) {
+    const latest = latestFirstWaveHandoffConfirmations[0];
+    highlights.push(`Latest first-wave handoff confirmation: ${latest.status || "confirmed"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
+  }
   if (launchReceiptFollowUps.length) {
     highlights.push(`Launch receipt follow-ups: ${launchReceiptFollowUps.slice(0, 3).map((item) => `${item.title} for ${item.productCode || "-"}`).join(", ")}.`);
   }
@@ -19274,6 +19377,7 @@ function buildSnapshotOverview({
     focusFingerprints,
     latestLaunchReceipts,
     latestStabilizationHandoffConfirmations,
+    latestFirstWaveHandoffConfirmations,
     launchReceiptFollowUps,
     queueSummary,
     recommendedQueue,
@@ -19458,6 +19562,24 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         );
       }
     }
+    const firstWaveHandoffConfirmation = initialLaunchOpsReadiness.firstWaveHandoffConfirmation || null;
+    if (firstWaveHandoffConfirmation) {
+      lines.push("");
+      lines.push("First-Wave Handoff Confirmation:");
+      lines.push(
+        `- status=${firstWaveHandoffConfirmation.status || "-"}`
+        + ` | audit=${firstWaveHandoffConfirmation.auditLogId || "-"}`
+        + ` | decision=${firstWaveHandoffConfirmation.decision || "-"}`
+        + ` | by=${firstWaveHandoffConfirmation.confirmedBy?.username || "-"}`
+        + ` | file=${firstWaveHandoffConfirmation.handoffFileName || "-"}`
+      );
+      lines.push(
+        `- inventory=${firstWaveHandoffConfirmation.sourceRecommendation?.inventoryStatus || "-"}`
+        + ` | cards=${firstWaveHandoffConfirmation.sourceRecommendation?.firstCardStatus || "-"}`
+        + ` | ops=${firstWaveHandoffConfirmation.sourceRecommendation?.firstRoundOpsStatus || "-"}`
+        + ` | latestReceipt=${firstWaveHandoffConfirmation.sourceRecommendation?.latestLaunchReceiptOperation || "-"}`
+      );
+    }
     const stabilizationHandoff = initialLaunchOpsReadiness.stabilizationHandoff || null;
     if (stabilizationHandoff) {
       lines.push("");
@@ -19523,6 +19645,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       if (confirmation) {
         lines.push(`- stabilizationConfirmation=${confirmation.status || "-"} | audit=${confirmation.auditLogId || "-"} | decision=${confirmation.decision || "-"} | by=${confirmation.confirmedBy?.username || "-"}`);
       }
+      const firstWaveConfirmation = traceability.firstWaveHandoffConfirmation || null;
+      if (firstWaveConfirmation) {
+        lines.push(`- firstWaveConfirmation=${firstWaveConfirmation.status || "-"} | audit=${firstWaveConfirmation.auditLogId || "-"} | decision=${firstWaveConfirmation.decision || "-"} | by=${firstWaveConfirmation.confirmedBy?.username || "-"}`);
+      }
     }
   }
 
@@ -19547,6 +19673,12 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Latest Launch Receipts:");
       for (const item of overview.latestLaunchReceipts) {
         lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
+      }
+    }
+    if (Array.isArray(overview.latestFirstWaveHandoffConfirmations) && overview.latestFirstWaveHandoffConfirmations.length) {
+      lines.push("Latest First-Wave Handoff Confirmations:");
+      for (const item of overview.latestFirstWaveHandoffConfirmations) {
+        lines.push(`- ${item.status || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | audit=${item.auditLogId || "-"} | file=${item.handoffFileName || "-"}`);
       }
     }
     if (Array.isArray(overview.launchReceiptFollowUps) && overview.launchReceiptFollowUps.length) {
@@ -19950,6 +20082,24 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     }
   } else {
     lines.push("- none");
+  }
+
+  const firstWaveHandoffConfirmation = readiness.firstWaveHandoffConfirmation || readiness.traceability?.firstWaveHandoffConfirmation || null;
+  if (firstWaveHandoffConfirmation) {
+    lines.push("");
+    lines.push("First-Wave Handoff Confirmation:");
+    lines.push(
+      `- status=${firstWaveHandoffConfirmation.status || "-"}`
+      + ` | audit=${firstWaveHandoffConfirmation.auditLogId || "-"}`
+      + ` | decision=${firstWaveHandoffConfirmation.decision || "-"}`
+      + ` | by=${firstWaveHandoffConfirmation.confirmedBy?.username || "-"}`
+    );
+    lines.push(
+      `- file=${firstWaveHandoffConfirmation.handoffFileName || "-"}`
+      + ` | inventory=${firstWaveHandoffConfirmation.sourceRecommendation?.inventoryStatus || "-"}`
+      + ` | cards=${firstWaveHandoffConfirmation.sourceRecommendation?.firstCardStatus || "-"}`
+      + ` | ops=${firstWaveHandoffConfirmation.sourceRecommendation?.firstRoundOpsStatus || "-"}`
+    );
   }
 
   lines.push("");

@@ -12990,6 +12990,40 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && item.metadata?.latestLaunchReceiptOperation === "first_batch_setup"
     ));
 
+    const confirmedOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTWAVE&limit=20",
+      operatorSession.token
+    );
+    const latestFirstWaveConfirmation = confirmedOpsSnapshot.overview.latestFirstWaveHandoffConfirmations[0];
+    assert.ok(latestFirstWaveConfirmation);
+    assert.equal(latestFirstWaveConfirmation.auditLogId, handoffConfirmation.auditLogId);
+    assert.equal(latestFirstWaveConfirmation.productCode, "FIRSTWAVE");
+    assert.equal(latestFirstWaveConfirmation.status, "confirmed");
+    assert.equal(latestFirstWaveConfirmation.decision, "confirmed");
+    assert.equal(latestFirstWaveConfirmation.handoffFileName, "developer-ops-first-wave-recommendations-firstwave-stable.txt");
+    assert.equal(latestFirstWaveConfirmation.sourceRecommendation.inventoryStatus, "ready");
+
+    const readinessFirstWaveConfirmation = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveHandoffConfirmation;
+    assert.ok(readinessFirstWaveConfirmation);
+    assert.equal(readinessFirstWaveConfirmation.auditLogId, handoffConfirmation.auditLogId);
+    assert.equal(readinessFirstWaveConfirmation.sourceRecommendation.latestLaunchReceiptOperation, "first_batch_setup");
+    assert.equal(
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveHandoffConfirmation.auditLogId,
+      handoffConfirmation.auditLogId
+    );
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:/);
+    assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.ok(confirmedOpsSnapshot.overview.highlights.some((item) => item.includes("Latest first-wave handoff confirmation")));
+
+    const firstWaveHandoffIndex = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=handoff-index&limit=20",
+      operatorSession.token
+    );
+    assert.match(firstWaveHandoffIndex.body, /First-Wave Handoff Confirmation:/);
+    assert.match(firstWaveHandoffIndex.body, /developer-ops-first-wave-recommendations-firstwave-stable\.txt/);
+
     const recommendationAudit = await getJson(
       baseUrl,
       "/api/developer/audit-logs?productCode=FIRSTWAVE&eventType=developer.ops.first-wave.recommendations&limit=5",
@@ -17836,6 +17870,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /loadFirstWaveRecommendations/);
     assert.match(html, /downloadFirstWaveRecommendations/);
     assert.match(html, /confirmFirstWaveHandoff/);
+    assert.match(html, /latestFirstWaveHandoffConfirmations/);
+    assert.match(html, /renderFirstWaveHandoffConfirmation/);
+    assert.match(html, /First-Wave Snapshot Confirmation/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);
   } finally {
     await app.close();

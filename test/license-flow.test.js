@@ -17365,8 +17365,6 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /sdk-credentials\/export/);
       assert.match(html, /integration-packages\/export/);
       assert.match(html, /integration-packages\/export\/download/);
-      assert.match(html, /api\/developer\/launch-review\/download/);
-      assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
       assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /products\/:productId\/profile/);
     assert.match(html, /\/assets\/product-features\.js/);
@@ -17411,7 +17409,6 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
     assert.match(html, /api\/developer\/license-quickstart\/restock/);
-    assert.match(html, /api\/developer\/ops\/export\/download/);
     assert.match(html, /runLaunchWorkflowBootstrap/);
     assert.match(html, /runLaunchWorkflowFirstBatchSetup/);
     assert.match(html, /currentLaunchWorkflowBootstrapAction/);
@@ -17483,6 +17480,12 @@ test("developer projects page is served from the dedicated route", async () => {
     assert.match(html, /downloadInlineReleaseAsset/);
     assert.match(html, /downloadLaunchWorkflowAsset/);
     assert.match(html, /downloadInlineIntegrationAsset/);
+    assert.match(html, /service-provided href/);
+    assert.match(html, /item\.href/);
+    assert.match(html, /downloadLaunchRecommendedItem/);
+    assert.doesNotMatch(html, /item\.source === "developer-/);
+    assert.doesNotMatch(html, /downloadLaunchOpsAsset/);
+    assert.doesNotMatch(html, /downloadLaunchReviewAsset/);
     assert.match(html, /requestedAutofocus/);
     assert.match(html, /requestedRouteTitle/);
     assert.match(html, /requestedRouteReason/);
@@ -17940,8 +17943,6 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/dashboard/);
       assert.match(html, /api\/developer\/cards\/export/);
       assert.match(html, /api\/developer\/cards\/export\/download/);
-      assert.match(html, /api\/developer\/launch-review\/download/);
-      assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
       assert.match(html, /\/developer\/launch-review/);
       assert.match(html, /\/assets\/product-features\.js/);
     assert.match(html, /Issue Card Batch/);
@@ -17959,7 +17960,6 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
     assert.match(html, /api\/developer\/license-quickstart\/restock/);
-    assert.match(html, /api\/developer\/launch-workflow\/download/);
     assert.match(html, /account-product-code/);
     assert.match(html, /launch-quickstart-box/);
     assert.match(html, /route-focus-box/);
@@ -17980,6 +17980,10 @@ test("developer license page is served from the dedicated route", async () => {
     assert.match(html, /Next Launch Follow-up/);
     assert.match(html, /renderQuickstartFollowUp/);
     assert.match(html, /downloadLaunchQuickstartFollowUpItem/);
+    assert.match(html, /service-provided href/);
+    assert.match(html, /item\.href/);
+    assert.doesNotMatch(html, /fallbackFormats\[item\.key\]/);
+    assert.doesNotMatch(html, /item\.source === "developer-/);
     assert.match(html, /openLaunchQuickstartWorkspaceAction/);
     assert.match(html, /findProjectMetrics/);
     assert.match(html, /fillStarterPolicyTemplate/);

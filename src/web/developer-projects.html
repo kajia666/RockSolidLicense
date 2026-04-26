@@ -2645,138 +2645,22 @@
         return { firstBatchSetup: setup, cardInventorySetup: setup, launchWorkflow: workflow };
       }
 
-        async function downloadLaunchOpsAsset(item) {
-          const productCode = el("edit-product-code").value.trim();
-          if (!productCode) {
-            throw new Error("Select a project before downloading launch ops assets.");
-          }
-        const result = await downloadUrlFile(
-          "/api/developer/ops/export/download",
-          {
-            productCode,
-            format: item?.format || "summary",
-            ...(item?.params && typeof item.params === "object" ? item.params : {})
-          },
-          item?.fileName || "developer-ops-summary.txt"
-        );
-          setStatus(`${item?.label || "Ops snapshot summary"} downloaded: ${result.fileName}`);
-          return result;
-        }
-
-        async function downloadLaunchReviewAsset(item) {
-          const productCode = el("edit-product-code").value.trim();
-          const channel = currentReleaseChannel();
-          if (!productCode) {
-            throw new Error("Select a project before downloading launch review assets.");
-          }
-          const result = await downloadUrlFile(
-            "/api/developer/launch-review/download",
-            {
-              productCode,
-              channel,
-              format: item?.format || "summary",
-              reviewMode: "matched",
-              ...(item?.params && typeof item.params === "object" ? item.params : {})
-            },
-            item?.fileName || "developer-launch-review-summary.txt"
-          );
-          setStatus(`${item?.label || "Launch review summary"} downloaded: ${result.fileName}`);
-          return result;
-        }
-
         async function downloadLaunchRecommendedItem(item) {
           if (!item?.key) {
             throw new Error("Preview Launch Workflow first so the recommended downloads can be resolved.");
           }
-        if (item.source === "developer-ops") {
-          return downloadLaunchOpsAsset(item);
-        }
-        if (item.source === "developer-launch-review") {
-          return downloadLaunchReviewAsset(item);
-        }
-        if (item.source === "developer-launch-mainline") {
-          return downloadApiFile(
-            `/api/developer/launch-mainline/download${q({
-              productCode: currentLaunchWorkflowTarget()?.productCode,
-              channel: currentLaunchWorkflowTarget()?.channel,
-              format: item.format || "summary",
-              ...(item.params && typeof item.params === "object" ? item.params : {})
-            })}`,
-            item.fileName || "developer-launch-mainline-summary.txt",
-            item.label || "Launch mainline summary"
+          const href = String(item.href || "").trim();
+          if (!href) {
+            throw new Error(`Recommended download ${item.key} is missing a service-provided href.`);
+          }
+          const result = await downloadUrlFile(
+            href,
+            {},
+            item.fileName || "launch-workflow.txt"
           );
+          setStatus(`${item.label || "Launch workflow recommendation"} downloaded: ${result.fileName}`);
+          return result;
         }
-        if (item.source === "developer-launch-smoke-kit") {
-          return downloadApiFile(
-            `/api/developer/launch-smoke-kit/download${q({
-              productCode: currentLaunchWorkflowTarget()?.productCode,
-              channel: currentLaunchWorkflowTarget()?.channel,
-              format: item.format || "summary",
-              ...(item.params && typeof item.params === "object" ? item.params : {})
-            })}`,
-            item.fileName || "developer-launch-smoke-kit-summary.txt",
-            item.label || "Launch smoke kit summary"
-          );
-        }
-        switch (item.key) {
-            case "launch_handoff_zip":
-              return downloadLaunchWorkflowAsset(
-                "handoff-zip",
-                item.fileName || launchWorkflowPreview?.payload?.handoffZipFileName || "launch-workflow-handoff.zip",
-              item.label || "Launch workflow handoff"
-            );
-          case "launch_handoff_checksums":
-            return downloadLaunchWorkflowAsset(
-              "handoff-checksums",
-              item.fileName || launchWorkflowPreview?.payload?.handoffChecksumsFileName || "launch-workflow-handoff-sha256.txt",
-              item.label || "Launch workflow handoff checksums"
-            );
-          case "launch_workflow_zip":
-            return downloadLaunchWorkflowAsset(
-              "zip",
-              item.fileName || "launch-workflow.zip",
-              item.label || "Launch workflow zip"
-            );
-          case "launch_summary":
-            return downloadLaunchWorkflowAsset(
-              "summary",
-              item.fileName || "launch-workflow.txt",
-              item.label || "Launch workflow summary"
-            );
-          case "launch_checklist":
-            return downloadLaunchWorkflowAsset(
-              "checklist",
-              item.fileName || "launch-workflow-checklist.txt",
-              item.label || "Launch workflow checklist"
-            );
-          case "release_summary":
-            return downloadInlineReleaseAsset(
-              "summary",
-              item.fileName || "release-summary.txt",
-              item.label || "Launch workflow release summary"
-            );
-          case "integration_env":
-            return downloadInlineIntegrationAsset(
-              "env",
-              item.fileName || "integration.env",
-              item.label || "Launch workflow integration env"
-            );
-          case "integration_host_config":
-            return downloadInlineIntegrationAsset(
-              "host-config",
-              item.fileName || "rocksolid_host_config.env",
-              item.label || "Launch workflow host config"
-            );
-          case "integration_host_skeleton":
-            return downloadInlineIntegrationAsset(
-              "host-skeleton",
-              item.fileName || "project-host-skeleton.cpp",
-              item.label || "Launch workflow host skeleton"
-            );
-          default:
-            throw new Error(`Unsupported recommended download key: ${item.key}`);
-        }
-      }
 
       el("clear-release-preview-btn").addEventListener("click", () => {
         releasePreview = null;

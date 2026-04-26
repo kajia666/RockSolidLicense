@@ -20274,11 +20274,22 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     }
     lines.push("");
   }
+  const formatGateDownloadText = (item = {}) => {
+    const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
+      ? item.recommendedDownload
+      : null;
+    return [
+      `download=${item.downloadKey || recommendedDownload?.key || "-"}`,
+      item.downloadFileName || recommendedDownload?.fileName ? `file=${item.downloadFileName || recommendedDownload?.fileName}` : "",
+      item.downloadFormat || recommendedDownload?.format ? `format=${item.downloadFormat || recommendedDownload?.format}` : "",
+      item.downloadHref || recommendedDownload?.href ? `href=${item.downloadHref || recommendedDownload?.href}` : ""
+    ].filter(Boolean).join(" | ");
+  };
   lines.push("Blockers:");
   const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];
   if (blockers.length) {
     for (const item of blockers) {
-      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"}`);
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | ${formatGateDownloadText(item)}`);
     }
   } else {
     lines.push("- none");
@@ -20288,7 +20299,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const requiredActions = Array.isArray(gate.requiredActions) ? gate.requiredActions : [];
   if (requiredActions.length) {
     for (const item of requiredActions) {
-      lines.push(`- ${item.label || item.key || "-"} | stage=${item.stage || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"}`);
+      lines.push(`- ${item.label || item.key || "-"} | stage=${item.stage || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | ${formatGateDownloadText(item)}`);
     }
   } else {
     lines.push("- none");
@@ -20298,7 +20309,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const warnings = Array.isArray(gate.warnings) ? gate.warnings : [];
   if (warnings.length) {
     for (const item of warnings) {
-      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"}`);
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | ${formatGateDownloadText(item)}`);
     }
   } else {
     lines.push("- none");

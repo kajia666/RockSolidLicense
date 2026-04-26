@@ -13930,8 +13930,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /Can Enter Initial Launch: no/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Blockers:/);
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`- \\[production_evidence\\].*operation=${latestLaunchReceipt.productionEvidenceNextOperation}`));
+    assert.match(
+      initialLaunchOpsReadinessDownload.body,
+      new RegExp(`Blockers:\\n- \\[production_evidence\\][^\\n]*operation=${latestLaunchReceipt.productionEvidenceNextOperation}[^\\n]*download=[^\\n]*href=.*\\/api\\/developer\\/(?:ops\\/export|launch-mainline)\\/download\\?`)
+    );
     assert.match(initialLaunchOpsReadinessDownload.body, /Required Actions:/);
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`));
+    assert.match(
+      initialLaunchOpsReadinessDownload.body,
+      new RegExp(`Required Actions:\\n- [^\\n]*stage=production_evidence[^\\n]*operation=${latestLaunchReceipt.productionEvidenceNextOperation}[^\\n]*download=[^\\n]*href=.*\\/api\\/developer\\/(?:ops\\/export|launch-mainline)\\/download\\?`)
+    );
     assert.match(initialLaunchOpsReadinessDownload.body, /Next Follow-up: \[REVIEW\]\[production_evidence\]/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Primary Workspace: Open Launch Mainline/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Primary Download: developer-ops-launch-receipt-next-follow-up\.txt.*href=.*format=launch-receipt-next-follow-up/);

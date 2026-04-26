@@ -4350,7 +4350,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
   lines.push(`- status: ${String(mainlineOverallGate?.status || "unknown").toUpperCase()}`);
   lines.push(`- headline: ${mainlineOverallGate?.headline || "-"}`);
   lines.push(`- primaryAction: ${mainlinePrimaryAction?.title || mainlinePrimaryAction?.label || mainlinePrimaryAction?.key || followUp?.primaryAction?.label || "-"}`);
-  lines.push(`- recommendedDownload: ${mainlineRecommendedDownload?.label || mainlineRecommendedDownload?.key || "-"}`);
+  lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(mainlineRecommendedDownload, { fileSeparator: " | " })}`);
 
   if (mainlineEvidenceQueue) {
     lines.push("");
@@ -4386,7 +4386,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
     lines.push(`- status: ${postLaunchLifecycleSummary.status || "-"}`);
     lines.push(`- summary: ${postLaunchLifecycleSummary.summary || "-"}`);
     lines.push(`- nextAction: ${postLaunchLifecycleSummary.nextAction?.title || postLaunchLifecycleSummary.nextAction?.label || postLaunchLifecycleSummary.nextAction?.key || "-"}`);
-    lines.push(`- recommendedDownload: ${postLaunchLifecycleSummary.primaryRecommendedDownload?.label || postLaunchLifecycleSummary.primaryRecommendedDownload?.key || "-"}`);
+    lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(postLaunchLifecycleSummary.primaryRecommendedDownload, { fileSeparator: " | " })}`);
   }
 
   if (firstLaunchInventoryQueue) {
@@ -14006,6 +14006,12 @@ function appendPostLaunchLifecycleTextLines(lines = [], mainlineSummary = {}) {
       .filter(Boolean);
     return labels.length ? labels.join(" | ") : fallback;
   };
+  const downloadList = (items = [], fallback = "-") => {
+    const labels = (Array.isArray(items) ? items : [])
+      .map((item) => formatLaunchHandoffDownloadText(item, { fileSeparator: " | " }))
+      .filter((item) => item && item !== "-");
+    return labels.length ? labels.join(" || ") : fallback;
+  };
   lines.push("");
   lines.push("Post-Launch Lifecycle:");
   lines.push(
@@ -14024,9 +14030,9 @@ function appendPostLaunchLifecycleTextLines(lines = [], mainlineSummary = {}) {
   }
   lines.push(`- Next Lifecycle Action: ${lifecycle.nextAction?.title || lifecycle.nextAction?.label || lifecycle.nextAction?.key || "All post-launch lifecycle phases are aligned."}`);
   lines.push(`- Primary Lifecycle Workspace: ${lifecycle.primaryWorkspaceAction?.label || lifecycle.primaryWorkspaceAction?.key || "-"}`);
-  lines.push(`- Primary Lifecycle Download: ${lifecycle.primaryRecommendedDownload?.label || lifecycle.primaryRecommendedDownload?.key || "-"}`);
+  lines.push(`- Primary Lifecycle Download: ${formatLaunchHandoffDownloadText(lifecycle.primaryRecommendedDownload, { fileSeparator: " | " })}`);
   lines.push(`- Lifecycle Workspace Actions: ${labelList(workspaceActions)}`);
-  lines.push(`- Lifecycle Recommended Downloads: ${labelList(recommendedDownloads)}`);
+  lines.push(`- Lifecycle Recommended Downloads: ${downloadList(recommendedDownloads)}`);
   return true;
 }
 
@@ -15835,7 +15841,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     `Post-Launch Lifecycle: ${String(lifecycle.status || "unknown").toUpperCase()}`,
     `Lifecycle Counts: ready=${lifecycle.readyCount ?? 0} | hold=${lifecycle.holdCount ?? 0} | review=${lifecycle.reviewCount ?? 0}`,
     `Next Lifecycle Action: ${lifecycle.nextAction?.title || lifecycle.nextAction?.label || lifecycle.nextAction?.key || "All post-launch lifecycle phases are aligned."}`,
-    `Primary Lifecycle Download: ${lifecycle.primaryRecommendedDownload?.label || lifecycle.primaryRecommendedDownload?.key || "-"}`,
+    `Primary Lifecycle Download: ${formatLaunchHandoffDownloadText(lifecycle.primaryRecommendedDownload, { fileSeparator: " | " })}`,
     ""
   ];
 
@@ -15927,7 +15933,7 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     item.timing ? `timing=${item.timing}` : "",
     item.summary || "",
     item.workspaceAction?.label ? `workspace=${item.workspaceAction.label}` : "",
-    item.recommendedDownload?.label ? `download=${item.recommendedDownload.label}` : ""
+    item.recommendedDownload ? `download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""
   ].filter(Boolean).join(" | ");
   const matchingOpsActions = (keys = []) => firstOpsActions.filter((item) => keys.includes(item?.key));
   const ownerHandoffs = [
@@ -15993,6 +15999,17 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     seenFirstLaunchRecommendedDownloads.add(key);
     firstLaunchRecommendedDownloads.push(item);
   };
+  const firstLaunchSelfDownload = createLaunchMainlineDownloadShortcut(
+    "First launch handoff",
+    "launch-mainline-first-launch-handoff.txt",
+    "first-launch-handoff",
+    {
+      productCode: project.code || filters.productCode || null,
+      channel: manifest.channel || filters.channel || "stable",
+      reviewMode: filters.reviewMode || mainlineSummary?.form?.reviewMode || "matched"
+    }
+  );
+  pushFirstLaunchRecommendedDownload(firstLaunchSelfDownload);
   for (const item of firstOpsActions) {
     pushFirstLaunchWorkspaceAction(item?.workspaceAction || null);
     pushFirstLaunchRecommendedDownload(item?.recommendedDownload || null);
@@ -16023,7 +16040,7 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     `- First ops actions: ${firstOpsActions.length}`,
     `- Owner path: ${ownerHandoffs.map((item) => item.owner).join(" -> ")}`,
     `- Workspace actions: ${firstLaunchWorkspaceActions.map((item) => item?.label || item?.key || "workspace").join(" | ") || "-"}`,
-    `- Recommended downloads: ${firstLaunchRecommendedDownloads.map((item) => item?.label || item?.key || "download").join(" | ") || "-"}`,
+    `- Recommended downloads: ${firstLaunchRecommendedDownloads.map((item) => formatLaunchHandoffDownloadText(item, { fileSeparator: " | " })).join(" || ") || "-"}`,
     `- Duty Chain: ${dutyActionLabels.join(" -> ")}`
   ];
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);

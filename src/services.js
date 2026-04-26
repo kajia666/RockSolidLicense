@@ -13922,10 +13922,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
     + ` | lifecycleNext=${latestReceipt.postLaunchLifecycleNextOperation || lifecycle.nextOperation || "-"}`
   );
   lines.push(
-    `- Next Follow-up: ${nextFollowUp.title || nextFollowUp.key || "-"}`
-    + ` | stage=${nextFollowUp.stage || "-"}`
-    + ` | operation=${nextFollowUp.operationToRecord || "-"}`
-    + ` | download=${nextFollowUp.downloadKey || "-"}`
+    `- Next Follow-up: ${formatLaunchReceiptNextFollowUp(nextFollowUp)}`
   );
   lines.push(
     `- Post-Launch Lifecycle: status=${String(lifecycle.status || "unknown").toUpperCase()}`
@@ -16604,14 +16601,23 @@ function formatLaunchReceiptNextFollowUp(item = null) {
   if (!item || typeof item !== "object") {
     return "-";
   }
+  const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
+    ? item.recommendedDownload
+    : null;
+  const downloadFileName = item.downloadFileName || recommendedDownload?.fileName || "";
+  const downloadFormat = item.downloadFormat || recommendedDownload?.format || "";
+  const downloadHref = item.downloadHref || recommendedDownload?.href || "";
   return [
     `[${String(item.priority || "secondary").toUpperCase()}][${item.stage || "-"}] ${item.title || "-"}`,
     `project=${item.productCode || "-"}`,
     `action=${item.actionKey || "-"}`,
     `operation=${item.operationToRecord || item.operation || "-"}`,
-    `download=${item.downloadKey || "-"}`,
+    `download=${item.downloadKey || recommendedDownload?.key || "-"}`,
+    downloadFileName ? `file=${downloadFileName}` : "",
+    downloadFormat ? `format=${downloadFormat}` : "",
+    downloadHref ? `href=${downloadHref}` : "",
     `handoff=${item.handoffFileName || "-"}`
-  ].join(" | ");
+  ].filter(Boolean).join(" | ");
 }
 
 function buildDeveloperOpsLaunchReceiptDownloadParams(scope = {}, item = null) {

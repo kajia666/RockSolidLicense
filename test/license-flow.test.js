@@ -13996,6 +13996,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      /Launch Receipt Next Follow-up: .*file=developer-ops-launch-receipt-next-follow-up\.txt.*format=launch-receipt-next-follow-up.*href=.*format=launch-receipt-next-follow-up/
+    );
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Stabilization Handoff: ops\/stabilization-handoff\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, new RegExp(`Stabilization Confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(
@@ -14181,6 +14185,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Next Follow-up: .*file=developer-ops-launch-receipt-next-follow-up\.txt.*format=launch-receipt-next-follow-up.*href=.*format=launch-receipt-next-follow-up/
+    );
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Stabilization Handoff: ops\/stabilization-handoff\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, new RegExp(`Stabilization Confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(

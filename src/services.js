@@ -20090,7 +20090,22 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.launchReceiptFollowUps) && overview.launchReceiptFollowUps.length) {
       lines.push("Launch Receipt Follow-ups:");
       for (const item of overview.launchReceiptFollowUps) {
-        lines.push(`- [${item.priority || "-"}][${item.stage || "-"}] ${item.title || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | action=${item.actionKey || "-"} | operation=${item.operationToRecord || "-"} | download=${item.downloadKey || "-"} | handoff=${item.handoffFileName || "-"} | ${item.summary || "-"}`);
+        const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
+          ? item.recommendedDownload
+          : buildDeveloperOpsLaunchReceiptFollowUpDownload(item, scope);
+        lines.push(
+          `- [${item.priority || "-"}][${item.stage || "-"}] ${item.title || "-"}`
+          + ` | project=${item.productCode || "-"}`
+          + ` | channel=${item.channel || "-"}`
+          + ` | action=${item.actionKey || "-"}`
+          + ` | operation=${item.operationToRecord || "-"}`
+          + ` | download=${item.downloadKey || recommendedDownload?.key || "-"}`
+          + ` | file=${item.downloadFileName || recommendedDownload?.fileName || "-"}`
+          + ` | format=${item.downloadFormat || recommendedDownload?.format || "-"}`
+          + ` | href=${item.downloadHref || recommendedDownload?.href || "-"}`
+          + ` | handoff=${item.handoffFileName || "-"}`
+          + ` | ${item.summary || "-"}`
+        );
       }
     }
     if (Array.isArray(overview.topReasons) && overview.topReasons.length) {

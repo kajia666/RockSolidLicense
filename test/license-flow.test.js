@@ -13863,6 +13863,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.summaryText, /download=launch_mainline_operations_handoff/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      new RegExp(
+        `Launch Receipt Follow-ups:[\\s\\S]*- \\[review\\]\\[production_evidence\\][^\\n]*operation=${latestLaunchReceipt.productionEvidenceNextOperation}`
+        + `[^\\n]*download=[^\\n]*href=.*\\/api\\/developer\\/(?:ops\\/export|launch-mainline)\\/download\\?`
+      )
+    );
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"stage","priority","title"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch_mainline_operations_handoff/);

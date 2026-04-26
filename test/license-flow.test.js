@@ -13497,6 +13497,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpCount, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.stage, "production_evidence");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.downloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.match(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.downloadHref, /\/api\/developer\/ops\/export\/download\?/);
+    assert.match(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.downloadHref, /format=launch-receipt-next-follow-up/);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.operation, "record_post_launch_ops_sweep");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.ok(Array.isArray(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue));
@@ -13504,16 +13507,36 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.length,
       launchReceiptSnapshot.overview.launchReceiptFollowUps.length
     );
-    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.some((item) =>
+    const productionEvidenceFollowUp = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.find((item) =>
       item.stage === "production_evidence"
         && item.operationToRecord === latestLaunchReceipt.productionEvidenceNextOperation
         && item.downloadKey === latestLaunchReceipt.firstLaunchDutyPrimaryDownloadKey
-    ));
-    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.some((item) =>
+    );
+    assert.ok(productionEvidenceFollowUp);
+    assert.ok(productionEvidenceFollowUp.downloadHref);
+    if (productionEvidenceFollowUp.downloadKey) {
+      assert.match(productionEvidenceFollowUp.downloadHref, /\/api\/developer\/launch-mainline\/download\?/);
+      assert.match(productionEvidenceFollowUp.downloadHref, new RegExp(`downloadKey=${productionEvidenceFollowUp.downloadKey}`));
+    } else {
+      assert.match(productionEvidenceFollowUp.downloadHref, /\/api\/developer\/ops\/export\/download\?/);
+      assert.match(productionEvidenceFollowUp.downloadHref, /format=launch-receipt-next-follow-up/);
+    }
+    assert.equal(productionEvidenceFollowUp.recommendedDownload?.href, productionEvidenceFollowUp.downloadHref);
+    const postLaunchLifecycleFollowUp = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.find((item) =>
       item.stage === "post_launch_lifecycle"
         && item.operationToRecord === latestLaunchReceipt.postLaunchLifecycleNextOperation
         && item.downloadKey === latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey
-    ));
+    );
+    assert.ok(postLaunchLifecycleFollowUp);
+    assert.ok(postLaunchLifecycleFollowUp.downloadHref);
+    if (postLaunchLifecycleFollowUp.downloadKey) {
+      assert.match(postLaunchLifecycleFollowUp.downloadHref, /\/api\/developer\/launch-mainline\/download\?/);
+      assert.match(postLaunchLifecycleFollowUp.downloadHref, new RegExp(`downloadKey=${postLaunchLifecycleFollowUp.downloadKey}`));
+    } else {
+      assert.match(postLaunchLifecycleFollowUp.downloadHref, /\/api\/developer\/ops\/export\/download\?/);
+      assert.match(postLaunchLifecycleFollowUp.downloadHref, /format=launch-receipt-next-follow-up/);
+    }
+    assert.equal(postLaunchLifecycleFollowUp.recommendedDownload?.href, postLaunchLifecycleFollowUp.downloadHref);
     assert.ok(Array.isArray(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads));
     assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
       item.key === "ops_launch_receipt_next_follow_up" && item.format === "launch-receipt-next-follow-up"
@@ -13531,9 +13554,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.decision, "hold");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.canEnterInitialLaunch, false);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.status, "review");
-    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.blockers.some((item) => item.stage === "production_evidence"));
-    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.requiredActions.some((item) => item.operation === latestLaunchReceipt.productionEvidenceNextOperation));
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.blockers.some((item) =>
+      item.stage === "production_evidence"
+        && /\/api\/developer\/(launch-mainline\/download|ops\/export\/download)\?/.test(item.downloadHref || "")
+    ));
+    assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.requiredActions.some((item) =>
+      item.operation === latestLaunchReceipt.productionEvidenceNextOperation
+        && /\/api\/developer\/(launch-mainline\/download|ops\/export\/download)\?/.test(item.downloadHref || "")
+    ));
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.nextAction.operation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.match(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.nextAction.downloadHref, /\/api\/developer\/ops\/export\/download\?/);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.primaryDownload.fileName, "developer-ops-launch-receipt-next-follow-up.txt");
     assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextSteps.some((item) => /Open Launch Mainline/i.test(item)));
     assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextSteps.some((item) => /Download next follow-up/i.test(item)));
@@ -13547,6 +13577,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchGoNoGo.blockerCount, launchReceiptSnapshot.summary.initialLaunchOpsReadiness.gate.blockerCount);
     assert.equal(initialLaunchGoNoGo.nextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(initialLaunchGoNoGo.nextDownloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.match(initialLaunchGoNoGo.nextDownloadHref, /\/api\/developer\/ops\/export\/download\?/);
     assert.equal(initialLaunchGoNoGo.traceability.latestReceiptOperation, "record_post_launch_ops_sweep");
     assert.equal(initialLaunchGoNoGo.traceability.opsHandoffIndex, "handoff-index.txt");
     const initialLaunchContract = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.contract;
@@ -13562,6 +13593,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchContract.nextRequiredAction.stage, "production_evidence");
     assert.equal(initialLaunchContract.nextRequiredAction.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(initialLaunchContract.nextRequiredAction.downloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.match(initialLaunchContract.nextRequiredAction.downloadHref, /\/api\/developer\/ops\/export\/download\?/);
     assert.match(initialLaunchContract.nextRequiredAction.workspaceHref, /\/developer\/launch-mainline\?/);
     assert.equal(initialLaunchContract.followUpQueueCount, launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.length);
     assert.ok(initialLaunchContract.blockingStages.includes("production_evidence"));
@@ -17911,9 +17943,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /launchReceiptFollowUps/);
     assert.match(html, /renderLaunchReceiptFollowUps/);
     assert.match(html, /data-launch-receipt-follow-up-action/);
+    assert.match(html, /data-download-href/);
     assert.match(html, /Open Mainline/);
     assert.match(html, /Download Handoff/);
-    assert.match(html, /launchReceiptDownloadFormat/);
+    assert.doesNotMatch(html, /launchReceiptDownloadFormat/);
+    assert.doesNotMatch(html, /api\/developer\/launch-mainline\/download\$\{q/);
     assert.match(html, /handleLaunchReceiptFollowUpAction/);
     assert.match(html, /renderFirstWaveRecommendations/);
     assert.match(html, /loadFirstWaveRecommendations/);

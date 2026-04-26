@@ -25,7 +25,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
 - Launch smoke handoff continuity: the CLI `launch:smoke` first-wave handoff now lands in Launch Review and Developer Ops with `source=launch-smoke` / `handoff=first-wave` preserved in route-focus UI, payload filters, exported summaries, and follow-up workspace links.
-- Recommended download routing: Launch Review, Launch Smoke, Launch Workflow, Release follow-ups, Developer Projects follow-up downloads, Developer License quickstart follow-ups, Developer Ops route-review handoffs, and Developer Ops operator/stabilization follow-ups now consume service-provided download `href` values for recommended downloads, so the first-wave handoff chain no longer relies on frontend source/format guessing in those launch-critical entrypoints.
+- Recommended download routing: Launch Review, Launch Smoke, Launch Workflow, Release follow-ups, Developer Projects follow-up downloads, Developer License quickstart follow-ups, Developer Ops route-review handoffs, launch receipt follow-up queue downloads, and Developer Ops operator/stabilization follow-ups now consume service-provided download `href` values for recommended downloads, so the first-wave handoff chain no longer relies on frontend source/format guessing in those launch-critical entrypoints.
 
 Estimated initial pilot-launch readiness: 87%-90%.
 
@@ -36,7 +36,7 @@ This estimate means the core flow is mostly ready for a controlled first launch,
 Work should continue in short backend/API-first slices. Each slice should end with a commit, targeted verification, and a note about the next slice.
 
 1. Finish a final spot audit for any non-critical or older launch-adjacent download surfaces outside the now-hardened Release, Launch Workflow, Launch Review, Launch Smoke, Launch Mainline, Developer Projects, Developer License, and Developer Ops first-wave chain.
-   The main launch-critical route/download handoffs now round-trip through service-provided `href` values; remaining work is mostly residual cleanup and regression coverage.
+   The main launch-critical route/download handoffs and receipt follow-up queue downloads now round-trip through service-provided `href` values; remaining work is mostly residual cleanup and regression coverage.
 
 2. Tighten initial launch ops readiness after real first-launch actions.
    Verify that launch bootstrap, first batch setup, inventory refill, first-wave ops sweep, and closeout/stabilization actions all refresh the same readiness chain.

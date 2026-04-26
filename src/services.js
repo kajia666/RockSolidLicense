@@ -15561,6 +15561,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           actionKey: launchReceiptNextFollowUp.actionKey || null,
           operationToRecord: launchReceiptNextFollowUp.operationToRecord || launchReceiptNextFollowUp.operation || null,
           downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          downloadFileName: launchReceiptNextFollowUp.downloadFileName || launchReceiptNextFollowUp.recommendedDownload?.fileName || null,
+          downloadHref: launchReceiptNextFollowUp.downloadHref || launchReceiptNextFollowUp.recommendedDownload?.href || null,
           handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
         }
       : null,
@@ -16609,7 +16611,20 @@ function formatLaunchReceiptNextFollowUp(item = null) {
   ].join(" | ");
 }
 
-function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}) {
+function buildDeveloperOpsLaunchReceiptDownloadParams(scope = {}, item = null) {
+  return compactRouteParams({
+    ...buildDeveloperOpsRouteReviewBaseDownloadParams(scope),
+    productCode: item?.productCode || scope.productCode || "",
+    channel: item?.channel || scope.channel || "stable",
+    operation: item?.operationToRecord || item?.operation || "",
+    actionKey: item?.actionKey || "",
+    downloadKey: item?.downloadKey || "",
+    routeTitle: item?.title || "",
+    routeReason: item?.summary || ""
+  });
+}
+
+function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}, item = null) {
   return createLaunchWorkflowDownloadShortcut(
     "ops_launch_receipt_next_follow_up",
     "developer-ops-launch-receipt-next-follow-up.txt",
@@ -16617,7 +16632,28 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}) {
     {
       source: "developer-ops",
       format: "launch-receipt-next-follow-up",
-      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+      params: buildDeveloperOpsLaunchReceiptDownloadParams(scope, item)
+    }
+  );
+}
+
+function buildDeveloperOpsLaunchReceiptFollowUpDownload(item = null, scope = {}) {
+  const downloadKey = String(item?.downloadKey || "").trim();
+  if (!downloadKey) {
+    return buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, item);
+  }
+  const format = inferRouteDownloadFormat(downloadKey);
+  const fileExtension = format === "zip" ? "zip" : "txt";
+  const fileName = item?.downloadFileName
+    || `${sanitizeExportNameSegment(downloadKey, "launch-receipt-follow-up")}.${fileExtension}`;
+  return createLaunchWorkflowDownloadShortcut(
+    downloadKey,
+    fileName,
+    item?.title ? `${item.title} handoff` : "Launch receipt follow-up handoff",
+    {
+      source: inferLaunchWorkflowDownloadSource(downloadKey),
+      format,
+      params: buildDeveloperOpsLaunchReceiptDownloadParams(scope, item)
     }
   );
 }
@@ -16641,6 +16677,10 @@ function buildDeveloperOpsInitialLaunchOpsGate({
     actionKey: item.actionKey || null,
     operation: item.operationToRecord || item.operation || null,
     downloadKey: item.downloadKey || null,
+    downloadFileName: item.downloadFileName || item.recommendedDownload?.fileName || null,
+    downloadHref: item.downloadHref || item.recommendedDownload?.href || null,
+    downloadFormat: item.downloadFormat || item.recommendedDownload?.format || null,
+    recommendedDownload: item.recommendedDownload || null,
     handoffFileName: item.handoffFileName || null,
     productCode: item.productCode || latestReceipt?.productCode || null,
     channel: item.channel || latestReceipt?.channel || "stable"
@@ -16678,6 +16718,8 @@ function buildDeveloperOpsInitialLaunchOpsGate({
     actionKey: item.actionKey || null,
     operation: item.operation || null,
     downloadKey: item.downloadKey || null,
+    downloadFileName: item.downloadFileName || null,
+    downloadHref: item.downloadHref || null,
     productCode: item.productCode || null,
     channel: item.channel || "stable",
     handoffFileName: item.handoffFileName || null
@@ -16690,7 +16732,9 @@ function buildDeveloperOpsInitialLaunchOpsGate({
         autofocus: primaryWorkspaceAction.autofocus || null,
         operation: primaryWorkspaceAction.params?.operation || launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || null,
         actionKey: primaryWorkspaceAction.params?.actionKey || launchReceiptNextFollowUp?.actionKey || null,
-        downloadKey: primaryWorkspaceAction.params?.downloadKey || launchReceiptNextFollowUp?.downloadKey || null
+        downloadKey: primaryWorkspaceAction.params?.downloadKey || launchReceiptNextFollowUp?.downloadKey || null,
+        downloadHref: primaryDownload?.href || launchReceiptNextFollowUp?.downloadHref || launchReceiptNextFollowUp?.recommendedDownload?.href || null,
+        downloadFileName: primaryDownload?.fileName || launchReceiptNextFollowUp?.downloadFileName || launchReceiptNextFollowUp?.recommendedDownload?.fileName || null
       }
     : null;
   const canEnterInitialLaunch = status === "ready" && blockers.length === 0;
@@ -16798,6 +16842,7 @@ function buildDeveloperOpsInitialLaunchGoNoGo({
     nextOperation: nextAction?.operation || launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || null,
     nextDownloadKey: nextAction?.downloadKey || launchReceiptNextFollowUp?.downloadKey || primaryDownload?.key || null,
     nextDownloadFileName: primaryDownload?.fileName || null,
+    nextDownloadHref: primaryDownload?.href || nextAction?.downloadHref || launchReceiptNextFollowUp?.downloadHref || launchReceiptNextFollowUp?.recommendedDownload?.href || null,
     traceability: {
       latestReceiptOperation: latestReceipt?.operation || null,
       latestReceiptHandoffFileName: latestReceipt?.handoffFileName || null,
@@ -16830,6 +16875,7 @@ function buildDeveloperOpsInitialLaunchContract({
     operation: goNoGo.nextOperation || launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || null,
     downloadKey: goNoGo.nextDownloadKey || launchReceiptNextFollowUp?.downloadKey || null,
     downloadFileName: goNoGo.nextDownloadFileName || primaryDownload?.fileName || null,
+    downloadHref: goNoGo.nextDownloadHref || primaryDownload?.href || launchReceiptNextFollowUp?.downloadHref || launchReceiptNextFollowUp?.recommendedDownload?.href || null,
     workspaceKey: primaryWorkspaceAction?.key || null,
     workspaceLabel: primaryWorkspaceAction?.label || null,
     workspaceHref: primaryWorkspaceAction?.href || null,
@@ -16899,6 +16945,7 @@ function buildDeveloperOpsInitialLaunchOperatorHeadline({
     headline: `${decisionLabel} | status=${status || "-"} | blocker=${primaryBlockerStage || "-"}`,
     nextOperation: nextRequiredAction.operation || goNoGo.nextOperation || null,
     nextDownloadFileName: nextRequiredAction.downloadFileName || goNoGo.nextDownloadFileName || null,
+    nextDownloadHref: nextRequiredAction.downloadHref || goNoGo.nextDownloadHref || null,
     workspaceHref: nextRequiredAction.workspaceHref || primaryWorkspaceAction?.href || null,
     handoffFileName: nextRequiredAction.handoffFileName || latestReceipt?.handoffFileName || null,
     files: {
@@ -17175,20 +17222,31 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
   const stabilizationHandoffDownload = mainlineHandoff?.downloads?.stabilizationHandoff || null;
   const followUpQueue = followUps
-    .map((item) => ({
-      key: item.key || null,
-      stage: item.stage || null,
-      priority: normalizeLaunchReceiptFollowUpPriority(item.priority),
-      title: item.title || null,
-      summary: item.summary || "",
-      productCode: item.productCode || latestReceipt?.productCode || null,
-      channel: item.channel || latestReceipt?.channel || "stable",
-      actionKey: item.actionKey || null,
-      operation: item.operation || null,
-      operationToRecord: item.operationToRecord || item.operation || null,
-      downloadKey: item.downloadKey || null,
-      handoffFileName: item.handoffFileName || latestReceipt?.handoffFileName || null
-    }))
+    .map((item) => {
+      const normalizedItem = {
+        key: item.key || null,
+        stage: item.stage || null,
+        priority: normalizeLaunchReceiptFollowUpPriority(item.priority),
+        title: item.title || null,
+        summary: item.summary || "",
+        productCode: item.productCode || latestReceipt?.productCode || null,
+        channel: item.channel || latestReceipt?.channel || "stable",
+        actionKey: item.actionKey || null,
+        operation: item.operation || null,
+        operationToRecord: item.operationToRecord || item.operation || null,
+        downloadKey: item.downloadKey || null,
+        handoffFileName: item.handoffFileName || latestReceipt?.handoffFileName || null
+      };
+      const recommendedDownload = buildDeveloperOpsLaunchReceiptFollowUpDownload(normalizedItem, scope);
+      return {
+        ...normalizedItem,
+        recommendedDownload,
+        downloadFileName: recommendedDownload?.fileName || null,
+        downloadHref: recommendedDownload?.href || null,
+        downloadFormat: recommendedDownload?.format || null,
+        downloadSource: recommendedDownload?.source || null
+      };
+    })
     .filter((item) => item.stage || item.actionKey || item.operationToRecord || item.downloadKey);
   const recommendedDownloads = [];
   const seenRecommendedDownloads = new Set();
@@ -17236,7 +17294,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const gate = buildDeveloperOpsInitialLaunchOpsGate({
     status,
     latestReceipt,
-    followUps,
+    followUps: followUpQueue,
     launchReceiptNextFollowUp,
     primaryWorkspaceAction,
     primaryDownload,
@@ -17341,6 +17399,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
           actionKey: launchReceiptNextFollowUp.actionKey || null,
           operationToRecord: launchReceiptNextFollowUp.operationToRecord || null,
           downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          recommendedDownload: launchReceiptNextFollowUp.recommendedDownload || null,
+          downloadFileName: launchReceiptNextFollowUp.recommendedDownload?.fileName || null,
+          downloadHref: launchReceiptNextFollowUp.recommendedDownload?.href || null,
+          downloadFormat: launchReceiptNextFollowUp.recommendedDownload?.format || null,
+          downloadSource: launchReceiptNextFollowUp.recommendedDownload?.source || null,
           handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
         }
       : null,
@@ -19800,7 +19863,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
     || buildDeveloperOpsLaunchReceiptNextFollowUpAction(item);
   const recommendedWorkspace = recommendedAction?.workspaceAction || null;
   const recommendedDownload = item?.recommendedDownload
-    || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope);
+    || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, item);
   const lines = [
     "RockSolid Developer Ops Launch Receipt Next Follow-up",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -19954,7 +20017,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const followUpQueue = Array.isArray(readiness.followUpQueue) ? readiness.followUpQueue : [];
   if (followUpQueue.length) {
     for (const item of followUpQueue) {
-      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operationToRecord || item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"} | handoff=${item.handoffFileName || "-"}`);
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operationToRecord || item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"} | href=${item.downloadHref || item.recommendedDownload?.href || "-"} | handoff=${item.handoffFileName || "-"}`);
     }
   } else {
     lines.push("- none");
@@ -20092,7 +20155,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("Follow-up Queue:");
   if (followUpQueue.length) {
     for (const item of followUpQueue) {
-      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operationToRecord || item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"} | handoff=${item.handoffFileName || "-"}`);
+      lines.push(`- [${item.stage || "-"}] ${item.title || "-"} | priority=${item.priority || "-"} | operation=${item.operationToRecord || item.operation || "-"} | action=${item.actionKey || "-"} | download=${item.downloadKey || "-"} | href=${item.downloadHref || item.recommendedDownload?.href || "-"} | handoff=${item.handoffFileName || "-"}`);
     }
   } else {
     lines.push("- none");
@@ -20215,7 +20278,7 @@ function buildDeveloperOpsSnapshotPayload({
     ? {
         ...launchReceiptNextFollowUpBase,
         recommendedAction: buildDeveloperOpsLaunchReceiptNextFollowUpAction(launchReceiptNextFollowUpBase),
-        recommendedDownload: buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope)
+        recommendedDownload: buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, launchReceiptNextFollowUpBase)
       }
     : null;
   const initialLaunchOpsReadiness = buildDeveloperOpsInitialLaunchOpsReadinessPayload({

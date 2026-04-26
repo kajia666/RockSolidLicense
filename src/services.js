@@ -17637,6 +17637,18 @@ function buildDeveloperOpsFirstWaveRecommendationsDownloadAsset(payload, format 
   };
 }
 
+function normalizeDeveloperOpsConfirmationToken(value, fallback = "unknown") {
+  return String(value ?? fallback).trim().toLowerCase().replace(/[^a-z0-9._-]/g, "_") || fallback;
+}
+
+function normalizeDeveloperOpsConfirmationFileName(value, fallback) {
+  const normalized = String(value || fallback)
+    .trim()
+    .replace(/[\\/:"*?<>|\r\n]/g, "_")
+    .slice(0, 160);
+  return normalized || fallback;
+}
+
 function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -33136,6 +33148,110 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       return {
         ...payload,
         auditLogId
+      };
+    },
+
+    async developerConfirmFirstWaveHandoff(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only confirm first-wave handoff reviews for your assigned projects."
+      );
+      requireField(body, "productCode");
+
+      const productCode = readProductCodeInput(body);
+      const product = await getStoreActiveProductByCode(productCode);
+      ensureDeveloperCanAccessProduct(
+        db,
+        session,
+        {
+          id: product.id,
+          owner_developer_id: product.ownerDeveloperId ?? product.ownerDeveloper?.id ?? null
+        },
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only confirm first-wave handoff reviews for your assigned projects."
+      );
+
+      const channel = normalizeChannel(body.channel, "stable");
+      const decision = normalizeDeveloperOpsConfirmationToken(body.decision, "confirmed");
+      const confirmedAt = nowIso();
+      const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
+      const handoffFileName = normalizeDeveloperOpsConfirmationFileName(
+        body.handoffFileName,
+        `${buildDeveloperOpsFirstWaveRecommendationsBaseName({ productCode: product.code, channel })}.txt`
+      );
+      const sourceRecommendation = {
+        inventoryStatus: normalizeDeveloperOpsConfirmationToken(body.inventoryStatus, "unknown"),
+        firstCardStatus: normalizeDeveloperOpsConfirmationToken(body.firstCardStatus, "unknown"),
+        firstRoundOpsStatus: normalizeDeveloperOpsConfirmationToken(body.firstRoundOpsStatus, "unknown"),
+        latestLaunchReceiptOperation: body.latestLaunchReceiptOperation
+          ? normalizeDeveloperOpsConfirmationToken(body.latestLaunchReceiptOperation, "")
+          : null,
+        recommendedCardCount: normalizeNonNegativeInteger(body.recommendedCardCount, "recommendedCardCount", 0, 1000000),
+        issuedFreshCardCount: normalizeNonNegativeInteger(body.issuedFreshCardCount, "issuedFreshCardCount", 0, 1000000)
+      };
+      const traceability = {
+        eventType: "developer.ops.first-wave.handoff.confirm",
+        entityType: "developer_ops_first_wave_handoff",
+        route: "/api/developer/ops/first-wave/recommendations",
+        downloadRoute: "/api/developer/ops/first-wave/recommendations/download",
+        downloads: {
+          summary: "first-wave-recommendations.txt",
+          json: "first-wave-recommendations.json",
+          checksums: "first-wave-recommendations-sha256.txt"
+        }
+      };
+      const confirmedBy = {
+        actorType: session.actor_scope === "member" ? "developer_member" : "developer",
+        actorScope: session.actor_scope,
+        actorId: session.actor_id,
+        username: session.username,
+        role: session.member_role ?? "owner"
+      };
+      const auditLogId = auditDeveloperSession(
+        db,
+        session,
+        traceability.eventType,
+        traceability.entityType,
+        product.id,
+        {
+          productCode: product.code,
+          channel,
+          decision,
+          status: "confirmed",
+          confirmedAt,
+          handoffFileName,
+          handoffFormat: "first-wave-recommendations",
+          note,
+          inventoryStatus: sourceRecommendation.inventoryStatus,
+          firstCardStatus: sourceRecommendation.firstCardStatus,
+          firstRoundOpsStatus: sourceRecommendation.firstRoundOpsStatus,
+          latestLaunchReceiptOperation: sourceRecommendation.latestLaunchReceiptOperation,
+          recommendedCardCount: sourceRecommendation.recommendedCardCount,
+          issuedFreshCardCount: sourceRecommendation.issuedFreshCardCount,
+          downloads: traceability.downloads
+        }
+      );
+
+      return {
+        version: "developer-ops-first-wave-handoff-confirmation/v1",
+        status: "confirmed",
+        productCode: product.code,
+        productId: product.id,
+        channel,
+        decision,
+        note,
+        confirmedAt,
+        confirmedBy,
+        handoffFileName,
+        handoffFormat: "first-wave-recommendations",
+        sourceRecommendation,
+        traceability,
+        auditLogId,
+        message: `First-wave handoff confirmed for ${product.code} (${channel}).`
       };
     },
 

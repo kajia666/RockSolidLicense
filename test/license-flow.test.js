@@ -12942,6 +12942,54 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(firstWaveChecksums.body, /first-wave-recommendations\.json/);
     assert.match(firstWaveChecksums.body, /first-wave-recommendations\.txt/);
 
+    const handoffConfirmation = await postJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/confirm",
+      {
+        productCode: "FIRSTWAVE",
+        channel: "stable",
+        decision: "confirmed",
+        note: "first-wave handoff reviewed by ops",
+        handoffFileName: "developer-ops-first-wave-recommendations-firstwave-stable.txt",
+        inventoryStatus: afterSetup.inventory.status,
+        firstCardStatus: afterSetup.firstCards.status,
+        firstRoundOpsStatus: afterSetup.firstRoundOps.status,
+        latestLaunchReceiptOperation: afterSetup.traceability.latestLaunchReceipt.operation,
+        recommendedCardCount: afterSetup.firstCards.recommendedCardCount,
+        issuedFreshCardCount: afterSetup.firstCards.issuedFreshCardCount
+      },
+      operatorSession.token
+    );
+    assert.equal(handoffConfirmation.version, "developer-ops-first-wave-handoff-confirmation/v1");
+    assert.equal(handoffConfirmation.status, "confirmed");
+    assert.equal(handoffConfirmation.productCode, "FIRSTWAVE");
+    assert.equal(handoffConfirmation.channel, "stable");
+    assert.equal(handoffConfirmation.decision, "confirmed");
+    assert.equal(handoffConfirmation.handoffFileName, "developer-ops-first-wave-recommendations-firstwave-stable.txt");
+    assert.equal(handoffConfirmation.confirmedBy.actorType, "developer_member");
+    assert.equal(handoffConfirmation.confirmedBy.username, "first.wave.operator");
+    assert.equal(handoffConfirmation.sourceRecommendation.inventoryStatus, "ready");
+    assert.equal(handoffConfirmation.sourceRecommendation.firstCardStatus, "ready");
+    assert.equal(handoffConfirmation.sourceRecommendation.firstRoundOpsStatus, "review");
+    assert.equal(handoffConfirmation.sourceRecommendation.latestLaunchReceiptOperation, "first_batch_setup");
+    assert.equal(handoffConfirmation.sourceRecommendation.recommendedCardCount, 150);
+    assert.equal(handoffConfirmation.traceability.downloads.summary, "first-wave-recommendations.txt");
+    assert.ok(handoffConfirmation.auditLogId);
+
+    const handoffConfirmationAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=FIRSTWAVE&eventType=developer.ops.first-wave.handoff.confirm&limit=5",
+      operatorSession.token
+    );
+    assert.ok(handoffConfirmationAudit.items.some((item) =>
+      item.id === handoffConfirmation.auditLogId
+      && item.entity_type === "developer_ops_first_wave_handoff"
+      && item.metadata?.decision === "confirmed"
+      && item.metadata?.handoffFileName === "developer-ops-first-wave-recommendations-firstwave-stable.txt"
+      && item.metadata?.inventoryStatus === "ready"
+      && item.metadata?.latestLaunchReceiptOperation === "first_batch_setup"
+    ));
+
     const recommendationAudit = await getJson(
       baseUrl,
       "/api/developer/audit-logs?productCode=FIRSTWAVE&eventType=developer.ops.first-wave.recommendations&limit=5",
@@ -12961,6 +13009,19 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     );
     assert.equal(forbidden.status, 403);
     assert.equal(forbidden.error.code, "DEVELOPER_PRODUCT_FORBIDDEN");
+
+    const forbiddenConfirmation = await postJsonExpectError(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/confirm",
+      {
+        productCode: "FIRSTWAVE_BETA",
+        channel: "stable",
+        decision: "confirmed"
+      },
+      operatorSession.token
+    );
+    assert.equal(forbiddenConfirmation.status, 403);
+    assert.equal(forbiddenConfirmation.error.code, "DEVELOPER_OPS_FORBIDDEN");
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -17577,9 +17638,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/audit-logs/);
     assert.match(html, /api\/developer\/ops\/export/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations/);
+    assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(html, /api\/developer\/ops\/stabilization-handoff\/confirm/);
     assert.match(html, /Preview First-Wave Recommendations/);
     assert.match(html, /Download First-Wave Handoff/);
+    assert.match(html, /Confirm First-Wave Handoff/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Next Follow-up/);
     assert.match(html, /Download Launch Readiness/);
@@ -17772,6 +17835,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /renderFirstWaveRecommendations/);
     assert.match(html, /loadFirstWaveRecommendations/);
     assert.match(html, /downloadFirstWaveRecommendations/);
+    assert.match(html, /confirmFirstWaveHandoff/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);
   } finally {
     await app.close();

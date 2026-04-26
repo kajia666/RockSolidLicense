@@ -140,6 +140,7 @@
             <button class="secondary" id="preview-export-btn">Preview Snapshot</button>
             <button class="secondary" id="load-first-wave-recommendations-btn">Preview First-Wave Recommendations</button>
             <button class="secondary" id="download-first-wave-recommendations-btn">Download First-Wave Handoff</button>
+            <button class="secondary" id="confirm-first-wave-handoff-btn">Confirm First-Wave Handoff</button>
             <button class="secondary" id="download-export-json-btn">Download JSON</button>
             <button class="secondary" id="download-export-summary-btn">Download Summary</button>
             <button class="secondary" id="download-export-next-follow-up-btn">Download Next Follow-up</button>
@@ -2559,6 +2560,7 @@
         const firstCards = payload.firstCards || {};
         const firstRoundOps = payload.firstRoundOps || {};
         const traceability = payload.traceability || {};
+        const confirmation = payload.confirmation || payload.handoffConfirmation || null;
         const status = String(payload.status || firstRoundOps.status || inventory.status || "review").toLowerCase();
         statusBox.textContent = `First-wave recommendations loaded for ${payload.productCode || "-"} | inventory=${inventory.status || "-"} | cards=${firstCards.status || "-"} | ops=${firstRoundOps.status || "-"}`;
         statusBox.className = status === "ready" ? "status" : "status warn";
@@ -2591,6 +2593,12 @@
             <div class="hint">primary=${esc(firstRoundOps.primaryAction?.title || firstRoundOps.primaryAction?.operation || "-")}</div>
             <ul class="snapshot-list">${actions.length ? actions.slice(0, 6).map((item) => `<li><strong>${esc(item.stage || "-")}</strong> ${esc(item.title || item.operation || "-")} | action=${esc(item.actionKey || "-")} | operation=${esc(item.operation || "-")} | download=${esc(item.downloadKey || "-")}</li>`).join("") : "<li>No first-round ops action is queued.</li>"}</ul>
           </div>
+          ${confirmation ? `
+          <div class="snapshot-recap">
+            <strong>First-Wave Handoff Confirmation</strong>
+            <div class="audit-meta">${renderTag(confirmation.status || "confirmed", true)}${renderTag(confirmation.decision || "confirmed")}</div>
+            <div class="hint">audit=${esc(confirmation.auditLogId || "-")} | by=${esc(confirmation.confirmedBy?.username || "-")} | file=${esc(confirmation.handoffFileName || "-")}</div>
+          </div>` : ""}
         `;
       }
 
@@ -5405,6 +5413,55 @@
         return result;
       }
 
+      function firstWaveHandoffFileName(productCode, channel) {
+        const safeProductCode = String(productCode || "project").trim().toLowerCase().replace(/[^a-z0-9._-]/g, "_") || "project";
+        const safeChannel = String(channel || "stable").trim().toLowerCase().replace(/[^a-z0-9._-]/g, "_") || "stable";
+        const lastFileName = String(lastExportDownload?.fileName || "").trim();
+        if (lastFileName.includes("first-wave-recommendations")) {
+          return lastFileName;
+        }
+        return `developer-ops-first-wave-recommendations-${safeProductCode}-${safeChannel}.txt`;
+      }
+
+      async function confirmFirstWaveHandoff() {
+        const currentFilters = filters();
+        const productCode = currentFilters.productCode || requestedProductCode || "";
+        if (!productCode) {
+          const error = new Error("Select or route a project code before confirming the first-wave handoff.");
+          error.code = "PRODUCT_CODE_REQUIRED";
+          throw error;
+        }
+        const payload = lastFirstWaveRecommendations || {};
+        const inventory = payload.inventory || {};
+        const firstCards = payload.firstCards || {};
+        const firstRoundOps = payload.firstRoundOps || {};
+        const traceability = payload.traceability || {};
+        const channel = requestedChannel || payload.channel || "stable";
+        const confirmation = await api("/api/developer/ops/first-wave/recommendations/confirm", {
+          method: "POST",
+          body: {
+            productCode,
+            channel,
+            decision: "confirmed",
+            note: "confirmed_from_developer_ops_first_wave_handoff",
+            handoffFileName: firstWaveHandoffFileName(productCode, channel),
+            inventoryStatus: inventory.status || "",
+            firstCardStatus: firstCards.status || "",
+            firstRoundOpsStatus: firstRoundOps.status || "",
+            latestLaunchReceiptOperation: traceability.latestLaunchReceipt?.operation || "",
+            recommendedCardCount: firstCards.recommendedCardCount ?? inventory.targetCardCount ?? 0,
+            issuedFreshCardCount: firstCards.issuedFreshCardCount ?? inventory.freshCardCount ?? 0
+          }
+        });
+        lastFirstWaveRecommendations = {
+          ...payload,
+          confirmation
+        };
+        renderFirstWaveRecommendations();
+        setStatus(`First-wave handoff confirmed: audit ${confirmation.auditLogId || "-"}`);
+        return confirmation;
+      }
+
       function clearSession() {
         token = "";
         profile = null;
@@ -5520,6 +5577,7 @@
       el("preview-export-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Scoped ops snapshot refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("load-first-wave-recommendations-btn").addEventListener("click", async () => { try { const data = await loadFirstWaveRecommendations(); setStatus(`First-wave recommendations loaded for ${data.productCode}.`); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-first-wave-recommendations-btn").addEventListener("click", async () => { try { const result = await downloadFirstWaveRecommendations("summary"); setOutput(result); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("confirm-first-wave-handoff-btn").addEventListener("click", async () => { try { const confirmation = await confirmFirstWaveHandoff(); setOutput(confirmation); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-json-btn").addEventListener("click", async () => { try { await handleExportDownload("json", "developer-ops.json", "Ops snapshot JSON"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-next-follow-up-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-next-follow-up", "developer-ops-launch-receipt-next-follow-up.txt", "Launch receipt next follow-up"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

@@ -17849,6 +17849,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /action === "download-mainline"/);
     assert.match(html, /action === "download-mainline-rehearsal"/);
     assert.match(html, /action === "download-mainline-first-launch-handoff"/);
+    assert.match(html, /service-provided href/);
+    assert.match(html, /item\.href/);
+    assert.doesNotMatch(html, /item\.source === "developer-launch-mainline"/);
+    assert.doesNotMatch(html, /Unsupported routed handoff download/);
     assert.match(html, /Latest Launch Receipts/);
     assert.match(html, /latestLaunchReceipts/);
     assert.match(html, /renderLatestLaunchReceipts/);

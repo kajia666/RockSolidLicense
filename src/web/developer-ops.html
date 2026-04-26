@@ -1386,24 +1386,16 @@
       }
 
       async function downloadRouteReviewShortcut(item) {
-        if (!item?.source) {
+        if (!item?.key) {
           throw { code: "MISSING_ROUTE_FOCUS", message: "No routed handoff download is available yet." };
         }
-        const baseParams = filters();
-        const params = {
-          productCode: currentOpsTarget().productCode || requestedProductCode || "",
-          limit: baseParams.limit || 60,
-          ...(item.params && typeof item.params === "object" ? item.params : {})
-        };
-        if (item.source === "developer-launch-mainline") {
-          await downloadApiFile(
-            `/api/developer/launch-mainline/download${q({ ...params, format: item.format || "summary" })}`,
-            item.fileName || "launch-mainline-summary.txt",
-            item.label || "Launch mainline summary"
-          );
-          return;
+        if (!item.href) {
+          throw { code: "MISSING_ROUTE_FOCUS", message: "This routed handoff download is missing a service-provided href." };
         }
-        throw { code: "UNSUPPORTED_ROUTE_DOWNLOAD", message: `Unsupported routed handoff download: ${item.source}` };
+        await downloadApiFile(
+          item.href,
+          item.fileName || "launch-mainline-summary.txt"
+        );
       }
 
       function routeReviewSectionPrimaryItem(review = collectRouteReview(), section = "") {

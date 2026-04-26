@@ -13406,8 +13406,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(exportSnapshot.summaryText, /Route Review Remaining Matches:/);
     assert.match(exportSnapshot.summaryText, /Launch Mainline Handoff:/);
     assert.match(exportSnapshot.summaryText, /Open Launch Mainline@summary/);
+    assert.match(exportSnapshot.summaryText, /workspace=Open Launch Mainline@summary \| href=\/developer\/launch-mainline\?.*productCode=EXPORT_ALPHA/);
+    assert.match(exportSnapshot.summaryText, /summary=Launch mainline summary.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/);
     assert.match(exportSnapshot.summaryText, /Launch mainline rehearsal guide/i);
+    assert.match(exportSnapshot.summaryText, /rehearsal=Launch mainline rehearsal guide.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=rehearsal-guide/i);
     assert.match(exportSnapshot.summaryText, /First launch handoff/i);
+    assert.match(exportSnapshot.summaryText, /firstLaunch=First launch handoff.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=first-launch-handoff/i);
     assert.match(exportSnapshot.summaryText, /Top Reasons:/);
     assert.match(exportSnapshot.summaryText, /Focus Account Details:/);
     assert.match(exportSnapshot.summaryText, /Focus Sessions:/);

@@ -20107,11 +20107,15 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         });
       }
       if (routeReview.mainlineHandoff?.workspaceAction?.key) {
+        const mainlineHandoff = routeReview.mainlineHandoff;
+        const workspaceAction = mainlineHandoff.workspaceAction || {};
+        const handoffDownloads = mainlineHandoff.downloads || {};
+        const summaryDownload = handoffDownloads.summary || mainlineHandoff.recommendedDownload || null;
         lines.push("Launch Mainline Handoff:");
-        lines.push(`- workspace=${routeReview.mainlineHandoff.workspaceAction.label || "-"}@${routeReview.mainlineHandoff.workspaceAction.autofocus || "-"}`);
-        lines.push(`- summary=${routeReview.mainlineHandoff.downloads?.summary?.label || routeReview.mainlineHandoff.recommendedDownload?.label || "-"}`);
-        lines.push(`- rehearsal=${routeReview.mainlineHandoff.downloads?.rehearsalGuide?.label || "-"}`);
-        lines.push(`- firstLaunch=${routeReview.mainlineHandoff.downloads?.firstLaunchHandoff?.label || "-"}`);
+        lines.push(`- workspace=${workspaceAction.label || "-"}@${workspaceAction.autofocus || "-"} | href=${workspaceAction.href || "-"}`);
+        lines.push(`- summary=${formatLaunchHandoffDownloadText(summaryDownload, { fileSeparator: " | " })}`);
+        lines.push(`- rehearsal=${formatLaunchHandoffDownloadText(handoffDownloads.rehearsalGuide, { fileSeparator: " | " })}`);
+        lines.push(`- firstLaunch=${formatLaunchHandoffDownloadText(handoffDownloads.firstLaunchHandoff, { fileSeparator: " | " })}`);
       }
     }
     appendSnapshotEscalationSummaryLines(lines, overview);

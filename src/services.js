@@ -14522,6 +14522,76 @@ function buildDeveloperLaunchMainlinePayload({
   return payload;
 }
 
+function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const traceability = payload.postLaunchHandoffTraceability || {};
+  const opsFiles = traceability.opsFiles || {};
+  const nextFollowUp = traceability.nextFollowUp || {};
+  const nextFollowUpDownload = nextFollowUp.recommendedDownload && typeof nextFollowUp.recommendedDownload === "object"
+    ? nextFollowUp.recommendedDownload
+    : {};
+  const mainlineSummary = payload.mainlineSummary || {};
+  const recommendedDownloads = Array.isArray(mainlineSummary.recommendedDownloads)
+    ? mainlineSummary.recommendedDownloads
+    : [];
+  const lines = [
+    "RockSolid Developer Launch Mainline Handoff Download Routes",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || payload.filters?.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || payload.filters?.channel || "stable"}`,
+    "",
+    "Critical Handoff Routes:"
+  ];
+  const pushRoute = (key, label, path, download = {}) => {
+    lines.push(
+      `- ${key}: ${path || "-"}`
+      + ` | label=${label || download.label || download.key || "-"}`
+      + ` | file=${download.fileName || "-"}`
+      + ` | format=${download.format || "-"}`
+      + ` | source=${download.source || "-"}`
+      + ` | href=${download.href || "-"}`
+    );
+  };
+  pushRoute(
+    "launch-receipt-next-follow-up",
+    nextFollowUp.title || "Launch receipt next follow-up",
+    opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt",
+    {
+      key: nextFollowUp.downloadKey || nextFollowUpDownload.key || null,
+      label: nextFollowUpDownload.label || nextFollowUp.title || "Launch receipt next follow-up",
+      fileName: nextFollowUp.downloadFileName || nextFollowUpDownload.fileName || null,
+      format: nextFollowUp.downloadFormat || nextFollowUpDownload.format || null,
+      source: nextFollowUp.downloadSource || nextFollowUpDownload.source || null,
+      href: nextFollowUp.downloadHref || nextFollowUpDownload.href || null
+    }
+  );
+  pushRoute(
+    "initial-launch-ops-readiness",
+    "Initial launch ops readiness",
+    opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt",
+    mainlineSummary.initialLaunchOpsReadinessDownload || {}
+  );
+
+  lines.push("");
+  lines.push("Launch Mainline Recommended Downloads:");
+  if (recommendedDownloads.length) {
+    for (const item of recommendedDownloads) {
+      pushRoute(item?.key || "download", item?.label || item?.key || "download", item?.fileName || "-", item || {});
+    }
+  } else {
+    lines.push("- none");
+  }
+
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push("- Use this route map when reviewing the Launch Mainline zip offline.");
+  lines.push("- Prefer the href values here over reconstructing download URLs from source and format names.");
+  lines.push("- Keep this file with SHA256SUMS.txt so handoff reviewers can verify both content and download routes.");
+  return lines.join("\n");
+}
+
 function buildDeveloperLaunchMainlineFiles(payload = {}) {
   const files = [
     {
@@ -14617,6 +14687,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
     payload.postLaunchHandoffIndexText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "handoff-download-routes.txt",
+    buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload)
   );
   appendLaunchWorkflowFileIfPresent(
     files,

@@ -14050,6 +14050,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/stabilization-handoff\.txt/);
+    assert.match(launchMainlineTraceabilityChecksums.body, /handoff-download-routes\.txt/);
+
+    const launchMainlineTraceabilityZip = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=zip",
+      operatorSession.token
+    );
+    assert.match(launchMainlineTraceabilityZip.contentType || "", /^application\/zip/);
+    assert.equal(launchMainlineTraceabilityZip.body.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    const launchMainlineTraceabilityZipText = launchMainlineTraceabilityZip.body.toString("latin1");
+    assert.match(launchMainlineTraceabilityZipText, /handoff-download-routes\.txt/);
+    assert.match(launchMainlineTraceabilityZipText, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(launchMainlineTraceabilityZipText, /ops\/launch-receipt-next-follow-up\.txt/);
+    assert.match(launchMainlineTraceabilityZipText, /format=launch-receipt-next-follow-up/);
 
     const launchMainlineTraceability = await getJson(
       baseUrl,

@@ -10587,6 +10587,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
     routeReason: routedRouteReason
   });
   const scopedOpsParams = {
+    ...(routeProductCode ? { productCode: routeProductCode } : {}),
+    ...(routeChannel ? { channel: routeChannel } : {}),
     reviewMode,
     ...(filters.username ? { username: filters.username } : {}),
     ...(filters.search ? { search: filters.search } : {}),

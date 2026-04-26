@@ -25,6 +25,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
 - Launch smoke handoff continuity: the CLI `launch:smoke` first-wave handoff now lands in Launch Review and Developer Ops with `source=launch-smoke` / `handoff=first-wave` preserved in route-focus UI, payload filters, exported summaries, and follow-up workspace links.
+- Recommended download routing: Launch Review and Launch Smoke now consume service-provided download `href` values for recommended downloads, so those pages no longer duplicate source/format mapping tables for the first-wave handoff chain.
 
 Estimated initial pilot-launch readiness: 85%-90%.
 
@@ -34,8 +35,8 @@ This estimate means the core flow is mostly ready for a controlled first launch,
 
 Work should continue in short backend/API-first slices. Each slice should end with a commit, targeted verification, and a note about the next slice.
 
-1. Audit remaining route/download key mappings outside the launch-smoke handoff path.
-   Confirm every `recommendedDownload.key` used by release, workflow, review, smoke, mainline, and ops can round-trip through route focus without falling back to the wrong source or format.
+1. Audit the smaller remaining route/download key surface outside Launch Mainline, Launch Review, and Launch Smoke.
+   Confirm release, workflow, and ops-only follow-up downloads can round-trip through service-provided `href` values without falling back to frontend source/format guesses.
 
 2. Tighten initial launch ops readiness after real first-launch actions.
    Verify that launch bootstrap, first batch setup, inventory refill, first-wave ops sweep, and closeout/stabilization actions all refresh the same readiness chain.

@@ -953,99 +953,11 @@
         if (!item?.key) {
           throw new Error("Generate Launch Review first so the recommended downloads can be resolved.");
         }
-        const target = currentReviewTarget();
-        const fallbackFormats = {
-          launch_smoke_kit_summary: "summary",
-          launch_review_summary: "summary",
-          launch_review_ops_summary: "summary",
-          launch_mainline_summary: "summary",
-          launch_mainline_rehearsal_guide: "rehearsal-guide",
-          launch_mainline_zip: "zip",
-          launch_mainline_checksums: "checksums",
-          launch_mainline_initial_launch_ops_readiness: "initial-launch-ops-readiness",
-          launch_mainline_operations_handoff: "operations-handoff",
-          launch_mainline_post_launch_sweep_handoff: "post-launch-sweep-handoff",
-          launch_mainline_closeout_handoff: "closeout-handoff",
-          launch_mainline_stabilization_handoff: "stabilization-handoff",
-          launch_handoff_zip: "handoff-zip",
-          launch_handoff_checksums: "handoff-checksums",
-          launch_workflow_zip: "zip",
-          launch_summary: "summary",
-          launch_checklist: "checklist",
-          release_summary: "release-summary",
-          integration_env: "integration-env",
-          integration_host_config: "integration-host-config",
-          integration_host_skeleton: "integration-host-skeleton",
-          integration_cmake: "integration-cmake",
-          integration_vs2022_guide: "integration-vs2022-guide",
-          integration_vs2022_sln: "integration-vs2022-sln",
-          integration_vs2022: "integration-vs2022",
-          integration_vs2022_filters: "integration-vs2022-filters",
-          integration_vs2022_props: "integration-vs2022-props",
-          integration_vs2022_local_props: "integration-vs2022-local-props",
-          integration_cpp: "integration-cpp",
-          integration_checksums: "integration-checksums",
-          ops_primary_summary: "route-review-primary",
-          ops_primary_account_summary: "route-review-primary",
-          ops_primary_entitlement_summary: "route-review-primary",
-          ops_primary_session_summary: "route-review-primary",
-          ops_primary_device_summary: "route-review-primary",
-          ops_route_next_summary: "route-review-next",
-          ops_remaining_summary: "route-review-remaining"
-        };
-        const requestedFormat = String(item.format || fallbackFormats[item.key] || "summary").trim() || "summary";
-        if (item.source === "developer-launch-review") {
-          return downloadLaunchReview(
-            requestedFormat,
-            item.fileName || "developer-launch-review-summary.txt",
-            item.label || "Launch review summary"
-          );
-        }
-        if (item.source === "developer-ops") {
-          return downloadApiFile(
-            `/api/developer/ops/export/download${q({
-              productCode: target.productCode,
-              format: requestedFormat,
-              reviewMode: target.reviewMode,
-              ...(item.params && typeof item.params === "object" ? item.params : {})
-            })}`,
-            item.fileName || "developer-ops-summary.txt",
-            item.label || "Routed ops summary"
-          );
-        }
-        if (item.source === "developer-launch-mainline") {
-          return downloadApiFile(
-            `/api/developer/launch-mainline/download${q({
-              productId: target.productId,
-              productCode: target.productCode,
-              channel: target.channel,
-              format: requestedFormat,
-              ...(item.params && typeof item.params === "object" ? item.params : {})
-            })}`,
-            item.fileName || "developer-launch-mainline-summary.txt",
-            item.label || "Launch mainline summary"
-          );
-        }
-        if (item.source === "developer-launch-smoke-kit") {
-          return downloadApiFile(
-            `/api/developer/launch-smoke-kit/download${q({
-              productId: target.productId,
-              productCode: target.productCode,
-              channel: target.channel,
-              format: requestedFormat,
-              ...(item.params && typeof item.params === "object" ? item.params : {})
-            })}`,
-            item.fileName || "developer-launch-smoke-kit-summary.txt",
-            item.label || "Launch smoke kit summary"
-          );
+        if (!item.href) {
+          throw new Error("This launch-review download is missing a service-provided href.");
         }
         return downloadApiFile(
-          `/api/developer/launch-workflow/download${q({
-            productId: target.productId,
-            productCode: target.productCode,
-            channel: target.channel,
-            format: requestedFormat
-          })}`,
+          item.href,
           item.fileName || "launch-workflow.txt",
           item.label || "Launch workflow download"
         );

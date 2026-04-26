@@ -6382,6 +6382,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Initial Launch Ops Gate:/);
       assert.match(launchMainline.summaryText, /- decision: HOLD/);
       assert.match(launchMainline.summaryText, /- canEnterInitialLaunch: false/);
+      assert.match(
+        launchMainline.summaryText,
+        /Initial Launch Ops Gate:[\s\S]*- blockerList:\n  - \[launch_receipt\].*download=launch_mainline_first_launch_handoff.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=first-launch-handoff/
+      );
       assert.match(launchMainline.summaryText, /Primary Mainline Action:/);
       assert.match(launchMainline.summaryText, /Mainline Recommended Download:/);
       assert.match(launchMainline.summaryText, /Mainline Continuation:/);
@@ -6442,6 +6446,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainlineSummaryDownload.body, /Initial Launch Ops Gate:/);
       assert.match(launchMainlineSummaryDownload.body, /canEnterInitialLaunch: false/);
+      assert.match(
+        launchMainlineSummaryDownload.body,
+        /Initial Launch Ops Gate:[\s\S]*- blockerList:\n  - \[launch_receipt\].*download=launch_mainline_first_launch_handoff.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=first-launch-handoff/
+      );
       assert.match(launchMainlineSummaryDownload.body, /Primary Mainline Action:/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Hero Controls:/);
       assert.match(launchMainlineSummaryDownload.body, /Download Launch Mainline Zip/);

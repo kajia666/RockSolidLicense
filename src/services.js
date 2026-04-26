@@ -6187,6 +6187,38 @@ function appendInitialLaunchOpsReadinessTextLines(lines = [], readiness = null, 
   const warnings = Array.isArray(gate.warnings) ? gate.warnings : [];
   const requiredActions = Array.isArray(gate.requiredActions) ? gate.requiredActions : [];
   const primaryDownload = download || gate.primaryDownload || readiness.primaryDownload || null;
+  const firstLaunchHandoffDownload = readiness.firstLaunchHandoffDownload || null;
+  const resolveGateItemDownload = (item = {}) => {
+    if (item.recommendedDownload && typeof item.recommendedDownload === "object") {
+      return item.recommendedDownload;
+    }
+    const downloadKey = String(item.downloadKey || "").trim();
+    const candidates = [
+      primaryDownload,
+      readiness.primaryDownload,
+      gate.primaryDownload,
+      firstLaunchHandoffDownload,
+      readiness.nextFollowUp?.recommendedDownload,
+      gate.nextAction?.recommendedDownload
+    ].filter((candidate) => candidate && typeof candidate === "object");
+    const matched = downloadKey
+      ? candidates.find((candidate) => candidate.key === downloadKey)
+      : null;
+    if (matched) {
+      return matched;
+    }
+    return item.stage === "launch_receipt" ? firstLaunchHandoffDownload : null;
+  };
+  const formatGateItemDownloadText = (item = {}) => {
+    const resolvedDownload = resolveGateItemDownload(item);
+    const downloadKey = item.downloadKey || resolvedDownload?.key || "-";
+    return [
+      `download=${downloadKey}`,
+      item.downloadFileName || resolvedDownload?.fileName ? `file=${item.downloadFileName || resolvedDownload?.fileName}` : "",
+      item.downloadFormat || resolvedDownload?.format ? `format=${item.downloadFormat || resolvedDownload?.format}` : "",
+      item.downloadHref || resolvedDownload?.href ? `href=${item.downloadHref || resolvedDownload?.href}` : ""
+    ].filter(Boolean).join(" | ");
+  };
   lines.push("");
   lines.push("Initial Launch Ops Gate:");
   lines.push(`- status: ${String(readiness.status || gate.status || "unknown").toUpperCase()}`);
@@ -6200,7 +6232,7 @@ function appendInitialLaunchOpsReadinessTextLines(lines = [], readiness = null, 
   if (blockers.length) {
     lines.push("- blockerList:");
     for (const item of blockers.slice(0, 3)) {
-      lines.push(`  - [${item.stage || "-"}] ${item.title || item.key || "blocker"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"}`);
+      lines.push(`  - [${item.stage || "-"}] ${item.title || item.key || "blocker"} | operation=${item.operation || "-"} | action=${item.actionKey || "-"} | ${formatGateItemDownloadText(item)}`);
     }
   }
 }

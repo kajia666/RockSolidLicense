@@ -6201,6 +6201,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
       assert.equal(launchReview.reviewSummary.routeFocus?.title, "Continue launch review sweep");
       assert.equal(launchReview.reviewSummary.routeFocus?.summary, "Continue review receipt follow-up");
+      assert.equal(launchReview.reviewSummary.routeFocus?.operation, "record_post_launch_ops_sweep");
+      assert.equal(launchReview.reviewSummary.routeFocus?.actionKey, "launch_review_record_post_launch_ops_sweep");
+      assert.equal(launchReview.reviewSummary.routeFocus?.downloadKey, "launch_review_post_launch_sweep_handoff");
       assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
       assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "action" && item.value === "launch_review_record_post_launch_ops_sweep"));
       assert.ok(launchReview.reviewSummary.routeFocus?.tags?.some((item) => item.label === "download" && item.value === "launch_review_post_launch_sweep_handoff"));
@@ -6225,6 +6228,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /operation=record_post_launch_ops_sweep/);
       assert.match(launchReview.summaryText, /action=launch_review_record_post_launch_ops_sweep/);
       assert.match(launchReview.summaryText, /download=launch_review_post_launch_sweep_handoff/);
+      assert.match(launchReview.summaryText, /download=launch_review_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
+      assert.match(launchReview.summaryText, /control: Download Review Summary \| download=.*href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
+      assert.match(launchReview.summaryText, /Launch Review Action Plan:[\s\S]*download=.*href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
+      assert.match(launchReview.summaryText, /Launch Review Focus Targets:[\s\S]*download=.*href=.*\/api\/developer\/ops\/export\/download\?.*format=summary/);
       assert.match(launchReview.summaryText, /source=launch-smoke/);
       assert.match(launchReview.summaryText, /handoff=first-wave/);
       assert.match(launchReview.summaryText, /action=Open (Account|Entitlement|Session|Device) Control/);
@@ -6249,6 +6256,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Launch Review Route Focus:/);
       assert.match(launchReviewSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff/);
+      assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
+      assert.match(launchReviewSummaryDownload.body, /control: Download Review Summary \| download=.*href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
       assert.match(launchReviewSummaryDownload.body, /source=launch-smoke/);
       assert.match(launchReviewSummaryDownload.body, /handoff=first-wave/);
 
@@ -6313,6 +6322,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchMainline.filters.operation, "record_post_launch_ops_sweep");
       assert.equal(launchMainline.filters.actionKey, "launch_mainline_record_post_launch_ops_sweep");
       assert.equal(launchMainline.filters.downloadKey, "launch_mainline_post_launch_sweep_handoff");
+      assert.equal(launchMainline.mainlineSummary.routeFocus?.operation, "record_post_launch_ops_sweep");
+      assert.equal(launchMainline.mainlineSummary.routeFocus?.actionKey, "launch_mainline_record_post_launch_ops_sweep");
+      assert.equal(launchMainline.mainlineSummary.routeFocus?.downloadKey, "launch_mainline_post_launch_sweep_handoff");
       assert.ok(launchMainline.mainlineSummary.routeFocus?.tags?.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
       assert.ok(launchMainline.mainlineSummary.routeFocus?.tags?.some((item) => item.label === "action" && item.value === "launch_mainline_record_post_launch_ops_sweep"));
       assert.ok(launchMainline.mainlineSummary.routeFocus?.tags?.some((item) => item.label === "download" && item.value === "launch_mainline_post_launch_sweep_handoff"));
@@ -6381,6 +6393,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /operation=record_post_launch_ops_sweep/);
       assert.match(launchMainline.summaryText, /action=launch_mainline_record_post_launch_ops_sweep/);
       assert.match(launchMainline.summaryText, /download=launch_mainline_post_launch_sweep_handoff/);
+      assert.match(launchMainline.summaryText, /download=launch_mainline_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-sweep-handoff/);
+      assert.match(launchMainline.summaryText, /Mainline Recommended Download: .*href=.*\/api\/developer\/launch-mainline\/download\?/);
+      assert.match(launchMainline.summaryText, /Mainline Continuation:[\s\S]*recommendedDownload: .*href=.*\/api\/developer\//);
+      assert.match(launchMainline.summaryText, /control: Download Launch Mainline Summary \| download=.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/);
       assert.match(launchMainline.summaryText, /Run Routed Operation/);
       assert.match(launchMainline.summaryText, /Mainline Next Actions:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
@@ -6408,6 +6424,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Post-Launch Lifecycle:/);
       assert.match(launchMainline.summaryText, /Lifecycle Phase Statuses:/);
       assert.match(launchMainline.summaryText, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
+      assert.match(launchMainline.summaryText, /Mainline Recommended Downloads:[\s\S]*Launch mainline post-launch sweep handoff.*href=.*format=post-launch-sweep-handoff/i);
       assert.match(launchMainline.summaryText, /Launch Mainline Rehearsal Guide:/);
       assert.match(launchMainline.summaryText, /Phase 1: Release And Workflow Precheck/);
       assert.match(launchMainline.summaryText, /Record Launch Rehearsal Run/);
@@ -6429,6 +6446,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Mainline Route Focus:/);
       assert.match(launchMainlineSummaryDownload.body, /Continue post-launch sweep/);
       assert.match(launchMainlineSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
+      assert.match(launchMainlineSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-sweep-handoff/);
+      assert.match(launchMainlineSummaryDownload.body, /control: Download Launch Mainline Summary \| download=.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/);
       assert.match(launchMainlineSummaryDownload.body, /Run Routed Operation/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);
@@ -8859,6 +8878,9 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
     assert.equal(smokeKit.smokeSummary?.routeFocus?.title, "Continue launch smoke sweep");
     assert.equal(smokeKit.smokeSummary?.routeFocus?.summary, "Continue smoke receipt follow-up");
+    assert.equal(smokeKit.smokeSummary?.routeFocus?.operation, "record_post_launch_ops_sweep");
+    assert.equal(smokeKit.smokeSummary?.routeFocus?.actionKey, "launch_smoke_record_post_launch_ops_sweep");
+    assert.equal(smokeKit.smokeSummary?.routeFocus?.downloadKey, "launch_smoke_summary");
     assert.ok(smokeKit.smokeSummary?.routeFocus?.tags?.some((item) => item.label === "operation" && item.value === "record_post_launch_ops_sweep"));
     assert.ok(smokeKit.smokeSummary?.routeFocus?.tags?.some((item) => item.label === "action" && item.value === "launch_smoke_record_post_launch_ops_sweep"));
     assert.ok(smokeKit.smokeSummary?.routeFocus?.tags?.some((item) => item.label === "download" && item.value === "launch_smoke_summary"));
@@ -8870,6 +8892,9 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(smokeKit.summaryText || "", /operation=record_post_launch_ops_sweep/);
     assert.match(smokeKit.summaryText || "", /action=launch_smoke_record_post_launch_ops_sweep/);
     assert.match(smokeKit.summaryText || "", /download=launch_smoke_summary/);
+    assert.match(smokeKit.summaryText || "", /download=launch_smoke_summary \| href=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/);
+    assert.match(smokeKit.summaryText || "", /control: Download Smoke Summary \| download=.*href=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/);
+    assert.match(smokeKit.summaryText || "", /Launch Smoke Action Plan:[\s\S]*Launch mainline rehearsal guide.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=rehearsal-guide/i);
     assert.match(smokeKit.summaryText || "", /Launch Mainline Gate:/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Primary Review Target:/);
     assert.match(smokeKit.summaryText || "", /action=Open (Account|Entitlement|Session|Device) Control/);
@@ -8886,6 +8911,8 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Route Focus:/);
     assert.match(smokeKitSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
     assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary/);
+    assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary \| href=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/);
+    assert.match(smokeKitSummaryDownload.body, /control: Download Smoke Summary \| download=.*href=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

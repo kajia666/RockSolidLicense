@@ -2006,6 +2006,20 @@ function findRouteFocusDownload(routeFocus = {}) {
     || null;
 }
 
+function appendRouteFocusHandoffTextLines(lines = [], routeFocus = {}) {
+  if (!Array.isArray(lines) || !routeFocus || typeof routeFocus !== "object") {
+    return;
+  }
+  const routeFocusDownload = findRouteFocusDownload(routeFocus);
+  lines.push(`- operation=${routeFocus.operation || "-"}`);
+  lines.push(`- action=${routeFocus.actionKey || "-"}`);
+  lines.push(
+    `- download=${routeFocus.downloadKey || routeFocusDownload?.key || "-"}`
+    + `${routeFocusDownload?.href ? ` | href=${routeFocusDownload.href}` : ""}`
+    + `${routeFocusDownload?.format ? ` | format=${routeFocusDownload.format}` : ""}`
+  );
+}
+
 function buildReleasePackageSummaryText(manifest = {}) {
   const project = manifest.project || {};
   const release = manifest.release || {};
@@ -2096,13 +2110,10 @@ function buildReleasePackageSummaryText(manifest = {}) {
   }
 
   if (routeFocus.title || routeFocus.operation || routeFocus.actionKey || routeFocus.downloadKey) {
-    const routeFocusDownload = findRouteFocusDownload(routeFocus);
     lines.push("Release Route Focus:");
     lines.push(`- title: ${routeFocus.title || "-"}`);
     lines.push(`- summary: ${routeFocus.summary || "-"}`);
-    lines.push(`- operation=${routeFocus.operation || "-"}`);
-    lines.push(`- action=${routeFocus.actionKey || "-"}`);
-    lines.push(`- download=${routeFocus.downloadKey || routeFocusDownload?.key || "-"}${routeFocusDownload?.href ? ` | href=${routeFocusDownload.href}` : ""}${routeFocusDownload?.format ? ` | format=${routeFocusDownload.format}` : ""}`);
+    appendRouteFocusHandoffTextLines(lines, routeFocus);
     if (Array.isArray(routeFocus.tags) && routeFocus.tags.length) {
       lines.push(`- tags: ${routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
     }
@@ -3569,6 +3580,9 @@ function inferLaunchWorkflowDownloadSource(key = "", source = "") {
   }
   if (/^launch_smoke_(accounts|entitlements|sessions|audit)_summary$/.test(normalizedKey)) {
     return "developer-ops";
+  }
+  if (normalizedKey === "launch_smoke_summary") {
+    return "developer-launch-smoke-kit";
   }
   if (normalizedKey.startsWith("launch_review_")) {
     return "developer-launch-review";
@@ -10401,6 +10415,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     lines.push("Launch Review Route Focus:");
     lines.push(`- title: ${reviewSummary.routeFocus.title || "-"}`);
     lines.push(`- summary: ${reviewSummary.routeFocus.summary || "-"}`);
+    appendRouteFocusHandoffTextLines(lines, reviewSummary.routeFocus);
     if (Array.isArray(reviewSummary.routeFocus.tags) && reviewSummary.routeFocus.tags.length) {
       lines.push(`- tags: ${reviewSummary.routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
     }
@@ -10409,7 +10424,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
         lines.push(
           `- control: ${control?.label || control?.kind || "Action"}`
           + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
-          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
         );
       }
     }
@@ -10421,7 +10436,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       lines.push(
         `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}`
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
-        + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+        + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
       );
     }
   }
@@ -10434,7 +10449,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
       + `${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}`
       + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
-      + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+      + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
     );
   }
   if (Array.isArray(reviewSummary.reviewTargets) && reviewSummary.reviewTargets.length) {
@@ -10446,7 +10461,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
         + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
         + `${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}`
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
-        + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+        + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
       );
     }
   }
@@ -10465,7 +10480,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     lines.push("");
     lines.push("Launch Review Recommended Downloads:");
     for (const item of reviewSummary.recommendedDownloads) {
-      lines.push(`- ${item.label || item.key || "download"} | ${item.fileName || "-"}`);
+      lines.push(`- ${formatLaunchHandoffDownloadText(item, { fileSeparator: " | " })}`);
     }
   }
 
@@ -11265,6 +11280,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
     pushRecommendedDownload(item);
   }
   const orderedRecommendedDownloads = frontloadLaunchMainlineRehearsalDownload(recommendedDownloads);
+  const routeFocusDownload = routedDownloadKey
+    ? createLaunchWorkflowDownloadShortcut(
+        routedDownloadKey,
+        `${sanitizeExportNameSegment(routedDownloadKey, "launch-review-route")}.txt`,
+        routedRouteTitle || "Routed launch review handoff download",
+        {
+          source: "developer-launch-review",
+          format: "summary",
+          params: scopedOpsParams
+        }
+      )
+    : null;
 
   const preferredReviewTarget = visibleReviewTargets[0] || null;
   const recommendedWorkspace = (actionPlan.find((item) => item.priority === "primary" && item.workspaceAction)?.workspaceAction)
@@ -11281,6 +11308,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
       : routeProductCode
       ? `Recheck ${routeProductCode} on lane ${routeChannel} with the routed launch review and ops filters intact.`
       : "Use the launch review handoff to preserve review filters, ops scope, and follow-up downloads."),
+    operation: routedOperation || null,
+    actionKey: routedActionKey || null,
+    downloadKey: routedDownloadKey || null,
+    routeTitle: routedRouteTitle || null,
+    routeReason: routedRouteReason || null,
     tags: [
       routeProductCode ? { label: "project", value: routeProductCode, strong: true } : null,
       routeChannel ? { label: "channel", value: routeChannel, strong: false } : null,
@@ -11309,8 +11341,15 @@ function buildDeveloperLaunchReviewSummaryPayload({
         kind: "download",
         label: "Download Review Summary",
         recommendedDownload: reviewDownload
-      }
-    ].filter((item) => item.workspaceAction || item.recommendedDownload)
+      },
+      routeFocusDownload
+        ? {
+            kind: "download",
+            label: routeFocusDownload.label || "Routed launch review handoff download",
+            recommendedDownload: routeFocusDownload
+          }
+        : null
+    ].filter((item) => item?.workspaceAction || item?.recommendedDownload)
   };
   const reviewStatus = workflowBlocked
     ? "block"
@@ -12286,11 +12325,28 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads
   });
+  const routeFocusDownload = routedDownloadKey
+    ? createLaunchWorkflowDownloadShortcut(
+        routedDownloadKey,
+        `${sanitizeExportNameSegment(routedDownloadKey, "launch-smoke-route")}.txt`,
+        routedRouteTitle || "Routed launch smoke handoff download",
+        {
+          source: "developer-launch-smoke-kit",
+          format: "summary",
+          params: smokeRouteParams
+        }
+      )
+    : null;
   const routeFocus = {
     title: routedRouteTitle || (routeProductCode ? `Launch smoke handoff for ${routeProductCode}` : "Launch smoke handoff"),
     summary: routedRouteReason || (routeProductCode
       ? `Continue the internal smoke path for ${routeProductCode} on lane ${routeChannel} while preserving routed follow-up context.`
       : "Use the launch smoke handoff to preserve smoke filters, runtime follow-up context, and smoke downloads."),
+    operation: routedOperation || null,
+    actionKey: routedActionKey || null,
+    downloadKey: routedDownloadKey || null,
+    routeTitle: routedRouteTitle || null,
+    routeReason: routedRouteReason || null,
     tags: [
       routeProductCode ? { label: "project", value: routeProductCode, strong: true } : null,
       routeChannel ? { label: "channel", value: routeChannel, strong: false } : null,
@@ -12313,8 +12369,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         kind: "download",
         label: "Download Smoke Summary",
         recommendedDownload: launchSmokeKitSummaryDownload
-      }
-    ].filter((item) => item.workspaceAction || item.recommendedDownload)
+      },
+      routeFocusDownload
+        ? {
+            kind: "download",
+            label: routeFocusDownload.label || "Routed launch smoke handoff download",
+            recommendedDownload: routeFocusDownload
+          }
+        : null
+    ].filter((item) => item?.workspaceAction || item?.recommendedDownload)
   };
 
   return {
@@ -12379,6 +12442,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     lines.push("Launch Smoke Route Focus:");
     lines.push(`- title: ${smokeSummary.routeFocus.title || "-"}`);
     lines.push(`- summary: ${smokeSummary.routeFocus.summary || "-"}`);
+    appendRouteFocusHandoffTextLines(lines, smokeSummary.routeFocus);
     if (Array.isArray(smokeSummary.routeFocus.tags) && smokeSummary.routeFocus.tags.length) {
       lines.push(`- tags: ${smokeSummary.routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
     }
@@ -12387,7 +12451,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
         lines.push(
           `- control: ${control?.label || control?.kind || "Action"}`
           + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
-          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
         );
       }
     }
@@ -12438,7 +12502,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     lines.push("Launch Smoke Action Plan:");
     for (const item of smokeSummary.actionPlan) {
       lines.push(
-        `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}:${item.recommendedDownload.fileName || "-"}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
+        `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
       );
     }
   }
@@ -12452,7 +12516,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
       + `${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}`
       + `${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}`
       + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
-      + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+      + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
     );
   }
 
@@ -12461,7 +12525,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     lines.push("Launch Smoke Review Targets:");
     for (const item of smokeSummary.reviewTargets) {
       lines.push(
-        `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+        `- ${item.label || item.key || "target"} | count=${item.count ?? 0} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}${item.routeActionLabel ? ` | action=${item.routeActionLabel}` : ""}${item.recommendedControl?.label ? ` | control=${item.recommendedControl.label}` : ""}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
       );
     }
   }
@@ -13362,6 +13426,18 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       }))
     }
   ];
+  const routeFocusDownload = routedDownloadKey
+    ? createLaunchWorkflowDownloadShortcut(
+        routedDownloadKey,
+        `${sanitizeExportNameSegment(routedDownloadKey, "launch-mainline-route")}.txt`,
+        routedRouteTitle || "Routed launch mainline handoff download",
+        {
+          source: "developer-launch-mainline",
+          format: inferRouteDownloadFormat(routedDownloadKey),
+          params
+        }
+      )
+    : null;
   const routeFocus = {
     title: routedRouteTitle || (params.productCode
       ? `Launch mainline handoff for ${params.productCode}`
@@ -13369,6 +13445,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     summary: routedRouteReason || (params.productCode
       ? `Keep ${params.productCode} on the unified launch-mainline path across release, workflow, review, smoke, and ops before widening rollout.`
       : "Use the unified launch-mainline handoff to continue across release, workflow, review, smoke, and ops."),
+    operation: routedOperation || null,
+    actionKey: routedActionKey || null,
+    downloadKey: routedDownloadKey || null,
+    routeTitle: routedRouteTitle || null,
+    routeReason: routedRouteReason || null,
     tags: [
       params.productCode
         ? { label: "project", value: params.productCode, strong: true }
@@ -13382,6 +13463,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     ].filter(Boolean).concat(routedOperationTags),
     controls: [
       routedOperationControl,
+      routeFocusDownload
+        ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: routeFocusDownload.label || "Routed launch mainline handoff download",
+            recommendedDownload: routeFocusDownload
+          }, params)
+        : null,
       recommendedWorkspace
         ? ensureLaunchMainlineControlHrefs({
             kind: "workspace",
@@ -14104,13 +14192,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     mainlineSummary.initialLaunchOpsReadinessDownload
   );
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
-  lines.push(`Mainline Recommended Download: ${mainlineSummary.recommendedDownload?.label || mainlineSummary.recommendedDownload?.key || "-"}`);
+  lines.push(`Mainline Recommended Download: ${formatLaunchHandoffDownloadText(mainlineSummary.recommendedDownload, { fileSeparator: " | " })}`);
   if (mainlineSummary.continuation) {
     lines.push("Mainline Continuation:");
     lines.push(`- title: ${mainlineSummary.continuation.title || "-"}`);
     lines.push(`- summary: ${mainlineSummary.continuation.summary || "-"}`);
     lines.push(`- workspace: ${formatWorkspaceActionText(mainlineSummary.continuation.workspaceAction)}`);
-    lines.push(`- recommendedDownload: ${mainlineSummary.continuation.recommendedDownload?.label || mainlineSummary.continuation.recommendedDownload?.key || "-"}`);
+    lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(mainlineSummary.continuation.recommendedDownload, { fileSeparator: " | " })}`);
   }
   if (Array.isArray(mainlineSummary.overviewCards) && mainlineSummary.overviewCards.length) {
     lines.push("Mainline Overview Cards:");
@@ -14124,7 +14212,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
           lines.push(
             `  control: ${control?.label || control?.kind || "Action"}`
             + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
-            + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+            + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
           );
         }
       }
@@ -14136,7 +14224,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       lines.push(
         `- ${item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action"}`
         + `${item?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
-        + `${item?.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+        + `${item?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
       );
     }
   }
@@ -14144,6 +14232,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("Mainline Route Focus:");
     lines.push(`- title: ${mainlineSummary.routeFocus.title || "-"}`);
     lines.push(`- summary: ${mainlineSummary.routeFocus.summary || "-"}`);
+    appendRouteFocusHandoffTextLines(lines, mainlineSummary.routeFocus);
     if (Array.isArray(mainlineSummary.routeFocus.tags) && mainlineSummary.routeFocus.tags.length) {
       lines.push(`- tags: ${mainlineSummary.routeFocus.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
     }
@@ -14152,7 +14241,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         lines.push(
           `- control: ${control?.label || control?.kind || "Action"}`
           + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
-          + `${control?.recommendedDownload ? ` | download=${control.recommendedDownload.label || control.recommendedDownload.key || "-"}` : ""}`
+          + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
           + `${control?.setupAction ? ` | setup=${control.setupAction.label || control.setupAction.key || "-"}@${control.setupAction.mode || "recommended"}:${control.setupAction.operation || "-"}` : ""}`
         );
       }
@@ -14203,7 +14292,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + ` | ${String(productionNextEvidenceAction.status || "review").toUpperCase()}`
       + ` | ${productionNextEvidenceAction.summary || "-"}`
       + `${productionNextEvidenceAction.setupAction ? ` | setup=${productionNextEvidenceAction.setupAction.label || productionNextEvidenceAction.setupAction.key || "-"}@${productionNextEvidenceAction.setupAction.mode || "recommended"}:${productionNextEvidenceAction.setupAction.operation || "first_batch_setup"}` : ""}`
-      + `${productionNextEvidenceAction.recommendedDownload ? ` | download=${productionNextEvidenceAction.recommendedDownload.label || productionNextEvidenceAction.recommendedDownload.key || "-"}` : ""}`
+      + `${productionNextEvidenceAction.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(productionNextEvidenceAction.recommendedDownload)}` : ""}`
     );
   }
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
@@ -14343,7 +14432,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       lines.push(
         `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${String(item.status || "review").toUpperCase()} | ${item.summary || "-"}`
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
-        + `${item.recommendedDownload ? ` | download=${item.recommendedDownload.label || item.recommendedDownload.key || "-"}` : ""}`
+        + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
       );
     }
   }
@@ -14351,7 +14440,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     lines.push("Mainline Recommended Downloads:");
     for (const item of mainlineSummary.recommendedDownloads) {
-      lines.push(`- ${item.label || item.key || "download"} | ${item.fileName || "-"}`);
+      lines.push(`- ${formatLaunchHandoffDownloadText(item, { fileSeparator: " | " })}`);
     }
   }
   return lines.join("\n").trimEnd();

@@ -41,6 +41,16 @@ npm.cmd --silent run launch:smoke -- --json --product-code SMOKE_ALPHA
 
 By default this command starts an ephemeral in-memory app, creates a smoke developer, creates a smoke project and policy, runs first batch setup, downloads the first-wave recommendation summary and checksums, confirms the first-wave handoff, and verifies the Developer Ops handoff index. This is the safest preflight for local or CI use because it does not touch persistent data.
 
+When the preflight passes, the JSON output includes a `handoff` block. That block is the shortest launch-duty bridge into the next manual review step:
+
+- `handoff.nextWorkspace` points to the scoped Launch Review workspace.
+- `handoff.reviewWorkspaces.developerOps` points to the scoped Developer Ops watch.
+- `handoff.downloads.firstWaveSummary` and `handoff.downloads.firstWaveChecksums` point to the first-wave evidence files.
+- `handoff.downloads.opsHandoffIndex` points to the Developer Ops handoff index.
+- `handoff.operatorChecklist` lists the next four launch-duty actions in order: open Launch Review, verify first-wave confirmation evidence, download the Ops handoff index, and continue the Developer Ops watch.
+
+In local ephemeral mode these entries use routes only because the temporary app shuts down after the script exits. In remote `--base-url` mode they also include absolute `href` values.
+
 To run the same write-path preflight against an already running staging API, pass a base URL and explicit write consent:
 
 ```powershell

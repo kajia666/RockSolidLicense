@@ -46,7 +46,7 @@ Work should continue in short backend/API-first slices. Each slice should end wi
    Keep full tests deferred until the remaining route/download and first-wave action gaps are smaller, but run grouped tests around release package, launch mainline actions, developer ops export, and launch workflow/review/smoke handoff.
 
 5. Prepare staging launch rehearsal.
-   Use a real server-like environment, non-default secrets, HTTPS, persistent storage, backup/restore rehearsal, and one test software-author project. The command-line `launch:smoke` preflight can now run locally against an ephemeral in-memory app or against a staging `--base-url` with explicit `--allow-live-writes`.
+   Use a real server-like environment, non-default secrets, HTTPS, persistent storage, backup/restore rehearsal, and one test software-author project. The command-line `launch:smoke` preflight can now run locally against an ephemeral in-memory app or against a staging `--base-url` with explicit `--allow-live-writes`; its `handoff` output now carries the scoped Launch Review route, Developer Ops route, first-wave downloads, Ops handoff index, and a four-step operator checklist.
 
 ## Overall Project Plan
 

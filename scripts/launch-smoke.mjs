@@ -194,12 +194,168 @@ function buildQuery(params) {
   return query.toString();
 }
 
+function buildRoute(pathname, params = {}) {
+  const query = buildQuery(params);
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+function buildHandoffLink(baseUrl, route) {
+  return {
+    route,
+    href: baseUrl ? `${baseUrl}${route}` : null
+  };
+}
+
 function parseAttachmentFileName(contentDisposition) {
   if (!contentDisposition) {
     return null;
   }
   const match = /filename="([^"]+)"/i.exec(contentDisposition);
   return match?.[1] ?? null;
+}
+
+function buildLaunchDutyHandoff({
+  options,
+  handoffBaseUrl,
+  afterSetup,
+  handoffConfirmation,
+  summaryDownload,
+  checksumDownload,
+  handoffIndex,
+  opsSnapshot
+}) {
+  const sharedWorkspaceParams = {
+    productCode: options.productCode,
+    channel: options.channel,
+    source: "launch-smoke",
+    handoff: "first-wave"
+  };
+  const launchReview = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/developer/launch-review", sharedWorkspaceParams)
+  );
+  const developerOps = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/developer/ops", {
+      productCode: options.productCode,
+      source: "launch-smoke",
+      handoff: "first-wave"
+    })
+  );
+  const firstWaveSummary = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/ops/first-wave/recommendations/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      limit: options.limit,
+      format: "summary"
+    })
+  );
+  const firstWaveChecksums = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/ops/first-wave/recommendations/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      limit: options.limit,
+      format: "checksums"
+    })
+  );
+  const opsHandoffIndex = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/ops/export/download", {
+      productCode: options.productCode,
+      format: "handoff-index",
+      limit: options.limit
+    })
+  );
+
+  const firstWaveConfirmation = opsSnapshot.summary.initialLaunchOpsReadiness.firstWaveHandoffConfirmation;
+  const auditLogId = handoffConfirmation.auditLogId;
+
+  return {
+    version: "launch-smoke-duty-handoff/v1",
+    status: "ready_for_launch_review",
+    productCode: options.productCode,
+    channel: options.channel,
+    generatedFor: options.baseUrl ? "remote-live-writes" : "ephemeral-in-memory",
+    nextWorkspace: {
+      key: "launch-review",
+      label: "Open Launch Review",
+      ...launchReview
+    },
+    reviewWorkspaces: {
+      launchReview: {
+        key: "launch-review",
+        label: "Launch Review",
+        ...launchReview
+      },
+      developerOps: {
+        key: "developer-ops",
+        label: "Developer Ops",
+        ...developerOps
+      }
+    },
+    downloads: {
+      firstWaveSummary: {
+        key: "first-wave-summary",
+        label: "First-wave recommendation summary",
+        fileName: summaryDownload.fileName || handoffConfirmation.handoffFileName,
+        ...firstWaveSummary
+      },
+      firstWaveChecksums: {
+        key: "first-wave-checksums",
+        label: "First-wave recommendation checksums",
+        fileName: checksumDownload.fileName || "first-wave-recommendations-sha256.txt",
+        ...firstWaveChecksums
+      },
+      opsHandoffIndex: {
+        key: "ops-handoff-index",
+        label: "Developer Ops handoff index",
+        fileName: handoffIndex.fileName || "developer-ops-handoff-index.txt",
+        ...opsHandoffIndex
+      }
+    },
+    evidence: {
+      inventoryStatus: afterSetup.inventory.status,
+      firstCardStatus: afterSetup.firstCards.status,
+      firstRoundOpsStatus: afterSetup.firstRoundOps.status,
+      firstWaveConfirmationStatus: firstWaveConfirmation.status,
+      latestLaunchReceiptOperation: afterSetup.traceability.latestLaunchReceipt.operation,
+      auditLogId,
+      handoffFileName: handoffConfirmation.handoffFileName
+    },
+    operatorChecklist: [
+      {
+        key: "open_launch_review",
+        label: "Open Launch Review with the smoke lane already scoped.",
+        status: "next",
+        route: launchReview.route,
+        href: launchReview.href
+      },
+      {
+        key: "verify_first_wave_confirmation",
+        label: "Verify first-wave handoff confirmation evidence is present.",
+        status: firstWaveConfirmation.status,
+        auditLogId,
+        handoffFileName: handoffConfirmation.handoffFileName
+      },
+      {
+        key: "download_ops_handoff_index",
+        label: "Download the Developer Ops handoff index for launch-duty handover.",
+        status: "next",
+        route: opsHandoffIndex.route,
+        href: opsHandoffIndex.href,
+        fileName: handoffIndex.fileName || "developer-ops-handoff-index.txt"
+      },
+      {
+        key: "continue_developer_ops_watch",
+        label: "Continue the first-wave watch from Developer Ops.",
+        status: "next",
+        route: developerOps.route,
+        href: developerOps.href
+      }
+    ]
+  };
 }
 
 async function requestJson(baseUrl, route, { method = "GET", token = null, body = null } = {}) {
@@ -462,7 +618,7 @@ async function runLaunchSmoke(options) {
       };
     });
 
-    await step("first-wave.download.checksums", async () => {
+    const checksumDownload = await step("first-wave.download.checksums", async () => {
       const download = await requestText(
         baseUrl,
         `/api/developer/ops/first-wave/recommendations/download?${buildQuery({ ...commonQuery, format: "checksums" })}`,
@@ -538,6 +694,16 @@ async function runLaunchSmoke(options) {
         fileName: parseAttachmentFileName(download.contentDisposition)
       };
     });
+    const handoff = buildLaunchDutyHandoff({
+      options,
+      handoffBaseUrl: options.baseUrl,
+      afterSetup,
+      handoffConfirmation,
+      summaryDownload,
+      checksumDownload,
+      handoffIndex,
+      opsSnapshot
+    });
 
     return {
       status: "pass",
@@ -562,6 +728,7 @@ async function runLaunchSmoke(options) {
           handoffIndexFileName: handoffIndex.fileName || "developer-ops-handoff-index.txt"
         }
       },
+      handoff,
       checks
     };
   } catch (error) {
@@ -590,6 +757,12 @@ function writeResult(result, json) {
     }
     console.log(`First-wave handoff: ${result.summary.firstWave.confirmationStatus}`);
     console.log(`Ops handoff index: ${result.summary.ops.handoffIndexFileName}`);
+    if (result.handoff) {
+      console.log("Next launch-duty handoff:");
+      console.log(`- Open Launch Review: ${result.handoff.nextWorkspace.href || result.handoff.nextWorkspace.route}`);
+      console.log(`- Download Ops handoff index: ${result.handoff.downloads.opsHandoffIndex.href || result.handoff.downloads.opsHandoffIndex.route}`);
+      console.log(`- Continue Developer Ops watch: ${result.handoff.reviewWorkspaces.developerOps.href || result.handoff.reviewWorkspaces.developerOps.route}`);
+    }
     return;
   }
 

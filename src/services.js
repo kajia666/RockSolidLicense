@@ -15561,8 +15561,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           actionKey: launchReceiptNextFollowUp.actionKey || null,
           operationToRecord: launchReceiptNextFollowUp.operationToRecord || launchReceiptNextFollowUp.operation || null,
           downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          recommendedDownload: launchReceiptNextFollowUp.recommendedDownload || null,
           downloadFileName: launchReceiptNextFollowUp.downloadFileName || launchReceiptNextFollowUp.recommendedDownload?.fileName || null,
           downloadHref: launchReceiptNextFollowUp.downloadHref || launchReceiptNextFollowUp.recommendedDownload?.href || null,
+          downloadFormat: launchReceiptNextFollowUp.downloadFormat || launchReceiptNextFollowUp.recommendedDownload?.format || null,
+          downloadSource: launchReceiptNextFollowUp.downloadSource || launchReceiptNextFollowUp.recommendedDownload?.source || null,
           handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
         }
       : null,
@@ -16793,6 +16796,11 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
           actionKey: launchReceiptNextFollowUp.actionKey || null,
           operationToRecord: launchReceiptNextFollowUp.operationToRecord || launchReceiptNextFollowUp.operation || null,
           downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          recommendedDownload: launchReceiptNextFollowUp.recommendedDownload || null,
+          downloadFileName: launchReceiptNextFollowUp.downloadFileName || launchReceiptNextFollowUp.recommendedDownload?.fileName || null,
+          downloadHref: launchReceiptNextFollowUp.downloadHref || launchReceiptNextFollowUp.recommendedDownload?.href || null,
+          downloadFormat: launchReceiptNextFollowUp.downloadFormat || launchReceiptNextFollowUp.recommendedDownload?.format || null,
+          downloadSource: launchReceiptNextFollowUp.downloadSource || launchReceiptNextFollowUp.recommendedDownload?.source || null,
           handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
         }
       : null,

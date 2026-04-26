@@ -25,7 +25,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
 - Launch smoke handoff continuity: the CLI `launch:smoke` first-wave handoff now lands in Launch Review and Developer Ops with `source=launch-smoke` / `handoff=first-wave` preserved in route-focus UI, payload filters, exported summaries, and follow-up workspace links.
-- Recommended download routing: Launch Review, Launch Smoke, Launch Workflow, Release follow-ups, Developer Projects follow-up downloads, Developer License quickstart follow-ups, Developer Ops route-review handoffs, launch receipt follow-up queue downloads, First Wave Recommendations first-round ops actions, and Developer Ops operator/stabilization follow-ups now consume service-provided download `href` values for recommended downloads, so the first-wave handoff chain no longer relies on frontend source/format guessing in those launch-critical entrypoints.
+- Recommended download routing: Launch Review, Launch Smoke, Launch Workflow, Release follow-ups, Developer Projects follow-up downloads, Developer License quickstart follow-ups, Developer Ops route-review handoffs, launch receipt follow-up queue downloads, First Wave Recommendations first-round ops actions, initial-launch traceability next-follow-up downloads, and Developer Ops operator/stabilization follow-ups now consume service-provided download `href` values for recommended downloads, so the first-wave handoff chain no longer relies on frontend source/format guessing in those launch-critical entrypoints.
 
 Estimated initial pilot-launch readiness: 88%-90%.
 
@@ -41,8 +41,8 @@ Work should continue in short backend/API-first slices. Each slice should end wi
 2. Tighten initial launch ops readiness after real first-launch actions.
    Verify that launch bootstrap, first batch setup, inventory refill, first-wave ops sweep, and closeout/stabilization actions all refresh the same readiness chain.
 
-3. Harden launch receipt follow-up recovery.
-   Confirm that `launchReceiptNextFollowUp`, `recommendedAction`, `recommendedDownload`, and handoff file names remain stable across Developer Ops export, Launch Mainline summary, action receipts, zip, and checksums.
+3. Continue hardening launch receipt follow-up recovery.
+   `launchReceiptNextFollowUp`, `recommendedAction`, `recommendedDownload`, readiness traceability, and Launch Mainline post-launch traceability now carry the same download href chain; remaining work is mostly grouped regression across action receipts, zip, and checksums.
 
 4. Run a broader targeted test batch.
    Keep full tests deferred until the remaining route/download and first-wave action gaps are smaller, but run grouped tests around release package, launch mainline actions, developer ops export, and launch workflow/review/smoke handoff.

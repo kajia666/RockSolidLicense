@@ -13688,6 +13688,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.equal(initialLaunchOpsTraceability.latestLaunchReceipt.productionEvidenceNextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(initialLaunchOpsTraceability.nextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(initialLaunchOpsTraceability.nextFollowUp.downloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.equal(initialLaunchOpsTraceability.nextFollowUp.downloadFormat, "launch-receipt-next-follow-up");
+    assert.equal(initialLaunchOpsTraceability.nextFollowUp.downloadSource, "developer-ops");
+    assert.match(initialLaunchOpsTraceability.nextFollowUp.downloadHref, /\/api\/developer\/ops\/export\/download\?/);
+    assert.match(initialLaunchOpsTraceability.nextFollowUp.downloadHref, /format=launch-receipt-next-follow-up/);
+    assert.equal(
+      initialLaunchOpsTraceability.nextFollowUp.recommendedDownload.href,
+      initialLaunchOpsTraceability.nextFollowUp.downloadHref
+    );
     assert.equal(initialLaunchOpsTraceability.opsFiles.handoffIndex, "handoff-index.txt");
     assert.equal(initialLaunchOpsTraceability.opsFiles.initialLaunchOpsReadiness, "initial-launch-ops-readiness.txt");
     assert.equal(initialLaunchOpsTraceability.opsFiles.launchReceiptNextFollowUp, "launch-receipt-next-follow-up.txt");
@@ -14084,6 +14093,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.operationToRecord,
       latestLaunchReceipt.productionEvidenceNextOperation
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadFileName,
+      "developer-ops-launch-receipt-next-follow-up.txt"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadFormat,
+      "launch-receipt-next-follow-up"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadSource,
+      "developer-ops"
+    );
+    assert.match(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadHref,
+      /\/api\/developer\/ops\/export\/download\?/
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.recommendedDownload.href,
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadHref
     );
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.postLaunchLifecycle.primaryDownloadKey,

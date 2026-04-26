@@ -13972,7 +13972,7 @@ function appendInitialLaunchContractTraceabilityTextLines(lines = [], contract =
   lines.push(`- Contract Version: ${contract.version || "-"}`);
   lines.push(`- Contract Decision: ${contract.label || String(contract.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${contract.canEnterInitialLaunch === true})`);
   lines.push(`- Contract Scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
-  lines.push(`- Contract Next Required Action: ${nextRequiredAction.stage || "-"} | operation=${nextRequiredAction.operation || "-"} | download=${nextRequiredAction.downloadFileName || "-"}`);
+  lines.push(`- Contract Next Required Action: ${nextRequiredAction.stage || "-"} | operation=${nextRequiredAction.operation || "-"} | download=${nextRequiredAction.downloadFileName || "-"} | href=${nextRequiredAction.downloadHref || "-"}`);
   lines.push(
     `- Contract Files: readiness=${toOpsFile(opsFiles.initialLaunchOpsReadiness, files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt")}`
     + ` | handoffIndex=${toOpsFile(opsFiles.handoffIndex, files.handoffIndex || "handoff-index.txt")}`
@@ -13988,7 +13988,7 @@ function appendInitialLaunchOperatorHeadlineTextLines(lines = [], operatorHeadli
   lines.push("");
   lines.push("Initial Launch Operator Headline:");
   lines.push(`- Headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
-  lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+  lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | href=${operatorHeadline.nextDownloadHref || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
   lines.push(`- Handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
   return true;
 }
@@ -19706,7 +19706,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Next Follow-up: ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`,
     `Receipt Next Follow-up Action: ${launchReceiptNextFollowUpAction?.key || "-"} (${launchReceiptNextFollowUpAction?.operation || "-"})`,
     `Receipt Next Follow-up Workspace: ${launchReceiptNextFollowUpWorkspace?.label || "-"}@${launchReceiptNextFollowUpWorkspace?.autofocus || "-"}`,
-    `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"})`
+    `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"}) | href=${launchReceiptNextFollowUpDownload?.href || "-"}`
   ];
 
   if (initialLaunchOpsReadiness) {
@@ -19723,7 +19723,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     lines.push(`- followUps: ${initialLaunchOpsReadiness.followUpCount ?? 0}`);
     lines.push(`- next: ${formatLaunchReceiptNextFollowUp(initialLaunchOpsReadiness.nextFollowUp)}`);
     lines.push(`- workspace: ${initialLaunchOpsReadiness.primaryWorkspaceAction?.label || "-"}@${initialLaunchOpsReadiness.primaryWorkspaceAction?.autofocus || "-"}`);
-    lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"})`);
+    lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"}) | href=${initialLaunchOpsReadiness.primaryDownload?.href || "-"}`);
     lines.push(`- firstLaunchHandoff: ${initialLaunchOpsReadiness.firstLaunchHandoffDownload?.fileName || "-"}`);
     const goNoGo = initialLaunchOpsReadiness.goNoGo || null;
     if (goNoGo) {
@@ -19732,7 +19732,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push(`- decision: ${goNoGo.label || String(goNoGo.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${goNoGo.canEnterInitialLaunch === true})`);
       lines.push(`- primaryBlocker: ${goNoGo.primaryBlockerStage || "-"}`);
       lines.push(`- nextOperation: ${goNoGo.nextOperation || "-"}`);
-      lines.push(`- nextDownload: ${goNoGo.nextDownloadFileName || "-"}`);
+      lines.push(`- nextDownload: ${goNoGo.nextDownloadFileName || "-"} | href=${goNoGo.nextDownloadHref || "-"}`);
       lines.push(`- traceability: latestReceipt=${goNoGo.traceability?.latestReceiptOperation || "-"} | handoff=${goNoGo.traceability?.latestReceiptHandoffFileName || "-"} | opsIndex=${goNoGo.traceability?.opsHandoffIndex || "-"}`);
     }
     const contract = initialLaunchOpsReadiness.contract || null;
@@ -19741,7 +19741,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Initial Launch Contract:");
       lines.push(`- version: ${contract.version || "-"} | decision=${contract.label || String(contract.decision || "unknown").toUpperCase()} | status=${contract.status || "-"}`);
       lines.push(`- scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
-      lines.push(`- nextRequiredAction: stage=${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"}`);
+      lines.push(`- nextRequiredAction: stage=${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"} | href=${contract.nextRequiredAction?.downloadHref || "-"}`);
       lines.push(`- files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
     }
     const operatorHeadline = initialLaunchOpsReadiness.operatorHeadline || null;
@@ -19749,7 +19749,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("");
       lines.push("Initial Launch Operator Headline:");
       lines.push(`- headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
-      lines.push(`- next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+      lines.push(`- next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | href=${operatorHeadline.nextDownloadHref || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
       lines.push(`- handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
     }
     appendInitialLaunchOperatorNextActionTextLines(lines, initialLaunchOpsReadiness.operatorNextAction || null, {
@@ -19770,6 +19770,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | action=${item.primaryActionKey || "-"}`
           + ` | next=${item.nextOperation || "-"}`
           + ` | download=${item.nextDownloadFileName || item.nextDownloadKey || "-"}`
+          + ` | href=${item.nextDownloadHref || "-"}`
         );
       }
     }
@@ -19813,6 +19814,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push(
         `- nextAction=${stabilizationHandoff.nextAction?.operation || "-"}`
         + ` | download=${stabilizationHandoff.nextAction?.downloadFileName || stabilizationHandoff.nextAction?.downloadKey || "-"}`
+        + ` | href=${stabilizationHandoff.nextAction?.downloadHref || "-"}`
         + ` | workspace=${stabilizationHandoff.nextAction?.workspaceHref || "-"}`
       );
       lines.push(
@@ -19849,7 +19851,13 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("");
       lines.push("Initial Launch Ops Traceability:");
       lines.push(`- latestReceipt=${latestLaunchReceipt.operation || "-"} | handoff=${latestLaunchReceipt.handoffFileName || "-"} | evidenceNext=${latestLaunchReceipt.productionEvidenceNextOperation || "-"} | lifecycleNext=${latestLaunchReceipt.postLaunchLifecycleNextOperation || "-"}`);
-      lines.push(`- nextFollowUp=${opsFiles.launchReceiptNextFollowUp || "-"} | operation=${nextFollowUp.operationToRecord || "-"} | action=${nextFollowUp.actionKey || "-"}`);
+      lines.push(
+        `- nextFollowUp=${opsFiles.launchReceiptNextFollowUp || "-"}`
+        + ` | operation=${nextFollowUp.operationToRecord || "-"}`
+        + ` | action=${nextFollowUp.actionKey || "-"}`
+        + ` | download=${nextFollowUp.downloadFileName || nextFollowUp.recommendedDownload?.fileName || nextFollowUp.downloadKey || "-"}`
+        + ` | href=${nextFollowUp.downloadHref || nextFollowUp.recommendedDownload?.href || "-"}`
+      );
       lines.push(`- opsIndex=${opsFiles.handoffIndex || "-"} | readiness=${opsFiles.initialLaunchOpsReadiness || "-"} | followUpsCsv=${opsFiles.launchReceiptFollowUpsCsv || "-"}`);
       lines.push(`- postLaunchIndex=${launchMainlineFiles.postLaunchHandoffIndex || "-"} | checksums=${launchMainlineFiles.checksums || "-"} | zip=${launchMainlineFiles.zip || "-"}`);
       const confirmation = traceability.stabilizationHandoffConfirmation || null;
@@ -20071,7 +20079,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Version: ${contract.version || "-"}`);
     lines.push(`- Decision: ${contract.label || String(contract.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${contract.canEnterInitialLaunch === true})`);
     lines.push(`- Scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
-    lines.push(`- Next Required Action: ${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"}`);
+    lines.push(`- Next Required Action: ${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"} | href=${contract.nextRequiredAction?.downloadHref || "-"}`);
     lines.push(`- Files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
     lines.push("");
   }
@@ -20079,7 +20087,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   if (operatorHeadline) {
     lines.push("Operator Headline:");
     lines.push(`- Headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
-    lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+    lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | href=${operatorHeadline.nextDownloadHref || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
     lines.push(`- Handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
     lines.push("");
   }
@@ -20208,7 +20216,7 @@ function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
   lines.push(`Post-Launch: status=${latestReceipt.postLaunchLifecycleStatus || "-"} | next=${latestReceipt.postLaunchLifecycleNextOperation || "-"}`);
   lines.push(`Latest Operator: ${latestOperator.operation || "-"} | audit=${latestOperator.auditLogId || "-"} | next=${latestOperator.nextOperation || "-"}`);
   lines.push(`Next Action: ${nextAction.operation || "-"} | stage=${nextAction.stage || "-"} | action=${nextAction.actionKey || "-"} | priority=${nextAction.priority || "-"}`);
-  lines.push(`Download: ${nextAction.downloadFileName || nextAction.downloadKey || "-"} | key=${nextAction.downloadKey || "-"}`);
+  lines.push(`Download: ${nextAction.downloadFileName || nextAction.downloadKey || "-"} | key=${nextAction.downloadKey || "-"} | href=${nextAction.downloadHref || "-"}`);
   lines.push(`Workspace Href: ${nextAction.workspaceHref || "-"}`);
   lines.push(`Files: readiness=${files.readiness || "-"} | handoffIndex=${files.handoffIndex || "-"} | nextFollowUp=${files.nextFollowUp || "-"} | postLaunchIndex=${files.postLaunchIndex || "-"}`);
   const confirmation = handoff.confirmation || null;

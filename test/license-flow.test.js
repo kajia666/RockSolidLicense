@@ -13716,12 +13716,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /- requiredActions: [1-9]/);
     assert.match(launchReceiptSnapshot.summaryText, /- next: \[REVIEW\]\[production_evidence\]/);
     assert.match(launchReceiptSnapshot.summaryText, /- workspace: Open Launch Mainline@summary/);
-    assert.match(launchReceiptSnapshot.summaryText, /- download: developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      /- download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\) \| href=.*format=launch-receipt-next-follow-up/
+    );
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Go\/No-Go:/);
     assert.match(launchReceiptSnapshot.summaryText, /- decision: NO-GO \(canEnterInitialLaunch=false\)/);
     assert.match(launchReceiptSnapshot.summaryText, /- primaryBlocker: production_evidence/);
     assert.match(launchReceiptSnapshot.summaryText, new RegExp(`- nextOperation: ${latestLaunchReceipt.productionEvidenceNextOperation}`));
-    assert.match(launchReceiptSnapshot.summaryText, /- nextDownload: developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      /- nextDownload: developer-ops-launch-receipt-next-follow-up\.txt \| href=.*format=launch-receipt-next-follow-up/
+    );
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Contract:/);
     assert.match(launchReceiptSnapshot.summaryText, /- version: initial-launch-ops\/v1 \| decision=NO-GO \| status=review/);
     assert.match(launchReceiptSnapshot.summaryText, /- scope: project=EXPORT_ALPHA \| channel=stable/);
@@ -13734,7 +13740,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /- headline: NO-GO \| status=review \| blocker=production_evidence/);
     assert.match(
       launchReceiptSnapshot.summaryText,
-      new RegExp(`- next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt`)
+      new RegExp(
+        `- next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt \\| href=.*format=launch-receipt-next-follow-up`
+      )
     );
     assert.match(launchReceiptSnapshot.summaryText, /- handoff: .* \| readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Next Action:/);
@@ -13744,6 +13752,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchReceiptSnapshot.summaryText, /- workspace: Open Launch Mainline@summary/);
     assert.match(launchReceiptSnapshot.summaryText, /- download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\)/);
+    assert.ok(launchReceiptSnapshot.summaryText.includes("Initial Launch Operator Action Receipts:"));
+    assert.ok(launchReceiptSnapshot.summaryText.includes(
+      `download=${latestLaunchReceipt.initialLaunchOperatorNextDownloadFileName} | href=${latestLaunchReceipt.initialLaunchOperatorNextDownloadHref}`
+    ));
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Action Manifest:/);
     assert.match(launchReceiptSnapshot.summaryText, /- manifest: initial-launch-operator-actions\/v1 \| primary=launch_mainline_follow_up \| actions=1/);
     assert.match(
@@ -13762,7 +13774,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
     assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));
     assert.match(launchReceiptSnapshot.summaryText, /opsIndex=handoff-index\.txt/);
-    assert.match(launchReceiptSnapshot.summaryText, /nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      new RegExp(
+        `nextFollowUp=launch-receipt-next-follow-up\\.txt \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| action=${latestLaunchReceipt.productionEvidenceNextActionKey} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt \\| href=.*format=launch-receipt-next-follow-up`
+      )
+    );
     assert.match(launchReceiptSnapshot.summaryText, /postLaunchIndex=post-launch-handoff-index/);
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Follow-up Count: 2/);
     assert.match(
@@ -13777,7 +13794,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`Receipt Next Follow-up Action: ${latestLaunchReceipt.productionEvidenceNextActionKey} \\(${latestLaunchReceipt.productionEvidenceNextOperation}\\)`)
     );
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up Workspace: Open Launch Mainline@summary/);
-    assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up Download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\)/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      /Receipt Next Follow-up Download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\) \| href=.*format=launch-receipt-next-follow-up/
+    );
     assert.match(launchReceiptSnapshot.summaryText, /record_post_launch_ops_sweep/i);
     assert.match(launchReceiptSnapshot.summaryText, /Launch Receipt Follow-ups:/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
@@ -13861,18 +13881,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`));
     assert.match(initialLaunchOpsReadinessDownload.body, /Next Follow-up: \[REVIEW\]\[production_evidence\]/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Primary Workspace: Open Launch Mainline/);
-    assert.match(initialLaunchOpsReadinessDownload.body, /Primary Download: developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Primary Download: developer-ops-launch-receipt-next-follow-up\.txt.*href=.*format=launch-receipt-next-follow-up/);
     assert.match(initialLaunchOpsReadinessDownload.body, /First Launch Handoff: launch-mainline-first-launch-handoff\.txt/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Contract:/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Version: initial-launch-ops\/v1/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Decision: NO-GO \(canEnterInitialLaunch=false\)/);
-    assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`- Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`));
+    assert.match(
+      initialLaunchOpsReadinessDownload.body,
+      new RegExp(`- Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt \\| href=.*format=launch-receipt-next-follow-up`)
+    );
     assert.match(initialLaunchOpsReadinessDownload.body, /- Files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Operator Headline:/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Headline: NO-GO \| status=review \| blocker=production_evidence/);
     assert.match(
       initialLaunchOpsReadinessDownload.body,
-      new RegExp(`- Next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt`)
+      new RegExp(`- Next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt \\| href=.*format=launch-receipt-next-follow-up`)
     );
     assert.match(initialLaunchOpsReadinessDownload.body, /Operator Next Action:/);
     assert.match(
@@ -13880,7 +13903,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`- Action: launch_mainline_follow_up \\| stage=production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
     assert.match(initialLaunchOpsReadinessDownload.body, /- Workspace: Open Launch Mainline@summary/);
-    assert.match(initialLaunchOpsReadinessDownload.body, /- Download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\)/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\) \| href=.*format=launch-receipt-next-follow-up/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Operator Action Manifest:/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Manifest: initial-launch-operator-actions\/v1 \| primary=launch_mainline_follow_up \| actions=1/);
     assert.match(
@@ -13911,6 +13934,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(stabilizationHandoffDownload.body, /Version: initial-launch-stabilization-handoff\/v1/);
     assert.match(stabilizationHandoffDownload.body, /Latest Operator: record_post_launch_ops_sweep/);
     assert.match(stabilizationHandoffDownload.body, new RegExp(`Next Action: ${latestLaunchReceipt.productionEvidenceNextOperation}`));
+    assert.match(stabilizationHandoffDownload.body, /Download: launch-mainline-stabilization-handoff\.txt.*href=.*format=stabilization-handoff/);
     assert.match(stabilizationHandoffDownload.body, /Files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
     assert.match(stabilizationHandoffDownload.body, /Checklist:/);
 
@@ -14018,7 +14042,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Contract Decision: NO-GO \(canEnterInitialLaunch=false\)/);
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
-      new RegExp(`Contract Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
+      new RegExp(`Contract Next Required Action: production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt \\| href=.*format=launch-receipt-next-follow-up`)
     );
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
@@ -14028,7 +14052,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Headline: NO-GO \| status=review \| blocker=production_evidence/);
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
-      new RegExp(`Next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt`)
+      new RegExp(`Next: operation=${latestLaunchReceipt.productionEvidenceNextOperation} \\| download=developer-ops-launch-receipt-next-follow-up\\.txt \\| href=.*format=launch-receipt-next-follow-up`)
     );
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Operator Next Action:/);
     assert.match(
@@ -14036,6 +14060,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`Action: launch_mainline_follow_up \\| stage=production_evidence \\| operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Workspace: Open Launch Mainline@summary/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Download: developer-ops-launch-receipt-next-follow-up\.txt \(launch-receipt-next-follow-up\) \| href=.*format=launch-receipt-next-follow-up/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Operator Action Manifest:/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Manifest: initial-launch-operator-actions\/v1 \| primary=launch_mainline_follow_up \| actions=1/);
     assert.match(

@@ -13418,6 +13418,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       latestLaunchReceipt.initialLaunchOperatorNextDownloadFileName,
       launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadFileName
     );
+    assert.match(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadHref, /\/api\/developer\/(?:ops\/export|launch-mainline)\/download\?/);
+    assert.match(launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadHref, /format=/);
+    assert.equal(
+      latestLaunchReceipt.initialLaunchOperatorNextDownloadHref,
+      launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadHref
+    );
     assert.equal(latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey, launchOpsAction.receipt.firstLaunchDutySummary?.handoffDownload?.key || null);
     assert.equal(latestLaunchReceipt.postLaunchLifecycleStatus, launchOpsAction.receipt.postLaunchLifecycleSummary?.status || null);
     assert.equal(
@@ -13618,6 +13624,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchOperatorActionReceiptEvidence.primaryActionKey, "launch_mainline_follow_up");
     assert.equal(initialLaunchOperatorActionReceiptEvidence.nextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(initialLaunchOperatorActionReceiptEvidence.nextDownloadFileName, latestLaunchReceipt.initialLaunchOperatorNextDownloadFileName);
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.nextDownloadHref, latestLaunchReceipt.initialLaunchOperatorNextDownloadHref);
     const initialLaunchStabilizationHandoff = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.stabilizationHandoff;
     assert.ok(initialLaunchStabilizationHandoff);
     assert.equal(initialLaunchStabilizationHandoff.version, "initial-launch-stabilization-handoff/v1");
@@ -13629,7 +13636,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchStabilizationHandoff.latestOperatorActionReceipt.operation, "record_post_launch_ops_sweep");
     assert.equal(initialLaunchStabilizationHandoff.latestOperatorActionReceipt.auditLogId, latestLaunchReceipt.auditLogId);
     assert.equal(initialLaunchStabilizationHandoff.nextAction.operation, latestLaunchReceipt.productionEvidenceNextOperation);
-    assert.equal(initialLaunchStabilizationHandoff.nextAction.downloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.equal(initialLaunchStabilizationHandoff.nextAction.downloadFileName, "launch-mainline-stabilization-handoff.txt");
+    assert.match(initialLaunchStabilizationHandoff.nextAction.downloadHref, /\/api\/developer\/launch-mainline\/download\?/);
+    assert.match(initialLaunchStabilizationHandoff.nextAction.downloadHref, /format=stabilization-handoff/);
     assert.equal(initialLaunchStabilizationHandoff.files.postLaunchIndex, "post-launch-handoff-index");
     assert.ok(initialLaunchStabilizationHandoff.checklist.some((item) => /stabilization/i.test(item)));
     const initialLaunchOpsTraceability = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.traceability;
@@ -16601,8 +16610,7 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /Developer Launch Smoke/);
     assert.match(html, /api\/developer\/launch-workflow/);
     assert.match(html, /api\/developer\/launch-workflow\/download/);
-    assert.match(html, /api\/developer\/launch-review\/download/);
-    assert.match(html, /api\/developer\/launch-smoke-kit\/download/);
+    assert.match(html, /service-provided href/);
     assert.match(html, /\/developer\/launch-review/);
     assert.match(html, /\/developer\/launch-smoke/);
       assert.match(html, /Generate Launch Workflow/);
@@ -16644,7 +16652,7 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /api\/developer\/license-quickstart\/bootstrap/);
     assert.match(html, /api\/developer\/license-quickstart\/first-batches/);
     assert.match(html, /api\/developer\/license-quickstart\/restock/);
-    assert.match(html, /api\/developer\/ops\/export\/download/);
+    assert.match(html, /service-provided href/);
     assert.match(html, /runLaunchBootstrap/);
     assert.match(html, /runLaunchFirstBatchSetup/);
     assert.match(html, /currentLaunchBootstrapAction/);
@@ -16680,10 +16688,10 @@ test("developer launch workflow page is served from the dedicated route", async 
     assert.match(html, /operation: target\.operation/);
     assert.match(html, /actionKey: target\.actionKey/);
     assert.match(html, /downloadKey: target\.downloadKey/);
-    assert.match(html, /fallbackFormats\[item\.key\]/);
-    assert.match(html, /format: requestedFormat,\s+\.\.\.\(item\.params && typeof item\.params === "object" \? item\.params : \{\}\)/);
-    assert.match(html, /launch_mainline_rehearsal_guide: "rehearsal-guide"/);
-    assert.match(html, /ops_route_next_summary: "route-review-next"/);
+    assert.match(html, /service-provided href/);
+    assert.match(html, /item\.href/);
+    assert.doesNotMatch(html, /fallbackFormats\[item\.key\]/);
+    assert.doesNotMatch(html, /item\.source === "developer-/);
     assert.match(html, /renderLaunchRouteFocus/);
     assert.match(html, /Launch Workflow Route Focus/);
     assert.match(html, /Open Project Workspace/);
@@ -17864,6 +17872,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-launch-receipt-operator-action="open-mainline"/);
     assert.match(html, /data-launch-receipt-operator-action="download-handoff"/);
     assert.match(html, /data-operator-operation/);
+    assert.match(html, /data-operator-download-href/);
     assert.match(html, /lastOperatorActionResult/);
     assert.match(html, /buildLaunchReceiptOperatorActionResult/);
     assert.match(html, /renderLastOperatorActionResult/);
@@ -17883,7 +17892,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-stabilization-handoff-action="open-workspace"/);
     assert.match(html, /data-stabilization-handoff-action="download-handoff"/);
     assert.match(html, /data-stabilization-workspace-href/);
-    assert.match(html, /data-stabilization-download-format/);
+    assert.match(html, /data-stabilization-download-href/);
+    assert.match(html, /service-provided href/);
+    assert.doesNotMatch(html, /launchReceiptOperatorDownloadFormat/);
+    assert.doesNotMatch(html, /data-stabilization-download-format/);
     assert.match(html, /Open Stabilization Workspace/);
     assert.match(html, /Download Stabilization Handoff/);
     assert.match(html, /lastStabilizationHandoffResult/);
@@ -18158,9 +18170,10 @@ test("developer release page is served from the dedicated route", async () => {
     assert.match(html, /data-release-route-focus-action/);
     assert.match(html, /operation: target\.operation/);
     assert.match(html, /downloadKey: target\.downloadKey/);
-    assert.match(html, /fallbackFormats\[shortcut\.key\]/);
-    assert.match(html, /launch_mainline_rehearsal_guide: "rehearsal-guide"/);
-    assert.match(html, /ops_route_next_summary: "route-review-next"/);
+    assert.match(html, /service-provided href/);
+    assert.match(html, /shortcut\.href/);
+    assert.doesNotMatch(html, /fallbackFormats\[shortcut\.key\]/);
+    assert.doesNotMatch(html, /shortcut\.source === "developer-/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

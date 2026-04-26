@@ -25,9 +25,9 @@ The project is now close to an initial pilot launch. The most important backend/
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
 - Launch smoke handoff continuity: the CLI `launch:smoke` first-wave handoff now lands in Launch Review and Developer Ops with `source=launch-smoke` / `handoff=first-wave` preserved in route-focus UI, payload filters, exported summaries, and follow-up workspace links.
-- Recommended download routing: Launch Review, Launch Smoke, and Developer Ops route-review handoffs now consume service-provided download `href` values for recommended downloads, so those pages no longer duplicate source/format mapping tables for the first-wave handoff chain.
+- Recommended download routing: Launch Review, Launch Smoke, Launch Workflow, Release follow-ups, Developer Ops route-review handoffs, and Developer Ops operator/stabilization follow-ups now consume service-provided download `href` values for recommended downloads, so the first-wave handoff chain no longer relies on frontend source/format guessing in those launch-critical entrypoints.
 
-Estimated initial pilot-launch readiness: 85%-90%.
+Estimated initial pilot-launch readiness: 86%-90%.
 
 This estimate means the core flow is mostly ready for a controlled first launch, but still needs a final verification pass, deployment rehearsal, and real first-wave operating data before being treated as production-stable.
 
@@ -35,8 +35,8 @@ This estimate means the core flow is mostly ready for a controlled first launch,
 
 Work should continue in short backend/API-first slices. Each slice should end with a commit, targeted verification, and a note about the next slice.
 
-1. Audit the smaller remaining route/download key surface outside Launch Mainline, Launch Review, Launch Smoke, and routed Developer Ops handoffs.
-   Confirm release, workflow, and non-route-review ops follow-up downloads can round-trip through service-provided `href` values without falling back to frontend source/format guesses.
+1. Finish a final spot audit for any non-critical or older launch-adjacent download surfaces outside the now-hardened Release, Launch Workflow, Launch Review, Launch Smoke, Launch Mainline, and Developer Ops first-wave chain.
+   The main launch-critical route/download handoffs now round-trip through service-provided `href` values; remaining work is mostly residual cleanup and regression coverage.
 
 2. Tighten initial launch ops readiness after real first-launch actions.
    Verify that launch bootstrap, first batch setup, inventory refill, first-wave ops sweep, and closeout/stabilization actions all refresh the same readiness chain.
@@ -191,13 +191,13 @@ Remaining work:
 Current high-level progress:
 
 - Core backend/API authorization: 90%-95%.
-- Developer delivery and handoff chain: 88%-92%.
-- Launch Mainline and first-launch operations: 85%-90%.
+- Developer delivery and handoff chain: 89%-93%.
+- Launch Mainline and first-launch operations: 86%-90%.
 - SDK/integration packaging: 80%-85%.
 - Production deployment readiness: 75%-85%.
 - Commercial operations readiness: 65%-75%.
 
-Overall initial pilot-launch readiness: 85%-90%.
+Overall initial pilot-launch readiness: 86%-90%.
 
 This is high enough to keep moving toward a controlled launch, but not high enough to skip staging, full tests, backup/restore rehearsal, or first-wave support preparation.
 
@@ -205,7 +205,7 @@ This is high enough to keep moving toward a controlled launch, but not high enou
 
 Minimum remaining work before a controlled pilot:
 
-1. Complete route/download key audit for the launch mainline chain.
+1. Finish residual route/download spot checks outside the launch-critical first-wave handoff chain.
 2. Run grouped targeted tests for release, launch workflow, launch review, launch smoke, launch mainline, and developer ops.
 3. Run full test suite once the current backend/API slices settle.
 4. Prepare staging environment with non-default secrets and public HTTPS.
@@ -269,7 +269,7 @@ The project can be treated as initially launchable when all of these are true:
 
 ### Medium
 
-- Some route/download key mappings may still need audit outside the paths recently tested.
+- Some older or non-critical route/download key mappings may still need spot audit outside the launch-critical paths recently tested.
 - SDK clean-machine integration should be rehearsed before inviting a real software author.
 - Payment/order automation may be unnecessary for pilot, but the manual process must be explicit if payment is accepted.
 

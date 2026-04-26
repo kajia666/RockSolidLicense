@@ -806,90 +806,12 @@
         if (!shortcut || typeof shortcut !== "object") {
           throw new Error("No release download shortcut is available.");
         }
-        const target = currentReleaseTarget();
-        if (!target.productCode) {
-          throw new Error("Enter a project code before downloading linked release material.");
-        }
-        const params = currentReleaseRequestParams(target);
-        Object.entries(shortcut.params || {}).forEach(([key, value]) => {
-          if (value !== null && value !== undefined && String(value).trim() !== "") {
-            params[key] = value;
-          }
-        });
-        const fallbackFormats = {
-          release_summary: "summary",
-          release_checklist: "checklist",
-          release_zip: "zip",
-          release_checksums: "checksums",
-          release_env: "env",
-          release_host_config: "host-config",
-          release_cmake: "cmake",
-          release_vs2022_guide: "vs2022-guide",
-          release_vs2022_sln: "vs2022-sln",
-          release_vs2022: "vs2022",
-          release_vs2022_filters: "vs2022-filters",
-          release_vs2022_props: "vs2022-props",
-          release_vs2022_local_props: "vs2022-local-props",
-          release_cpp: "cpp",
-          release_host_skeleton: "host-skeleton",
-          launch_smoke_kit_summary: "summary",
-          launch_review_summary: "summary",
-          launch_review_ops_summary: "summary",
-          launch_mainline_summary: "summary",
-          launch_mainline_rehearsal_guide: "rehearsal-guide",
-          launch_mainline_zip: "zip",
-          launch_mainline_checksums: "checksums",
-          launch_mainline_initial_launch_ops_readiness: "initial-launch-ops-readiness",
-          launch_mainline_operations_handoff: "operations-handoff",
-          launch_mainline_post_launch_sweep_handoff: "post-launch-sweep-handoff",
-          launch_mainline_closeout_handoff: "closeout-handoff",
-          launch_mainline_stabilization_handoff: "stabilization-handoff",
-          launch_handoff_zip: "handoff-zip",
-          launch_handoff_checksums: "handoff-checksums",
-          launch_workflow_zip: "zip",
-          launch_summary: "summary",
-          launch_checklist: "checklist",
-          ops_primary_summary: "route-review-primary",
-          ops_primary_account_summary: "route-review-primary",
-          ops_primary_entitlement_summary: "route-review-primary",
-          ops_primary_session_summary: "route-review-primary",
-          ops_primary_device_summary: "route-review-primary",
-          ops_route_next_summary: "route-review-next",
-          ops_remaining_summary: "route-review-remaining"
-        };
-        const format = String(shortcut.format || fallbackFormats[shortcut.key] || "summary").trim() || "summary";
-        if (shortcut.source === "developer-launch-workflow") {
-          return {
-            path: `/api/developer/launch-workflow/download${q({ ...params, format })}`,
-            fileName: shortcut.fileName || "launch-workflow.txt"
-          };
-        }
-        if (shortcut.source === "developer-launch-review") {
-          return {
-            path: `/api/developer/launch-review/download${q({ ...params, format })}`,
-            fileName: shortcut.fileName || "launch-review.txt"
-          };
-        }
-        if (shortcut.source === "developer-launch-smoke-kit") {
-          return {
-            path: `/api/developer/launch-smoke-kit/download${q({ ...params, format })}`,
-            fileName: shortcut.fileName || "launch-smoke-kit.txt"
-          };
-        }
-        if (shortcut.source === "developer-launch-mainline") {
-          return {
-            path: `/api/developer/launch-mainline/download${q({ ...params, format })}`,
-            fileName: shortcut.fileName || "developer-launch-mainline-summary.txt"
-          };
-        }
-        if (shortcut.source === "developer-ops") {
-          return {
-            path: `/api/developer/ops/export/download${q({ ...params, format })}`,
-            fileName: shortcut.fileName || "developer-ops-summary.txt"
-          };
+        const href = String(shortcut.href || "").trim();
+        if (!href) {
+          throw new Error(`Release shortcut ${shortcut.key || shortcut.label || "download"} is missing a service-provided href.`);
         }
         return {
-          path: `/api/developer/release-package/download${q({ ...params, format })}`,
+          path: href,
           fileName: shortcut.fileName || "release-package.txt"
         };
       }
@@ -898,6 +820,19 @@
         const request = buildReleaseShortcutDownloadRequest(shortcut);
         const result = await downloadApiFile(request.path, request.fileName);
         setStatus(`${label || shortcut.label || "Release follow-up download"} downloaded: ${result.fileName}`);
+        return result;
+      }
+
+      async function downloadLinkedReleaseAsset(endpoint, format, fallbackFileName, label) {
+        const target = currentReleaseTarget();
+        if (!target.productCode) {
+          throw new Error("Enter a project code before downloading linked release material.");
+        }
+        const result = await downloadApiFile(
+          `${endpoint}${q(currentReleaseRequestParams(target, { format }))}`,
+          fallbackFileName
+        );
+        setStatus(`${label} downloaded: ${result.fileName}`);
         return result;
       }
 
@@ -1789,25 +1724,19 @@
             "download-cmake": ["cmake", "CMakeLists.txt", "Release package CMake template"]
           };
           if (actionKey === "download-launch-review") {
-            await downloadReleaseShortcut(
-              {
-                source: "developer-launch-review",
-                format: "summary",
-                fileName: "launch-review.txt",
-                label: "Launch review summary"
-              },
+            await downloadLinkedReleaseAsset(
+              "/api/developer/launch-review/download",
+              "summary",
+              "launch-review.txt",
               "Launch review summary"
             );
             return;
           }
           if (actionKey === "download-smoke-kit") {
-            await downloadReleaseShortcut(
-              {
-                source: "developer-launch-smoke-kit",
-                format: "summary",
-                fileName: "launch-smoke-kit.txt",
-                label: "Launch smoke kit summary"
-              },
+            await downloadLinkedReleaseAsset(
+              "/api/developer/launch-smoke-kit/download",
+              "summary",
+              "launch-smoke-kit.txt",
               "Launch smoke kit summary"
             );
             return;

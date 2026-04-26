@@ -2636,6 +2636,7 @@
           `download=${esc(item.initialLaunchOperatorNextDownloadFileName || item.initialLaunchOperatorNextDownloadKey || "-")}`,
           `workspace=${esc(item.initialLaunchOperatorWorkspaceKey || "-")}@${esc(item.initialLaunchOperatorWorkspaceAutofocus || "-")}`
         ].join(" | ");
+        const operatorDownloadHref = String(item.initialLaunchOperatorNextDownloadHref || "").trim();
         const actionAttrs = [
           item.productCode ? `data-product-code="${esc(item.productCode)}"` : "",
           item.channel ? `data-channel="${esc(item.channel)}"` : "",
@@ -2643,6 +2644,7 @@
           item.initialLaunchOperatorNextActionKey ? `data-operator-action-key="${esc(item.initialLaunchOperatorNextActionKey)}"` : "",
           item.initialLaunchOperatorNextDownloadKey ? `data-operator-download-key="${esc(item.initialLaunchOperatorNextDownloadKey)}"` : "",
           item.initialLaunchOperatorNextDownloadFileName ? `data-operator-download-file-name="${esc(item.initialLaunchOperatorNextDownloadFileName)}"` : "",
+          operatorDownloadHref ? `data-operator-download-href="${esc(operatorDownloadHref)}"` : "",
           item.initialLaunchOperatorWorkspaceAutofocus ? `data-operator-workspace-autofocus="${esc(item.initialLaunchOperatorWorkspaceAutofocus)}"` : ""
         ].filter(Boolean).join(" ");
         return `
@@ -2652,7 +2654,7 @@
             <div>${details}</div>
             <div class="snapshot-recap-actions" style="margin-top:8px;">
               <button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="open-mainline" ${actionAttrs}>Open Operator Mainline</button>
-              <button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="download-handoff" ${actionAttrs} ${(token && (item.initialLaunchOperatorNextDownloadKey || item.initialLaunchOperatorNextDownloadFileName)) ? "" : "disabled"}>Download Operator Handoff</button>
+              <button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="download-handoff" ${actionAttrs} ${(token && operatorDownloadHref) ? "" : "disabled"}>Download Operator Handoff</button>
             </div>
           </div>
         `;
@@ -2871,10 +2873,13 @@
           if (!productCode) {
             throw { code: "MISSING_PROJECT", message: "Select or route a project before downloading the stabilization handoff." };
           }
-          const format = String(data.stabilizationDownloadFormat || "stabilization-handoff").trim() || "stabilization-handoff";
+          const href = String(data.stabilizationDownloadHref || "").trim();
+          if (!href) {
+            throw { code: "MISSING_DOWNLOAD", message: "No stabilization handoff download href is available." };
+          }
           const result = await downloadApiFile(
-            `/api/developer/launch-mainline/download${q({ productCode, channel, format })}`,
-            data.stabilizationDownloadFileName || `${productCode}-${channel}-${format}.txt`
+            href,
+            data.stabilizationDownloadFileName || `${productCode}-${channel}-stabilization-handoff.txt`
           );
           lastExportDownload = result;
           lastStabilizationHandoffResult = buildStabilizationHandoffActionResult(normalizedAction, data, {
@@ -2914,40 +2919,6 @@
         throw { code: "UNSUPPORTED_STABILIZATION_HANDOFF", message: `Unsupported stabilization handoff action: ${normalizedAction || "-"}` };
       }
 
-      function launchReceiptOperatorDownloadFormat(data = {}) {
-        const normalizedKey = String(data.operatorDownloadKey || "").trim().toLowerCase();
-        if (normalizedKey === "ops_launch_receipt_next_follow_up" || normalizedKey === "launch_receipt_next_follow_up") {
-          return "launch-receipt-next-follow-up";
-        }
-        const fromKey = launchReceiptDownloadFormat(data.operatorDownloadKey || "");
-        if (fromKey) {
-          return fromKey;
-        }
-        const fileName = String(data.operatorDownloadFileName || "").trim().toLowerCase();
-        if (fileName.includes("launch-receipt-next-follow-up")) {
-          return "launch-receipt-next-follow-up";
-        }
-        if (fileName.includes("rehearsal-guide")) {
-          return "rehearsal-guide";
-        }
-        if (fileName.includes("first-launch-handoff")) {
-          return "first-launch-handoff";
-        }
-        if (fileName.includes("operations-handoff")) {
-          return "operations-handoff";
-        }
-        if (fileName.includes("post-launch-sweep-handoff")) {
-          return "post-launch-sweep-handoff";
-        }
-        if (fileName.includes("closeout-handoff")) {
-          return "closeout-handoff";
-        }
-        if (fileName.includes("stabilization-handoff")) {
-          return "stabilization-handoff";
-        }
-        return "";
-      }
-
       async function handleLaunchReceiptOperatorAction(action = "", data = {}) {
         const normalizedAction = String(action || "").trim().toLowerCase();
         const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
@@ -2975,13 +2946,13 @@
           return;
         }
         if (normalizedAction === "download-handoff") {
-          const format = launchReceiptOperatorDownloadFormat(data);
-          if (!format) {
+          const href = String(data.operatorDownloadHref || "").trim();
+          if (!href) {
             throw { code: "MISSING_DOWNLOAD", message: "No initial operator handoff download is available." };
           }
           const result = await downloadApiFile(
-            `/api/developer/launch-mainline/download${q({ productCode, channel, format })}`,
-            data.operatorDownloadFileName || `${productCode}-${channel}-${format}.txt`
+            href,
+            data.operatorDownloadFileName || `${productCode}-${channel}-operator-handoff.txt`
           );
           lastExportDownload = result;
           lastOperatorActionResult = buildLaunchReceiptOperatorActionResult(normalizedAction, data, {
@@ -4354,15 +4325,15 @@
               downloadKey: "launch_mainline_stabilization_handoff"
             })
           : "");
-        const stabilizationDownloadFormat = "stabilization-handoff";
-        const stabilizationDownloadFileName = `${productCode || "developer"}-${channel}-${stabilizationDownloadFormat}.txt`;
+        const stabilizationDownloadHref = String(nextAction.downloadHref || "").trim();
+        const stabilizationDownloadFileName = nextAction.downloadFileName || `${productCode || "developer"}-${channel}-stabilization-handoff.txt`;
         const actionAttrs = [
           productCode ? `data-product-code="${esc(productCode)}"` : "",
           channel ? `data-channel="${esc(channel)}"` : "",
           workspaceHref ? `data-stabilization-workspace-href="${esc(workspaceHref)}"` : "",
           nextOperation ? `data-stabilization-operation="${esc(nextOperation)}"` : "",
           nextAction.actionKey ? `data-stabilization-action-key="${esc(nextAction.actionKey)}"` : "",
-          `data-stabilization-download-format="${esc(stabilizationDownloadFormat)}"`,
+          stabilizationDownloadHref ? `data-stabilization-download-href="${esc(stabilizationDownloadHref)}"` : "",
           `data-stabilization-download-file-name="${esc(stabilizationDownloadFileName)}"`
         ].filter(Boolean).join(" ");
         const status = String(item.status || "unknown").toLowerCase();
@@ -4419,7 +4390,7 @@
             ${confirmationDetails ? `<div class="snapshot-focus-meta">${confirmationDetails}</div>` : ""}
             <div class="snapshot-recap-actions">
               <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="open-workspace" ${actionAttrs} ${workspaceHref ? "" : "disabled"}>Open Stabilization Workspace</button>
-              <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="download-handoff" ${actionAttrs} ${(token && productCode) ? "" : "disabled"}>Download Stabilization Handoff</button>
+              <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="download-handoff" ${actionAttrs} ${(token && stabilizationDownloadHref) ? "" : "disabled"}>Download Stabilization Handoff</button>
               <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="confirm-handoff" ${actionAttrs} ${(token && productCode) ? "" : "disabled"}>Confirm Stabilization Handoff</button>
             </div>
             ${checklist.length ? `<ul class="snapshot-list">${checklist.map((entry) => `<li>${esc(entry)}</li>`).join("")}</ul>` : ""}

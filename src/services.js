@@ -5052,6 +5052,7 @@ function buildLaunchMainlineActionReceipt({
         nextOperation: initialLaunchOperatorPrimaryAction?.operation || initialLaunchOperatorFallbackAction?.setupAction?.operation || null,
         nextDownloadKey: initialLaunchOperatorPrimaryAction?.downloadKey || initialLaunchOperatorDownload?.key || null,
         nextDownloadFileName: initialLaunchOperatorDownload?.fileName || null,
+        nextDownloadHref: initialLaunchOperatorDownload?.href || initialLaunchOperatorActionManifest.entrypoints?.downloadHref || null,
         workspaceKey: initialLaunchOperatorWorkspaceAction?.key || null,
         workspaceAutofocus: initialLaunchOperatorWorkspaceAction?.autofocus || null,
         workspaceHref: initialLaunchOperatorWorkspaceAction?.href || initialLaunchOperatorActionManifest.entrypoints?.workspaceHref || null,
@@ -5999,6 +6000,7 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           nextOperation: initialLaunchOperator.nextOperation || null,
           nextDownloadKey: initialLaunchOperator.nextDownloadKey || null,
           nextDownloadFileName: initialLaunchOperator.nextDownloadFileName || null,
+          nextDownloadHref: initialLaunchOperator.nextDownloadHref || null,
           workspaceKey: initialLaunchOperator.workspaceKey || null,
           workspaceAutofocus: initialLaunchOperator.workspaceAutofocus || null,
           files: {
@@ -16301,6 +16303,7 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
         initialLaunchOperatorNextOperation: receipt.initialLaunchOperator?.nextOperation || null,
         initialLaunchOperatorNextDownloadKey: receipt.initialLaunchOperator?.nextDownloadKey || null,
         initialLaunchOperatorNextDownloadFileName: receipt.initialLaunchOperator?.nextDownloadFileName || null,
+        initialLaunchOperatorNextDownloadHref: receipt.initialLaunchOperator?.nextDownloadHref || null,
         initialLaunchOperatorWorkspaceKey: receipt.initialLaunchOperator?.workspaceKey || null,
         initialLaunchOperatorWorkspaceAutofocus: receipt.initialLaunchOperator?.workspaceAutofocus || null,
         createdAt: item.createdAt || null
@@ -17030,6 +17033,7 @@ function buildDeveloperOpsInitialLaunchOperatorActionReceipts(latestLaunchReceip
       nextOperation: item.initialLaunchOperatorNextOperation || null,
       nextDownloadKey: item.initialLaunchOperatorNextDownloadKey || null,
       nextDownloadFileName: item.initialLaunchOperatorNextDownloadFileName || null,
+      nextDownloadHref: item.initialLaunchOperatorNextDownloadHref || null,
       workspaceKey: item.initialLaunchOperatorWorkspaceKey || null,
       workspaceAutofocus: item.initialLaunchOperatorWorkspaceAutofocus || null,
       handoffFileName: item.handoffFileName || null,
@@ -17049,6 +17053,7 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
   operatorActionReceipts = [],
   primaryWorkspaceAction = null,
   primaryDownload = null,
+  stabilizationDownload = null,
   traceability = {},
   goNoGo = {},
   stabilizationHandoffConfirmation = null
@@ -17067,8 +17072,10 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
     title: launchReceiptNextFollowUp?.title || null,
     operation: launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || goNoGo.nextOperation || null,
     actionKey: launchReceiptNextFollowUp?.actionKey || goNoGo.nextActionKey || null,
-    downloadKey: launchReceiptNextFollowUp?.downloadKey || goNoGo.nextDownloadKey || primaryDownload?.key || null,
-    downloadFileName: primaryDownload?.fileName || null,
+    downloadKey: stabilizationDownload?.key || launchReceiptNextFollowUp?.downloadKey || goNoGo.nextDownloadKey || primaryDownload?.key || null,
+    downloadFileName: stabilizationDownload?.fileName || primaryDownload?.fileName || null,
+    downloadHref: stabilizationDownload?.href || primaryDownload?.href || null,
+    downloadFormat: stabilizationDownload?.format || primaryDownload?.format || null,
     workspaceHref: primaryWorkspaceAction?.href || null
   };
   const postLaunchLifecycleStatus = latestReceipt?.postLaunchLifecycleStatus || null;
@@ -17166,6 +17173,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     || null;
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
+  const stabilizationHandoffDownload = mainlineHandoff?.downloads?.stabilizationHandoff || null;
   const followUpQueue = followUps
     .map((item) => ({
       key: item.key || null,
@@ -17287,6 +17295,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operatorActionReceipts,
     primaryWorkspaceAction,
     primaryDownload,
+    stabilizationDownload: stabilizationHandoffDownload,
     traceability,
     goNoGo,
     stabilizationHandoffConfirmation
@@ -19901,7 +19910,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Latest Receipt: ${stabilizationHandoff.latestLaunchReceipt?.operation || "-"} | handoff=${stabilizationHandoff.latestLaunchReceipt?.handoffFileName || "-"}`);
     lines.push(`- Post-Launch: status=${stabilizationHandoff.latestLaunchReceipt?.postLaunchLifecycleStatus || "-"} | next=${stabilizationHandoff.latestLaunchReceipt?.postLaunchLifecycleNextOperation || "-"}`);
     lines.push(`- Latest Operator: ${stabilizationHandoff.latestOperatorActionReceipt?.operation || "-"} | audit=${stabilizationHandoff.latestOperatorActionReceipt?.auditLogId || "-"} | next=${stabilizationHandoff.latestOperatorActionReceipt?.nextOperation || "-"}`);
-    lines.push(`- Next Action: ${stabilizationHandoff.nextAction?.operation || "-"} | download=${stabilizationHandoff.nextAction?.downloadFileName || stabilizationHandoff.nextAction?.downloadKey || "-"} | workspace=${stabilizationHandoff.nextAction?.workspaceHref || "-"}`);
+    lines.push(`- Next Action: ${stabilizationHandoff.nextAction?.operation || "-"} | download=${stabilizationHandoff.nextAction?.downloadFileName || stabilizationHandoff.nextAction?.downloadKey || "-"} | href=${stabilizationHandoff.nextAction?.downloadHref || "-"} | workspace=${stabilizationHandoff.nextAction?.workspaceHref || "-"}`);
     lines.push(`- Files: readiness=${stabilizationHandoff.files?.readiness || "-"} | handoffIndex=${stabilizationHandoff.files?.handoffIndex || "-"} | nextFollowUp=${stabilizationHandoff.files?.nextFollowUp || "-"} | postLaunchIndex=${stabilizationHandoff.files?.postLaunchIndex || "-"}`);
     if (Array.isArray(stabilizationHandoff.checklist) && stabilizationHandoff.checklist.length) {
       lines.push("- Checklist:");
@@ -20693,6 +20702,12 @@ function buildDeveloperOpsMainlineHandoff(scope = {}) {
       "First launch handoff",
       "launch-mainline-first-launch-handoff.txt",
       "first-launch-handoff",
+      params
+    ),
+    stabilizationHandoff: createLaunchMainlineDownloadShortcut(
+      "Stabilization handoff",
+      "launch-mainline-stabilization-handoff.txt",
+      "stabilization-handoff",
       params
     ),
     checksums: createLaunchMainlineDownloadShortcut(

@@ -5361,7 +5361,8 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(routedReleasePackage.summaryText, /Release Route Focus:/);
     assert.match(routedReleasePackage.summaryText, /operation=record_post_launch_ops_sweep/);
     assert.match(routedReleasePackage.summaryText, /action=release_route_post_launch_ops_sweep/);
-    assert.match(routedReleasePackage.summaryText, /download=launch_mainline_post_launch_sweep_handoff/);
+    assert.match(routedReleasePackage.summaryText, /download=launch_mainline_post_launch_sweep_handoff \| href=.*format=post-launch-sweep-handoff/);
+    assert.match(routedReleasePackage.summaryText, /control: .*download=.*href=.*format=post-launch-sweep-handoff/);
     const readinessRouteParams = new URLSearchParams({
       productCode: "RELPKG_ALPHA",
       channel: "stable",
@@ -5577,7 +5578,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(releasePackage.summaryText, /Launch Mainline Gate:/);
     assert.match(releasePackage.summaryText, /Initial Launch Ops Gate:/);
     assert.match(releasePackage.summaryText, /- decision: HOLD/);
-    assert.match(releasePackage.summaryText, /- download: Launch mainline initial launch ops readiness/);
+    assert.match(releasePackage.summaryText, /- download: Launch mainline initial launch ops readiness.*href=.*format=initial-launch-ops-readiness/);
     assert.match(releasePackage.summaryText, /- status: HOLD/);
     assert.match(releasePackage.summaryText, /hostConfig=host-config\/rocksolid_host_config\.env/);
     assert.match(releasePackage.summaryText, /cmake=cmake-consumer\/CMakeLists\.txt/);
@@ -5610,7 +5611,7 @@ test("developer release package export bundles integration, versions, and notice
     );
     assert.match(releaseRouteSummaryDownload.body, /Release Route Focus:/);
     assert.match(releaseRouteSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
-    assert.match(releaseRouteSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff/);
+    assert.match(releaseRouteSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff \| href=.*format=post-launch-sweep-handoff/);
 
     const releaseChecklistDownload = await getText(
       baseUrl,
@@ -5912,7 +5913,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /Launch Workflow Route Focus:/);
     assert.match(launchWorkflow.summaryText, /Continue post-launch ops sweep/);
     assert.match(launchWorkflow.summaryText, /operation=record_post_launch_ops_sweep/);
-    assert.match(launchWorkflow.summaryText, /download=launch_mainline_post_launch_sweep_handoff/);
+    assert.match(launchWorkflow.summaryText, /download=launch_mainline_post_launch_sweep_handoff \| href=.*format=post-launch-sweep-handoff/);
     assert.match(launchWorkflow.summaryText, /Authorization Summary: modes=account\+register/);
     assert.match(launchWorkflow.summaryText, /Recommended Downloads:/);
     assert.match(launchWorkflow.summaryText, /Recommended Workspace:/);
@@ -5923,7 +5924,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /First Ops Actions:/);
     assert.match(launchWorkflow.summaryText, /Action Plan:/);
     assert.match(launchWorkflow.summaryText, /workspace=Open Ops Workspace@/);
-    assert.match(launchWorkflow.summaryText, /download=Runtime smoke summary:developer-ops-summary\.txt|download=Card redemption summary:developer-ops-summary\.txt|download=Early session summary:developer-ops-summary\.txt/);
+    assert.match(launchWorkflow.summaryText, /First Ops Actions:[\s\S]*download=(Runtime smoke summary|Card redemption summary|Early session summary):developer-ops-summary\.txt \| href=.*format=summary/);
     assert.match(launchWorkflow.summaryText, /eventType=session\.login|entityType=license_key/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
@@ -5931,7 +5932,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /bootstrap=Run Launch Bootstrap/);
     assert.doesNotMatch(launchWorkflow.summaryText, /setup=Run First Batch Setup@recommended/);
     assert.match(launchWorkflow.summaryText, /workspace=Open Integration Workspace@startup/);
-    assert.match(launchWorkflow.summaryText, /download=Release summary:/);
+    assert.match(launchWorkflow.summaryText, /Action Plan:[\s\S]*download=Release summary:.*href=.*format=summary/);
     assert.match(launchWorkflow.checklistText, /RockSolid Launch Workflow Checklist/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Authorization readiness/);
     assert.match(launchWorkflow.checklistText, /workspace: Open License Workspace \| focus=quickstart/);
@@ -5940,11 +5941,11 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.checklistText, /Initial Inventory Recommendations:/);
     assert.match(launchWorkflow.checklistText, /First Batch Card Suggestions:/);
     assert.match(launchWorkflow.checklistText, /First Ops Actions:/);
-    assert.match(launchWorkflow.checklistText, /download=Runtime smoke summary:developer-ops-summary\.txt|download=Card redemption summary:developer-ops-summary\.txt|download=Early session summary:developer-ops-summary\.txt/);
+    assert.match(launchWorkflow.checklistText, /download=(Runtime smoke summary|Card redemption summary|Early session summary):developer-ops-summary\.txt \| href=.*format=summary/);
     assert.match(launchWorkflow.checklistText, /Open Ops Workspace@|workspace: Open .*Workspace \| focus=.*filters=/);
     assert.match(launchWorkflow.checklistText, /\[BLOCK\] Startup bootstrap decision/);
     assert.match(launchWorkflow.checklistText, /workspace: Open Integration Workspace \| focus=startup/);
-    assert.match(launchWorkflow.checklistText, /download: Recommended handoff zip \| rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip/);
+    assert.match(launchWorkflow.checklistText, /download: Recommended handoff zip \| rocksolid-launch-workflow-RELPKG_ALPHA-stable-.*-handoff\.zip \| href=.*format=zip/);
 
     const launchSummaryDownload = await getText(
       baseUrl,
@@ -5958,7 +5959,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchSummaryDownload.body, /Launch Workflow Route Focus:/);
     assert.match(launchSummaryDownload.body, /Continue post-launch ops sweep/);
     assert.match(launchSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
-    assert.match(launchSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff/);
+    assert.match(launchSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff \| href=.*format=post-launch-sweep-handoff/);
     assert.match(launchSummaryDownload.body, /Recommended handoff zip/);
     assert.match(launchSummaryDownload.body, /Combined launch workflow zip/);
 

@@ -17579,19 +17579,39 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
   const latestLaunchReceipt = Array.isArray(opsSnapshot?.overview?.latestLaunchReceipts)
     ? opsSnapshot.overview.latestLaunchReceipts[0] || null
     : null;
+  const fallbackFirstRoundDownload = readiness.firstLaunchHandoffDownload
+    || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff
+    || null;
   const firstRoundActions = (Array.isArray(readiness.followUpQueue) ? readiness.followUpQueue : [])
-    .map((item) => ({
-      key: item?.key || null,
-      stage: item?.stage || null,
-      priority: item?.priority || null,
-      title: item?.title || item?.key || "First-wave follow-up",
-      summary: item?.summary || "",
-      actionKey: item?.actionKey || null,
-      operation: item?.operationToRecord || item?.operation || null,
-      downloadKey: item?.downloadKey || null,
-      handoffFileName: item?.handoffFileName || null
-    }))
-    .filter((item) => item.stage || item.actionKey || item.operation || item.downloadKey);
+    .map((item) => {
+      const recommendedDownload = item?.recommendedDownload && typeof item.recommendedDownload === "object"
+        ? {
+            ...item.recommendedDownload,
+            key: item.recommendedDownload.key || item?.downloadKey || null,
+            fileName: item.recommendedDownload.fileName || item?.downloadFileName || null,
+            format: item.recommendedDownload.format || item?.downloadFormat || null,
+            href: item.recommendedDownload.href || item?.downloadHref || null,
+            source: item.recommendedDownload.source || item?.downloadSource || null
+          }
+        : null;
+      return {
+        key: item?.key || null,
+        stage: item?.stage || null,
+        priority: item?.priority || null,
+        title: item?.title || item?.key || "First-wave follow-up",
+        summary: item?.summary || "",
+        actionKey: item?.actionKey || null,
+        operation: item?.operationToRecord || item?.operation || null,
+        downloadKey: item?.downloadKey || recommendedDownload?.key || null,
+        downloadFileName: item?.downloadFileName || recommendedDownload?.fileName || null,
+        downloadHref: item?.downloadHref || recommendedDownload?.href || null,
+        downloadFormat: item?.downloadFormat || recommendedDownload?.format || null,
+        downloadSource: item?.downloadSource || recommendedDownload?.source || null,
+        recommendedDownload,
+        handoffFileName: item?.handoffFileName || null
+      };
+    })
+    .filter((item) => item.stage || item.actionKey || item.operation || item.downloadKey || item.downloadHref);
   const firstRoundStatus = latestLaunchReceipt
     ? (readiness.status || (firstRoundActions.length ? "review" : "ready"))
     : "not_started";
@@ -17604,7 +17624,12 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         summary: "No launch receipt follow-up is queued; continue watching scoped Developer Ops signals.",
         actionKey: "open_ops_snapshot",
         operation: "monitor",
-        downloadKey: readiness.firstLaunchHandoffDownload?.key || null,
+        downloadKey: fallbackFirstRoundDownload?.key || null,
+        downloadFileName: fallbackFirstRoundDownload?.fileName || null,
+        downloadHref: fallbackFirstRoundDownload?.href || null,
+        downloadFormat: fallbackFirstRoundDownload?.format || null,
+        downloadSource: fallbackFirstRoundDownload?.source || null,
+        recommendedDownload: fallbackFirstRoundDownload,
         handoffFileName: readiness.latestReceipt?.handoffFileName || null
       }
     : {
@@ -17616,6 +17641,11 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         actionKey: "launch_first_batch_setup",
         operation: "first_batch_setup",
         downloadKey: null,
+        downloadFileName: null,
+        downloadHref: null,
+        downloadFormat: null,
+        downloadSource: null,
+        recommendedDownload: null,
         handoffFileName: null
       };
 
@@ -17754,7 +17784,7 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   );
   const actions = Array.isArray(firstRoundOps.actions) ? firstRoundOps.actions : [];
   for (const action of actions) {
-    lines.push(`- [${action.stage || action.key || "first_wave"}] ${action.title || "First-wave action"} | action=${action.actionKey || "-"} | operation=${action.operation || "-"} | download=${action.downloadKey || action.handoffFileName || "-"}`);
+    lines.push(`- [${action.stage || action.key || "first_wave"}] ${action.title || "First-wave action"} | action=${action.actionKey || "-"} | operation=${action.operation || "-"} | download=${action.downloadKey || action.recommendedDownload?.key || action.handoffFileName || "-"} | file=${action.downloadFileName || action.recommendedDownload?.fileName || action.handoffFileName || "-"} | href=${action.downloadHref || action.recommendedDownload?.href || "-"}`);
     if (action.summary) {
       lines.push(`  summary=${action.summary}`);
     }

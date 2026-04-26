@@ -12933,6 +12933,14 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.ok(Array.isArray(afterSetup.firstRoundOps.actions));
     assert.ok(afterSetup.firstRoundOps.actions.length >= 1);
     assert.ok(afterSetup.firstRoundOps.actions.some((item) => item.stage === "first_launch_handoff"));
+    const firstLaunchHandoffAction = afterSetup.firstRoundOps.actions.find((item) => item.stage === "first_launch_handoff");
+    assert.ok(firstLaunchHandoffAction.downloadHref);
+    assert.equal(firstLaunchHandoffAction.recommendedDownload.href, firstLaunchHandoffAction.downloadHref);
+    assert.match(firstLaunchHandoffAction.downloadHref, /\/api\/developer\/launch-mainline\/download\?/);
+    assert.match(firstLaunchHandoffAction.downloadHref, /format=first-launch-handoff/);
+    assert.match(firstLaunchHandoffAction.downloadHref, /productCode=FIRSTWAVE/);
+    assert.ok(afterSetup.firstRoundOps.primaryAction.downloadHref);
+    assert.equal(afterSetup.firstRoundOps.primaryAction.recommendedDownload.href, afterSetup.firstRoundOps.primaryAction.downloadHref);
     assert.equal(afterSetup.traceability.latestLaunchReceipt.operation, "first_batch_setup");
     assert.equal(afterSetup.traceability.latestLaunchReceipt.firstLaunchInventoryCreatedCardCount, 150);
     assert.ok(afterSetup.traceability.opsSnapshotFileName);
@@ -12952,6 +12960,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(handoffDownload.body, /First Round Ops Actions:/);
     assert.match(handoffDownload.body, /Traceability:/);
     assert.match(handoffDownload.body, /latestReceipt=first_batch_setup/);
+    assert.match(handoffDownload.body, /href=.*format=first-launch-handoff/);
 
     const firstWaveChecksums = await getText(
       baseUrl,

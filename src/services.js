@@ -16696,6 +16696,8 @@ function buildStabilizationHandoffConfirmationPayload(item = null) {
     note: item.note || metadata.note || "",
     opsFiles: item.opsFiles || metadata.opsFiles || null,
     launchMainlineFiles: item.launchMainlineFiles || metadata.launchMainlineFiles || null,
+    opsDownloads: item.opsDownloads || metadata.opsDownloads || null,
+    launchMainlineDownloads: item.launchMainlineDownloads || metadata.launchMainlineDownloads || null,
     createdAt: item.createdAt || null
   };
 }
@@ -16729,6 +16731,8 @@ function buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs = [], li
         note: metadata.note || "",
         opsFiles: metadata.opsFiles || null,
         launchMainlineFiles: metadata.launchMainlineFiles || null,
+        opsDownloads: metadata.opsDownloads || null,
+        launchMainlineDownloads: metadata.launchMainlineDownloads || null,
         createdAt: item.createdAt || item.created_at || null
       });
     })
@@ -33838,6 +33842,23 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const confirmedAt = nowIso();
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
       const handoffFileName = "developer-ops-stabilization-handoff.txt";
+      const traceabilityParams = { productCode: product.code, channel };
+      const opsStabilizationHandoffDownload = createLaunchWorkflowDownloadShortcut(
+        "ops_stabilization_handoff",
+        "developer-ops-stabilization-handoff.txt",
+        "Developer Ops stabilization handoff",
+        {
+          source: "developer-ops",
+          format: "stabilization-handoff",
+          params: traceabilityParams
+        }
+      );
+      const launchMainlineStabilizationHandoffDownload = createLaunchMainlineDownloadShortcut(
+        "Launch Mainline stabilization handoff",
+        "launch-mainline-stabilization-handoff.txt",
+        "stabilization-handoff",
+        traceabilityParams
+      );
       const traceability = {
         eventType: "developer.ops.stabilization-handoff.confirm",
         entityType: "developer_ops_stabilization_handoff",
@@ -33855,6 +33876,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           summary: "summary",
           checksums: "checksums",
           zip: "zip"
+        },
+        opsDownloads: {
+          stabilizationHandoff: opsStabilizationHandoffDownload
+        },
+        launchMainlineDownloads: {
+          stabilizationHandoff: launchMainlineStabilizationHandoffDownload
         }
       };
       const confirmedBy = {
@@ -33879,7 +33906,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           handoffFileName,
           note,
           opsFiles: traceability.opsFiles,
-          launchMainlineFiles: traceability.launchMainlineFiles
+          launchMainlineFiles: traceability.launchMainlineFiles,
+          opsDownloads: traceability.opsDownloads,
+          launchMainlineDownloads: traceability.launchMainlineDownloads
         }
       );
 

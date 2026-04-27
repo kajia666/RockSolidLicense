@@ -14241,6 +14241,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(stabilizationConfirmation.confirmedBy.username, "ops.export.operator");
     assert.equal(stabilizationConfirmation.traceability.opsFiles.stabilizationHandoff, "stabilization-handoff.txt");
     assert.equal(stabilizationConfirmation.traceability.launchMainlineFiles.stabilizationHandoff, "ops/stabilization-handoff.txt");
+    assert.ok(stabilizationConfirmation.traceability.opsDownloads?.stabilizationHandoff);
+    assert.ok(stabilizationConfirmation.traceability.launchMainlineDownloads?.stabilizationHandoff);
+    assert.match(
+      stabilizationConfirmation.traceability.opsDownloads.stabilizationHandoff.href,
+      /\/api\/developer\/ops\/export\/download\?/
+    );
+    assert.match(stabilizationConfirmation.traceability.opsDownloads.stabilizationHandoff.href, /productCode=EXPORT_ALPHA/);
+    assert.match(stabilizationConfirmation.traceability.opsDownloads.stabilizationHandoff.href, /channel=stable/);
+    assert.match(stabilizationConfirmation.traceability.opsDownloads.stabilizationHandoff.href, /format=stabilization-handoff/);
+    assert.match(
+      stabilizationConfirmation.traceability.launchMainlineDownloads.stabilizationHandoff.href,
+      /\/api\/developer\/launch-mainline\/download\?/
+    );
+    assert.match(stabilizationConfirmation.traceability.launchMainlineDownloads.stabilizationHandoff.href, /productCode=EXPORT_ALPHA/);
+    assert.match(stabilizationConfirmation.traceability.launchMainlineDownloads.stabilizationHandoff.href, /channel=stable/);
+    assert.match(stabilizationConfirmation.traceability.launchMainlineDownloads.stabilizationHandoff.href, /format=stabilization-handoff/);
     assert.ok(stabilizationConfirmation.auditLogId);
 
     const stabilizationConfirmationAudit = await getJson(
@@ -14253,6 +14269,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         && item.entity_type === "developer_ops_stabilization_handoff"
         && item.metadata?.decision === "confirmed"
         && item.metadata?.handoffFileName === "developer-ops-stabilization-handoff.txt"
+        && /format=stabilization-handoff/.test(item.metadata?.opsDownloads?.stabilizationHandoff?.href || "")
     ));
 
     const confirmedOpsSnapshot = await getJson(
@@ -14267,6 +14284,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(stabilizationConfirmationEvidence.decision, "confirmed");
     assert.equal(stabilizationConfirmationEvidence.handoffFileName, "developer-ops-stabilization-handoff.txt");
     assert.equal(stabilizationConfirmationEvidence.confirmedBy.username, "ops.export.operator");
+    assert.ok(stabilizationConfirmationEvidence.opsDownloads?.stabilizationHandoff);
+    assert.ok(stabilizationConfirmationEvidence.launchMainlineDownloads?.stabilizationHandoff);
+    assert.equal(
+      stabilizationConfirmationEvidence.opsDownloads.stabilizationHandoff.href,
+      stabilizationConfirmation.traceability.opsDownloads.stabilizationHandoff.href
+    );
+    assert.equal(
+      stabilizationConfirmationEvidence.launchMainlineDownloads.stabilizationHandoff.href,
+      stabilizationConfirmation.traceability.launchMainlineDownloads.stabilizationHandoff.href
+    );
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.stabilizationHandoffConfirmation.auditLogId,
       stabilizationConfirmation.auditLogId

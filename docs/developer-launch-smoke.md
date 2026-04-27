@@ -53,6 +53,20 @@ The two workspace routes intentionally carry `source=launch-smoke` and `handoff=
 
 In local ephemeral mode these entries use routes only because the temporary app shuts down after the script exits. In remote `--base-url` mode they also include absolute `href` values.
 
+Before running the remote write-path smoke against staging, run the no-write staging preflight first:
+
+```powershell
+npm.cmd --silent run staging:preflight -- --json `
+  --base-url https://staging.example.com `
+  --admin-username admin@example.com `
+  --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD `
+  --developer-username launch.smoke.owner `
+  --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `
+  --product-code SMOKE_ALPHA
+```
+
+The preflight checks that the staging base URL is HTTPS, the smoke credentials are present and non-default, and the product/channel are explicit. When it passes, the JSON output includes a redacted `nextCommand.powershell` value for the real `launch:smoke:staging` run, so passwords stay in environment variables instead of being printed into handoff notes.
+
 To run the same write-path preflight against an already running staging API, use the staging wrapper. It adds `--require-https` so the rehearsal fails before writing if the base URL is accidentally pointed at plain HTTP:
 
 ```powershell

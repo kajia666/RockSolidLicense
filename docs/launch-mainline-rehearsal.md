@@ -50,6 +50,21 @@ Before starting, fix one lane:
 - one intended public entrypoint
 - one intended storage/runtime topology
 
+For a staging API rehearsal, run the no-write command preflight before the live-write smoke step:
+
+```powershell
+npm.cmd --silent run staging:preflight -- --json `
+  --base-url https://staging.example.com `
+  --admin-username admin@example.com `
+  --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD `
+  --developer-username launch.smoke.owner `
+  --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `
+  --product-code SMOKE_ALPHA `
+  --channel stable
+```
+
+Do not continue to `launch:smoke:staging --allow-live-writes` until this preflight passes. Its output includes a redacted next command that keeps smoke passwords in environment variables.
+
 Keep these outputs available during the rehearsal:
 
 - release package summary

@@ -3615,6 +3615,9 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
+  if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
+  if (normalized === "integration_host_config" || normalized.includes("integration-host-config")) return "host-config";
+  if (normalized === "integration_host_skeleton" || normalized.includes("integration-host-skeleton")) return "host-skeleton";
   if (normalized === "ops_primary_summary" || /^ops_primary_(account|entitlement|session|device)_summary$/.test(normalized)) return "route-review-primary";
   if (normalized === "ops_route_next_summary") return "route-review-next";
   if (normalized === "ops_remaining_summary") return "route-review-remaining";
@@ -8460,6 +8463,8 @@ function buildLaunchQuickstartFollowUpPlan({
 }
 
 function buildLaunchWorkflowChecklistPayload({
+  product = null,
+  channel = "stable",
   releasePackage,
   integrationPackage,
   authReadiness = {},
@@ -8477,6 +8482,10 @@ function buildLaunchWorkflowChecklistPayload({
   const tokenKeySummary = startupPreview.tokenKeySummary || {};
   const clientHardening = startupPreview.clientHardening || integrationPackage?.manifest?.clientHardening || {};
   const tokenKeyTotal = tokenKeySummary.totalKeys ?? integrationPackage?.manifest?.tokenKeys?.length ?? 0;
+  const routeParams = compactRouteParams({
+    productCode: product?.code || releasePackage?.manifest?.project?.code || integrationPackage?.manifest?.project?.code || null,
+    channel: normalizeChannel(channel)
+  });
   const releaseAutofocus = pickLaunchWorkflowReleaseAutofocus(readiness);
   const items = [
     {
@@ -8492,7 +8501,8 @@ function buildLaunchWorkflowChecklistPayload({
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "release_summary",
         releasePackage?.summaryFileName || "release-package.txt",
-        "Release summary"
+        "Release summary",
+        { params: routeParams }
       )
     },
     {
@@ -8510,7 +8520,8 @@ function buildLaunchWorkflowChecklistPayload({
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "launch_checklist",
         checklistFileName,
-        "Launch workflow checklist"
+        "Launch workflow checklist",
+        { params: routeParams }
       )
     },
     {
@@ -8546,7 +8557,11 @@ function buildLaunchWorkflowChecklistPayload({
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "integration_env",
         integrationPackage?.snippets?.envFileName || "project.env",
-        "Integration env"
+        "Integration env",
+        {
+          format: "env",
+          params: routeParams
+        }
       )
     },
     {
@@ -8560,7 +8575,11 @@ function buildLaunchWorkflowChecklistPayload({
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "integration_host_skeleton",
         integrationPackage?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp",
-        "Host skeleton"
+        "Host skeleton",
+        {
+          format: "host-skeleton",
+          params: routeParams
+        }
       )
     },
     {
@@ -8578,7 +8597,11 @@ function buildLaunchWorkflowChecklistPayload({
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "integration_host_config",
         integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env",
-        "Integration host config"
+        "Integration host config",
+        {
+          format: "host-config",
+          params: routeParams
+        }
       )
     },
     {
@@ -8593,7 +8616,10 @@ function buildLaunchWorkflowChecklistPayload({
         "launch_handoff_zip",
         handoffZipFileName,
         "Recommended handoff zip",
-        { format: "handoff-zip" }
+        {
+          format: "handoff-zip",
+          params: routeParams
+        }
       )
     }
   ];
@@ -9048,7 +9074,11 @@ function buildLaunchWorkflowSummaryPayload({
         startupDecision.ready === false
           ? (integrationPackage?.snippets?.envFileName || "project.env")
           : (integrationPackage?.snippets?.hostSkeletonFileName || "project-host-skeleton.cpp"),
-        startupDecision.ready === false ? "Integration env" : "Host skeleton"
+        startupDecision.ready === false ? "Integration env" : "Host skeleton",
+        {
+          format: startupDecision.ready === false ? "env" : "host-skeleton",
+          params: routeQueryParams
+        }
       )
     }));
   }
@@ -9498,6 +9528,8 @@ function buildLaunchWorkflowPackagePayload({
   const handoffZipFileName = `${buildArchiveRootName(fileName, "launch-workflow")}-handoff.zip`;
   const handoffChecksumsFileName = buildChecksumFileName(handoffZipFileName, "launch-workflow-handoff");
   const workflowChecklist = buildLaunchWorkflowChecklistPayload({
+    product,
+    channel: normalizedChannel,
     releasePackage,
     integrationPackage,
     authReadiness,

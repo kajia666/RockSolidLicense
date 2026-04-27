@@ -26,6 +26,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
 - Launch smoke handoff continuity: the CLI `launch:smoke` first-wave handoff now lands in Launch Review and Developer Ops with `source=launch-smoke` / `handoff=first-wave` preserved in route-focus UI, payload filters, exported summaries, and follow-up workspace links.
 - Recommended download routing: Release Package and Launch Workflow text handoffs, Launch Workflow local zip/summary/checklist downloads, Launch Workflow integration env/host-config/host-skeleton download format routing, Launch Workflow handoff zip/checksum downloads, Launch Workflow checklist/action-plan handoff zip format consistency, Launch Review route focus/action/focus-target text, Launch Review scoped Workflow summary/checklist downloads, Launch Smoke route focus/action text, Launch Smoke action-plan scoped Smoke Kit downloads, Launch Mainline route focus/continuation/recommended-download text, First Launch Handoff text, Post-Launch Lifecycle text, Launch Workflow, Release follow-ups, Developer Projects follow-up downloads, Developer License quickstart follow-ups, Developer Ops route-review handoffs, Developer Ops Launch Mainline handoff summary text, shared Initial Launch Ops Gate blocker text, launch receipt follow-up queue downloads/CSV export and Developer Ops follow-up overview text, First Wave Recommendations first-round ops actions, initial-launch traceability next-follow-up downloads, Developer Ops summary/readiness/stabilization traceability text, Developer Ops readiness blocker/action text, Developer Ops operator action manifest text, Launch Mainline post-launch handoff traceability/lifecycle primary-download text, Launch Mainline action receipt handoff text, Launch Mainline zip/checksum handoff download routes, and Developer Ops operator/stabilization follow-ups now consume service-provided download `href` values for recommended downloads, so the first-wave handoff chain no longer relies on frontend source/format guessing in those launch-critical entrypoints.
+- Latest backend/API slice: Launch Mainline now preserves Developer Ops route-review primary and remaining download scope across product, channel, event type, and actor type, so operators can reopen the exact scoped Ops export from the mainline page without losing the release lane.
 
 Estimated initial pilot-launch readiness: 88%-90%.
 
@@ -36,7 +37,7 @@ This estimate means the core flow is mostly ready for a controlled first launch,
 Work should continue in short backend/API-first slices. Each slice should end with a commit, targeted verification, and a note about the next slice.
 
 1. Finish a final spot audit for any non-critical or older launch-adjacent download surfaces outside the now-hardened Release, Launch Workflow, Launch Review, Launch Smoke, Launch Mainline, Developer Projects, Developer License, Developer Ops first-wave chain, and First Wave Recommendations chain.
-   The main launch-critical route/download handoffs, Release Package/Launch Workflow/Launch Review/Launch Smoke/Launch Mainline text handoffs, Launch Workflow local zip/summary/checklist downloads, Launch Workflow integration env/host-config/host-skeleton downloads, Launch Workflow handoff zip/checksum downloads and checklist/action-plan handoff zip entries, Launch Review scoped Workflow summary/checklist downloads, Launch Smoke action-plan scoped Smoke Kit downloads, First Launch Handoff text, Post-Launch Lifecycle text, receipt follow-up queue downloads/CSV export and Developer Ops follow-up overview text, first-round ops recommendation downloads, Developer Ops Launch Mainline handoff summary text, shared Initial Launch Ops Gate blocker text, Developer Ops readiness blocker/action text, Developer Ops operator action manifest text, and Developer Ops text handoffs now round-trip through service-provided `href` values; remaining work is mostly residual cleanup and regression coverage.
+   The main launch-critical route/download handoffs, Release Package/Launch Workflow/Launch Review/Launch Smoke/Launch Mainline text handoffs, Launch Workflow local zip/summary/checklist downloads, Launch Workflow integration env/host-config/host-skeleton downloads, Launch Workflow handoff zip/checksum downloads and checklist/action-plan handoff zip entries, Launch Review scoped Workflow summary/checklist downloads, Launch Smoke action-plan scoped Smoke Kit downloads, Launch Mainline Developer Ops route-review primary/remaining downloads, First Launch Handoff text, Post-Launch Lifecycle text, receipt follow-up queue downloads/CSV export and Developer Ops follow-up overview text, first-round ops recommendation downloads, Developer Ops Launch Mainline handoff summary text, shared Initial Launch Ops Gate blocker text, Developer Ops readiness blocker/action text, Developer Ops operator action manifest text, and Developer Ops text handoffs now round-trip through service-provided `href` values; remaining work is mostly residual cleanup and regression coverage.
 
 2. Tighten initial launch ops readiness after real first-launch actions.
    Verify that launch bootstrap, first batch setup, inventory refill, first-wave ops sweep, and closeout/stabilization actions all refresh the same readiness chain.
@@ -192,7 +193,7 @@ Current high-level progress:
 
 - Core backend/API authorization: 90%-95%.
 - Developer delivery and handoff chain: 91%-94%.
-- Launch Mainline and first-launch operations: 88%-91%.
+- Launch Mainline and first-launch operations: 89%-92%.
 - SDK/integration packaging: 80%-85%.
 - Production deployment readiness: 75%-85%.
 - Commercial operations readiness: 65%-75%.
@@ -205,7 +206,7 @@ This is high enough to keep moving toward a controlled launch, but not high enou
 
 Minimum remaining work before a controlled pilot:
 
-1. Finish residual route/download spot checks outside the launch-critical first-wave handoff chain.
+1. Finish residual route/download spot checks outside the launch-critical first-wave handoff chain and any less-used Ops export variants.
 2. Run grouped targeted tests for release, launch workflow, launch review, launch smoke, launch mainline, and developer ops.
 3. Run full test suite once the current backend/API slices settle and before staging rehearsal sign-off.
 4. Prepare staging environment with non-default secrets and public HTTPS.

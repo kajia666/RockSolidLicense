@@ -20653,6 +20653,7 @@ function buildDeveloperOpsSnapshotPayload({
     accessibleProjectCount: accessibleProjects.length,
     exportedProjectCount: normalizedProjects.length,
     productCode: filters.productCode || null,
+    channel: filters.channel || null,
     username: filters.username || null,
     search: filters.search || null,
     eventType: filters.eventType || null,
@@ -20970,6 +20971,7 @@ function buildDeveloperOpsRouteReviewRemainingSummaryText(payload = {}) {
 function buildDeveloperOpsRouteReviewBaseDownloadParams(scope = {}) {
   const params = {
     productCode: scope.productCode || "",
+    channel: scope.channel || "",
     username: scope.username || "",
     search: scope.search || "",
     eventType: scope.eventType || "",
@@ -20977,7 +20979,7 @@ function buildDeveloperOpsRouteReviewBaseDownloadParams(scope = {}) {
     entityType: scope.entityType || "",
     limit: Number(scope.auditLimit || 0) || 60
   };
-  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+  for (const field of ["productCode", "channel", "username", "search", "eventType", "actorType", "entityType"]) {
     if (!params[field]) {
       delete params[field];
     }
@@ -21025,7 +21027,7 @@ function buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope = {}, match =
     params.entityType = params.entityType || (item.blockId ? "device_block" : (item.bindingId ? "device_binding" : ""));
     params.search = item.fingerprint || params.search || "";
   }
-  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+  for (const field of ["productCode", "channel", "username", "search", "eventType", "actorType", "entityType"]) {
     if (!params[field]) {
       delete params[field];
     }
@@ -33936,6 +33938,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
 
       const normalizedFilters = {
         productCode: filters.productCode ? String(filters.productCode).trim().toUpperCase() : null,
+        channel: normalizeChannel(filters.channel, "stable"),
         username: filters.username ? String(filters.username).trim() : null,
         search: filters.search ? String(filters.search).trim() : null,
         eventType: filters.eventType ? String(filters.eventType).trim() : null,

@@ -53,10 +53,10 @@ The two workspace routes intentionally carry `source=launch-smoke` and `handoff=
 
 In local ephemeral mode these entries use routes only because the temporary app shuts down after the script exits. In remote `--base-url` mode they also include absolute `href` values.
 
-To run the same write-path preflight against an already running staging API, pass a base URL and explicit write consent:
+To run the same write-path preflight against an already running staging API, use the staging wrapper. It adds `--require-https` so the rehearsal fails before writing if the base URL is accidentally pointed at plain HTTP:
 
 ```powershell
-npm.cmd --silent run launch:smoke -- --json `
+npm.cmd --silent run launch:smoke:staging -- --json `
   --base-url https://staging.example.com `
   --allow-live-writes `
   --admin-username admin@example.com `
@@ -67,6 +67,8 @@ npm.cmd --silent run launch:smoke -- --json `
 ```
 
 Remote mode intentionally requires `--allow-live-writes` because it creates a developer, product, policy, first-batch card inventory, and a first-wave handoff confirmation. Use it for staging or a deliberately scoped production pilot project, not against an existing customer project.
+
+If you intentionally need to run a remote smoke against a local HTTP test server, keep using `launch:smoke` directly. For staging and launch rehearsal, prefer `launch:smoke:staging` so HTTPS enforcement is part of the command instead of a manual checklist item.
 
 It also preserves routed project and lane context from nearby workspaces such as:
 

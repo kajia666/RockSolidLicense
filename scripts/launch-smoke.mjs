@@ -25,6 +25,7 @@ function parseArgs(argv) {
     json: false,
     baseUrl: null,
     allowLiveWrites: false,
+    requireHttps: false,
     productCode: "LAUNCH_SMOKE",
     channel: "stable",
     limit: "20",
@@ -42,6 +43,10 @@ function parseArgs(argv) {
     }
     if (arg === "--allow-live-writes") {
       options.allowLiveWrites = true;
+      continue;
+    }
+    if (arg === "--require-https") {
+      options.requireHttps = true;
       continue;
     }
 
@@ -118,6 +123,7 @@ function parseArgs(argv) {
 
   if (options.baseUrl) {
     ensure(options.allowLiveWrites, "Remote launch smoke creates a developer, product, policy, first batches, and handoff confirmation. Pass --allow-live-writes to run against --base-url.");
+    ensure(!options.requireHttps || options.baseUrl.startsWith("https://"), "Remote launch smoke with --require-https requires an https:// base URL.");
     ensure(options.adminUsername, "Remote launch smoke requires --admin-username or RSL_SMOKE_ADMIN_USERNAME.");
     ensure(options.adminPassword, "Remote launch smoke requires --admin-password or RSL_SMOKE_ADMIN_PASSWORD.");
     ensure(options.developerUsername, "Remote launch smoke requires --developer-username or RSL_SMOKE_DEVELOPER_USERNAME.");

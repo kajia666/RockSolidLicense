@@ -72,6 +72,7 @@ function spawnNode(args, { timeout = 300_000 } = {}) {
 test("launch smoke script runs the first-wave operations preflight", () => {
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   assert.equal(packageJson.scripts["launch:smoke"], "node scripts/launch-smoke.mjs");
+  assert.equal(packageJson.scripts["launch:smoke:staging"], "node scripts/launch-smoke.mjs --require-https");
 
   const result = spawnSync(
     process.execPath,
@@ -174,6 +175,42 @@ test("launch smoke script reports missing option values before running checks", 
   const output = JSON.parse(result.stdout);
   assert.equal(output.status, "fail");
   assert.match(output.error.message, /--base-url requires a value/);
+  assert.deepEqual(output.checks, []);
+});
+
+test("launch smoke script can require https for staging remote smoke runs", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "scripts/launch-smoke.mjs",
+      "--json",
+      "--base-url",
+      "http://127.0.0.1:1",
+      "--allow-live-writes",
+      "--require-https",
+      "--admin-username",
+      "admin",
+      "--admin-password",
+      "Pass123!abc",
+      "--developer-username",
+      "live.smoke.owner",
+      "--developer-password",
+      "LiveSmokeOwner123!",
+      "--product-code",
+      "LIVE_SMOKE_ALPHA"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 300_000
+    }
+  );
+
+  assert.equal(result.status, 1, result.stderr || result.stdout);
+  assert.equal(result.stderr, "");
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.status, "fail");
+  assert.match(output.error.message, /requires an https:\/\/ base URL/);
   assert.deepEqual(output.checks, []);
 });
 

@@ -14780,6 +14780,24 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const recommendedDownloads = Array.isArray(mainlineSummary.recommendedDownloads)
     ? mainlineSummary.recommendedDownloads
     : [];
+  const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
+    ? payload.opsSnapshot.scope
+    : {};
+  const opsHandoffIndexDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_handoff_index",
+    "developer-ops-handoff-index.txt",
+    "Developer Ops handoff index",
+    {
+      source: "developer-ops",
+      format: "handoff-index",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams({
+        ...payload.filters,
+        ...opsScope,
+        productCode: opsScope.productCode || payload.filters?.productCode || project.code || "",
+        channel: opsScope.channel || payload.filters?.channel || manifest.channel || "stable"
+      })
+    }
+  );
   const lines = [
     "RockSolid Developer Launch Mainline Handoff Download Routes",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -14799,6 +14817,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | href=${download.href || "-"}`
     );
   };
+  pushRoute(
+    "ops-handoff-index",
+    "Developer Ops handoff index",
+    opsFiles.handoffIndex || "ops/handoff-index.txt",
+    opsHandoffIndexDownload || {}
+  );
   pushRoute(
     "launch-receipt-next-follow-up",
     nextFollowUp.title || "Launch receipt next follow-up",

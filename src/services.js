@@ -6038,8 +6038,9 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           primaryWorkspaceAutofocus: lifecyclePrimaryWorkspace?.autofocus || lifecycleNextAction?.workspaceAction?.autofocus || null,
           primaryDownloadKey: lifecyclePrimaryDownload?.key || null,
           primaryDownloadFormat: lifecyclePrimaryDownload?.format || null,
-          primaryDownloadFileName: lifecyclePrimaryDownload?.fileName || null
-      }
+          primaryDownloadFileName: lifecyclePrimaryDownload?.fileName || null,
+          primaryDownloadHref: lifecyclePrimaryDownload?.href || null
+        }
       : null,
     initialLaunchOperator: initialLaunchOperator
       ? {
@@ -15857,7 +15858,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null,
           postLaunchLifecyclePrimaryDownloadKey: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
           postLaunchLifecyclePrimaryDownloadFormat: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
-          postLaunchLifecyclePrimaryDownloadFileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null
+          postLaunchLifecyclePrimaryDownloadFileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
+          postLaunchLifecyclePrimaryDownloadHref: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null
         }
       : null,
     nextFollowUp: launchReceiptNextFollowUp
@@ -15883,7 +15885,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       primaryDownloadKey: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadKey || lifecyclePrimaryDownload?.key || null,
       primaryDownloadFormat: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFormat || lifecyclePrimaryDownload?.format || null,
       primaryDownloadFileName: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadFileName || lifecyclePrimaryDownload?.fileName || null,
-      primaryDownloadHref: lifecyclePrimaryDownload?.href || null,
+      primaryDownloadHref: latestLaunchReceipt?.postLaunchLifecyclePrimaryDownloadHref || lifecyclePrimaryDownload?.href || null,
       primaryDownloadSource: lifecyclePrimaryDownload?.source || null
     },
     initialLaunchOpsContract,
@@ -16636,6 +16638,7 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         postLaunchLifecyclePrimaryDownloadKey: receipt.postLaunchLifecycle?.primaryDownloadKey || null,
         postLaunchLifecyclePrimaryDownloadFormat: receipt.postLaunchLifecycle?.primaryDownloadFormat || null,
         postLaunchLifecyclePrimaryDownloadFileName: receipt.postLaunchLifecycle?.primaryDownloadFileName || null,
+        postLaunchLifecyclePrimaryDownloadHref: receipt.postLaunchLifecycle?.primaryDownloadHref || null,
         initialLaunchOperatorDecision: receipt.initialLaunchOperator?.decision || null,
         initialLaunchOperatorStatus: receipt.initialLaunchOperator?.status || null,
         initialLaunchOperatorPrimaryActionKey: receipt.initialLaunchOperator?.primaryActionKey || null,

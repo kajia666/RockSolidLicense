@@ -13701,6 +13701,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName,
       launchOpsAction.receipt.postLaunchLifecycleSummary?.primaryRecommendedDownload?.fileName || null
     );
+    assert.equal(
+      latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref,
+      launchOpsAction.receipt.postLaunchLifecycleSummary?.primaryRecommendedDownload?.href || null
+    );
     const launchReceiptEvidenceFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.operation === "record_post_launch_ops_sweep" && item.stage === "production_evidence"
     );
@@ -14462,6 +14466,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceability.postLaunchHandoffTraceability.postLaunchLifecycle.primaryDownloadHref,
       new RegExp(`format=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat}`)
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.postLaunchLifecycle.primaryDownloadHref,
+      latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref
     );
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.initialLaunchOpsContract.version,

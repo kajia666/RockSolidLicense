@@ -12107,7 +12107,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         "Launch smoke kit summary",
         "launch-smoke-kit.txt",
         "summary",
-        { reviewMode: "matched" }
+        smokeRouteParams
       )
     }) : null,
     readyPaths.length ? createSmokeReviewTarget({
@@ -12274,7 +12274,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       status: verificationPaths.find((item) => item.key === "startup_bootstrap")?.status || "review",
       summary: startupDecision.message || "Use the staged startup request, then confirm the lane is not blocked by version rules or notices.",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
-      recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", { reviewMode: "matched" })
+      recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", smokeRouteParams)
     },
     bootstrapAction ? {
       key: "launch_smoke_bootstrap",
@@ -12304,7 +12304,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       status: "review",
       summary: `Use one of the ready smoke paths first: ${readyPaths.map((item) => item.label).join(" / ")}.`,
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
-      recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", { reviewMode: "matched" })
+      recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", smokeRouteParams)
     } : null,
     {
       key: "launch_mainline_overview",

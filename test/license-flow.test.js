@@ -8929,6 +8929,26 @@ test("developer license quickstart bootstrap can create starter launch assets in
       && /^(review_next|complete_route_review)$/.test(item.workspaceAction?.params?.routeAction || "")
       && /^(route-review-next|summary)$/.test(item.recommendedDownload?.format || "")
     ));
+    const smokeStartupRecheckAction = smokeKit.smokeSummary?.actionPlan?.find((item) => item.key === "startup_bootstrap_recheck");
+    assert.equal(smokeStartupRecheckAction?.recommendedDownload?.source, "developer-launch-smoke-kit");
+    assert.equal(smokeStartupRecheckAction?.recommendedDownload?.format, "summary");
+    assert.match(smokeStartupRecheckAction?.recommendedDownload?.href || "", /\/api\/developer\/launch-smoke-kit\/download\?/);
+    assert.match(smokeStartupRecheckAction?.recommendedDownload?.href || "", /productCode=BOOT_ALPHA/);
+    assert.match(smokeStartupRecheckAction?.recommendedDownload?.href || "", /channel=stable/);
+    assert.match(smokeStartupRecheckAction?.recommendedDownload?.href || "", /operation=record_post_launch_ops_sweep/);
+    assert.match(smokeStartupRecheckAction?.recommendedDownload?.href || "", /actionKey=launch_smoke_record_post_launch_ops_sweep/);
+    assert.match(smokeStartupRecheckAction?.recommendedDownload?.href || "", /downloadKey=launch_smoke_summary/);
+    assert.match(smokeStartupRecheckAction?.recommendedDownload?.href || "", /format=summary/);
+    const smokeExecutionAction = smokeKit.smokeSummary?.actionPlan?.find((item) => item.key === "launch_smoke_execution");
+    assert.equal(smokeExecutionAction?.recommendedDownload?.source, "developer-launch-smoke-kit");
+    assert.equal(smokeExecutionAction?.recommendedDownload?.format, "summary");
+    assert.match(smokeExecutionAction?.recommendedDownload?.href || "", /\/api\/developer\/launch-smoke-kit\/download\?/);
+    assert.match(smokeExecutionAction?.recommendedDownload?.href || "", /productCode=BOOT_ALPHA/);
+    assert.match(smokeExecutionAction?.recommendedDownload?.href || "", /channel=stable/);
+    assert.match(smokeExecutionAction?.recommendedDownload?.href || "", /operation=record_post_launch_ops_sweep/);
+    assert.match(smokeExecutionAction?.recommendedDownload?.href || "", /actionKey=launch_smoke_record_post_launch_ops_sweep/);
+    assert.match(smokeExecutionAction?.recommendedDownload?.href || "", /downloadKey=launch_smoke_summary/);
+    assert.match(smokeExecutionAction?.recommendedDownload?.href || "", /format=summary/);
     assert.ok(Array.isArray(smokeKit.smokeSummary?.reviewTargets));
     assert.ok(smokeKit.smokeSummary?.primaryReviewTarget);
     assert.equal(smokeKit.smokeSummary?.primaryReviewTarget?.workspaceAction?.key, "ops");

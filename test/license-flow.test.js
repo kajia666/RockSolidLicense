@@ -14415,6 +14415,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilityZipText, /RockSolid Developer Launch Mainline Handoff Download Routes/);
     assert.match(launchMainlineTraceabilityZipText, /ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(launchMainlineTraceabilityZipText, /format=launch-receipt-next-follow-up/);
+    assert.match(launchMainlineTraceabilityZipText, /post-launch-lifecycle-primary/);
+    assert.match(
+      launchMainlineTraceabilityZipText,
+      new RegExp(`post-launch-lifecycle-primary: .*format=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat}.*href=.*format=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat}`)
+    );
     assert.match(launchMainlineTraceabilityZipText, /stabilization-confirmation-ops/);
     assert.match(launchMainlineTraceabilityZipText, /stabilization-confirmation-mainline/);
     assert.match(launchMainlineTraceabilityZipText, /format=stabilization-handoff/);

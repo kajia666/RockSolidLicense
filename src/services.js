@@ -14760,10 +14760,23 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const nextFollowUpDownload = nextFollowUp.recommendedDownload && typeof nextFollowUp.recommendedDownload === "object"
     ? nextFollowUp.recommendedDownload
     : {};
+  const mainlineSummary = payload.mainlineSummary || {};
+  const postLaunchLifecycle = traceability.postLaunchLifecycle || {};
+  const lifecyclePrimaryRecommendedDownload = mainlineSummary.productionGate?.postLaunchLifecycle?.primaryRecommendedDownload
+    && typeof mainlineSummary.productionGate.postLaunchLifecycle.primaryRecommendedDownload === "object"
+    ? mainlineSummary.productionGate.postLaunchLifecycle.primaryRecommendedDownload
+    : {};
+  const lifecyclePrimaryDownload = {
+    key: postLaunchLifecycle.primaryDownloadKey || lifecyclePrimaryRecommendedDownload.key || null,
+    label: lifecyclePrimaryRecommendedDownload.label || postLaunchLifecycle.primaryDownloadKey || "Post-launch lifecycle primary download",
+    fileName: postLaunchLifecycle.primaryDownloadFileName || lifecyclePrimaryRecommendedDownload.fileName || null,
+    format: postLaunchLifecycle.primaryDownloadFormat || lifecyclePrimaryRecommendedDownload.format || null,
+    source: postLaunchLifecycle.primaryDownloadSource || lifecyclePrimaryRecommendedDownload.source || null,
+    href: postLaunchLifecycle.primaryDownloadHref || lifecyclePrimaryRecommendedDownload.href || null
+  };
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
   const stabilizationOpsDownload = stabilizationConfirmation?.opsDownloads?.stabilizationHandoff || null;
   const stabilizationMainlineDownload = stabilizationConfirmation?.launchMainlineDownloads?.stabilizationHandoff || null;
-  const mainlineSummary = payload.mainlineSummary || {};
   const recommendedDownloads = Array.isArray(mainlineSummary.recommendedDownloads)
     ? mainlineSummary.recommendedDownloads
     : [];
@@ -14799,6 +14812,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       href: nextFollowUp.downloadHref || nextFollowUpDownload.href || null
     }
   );
+  if (lifecyclePrimaryDownload.key || lifecyclePrimaryDownload.fileName || lifecyclePrimaryDownload.href) {
+    pushRoute(
+      "post-launch-lifecycle-primary",
+      lifecyclePrimaryDownload.label || "Post-launch lifecycle primary download",
+      lifecyclePrimaryDownload.fileName || "-",
+      lifecyclePrimaryDownload
+    );
+  }
   pushRoute(
     "initial-launch-ops-readiness",
     "Initial launch ops readiness",

@@ -20987,17 +20987,35 @@ function buildDeveloperOpsRouteReviewBaseDownloadParams(scope = {}) {
   return params;
 }
 
+function createDeveloperOpsRouteReviewDownloadShortcut(descriptor = {}) {
+  if (!descriptor?.key) {
+    return null;
+  }
+  return createLaunchWorkflowDownloadShortcut(
+    descriptor.key,
+    descriptor.fileName || "developer-ops-summary.txt",
+    descriptor.label || descriptor.key,
+    {
+      source: "developer-ops",
+      format: descriptor.format || "summary",
+      params: descriptor.params && typeof descriptor.params === "object"
+        ? { ...descriptor.params }
+        : {}
+    }
+  );
+}
+
 function buildDeveloperOpsRouteReviewMatchDownloadDescriptor(scope = {}, routeReview = {}, target = "primary") {
   const descriptor = buildDeveloperOpsRouteReviewMatchDescriptor({ routeReview }, target);
   const match = descriptor.match;
   if (!match) {
-    return {
+    return createDeveloperOpsRouteReviewDownloadShortcut({
       key: descriptor.key,
       label: descriptor.label,
       fileName: descriptor.fileName,
       format: descriptor.format,
       params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
-    };
+    });
   }
   return buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope, match, target, descriptor);
 }
@@ -21039,23 +21057,23 @@ function buildDeveloperOpsRouteReviewEntryDownloadDescriptor(scope = {}, match =
         label: normalizedTarget === "next" ? `Next ${match?.kind || "route"} summary` : `Primary ${match?.kind || "route"} summary`,
         fileName: `developer-ops-${normalizedTarget}-${match?.kind || "route"}-summary.txt`
       };
-  return {
+  return createDeveloperOpsRouteReviewDownloadShortcut({
     key: fallbackDescriptor.key,
     label: fallbackDescriptor.label,
     fileName: fallbackDescriptor.fileName,
     format: normalizedTarget === "next" ? "route-review-next" : "route-review-primary",
     params
-  };
+  });
 }
 
 function buildDeveloperOpsRouteReviewRemainingDownloadDescriptor(scope = {}) {
-  return {
+  return createDeveloperOpsRouteReviewDownloadShortcut({
     key: "route_review_remaining",
     label: "Remaining routed review summary",
     fileName: "developer-ops-remaining-summary.txt",
     format: "route-review-remaining",
     params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
-  };
+  });
 }
 
 function findDeveloperOpsRouteReviewSectionMatch(routeReview = {}, section = "") {
@@ -21120,12 +21138,12 @@ function buildDeveloperOpsRouteReviewSectionDownloadDescriptor(scope = {}, route
   } else {
     return null;
   }
-  for (const field of ["productCode", "username", "search", "eventType", "actorType", "entityType"]) {
+  for (const field of ["productCode", "channel", "username", "search", "eventType", "actorType", "entityType"]) {
     if (!descriptor.params[field]) {
       delete descriptor.params[field];
     }
   }
-  return descriptor;
+  return createDeveloperOpsRouteReviewDownloadShortcut(descriptor);
 }
 
 function buildDeveloperOpsRouteReviewSectionDownloads(scope = {}, routeReview = {}) {

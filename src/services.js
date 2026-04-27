@@ -20791,6 +20791,40 @@ function buildDeveloperOpsSnapshotPayload({
   return payload;
 }
 
+function buildDeveloperOpsRouteReviewExportFiles(payload = {}) {
+  const routeReview = payload.routeReview && typeof payload.routeReview === "object" ? payload.routeReview : {};
+  if (!routeReview.active) {
+    return [];
+  }
+  const downloads = routeReview.downloads && typeof routeReview.downloads === "object" ? routeReview.downloads : {};
+  const files = [];
+  const seenPaths = new Set();
+  const appendRouteReviewFile = (descriptor = null, body = "") => {
+    if (!descriptor?.fileName) {
+      return;
+    }
+    const path = `route-review/${descriptor.fileName}`;
+    if (seenPaths.has(path)) {
+      return;
+    }
+    seenPaths.add(path);
+    files.push({ path, body });
+  };
+
+  appendRouteReviewFile(downloads.primary, buildDeveloperOpsRouteReviewMatchSummaryText(payload, "primary"));
+  if (routeReview.nextMatch) {
+    appendRouteReviewFile(downloads.next, buildDeveloperOpsRouteReviewMatchSummaryText(payload, "next"));
+  }
+  if (Array.isArray(routeReview.remainingMatches) && routeReview.remainingMatches.length) {
+    appendRouteReviewFile(downloads.remaining, buildDeveloperOpsRouteReviewRemainingSummaryText(payload));
+  }
+  const sectionDownloads = downloads.sections && typeof downloads.sections === "object" ? downloads.sections : {};
+  for (const [section, descriptor] of Object.entries(sectionDownloads)) {
+    appendRouteReviewFile(descriptor, buildDeveloperOpsRouteReviewSectionSummaryText(payload, section));
+  }
+  return files;
+}
+
 function buildDeveloperOpsExportFiles(payload) {
   return [
     {
@@ -20817,6 +20851,7 @@ function buildDeveloperOpsExportFiles(payload) {
       path: "stabilization-handoff.txt",
       body: buildDeveloperOpsStabilizationHandoffText(payload)
     },
+    ...buildDeveloperOpsRouteReviewExportFiles(payload),
     {
       path: "csv/projects.csv",
       body: payload.csv?.projects || ""

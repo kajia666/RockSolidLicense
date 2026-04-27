@@ -14606,6 +14606,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(checksumsDownload.body, /initial-launch-ops-readiness\.txt/);
     assert.match(checksumsDownload.body, /stabilization-handoff\.txt/);
+    assert.match(checksumsDownload.body, /route-review\/developer-ops-primary-session-summary\.txt/);
+    assert.match(checksumsDownload.body, /route-review\/developer-ops-next-audit-summary\.txt/);
+    assert.match(checksumsDownload.body, /route-review\/developer-ops-remaining-summary\.txt/);
+    assert.match(checksumsDownload.body, /route-review\/developer-ops-sessions-summary\.txt/);
 
     const zipDownload = await getBinary(
       baseUrl,
@@ -14620,6 +14624,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(zipText, /handoff-index\.txt/);
     assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
+    assert.match(zipText, /route-review\/developer-ops-primary-session-summary\.txt/);
+    assert.match(zipText, /route-review\/developer-ops-next-audit-summary\.txt/);
+    assert.match(zipText, /route-review\/developer-ops-remaining-summary\.txt/);
+    assert.match(zipText, /route-review\/developer-ops-sessions-summary\.txt/);
     assert.match(zipText, /initial-launch-ops-readiness\.txt/);
     assert.match(zipText, /stabilization-handoff\.txt/);
     assert.match(zipText, /csv\/audit-logs\.csv/);

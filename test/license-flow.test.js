@@ -13239,6 +13239,30 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && item.metadata?.firstRoundOpsStatus === "review"
     ));
 
+    const betaLaunchReceipt = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "FIRSTWAVE",
+        channel: "beta",
+        operation: "record_launch_rehearsal_run"
+      },
+      ownerSession.token
+    );
+    assert.equal(betaLaunchReceipt.result?.channel, "beta");
+    assert.equal(betaLaunchReceipt.receipt?.operation, "record_launch_rehearsal_run");
+
+    const stableAfterBetaReceipt = await getJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=20",
+      operatorSession.token
+    );
+    assert.equal(stableAfterBetaReceipt.channel, "stable");
+    assert.equal(stableAfterBetaReceipt.traceability.latestLaunchReceipt.channel, "stable");
+    assert.equal(stableAfterBetaReceipt.traceability.latestLaunchReceipt.operation, "first_batch_setup");
+    assert.match(stableAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=stable/);
+    assert.doesNotMatch(stableAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=beta/);
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE_BETA",

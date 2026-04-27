@@ -16584,7 +16584,8 @@ function latestSnapshotTimestamp(values = []) {
   return latest;
 }
 
-function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
+function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = null) {
+  const normalizedChannel = channel ? normalizeChannel(channel, "stable") : null;
   return auditLogs
     .map((item) => {
       const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
@@ -16602,7 +16603,7 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
         entityType: item.entityType || null,
         entityId: item.entityId || null,
         productCode: metadata.productCode || metadata.code || metadata.projectCode || metadata.softwareCode || null,
-        channel: metadata.channel || null,
+        channel: metadata.channel || "stable",
         operation: receipt.operation || null,
         operationLabel: receipt.operationLabel || null,
         summary: receipt.summary || "",
@@ -16650,7 +16651,15 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5) {
         createdAt: item.createdAt || null
       };
     })
-    .filter(Boolean)
+    .filter((item) => {
+      if (!item) {
+        return false;
+      }
+      if (!normalizedChannel) {
+        return true;
+      }
+      return normalizeChannel(item.channel, "stable") === normalizedChannel;
+    })
     .sort((left, right) => snapshotDateMs(right.createdAt || right.handoffGeneratedAt) - snapshotDateMs(left.createdAt || left.handoffGeneratedAt))
     .slice(0, Math.max(1, Number(limit || 5)));
 }
@@ -18065,6 +18074,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
             auditLogId: latestLaunchReceipt.auditLogId || null,
             operation: latestLaunchReceipt.operation || null,
             operationLabel: latestLaunchReceipt.operationLabel || null,
+            channel: latestLaunchReceipt.channel || null,
             handoffFileName: latestLaunchReceipt.handoffFileName || null,
             firstLaunchInventoryCreatedBatchCount: latestLaunchReceipt.firstLaunchInventoryCreatedBatchCount ?? null,
             firstLaunchInventoryCreatedCardCount: latestLaunchReceipt.firstLaunchInventoryCreatedCardCount ?? null,
@@ -18146,7 +18156,7 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   lines.push(
     "",
     "Traceability:",
-    `- latestReceipt=${latestReceipt.operation || "-"} | handoff=${latestReceipt.handoffFileName || traceability.firstLaunchHandoffDownload?.fileName || "-"} | inventoryCards=${latestReceipt.firstLaunchInventoryCreatedCardCount ?? inventory.freshCardCount ?? 0}`,
+    `- latestReceipt=${latestReceipt.operation || "-"} | channel=${latestReceipt.channel || payload.channel || "-"} | handoff=${latestReceipt.handoffFileName || traceability.firstLaunchHandoffDownload?.fileName || "-"} | inventoryCards=${latestReceipt.firstLaunchInventoryCreatedCardCount ?? inventory.freshCardCount ?? 0}`,
     `- opsSnapshot=${traceability.opsSnapshotFileName || "-"} | summary=${traceability.opsSummaryFileName || "-"}`,
     `- firstLaunchHandoff=${traceability.firstLaunchHandoffDownload?.fileName || traceability.firstLaunchHandoffDownload?.key || "-"} | readiness=${traceability.initialLaunchOpsReadinessStatus || "-"}`,
     "",
@@ -19634,7 +19644,8 @@ function buildSnapshotOverview({
   sessions = [],
   bindings = [],
   blocks = [],
-  auditLogs = []
+  auditLogs = [],
+  scope = {}
 } = {}) {
   const metrics = {
     activeProjects: projects.reduce((count, item) => count + (normalizeSnapshotStatus(item?.status || "active") === "active" ? 1 : 0), 0),
@@ -19748,7 +19759,7 @@ function buildSnapshotOverview({
   const focusAccounts = buildSnapshotFocusAccounts(accounts, entitlements, sessions, 5);
   const focusSessions = buildSnapshotFocusSessions(sessions, 5);
   const focusDevices = buildSnapshotFocusDevices(bindings, blocks, sessions, 5);
-  const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5);
+  const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5, scope.channel || null);
   const latestStabilizationHandoffConfirmations = buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs, 5);
   const latestFirstWaveHandoffConfirmations = buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs, 5);
   const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6);
@@ -20689,7 +20700,8 @@ function buildDeveloperOpsSnapshotPayload({
     sessions: normalizedSessions,
     bindings: normalizedBindings,
     blocks: normalizedBlocks,
-    auditLogs: normalizedAuditLogs
+    auditLogs: normalizedAuditLogs,
+    scope
   });
   const launchReceiptFollowUps = Array.isArray(overview.launchReceiptFollowUps)
     ? overview.launchReceiptFollowUps

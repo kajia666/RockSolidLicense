@@ -13444,10 +13444,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
 
     const exportSnapshot = await getJson(
       baseUrl,
-      "/api/developer/ops/export?productCode=EXPORT_ALPHA&eventType=session.revoke&limit=20",
+      "/api/developer/ops/export?productCode=EXPORT_ALPHA&channel=beta&eventType=session.revoke&limit=20",
       operatorSession.token
     );
     assert.equal(exportSnapshot.scope.productCode, "EXPORT_ALPHA");
+    assert.equal(exportSnapshot.scope.channel, "beta");
     assert.equal(exportSnapshot.summary.projects, 1);
     assert.equal(exportSnapshot.accounts.total, 1);
     assert.equal(exportSnapshot.sessions.total, 1);
@@ -13488,28 +13489,36 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(opsRoutePrimaryDownload?.fileName || "", /developer-ops-primary-session-summary\.txt/);
     assert.match(opsRoutePrimaryDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
     assert.match(opsRoutePrimaryDownload?.href || "", /productCode=EXPORT_ALPHA/);
-    assert.match(opsRoutePrimaryDownload?.href || "", /channel=stable/);
+    assert.match(opsRoutePrimaryDownload?.href || "", /channel=beta/);
     assert.match(opsRoutePrimaryDownload?.href || "", /eventType=session\.revoke/);
     assert.match(opsRoutePrimaryDownload?.href || "", /format=route-review-primary/);
     const opsRouteNextDownload = exportSnapshot.routeReview?.downloads?.next;
     assert.equal(opsRouteNextDownload?.source, "developer-ops");
     assert.equal(opsRouteNextDownload?.format, "route-review-next");
     assert.match(opsRouteNextDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
-    assert.match(opsRouteNextDownload?.href || "", /channel=stable/);
+    assert.match(opsRouteNextDownload?.href || "", /channel=beta/);
     assert.match(opsRouteNextDownload?.href || "", /format=route-review-next/);
     const opsRouteRemainingDownload = exportSnapshot.routeReview?.downloads?.remaining;
     assert.equal(opsRouteRemainingDownload?.source, "developer-ops");
     assert.equal(opsRouteRemainingDownload?.format, "route-review-remaining");
     assert.equal(opsRouteRemainingDownload?.fileName, "developer-ops-remaining-summary.txt");
     assert.match(opsRouteRemainingDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
-    assert.match(opsRouteRemainingDownload?.href || "", /channel=stable/);
+    assert.match(opsRouteRemainingDownload?.href || "", /channel=beta/);
     assert.match(opsRouteRemainingDownload?.href || "", /format=route-review-remaining/);
     const opsRouteSessionSectionDownload = exportSnapshot.routeReview?.downloads?.sections?.sessions;
     assert.equal(opsRouteSessionSectionDownload?.source, "developer-ops");
+    assert.equal(opsRouteSessionSectionDownload?.format, "route-review-section-sessions");
     assert.equal(opsRouteSessionSectionDownload?.fileName, "developer-ops-sessions-summary.txt");
     assert.match(opsRouteSessionSectionDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
-    assert.match(opsRouteSessionSectionDownload?.href || "", /channel=stable/);
-    assert.match(opsRouteSessionSectionDownload?.href || "", /format=summary/);
+    assert.match(opsRouteSessionSectionDownload?.href || "", /channel=beta/);
+    assert.match(opsRouteSessionSectionDownload?.href || "", /format=route-review-section-sessions/);
+    const opsRouteSessionSectionText = await getText(baseUrl, opsRouteSessionSectionDownload.href, operatorSession.token);
+    assert.match(opsRouteSessionSectionText.contentType || "", /^text\/plain/);
+    assert.match(opsRouteSessionSectionText.contentDisposition || "", /developer-ops-sessions-summary\.txt/);
+    assert.match(opsRouteSessionSectionText.body, /RockSolid Developer Ops Route Review Section Summary/);
+    assert.match(opsRouteSessionSectionText.body, /Route Review Section: sessions/);
+    assert.match(opsRouteSessionSectionText.body, /Channel Filter: beta/);
+    assert.match(opsRouteSessionSectionText.body, /Export Alpha Desktop/);
     assert.equal(exportSnapshot.routeReview?.sections?.sessions?.primaryMatch?.kind, "session");
     assert.deepEqual(exportSnapshot.routeReview?.matchedIds?.sessions, [exportSnapshot.routeReview?.primaryMatch?.item?.sessionId]);
     assert.deepEqual(exportSnapshot.routeReview?.matchedIds?.audit, [exportSnapshot.routeReview?.nextMatch?.item?.id]);
@@ -13518,7 +13527,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(exportSnapshot.routeReview?.continuation?.secondaryAction, "download_next");
     assert.equal(exportSnapshot.routeReview?.continuation?.nextDownload?.format, "route-review-next");
     assert.match(exportSnapshot.routeReview?.continuation?.nextDownload?.href || "", /\/api\/developer\/ops\/export\/download\?/);
-    assert.match(exportSnapshot.routeReview?.continuation?.nextDownload?.href || "", /channel=stable/);
+    assert.match(exportSnapshot.routeReview?.continuation?.nextDownload?.href || "", /channel=beta/);
     const primaryContinuationKey = `${exportSnapshot.routeReview?.primaryMatch?.kind}:${exportSnapshot.routeReview?.primaryMatch?.item?.sessionId || exportSnapshot.routeReview?.primaryMatch?.item?.id}`;
     const nextContinuationKey = `${exportSnapshot.routeReview?.nextMatch?.kind}:${exportSnapshot.routeReview?.nextMatch?.item?.id}`;
     assert.equal(exportSnapshot.routeReview?.continuations?.[primaryContinuationKey]?.primaryAction, "review_next");

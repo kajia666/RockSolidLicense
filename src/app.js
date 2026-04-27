@@ -1895,6 +1895,7 @@ export function createApp(overrides = {}) {
           ok: true,
           data: await services.developerExportOpsSnapshot(getBearerToken(req), {
             productCode: url.searchParams.get("productCode"),
+            channel: url.searchParams.get("channel"),
             username: url.searchParams.get("username"),
             search: url.searchParams.get("search"),
             eventType: url.searchParams.get("eventType"),
@@ -1947,6 +1948,7 @@ export function createApp(overrides = {}) {
       if (req.method === "GET" && url.pathname === "/api/developer/ops/export/download") {
         const data = await services.developerExportOpsSnapshot(getBearerToken(req), {
           productCode: url.searchParams.get("productCode"),
+          channel: url.searchParams.get("channel"),
           username: url.searchParams.get("username"),
           search: url.searchParams.get("search"),
           eventType: url.searchParams.get("eventType"),

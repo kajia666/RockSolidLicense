@@ -20968,6 +20968,71 @@ function buildDeveloperOpsRouteReviewRemainingSummaryText(payload = {}) {
   return lines.join("\n");
 }
 
+function normalizeDeveloperOpsRouteReviewSection(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["accounts", "entitlements", "sessions", "devices", "audit"].includes(normalized)
+    ? normalized
+    : "";
+}
+
+function buildDeveloperOpsRouteReviewSectionFormat(section = "") {
+  const normalized = normalizeDeveloperOpsRouteReviewSection(section);
+  return normalized ? `route-review-section-${normalized}` : "summary";
+}
+
+function parseDeveloperOpsRouteReviewSectionFormat(format = "") {
+  const normalized = String(format || "").trim().toLowerCase();
+  return normalizeDeveloperOpsRouteReviewSection(normalized.replace(/^route-review-section-/, ""));
+}
+
+function buildDeveloperOpsRouteReviewSectionSummaryText(payload = {}, section = "") {
+  const normalizedSection = normalizeDeveloperOpsRouteReviewSection(section);
+  const scope = payload.scope || {};
+  const routeReview = payload.routeReview || {};
+  const sectionPayload = normalizedSection && routeReview.sections && typeof routeReview.sections === "object"
+    ? routeReview.sections[normalizedSection] || {}
+    : {};
+  const sectionMatches = Array.isArray(routeReview.queue)
+    ? routeReview.queue.filter((item) => String(item?.section || "").trim().toLowerCase() === normalizedSection)
+    : [];
+  if (!sectionMatches.length && sectionPayload.primaryMatch) {
+    sectionMatches.push(sectionPayload.primaryMatch);
+  }
+  const lines = [
+    "RockSolid Developer Ops Route Review Section Summary",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Developer: ${payload.developer?.username || "-"}`,
+    `Actor: ${payload.actor?.username || "-"}`,
+    `Actor Role: ${payload.actor?.role || "-"}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Channel Filter: ${scope.channel || "-"}`,
+    `Username Filter: ${scope.username || "-"}`,
+    `Search Filter: ${scope.search || "-"}`,
+    `Audit Event Filter: ${scope.eventType || "-"}`,
+    `Audit Actor Filter: ${scope.actorType || "-"}`,
+    `Audit Entity Filter: ${scope.entityType || "-"}`,
+    `Audit Limit: ${scope.auditLimit ?? 0}`,
+    `Route Review Focus: ${routeReview.focus || "-"}`,
+    `Route Review Section: ${normalizedSection || "-"}`,
+    `Section Count: ${sectionPayload.count ?? sectionMatches.length}`
+  ];
+  lines.push("");
+  lines.push("Section Matches:");
+  if (!sectionMatches.length) {
+    lines.push("- none");
+    return lines.join("\n");
+  }
+  sectionMatches.forEach((match) => {
+    lines.push(`- ${match.title || "-"}`);
+    lines.push(`  kind=${match.kind || "-"}`);
+    lines.push(`  section=${match.section || "-"}`);
+    lines.push(`  summary=${match.summary || "-"}`);
+    lines.push(`  action=${match.routeActionLabel || match.routeAction || "-"}`);
+    lines.push(`  control=${match.recommendedControl?.label || "-"}`);
+  });
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsRouteReviewBaseDownloadParams(scope = {}) {
   const params = {
     productCode: scope.productCode || "",
@@ -21105,7 +21170,7 @@ function buildDeveloperOpsRouteReviewSectionDownloadDescriptor(scope = {}, route
     key: `route_review_section_${normalizedSection}`,
     label: "Routed section summary",
     fileName: "developer-ops-routed-summary.txt",
-    format: "summary",
+    format: buildDeveloperOpsRouteReviewSectionFormat(normalizedSection),
     params
   };
   if (normalizedSection === "accounts") {
@@ -21466,7 +21531,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "route-review-primary", "route-review-next", "route-review-remaining", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "stabilization-handoff"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "stabilization-handoff"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -21551,6 +21616,16 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-remaining-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsRouteReviewRemainingSummaryText(payload)
+    };
+  }
+
+  const sectionFormat = parseDeveloperOpsRouteReviewSectionFormat(normalizedFormat);
+  if (sectionFormat) {
+    const descriptor = payload.routeReview?.downloads?.sections?.[sectionFormat] || null;
+    return {
+      fileName: descriptor?.fileName || `developer-ops-${sectionFormat}-summary.txt`,
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsRouteReviewSectionSummaryText(payload, sectionFormat)
     };
   }
 

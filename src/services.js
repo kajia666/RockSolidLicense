@@ -14821,6 +14821,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "post-launch-handoff-index",
     mainlineRouteParams
   );
+  const mainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline checksums",
+    buildChecksumFileName(payload.fileName, "developer-launch-mainline"),
+    "checksums",
+    mainlineRouteParams
+  );
+  const mainlineZipDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline zip",
+    `${buildArchiveRootName(payload.fileName, "developer-launch-mainline")}.zip`,
+    "zip",
+    mainlineRouteParams
+  );
   const lines = [
     "RockSolid Developer Launch Mainline Handoff Download Routes",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -14851,6 +14863,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "Launch Mainline post-launch handoff index",
     payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
     postLaunchHandoffIndexDownload || {}
+  );
+  pushRoute(
+    "launch-mainline-checksums",
+    "Launch Mainline checksums",
+    mainlineChecksumsDownload.fileName || "developer-launch-mainline-sha256.txt",
+    mainlineChecksumsDownload || {}
+  );
+  pushRoute(
+    "launch-mainline-zip",
+    "Launch Mainline zip",
+    mainlineZipDownload.fileName || "developer-launch-mainline.zip",
+    mainlineZipDownload || {}
   );
   pushRoute(
     "launch-receipt-next-follow-up",

@@ -14353,6 +14353,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, new RegExp(`Stabilization Confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
+      /Stabilization Confirmation:.*opsHref=.*\/api\/developer\/ops\/export\/download\?.*format=stabilization-handoff/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      /Stabilization Confirmation:.*mainlineHref=.*\/api\/developer\/launch-mainline\/download\?.*format=stabilization-handoff/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
       new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Contract:/);
@@ -14407,6 +14415,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilityZipText, /RockSolid Developer Launch Mainline Handoff Download Routes/);
     assert.match(launchMainlineTraceabilityZipText, /ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(launchMainlineTraceabilityZipText, /format=launch-receipt-next-follow-up/);
+    assert.match(launchMainlineTraceabilityZipText, /stabilization-confirmation-ops/);
+    assert.match(launchMainlineTraceabilityZipText, /stabilization-confirmation-mainline/);
+    assert.match(launchMainlineTraceabilityZipText, /format=stabilization-handoff/);
 
     const launchMainlineTraceability = await getJson(
       baseUrl,

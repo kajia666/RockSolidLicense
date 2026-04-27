@@ -14760,6 +14760,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const nextFollowUpDownload = nextFollowUp.recommendedDownload && typeof nextFollowUp.recommendedDownload === "object"
     ? nextFollowUp.recommendedDownload
     : {};
+  const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
+  const stabilizationOpsDownload = stabilizationConfirmation?.opsDownloads?.stabilizationHandoff || null;
+  const stabilizationMainlineDownload = stabilizationConfirmation?.launchMainlineDownloads?.stabilizationHandoff || null;
   const mainlineSummary = payload.mainlineSummary || {};
   const recommendedDownloads = Array.isArray(mainlineSummary.recommendedDownloads)
     ? mainlineSummary.recommendedDownloads
@@ -14802,6 +14805,22 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt",
     mainlineSummary.initialLaunchOpsReadinessDownload || {}
   );
+  if (stabilizationOpsDownload) {
+    pushRoute(
+      "stabilization-confirmation-ops",
+      "Developer Ops stabilization handoff",
+      opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt",
+      stabilizationOpsDownload
+    );
+  }
+  if (stabilizationMainlineDownload) {
+    pushRoute(
+      "stabilization-confirmation-mainline",
+      "Launch Mainline stabilization handoff",
+      payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
+      stabilizationMainlineDownload
+    );
+  }
 
   lines.push("");
   lines.push("Launch Mainline Recommended Downloads:");
@@ -15987,6 +16006,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | audit=${stabilizationConfirmation.auditLogId || "-"}`
       + ` | decision=${stabilizationConfirmation.decision || "-"}`
       + ` | by=${stabilizationConfirmation.confirmedBy?.username || "-"}`
+      + ` | opsHref=${stabilizationConfirmation.opsDownloads?.stabilizationHandoff?.href || "-"}`
+      + ` | mainlineHref=${stabilizationConfirmation.launchMainlineDownloads?.stabilizationHandoff?.href || "-"}`
     );
   }
   appendInitialLaunchContractTraceabilityTextLines(lines, traceability.initialLaunchOpsContract || null, opsFiles);

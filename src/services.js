@@ -27535,6 +27535,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const channel = launchWorkflow?.manifest?.channel || normalizeChannel(selector.channel, "stable");
       const opsSnapshot = await this.developerExportOpsSnapshot(token, {
         productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+        channel,
         username: selector.username,
         search: selector.search,
         eventType: selector.eventType,
@@ -27583,6 +27584,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         this.developerListCards(token, { productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null }),
         this.developerExportOpsSnapshot(token, {
           productCode: project.code || selector.productCode || selector.projectCode || selector.softwareCode || null,
+          channel,
           username: selector.username,
           search: selector.search,
           eventType: selector.eventType,
@@ -33921,6 +33923,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         this.developerListCards(token, { productCode }),
         this.developerExportOpsSnapshot(token, {
           productCode,
+          channel,
           limit
         })
       ]);

@@ -13263,6 +13263,17 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(stableAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=stable/);
     assert.doesNotMatch(stableAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=beta/);
 
+    const betaAfterBetaReceipt = await getJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=beta&limit=20",
+      operatorSession.token
+    );
+    assert.equal(betaAfterBetaReceipt.channel, "beta");
+    assert.equal(betaAfterBetaReceipt.traceability.latestLaunchReceipt.channel, "beta");
+    assert.equal(betaAfterBetaReceipt.traceability.latestLaunchReceipt.operation, "record_launch_rehearsal_run");
+    assert.match(betaAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=beta/);
+    assert.doesNotMatch(betaAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=stable/);
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE_BETA",

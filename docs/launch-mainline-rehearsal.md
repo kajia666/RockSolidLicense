@@ -65,6 +65,20 @@ npm.cmd --silent run staging:preflight -- --json `
 
 Do not continue to `launch:smoke:staging --allow-live-writes` until this preflight passes. Its output includes a redacted next command that keeps smoke passwords in environment variables.
 
+Before the backup/restore portion of the rehearsal, run the no-write recovery preflight for the selected OS and storage profile:
+
+```powershell
+npm.cmd --silent run recovery:preflight -- --json `
+  --target-os linux `
+  --storage-profile postgres-preview `
+  --target-env-file /etc/rocksolidlicense/staging.env `
+  --app-backup-dir /var/lib/rocksolid/backups `
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
+  --base-url https://staging.example.com
+```
+
+Use `--storage-profile sqlite` when the main store is SQLite. The option is named `--target-env-file` instead of `--env-file` because modern Node versions reserve `--env-file` as a runtime flag before the script can parse it.
+
 Keep these outputs available during the rehearsal:
 
 - release package summary
@@ -201,6 +215,7 @@ Use them for these purposes:
 Exit condition:
 
 - the lane has one consistent author-side handoff path from deployment through first-week stabilization
+- the recovery preflight has confirmed the expected backup, restore, healthcheck, and runbook assets for the selected target OS and storage profile
 
 ## Phase 5: Evidence Recording Order
 

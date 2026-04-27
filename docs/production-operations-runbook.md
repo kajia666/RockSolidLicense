@@ -189,6 +189,33 @@ For Redis in this topology, losing runtime state is usually survivable, but expe
 
 ## Manual backup commands
 
+Before a staging recovery drill, run the repository preflight from a checkout of this project. It does not back up, restore, or modify data; it only verifies that the selected OS/storage profile has the expected scripts and prints the next commands to run on the target:
+
+Linux PostgreSQL preview example:
+
+```powershell
+npm.cmd --silent run recovery:preflight -- --json `
+  --target-os linux `
+  --storage-profile postgres-preview `
+  --target-env-file /etc/rocksolidlicense/staging.env `
+  --app-backup-dir /var/lib/rocksolid/backups `
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
+  --base-url https://staging.example.com
+```
+
+Windows SQLite example:
+
+```powershell
+npm.cmd --silent run recovery:preflight -- --json `
+  --target-os windows `
+  --storage-profile sqlite `
+  --target-env-file C:\RockSolidLicense\deploy\windows\rocksolid.env.ps1 `
+  --app-backup-dir C:\RockSolidLicense\backups `
+  --base-url https://staging.example.com
+```
+
+Use `--target-env-file` here rather than `--env-file`; `--env-file` is a Node runtime option in newer Node versions and can be intercepted before the script runs.
+
 Linux:
 
 ```bash

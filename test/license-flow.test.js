@@ -14418,6 +14418,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineTraceabilityZipText,
       /ops-handoff-index: ops\/handoff-index\.txt.*format=handoff-index.*href=.*\/api\/developer\/ops\/export\/download\?.*format=handoff-index/
     );
+    assert.match(launchMainlineTraceabilityZipText, /launch-mainline-post-launch-handoff-index/);
+    assert.match(
+      launchMainlineTraceabilityZipText,
+      /launch-mainline-post-launch-handoff-index: .*post-launch-handoff-index\.txt.*format=post-launch-handoff-index.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-handoff-index/
+    );
     assert.match(launchMainlineTraceabilityZipText, /ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(launchMainlineTraceabilityZipText, /format=launch-receipt-next-follow-up/);
     assert.match(launchMainlineTraceabilityZipText, /post-launch-lifecycle-primary/);

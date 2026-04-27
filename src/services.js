@@ -4065,6 +4065,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_closeout_handoff"
         : normalizedFormat === "stabilization-handoff"
           ? "launch_mainline_stabilization_handoff"
+        : normalizedFormat === "post-launch-handoff-index"
+          ? "launch_mainline_post_launch_handoff_index"
         : normalizedFormat === "first-launch-handoff"
           ? "launch_mainline_first_launch_handoff"
         : normalizedFormat === "initial-launch-ops-readiness"
@@ -14798,6 +14800,27 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       })
     }
   );
+  const mainlineRouteParams = compactRouteParams({
+    productCode: payload.filters?.productCode || project.code || "",
+    channel: payload.filters?.channel || manifest.channel || "stable",
+    username: payload.filters?.username || "",
+    search: payload.filters?.search || "",
+    eventType: payload.filters?.eventType || "",
+    actorType: payload.filters?.actorType || "",
+    entityType: payload.filters?.entityType || "",
+    reviewMode: payload.filters?.reviewMode || "",
+    operation: payload.filters?.operation || "",
+    actionKey: payload.filters?.actionKey || "",
+    downloadKey: payload.filters?.downloadKey || "",
+    routeTitle: payload.filters?.routeTitle || "",
+    routeReason: payload.filters?.routeReason || ""
+  });
+  const postLaunchHandoffIndexDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline post-launch handoff index",
+    payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
+    "post-launch-handoff-index",
+    mainlineRouteParams
+  );
   const lines = [
     "RockSolid Developer Launch Mainline Handoff Download Routes",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -14822,6 +14845,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "Developer Ops handoff index",
     opsFiles.handoffIndex || "ops/handoff-index.txt",
     opsHandoffIndexDownload || {}
+  );
+  pushRoute(
+    "launch-mainline-post-launch-handoff-index",
+    "Launch Mainline post-launch handoff index",
+    payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
+    postLaunchHandoffIndexDownload || {}
   );
   pushRoute(
     "launch-receipt-next-follow-up",

@@ -8747,16 +8747,24 @@ function buildLaunchWorkflowSummaryPayload({
     }
   );
   const recommendedDownloads = [
-    {
-      key: "launch_handoff_zip",
-      label: "Recommended handoff zip",
-      fileName: handoffZipFileName
-    },
-    {
-      key: "launch_handoff_checksums",
-      label: "Recommended handoff checksums",
-      fileName: handoffChecksumsFileName
-    },
+    createLaunchWorkflowDownloadShortcut(
+      "launch_handoff_zip",
+      handoffZipFileName,
+      "Recommended handoff zip",
+      {
+        format: "handoff-zip",
+        params: routeQueryParams
+      }
+    ),
+    createLaunchWorkflowDownloadShortcut(
+      "launch_handoff_checksums",
+      handoffChecksumsFileName,
+      "Recommended handoff checksums",
+      {
+        format: "handoff-checksums",
+        params: routeQueryParams
+      }
+    ),
     {
       key: "launch_workflow_zip",
       label: "Combined launch workflow zip",

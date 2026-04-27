@@ -5870,8 +5870,18 @@ test("developer release package export bundles integration, versions, and notice
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "release"));
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "licenses"));
     assert.ok(launchWorkflow.workflowSummary.workspaceActions.some((item) => item.key === "ops"));
-    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_zip"));
-    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_handoff_checksums"));
+    const launchHandoffZipRecommended = launchWorkflow.workflowSummary.recommendedDownloads.find((item) => item.key === "launch_handoff_zip");
+    assert.ok(launchHandoffZipRecommended);
+    assert.equal(launchHandoffZipRecommended.source, "developer-launch-workflow");
+    assert.equal(launchHandoffZipRecommended.format, "handoff-zip");
+    assert.match(launchHandoffZipRecommended.href || "", /\/api\/developer\/launch-workflow\/download\?/);
+    assert.match(launchHandoffZipRecommended.href || "", /format=handoff-zip/);
+    const launchHandoffChecksumsRecommended = launchWorkflow.workflowSummary.recommendedDownloads.find((item) => item.key === "launch_handoff_checksums");
+    assert.ok(launchHandoffChecksumsRecommended);
+    assert.equal(launchHandoffChecksumsRecommended.source, "developer-launch-workflow");
+    assert.equal(launchHandoffChecksumsRecommended.format, "handoff-checksums");
+    assert.match(launchHandoffChecksumsRecommended.href || "", /\/api\/developer\/launch-workflow\/download\?/);
+    assert.match(launchHandoffChecksumsRecommended.href || "", /format=handoff-checksums/);
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_workflow_zip"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_summary" && item.source === "developer-launch-mainline"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide" && item.source === "developer-launch-mainline"));
@@ -5927,6 +5937,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /First Ops Actions:[\s\S]*download=(Runtime smoke summary|Card redemption summary|Early session summary):developer-ops-summary\.txt \| href=.*format=summary/);
     assert.match(launchWorkflow.summaryText, /eventType=session\.login|entityType=license_key/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
+    assert.match(launchWorkflow.summaryText, /Recommended handoff checksums.*href=.*format=handoff-checksums/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip/);
     assert.match(launchWorkflow.summaryText, /workspace=Open License Workspace@quickstart/);
     assert.match(launchWorkflow.summaryText, /bootstrap=Run Launch Bootstrap/);
@@ -5961,6 +5972,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
     assert.match(launchSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff \| href=.*format=post-launch-sweep-handoff/);
     assert.match(launchSummaryDownload.body, /Recommended handoff zip/);
+    assert.match(launchSummaryDownload.body, /Recommended handoff checksums.*href=.*format=handoff-checksums/);
     assert.match(launchSummaryDownload.body, /Combined launch workflow zip/);
 
     const launchChecklistDownload = await getText(

@@ -8592,7 +8592,8 @@ function buildLaunchWorkflowChecklistPayload({
       recommendedDownload: createLaunchWorkflowDownloadShortcut(
         "launch_handoff_zip",
         handoffZipFileName,
-        "Recommended handoff zip"
+        "Recommended handoff zip",
+        { format: "handoff-zip" }
       )
     }
   ];
@@ -9109,7 +9110,15 @@ function buildLaunchWorkflowSummaryPayload({
       summary: "Share the curated handoff package with release, QA, and integration teammates.",
       status: workflowStatus === "ready" ? "pass" : "review",
       priority: actionPlan.length ? "secondary" : "primary",
-      recommendedDownload: createLaunchWorkflowDownloadShortcut("launch_handoff_zip", handoffZipFileName, "Recommended handoff zip")
+      recommendedDownload: createLaunchWorkflowDownloadShortcut(
+        "launch_handoff_zip",
+        handoffZipFileName,
+        "Recommended handoff zip",
+        {
+          format: "handoff-zip",
+          params: routeQueryParams
+        }
+      )
     }));
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_checklist",

@@ -10762,7 +10762,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
     "Launch workflow summary",
     {
       source: "developer-launch-workflow",
-      format: "summary"
+      format: "summary",
+      params: { ...scopedOpsParams }
     }
   );
   const workflowChecklistDownload = createLaunchWorkflowDownloadShortcut(
@@ -10771,7 +10772,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
     "Launch workflow checklist",
     {
       source: "developer-launch-workflow",
-      format: "checklist"
+      format: "checklist",
+      params: { ...scopedOpsParams }
     }
   );
   const opsSummaryDownload = createLaunchWorkflowDownloadShortcut(

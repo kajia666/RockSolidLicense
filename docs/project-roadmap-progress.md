@@ -1,6 +1,6 @@
 # Project Roadmap, Overall Plan, and Development Progress
 
-Updated: 2026-04-27
+Updated: 2026-04-28
 
 This document is the rolling project control sheet for RockSolidLicense. It answers three recurring questions:
 
@@ -28,11 +28,11 @@ The project is now close to an initial pilot launch. The most important backend/
 - Recommended download routing: Release Package and Launch Workflow text handoffs, Launch Workflow local zip/summary/checklist downloads, Launch Workflow integration env/host-config/host-skeleton download format routing, Launch Workflow handoff zip/checksum downloads, Launch Workflow checklist/action-plan handoff zip format consistency, Launch Review route focus/action/focus-target text, Launch Review scoped Workflow summary/checklist downloads, Launch Smoke route focus/action text, Launch Smoke action-plan scoped Smoke Kit downloads, Launch Mainline route focus/continuation/recommended-download text, First Launch Handoff text, Post-Launch Lifecycle text, Launch Workflow, Release follow-ups, Developer Projects follow-up downloads, Developer License quickstart follow-ups, Developer Ops route-review handoffs, Developer Ops Launch Mainline handoff summary text, shared Initial Launch Ops Gate blocker text, launch receipt follow-up queue downloads/CSV export and Developer Ops follow-up overview text, First Wave Recommendations first-round ops actions, initial-launch traceability next-follow-up downloads, Developer Ops summary/readiness/stabilization traceability text, Developer Ops readiness blocker/action text, Developer Ops operator action manifest text, Launch Mainline post-launch handoff traceability/lifecycle primary-download text, Launch Mainline action receipt handoff text, Launch Mainline zip/checksum handoff download routes, and Developer Ops operator/stabilization follow-ups now consume service-provided download `href` values for recommended downloads, so the first-wave handoff chain no longer relies on frontend source/format guessing in those launch-critical entrypoints.
 - Latest backend/API slice: First-Wave Recommendations, Launch Review, and Launch Smoke Kit now pass the selected channel into their internal Developer Ops snapshots; stable and beta launch-duty views no longer silently fall back to the wrong lane when reading latest launch receipts. Post-launch lifecycle receipts and stabilization handoff confirmations now also preserve primary handoff download hrefs through Ops snapshots, Launch Mainline traceability, the post-launch handoff index, and the handoff route map; the route map now calls out the Ops handoff index, Launch Mainline JSON, summary, post-launch handoff index, post-launch lifecycle primary download, checksums, and zip package as critical routes for offline launch-duty review.
 - Latest Ops export slice: Developer Ops route-review primary, next, remaining, section, and continuation downloads now include service-generated `href` values directly in the snapshot payload; Ops export/download routes preserve non-default channel scope; route-review section downloads now return section-specific handoff files instead of falling back to the generic summary; Ops export zip/checksum packages now include the route-review handoff files for offline launch-duty review.
-- Latest verification slice: broader targeted launch-readiness batches now pass across release package export, release mainline follow-up, launch workflow blockers/restock, launch mainline first-launch and post-launch actions, first-wave recommendations, Developer Ops export, launch pages, the `launch:smoke` CLI preflight, account/card/session authorization flows, production gate/security checks, deployment assets, and runtime-state checks.
+- Latest verification slice: broader targeted launch-readiness batches now pass across release package export, release mainline follow-up, launch workflow blockers/restock, launch mainline first-launch and post-launch actions, first-wave recommendations, Developer Ops export, launch pages, the `launch:smoke` CLI preflight, account/card/session authorization flows, production gate/security checks, deployment assets, and runtime-state checks. The full `test\license-flow.test.js` pre-staging gate also passed on 2026-04-28 with 80/80 tests, followed by `node --check src\services.js` and `git diff --check`.
 
-Estimated initial pilot-launch readiness: 88%-90%.
+Estimated initial pilot-launch readiness: 89%-91%.
 
-This estimate means the core flow is mostly ready for a controlled first launch, but still needs a final verification pass, deployment rehearsal, and real first-wave operating data before being treated as production-stable.
+This estimate means the core flow is mostly ready for a controlled first launch, but still needs staging rehearsal, backup/restore rehearsal, and real first-wave operating data before being treated as production-stable.
 
 ## Immediate Next Plan
 
@@ -47,8 +47,8 @@ Work should continue in short backend/API-first slices. Each slice should end wi
 3. Continue hardening launch receipt follow-up recovery.
    `launchReceiptNextFollowUp`, `recommendedAction`, `recommendedDownload`, Developer Ops launch receipt follow-up CSV, Release Package/Launch Workflow/Launch Review/Launch Smoke/Launch Mainline summary and route-focus text, First Launch Handoff text, Post-Launch Lifecycle text, readiness traceability, shared Initial Launch Ops Gate blocker text, Developer Ops follow-up overview text, Developer Ops Launch Mainline handoff summary text, Developer Ops readiness blocker/action text, Developer Ops operator action manifest text, Developer Ops summary/readiness/stabilization text, Launch Mainline post-launch traceability JSON/lifecycle primary-download text, post-launch handoff summary/index text, Launch Mainline action receipt handoff text, and Launch Mainline zip/checksum handoff download routes now carry the same download href chain; remaining work is mostly grouped regression around the already-connected path.
 
-4. Move from grouped verification to the full pre-staging gate.
-   Broader targeted batches now pass across release package, launch workflow, launch mainline actions, first-wave recommendations, Developer Ops export, launch pages, the `launch:smoke` CLI preflight, account/card/session authorization, production gate/security checks, deployment assets, and runtime-state checks. The next verification step should be the full `license-flow` run plus static checks before staging rehearsal sign-off.
+4. Keep the full pre-staging gate green while preparing staging.
+   Broader targeted batches now pass across release package, launch workflow, launch mainline actions, first-wave recommendations, Developer Ops export, launch pages, the `launch:smoke` CLI preflight, account/card/session authorization, production gate/security checks, deployment assets, and runtime-state checks. The 2026-04-28 full `license-flow` gate passed with 80/80 tests plus static checks; the next verification step is staging rehearsal with real-like secrets, storage, HTTPS, and `launch:smoke --base-url`.
 
 5. Prepare staging launch rehearsal.
    Use a real server-like environment, non-default secrets, HTTPS, persistent storage, backup/restore rehearsal, and one test software-author project. The command-line `launch:smoke` preflight can now run locally against an ephemeral in-memory app or against a staging `--base-url` with explicit `--allow-live-writes`; its `handoff` output now carries the scoped Launch Review route, Developer Ops route, first-wave downloads, Ops handoff index, and a four-step operator checklist.
@@ -117,7 +117,7 @@ Remaining work:
 
 - Continue reducing any fallback logic where frontend or route recovery guesses source/format.
 - Keep documentation aligned with supported API formats and generated handoff assets.
-- Run broader grouped verification before staging launch.
+- Keep the full `license-flow` gate and grouped launch-readiness checks green before staging launch.
 
 ### Phase 4: First Launch Operations
 
@@ -195,22 +195,22 @@ Current high-level progress:
 
 - Core backend/API authorization: 90%-95%.
 - Developer delivery and handoff chain: 92%-94%.
-- Launch Mainline and first-launch operations: 89%-92%.
+- Launch Mainline and first-launch operations: 90%-93%.
 - SDK/integration packaging: 80%-85%.
-- Production deployment readiness: 75%-85%.
+- Production deployment readiness: 78%-86%.
 - Commercial operations readiness: 65%-75%.
 
-Overall initial pilot-launch readiness: 88%-90%.
+Overall initial pilot-launch readiness: 89%-91%.
 
-This is high enough to keep moving toward a controlled launch, but not high enough to skip staging, full tests, backup/restore rehearsal, or first-wave support preparation.
+This is high enough to keep moving toward a controlled launch, but not high enough to skip staging, the full repository test window, backup/restore rehearsal, or first-wave support preparation.
 
 ## Work Remaining Before Initial Launch
 
 Minimum remaining work before a controlled pilot:
 
 1. Finish residual route/download spot checks outside the launch-critical first-wave handoff chain and any less-used Ops export variants.
-2. Run grouped targeted tests for release, launch workflow, launch review, launch smoke, launch mainline, and developer ops.
-3. Run full test suite once the current backend/API slices settle and before staging rehearsal sign-off.
+2. Keep the full `license-flow` pre-staging gate and grouped launch-readiness checks green after any new backend/API changes.
+3. Run the full repository test suite once before staging rehearsal sign-off.
 4. Prepare staging environment with non-default secrets and public HTTPS.
 5. Run one complete staging rehearsal:
    release package -> launch workflow -> bootstrap -> first batch setup -> launch review -> `launch:smoke --base-url` -> launch smoke workspace -> launch mainline -> developer ops -> post-launch sweep.
@@ -224,7 +224,8 @@ Current rhythm:
 
 - Run focused tests on every small backend/API slice.
 - Latest grouped targeted verification passed 57 tests across launch readiness, first-wave operations, account/card/session authorization, production gate/security, deployment assets, runtime-state, launch pages, and `launch:smoke`.
-- The next major verification step is the full `license-flow` run plus static checks before staging rehearsal sign-off.
+- Latest full pre-staging gate passed on 2026-04-28: `node --test --test-concurrency=1 --test-isolation=none test\license-flow.test.js` reported 80/80 passing tests, then `node --check src\services.js` and `git diff --check` exited cleanly.
+- The next major verification step is staging rehearsal against a real-like environment, followed by the full repository test window before sign-off.
 - Run full test suite when either:
   - another 2-4 launch-mainline/backend API commits land, or
   - before the first staging deployment rehearsal, whichever comes first.
@@ -236,6 +237,8 @@ node --test --test-concurrency=1 --test-isolation=none test\license-flow.test.js
 node --check src\services.js
 git diff --check
 ```
+
+Latest run: 2026-04-28, passed 80/80 tests plus clean static and diff checks.
 
 If the full suite is too slow or noisy, split it into grouped runs but do not skip:
 
@@ -267,7 +270,7 @@ The project can be treated as initially launchable when all of these are true:
 
 ### High
 
-- Full test suite has been intentionally deferred during rapid backend/API iteration.
+- Full repository test suite has been intentionally deferred during rapid backend/API iteration, although the main `license-flow` pre-staging gate is now green.
 - Real deployment rehearsal has not replaced local verification yet.
 - Commercial operations decisions may still affect first-launch packaging.
 

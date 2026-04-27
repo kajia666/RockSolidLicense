@@ -14413,6 +14413,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     const launchMainlineTraceabilityZipText = launchMainlineTraceabilityZip.body.toString("latin1");
     assert.match(launchMainlineTraceabilityZipText, /handoff-download-routes\.txt/);
     assert.match(launchMainlineTraceabilityZipText, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(
+      launchMainlineTraceabilityZipText,
+      /launch-mainline-json: .*\.json.*format=json.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=json/
+    );
+    assert.match(
+      launchMainlineTraceabilityZipText,
+      /launch-mainline-summary: .*summary\.txt.*format=summary.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/
+    );
     assert.match(launchMainlineTraceabilityZipText, /ops-handoff-index/);
     assert.match(
       launchMainlineTraceabilityZipText,

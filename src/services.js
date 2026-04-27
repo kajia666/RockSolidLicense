@@ -14821,6 +14821,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "post-launch-handoff-index",
     mainlineRouteParams
   );
+  const mainlineJsonDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline JSON",
+    payload.fileName || "developer-launch-mainline.json",
+    "json",
+    mainlineRouteParams
+  );
+  const mainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline summary",
+    payload.summaryFileName || "developer-launch-mainline-summary.txt",
+    "summary",
+    mainlineRouteParams
+  );
   const mainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline checksums",
     buildChecksumFileName(payload.fileName, "developer-launch-mainline"),
@@ -14863,6 +14875,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "Launch Mainline post-launch handoff index",
     payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
     postLaunchHandoffIndexDownload || {}
+  );
+  pushRoute(
+    "launch-mainline-json",
+    "Launch Mainline JSON",
+    mainlineJsonDownload.fileName || "developer-launch-mainline.json",
+    mainlineJsonDownload || {}
+  );
+  pushRoute(
+    "launch-mainline-summary",
+    "Launch Mainline summary",
+    mainlineSummaryDownload.fileName || "developer-launch-mainline-summary.txt",
+    mainlineSummaryDownload || {}
   );
   pushRoute(
     "launch-mainline-checksums",

@@ -99,6 +99,24 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     operation: "record_launch_rehearsal_run"
   });
   assert.equal(output.evidenceActionPlan.items[0].expectedReceiptOperation, "record_launch_rehearsal_run");
+  assert.deepEqual(output.evidenceActionPlan.items[0].request, {
+    method: "POST",
+    url: "https://staging.example.com/api/developer/launch-mainline/action",
+    contentType: "application/json",
+    bearerTokenEnv: "RSL_DEVELOPER_BEARER_TOKEN",
+    powershell: [
+      "$headers = @{ Authorization = \"Bearer $env:RSL_DEVELOPER_BEARER_TOKEN\" }",
+      "$body = @'",
+      "{",
+      "  \"productCode\": \"PILOT_ALPHA\",",
+      "  \"channel\": \"stable\",",
+      "  \"operation\": \"record_launch_rehearsal_run\"",
+      "}",
+      "'@",
+      "Invoke-RestMethod -Method Post -Uri 'https://staging.example.com/api/developer/launch-mainline/action' -Headers $headers -ContentType 'application/json' -Body $body"
+    ].join("\n")
+  });
+  assert.doesNotMatch(output.evidenceActionPlan.items[0].request.powershell, /StrongAdmin123!|StrongDeveloper123!/);
 });
 
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
@@ -144,6 +162,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /\/api\/developer\/launch-mainline\/action/);
     assert.match(handoff, /record_launch_rehearsal_run/);
     assert.match(handoff, /Record Launch Stabilization Review/);
+    assert.match(handoff, /\$env:RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.match(handoff, /Invoke-RestMethod -Method Post/);
+    assert.match(handoff, /"operation": "record_launch_rehearsal_run"/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

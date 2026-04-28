@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const DEVELOPER_BEARER_TOKEN_ENV = "RSL_DEVELOPER_BEARER_TOKEN";
 
 const EVIDENCE_ORDER = [
   "Record Launch Rehearsal Run",
@@ -230,6 +231,26 @@ function firstFailedPhase(phases) {
   return phases.find((phase) => phase.status === "blocked" || phase.status === "fail") || null;
 }
 
+function quotePowerShellSingleQuoted(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function buildEvidenceRequest(endpoint, payload) {
+  return {
+    method: "POST",
+    url: endpoint,
+    contentType: "application/json",
+    bearerTokenEnv: DEVELOPER_BEARER_TOKEN_ENV,
+    powershell: [
+      `$headers = @{ Authorization = "Bearer $env:${DEVELOPER_BEARER_TOKEN_ENV}" }`,
+      "$body = @'",
+      JSON.stringify(payload, null, 2),
+      "'@",
+      `Invoke-RestMethod -Method Post -Uri ${quotePowerShellSingleQuoted(endpoint)} -Headers $headers -ContentType 'application/json' -Body $body`
+    ].join("\n")
+  };
+}
+
 function buildEvidenceActionPlan(options) {
   const endpoint = buildRoute(options.baseUrl, "/api/developer/launch-mainline/action", {});
   return {
@@ -237,18 +258,22 @@ function buildEvidenceActionPlan(options) {
     method: "POST",
     willModifyData: true,
     auth: "developer bearer token",
-    items: EVIDENCE_ACTIONS.map(([label, operation], index) => ({
-      key: operation,
-      label,
-      operation,
-      order: index + 1,
-      payload: {
+    items: EVIDENCE_ACTIONS.map(([label, operation], index) => {
+      const payload = {
         productCode: options.productCode,
         channel: options.channel,
         operation
-      },
-      expectedReceiptOperation: operation
-    }))
+      };
+      return {
+        key: operation,
+        label,
+        operation,
+        order: index + 1,
+        payload,
+        expectedReceiptOperation: operation,
+        request: buildEvidenceRequest(endpoint, payload)
+      };
+    })
   };
 }
 
@@ -334,8 +359,14 @@ function renderEvidenceActions(plan) {
     return "- Not available";
   }
   return plan.items
-    .map((item) => `${item.order}. ${item.label} - \`${item.operation}\``)
-    .join("\n");
+    .map((item) => [
+      `${item.order}. ${item.label} - \`${item.operation}\``,
+      "",
+      "```powershell",
+      item.request.powershell,
+      "```"
+    ].join("\n"))
+    .join("\n\n");
 }
 
 function renderHandoffFile(result) {

@@ -493,6 +493,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Readiness gaps/);
     assert.match(handoff, /closeout_backfill_pending/);
     assert.match(handoff, /developer_bearer_token_missing/);
+    assert.match(handoff, /missingReceiptVisibilityKeys: launchMainline, launchReview, launchSmoke, developerOps/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
@@ -726,6 +727,12 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       mode: "staging-closeout-template",
       decision: "ready-for-full-test-window",
       acceptanceFields,
+      receiptVisibility: {
+        launchMainline: "visible",
+        launchReview: "visible",
+        launchSmoke: "visible",
+        developerOps: "visible"
+      },
       productionSignoff: {
         decision: "ready-for-production-signoff",
         conditions: signoffConditions
@@ -744,8 +751,10 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     const output = JSON.parse(result.stdout);
     assert.equal(output.closeoutInput.readyForFullTestWindow, true);
     assert.equal(output.closeoutInput.readyForProductionSignoff, true);
+    assert.equal(output.closeoutInput.readyForReceiptVisibility, true);
     assert.equal(output.closeoutInput.productionDecision, "ready-for-production-signoff");
     assert.deepEqual(output.closeoutInput.signoffMissingKeys, []);
+    assert.deepEqual(output.closeoutInput.missingReceiptVisibilityKeys, []);
     assert.deepEqual(
       output.closeoutInput.signoffFilledKeys,
       output.stagingAcceptanceCloseout.productionSignoffConditions.conditions.map((item) => item.key)
@@ -764,6 +773,87 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "production_signoff_blocked"),
       false
     );
+    assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging rehearsal runner blocks production signoff until all receipt visibility lanes are visible", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-receipt-visibility-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-signoff-closeout.json");
+    const acceptanceFields = [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review",
+      "operator_go_no_go"
+    ].map((key) => ({
+      key,
+      status: "filled",
+      value: key === "operator_go_no_go" ? "ready-for-full-test-window" : { result: "pass" }
+    }));
+    const signoffConditions = [
+      "full_test_window_passed",
+      "staging_artifacts_archived",
+      "launch_mainline_receipts_visible",
+      "backup_restore_drill_passed",
+      "rollback_path_confirmed",
+      "operator_signoff_recorded"
+    ].map((key) => ({
+      key,
+      status: "filled",
+      value: key === "full_test_window_passed"
+        ? { result: "pass", command: "npm.cmd test", failureCount: 0 }
+        : { result: "confirmed" }
+    }));
+    const closeoutInput = {
+      mode: "staging-closeout-template",
+      decision: "ready-for-full-test-window",
+      acceptanceFields,
+      receiptVisibility: {
+        launchMainline: "visible",
+        launchReview: "visible",
+        launchSmoke: "visible"
+      },
+      productionSignoff: {
+        decision: "ready-for-production-signoff",
+        conditions: signoffConditions
+      }
+    };
+    writeFileSync(closeoutInputFile, `${JSON.stringify(closeoutInput, null, 2)}\n`, "utf8");
+
+    const result = runRehearsal([
+      ...validArgs,
+      "--closeout-input-file",
+      closeoutInputFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.closeoutInput.readyForFullTestWindow, true);
+    assert.equal(output.closeoutInput.readyForReceiptVisibility, false);
+    assert.equal(output.closeoutInput.readyForProductionSignoff, false);
+    assert.deepEqual(output.closeoutInput.missingReceiptVisibilityKeys, ["developerOps"]);
+    assert.deepEqual(
+      output.operatorExecutionPlan.readinessGaps.map((item) => item.key),
+      [
+        "handoff_file_not_requested",
+        "closeout_file_not_requested",
+        "receipt_visibility_not_confirmed",
+        "production_signoff_blocked"
+      ]
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.readinessGaps.find((item) => item.key === "receipt_visibility_not_confirmed").missingReceiptVisibilityKeys,
+      ["developerOps"]
+    );
+    assert.equal(output.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, true);
+    assert.equal(output.operatorExecutionPlan.readinessSummary.canSignoffProduction, false);
     assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

@@ -38,6 +38,13 @@ const EVIDENCE_ACTIONS = [
   ["Record Launch Stabilization Review", "record_launch_stabilization_review"]
 ];
 
+const RECEIPT_VISIBILITY_KEYS = [
+  "launchMainline",
+  "launchReview",
+  "launchSmoke",
+  "developerOps"
+];
+
 function parseArgs(argv) {
   const options = {
     json: false,
@@ -543,6 +550,20 @@ function isFilledCloseoutField(field) {
   return true;
 }
 
+function isReceiptVisibilityVisible(value) {
+  if (value === true) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return ["visible", "pass", "confirmed"].includes(value.trim().toLowerCase());
+  }
+  if (value && typeof value === "object") {
+    const status = String(value.status || value.result || value.visibility || "").trim().toLowerCase();
+    return ["visible", "pass", "confirmed"].includes(status);
+  }
+  return false;
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -576,10 +597,24 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   const signoffFilledKeys = requiredSignoffKeys.filter((key) => isFilledCloseoutField(signoffFieldsByKey.get(key)));
   const signoffMissingKeys = requiredSignoffKeys.filter((key) => !signoffFilledKeys.includes(key));
   const productionDecision = payload.productionSignoff?.decision || null;
+  const receiptVisibility = payload.receiptVisibility || payload.productionSignoff?.receiptVisibility || {};
+  const receiptVisibilityChecks = Object.fromEntries(
+    RECEIPT_VISIBILITY_KEYS.map((key) => [
+      key,
+      {
+        status: isReceiptVisibilityVisible(receiptVisibility[key]) ? "visible" : "missing"
+      }
+    ])
+  );
+  const missingReceiptVisibilityKeys = RECEIPT_VISIBILITY_KEYS.filter(
+    (key) => receiptVisibilityChecks[key].status !== "visible"
+  );
+  const readyForReceiptVisibility = missingReceiptVisibilityKeys.length === 0;
   const readyForFullTestWindow = missingKeys.length === 0 && decision === "ready-for-full-test-window";
   const readyForProductionSignoff = readyForFullTestWindow
     && signoffMissingKeys.length === 0
-    && productionDecision === closeout.productionSignoffConditions?.requiredDecision;
+    && productionDecision === closeout.productionSignoffConditions?.requiredDecision
+    && readyForReceiptVisibility;
   return {
     status: "loaded",
     path: resolvedPath,
@@ -594,7 +629,11 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
     signoffFilledKeys,
     signoffMissingKeys,
     productionDecision,
+    receiptVisibilityStatus: readyForReceiptVisibility ? "visible" : "missing",
+    receiptVisibilityChecks,
+    missingReceiptVisibilityKeys,
     readyForFullTestWindow,
+    readyForReceiptVisibility,
     readyForProductionSignoff,
     nextAction: missingKeys.length === 0
       ? "Closeout input is backfilled; confirm operator_go_no_go before entering the full test window."
@@ -656,6 +695,24 @@ function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } 
       nextAction: "Run the full test command only after operator_go_no_go is ready-for-full-test-window."
     });
   }
+  const signoffConditionsReady = Array.isArray(closeoutInput?.signoffMissingKeys)
+    && closeoutInput.signoffMissingKeys.length === 0;
+  const productionDecisionReady = closeoutInput?.productionDecision === closeout.productionSignoffConditions?.requiredDecision;
+  if (
+    closeoutInput?.readyForFullTestWindow === true
+    && signoffConditionsReady
+    && productionDecisionReady
+    && closeoutInput.readyForReceiptVisibility !== true
+  ) {
+    gaps.push({
+      key: "receipt_visibility_not_confirmed",
+      severity: "blocker",
+      stepKey: "verify_receipt_visibility",
+      missingReceiptVisibilityKeys: closeoutInput.missingReceiptVisibilityKeys || [],
+      summary: "Production sign-off needs Launch Mainline, Launch Review, Launch Smoke, and Developer Ops receipt visibility confirmed.",
+      nextAction: "Backfill receiptVisibility with visible statuses for every required lane before production sign-off review."
+    });
+  }
   if (closeoutInput?.readyForProductionSignoff !== true) {
     gaps.push({
       key: "production_signoff_blocked",
@@ -663,6 +720,7 @@ function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } 
       stepKey: "production_signoff_review",
       requiredDecision: closeout.productionSignoffConditions?.requiredDecision || null,
       missingSignoffKeys: closeoutInput?.signoffMissingKeys || (closeout.productionSignoffConditions?.conditions || []).map((item) => item.key).filter(Boolean),
+      missingReceiptVisibilityKeys: closeoutInput?.missingReceiptVisibilityKeys || RECEIPT_VISIBILITY_KEYS,
       summary: "Production sign-off is blocked until the full test window passes and sign-off evidence is attached.",
       nextAction: "Do not move to production cutover before production sign-off review is ready."
     });
@@ -1313,6 +1371,12 @@ function renderOperatorExecutionPlan(plan) {
       }
       if (Array.isArray(gap.missingCloseoutKeys) && gap.missingCloseoutKeys.length) {
         lines.push(`    - missingCloseoutKeys: ${gap.missingCloseoutKeys.join(", ")}`);
+      }
+      if (Array.isArray(gap.missingSignoffKeys) && gap.missingSignoffKeys.length) {
+        lines.push(`    - missingSignoffKeys: ${gap.missingSignoffKeys.join(", ")}`);
+      }
+      if (Array.isArray(gap.missingReceiptVisibilityKeys) && gap.missingReceiptVisibilityKeys.length) {
+        lines.push(`    - missingReceiptVisibilityKeys: ${gap.missingReceiptVisibilityKeys.join(", ")}`);
       }
       lines.push(`    - nextAction: ${gap.nextAction || "-"}`);
     }

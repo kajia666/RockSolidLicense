@@ -604,68 +604,145 @@ function buildStagingArtifactReceiptLedger(result) {
   };
 }
 
+function buildFullTestWindowEntry(result, acceptanceChecks = [], artifactReceiptLedger = null) {
+  return {
+    status: "blocked_until_staging_closeout",
+    command: "npm.cmd test",
+    willRunFullSuite: true,
+    willModifyData: false,
+    triggerDecision: "ready-for-full-test-window",
+    requiredCloseoutKeys: acceptanceChecks.map((item) => item.key).filter(Boolean),
+    archiveRoot: artifactReceiptLedger?.archiveRoot || null,
+    entryCriteria: [
+      {
+        key: "staging_closeout_completed",
+        status: "operator_confirm",
+        summary: "All staging acceptance closeout checks have redacted results."
+      },
+      {
+        key: "artifact_receipt_ledger_filled",
+        status: "operator_confirm",
+        summary: "Every required artifact path and Launch Mainline receipt operation is recorded."
+      },
+      {
+        key: "operator_go_no_go_ready",
+        status: "operator_confirm",
+        summary: "Operator decision is ready-for-full-test-window, not hold or rollback-follow-up."
+      },
+      {
+        key: "test_window_reserved",
+        status: "operator_confirm",
+        summary: "A quiet test window is reserved for the full repository suite and follow-up fixes."
+      }
+    ],
+    nextAction: "Do not run the full suite until staging closeout is backfilled and operator_go_no_go is ready-for-full-test-window."
+  };
+}
+
+function buildProductionSignoffConditions(result) {
+  return {
+    status: "blocked_until_full_test_window",
+    requiredDecision: "ready-for-production-signoff",
+    willModifyData: false,
+    conditions: [
+      {
+        key: "full_test_window_passed",
+        status: "required",
+        evidence: "Attach the full `npm.cmd test` output summary and failure count."
+      },
+      {
+        key: "staging_artifacts_archived",
+        status: "required",
+        evidence: "Confirm the artifact/receipt ledger archive paths exist and contain redacted artifacts."
+      },
+      {
+        key: "launch_mainline_receipts_visible",
+        status: "required",
+        evidence: "Confirm Launch Mainline, Launch Review, Launch Smoke, and Developer Ops show the latest receipts."
+      },
+      {
+        key: "backup_restore_drill_passed",
+        status: "required",
+        evidence: "Confirm the backup and restore drill passed on the intended staging storage profile."
+      },
+      {
+        key: "rollback_path_confirmed",
+        status: "required",
+        evidence: "Confirm rollback walkthrough and recovery handoff are current before production cutover."
+      },
+      {
+        key: "operator_signoff_recorded",
+        status: "required",
+        evidence: "Record operator, timestamp, decision, and reason in the go/no-go artifact."
+      }
+    ],
+    nextAction: "Only move to production cutover after every condition is attached to the staging closeout and the full test window has passed."
+  };
+}
+
 function buildStagingAcceptanceCloseout(result) {
   const resultBackfill = result.resultBackfillSummary || null;
   const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
     ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
     : [];
   const artifactReceiptLedger = buildStagingArtifactReceiptLedger(result);
+  const acceptanceChecks = [
+    {
+      key: "route_map_gate_result",
+      label: "Route-map and download-surface targeted gate",
+      required: true,
+      command: result.nextCommands?.launchRouteMapGate?.command || null,
+      expectedEvidence: "Record the targeted gate exit status, pass count, and redacted output artifact path."
+    },
+    {
+      key: "backup_restore_drill_result",
+      label: "Backup and restore drill",
+      required: true,
+      commandKeys: result.environmentReadiness?.checks?.find((item) => item.key === "backup_restore_drill")?.commandKeys || [],
+      expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result."
+    },
+    {
+      key: "live_write_smoke_result",
+      label: "Live-write staging smoke",
+      required: true,
+      command: result.nextCommands?.launchSmoke || null,
+      expectedEvidence: "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path."
+    },
+    {
+      key: "launch_smoke_handoff",
+      label: "Launch smoke handoff archive",
+      required: true,
+      expectedEvidence: "Save the launch smoke handoff JSON or Markdown path with passwords and bearer tokens redacted."
+    },
+    {
+      key: "launch_mainline_evidence_receipts",
+      label: "Launch Mainline evidence receipts",
+      required: true,
+      endpoint: result.evidenceActionPlan?.endpoint || null,
+      operations: evidenceOperations,
+      expectedEvidence: "Record the Launch Mainline receipt IDs or handoff file names produced by each evidence action."
+    },
+    {
+      key: "receipt_visibility_review",
+      label: "Receipt visibility review",
+      required: true,
+      downloads: result.nextCommands?.receiptVisibilitySummaries || null,
+      expectedEvidence: "Verify Launch Review and Launch Smoke receipt-visibility summaries show the recorded first-wave receipt."
+    },
+    {
+      key: "operator_go_no_go",
+      label: "Operator go/no-go decision",
+      required: true,
+      expectedEvidence: "Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp."
+    }
+  ];
   return {
     status: "awaiting_operator_closeout",
     willModifyData: false,
     decision: "pending_staging_results",
     requiredResultKeys: resultBackfill?.requiredResultKeys || [],
     evidenceOperations,
-    acceptanceChecks: [
-      {
-        key: "route_map_gate_result",
-        label: "Route-map and download-surface targeted gate",
-        required: true,
-        command: result.nextCommands?.launchRouteMapGate?.command || null,
-        expectedEvidence: "Record the targeted gate exit status, pass count, and redacted output artifact path."
-      },
-      {
-        key: "backup_restore_drill_result",
-        label: "Backup and restore drill",
-        required: true,
-        commandKeys: result.environmentReadiness?.checks?.find((item) => item.key === "backup_restore_drill")?.commandKeys || [],
-        expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result."
-      },
-      {
-        key: "live_write_smoke_result",
-        label: "Live-write staging smoke",
-        required: true,
-        command: result.nextCommands?.launchSmoke || null,
-        expectedEvidence: "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path."
-      },
-      {
-        key: "launch_smoke_handoff",
-        label: "Launch smoke handoff archive",
-        required: true,
-        expectedEvidence: "Save the launch smoke handoff JSON or Markdown path with passwords and bearer tokens redacted."
-      },
-      {
-        key: "launch_mainline_evidence_receipts",
-        label: "Launch Mainline evidence receipts",
-        required: true,
-        endpoint: result.evidenceActionPlan?.endpoint || null,
-        operations: evidenceOperations,
-        expectedEvidence: "Record the Launch Mainline receipt IDs or handoff file names produced by each evidence action."
-      },
-      {
-        key: "receipt_visibility_review",
-        label: "Receipt visibility review",
-        required: true,
-        downloads: result.nextCommands?.receiptVisibilitySummaries || null,
-        expectedEvidence: "Verify Launch Review and Launch Smoke receipt-visibility summaries show the recorded first-wave receipt."
-      },
-      {
-        key: "operator_go_no_go",
-        label: "Operator go/no-go decision",
-        required: true,
-        expectedEvidence: "Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp."
-      }
-    ],
+    acceptanceChecks,
     destinations: {
       launchMainline: resultBackfill?.destinations?.launchMainline || result.nextCommands?.launchMainline || null,
       developerOps: resultBackfill?.destinations?.developerOps || null,
@@ -674,7 +751,9 @@ function buildStagingAcceptanceCloseout(result) {
     },
     nextAction: "Run the real staging steps, backfill the redacted result values, then schedule the full repository test window before production sign-off.",
     operatorNote: "Use redacted result values only: statuses, receipt IDs, artifact paths, handoff file names, and operator decisions. Do not paste passwords or bearer tokens.",
-    artifactReceiptLedger
+    artifactReceiptLedger,
+    fullTestWindowEntry: buildFullTestWindowEntry(result, acceptanceChecks, artifactReceiptLedger),
+    productionSignoffConditions: buildProductionSignoffConditions(result)
   };
 }
 
@@ -976,6 +1055,50 @@ function renderArtifactReceiptLedger(ledger) {
   return lines.join("\n");
 }
 
+function renderFullTestWindowEntry(entry) {
+  if (!entry) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Status: ${entry.status || "-"}`,
+    `- Command: \`${entry.command || "-"}\``,
+    `- Runs full suite: ${entry.willRunFullSuite ? "yes" : "no"}`,
+    `- Writes data: ${entry.willModifyData ? "yes" : "no"}`,
+    `- Trigger decision: ${entry.triggerDecision || "-"}`,
+    `- Required closeout keys: ${(entry.requiredCloseoutKeys || []).join(", ")}`,
+    `- Archive root: ${entry.archiveRoot || "-"}`,
+    `- Next action: ${entry.nextAction || "-"}`
+  ];
+  if (Array.isArray(entry.entryCriteria) && entry.entryCriteria.length) {
+    lines.push("- Entry criteria:");
+    for (const item of entry.entryCriteria) {
+      lines.push(`  - ${item.key || "-"}: ${item.status || "-"}`);
+      lines.push(`    - summary: ${item.summary || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderProductionSignoffConditions(signoff) {
+  if (!signoff) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Status: ${signoff.status || "-"}`,
+    `- Required decision: ${signoff.requiredDecision || "-"}`,
+    `- Writes data: ${signoff.willModifyData ? "yes" : "no"}`,
+    `- Next action: ${signoff.nextAction || "-"}`
+  ];
+  if (Array.isArray(signoff.conditions) && signoff.conditions.length) {
+    lines.push("- Conditions:");
+    for (const item of signoff.conditions) {
+      lines.push(`  - ${item.key || "-"}: ${item.status || "-"}`);
+      lines.push(`    - evidence: ${item.evidence || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -1034,6 +1157,14 @@ function renderHandoffFile(result) {
     "## Artifact / Receipt Ledger",
     "",
     renderArtifactReceiptLedger(result.stagingAcceptanceCloseout?.artifactReceiptLedger),
+    "",
+    "## Full Test Window Entry",
+    "",
+    renderFullTestWindowEntry(result.stagingAcceptanceCloseout?.fullTestWindowEntry),
+    "",
+    "## Production Sign-Off Conditions",
+    "",
+    renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
     "",
     "## Evidence Readiness",
     "",

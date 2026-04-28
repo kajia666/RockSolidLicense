@@ -304,6 +304,39 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ["ready-for-full-test-window", "hold", "rollback-follow-up"]
   );
   assert.doesNotMatch(JSON.stringify(output.stagingAcceptanceCloseout.artifactReceiptLedger), /StrongAdmin123!|StrongDeveloper123!/);
+  assert.equal(output.stagingAcceptanceCloseout.fullTestWindowEntry.status, "blocked_until_staging_closeout");
+  assert.equal(output.stagingAcceptanceCloseout.fullTestWindowEntry.command, "npm.cmd test");
+  assert.equal(output.stagingAcceptanceCloseout.fullTestWindowEntry.willRunFullSuite, true);
+  assert.equal(output.stagingAcceptanceCloseout.fullTestWindowEntry.willModifyData, false);
+  assert.equal(output.stagingAcceptanceCloseout.fullTestWindowEntry.triggerDecision, "ready-for-full-test-window");
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.fullTestWindowEntry.requiredCloseoutKeys,
+    output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
+  );
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.fullTestWindowEntry.entryCriteria.map((item) => item.key),
+    [
+      "staging_closeout_completed",
+      "artifact_receipt_ledger_filled",
+      "operator_go_no_go_ready",
+      "test_window_reserved"
+    ]
+  );
+  assert.match(output.stagingAcceptanceCloseout.fullTestWindowEntry.nextAction, /Do not run the full suite/);
+  assert.equal(output.stagingAcceptanceCloseout.productionSignoffConditions.status, "blocked_until_full_test_window");
+  assert.equal(output.stagingAcceptanceCloseout.productionSignoffConditions.requiredDecision, "ready-for-production-signoff");
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.productionSignoffConditions.conditions.map((item) => item.key),
+    [
+      "full_test_window_passed",
+      "staging_artifacts_archived",
+      "launch_mainline_receipts_visible",
+      "backup_restore_drill_passed",
+      "rollback_path_confirmed",
+      "operator_signoff_recorded"
+    ]
+  );
+  assert.match(output.stagingAcceptanceCloseout.productionSignoffConditions.nextAction, /production cutover/);
   assert.doesNotMatch(JSON.stringify(output.stagingAcceptanceCloseout), /StrongAdmin123!|StrongDeveloper123!/);
 });
 
@@ -384,6 +417,13 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
     assert.match(handoff, /record_recovery_drill, record_backup_verification/);
+    assert.match(handoff, /## Full Test Window Entry/);
+    assert.match(handoff, /Command: `npm\.cmd test`/);
+    assert.match(handoff, /blocked_until_staging_closeout/);
+    assert.match(handoff, /Do not run the full suite/);
+    assert.match(handoff, /## Production Sign-Off Conditions/);
+    assert.match(handoff, /blocked_until_full_test_window/);
+    assert.match(handoff, /ready-for-production-signoff/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

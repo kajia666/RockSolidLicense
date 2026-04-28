@@ -184,6 +184,30 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(readinessChecks.live_write_approval.status, "operator_confirm");
   assert.match(readinessChecks.live_write_approval.evidence, /--allow-live-writes/);
   assert.doesNotMatch(JSON.stringify(output.environmentReadiness), /StrongAdmin123!|StrongDeveloper123!/);
+  assert.deepEqual(
+    output.operatorChecklist.map((item) => item.key),
+    [
+      "review_environment_readiness",
+      "run_route_map_gate",
+      "run_backup_restore_drill",
+      "approve_live_write_smoke",
+      "run_live_write_smoke",
+      "save_smoke_handoff",
+      "open_launch_mainline",
+      "record_launch_mainline_evidence",
+      "verify_receipt_visibility"
+    ]
+  );
+  assert.equal(output.operatorChecklist[0].status, "operator_review");
+  assert.match(output.operatorChecklist[1].command, /launch:route-map-gate/);
+  assert.match(output.operatorChecklist[4].command, /launch:smoke:staging/);
+  assert.equal(output.operatorChecklist[7].endpoint, "https://staging.example.com/api/developer/launch-mainline/action");
+  assert.deepEqual(output.operatorChecklist[7].evidenceOperations.slice(0, 3), [
+    "record_launch_rehearsal_run",
+    "record_recovery_drill",
+    "record_backup_verification"
+  ]);
+  assert.doesNotMatch(JSON.stringify(output.operatorChecklist), /StrongAdmin123!|StrongDeveloper123!/);
 });
 
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
@@ -245,6 +269,11 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /non_default_secrets: operator_confirm/);
     assert.match(handoff, /backup_restore_drill: operator_execute/);
     assert.match(handoff, /route_map_gate: operator_execute/);
+    assert.match(handoff, /## Staging Operator Checklist/);
+    assert.match(handoff, /1\. Review environment readiness/);
+    assert.match(handoff, /2\. Run route-map and download-surface gate/);
+    assert.match(handoff, /5\. Run live-write staging smoke/);
+    assert.match(handoff, /8\. Record Launch Mainline evidence/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

@@ -396,6 +396,88 @@ function buildStagingEnvironmentReadiness(options, { recovery = null, launchRout
   };
 }
 
+function buildStagingOperatorChecklist(result) {
+  const recoveryCommandKeys = Object.keys(result.nextCommands?.recovery || {});
+  const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
+    ? result.evidenceActionPlan.items.map((item) => item.operation)
+    : [];
+  return [
+    {
+      key: "review_environment_readiness",
+      order: 1,
+      label: "Review environment readiness",
+      status: "operator_review",
+      summary: "Confirm HTTPS, non-default secrets, storage, recovery, route-map gate, and live-write approval readiness.",
+      readinessStatus: result.environmentReadiness?.status || "not_available"
+    },
+    {
+      key: "run_route_map_gate",
+      order: 2,
+      label: "Run route-map and download-surface gate",
+      status: "operator_execute",
+      command: result.nextCommands?.launchRouteMapGate?.command || null,
+      dryRunCommand: result.nextCommands?.launchRouteMapGate?.dryRunCommand || null,
+      summary: "Run the targeted pre-staging gate before any live-write smoke command."
+    },
+    {
+      key: "run_backup_restore_drill",
+      order: 3,
+      label: "Run backup and restore drill",
+      status: "operator_execute",
+      commandKeys: recoveryCommandKeys,
+      summary: "Run generated backup and restore dry-run commands on a separate restore target."
+    },
+    {
+      key: "approve_live_write_smoke",
+      order: 4,
+      label: "Approve live-write smoke",
+      status: "operator_confirm",
+      summary: "Confirm launch duty accepts staging writes before running the smoke command."
+    },
+    {
+      key: "run_live_write_smoke",
+      order: 5,
+      label: "Run live-write staging smoke",
+      status: "operator_execute",
+      command: result.nextCommands?.launchSmoke || null,
+      summary: "Run launch:smoke:staging only after approvals and recovery checks are complete."
+    },
+    {
+      key: "save_smoke_handoff",
+      order: 6,
+      label: "Save smoke handoff",
+      status: "operator_archive",
+      summary: "Keep the launch smoke JSON handoff with duty notes, summary downloads, and route links."
+    },
+    {
+      key: "open_launch_mainline",
+      order: 7,
+      label: "Open Launch Mainline",
+      status: "operator_open",
+      route: result.nextCommands?.launchMainline || null,
+      summary: "Open the scoped Launch Mainline lane after smoke completes."
+    },
+    {
+      key: "record_launch_mainline_evidence",
+      order: 8,
+      label: "Record Launch Mainline evidence",
+      status: "operator_execute",
+      endpoint: result.evidenceActionPlan?.endpoint || null,
+      bearerTokenEnv: result.evidenceReadiness?.tokenEnv || DEVELOPER_BEARER_TOKEN_ENV,
+      evidenceOperations,
+      summary: "Record evidence receipts in the order shown by evidenceActionPlan.items."
+    },
+    {
+      key: "verify_receipt_visibility",
+      order: 9,
+      label: "Verify receipt visibility",
+      status: "operator_review",
+      downloads: result.nextCommands?.receiptVisibilitySummaries || null,
+      summary: "Verify Launch Review and Launch Smoke receipt-visibility summaries after evidence is recorded."
+    }
+  ];
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -424,7 +506,7 @@ function buildResult(options) {
     ? buildStagingEnvironmentReadiness(options, { recovery, launchRouteMapGate })
     : null;
 
-  return {
+  const result = {
     status,
     mode: "staging-rehearsal",
     generatedAt: new Date().toISOString(),
@@ -468,6 +550,10 @@ function buildResult(options) {
         }
       }
       : {})
+  };
+  return {
+    ...result,
+    operatorChecklist: gatesPassed ? buildStagingOperatorChecklist(result) : []
   };
 }
 
@@ -561,6 +647,40 @@ function renderStagingEnvironmentReadiness(readiness) {
   return lines.join("\n");
 }
 
+function renderStagingOperatorChecklist(checklist = []) {
+  if (!Array.isArray(checklist) || checklist.length === 0) {
+    return "- Not available";
+  }
+  return checklist
+    .map((item) => {
+      const details = [
+        `${item.order}. ${item.label}`,
+        `   - status: ${item.status}`,
+        `   - summary: ${item.summary}`
+      ];
+      if (item.command) {
+        details.push(`   - command: \`${item.command}\``);
+      }
+      if (item.dryRunCommand) {
+        details.push(`   - dryRun: \`${item.dryRunCommand}\``);
+      }
+      if (item.route) {
+        details.push(`   - route: ${item.route}`);
+      }
+      if (item.endpoint) {
+        details.push(`   - endpoint: ${item.endpoint}`);
+      }
+      if (Array.isArray(item.commandKeys) && item.commandKeys.length) {
+        details.push(`   - commandKeys: ${item.commandKeys.join(", ")}`);
+      }
+      if (Array.isArray(item.evidenceOperations) && item.evidenceOperations.length) {
+        details.push(`   - evidenceOperations: ${item.evidenceOperations.join(", ")}`);
+      }
+      return details.join("\n");
+    })
+    .join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -603,6 +723,10 @@ function renderHandoffFile(result) {
     "## Staging Environment Readiness",
     "",
     renderStagingEnvironmentReadiness(result.environmentReadiness),
+    "",
+    "## Staging Operator Checklist",
+    "",
+    renderStagingOperatorChecklist(result.operatorChecklist),
     "",
     "## Evidence Readiness",
     "",

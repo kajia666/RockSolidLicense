@@ -241,6 +241,33 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   );
   assert.equal(output.operatorExecutionPlan.fullTestWindow.command, "npm.cmd test");
   assert.equal(output.operatorExecutionPlan.productionSignoff.requiredDecision, "ready-for-production-signoff");
+  assert.deepEqual(output.operatorExecutionPlan.readinessSummary, {
+    status: "needs_operator_input",
+    gapCount: 6,
+    canRunLiveWriteSmoke: false,
+    canRunFullTestWindow: false,
+    canSignoffProduction: false,
+    nextAction: "Resolve readinessGaps in order before live-write smoke, full test window, or production sign-off."
+  });
+  assert.deepEqual(
+    output.operatorExecutionPlan.readinessGaps.map((item) => item.key),
+    [
+      "handoff_file_not_requested",
+      "closeout_file_not_requested",
+      "developer_bearer_token_missing",
+      "closeout_backfill_pending",
+      "full_test_window_blocked",
+      "production_signoff_blocked"
+    ]
+  );
+  assert.equal(
+    output.operatorExecutionPlan.readinessGaps.find((item) => item.key === "closeout_backfill_pending").missingCloseoutKeys.length,
+    output.stagingAcceptanceCloseout.acceptanceChecks.length
+  );
+  assert.equal(
+    output.operatorExecutionPlan.readinessGaps.find((item) => item.key === "full_test_window_blocked").command,
+    "npm.cmd test"
+  );
   assert.match(output.operatorExecutionPlan.nextAction, /Run the ordered steps/);
   assert.doesNotMatch(JSON.stringify(output.operatorExecutionPlan), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.resultBackfillSummary.status, "awaiting_staging_execution");
@@ -463,6 +490,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /review_generated_bundle/);
     assert.match(handoff, /backfill_closeout_template/);
     assert.match(handoff, /production_signoff_review/);
+    assert.match(handoff, /Readiness gaps/);
+    assert.match(handoff, /closeout_backfill_pending/);
+    assert.match(handoff, /developer_bearer_token_missing/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
@@ -493,6 +523,16 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       output.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").path,
       closeoutFile
     );
+    assert.deepEqual(
+      output.operatorExecutionPlan.readinessGaps.map((item) => item.key),
+      [
+        "handoff_file_not_requested",
+        "developer_bearer_token_missing",
+        "closeout_backfill_pending",
+        "full_test_window_blocked",
+        "production_signoff_blocked"
+      ]
+    );
     assert.equal(existsSync(closeoutFile), true);
 
     const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
@@ -514,6 +554,20 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.fullTestWindowEntry.status, "blocked_until_staging_closeout");
     assert.equal(template.productionSignoffConditions.requiredDecision, "ready-for-production-signoff");
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
+    assert.equal(
+      template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,
+      "written"
+    );
+    assert.deepEqual(
+      template.operatorExecutionPlan.readinessGaps.map((item) => item.key),
+      [
+        "handoff_file_not_requested",
+        "developer_bearer_token_missing",
+        "closeout_backfill_pending",
+        "full_test_window_blocked",
+        "production_signoff_blocked"
+      ]
+    );
     assert.deepEqual(
       template.operatorExecutionPlan.orderedSteps.slice(-3).map((item) => item.key),
       [
@@ -540,5 +594,9 @@ test("staging rehearsal runner marks evidence requests ready when bearer token e
   assert.equal(output.evidenceReadiness.readyToExecute, true);
   assert.equal(output.evidenceReadiness.checks.developerBearerToken, "present");
   assert.equal(output.evidenceReadiness.nextAction, "Copy evidence request snippets only after the matching launch evidence has actually happened.");
+  assert.equal(
+    output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "developer_bearer_token_missing"),
+    false
+  );
   assert.doesNotMatch(result.stdout, /developer-secret-token/);
 });

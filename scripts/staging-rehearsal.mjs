@@ -520,31 +520,101 @@ function fileOutputStatus(file) {
   return file.written ? "written" : "pending_write";
 }
 
+function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } = {}) {
+  const outputStatus = new Map(outputFiles.map((item) => [item.key, item.status]));
+  const missingCloseoutKeys = (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
+  const gaps = [];
+  if (outputStatus.get("handoff_file") === "not_requested") {
+    gaps.push({
+      key: "handoff_file_not_requested",
+      severity: "warning",
+      stepKey: "review_generated_bundle",
+      summary: "No Markdown handoff file was requested for launch duty.",
+      nextAction: "Re-run staging:rehearsal with --handoff-file before live-write smoke."
+    });
+  }
+  if (outputStatus.get("closeout_file") === "not_requested") {
+    gaps.push({
+      key: "closeout_file_not_requested",
+      severity: "warning",
+      stepKey: "review_generated_bundle",
+      summary: "No JSON closeout template was requested for operator backfill.",
+      nextAction: "Re-run staging:rehearsal with --closeout-file before live-write smoke."
+    });
+  }
+  if (result.evidenceReadiness?.checks?.developerBearerToken !== "present") {
+    gaps.push({
+      key: "developer_bearer_token_missing",
+      severity: "blocker",
+      stepKey: "record_launch_mainline_evidence",
+      env: result.evidenceReadiness?.tokenEnv || DEVELOPER_BEARER_TOKEN_ENV,
+      summary: "Launch Mainline evidence requests cannot run until the developer bearer token env var is set.",
+      nextAction: `Set $env:${result.evidenceReadiness?.tokenEnv || DEVELOPER_BEARER_TOKEN_ENV} before copying evidence request snippets.`
+    });
+  }
+  gaps.push({
+    key: "closeout_backfill_pending",
+    severity: "blocker",
+    stepKey: "backfill_closeout_template",
+    missingCloseoutKeys,
+    summary: "Staging closeout is still waiting for redacted result values, artifact paths, receipt IDs, and operator_go_no_go.",
+    nextAction: "Backfill every required closeout key before reserving the full test window."
+  });
+  gaps.push({
+    key: "full_test_window_blocked",
+    severity: "blocker",
+    stepKey: "reserve_full_test_window",
+    command: closeout.fullTestWindowEntry?.command || null,
+    summary: "The full repository test window is blocked until closeout is backfilled.",
+    nextAction: "Run the full test command only after operator_go_no_go is ready-for-full-test-window."
+  });
+  gaps.push({
+    key: "production_signoff_blocked",
+    severity: "blocker",
+    stepKey: "production_signoff_review",
+    requiredDecision: closeout.productionSignoffConditions?.requiredDecision || null,
+    summary: "Production sign-off is blocked until the full test window passes and sign-off evidence is attached.",
+    nextAction: "Do not move to production cutover before production sign-off review is ready."
+  });
+  return gaps;
+}
+
 function buildStagingOperatorExecutionPlan(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
     ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
     : [];
+  const outputFiles = [
+    {
+      key: "handoff_file",
+      label: "Staging rehearsal Markdown handoff",
+      status: fileOutputStatus(result.handoffFile),
+      path: result.handoffFile?.path || null,
+      purpose: "Carry commands, routes, evidence requests, and operator notes into the live-write step."
+    },
+    {
+      key: "closeout_file",
+      label: "Staging closeout JSON template",
+      status: fileOutputStatus(result.closeoutFile),
+      path: result.closeoutFile?.path || null,
+      purpose: "Backfill redacted result values, artifact paths, receipt IDs, and go/no-go decision."
+    }
+  ];
+  const readinessGaps = buildOperatorReadinessGaps(result, { closeout, outputFiles });
   return {
     status: "ready_for_staging_execution",
     willModifyData: false,
     trigger: "no-write-rehearsal-gates-passed",
-    outputFiles: [
-      {
-        key: "handoff_file",
-        label: "Staging rehearsal Markdown handoff",
-        status: fileOutputStatus(result.handoffFile),
-        path: result.handoffFile?.path || null,
-        purpose: "Carry commands, routes, evidence requests, and operator notes into the live-write step."
-      },
-      {
-        key: "closeout_file",
-        label: "Staging closeout JSON template",
-        status: fileOutputStatus(result.closeoutFile),
-        path: result.closeoutFile?.path || null,
-        purpose: "Backfill redacted result values, artifact paths, receipt IDs, and go/no-go decision."
-      }
-    ],
+    outputFiles,
+    readinessSummary: {
+      status: readinessGaps.length ? "needs_operator_input" : "ready",
+      gapCount: readinessGaps.length,
+      canRunLiveWriteSmoke: false,
+      canRunFullTestWindow: false,
+      canSignoffProduction: false,
+      nextAction: "Resolve readinessGaps in order before live-write smoke, full test window, or production sign-off."
+    },
+    readinessGaps,
     orderedSteps: [
       {
         key: "review_generated_bundle",
@@ -1120,6 +1190,8 @@ function renderOperatorExecutionPlan(plan) {
     `- Evidence operations: ${(plan.evidenceOperations || []).join(", ")}`,
     `- Full test command: ${plan.fullTestWindow?.command || "-"}`,
     `- Production sign-off decision: ${plan.productionSignoff?.requiredDecision || "-"}`,
+    `- Readiness status: ${plan.readinessSummary?.status || "-"}`,
+    `- Readiness gap count: ${plan.readinessSummary?.gapCount ?? "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
   if (Array.isArray(plan.outputFiles) && plan.outputFiles.length) {
@@ -1128,6 +1200,24 @@ function renderOperatorExecutionPlan(plan) {
       lines.push(`  - ${file.key || "-"}: ${file.status || "-"}`);
       lines.push(`    - path: ${file.path || "-"}`);
       lines.push(`    - purpose: ${file.purpose || "-"}`);
+    }
+  }
+  if (Array.isArray(plan.readinessGaps) && plan.readinessGaps.length) {
+    lines.push("- Readiness gaps:");
+    for (const gap of plan.readinessGaps) {
+      lines.push(`  - ${gap.key || "-"}: ${gap.severity || "-"}`);
+      lines.push(`    - stepKey: ${gap.stepKey || "-"}`);
+      lines.push(`    - summary: ${gap.summary || "-"}`);
+      if (gap.command) {
+        lines.push(`    - command: \`${gap.command}\``);
+      }
+      if (gap.env) {
+        lines.push(`    - env: ${gap.env}`);
+      }
+      if (Array.isArray(gap.missingCloseoutKeys) && gap.missingCloseoutKeys.length) {
+        lines.push(`    - missingCloseoutKeys: ${gap.missingCloseoutKeys.join(", ")}`);
+      }
+      lines.push(`    - nextAction: ${gap.nextAction || "-"}`);
     }
   }
   if (Array.isArray(plan.orderedSteps) && plan.orderedSteps.length) {
@@ -1442,15 +1532,16 @@ function writeHandoffFile(result) {
     return result;
   }
 
-  mkdirSync(path.dirname(result.handoffFile.path), { recursive: true });
-  writeFileSync(result.handoffFile.path, renderHandoffFile(result), "utf8");
-  return {
+  const nextResult = {
     ...result,
     handoffFile: {
       ...result.handoffFile,
       written: true
     }
   };
+  mkdirSync(path.dirname(result.handoffFile.path), { recursive: true });
+  writeFileSync(result.handoffFile.path, renderHandoffFile(refreshOperatorExecutionPlan(nextResult)), "utf8");
+  return nextResult;
 }
 
 function writeCloseoutFile(result) {
@@ -1461,15 +1552,16 @@ function writeCloseoutFile(result) {
     return result;
   }
 
-  mkdirSync(path.dirname(result.closeoutFile.path), { recursive: true });
-  writeFileSync(result.closeoutFile.path, `${JSON.stringify(buildCloseoutTemplate(result), null, 2)}\n`, "utf8");
-  return {
+  const nextResult = {
     ...result,
     closeoutFile: {
       ...result.closeoutFile,
       written: true
     }
   };
+  mkdirSync(path.dirname(result.closeoutFile.path), { recursive: true });
+  writeFileSync(result.closeoutFile.path, `${JSON.stringify(buildCloseoutTemplate(refreshOperatorExecutionPlan(nextResult)), null, 2)}\n`, "utf8");
+  return nextResult;
 }
 
 function refreshOperatorExecutionPlan(result) {

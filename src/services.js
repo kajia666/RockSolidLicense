@@ -20417,6 +20417,43 @@ function appendSnapshotEscalationSummaryLines(lines = [], overview = {}) {
   }
 }
 
+function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
+  const visibility = receipt?.receiptVisibility && typeof receipt.receiptVisibility === "object"
+    ? receipt.receiptVisibility
+    : null;
+  if (!Array.isArray(lines) || !visibility) {
+    return;
+  }
+  const workspaces = Object.values(visibility.workspaces || {}).filter((item) => item?.key || item?.href);
+  const downloads = Object.values(visibility.downloads || {}).filter((item) => item?.key || item?.href);
+  const checkpoints = Array.isArray(visibility.checkpoints) ? visibility.checkpoints : [];
+  lines.push("Receipt Visibility:");
+  lines.push(
+    `- status=${visibility.status || "-"}`
+    + ` | operation=${visibility.recordedReceipt?.operation || receipt?.operation || "-"}`
+    + ` | handoff=${visibility.recordedReceipt?.handoffFileName || receipt?.handoffFileName || "-"}`
+  );
+  for (const item of workspaces) {
+    lines.push(`- workspace=${item.label || item.key || "-"}@${item.autofocus || "-"} | href=${item.href || "-"}`);
+  }
+  for (const item of downloads) {
+    lines.push(
+      `- download=${item.fileName || item.key || "-"}`
+      + ` | format=${item.format || "-"}`
+      + ` | href=${item.href || "-"}`
+    );
+  }
+  for (const item of checkpoints) {
+    lines.push(
+      `- checkpoint=${item.label || item.key || "-"}`
+      + ` | workspace=${item.workspaceKey || "-"}`
+      + ` | download=${item.downloadFileName || item.downloadKey || "-"}`
+      + ` | format=${item.downloadFormat || "-"}`
+      + ` | href=${item.downloadHref || "-"}`
+    );
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -20642,6 +20679,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Latest Launch Receipts:");
       for (const item of overview.latestLaunchReceipts) {
         lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
+        appendDeveloperOpsReceiptVisibilityText(lines, item);
       }
     }
     if (Array.isArray(overview.latestFirstWaveHandoffConfirmations) && overview.latestFirstWaveHandoffConfirmations.length) {
@@ -21071,6 +21109,19 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     }
   } else {
     lines.push("- none");
+  }
+
+  const latestLaunchReceipts = Array.isArray(payload.overview?.latestLaunchReceipts)
+    ? payload.overview.latestLaunchReceipts
+    : [];
+  const visibleReceipts = latestLaunchReceipts.filter((item) => item?.receiptVisibility);
+  if (visibleReceipts.length) {
+    lines.push("");
+    lines.push("Latest Receipt Visibility:");
+    for (const item of visibleReceipts) {
+      lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | handoff=${item.handoffFileName || "-"}`);
+      appendDeveloperOpsReceiptVisibilityText(lines, item);
+    }
   }
 
   lines.push("");

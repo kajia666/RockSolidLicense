@@ -54,6 +54,18 @@ async function getJson(baseUrl, route, token = null) {
   return json.data;
 }
 
+async function getText(baseUrl, route, token = null) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+  const text = await response.text();
+  assert.equal(response.ok, true, text);
+  return {
+    contentType: response.headers.get("content-type"),
+    body: text
+  };
+}
+
 test("developer launch mainline action receipt exposes visibility checkpoints for first-wave ops sweep", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -238,6 +250,32 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         { key: "post_launch_handoff_index", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_handoff_index" }
       ]
     );
+    assert.match(opsExport.summaryText || "", /Receipt Visibility:/);
+    assert.match(opsExport.summaryText || "", /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(opsExport.summaryText || "", /post-launch-sweep-handoff/);
+    assert.match(opsExport.summaryText || "", /post-launch-handoff-index/);
+
+    const opsSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=VISIBILITY_ALPHA&format=summary&limit=20",
+      ownerSession.token
+    );
+    assert.equal(opsSummaryDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(opsSummaryDownload.body, /Receipt Visibility:/);
+    assert.match(opsSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(opsSummaryDownload.body, /post-launch-sweep-handoff/);
+    assert.match(opsSummaryDownload.body, /post-launch-handoff-index/);
+
+    const opsHandoffIndex = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=VISIBILITY_ALPHA&format=handoff-index&limit=20",
+      ownerSession.token
+    );
+    assert.equal(opsHandoffIndex.contentType, "text/plain; charset=utf-8");
+    assert.match(opsHandoffIndex.body, /Receipt Visibility:/);
+    assert.match(opsHandoffIndex.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(opsHandoffIndex.body, /post-launch-sweep-handoff/);
+    assert.match(opsHandoffIndex.body, /post-launch-handoff-index/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

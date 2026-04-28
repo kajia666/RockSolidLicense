@@ -562,6 +562,24 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   const decision = typeof goNoGoField?.value === "string"
     ? goNoGoField.value
     : payload.decision || closeout.decision || null;
+  const signoffConditions = Array.isArray(payload.productionSignoff?.conditions)
+    ? payload.productionSignoff.conditions
+    : [];
+  const signoffFieldsByKey = new Map(
+    signoffConditions
+      .filter((field) => field && field.key)
+      .map((field) => [field.key, field])
+  );
+  const requiredSignoffKeys = (closeout.productionSignoffConditions?.conditions || [])
+    .map((item) => item.key)
+    .filter(Boolean);
+  const signoffFilledKeys = requiredSignoffKeys.filter((key) => isFilledCloseoutField(signoffFieldsByKey.get(key)));
+  const signoffMissingKeys = requiredSignoffKeys.filter((key) => !signoffFilledKeys.includes(key));
+  const productionDecision = payload.productionSignoff?.decision || null;
+  const readyForFullTestWindow = missingKeys.length === 0 && decision === "ready-for-full-test-window";
+  const readyForProductionSignoff = readyForFullTestWindow
+    && signoffMissingKeys.length === 0
+    && productionDecision === closeout.productionSignoffConditions?.requiredDecision;
   return {
     status: "loaded",
     path: resolvedPath,
@@ -572,7 +590,12 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
     requiredKeys,
     filledKeys,
     missingKeys,
-    readyForFullTestWindow: missingKeys.length === 0 && decision === "ready-for-full-test-window",
+    requiredSignoffKeys,
+    signoffFilledKeys,
+    signoffMissingKeys,
+    productionDecision,
+    readyForFullTestWindow,
+    readyForProductionSignoff,
     nextAction: missingKeys.length === 0
       ? "Closeout input is backfilled; confirm operator_go_no_go before entering the full test window."
       : "Backfill missingKeys in the closeout input before entering the full test window."
@@ -633,14 +656,17 @@ function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } 
       nextAction: "Run the full test command only after operator_go_no_go is ready-for-full-test-window."
     });
   }
-  gaps.push({
-    key: "production_signoff_blocked",
-    severity: "blocker",
-    stepKey: "production_signoff_review",
-    requiredDecision: closeout.productionSignoffConditions?.requiredDecision || null,
-    summary: "Production sign-off is blocked until the full test window passes and sign-off evidence is attached.",
-    nextAction: "Do not move to production cutover before production sign-off review is ready."
-  });
+  if (closeoutInput?.readyForProductionSignoff !== true) {
+    gaps.push({
+      key: "production_signoff_blocked",
+      severity: "blocker",
+      stepKey: "production_signoff_review",
+      requiredDecision: closeout.productionSignoffConditions?.requiredDecision || null,
+      missingSignoffKeys: closeoutInput?.signoffMissingKeys || (closeout.productionSignoffConditions?.conditions || []).map((item) => item.key).filter(Boolean),
+      summary: "Production sign-off is blocked until the full test window passes and sign-off evidence is attached.",
+      nextAction: "Do not move to production cutover before production sign-off review is ready."
+    });
+  }
   return gaps;
 }
 
@@ -676,7 +702,7 @@ function buildStagingOperatorExecutionPlan(result) {
       gapCount: readinessGaps.length,
       canRunLiveWriteSmoke: false,
       canRunFullTestWindow: result.closeoutInput?.readyForFullTestWindow === true,
-      canSignoffProduction: false,
+      canSignoffProduction: result.closeoutInput?.readyForProductionSignoff === true,
       nextAction: "Resolve readinessGaps in order before live-write smoke, full test window, or production sign-off."
     },
     readinessGaps,

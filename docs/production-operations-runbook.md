@@ -102,6 +102,8 @@ That sequence is useful because it keeps the end-to-end rehearsal, launch-day du
 
 When `Record First-Wave Ops Sweep` is captured through `/api/developer/launch-mainline/action`, the returned receipt now also includes a `visibility` block, a `receipt_visibility` last-action section, matching handoff text, `receiptVisibility` inside Developer Ops latest launch receipts, and matching lines in the Developer Ops summary, launch receipt next-follow-up, handoff-index, Launch Review summary, and Launch Smoke Kit summary downloads. These point directly to the next four operator review locations: Developer Ops summary, launch receipt next follow-up, post-launch sweep handoff, and post-launch handoff index.
 
+After `launch:smoke` or `launch:smoke:staging` passes, keep the CLI `handoff` JSON with the launch-duty notes. It now includes direct Launch Review summary and Launch Smoke Kit summary downloads before the Ops handoff index step, so the operator can verify those receipt-visibility sections without rebuilding the scoped routes by hand.
+
 For logging, dashboard, and alert suggestions, also see:
 
 - [observability-guide.md](/D:/code/OnlineVerification/docs/observability-guide.md)

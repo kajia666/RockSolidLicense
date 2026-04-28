@@ -278,6 +278,26 @@ function buildLaunchDutyHandoff({
       limit: options.limit
     })
   );
+  const launchReviewSummary = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/launch-review/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      source: "launch-smoke",
+      handoff: "first-wave",
+      format: "summary"
+    })
+  );
+  const launchSmokeSummary = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/launch-smoke-kit/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      operation: "record_post_launch_ops_sweep",
+      downloadKey: "launch_smoke_summary",
+      format: "summary"
+    })
+  );
 
   const firstWaveConfirmation = opsSnapshot.summary.initialLaunchOpsReadiness.firstWaveHandoffConfirmation;
   const auditLogId = handoffConfirmation.auditLogId;
@@ -328,6 +348,18 @@ function buildLaunchDutyHandoff({
         label: "Developer Ops handoff index",
         fileName: handoffIndex.fileName || "developer-ops-handoff-index.txt",
         ...opsHandoffIndex
+      },
+      launchReviewSummary: {
+        key: "launch-review-summary",
+        label: "Launch Review receipt visibility summary",
+        fileName: "launch-review.txt",
+        ...launchReviewSummary
+      },
+      launchSmokeSummary: {
+        key: "launch-smoke-summary",
+        label: "Launch Smoke receipt visibility summary",
+        fileName: "launch-smoke-kit.txt",
+        ...launchSmokeSummary
       }
     },
     evidence: {
@@ -346,6 +378,22 @@ function buildLaunchDutyHandoff({
         status: "next",
         route: launchReview.route,
         href: launchReview.href
+      },
+      {
+        key: "verify_launch_review_receipt_visibility",
+        label: "Download Launch Review summary and verify the receipt visibility section points to the next handoff assets.",
+        status: "next",
+        route: launchReviewSummary.route,
+        href: launchReviewSummary.href,
+        fileName: "launch-review.txt"
+      },
+      {
+        key: "verify_launch_smoke_receipt_visibility",
+        label: "Download Launch Smoke Kit summary and verify the receipt visibility section before handing off smoke duty.",
+        status: "next",
+        route: launchSmokeSummary.route,
+        href: launchSmokeSummary.href,
+        fileName: "launch-smoke-kit.txt"
       },
       {
         key: "verify_first_wave_confirmation",
@@ -782,6 +830,8 @@ function writeResult(result, json) {
     if (result.handoff) {
       console.log("Next launch-duty handoff:");
       console.log(`- Open Launch Review: ${result.handoff.nextWorkspace.href || result.handoff.nextWorkspace.route}`);
+      console.log(`- Verify Launch Review receipt visibility: ${result.handoff.downloads.launchReviewSummary.href || result.handoff.downloads.launchReviewSummary.route}`);
+      console.log(`- Verify Launch Smoke receipt visibility: ${result.handoff.downloads.launchSmokeSummary.href || result.handoff.downloads.launchSmokeSummary.route}`);
       console.log(`- Download Ops handoff index: ${result.handoff.downloads.opsHandoffIndex.href || result.handoff.downloads.opsHandoffIndex.route}`);
       console.log(`- Continue Developer Ops watch: ${result.handoff.reviewWorkspaces.developerOps.href || result.handoff.reviewWorkspaces.developerOps.route}`);
       console.log(`- Open Launch Mainline evidence: ${result.handoff.reviewWorkspaces.launchMainline.href || result.handoff.reviewWorkspaces.launchMainline.route}`);

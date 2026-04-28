@@ -266,6 +266,17 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(opsSummaryDownload.body, /post-launch-sweep-handoff/);
     assert.match(opsSummaryDownload.body, /post-launch-handoff-index/);
 
+    const opsLaunchReceiptNextFollowUp = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=VISIBILITY_ALPHA&format=launch-receipt-next-follow-up&limit=20",
+      ownerSession.token
+    );
+    assert.equal(opsLaunchReceiptNextFollowUp.contentType, "text/plain; charset=utf-8");
+    assert.match(opsLaunchReceiptNextFollowUp.body, /Receipt Visibility:/);
+    assert.match(opsLaunchReceiptNextFollowUp.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(opsLaunchReceiptNextFollowUp.body, /post-launch-sweep-handoff/);
+    assert.match(opsLaunchReceiptNextFollowUp.body, /post-launch-handoff-index/);
+
     const opsHandoffIndex = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=VISIBILITY_ALPHA&format=handoff-index&limit=20",

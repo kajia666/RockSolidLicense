@@ -20803,6 +20803,19 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   const recommendedWorkspace = recommendedAction?.workspaceAction || null;
   const recommendedDownload = item?.recommendedDownload
     || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, item);
+  const latestLaunchReceipts = Array.isArray(overview.latestLaunchReceipts)
+    ? overview.latestLaunchReceipts
+    : [];
+  const receiptVisibilitySource = latestLaunchReceipts.find((receipt) => (
+    receipt?.receiptVisibility
+      && item?.handoffFileName
+      && receipt.handoffFileName === item.handoffFileName
+  )) || latestLaunchReceipts.find((receipt) => (
+    receipt?.receiptVisibility
+      && (!item?.operation || receipt.operation === item.operation)
+      && (!item?.productCode || receipt.productCode === item.productCode)
+      && (!item?.channel || receipt.channel === item.channel)
+  )) || latestLaunchReceipts.find((receipt) => receipt?.receiptVisibility);
   const lines = [
     "RockSolid Developer Ops Launch Receipt Next Follow-up",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -20839,6 +20852,10 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Download File: ${recommendedDownload?.fileName || "-"}`);
   lines.push(`Download Format: ${recommendedDownload?.format || "-"}`);
   lines.push(`Download Href: ${recommendedDownload?.href || "-"}`);
+  if (receiptVisibilitySource) {
+    lines.push("");
+    appendDeveloperOpsReceiptVisibilityText(lines, receiptVisibilitySource);
+  }
   lines.push("");
   lines.push("Operator Hand-off:");
   lines.push(`- Next: ${formatLaunchReceiptNextFollowUp(item)}`);

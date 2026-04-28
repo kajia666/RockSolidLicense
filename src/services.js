@@ -10816,6 +10816,11 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
   };
 
   appendLaunchMainlineGateText(lines, reviewSummary.mainlineGate, formatWorkspaceActionText);
+  appendLaunchDutyReceiptVisibilityText(
+    lines,
+    opsOverview.latestLaunchReceipts,
+    "Launch Review Receipt Visibility:"
+  );
 
   if (reviewSummary.recommendedWorkspace?.label || reviewSummary.recommendedWorkspace?.key) {
     lines.push("");
@@ -12823,6 +12828,8 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
   const smokeSummary = payload.smokeSummary || {};
+  const opsSnapshot = payload.opsSnapshot || {};
+  const opsOverview = opsSnapshot.overview || {};
   const formatWorkspaceActionText = (action = null) => {
     if (!action || typeof action !== "object") {
       return "-";
@@ -12851,6 +12858,11 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
   ];
 
   appendLaunchMainlineGateText(lines, smokeSummary.mainlineGate, formatWorkspaceActionText);
+  appendLaunchDutyReceiptVisibilityText(
+    lines,
+    opsOverview.latestLaunchReceipts,
+    "Launch Smoke Receipt Visibility:"
+  );
 
   if (smokeSummary.routeFocus && typeof smokeSummary.routeFocus === "object") {
     lines.push("");
@@ -20451,6 +20463,23 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
       + ` | format=${item.downloadFormat || "-"}`
       + ` | href=${item.downloadHref || "-"}`
     );
+  }
+}
+
+function appendLaunchDutyReceiptVisibilityText(lines = [], latestLaunchReceipts = [], heading = "Launch Duty Receipt Visibility:") {
+  if (!Array.isArray(lines)) {
+    return;
+  }
+  const visibleReceipts = (Array.isArray(latestLaunchReceipts) ? latestLaunchReceipts : [])
+    .filter((item) => item?.receiptVisibility);
+  if (!visibleReceipts.length) {
+    return;
+  }
+  lines.push("");
+  lines.push(heading);
+  for (const item of visibleReceipts) {
+    lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | handoff=${item.handoffFileName || "-"}`);
+    appendDeveloperOpsReceiptVisibilityText(lines, item);
   }
 }
 

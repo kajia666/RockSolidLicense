@@ -287,6 +287,28 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(opsHandoffIndex.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(opsHandoffIndex.body, /post-launch-sweep-handoff/);
     assert.match(opsHandoffIndex.body, /post-launch-handoff-index/);
+
+    const launchReviewSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=VISIBILITY_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary",
+      ownerSession.token
+    );
+    assert.equal(launchReviewSummaryDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchReviewSummaryDownload.body, /Launch Review Receipt Visibility:/);
+    assert.match(launchReviewSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(launchReviewSummaryDownload.body, /post-launch-sweep-handoff/);
+    assert.match(launchReviewSummaryDownload.body, /post-launch-handoff-index/);
+
+    const launchSmokeSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=VISIBILITY_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary",
+      ownerSession.token
+    );
+    assert.equal(launchSmokeSummaryDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchSmokeSummaryDownload.body, /Launch Smoke Receipt Visibility:/);
+    assert.match(launchSmokeSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(launchSmokeSummaryDownload.body, /post-launch-sweep-handoff/);
+    assert.match(launchSmokeSummaryDownload.body, /post-launch-handoff-index/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

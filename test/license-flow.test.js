@@ -14321,7 +14321,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /initial-launch-ops-readiness\.txt/);
     assert.match(handoffIndexDownload.body, /stabilization-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /launch-receipt-next-follow-up\.txt/);
+    assert.match(handoffIndexDownload.body, /launch-mainline-handoff-routes\.txt/);
     assert.match(handoffIndexDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
+
+    const opsLaunchMainlineRouteMapDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=launch-mainline-handoff-routes",
+      operatorSession.token
+    );
+    assert.equal(opsLaunchMainlineRouteMapDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(opsLaunchMainlineRouteMapDownload.contentDisposition || "", /developer-ops-launch-mainline-handoff-routes\.txt/);
+    assert.match(opsLaunchMainlineRouteMapDownload.body, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-mainline-handoff-download-routes.*\/api\/developer\/launch-mainline\/download\?.*format=handoff-download-routes/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-mainline-post-launch-handoff-index.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-handoff-index/
+    );
 
     const launchMainlinePostLaunchIndexDownload = await getText(
       baseUrl,
@@ -14718,6 +14736,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(checksumsDownload.body, /initial-launch-ops-readiness\.txt/);
     assert.match(checksumsDownload.body, /stabilization-handoff\.txt/);
+    assert.match(checksumsDownload.body, /launch-mainline-handoff-routes\.txt/);
     assert.match(checksumsDownload.body, /route-review\/developer-ops-primary-session-summary\.txt/);
     assert.match(checksumsDownload.body, /route-review\/developer-ops-next-audit-summary\.txt/);
     assert.match(checksumsDownload.body, /route-review\/developer-ops-remaining-summary\.txt/);
@@ -14736,6 +14755,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(zipText, /handoff-index\.txt/);
     assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
+    assert.match(zipText, /launch-mainline-handoff-routes\.txt/);
     assert.match(zipText, /route-review\/developer-ops-primary-session-summary\.txt/);
     assert.match(zipText, /route-review\/developer-ops-next-audit-summary\.txt/);
     assert.match(zipText, /route-review\/developer-ops-remaining-summary\.txt/);

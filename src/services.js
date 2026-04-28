@@ -17709,6 +17709,7 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
     },
     launchMainlineFiles: {
       postLaunchHandoffIndex: "post-launch-handoff-index",
+      handoffDownloadRoutes: "handoff-download-routes.txt",
       summary: "summary",
       checksums: "checksums",
       zip: "zip"
@@ -17823,7 +17824,8 @@ function buildDeveloperOpsInitialLaunchContract({
       launchReceiptNextFollowUp: opsFiles.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt",
       launchReceiptFollowUpsCsv: opsFiles.launchReceiptFollowUpsCsv || "csv/launch-receipt-follow-ups.csv",
       auditLogsCsv: opsFiles.auditLogsCsv || "csv/audit-logs.csv",
-      launchMainlinePostLaunchHandoffIndex: launchMainlineFiles.postLaunchHandoffIndex || "post-launch-handoff-index"
+      launchMainlinePostLaunchHandoffIndex: launchMainlineFiles.postLaunchHandoffIndex || "post-launch-handoff-index",
+      launchMainlineHandoffDownloadRoutes: launchMainlineFiles.handoffDownloadRoutes || "handoff-download-routes.txt"
     }
   };
 }
@@ -18035,7 +18037,7 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
     nextAction.operation
       ? `Complete next stabilization action through Launch Mainline: ${nextAction.operation}.`
       : "Keep Launch Mainline open until the next stabilization action is selected.",
-    `Attach Ops files for handoff: ${opsFiles.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt"}, ${opsFiles.handoffIndex || "handoff-index.txt"}, ${opsFiles.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt"}.`,
+    `Attach Ops files for handoff: ${opsFiles.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt"}, ${opsFiles.handoffIndex || "handoff-index.txt"}, ${opsFiles.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt"}, ${launchMainlineFiles.handoffDownloadRoutes || "handoff-download-routes.txt"}.`,
     confirmation
       ? `Keep stabilization confirmation audit attached: ${confirmation.auditLogId || "-"}.`
       : "Confirm the stabilization handoff in Developer Ops before handing off steady monitoring."
@@ -18074,7 +18076,8 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
       readiness: opsFiles.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
       handoffIndex: opsFiles.handoffIndex || "handoff-index.txt",
       nextFollowUp: opsFiles.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt",
-      postLaunchIndex: launchMainlineFiles.postLaunchHandoffIndex || "post-launch-handoff-index"
+      postLaunchIndex: launchMainlineFiles.postLaunchHandoffIndex || "post-launch-handoff-index",
+      routeMap: launchMainlineFiles.handoffDownloadRoutes || "handoff-download-routes.txt"
     },
     checklist
   };
@@ -20717,6 +20720,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | handoffIndex=${stabilizationHandoff.files?.handoffIndex || "-"}`
         + ` | nextFollowUp=${stabilizationHandoff.files?.nextFollowUp || "-"}`
         + ` | postLaunchIndex=${stabilizationHandoff.files?.postLaunchIndex || "-"}`
+        + ` | routeMap=${stabilizationHandoff.files?.routeMap || "-"}`
       );
       const confirmation = stabilizationHandoff.confirmation || null;
       if (confirmation) {
@@ -20754,7 +20758,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | href=${nextFollowUp.downloadHref || nextFollowUp.recommendedDownload?.href || "-"}`
       );
       lines.push(`- opsIndex=${opsFiles.handoffIndex || "-"} | readiness=${opsFiles.initialLaunchOpsReadiness || "-"} | followUpsCsv=${opsFiles.launchReceiptFollowUpsCsv || "-"}`);
-      lines.push(`- postLaunchIndex=${launchMainlineFiles.postLaunchHandoffIndex || "-"} | checksums=${launchMainlineFiles.checksums || "-"} | zip=${launchMainlineFiles.zip || "-"}`);
+      lines.push(`- postLaunchIndex=${launchMainlineFiles.postLaunchHandoffIndex || "-"} | routeMap=${launchMainlineFiles.handoffDownloadRoutes || "-"} | checksums=${launchMainlineFiles.checksums || "-"} | zip=${launchMainlineFiles.zip || "-"}`);
       const confirmation = traceability.stabilizationHandoffConfirmation || null;
       if (confirmation) {
         lines.push(`- stabilizationConfirmation=${confirmation.status || "-"} | audit=${confirmation.auditLogId || "-"} | decision=${confirmation.decision || "-"} | by=${confirmation.confirmedBy?.username || "-"}`);
@@ -21183,6 +21187,89 @@ function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
+  const scope = payload.scope || {};
+  const readiness = payload.summary?.initialLaunchOpsReadiness || {};
+  const traceability = readiness.traceability || {};
+  const latestLaunchReceipt = traceability.latestLaunchReceipt || {};
+  const launchMainlineFiles = traceability.launchMainlineFiles || {};
+  const routeParams = compactRouteParams({
+    productCode: scope.productCode || latestLaunchReceipt.productCode || "",
+    channel: scope.channel || latestLaunchReceipt.channel || "stable",
+    username: scope.username || "",
+    search: scope.search || "",
+    eventType: scope.eventType || "",
+    actorType: scope.actorType || "",
+    entityType: scope.entityType || "",
+    limit: scope.auditLimit || "",
+    reviewMode: "matched"
+  });
+  const downloads = [
+    [
+      "launch-mainline-handoff-download-routes",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline handoff download routes",
+        launchMainlineFiles.handoffDownloadRoutes || "handoff-download-routes.txt",
+        "handoff-download-routes",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-post-launch-handoff-index",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline post-launch handoff index",
+        "developer-launch-mainline-post-launch-handoff-index.txt",
+        "post-launch-handoff-index",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-summary",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline summary",
+        "developer-launch-mainline-summary.txt",
+        "summary",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-checksums",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline checksums",
+        "developer-launch-mainline-sha256.txt",
+        "checksums",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-zip",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline zip",
+        "developer-launch-mainline.zip",
+        "zip",
+        routeParams
+      )
+    ]
+  ];
+  const lines = [
+    "RockSolid Developer Ops Launch Mainline Handoff Routes",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Channel: ${scope.channel || latestLaunchReceipt.channel || "stable"}`,
+    "",
+    "Launch Mainline Direct Downloads:"
+  ];
+  for (const [key, download] of downloads) {
+    lines.push(`- ${key}: ${formatLaunchHandoffDownloadText(download, { fileSeparator: " | " })}`);
+  }
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push("- Open this file from the Developer Ops export when handing launch duty to a reviewer who does not have the Launch Mainline zip open.");
+  lines.push("- Prefer the handoff-download-routes link when the reviewer needs the complete Launch Mainline route map.");
+  lines.push("- Keep this file beside handoff-index.txt so Ops and Launch Mainline reviewers share the same download hrefs.");
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -21204,6 +21291,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "launch-receipt-next-follow-up.txt",
     "initial-launch-ops-readiness.txt",
     "stabilization-handoff.txt",
+    "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
     "csv/accounts.csv",
     "csv/entitlements.csv",
@@ -21289,6 +21377,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use initial-launch-ops-readiness.txt for the current gate and launch duty decision.");
   lines.push("- Use launch-receipt-next-follow-up.txt for the next recorded Launch Mainline operation.");
   lines.push("- Use stabilization-handoff.txt when handing first-wave stabilization duty to the next operator.");
+  lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
 }
@@ -21518,6 +21607,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "stabilization-handoff.txt",
       body: buildDeveloperOpsStabilizationHandoffText(payload)
+    },
+    {
+      path: "launch-mainline-handoff-routes.txt",
+      body: buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload)
     },
     ...buildDeveloperOpsRouteReviewExportFiles(payload),
     {
@@ -22234,7 +22327,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "stabilization-handoff"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "stabilization-handoff"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -22269,6 +22362,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-handoff-index.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsHandoffIndexText(payload)
+    };
+  }
+
+  if (normalizedFormat === "launch-mainline-handoff-routes") {
+    return {
+      fileName: "developer-ops-launch-mainline-handoff-routes.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload)
     };
   }
 

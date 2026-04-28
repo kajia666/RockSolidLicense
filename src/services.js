@@ -16404,6 +16404,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const latestLaunchReceipt = traceability.latestLaunchReceipt || null;
   const launchReceiptNextFollowUp = traceability.nextFollowUp || null;
   const opsFiles = traceability.opsFiles || {};
+  const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
+    productCode: project.code || filters.productCode || "",
+    channel: manifest.channel || filters.channel || "stable"
+  });
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
@@ -16477,6 +16481,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   appendInitialLaunchOperatorHeadlineTextLines(lines, traceability.initialLaunchOperatorHeadline || null);
   appendInitialLaunchOperatorNextActionTextLines(lines, traceability.initialLaunchOperatorNextAction || null);
   appendInitialLaunchOperatorActionManifestTextLines(lines, traceability.initialLaunchOperatorActionManifest || null);
+
+  lines.push("");
+  lines.push("Receipt Visibility Summary Downloads:");
+  lines.push(`- Launch Review summary | file=${receiptVisibilitySummaryDownloads.launchReviewSummary?.fileName || "-"} | format=${receiptVisibilitySummaryDownloads.launchReviewSummary?.format || "-"} | href=${receiptVisibilitySummaryDownloads.launchReviewSummary?.href || "-"}`);
+  lines.push(`- Launch Smoke Kit summary | file=${receiptVisibilitySummaryDownloads.launchSmokeSummary?.fileName || "-"} | format=${receiptVisibilitySummaryDownloads.launchSmokeSummary?.format || "-"} | href=${receiptVisibilitySummaryDownloads.launchSmokeSummary?.href || "-"}`);
 
   lines.push("");
   lines.push("Recommended Downloads:");
@@ -20481,6 +20490,37 @@ function appendLaunchDutyReceiptVisibilityText(lines = [], latestLaunchReceipts 
     lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | handoff=${item.handoffFileName || "-"}`);
     appendDeveloperOpsReceiptVisibilityText(lines, item);
   }
+}
+
+function buildLaunchDutyReceiptVisibilitySummaryDownloads({
+  productCode = "",
+  channel = "stable"
+} = {}) {
+  const baseParams = compactRouteParams({
+    productCode,
+    channel,
+    source: "launch-smoke",
+    handoff: "first-wave"
+  });
+  return {
+    launchReviewSummary: createLaunchWorkflowReviewDownloadShortcut(
+      "Launch Review receipt visibility summary",
+      "launch-review.txt",
+      "summary",
+      baseParams
+    ),
+    launchSmokeSummary: createLaunchWorkflowSmokeKitDownloadShortcut(
+      "Launch Smoke receipt visibility summary",
+      "launch-smoke-kit.txt",
+      "summary",
+      compactRouteParams({
+        productCode,
+        channel,
+        operation: "record_post_launch_ops_sweep",
+        downloadKey: "launch_smoke_summary"
+      })
+    )
+  };
 }
 
 function buildDeveloperOpsSummaryText(payload = {}) {

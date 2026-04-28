@@ -309,6 +309,22 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(launchSmokeSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchSmokeSummaryDownload.body, /post-launch-sweep-handoff/);
     assert.match(launchSmokeSummaryDownload.body, /post-launch-handoff-index/);
+
+    const postLaunchHandoffIndex = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=VISIBILITY_ALPHA&channel=stable&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.equal(postLaunchHandoffIndex.contentType, "text/plain; charset=utf-8");
+    assert.match(postLaunchHandoffIndex.body, /Receipt Visibility Summary Downloads:/);
+    assert.match(
+      postLaunchHandoffIndex.body,
+      /Launch Review summary.*\/api\/developer\/launch-review\/download\?.*source=launch-smoke.*handoff=first-wave.*format=summary/
+    );
+    assert.match(
+      postLaunchHandoffIndex.body,
+      /Launch Smoke Kit summary.*\/api\/developer\/launch-smoke-kit\/download\?.*operation=record_post_launch_ops_sweep.*downloadKey=launch_smoke_summary.*format=summary/
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

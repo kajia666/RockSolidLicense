@@ -475,6 +475,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Decision: pending_staging_results/);
     assert.match(handoff, /operator_go_no_go/);
     assert.match(handoff, /full repository test window/);
+    assert.match(handoff, /## Closeout Backfill Guide/);
+    assert.match(handoff, /Closeout input reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout\.json>`/);
+    assert.match(handoff, /Full test window command: `npm\.cmd test`/);
+    assert.match(handoff, /Production sign-off decision: ready-for-production-signoff/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
@@ -571,6 +575,21 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.productionSignoff.requiredDecision, "ready-for-production-signoff");
     assert.equal(template.productionSignoff.conditions.every((item) => item.status === "pending_operator_entry"), true);
     assert.equal(template.productionSignoff.conditions.every((item) => item.value === null), true);
+    assert.equal(template.closeoutBackfillGuide.status, "awaiting_staging_results");
+    assert.equal(template.closeoutBackfillGuide.closeoutInputReload.command, "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>");
+    assert.deepEqual(
+      template.closeoutBackfillGuide.orderedBackfillKeys,
+      template.acceptanceFields.map((item) => item.key)
+    );
+    assert.deepEqual(template.closeoutBackfillGuide.receiptVisibilityKeys, [
+      "launchMainline",
+      "launchReview",
+      "launchSmoke",
+      "developerOps"
+    ]);
+    assert.equal(template.closeoutBackfillGuide.fullTestWindow.command, "npm.cmd test");
+    assert.equal(template.closeoutBackfillGuide.fullTestWindow.requiredDecision, "ready-for-full-test-window");
+    assert.equal(template.closeoutBackfillGuide.productionSignoff.requiredDecision, "ready-for-production-signoff");
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,

@@ -593,6 +593,39 @@ function buildProductionSignoffInputTemplate(signoff = {}) {
   };
 }
 
+function buildCloseoutBackfillGuide(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const orderedBackfillKeys = (closeout.acceptanceChecks || [])
+    .map((item) => item.key)
+    .filter(Boolean);
+  const productionSignoffKeys = (closeout.productionSignoffConditions?.conditions || [])
+    .map((item) => item.key)
+    .filter(Boolean);
+  return {
+    status: "awaiting_staging_results",
+    willModifyData: false,
+    closeoutInputReload: {
+      option: "--closeout-input-file",
+      command: "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+      purpose: "Reload the redacted closeout input after staging results are backfilled."
+    },
+    orderedBackfillKeys,
+    receiptVisibilityKeys: RECEIPT_VISIBILITY_KEYS,
+    productionSignoffKeys,
+    fullTestWindow: {
+      command: closeout.fullTestWindowEntry?.command || "npm.cmd test",
+      requiredDecision: closeout.fullTestWindowEntry?.triggerDecision || "ready-for-full-test-window",
+      requiredCloseoutKeys: closeout.fullTestWindowEntry?.requiredCloseoutKeys || orderedBackfillKeys
+    },
+    productionSignoff: {
+      requiredDecision: closeout.productionSignoffConditions?.requiredDecision || "ready-for-production-signoff",
+      requiredSignoffKeys: productionSignoffKeys,
+      requiredReceiptVisibilityKeys: RECEIPT_VISIBILITY_KEYS
+    },
+    nextAction: "Backfill the generated closeout JSON, reload it with --closeout-input-file, then enter the full test window only after the readiness gaps clear."
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -1231,9 +1264,13 @@ function buildResult(options) {
     ...resultWithCloseout,
     closeoutInput
   };
-  return {
+  const resultWithCloseoutBackfillGuide = {
     ...resultWithCloseoutInput,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithCloseoutInput) : null
+    closeoutBackfillGuide: gatesPassed ? buildCloseoutBackfillGuide(resultWithCloseoutInput) : null
+  };
+  return {
+    ...resultWithCloseoutBackfillGuide,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithCloseoutBackfillGuide) : null
   };
 }
 
@@ -1492,6 +1529,24 @@ function renderStagingAcceptanceCloseout(closeout) {
   return lines.join("\n");
 }
 
+function renderCloseoutBackfillGuide(guide) {
+  if (!guide) {
+    return "- Not available";
+  }
+  return [
+    `- Status: ${guide.status || "-"}`,
+    `- Writes data: ${guide.willModifyData ? "yes" : "no"}`,
+    `- Closeout input reload: \`${guide.closeoutInputReload?.command || "-"}\``,
+    `- Ordered backfill keys: ${(guide.orderedBackfillKeys || []).join(", ")}`,
+    `- Receipt visibility keys: ${(guide.receiptVisibilityKeys || []).join(", ")}`,
+    `- Production sign-off keys: ${(guide.productionSignoffKeys || []).join(", ")}`,
+    `- Full test window command: \`${guide.fullTestWindow?.command || "-"}\``,
+    `- Full test window decision: ${guide.fullTestWindow?.requiredDecision || "-"}`,
+    `- Production sign-off decision: ${guide.productionSignoff?.requiredDecision || "-"}`,
+    `- Next action: ${guide.nextAction || "-"}`
+  ].join("\n");
+}
+
 function renderArtifactReceiptLedger(ledger) {
   if (!ledger) {
     return "- Not available";
@@ -1622,6 +1677,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingAcceptanceCloseout(result.stagingAcceptanceCloseout),
     "",
+    "## Closeout Backfill Guide",
+    "",
+    renderCloseoutBackfillGuide(result.closeoutBackfillGuide),
+    "",
     "## Artifact / Receipt Ledger",
     "",
     renderArtifactReceiptLedger(result.stagingAcceptanceCloseout?.artifactReceiptLedger),
@@ -1699,6 +1758,7 @@ function buildCloseoutTemplate(result) {
     artifactReceiptLedger: ledger,
     receiptVisibility: buildReceiptVisibilityTemplate(),
     productionSignoff: buildProductionSignoffInputTemplate(closeout.productionSignoffConditions || {}),
+    closeoutBackfillGuide: result.closeoutBackfillGuide || buildCloseoutBackfillGuide(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

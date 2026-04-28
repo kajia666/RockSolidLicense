@@ -154,13 +154,17 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.equal(visibility?.downloads?.postLaunchHandoffIndex?.format, "post-launch-handoff-index");
     assert.match(visibility?.downloads?.postLaunchHandoffIndex?.href || "", /format=post-launch-handoff-index/);
 
+    assert.equal(visibility?.downloads?.handoffDownloadRoutes?.format, "handoff-download-routes");
+    assert.match(visibility?.downloads?.handoffDownloadRoutes?.href || "", /format=handoff-download-routes/);
+
     assert.deepEqual(
       Array.isArray(visibility?.checkpoints) ? visibility.checkpoints.map((item) => item.key) : [],
       [
         "developer_ops_summary",
         "launch_receipt_next_follow_up",
         "post_launch_sweep_handoff",
-        "post_launch_handoff_index"
+        "post_launch_handoff_index",
+        "handoff_download_routes"
       ]
     );
 
@@ -175,7 +179,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "receipt_visibility_developer_ops_summary",
         "receipt_visibility_launch_receipt_next_follow_up",
         "receipt_visibility_post_launch_sweep_handoff",
-        "receipt_visibility_post_launch_handoff_index"
+        "receipt_visibility_post_launch_handoff_index",
+        "receipt_visibility_handoff_download_routes"
       ]
     );
     assert.deepEqual(
@@ -196,7 +201,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         { kind: "download", workspace: null, download: "ops_summary" },
         { kind: "download", workspace: null, download: "ops_launch_receipt_next_follow_up" },
         { kind: "download", workspace: null, download: "launch_mainline_post_launch_sweep_handoff" },
-        { kind: "download", workspace: null, download: "launch_mainline_post_launch_handoff_index" }
+        { kind: "download", workspace: null, download: "launch_mainline_post_launch_handoff_index" },
+        { kind: "download", workspace: null, download: "launch_mainline_handoff_download_routes" }
       ]
     );
     assert.equal(
@@ -211,6 +217,7 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(actionResult.receipt?.handoffText || "", /Receipt Visibility:/);
     assert.match(actionResult.receipt?.handoffText || "", /developer-ops-launch-receipt-next-follow-up\.txt/i);
     assert.match(actionResult.receipt?.handoffText || "", /post-launch-handoff-index/i);
+    assert.match(actionResult.receipt?.handoffText || "", /handoff-download-routes/i);
 
     const opsExport = await getJson(
       baseUrl,
@@ -228,13 +235,15 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "ops_summary",
         "ops_launch_receipt_next_follow_up",
         "launch_mainline_post_launch_sweep_handoff",
-        "launch_mainline_post_launch_handoff_index"
+        "launch_mainline_post_launch_handoff_index",
+        "launch_mainline_handoff_download_routes"
       ]
     );
     assert.match(latestReceipt?.receiptVisibility?.downloads?.developerOpsSummary?.href || "", /format=summary/);
     assert.match(latestReceipt?.receiptVisibility?.downloads?.launchReceiptNextFollowUp?.href || "", /format=launch-receipt-next-follow-up/);
     assert.match(latestReceipt?.receiptVisibility?.downloads?.postLaunchSweepHandoff?.href || "", /format=post-launch-sweep-handoff/);
     assert.match(latestReceipt?.receiptVisibility?.downloads?.postLaunchHandoffIndex?.href || "", /format=post-launch-handoff-index/);
+    assert.match(latestReceipt?.receiptVisibility?.downloads?.handoffDownloadRoutes?.href || "", /format=handoff-download-routes/);
     assert.deepEqual(
       Array.isArray(latestReceipt?.receiptVisibility?.checkpoints)
         ? latestReceipt.receiptVisibility.checkpoints.map((item) => ({
@@ -247,13 +256,15 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         { key: "developer_ops_summary", workspaceKey: "ops", downloadKey: "ops_summary" },
         { key: "launch_receipt_next_follow_up", workspaceKey: "ops", downloadKey: "ops_launch_receipt_next_follow_up" },
         { key: "post_launch_sweep_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_sweep_handoff" },
-        { key: "post_launch_handoff_index", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_handoff_index" }
+        { key: "post_launch_handoff_index", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_handoff_index" },
+        { key: "handoff_download_routes", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_handoff_download_routes" }
       ]
     );
     assert.match(opsExport.summaryText || "", /Receipt Visibility:/);
     assert.match(opsExport.summaryText || "", /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(opsExport.summaryText || "", /post-launch-sweep-handoff/);
     assert.match(opsExport.summaryText || "", /post-launch-handoff-index/);
+    assert.match(opsExport.summaryText || "", /handoff-download-routes/);
 
     const opsSummaryDownload = await getText(
       baseUrl,

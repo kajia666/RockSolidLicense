@@ -4408,6 +4408,12 @@ function buildLaunchMainlineActionReceiptVisibility({
     "post-launch-handoff-index",
     mainlineRouteParams
   );
+  const handoffDownloadRoutes = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline handoff download routes",
+    "handoff-download-routes.txt",
+    "handoff-download-routes",
+    mainlineRouteParams
+  );
   return {
     status: "ready",
     headline: `${operationLabel || operation || "Launch mainline action"} receipt is now visible in Developer Ops and Launch Mainline follow-up assets.`,
@@ -4426,7 +4432,8 @@ function buildLaunchMainlineActionReceiptVisibility({
       developerOpsSummary,
       launchReceiptNextFollowUp,
       postLaunchSweepHandoff,
-      postLaunchHandoffIndex
+      postLaunchHandoffIndex,
+      handoffDownloadRoutes
     },
     checkpoints: [
       {
@@ -4456,6 +4463,13 @@ function buildLaunchMainlineActionReceiptVisibility({
         summary: "Use the post-launch handoff index as the cross-workspace traceability view for this receipt.",
         workspaceAction: launchMainlineWorkspace,
         recommendedDownload: postLaunchHandoffIndex
+      },
+      {
+        key: "handoff_download_routes",
+        label: "Open handoff download routes",
+        summary: "Use the route map to verify the exact download hrefs before handing launch duty to the next reviewer.",
+        workspaceAction: launchMainlineWorkspace,
+        recommendedDownload: handoffDownloadRoutes
       }
     ]
   };

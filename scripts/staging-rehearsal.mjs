@@ -277,6 +277,33 @@ function buildEvidenceActionPlan(options) {
   };
 }
 
+function buildEvidenceReadiness(options, actionPlan) {
+  const developerBearerToken = process.env[DEVELOPER_BEARER_TOKEN_ENV] || "";
+  const targetLaneReady = Boolean(options.productCode && options.channel);
+  const endpointReady = Boolean(actionPlan?.endpoint);
+  const tokenReady = developerBearerToken.trim() !== "";
+  const readyToExecute = targetLaneReady && endpointReady && tokenReady;
+
+  return {
+    status: readyToExecute ? "ready" : "needs_operator_input",
+    readyToExecute,
+    checks: {
+      targetLane: targetLaneReady ? "pass" : "missing",
+      evidenceEndpoint: endpointReady ? "pass" : "missing",
+      developerBearerToken: tokenReady ? "present" : "missing"
+    },
+    tokenEnv: DEVELOPER_BEARER_TOKEN_ENV,
+    targetLane: {
+      productCode: options.productCode,
+      channel: options.channel
+    },
+    endpoint: actionPlan?.endpoint || null,
+    nextAction: readyToExecute
+      ? "Copy evidence request snippets only after the matching launch evidence has actually happened."
+      : `Set $env:${DEVELOPER_BEARER_TOKEN_ENV} before copying evidence request snippets.`
+  };
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -298,6 +325,7 @@ function buildResult(options) {
       handoff: "first-wave"
     })
     : null;
+  const evidenceActionPlan = gatesPassed ? buildEvidenceActionPlan(options) : null;
 
   return {
     status,
@@ -322,7 +350,8 @@ function buildResult(options) {
       launchMainline
     },
     evidenceOrder: gatesPassed ? EVIDENCE_ORDER : [],
-    evidenceActionPlan: gatesPassed ? buildEvidenceActionPlan(options) : null,
+    evidenceActionPlan,
+    evidenceReadiness: gatesPassed ? buildEvidenceReadiness(options, evidenceActionPlan) : null,
     ...(options.handoffFile
       ? {
         handoffFile: {
@@ -369,6 +398,20 @@ function renderEvidenceActions(plan) {
     .join("\n\n");
 }
 
+function renderEvidenceReadiness(readiness) {
+  if (!readiness) {
+    return "- Not available";
+  }
+  return [
+    `- Ready to execute evidence requests: ${readiness.readyToExecute ? "yes" : "no"}`,
+    `- Target lane: ${readiness.targetLane.productCode} / ${readiness.targetLane.channel}`,
+    `- Evidence endpoint: ${readiness.endpoint}`,
+    `- Developer bearer token env: ${readiness.tokenEnv}`,
+    `- Developer bearer token status: ${readiness.checks.developerBearerToken}`,
+    `- Next action: ${readiness.nextAction}`
+  ].join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -399,6 +442,10 @@ function renderHandoffFile(result) {
     "## Launch Mainline",
     "",
     result.nextCommands.launchMainline || "Not available",
+    "",
+    "## Evidence Readiness",
+    "",
+    renderEvidenceReadiness(result.evidenceReadiness),
     "",
     "## Evidence Action Plan",
     "",

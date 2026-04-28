@@ -9,10 +9,15 @@ import test from "node:test";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
 
-function runRehearsal(args) {
+function runRehearsal(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-rehearsal.mjs", "--json", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      RSL_DEVELOPER_BEARER_TOKEN: "",
+      ...env
+    },
     timeout: 120_000
   });
 }
@@ -117,6 +122,22 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ].join("\n")
   });
   assert.doesNotMatch(output.evidenceActionPlan.items[0].request.powershell, /StrongAdmin123!|StrongDeveloper123!/);
+  assert.deepEqual(output.evidenceReadiness, {
+    status: "needs_operator_input",
+    readyToExecute: false,
+    checks: {
+      targetLane: "pass",
+      evidenceEndpoint: "pass",
+      developerBearerToken: "missing"
+    },
+    tokenEnv: "RSL_DEVELOPER_BEARER_TOKEN",
+    targetLane: {
+      productCode: "PILOT_ALPHA",
+      channel: "stable"
+    },
+    endpoint: "https://staging.example.com/api/developer/launch-mainline/action",
+    nextAction: "Set $env:RSL_DEVELOPER_BEARER_TOKEN before copying evidence request snippets."
+  });
 });
 
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
@@ -165,8 +186,24 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /\$env:RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(handoff, /Invoke-RestMethod -Method Post/);
     assert.match(handoff, /"operation": "record_launch_rehearsal_run"/);
+    assert.match(handoff, /## Evidence Readiness/);
+    assert.match(handoff, /Ready to execute evidence requests: no/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
+});
+
+test("staging rehearsal runner marks evidence requests ready when bearer token env exists without printing it", () => {
+  const result = runRehearsal(validArgs, {
+    RSL_DEVELOPER_BEARER_TOKEN: "developer-secret-token"
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.evidenceReadiness.status, "ready");
+  assert.equal(output.evidenceReadiness.readyToExecute, true);
+  assert.equal(output.evidenceReadiness.checks.developerBearerToken, "present");
+  assert.equal(output.evidenceReadiness.nextAction, "Copy evidence request snippets only after the matching launch evidence has actually happened.");
+  assert.doesNotMatch(result.stdout, /developer-secret-token/);
 });

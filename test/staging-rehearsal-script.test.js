@@ -554,6 +554,23 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.fullTestWindowEntry.command, "npm.cmd test");
     assert.equal(template.fullTestWindowEntry.status, "blocked_until_staging_closeout");
     assert.equal(template.productionSignoffConditions.requiredDecision, "ready-for-production-signoff");
+    assert.deepEqual(Object.keys(template.receiptVisibility), [
+      "launchMainline",
+      "launchReview",
+      "launchSmoke",
+      "developerOps"
+    ]);
+    assert.equal(template.receiptVisibility.launchMainline.status, "pending_operator_entry");
+    assert.equal(template.receiptVisibility.launchMainline.value, null);
+    assert.equal(template.receiptVisibility.launchMainline.expectedValue, "visible");
+    assert.deepEqual(
+      template.productionSignoff.conditions.map((item) => item.key),
+      template.productionSignoffConditions.conditions.map((item) => item.key)
+    );
+    assert.equal(template.productionSignoff.decision, null);
+    assert.equal(template.productionSignoff.requiredDecision, "ready-for-production-signoff");
+    assert.equal(template.productionSignoff.conditions.every((item) => item.status === "pending_operator_entry"), true);
+    assert.equal(template.productionSignoff.conditions.every((item) => item.value === null), true);
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,
@@ -731,7 +748,10 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
         launchMainline: "visible",
         launchReview: "visible",
         launchSmoke: "visible",
-        developerOps: "visible"
+        developerOps: {
+          status: "filled",
+          value: "visible"
+        }
       },
       productionSignoff: {
         decision: "ready-for-production-signoff",

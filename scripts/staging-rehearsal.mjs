@@ -558,10 +558,39 @@ function isReceiptVisibilityVisible(value) {
     return ["visible", "pass", "confirmed"].includes(value.trim().toLowerCase());
   }
   if (value && typeof value === "object") {
-    const status = String(value.status || value.result || value.visibility || "").trim().toLowerCase();
-    return ["visible", "pass", "confirmed"].includes(status);
+    return [value.status, value.result, value.visibility, value.value]
+      .map((item) => String(item || "").trim().toLowerCase())
+      .some((item) => ["visible", "pass", "confirmed"].includes(item));
   }
   return false;
+}
+
+function buildReceiptVisibilityTemplate() {
+  return Object.fromEntries(
+    RECEIPT_VISIBILITY_KEYS.map((key) => [
+      key,
+      {
+        status: "pending_operator_entry",
+        value: null,
+        expectedValue: "visible",
+        operatorNote: "Set value to visible only after this lane shows the latest staging evidence receipts."
+      }
+    ])
+  );
+}
+
+function buildProductionSignoffInputTemplate(signoff = {}) {
+  return {
+    decision: null,
+    requiredDecision: signoff.requiredDecision || null,
+    conditions: (signoff.conditions || []).map((condition) => ({
+      key: condition.key,
+      status: "pending_operator_entry",
+      value: null,
+      expectedEvidence: condition.evidence || null,
+      operatorNote: "Backfill a redacted pass/confirmed result after the full test window and sign-off review."
+    }))
+  };
 }
 
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
@@ -1668,6 +1697,8 @@ function buildCloseoutTemplate(result) {
     }),
     resultBackfillSummary: result.resultBackfillSummary || null,
     artifactReceiptLedger: ledger,
+    receiptVisibility: buildReceiptVisibilityTemplate(),
+    productionSignoff: buildProductionSignoffInputTemplate(closeout.productionSignoffConditions || {}),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

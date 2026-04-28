@@ -304,6 +304,25 @@ function buildEvidenceReadiness(options, actionPlan) {
   };
 }
 
+function buildReceiptVisibilitySummaryDownloads(options) {
+  return {
+    launchReviewSummary: buildRoute(options.baseUrl, "/api/developer/launch-review/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      source: "launch-smoke",
+      handoff: "first-wave",
+      format: "summary"
+    }),
+    launchSmokeSummary: buildRoute(options.baseUrl, "/api/developer/launch-smoke-kit/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      operation: "record_post_launch_ops_sweep",
+      downloadKey: "launch_smoke_summary",
+      format: "summary"
+    })
+  };
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -326,6 +345,7 @@ function buildResult(options) {
     })
     : null;
   const evidenceActionPlan = gatesPassed ? buildEvidenceActionPlan(options) : null;
+  const receiptVisibilitySummaries = gatesPassed ? buildReceiptVisibilitySummaryDownloads(options) : null;
 
   return {
     status,
@@ -347,7 +367,8 @@ function buildResult(options) {
     nextCommands: {
       launchSmoke: gatesPassed ? staging.nextCommand?.powershell || null : null,
       recovery: gatesPassed ? recovery.nextCommands || null : null,
-      launchMainline
+      launchMainline,
+      receiptVisibilitySummaries
     },
     evidenceOrder: gatesPassed ? EVIDENCE_ORDER : [],
     evidenceActionPlan,
@@ -412,6 +433,16 @@ function renderEvidenceReadiness(readiness) {
   ].join("\n");
 }
 
+function renderReceiptVisibilitySummaries(downloads) {
+  if (!downloads) {
+    return "- Not available";
+  }
+  return [
+    `- Launch Review summary: \`${downloads.launchReviewSummary}\``,
+    `- Launch Smoke Kit summary: \`${downloads.launchSmokeSummary}\``
+  ].join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -442,6 +473,10 @@ function renderHandoffFile(result) {
     "## Launch Mainline",
     "",
     result.nextCommands.launchMainline || "Not available",
+    "",
+    "## Receipt Visibility Summary Downloads",
+    "",
+    renderReceiptVisibilitySummaries(result.nextCommands.receiptVisibilitySummaries),
     "",
     "## Evidence Readiness",
     "",
@@ -493,6 +528,8 @@ function writeResult(result, json) {
     console.log("Staging rehearsal gates passed. No data was modified.");
     console.log(result.nextCommands.launchSmoke);
     console.log(result.nextCommands.launchMainline);
+    console.log(result.nextCommands.receiptVisibilitySummaries?.launchReviewSummary || "");
+    console.log(result.nextCommands.receiptVisibilitySummaries?.launchSmokeSummary || "");
     return;
   }
 

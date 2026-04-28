@@ -81,6 +81,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.doesNotMatch(output.nextCommands.launchSmoke, /StrongAdmin123!|StrongDeveloper123!/);
   assert.match(output.nextCommands.recovery.appBackup, /backup-rocksolid\.sh/);
   assert.match(output.nextCommands.launchMainline, /\/developer\/launch-mainline\?productCode=PILOT_ALPHA&channel=stable/);
+  assert.deepEqual(output.nextCommands.receiptVisibilitySummaries, {
+    launchReviewSummary: "https://staging.example.com/api/developer/launch-review/download?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary",
+    launchSmokeSummary: "https://staging.example.com/api/developer/launch-smoke-kit/download?productCode=PILOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary"
+  });
   assert.deepEqual(output.evidenceOrder.slice(0, 3), [
     "Record Launch Rehearsal Run",
     "Record Recovery Drill",
@@ -180,6 +184,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     const handoff = readFileSync(handoffFile, "utf8");
     assert.match(handoff, /# Staging Rehearsal Handoff/);
     assert.match(handoff, /launch:smoke:staging/);
+    assert.match(handoff, /## Receipt Visibility Summary Downloads/);
+    assert.match(handoff, /Launch Review summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`/);
+    assert.match(handoff, /Launch Smoke Kit summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-smoke-kit\/download\?productCode=PILOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`/);
     assert.match(handoff, /\/api\/developer\/launch-mainline\/action/);
     assert.match(handoff, /record_launch_rehearsal_run/);
     assert.match(handoff, /Record Launch Stabilization Review/);

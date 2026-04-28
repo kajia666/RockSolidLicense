@@ -4318,6 +4318,147 @@ function formatLaunchProductionEvidenceLine(evidenceQueue = {}, label = "Product
   ].join(" | ");
 }
 
+function buildLaunchMainlineActionReceiptVisibility({
+  operation = "",
+  operationLabel = "",
+  handoffFileName = "",
+  launchMainline = null
+} = {}) {
+  const payload = launchMainline && typeof launchMainline === "object" ? launchMainline : {};
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object"
+    ? payload.opsSnapshot
+    : {};
+  const opsScope = opsSnapshot.scope && typeof opsSnapshot.scope === "object"
+    ? opsSnapshot.scope
+    : {};
+  const productCode = project.code || filters.productCode || null;
+  const channel = manifest.channel || filters.channel || "stable";
+  const developerOpsParams = buildDeveloperOpsRouteReviewBaseDownloadParams({
+    ...opsScope,
+    productCode: opsScope.productCode || productCode || "",
+    channel: opsScope.channel || channel || "stable",
+    username: opsScope.username || filters.username || "",
+    search: opsScope.search || filters.search || "",
+    eventType: opsScope.eventType || filters.eventType || "",
+    actorType: opsScope.actorType || filters.actorType || "",
+    entityType: opsScope.entityType || filters.entityType || "",
+    auditLimit: Number(opsScope.auditLimit || 0) || 60
+  });
+  const mainlineRouteParams = compactRouteParams({
+    productCode: productCode || "",
+    channel,
+    username: filters.username || "",
+    search: filters.search || "",
+    eventType: filters.eventType || "",
+    actorType: filters.actorType || "",
+    entityType: filters.entityType || "",
+    reviewMode: filters.reviewMode || "",
+    operation: filters.operation || "",
+    actionKey: filters.actionKey || "",
+    downloadKey: filters.downloadKey || "",
+    routeTitle: filters.routeTitle || "",
+    routeReason: filters.routeReason || ""
+  });
+  const developerOpsWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    "ops",
+    "snapshot",
+    "Open Developer Ops",
+    developerOpsParams
+  );
+  const launchMainlineWorkspace = createLaunchWorkflowWorkspaceShortcut(
+    "launch-mainline",
+    "summary",
+    "Open Launch Mainline",
+    mainlineRouteParams
+  );
+  const developerOpsSummary = createLaunchWorkflowDownloadShortcut(
+    "ops_summary",
+    opsSnapshot.summaryFileName || "developer-ops-summary.txt",
+    "Developer Ops summary",
+    {
+      source: "developer-ops",
+      format: "summary",
+      params: developerOpsParams
+    }
+  );
+  const launchReceiptNextFollowUp = createLaunchWorkflowDownloadShortcut(
+    "ops_launch_receipt_next_follow_up",
+    "developer-ops-launch-receipt-next-follow-up.txt",
+    "Launch receipt next follow-up",
+    {
+      source: "developer-ops",
+      format: "launch-receipt-next-follow-up",
+      params: developerOpsParams
+    }
+  );
+  const postLaunchSweepHandoff = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline post-launch sweep handoff",
+    payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
+    "post-launch-sweep-handoff",
+    mainlineRouteParams
+  );
+  const postLaunchHandoffIndex = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline post-launch handoff index",
+    payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
+    "post-launch-handoff-index",
+    mainlineRouteParams
+  );
+  return {
+    status: "ready",
+    headline: `${operationLabel || operation || "Launch mainline action"} receipt is now visible in Developer Ops and Launch Mainline follow-up assets.`,
+    recordedReceipt: {
+      operation: operation || null,
+      operationLabel: operationLabel || null,
+      handoffFileName: handoffFileName || null,
+      productCode: productCode || null,
+      channel: channel || null
+    },
+    workspaces: {
+      developerOps: developerOpsWorkspace,
+      launchMainline: launchMainlineWorkspace
+    },
+    downloads: {
+      developerOpsSummary,
+      launchReceiptNextFollowUp,
+      postLaunchSweepHandoff,
+      postLaunchHandoffIndex
+    },
+    checkpoints: [
+      {
+        key: "developer_ops_summary",
+        label: "Review Developer Ops summary",
+        summary: "Confirm the latest scoped receipt and its follow-up are visible in the Developer Ops export snapshot.",
+        workspaceAction: developerOpsWorkspace,
+        recommendedDownload: developerOpsSummary
+      },
+      {
+        key: "launch_receipt_next_follow_up",
+        label: "Open launch receipt next follow-up",
+        summary: "Use the receipt follow-up asset to continue the next production evidence or post-launch lifecycle action.",
+        workspaceAction: developerOpsWorkspace,
+        recommendedDownload: launchReceiptNextFollowUp
+      },
+      {
+        key: "post_launch_sweep_handoff",
+        label: "Reopen post-launch sweep handoff",
+        summary: "Verify the first-wave ops sweep handoff reflects the newly recorded receipt.",
+        workspaceAction: launchMainlineWorkspace,
+        recommendedDownload: postLaunchSweepHandoff
+      },
+      {
+        key: "post_launch_handoff_index",
+        label: "Open post-launch handoff index",
+        summary: "Use the post-launch handoff index as the cross-workspace traceability view for this receipt.",
+        workspaceAction: launchMainlineWorkspace,
+        recommendedDownload: postLaunchHandoffIndex
+      }
+    ]
+  };
+}
+
 function buildLaunchMainlineActionReceiptHandoffText({
   generatedAt = "",
   operation = "",
@@ -4337,6 +4478,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
   firstLaunchDutySummary = null,
   postLaunchLifecycleSummary = null,
   initialLaunchOperatorActionReceipt = null,
+  visibility = null,
   mainlineRecapCards = [],
   actions = []
 } = {}) {
@@ -4429,6 +4571,35 @@ function buildLaunchMainlineActionReceiptHandoffText({
       for (const item of skipped) {
         lines.push(`- ${item.reason || item.label || item.key || "-"}`);
       }
+    }
+  }
+
+  if (visibility && typeof visibility === "object") {
+    const workspaceItems = Object.values(visibility.workspaces || {}).filter((item) => item?.key);
+    const downloadItems = Object.values(visibility.downloads || {}).filter((item) => item?.key);
+    lines.push("");
+    lines.push("Receipt Visibility:");
+    lines.push(`- status: ${visibility.status || "-"}`);
+    lines.push(`- headline: ${visibility.headline || "-"}`);
+    lines.push(
+      `- receipt: operation=${visibility.recordedReceipt?.operation || "-"}`
+      + ` | handoff=${visibility.recordedReceipt?.handoffFileName || "-"}`
+      + ` | product=${visibility.recordedReceipt?.productCode || "-"}`
+      + ` | channel=${visibility.recordedReceipt?.channel || "-"}`
+    );
+    for (const item of workspaceItems) {
+      lines.push(`- workspace: ${item.label || item.key || "-"}@${item.autofocus || "-"} | href=${item.href || "-"}`);
+    }
+    for (const item of downloadItems) {
+      lines.push(`- download: ${formatLaunchHandoffDownloadText(item, { fileSeparator: " | " })}`);
+    }
+    for (const item of Array.isArray(visibility.checkpoints) ? visibility.checkpoints.slice(0, 8) : []) {
+      lines.push(
+        `- checkpoint: ${item.label || item.key || "-"}`
+        + ` | ${item.summary || "-"}`
+        + `${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"} | href=${item.workspaceAction.href || "-"}` : ""}`
+        + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload, { fileSeparator: " | " })}` : ""}`
+      );
     }
   }
 
@@ -5869,6 +6040,12 @@ function buildLaunchMainlineActionReceipt({
   );
   const handoffOperationTag = sanitizeExportNameSegment(normalizedOperation || "bootstrap", "bootstrap");
   const handoffFileName = `rocksolid-launch-mainline-receipt-${handoffScopeTag}-${handoffChannelTag}-${handoffOperationTag}-${buildExportTimestampTag(handoffGeneratedAt)}.txt`;
+  const visibility = buildLaunchMainlineActionReceiptVisibility({
+    operation: normalizedOperation || "bootstrap",
+    operationLabel,
+    handoffFileName,
+    launchMainline
+  });
   const handoffText = buildLaunchMainlineActionReceiptHandoffText({
     generatedAt: handoffGeneratedAt,
     operation: normalizedOperation || "bootstrap",
@@ -5891,6 +6068,7 @@ function buildLaunchMainlineActionReceipt({
     firstLaunchDutySummary,
     postLaunchLifecycleSummary,
     initialLaunchOperatorActionReceipt,
+    visibility,
     mainlineRecapCards,
     actions
   });
@@ -5907,6 +6085,7 @@ function buildLaunchMainlineActionReceipt({
     handoffFileName,
     handoffText,
     handoffGeneratedAt,
+    visibility,
     primaryAction: followUp?.primaryAction || null,
     mainlineOverallGate,
     mainlinePrimaryAction,
@@ -5975,6 +6154,9 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
     : null;
   const gate = receipt.mainlineOverallGate && typeof receipt.mainlineOverallGate === "object"
     ? receipt.mainlineOverallGate
+    : null;
+  const visibility = receipt.visibility && typeof receipt.visibility === "object"
+    ? receipt.visibility
     : null;
   return {
     operation: receipt.operation || null,
@@ -6066,6 +6248,16 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
             handoffIndex: initialLaunchOperator.files?.handoffIndex || null,
             launchReceiptNextFollowUp: initialLaunchOperator.files?.launchReceiptNextFollowUp || null
           }
+        }
+      : null,
+    visibility: visibility
+      ? {
+          status: visibility.status || null,
+          workspaceKeys: Object.values(visibility.workspaces || {}).map((item) => item?.key || null).filter(Boolean),
+          downloadKeys: Object.values(visibility.downloads || {}).map((item) => item?.key || null).filter(Boolean),
+          checkpointKeys: Array.isArray(visibility.checkpoints)
+            ? visibility.checkpoints.map((item) => item?.key || null).filter(Boolean)
+            : []
         }
       : null,
     recapCardKeys: Array.isArray(receipt.mainlineRecapCards)

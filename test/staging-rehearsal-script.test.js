@@ -149,6 +149,41 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     endpoint: "https://staging.example.com/api/developer/launch-mainline/action",
     nextAction: "Set $env:RSL_DEVELOPER_BEARER_TOKEN before copying evidence request snippets."
   });
+  assert.equal(output.environmentReadiness.status, "needs_operator_execution");
+  assert.equal(output.environmentReadiness.willModifyData, false);
+  assert.deepEqual(
+    output.environmentReadiness.checks.map((item) => item.key),
+    [
+      "public_https_entrypoint",
+      "non_default_secrets",
+      "persistent_storage",
+      "backup_restore_drill",
+      "route_map_gate",
+      "live_write_approval"
+    ]
+  );
+  const readinessChecks = Object.fromEntries(
+    output.environmentReadiness.checks.map((item) => [item.key, item])
+  );
+  assert.equal(readinessChecks.public_https_entrypoint.status, "pass");
+  assert.match(readinessChecks.public_https_entrypoint.evidence, /https:\/\/staging\.example\.com/);
+  assert.equal(readinessChecks.non_default_secrets.status, "operator_confirm");
+  assert.match(readinessChecks.non_default_secrets.nextAction, /Confirm the deployed server token secret/);
+  assert.equal(readinessChecks.persistent_storage.status, "operator_confirm");
+  assert.match(readinessChecks.persistent_storage.evidence, /postgres-preview/);
+  assert.equal(readinessChecks.backup_restore_drill.status, "operator_execute");
+  assert.deepEqual(readinessChecks.backup_restore_drill.commandKeys, [
+    "appBackup",
+    "postgresBackup",
+    "postgresRestoreDryRun",
+    "restoreDrillReminder",
+    "healthcheck"
+  ]);
+  assert.equal(readinessChecks.route_map_gate.status, "operator_execute");
+  assert.equal(readinessChecks.route_map_gate.command, "npm.cmd run launch:route-map-gate");
+  assert.equal(readinessChecks.live_write_approval.status, "operator_confirm");
+  assert.match(readinessChecks.live_write_approval.evidence, /--allow-live-writes/);
+  assert.doesNotMatch(JSON.stringify(output.environmentReadiness), /StrongAdmin123!|StrongDeveloper123!/);
 });
 
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
@@ -205,6 +240,11 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /"operation": "record_launch_rehearsal_run"/);
     assert.match(handoff, /## Evidence Readiness/);
     assert.match(handoff, /Ready to execute evidence requests: no/);
+    assert.match(handoff, /## Staging Environment Readiness/);
+    assert.match(handoff, /public_https_entrypoint: pass/);
+    assert.match(handoff, /non_default_secrets: operator_confirm/);
+    assert.match(handoff, /backup_restore_drill: operator_execute/);
+    assert.match(handoff, /route_map_gate: operator_execute/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

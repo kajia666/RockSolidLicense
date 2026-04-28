@@ -333,6 +333,69 @@ function buildLaunchRouteMapGateCommand() {
   };
 }
 
+function buildStagingEnvironmentReadiness(options, { recovery = null, launchRouteMapGate = null } = {}) {
+  const recoveryCommandKeys = Object.keys(recovery?.nextCommands || {});
+  return {
+    status: "needs_operator_execution",
+    willModifyData: false,
+    nextAction: "Complete the operator_confirm and operator_execute items before running the live-write staging smoke command.",
+    checks: [
+      {
+        key: "public_https_entrypoint",
+        label: "Public HTTPS entrypoint",
+        status: String(options.baseUrl || "").startsWith("https://") ? "pass" : "fail",
+        evidence: `Base URL: ${options.baseUrl || "-"}`,
+        nextAction: "Keep staging smoke pointed at the public HTTPS endpoint."
+      },
+      {
+        key: "non_default_secrets",
+        label: "Non-default secrets",
+        status: "operator_confirm",
+        evidence: "Smoke commands reference password environment variables and do not print secret values.",
+        nextAction: "Confirm the deployed server token secret, admin password, and smoke developer credentials are non-default before live-write smoke."
+      },
+      {
+        key: "persistent_storage",
+        label: "Persistent storage",
+        status: "operator_confirm",
+        evidence: [
+          `Storage profile: ${options.storageProfile || "-"}`,
+          `Env file: ${options.targetEnvFile || "-"}`,
+          `App backup dir: ${options.appBackupDir || "-"}`,
+          `Postgres backup dir: ${options.postgresBackupDir || "-"}`
+        ].join(" | "),
+        nextAction: "Confirm the target uses the intended persistent storage profile and backup directories before writing smoke data."
+      },
+      {
+        key: "backup_restore_drill",
+        label: "Backup and restore drill",
+        status: "operator_execute",
+        evidence: recoveryCommandKeys.length
+          ? `Recovery command keys: ${recoveryCommandKeys.join(", ")}`
+          : "Recovery commands are not available.",
+        commandKeys: recoveryCommandKeys,
+        nextAction: "Run the generated backup and restore dry-run commands on a separate restore target before staging sign-off."
+      },
+      {
+        key: "route_map_gate",
+        label: "Route-map and download-surface gate",
+        status: "operator_execute",
+        evidence: launchRouteMapGate?.dryRunCommand || "Run the route-map gate dry run first.",
+        command: launchRouteMapGate?.command || null,
+        dryRunCommand: launchRouteMapGate?.dryRunCommand || null,
+        nextAction: "Run the targeted gate after the rehearsal handoff and before live-write staging smoke."
+      },
+      {
+        key: "live_write_approval",
+        label: "Live-write approval",
+        status: "operator_confirm",
+        evidence: "The generated staging smoke command includes --allow-live-writes and will modify staging data.",
+        nextAction: "Get explicit launch-duty approval before running the live-write smoke command."
+      }
+    ]
+  };
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -356,6 +419,10 @@ function buildResult(options) {
     : null;
   const evidenceActionPlan = gatesPassed ? buildEvidenceActionPlan(options) : null;
   const receiptVisibilitySummaries = gatesPassed ? buildReceiptVisibilitySummaryDownloads(options) : null;
+  const launchRouteMapGate = gatesPassed ? buildLaunchRouteMapGateCommand() : null;
+  const environmentReadiness = gatesPassed
+    ? buildStagingEnvironmentReadiness(options, { recovery, launchRouteMapGate })
+    : null;
 
   return {
     status,
@@ -377,13 +444,14 @@ function buildResult(options) {
     nextCommands: {
       launchSmoke: gatesPassed ? staging.nextCommand?.powershell || null : null,
       recovery: gatesPassed ? recovery.nextCommands || null : null,
-      launchRouteMapGate: gatesPassed ? buildLaunchRouteMapGateCommand() : null,
+      launchRouteMapGate,
       launchMainline,
       receiptVisibilitySummaries
     },
     evidenceOrder: gatesPassed ? EVIDENCE_ORDER : [],
     evidenceActionPlan,
     evidenceReadiness: gatesPassed ? buildEvidenceReadiness(options, evidenceActionPlan) : null,
+    environmentReadiness,
     ...(options.handoffFile
       ? {
         handoffFile: {
@@ -467,6 +535,32 @@ function renderLaunchRouteMapGate(command) {
   ].join("\n");
 }
 
+function renderStagingEnvironmentReadiness(readiness) {
+  if (!readiness) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Status: ${readiness.status}`,
+    `- Writes data: ${readiness.willModifyData ? "yes" : "no"}`,
+    `- Next action: ${readiness.nextAction}`
+  ];
+  for (const check of readiness.checks || []) {
+    lines.push(`- ${check.key}: ${check.status}`);
+    lines.push(`  - Evidence: ${check.evidence || "-"}`);
+    if (check.command) {
+      lines.push(`  - Command: \`${check.command}\``);
+    }
+    if (check.dryRunCommand) {
+      lines.push(`  - Dry run: \`${check.dryRunCommand}\``);
+    }
+    if (Array.isArray(check.commandKeys) && check.commandKeys.length) {
+      lines.push(`  - Command keys: ${check.commandKeys.join(", ")}`);
+    }
+    lines.push(`  - Next action: ${check.nextAction || "-"}`);
+  }
+  return lines.join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -505,6 +599,10 @@ function renderHandoffFile(result) {
     "## Receipt Visibility Summary Downloads",
     "",
     renderReceiptVisibilitySummaries(result.nextCommands.receiptVisibilitySummaries),
+    "",
+    "## Staging Environment Readiness",
+    "",
+    renderStagingEnvironmentReadiness(result.environmentReadiness),
     "",
     "## Evidence Readiness",
     "",
@@ -557,6 +655,7 @@ function writeResult(result, json) {
     console.log(result.nextCommands.launchSmoke);
     console.log(result.nextCommands.launchRouteMapGate?.command || "");
     console.log(result.nextCommands.launchMainline);
+    console.log(result.environmentReadiness?.nextAction || "");
     console.log(result.nextCommands.receiptVisibilitySummaries?.launchReviewSummary || "");
     console.log(result.nextCommands.receiptVisibilitySummaries?.launchSmokeSummary || "");
     return;

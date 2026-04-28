@@ -509,6 +509,78 @@ function buildStagingResultBackfillSummary(result) {
   };
 }
 
+function buildStagingAcceptanceCloseout(result) {
+  const resultBackfill = result.resultBackfillSummary || null;
+  const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
+    ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
+    : [];
+  return {
+    status: "awaiting_operator_closeout",
+    willModifyData: false,
+    decision: "pending_staging_results",
+    requiredResultKeys: resultBackfill?.requiredResultKeys || [],
+    evidenceOperations,
+    acceptanceChecks: [
+      {
+        key: "route_map_gate_result",
+        label: "Route-map and download-surface targeted gate",
+        required: true,
+        command: result.nextCommands?.launchRouteMapGate?.command || null,
+        expectedEvidence: "Record the targeted gate exit status, pass count, and redacted output artifact path."
+      },
+      {
+        key: "backup_restore_drill_result",
+        label: "Backup and restore drill",
+        required: true,
+        commandKeys: result.environmentReadiness?.checks?.find((item) => item.key === "backup_restore_drill")?.commandKeys || [],
+        expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result."
+      },
+      {
+        key: "live_write_smoke_result",
+        label: "Live-write staging smoke",
+        required: true,
+        command: result.nextCommands?.launchSmoke || null,
+        expectedEvidence: "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path."
+      },
+      {
+        key: "launch_smoke_handoff",
+        label: "Launch smoke handoff archive",
+        required: true,
+        expectedEvidence: "Save the launch smoke handoff JSON or Markdown path with passwords and bearer tokens redacted."
+      },
+      {
+        key: "launch_mainline_evidence_receipts",
+        label: "Launch Mainline evidence receipts",
+        required: true,
+        endpoint: result.evidenceActionPlan?.endpoint || null,
+        operations: evidenceOperations,
+        expectedEvidence: "Record the Launch Mainline receipt IDs or handoff file names produced by each evidence action."
+      },
+      {
+        key: "receipt_visibility_review",
+        label: "Receipt visibility review",
+        required: true,
+        downloads: result.nextCommands?.receiptVisibilitySummaries || null,
+        expectedEvidence: "Verify Launch Review and Launch Smoke receipt-visibility summaries show the recorded first-wave receipt."
+      },
+      {
+        key: "operator_go_no_go",
+        label: "Operator go/no-go decision",
+        required: true,
+        expectedEvidence: "Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp."
+      }
+    ],
+    destinations: {
+      launchMainline: resultBackfill?.destinations?.launchMainline || result.nextCommands?.launchMainline || null,
+      developerOps: resultBackfill?.destinations?.developerOps || null,
+      evidenceEndpoint: result.evidenceActionPlan?.endpoint || null,
+      receiptVisibilityDownloads: result.nextCommands?.receiptVisibilitySummaries || null
+    },
+    nextAction: "Run the real staging steps, backfill the redacted result values, then schedule the full repository test window before production sign-off.",
+    operatorNote: "Use redacted result values only: statuses, receipt IDs, artifact paths, handoff file names, and operator decisions. Do not paste passwords or bearer tokens."
+  };
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -583,10 +655,14 @@ function buildResult(options) {
       : {})
   };
   const operatorChecklist = gatesPassed ? buildStagingOperatorChecklist(result) : [];
-  return {
+  const resultWithBackfill = {
     ...result,
     operatorChecklist,
     resultBackfillSummary: gatesPassed ? buildStagingResultBackfillSummary(result) : null
+  };
+  return {
+    ...resultWithBackfill,
+    stagingAcceptanceCloseout: gatesPassed ? buildStagingAcceptanceCloseout(resultWithBackfill) : null
   };
 }
 
@@ -731,6 +807,51 @@ function renderStagingResultBackfillSummary(summary) {
   ].join("\n");
 }
 
+function renderStagingAcceptanceCloseout(closeout) {
+  if (!closeout) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Status: ${closeout.status}`,
+    `- Decision: ${closeout.decision}`,
+    `- Writes data: ${closeout.willModifyData ? "yes" : "no"}`,
+    `- Required result keys: ${(closeout.requiredResultKeys || []).join(", ")}`,
+    `- Evidence operations: ${(closeout.evidenceOperations || []).join(", ")}`,
+    `- Launch Mainline: ${closeout.destinations?.launchMainline || "-"}`,
+    `- Developer Ops: ${closeout.destinations?.developerOps || "-"}`,
+    `- Evidence endpoint: ${closeout.destinations?.evidenceEndpoint || "-"}`,
+    `- Launch Review visibility: ${closeout.destinations?.receiptVisibilityDownloads?.launchReviewSummary || "-"}`,
+    `- Launch Smoke visibility: ${closeout.destinations?.receiptVisibilityDownloads?.launchSmokeSummary || "-"}`,
+    `- Next action: ${closeout.nextAction || "-"}`,
+    `- Operator note: ${closeout.operatorNote || "-"}`
+  ];
+  if (Array.isArray(closeout.acceptanceChecks) && closeout.acceptanceChecks.length) {
+    lines.push("- Acceptance checks:");
+    for (const check of closeout.acceptanceChecks) {
+      lines.push(`  - ${check.key}: ${check.label || "-"}`);
+      lines.push(`    - required: ${check.required ? "yes" : "no"}`);
+      if (check.command) {
+        lines.push(`    - command: \`${check.command}\``);
+      }
+      if (Array.isArray(check.commandKeys) && check.commandKeys.length) {
+        lines.push(`    - commandKeys: ${check.commandKeys.join(", ")}`);
+      }
+      if (check.endpoint) {
+        lines.push(`    - endpoint: ${check.endpoint}`);
+      }
+      if (Array.isArray(check.operations) && check.operations.length) {
+        lines.push(`    - operations: ${check.operations.join(", ")}`);
+      }
+      if (check.downloads) {
+        lines.push(`    - launchReviewVisibility: ${check.downloads.launchReviewSummary || "-"}`);
+        lines.push(`    - launchSmokeVisibility: ${check.downloads.launchSmokeSummary || "-"}`);
+      }
+      lines.push(`    - expectedEvidence: ${check.expectedEvidence || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -781,6 +902,10 @@ function renderHandoffFile(result) {
     "## Staging Result Backfill Summary",
     "",
     renderStagingResultBackfillSummary(result.resultBackfillSummary),
+    "",
+    "## Staging Acceptance Closeout",
+    "",
+    renderStagingAcceptanceCloseout(result.stagingAcceptanceCloseout),
     "",
     "## Evidence Readiness",
     "",

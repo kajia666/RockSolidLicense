@@ -230,6 +230,38 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.deepEqual(output.resultBackfillSummary.receiptVisibilityDownloads, output.nextCommands.receiptVisibilitySummaries);
   assert.match(output.resultBackfillSummary.operatorNote, /Do not paste passwords/);
   assert.doesNotMatch(JSON.stringify(output.resultBackfillSummary), /StrongAdmin123!|StrongDeveloper123!/);
+  assert.equal(output.stagingAcceptanceCloseout.status, "awaiting_operator_closeout");
+  assert.equal(output.stagingAcceptanceCloseout.willModifyData, false);
+  assert.equal(output.stagingAcceptanceCloseout.decision, "pending_staging_results");
+  assert.deepEqual(output.stagingAcceptanceCloseout.requiredResultKeys, output.resultBackfillSummary.requiredResultKeys);
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key),
+    [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review",
+      "operator_go_no_go"
+    ]
+  );
+  assert.equal(output.stagingAcceptanceCloseout.acceptanceChecks[0].command, "npm.cmd run launch:route-map-gate");
+  assert.equal(output.stagingAcceptanceCloseout.destinations.launchMainline, output.nextCommands.launchMainline);
+  assert.equal(output.stagingAcceptanceCloseout.destinations.developerOps, output.resultBackfillSummary.destinations.developerOps);
+  assert.equal(output.stagingAcceptanceCloseout.destinations.evidenceEndpoint, output.evidenceActionPlan.endpoint);
+  assert.deepEqual(output.stagingAcceptanceCloseout.destinations.receiptVisibilityDownloads, output.nextCommands.receiptVisibilitySummaries);
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.evidenceOperations.slice(0, 3),
+    [
+      "record_launch_rehearsal_run",
+      "record_recovery_drill",
+      "record_backup_verification"
+    ]
+  );
+  assert.match(output.stagingAcceptanceCloseout.nextAction, /full repository test window/);
+  assert.match(output.stagingAcceptanceCloseout.operatorNote, /redacted result values/);
+  assert.doesNotMatch(JSON.stringify(output.stagingAcceptanceCloseout), /StrongAdmin123!|StrongDeveloper123!/);
 });
 
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
@@ -249,6 +281,7 @@ test("staging rehearsal runner stops before live-write steps when a no-write gat
   assert.equal(output.nextCommands.launchSmoke, null);
   assert.equal(output.failedPhase.key, "staging_command_preflight");
   assert.equal(output.evidenceActionPlan, null);
+  assert.equal(output.stagingAcceptanceCloseout, null);
 });
 
 test("staging rehearsal runner can write a redacted launch-duty handoff file", () => {
@@ -300,6 +333,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /route_map_gate_result/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
     assert.match(handoff, /Developer Ops: https:\/\/staging\.example\.com\/developer\/ops\?productCode=PILOT_ALPHA&source=staging-rehearsal&handoff=first-wave/);
+    assert.match(handoff, /## Staging Acceptance Closeout/);
+    assert.match(handoff, /Decision: pending_staging_results/);
+    assert.match(handoff, /operator_go_no_go/);
+    assert.match(handoff, /full repository test window/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

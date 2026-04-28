@@ -208,6 +208,41 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "record_backup_verification"
   ]);
   assert.doesNotMatch(JSON.stringify(output.operatorChecklist), /StrongAdmin123!|StrongDeveloper123!/);
+  assert.equal(output.operatorExecutionPlan.status, "ready_for_staging_execution");
+  assert.equal(output.operatorExecutionPlan.willModifyData, false);
+  assert.equal(output.operatorExecutionPlan.trigger, "no-write-rehearsal-gates-passed");
+  assert.deepEqual(
+    output.operatorExecutionPlan.outputFiles.map((item) => [item.key, item.status]),
+    [
+      ["handoff_file", "not_requested"],
+      ["closeout_file", "not_requested"]
+    ]
+  );
+  assert.deepEqual(
+    output.operatorExecutionPlan.orderedSteps.map((item) => item.key),
+    [
+      "review_generated_bundle",
+      "run_route_map_gate",
+      "run_backup_restore_drill",
+      "approve_and_run_live_write_smoke",
+      "archive_launch_smoke_handoff",
+      "record_launch_mainline_evidence",
+      "verify_receipt_visibility",
+      "backfill_closeout_template",
+      "reserve_full_test_window",
+      "production_signoff_review"
+    ]
+  );
+  assert.equal(output.operatorExecutionPlan.orderedSteps[1].command, "npm.cmd run launch:route-map-gate");
+  assert.equal(output.operatorExecutionPlan.orderedSteps[5].endpoint, output.evidenceActionPlan.endpoint);
+  assert.deepEqual(
+    output.operatorExecutionPlan.requiredCloseoutKeys,
+    output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
+  );
+  assert.equal(output.operatorExecutionPlan.fullTestWindow.command, "npm.cmd test");
+  assert.equal(output.operatorExecutionPlan.productionSignoff.requiredDecision, "ready-for-production-signoff");
+  assert.match(output.operatorExecutionPlan.nextAction, /Run the ordered steps/);
+  assert.doesNotMatch(JSON.stringify(output.operatorExecutionPlan), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.resultBackfillSummary.status, "awaiting_staging_execution");
   assert.equal(output.resultBackfillSummary.willModifyData, false);
   assert.deepEqual(
@@ -424,6 +459,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Production Sign-Off Conditions/);
     assert.match(handoff, /blocked_until_full_test_window/);
     assert.match(handoff, /ready-for-production-signoff/);
+    assert.match(handoff, /## Operator Execution Plan/);
+    assert.match(handoff, /review_generated_bundle/);
+    assert.match(handoff, /backfill_closeout_template/);
+    assert.match(handoff, /production_signoff_review/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
@@ -446,6 +485,14 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(output.status, "pass");
     assert.equal(output.closeoutFile.path, closeoutFile);
     assert.equal(output.closeoutFile.written, true);
+    assert.equal(
+      output.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,
+      "written"
+    );
+    assert.equal(
+      output.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").path,
+      closeoutFile
+    );
     assert.equal(existsSync(closeoutFile), true);
 
     const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
@@ -466,6 +513,15 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.fullTestWindowEntry.command, "npm.cmd test");
     assert.equal(template.fullTestWindowEntry.status, "blocked_until_staging_closeout");
     assert.equal(template.productionSignoffConditions.requiredDecision, "ready-for-production-signoff");
+    assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
+    assert.deepEqual(
+      template.operatorExecutionPlan.orderedSteps.slice(-3).map((item) => item.key),
+      [
+        "backfill_closeout_template",
+        "reserve_full_test_window",
+        "production_signoff_review"
+      ]
+    );
     assert.equal(template.nextCommands.launchRouteMapGate.command, "npm.cmd run launch:route-map-gate");
     assert.doesNotMatch(JSON.stringify(template), /StrongAdmin123!|StrongDeveloper123!/);
   } finally {

@@ -513,6 +513,131 @@ function buildStagingResultBackfillSummary(result) {
   };
 }
 
+function fileOutputStatus(file) {
+  if (!file) {
+    return "not_requested";
+  }
+  return file.written ? "written" : "pending_write";
+}
+
+function buildStagingOperatorExecutionPlan(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
+    ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
+    : [];
+  return {
+    status: "ready_for_staging_execution",
+    willModifyData: false,
+    trigger: "no-write-rehearsal-gates-passed",
+    outputFiles: [
+      {
+        key: "handoff_file",
+        label: "Staging rehearsal Markdown handoff",
+        status: fileOutputStatus(result.handoffFile),
+        path: result.handoffFile?.path || null,
+        purpose: "Carry commands, routes, evidence requests, and operator notes into the live-write step."
+      },
+      {
+        key: "closeout_file",
+        label: "Staging closeout JSON template",
+        status: fileOutputStatus(result.closeoutFile),
+        path: result.closeoutFile?.path || null,
+        purpose: "Backfill redacted result values, artifact paths, receipt IDs, and go/no-go decision."
+      }
+    ],
+    orderedSteps: [
+      {
+        key: "review_generated_bundle",
+        order: 1,
+        status: "operator_review",
+        outputFileKeys: ["handoff_file", "closeout_file"],
+        summary: "Review generated handoff and closeout template before touching staging data."
+      },
+      {
+        key: "run_route_map_gate",
+        order: 2,
+        status: "operator_execute",
+        command: result.nextCommands?.launchRouteMapGate?.command || null,
+        dryRunCommand: result.nextCommands?.launchRouteMapGate?.dryRunCommand || null,
+        closeoutKey: "route_map_gate_result",
+        summary: "Run the repeatable Launch Mainline / Launch Smoke / Developer Ops route-map gate."
+      },
+      {
+        key: "run_backup_restore_drill",
+        order: 3,
+        status: "operator_execute",
+        commandKeys: Object.keys(result.nextCommands?.recovery || {}),
+        closeoutKey: "backup_restore_drill_result",
+        receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+        summary: "Run backup and restore drill on the intended restore target."
+      },
+      {
+        key: "approve_and_run_live_write_smoke",
+        order: 4,
+        status: "operator_confirm_then_execute",
+        command: result.nextCommands?.launchSmoke || null,
+        closeoutKey: "live_write_smoke_result",
+        receiptOperations: ["record_launch_rehearsal_run"],
+        summary: "Confirm staging writes are approved, then run the live-write smoke command."
+      },
+      {
+        key: "archive_launch_smoke_handoff",
+        order: 5,
+        status: "operator_archive",
+        closeoutKey: "launch_smoke_handoff",
+        summary: "Archive the redacted Launch Smoke handoff and generated test identifiers."
+      },
+      {
+        key: "record_launch_mainline_evidence",
+        order: 6,
+        status: "operator_execute",
+        endpoint: result.evidenceActionPlan?.endpoint || null,
+        bearerTokenEnv: result.evidenceReadiness?.tokenEnv || DEVELOPER_BEARER_TOKEN_ENV,
+        closeoutKey: "launch_mainline_evidence_receipts",
+        evidenceOperations,
+        summary: "Post Launch Mainline evidence actions and capture receipt IDs or handoff filenames."
+      },
+      {
+        key: "verify_receipt_visibility",
+        order: 7,
+        status: "operator_review",
+        downloads: result.nextCommands?.receiptVisibilitySummaries || null,
+        closeoutKey: "receipt_visibility_review",
+        summary: "Verify Launch Review and Launch Smoke visibility summaries show the recorded receipts."
+      },
+      {
+        key: "backfill_closeout_template",
+        order: 8,
+        status: "operator_backfill",
+        outputFileKey: "closeout_file",
+        requiredCloseoutKeys: (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean),
+        summary: "Fill the closeout template with redacted statuses, artifact paths, receipt IDs, and operator_go_no_go."
+      },
+      {
+        key: "reserve_full_test_window",
+        order: 9,
+        status: "operator_schedule",
+        command: closeout.fullTestWindowEntry?.command || null,
+        triggerDecision: closeout.fullTestWindowEntry?.triggerDecision || null,
+        summary: "Reserve the full repository test window only after closeout is backfilled."
+      },
+      {
+        key: "production_signoff_review",
+        order: 10,
+        status: "operator_review",
+        requiredDecision: closeout.productionSignoffConditions?.requiredDecision || null,
+        summary: "Attach production sign-off evidence before cutover."
+      }
+    ],
+    requiredCloseoutKeys: (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean),
+    artifactArchiveRoot: closeout.artifactReceiptLedger?.archiveRoot || null,
+    evidenceOperations,
+    fullTestWindow: closeout.fullTestWindowEntry || null,
+    productionSignoff: closeout.productionSignoffConditions || null,
+    nextAction: "Run the ordered steps in sequence, then backfill closeout with redacted statuses, receipt IDs, and artifact paths before starting the full test window."
+  };
+}
+
 function sanitizeArtifactPathSegment(value, fallback = "unknown") {
   const segment = String(value || "").trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   return segment || fallback;
@@ -848,9 +973,13 @@ function buildResult(options) {
     operatorChecklist,
     resultBackfillSummary: gatesPassed ? buildStagingResultBackfillSummary(result) : null
   };
-  return {
+  const resultWithCloseout = {
     ...resultWithBackfill,
     stagingAcceptanceCloseout: gatesPassed ? buildStagingAcceptanceCloseout(resultWithBackfill) : null
+  };
+  return {
+    ...resultWithCloseout,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithCloseout) : null
   };
 }
 
@@ -976,6 +1105,49 @@ function renderStagingOperatorChecklist(checklist = []) {
       return details.join("\n");
     })
     .join("\n");
+}
+
+function renderOperatorExecutionPlan(plan) {
+  if (!plan) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Status: ${plan.status || "-"}`,
+    `- Writes data: ${plan.willModifyData ? "yes" : "no"}`,
+    `- Trigger: ${plan.trigger || "-"}`,
+    `- Artifact archive root: ${plan.artifactArchiveRoot || "-"}`,
+    `- Required closeout keys: ${(plan.requiredCloseoutKeys || []).join(", ")}`,
+    `- Evidence operations: ${(plan.evidenceOperations || []).join(", ")}`,
+    `- Full test command: ${plan.fullTestWindow?.command || "-"}`,
+    `- Production sign-off decision: ${plan.productionSignoff?.requiredDecision || "-"}`,
+    `- Next action: ${plan.nextAction || "-"}`
+  ];
+  if (Array.isArray(plan.outputFiles) && plan.outputFiles.length) {
+    lines.push("- Output files:");
+    for (const file of plan.outputFiles) {
+      lines.push(`  - ${file.key || "-"}: ${file.status || "-"}`);
+      lines.push(`    - path: ${file.path || "-"}`);
+      lines.push(`    - purpose: ${file.purpose || "-"}`);
+    }
+  }
+  if (Array.isArray(plan.orderedSteps) && plan.orderedSteps.length) {
+    lines.push("- Ordered steps:");
+    for (const step of plan.orderedSteps) {
+      lines.push(`  - ${step.order || "-"}: ${step.key || "-"}`);
+      lines.push(`    - status: ${step.status || "-"}`);
+      lines.push(`    - summary: ${step.summary || "-"}`);
+      if (step.command) {
+        lines.push(`    - command: \`${step.command}\``);
+      }
+      if (step.endpoint) {
+        lines.push(`    - endpoint: ${step.endpoint}`);
+      }
+      if (step.closeoutKey) {
+        lines.push(`    - closeoutKey: ${step.closeoutKey}`);
+      }
+    }
+  }
+  return lines.join("\n");
 }
 
 function renderStagingResultBackfillSummary(summary) {
@@ -1158,6 +1330,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingOperatorChecklist(result.operatorChecklist),
     "",
+    "## Operator Execution Plan",
+    "",
+    renderOperatorExecutionPlan(result.operatorExecutionPlan),
+    "",
     "## Staging Result Backfill Summary",
     "",
     renderStagingResultBackfillSummary(result.resultBackfillSummary),
@@ -1241,6 +1417,7 @@ function buildCloseoutTemplate(result) {
     }),
     resultBackfillSummary: result.resultBackfillSummary || null,
     artifactReceiptLedger: ledger,
+    operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,
     productionSignoffConditions: closeout.productionSignoffConditions || null,
     destinations: closeout.destinations || null,
@@ -1295,8 +1472,18 @@ function writeCloseoutFile(result) {
   };
 }
 
+function refreshOperatorExecutionPlan(result) {
+  if (!result.operatorExecutionPlan) {
+    return result;
+  }
+  return {
+    ...result,
+    operatorExecutionPlan: buildStagingOperatorExecutionPlan(result)
+  };
+}
+
 function writeOutputFiles(result) {
-  return writeCloseoutFile(writeHandoffFile(result));
+  return refreshOperatorExecutionPlan(writeCloseoutFile(writeHandoffFile(result)));
 }
 
 function writeResult(result, json) {

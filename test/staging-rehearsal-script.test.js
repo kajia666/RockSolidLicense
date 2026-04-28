@@ -261,6 +261,49 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   );
   assert.match(output.stagingAcceptanceCloseout.nextAction, /full repository test window/);
   assert.match(output.stagingAcceptanceCloseout.operatorNote, /redacted result values/);
+  assert.equal(output.stagingAcceptanceCloseout.artifactReceiptLedger.status, "awaiting_staging_artifacts");
+  assert.equal(output.stagingAcceptanceCloseout.artifactReceiptLedger.willModifyData, false);
+  assert.equal(output.stagingAcceptanceCloseout.artifactReceiptLedger.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.artifactReceiptLedger.columns,
+    [
+      "check_key",
+      "artifact_key",
+      "artifact_path",
+      "receipt_operations",
+      "closeout_status",
+      "operator_note"
+    ]
+  );
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.artifactReceiptLedger.rows.map((item) => item.checkKey),
+    [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review",
+      "operator_go_no_go"
+    ]
+  );
+  assert.match(
+    output.stagingAcceptanceCloseout.artifactReceiptLedger.rows[0].artifactPath,
+    /artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt$/
+  );
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.artifactReceiptLedger.rows.find((item) => item.checkKey === "backup_restore_drill_result").receiptOperations,
+    ["record_recovery_drill", "record_backup_verification"]
+  );
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.artifactReceiptLedger.rows.find((item) => item.checkKey === "launch_mainline_evidence_receipts").receiptOperations,
+    output.evidenceActionPlan.items.map((item) => item.operation)
+  );
+  assert.deepEqual(
+    output.stagingAcceptanceCloseout.artifactReceiptLedger.rows.find((item) => item.checkKey === "operator_go_no_go").allowedDecisions,
+    ["ready-for-full-test-window", "hold", "rollback-follow-up"]
+  );
+  assert.doesNotMatch(JSON.stringify(output.stagingAcceptanceCloseout.artifactReceiptLedger), /StrongAdmin123!|StrongDeveloper123!/);
   assert.doesNotMatch(JSON.stringify(output.stagingAcceptanceCloseout), /StrongAdmin123!|StrongDeveloper123!/);
 });
 
@@ -337,6 +380,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Decision: pending_staging_results/);
     assert.match(handoff, /operator_go_no_go/);
     assert.match(handoff, /full repository test window/);
+    assert.match(handoff, /## Artifact \/ Receipt Ledger/);
+    assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
+    assert.match(handoff, /launch_mainline_evidence_receipts/);
+    assert.match(handoff, /record_recovery_drill, record_backup_verification/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

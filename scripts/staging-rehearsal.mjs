@@ -509,11 +509,107 @@ function buildStagingResultBackfillSummary(result) {
   };
 }
 
+function sanitizeArtifactPathSegment(value, fallback = "unknown") {
+  const segment = String(value || "").trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return segment || fallback;
+}
+
+function buildStagingArtifactReceiptLedger(result) {
+  const productCode = sanitizeArtifactPathSegment(result.summary?.productCode, "product");
+  const channel = sanitizeArtifactPathSegment(result.summary?.channel || "stable", "stable");
+  const archiveRoot = path.posix.join("artifacts", "staging", productCode, channel);
+  const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
+    ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
+    : [];
+  const row = ({
+    checkKey,
+    artifactKey,
+    fileName,
+    receiptOperations = [],
+    closeoutStatus = "pending",
+    operatorNote = "",
+    allowedDecisions = null
+  }) => ({
+    checkKey,
+    artifactKey,
+    artifactPath: path.posix.join(archiveRoot, fileName),
+    receiptOperations,
+    closeoutStatus,
+    operatorNote,
+    ...(allowedDecisions ? { allowedDecisions } : {})
+  });
+  return {
+    status: "awaiting_staging_artifacts",
+    willModifyData: false,
+    archiveRoot,
+    columns: [
+      "check_key",
+      "artifact_key",
+      "artifact_path",
+      "receipt_operations",
+      "closeout_status",
+      "operator_note"
+    ],
+    rows: [
+      row({
+        checkKey: "route_map_gate_result",
+        artifactKey: "route_map_gate_output",
+        fileName: "route-map-gate-output.txt",
+        operatorNote: "Attach the targeted gate output after secrets have been redacted."
+      }),
+      row({
+        checkKey: "backup_restore_drill_result",
+        artifactKey: "backup_restore_drill_log",
+        fileName: "backup-restore-drill.txt",
+        receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+        operatorNote: "Record backup, restore dry-run, and healthcheck artifact paths."
+      }),
+      row({
+        checkKey: "live_write_smoke_result",
+        artifactKey: "live_write_smoke_output",
+        fileName: "live-write-smoke-output.json",
+        receiptOperations: ["record_launch_rehearsal_run"],
+        operatorNote: "Attach the live-write smoke output with generated test identifiers only."
+      }),
+      row({
+        checkKey: "launch_smoke_handoff",
+        artifactKey: "launch_smoke_handoff",
+        fileName: "launch-smoke-handoff.json",
+        receiptOperations: ["record_post_launch_ops_sweep"],
+        operatorNote: "Save the Launch Smoke handoff used by Launch Review, Developer Ops, and Launch Mainline."
+      }),
+      row({
+        checkKey: "launch_mainline_evidence_receipts",
+        artifactKey: "launch_mainline_evidence_receipts",
+        fileName: "launch-mainline-evidence-receipts.json",
+        receiptOperations: evidenceOperations,
+        operatorNote: "List the Launch Mainline receipt IDs or handoff file names for every evidence action."
+      }),
+      row({
+        checkKey: "receipt_visibility_review",
+        artifactKey: "receipt_visibility_review",
+        fileName: "receipt-visibility-review.txt",
+        receiptOperations: ["record_post_launch_ops_sweep"],
+        operatorNote: "Record the Launch Review and Launch Smoke visibility summary review result."
+      }),
+      row({
+        checkKey: "operator_go_no_go",
+        artifactKey: "operator_go_no_go",
+        fileName: "operator-go-no-go.md",
+        allowedDecisions: ["ready-for-full-test-window", "hold", "rollback-follow-up"],
+        operatorNote: "Record the final staging decision, operator, timestamp, and reason."
+      })
+    ],
+    operatorNote: "Keep artifact paths and receipt identifiers here; do not paste passwords, bearer tokens, or raw secret-bearing logs."
+  };
+}
+
 function buildStagingAcceptanceCloseout(result) {
   const resultBackfill = result.resultBackfillSummary || null;
   const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
     ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
     : [];
+  const artifactReceiptLedger = buildStagingArtifactReceiptLedger(result);
   return {
     status: "awaiting_operator_closeout",
     willModifyData: false,
@@ -577,7 +673,8 @@ function buildStagingAcceptanceCloseout(result) {
       receiptVisibilityDownloads: result.nextCommands?.receiptVisibilitySummaries || null
     },
     nextAction: "Run the real staging steps, backfill the redacted result values, then schedule the full repository test window before production sign-off.",
-    operatorNote: "Use redacted result values only: statuses, receipt IDs, artifact paths, handoff file names, and operator decisions. Do not paste passwords or bearer tokens."
+    operatorNote: "Use redacted result values only: statuses, receipt IDs, artifact paths, handoff file names, and operator decisions. Do not paste passwords or bearer tokens.",
+    artifactReceiptLedger
   };
 }
 
@@ -852,6 +949,33 @@ function renderStagingAcceptanceCloseout(closeout) {
   return lines.join("\n");
 }
 
+function renderArtifactReceiptLedger(ledger) {
+  if (!ledger) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Status: ${ledger.status || "-"}`,
+    `- Writes data: ${ledger.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${ledger.archiveRoot || "-"}`,
+    `- Columns: ${(ledger.columns || []).join(", ")}`,
+    `- Operator note: ${ledger.operatorNote || "-"}`
+  ];
+  if (Array.isArray(ledger.rows) && ledger.rows.length) {
+    lines.push("- Rows:");
+    for (const item of ledger.rows) {
+      lines.push(`  - ${item.checkKey || "-"} -> ${item.artifactKey || "-"}`);
+      lines.push(`    - artifactPath: ${item.artifactPath || "-"}`);
+      lines.push(`    - receiptOperations: ${(item.receiptOperations || []).join(", ") || "-"}`);
+      if (Array.isArray(item.allowedDecisions) && item.allowedDecisions.length) {
+        lines.push(`    - allowedDecisions: ${item.allowedDecisions.join(", ")}`);
+      }
+      lines.push(`    - closeoutStatus: ${item.closeoutStatus || "-"}`);
+      lines.push(`    - operatorNote: ${item.operatorNote || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -906,6 +1030,10 @@ function renderHandoffFile(result) {
     "## Staging Acceptance Closeout",
     "",
     renderStagingAcceptanceCloseout(result.stagingAcceptanceCloseout),
+    "",
+    "## Artifact / Receipt Ledger",
+    "",
+    renderArtifactReceiptLedger(result.stagingAcceptanceCloseout?.artifactReceiptLedger),
     "",
     "## Evidence Readiness",
     "",

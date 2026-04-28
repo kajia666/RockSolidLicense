@@ -323,6 +323,16 @@ function buildReceiptVisibilitySummaryDownloads(options) {
   };
 }
 
+function buildLaunchRouteMapGateCommand() {
+  return {
+    command: "npm.cmd run launch:route-map-gate",
+    dryRunCommand: "npm.cmd run launch:route-map-gate -- --dry-run --json",
+    willModifyData: false,
+    willRunFullSuite: false,
+    purpose: "Re-run the Launch Mainline / Launch Smoke / Developer Ops route-map visibility targeted gate before live-write staging smoke."
+  };
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -367,6 +377,7 @@ function buildResult(options) {
     nextCommands: {
       launchSmoke: gatesPassed ? staging.nextCommand?.powershell || null : null,
       recovery: gatesPassed ? recovery.nextCommands || null : null,
+      launchRouteMapGate: gatesPassed ? buildLaunchRouteMapGateCommand() : null,
       launchMainline,
       receiptVisibilitySummaries
     },
@@ -443,6 +454,19 @@ function renderReceiptVisibilitySummaries(downloads) {
   ].join("\n");
 }
 
+function renderLaunchRouteMapGate(command) {
+  if (!command) {
+    return "- Not available";
+  }
+  return [
+    `- Command: \`${command.command}\``,
+    `- Dry run: \`${command.dryRunCommand}\``,
+    `- Writes data: ${command.willModifyData ? "yes" : "no"}`,
+    `- Runs full suite: ${command.willRunFullSuite ? "yes" : "no"}`,
+    `- Purpose: ${command.purpose}`
+  ].join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -473,6 +497,10 @@ function renderHandoffFile(result) {
     "## Launch Mainline",
     "",
     result.nextCommands.launchMainline || "Not available",
+    "",
+    "## Launch Route Map Targeted Gate",
+    "",
+    renderLaunchRouteMapGate(result.nextCommands.launchRouteMapGate),
     "",
     "## Receipt Visibility Summary Downloads",
     "",
@@ -527,6 +555,7 @@ function writeResult(result, json) {
   if (result.status === "pass") {
     console.log("Staging rehearsal gates passed. No data was modified.");
     console.log(result.nextCommands.launchSmoke);
+    console.log(result.nextCommands.launchRouteMapGate?.command || "");
     console.log(result.nextCommands.launchMainline);
     console.log(result.nextCommands.receiptVisibilitySummaries?.launchReviewSummary || "");
     console.log(result.nextCommands.receiptVisibilitySummaries?.launchSmokeSummary || "");

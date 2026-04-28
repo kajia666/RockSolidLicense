@@ -66,10 +66,10 @@ npm.cmd --silent run staging:rehearsal -- --json `
   --target-env-file /etc/rocksolidlicense/staging.env `
   --app-backup-dir /var/lib/rocksolid/backups `
   --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
-  --base-url https://staging.example.com
+  --handoff-file .\artifacts\staging-rehearsal-handoff.md
 ```
 
-Do not continue to `launch:smoke:staging --allow-live-writes` until this runner passes. Its output includes the redacted live-write smoke command, the recovery rehearsal commands, the scoped Launch Mainline URL, the evidence recording order, and an `evidenceActionPlan` block. That block lists the real `POST /api/developer/launch-mainline/action` payload for each evidence action, including the expected receipt operation, so launch duty can record evidence without translating labels by hand. If you need to debug a single gate, run `staging:preflight` or `recovery:preflight` directly.
+Do not continue to `launch:smoke:staging --allow-live-writes` until this runner passes. Its output includes the redacted live-write smoke command, the recovery rehearsal commands, the scoped Launch Mainline URL, the evidence recording order, and an `evidenceActionPlan` block. That block lists the real `POST /api/developer/launch-mainline/action` payload for each evidence action, including the expected receipt operation, so launch duty can record evidence without translating labels by hand. When `--handoff-file` is provided and the no-write gates pass, the runner also writes a local Markdown handoff pack with the same smoke, recovery, Launch Mainline, and evidence-action material, without printing or storing smoke passwords. If you need to debug a single gate, run `staging:preflight` or `recovery:preflight` directly.
 
 Use `--storage-profile sqlite` when the main store is SQLite. The option is named `--target-env-file` instead of `--env-file` because modern Node versions reserve `--env-file` as a runtime flag before the script can parse it.
 
@@ -228,7 +228,7 @@ Once the lane has actually been rehearsed or observed, record evidence in `/deve
 11. `Record Launch Closeout Review`
 12. `Record Launch Stabilization Review`
 
-When using the CLI runner, copy the matching entry from `evidenceActionPlan.items`. Each item already contains:
+When using the CLI runner, use `evidenceActionPlan.endpoint` with the matching entry from `evidenceActionPlan.items`. The plan and item together contain:
 
 - `endpoint`
   `POST /api/developer/launch-mainline/action`
@@ -260,7 +260,8 @@ Treat the rehearsal as good enough for a cautious first rollout only when all of
 3. The first routed runtime review path was actually opened and understood.
 4. The mainline production gate is not blocked by basic production-readiness failures.
 5. The current cutover, post-launch, closeout, and stabilization handoffs are downloadable for the lane.
-6. The operator can explain who will own:
+6. The generated `staging-rehearsal-handoff.md` or equivalent local handoff pack is available to launch duty.
+7. The operator can explain who will own:
    - launch-day cutover
    - first-wave review
    - end-of-day closeout

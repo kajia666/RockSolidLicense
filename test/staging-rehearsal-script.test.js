@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -117,4 +118,34 @@ test("staging rehearsal runner stops before live-write steps when a no-write gat
   assert.equal(output.nextCommands.launchSmoke, null);
   assert.equal(output.failedPhase.key, "staging_command_preflight");
   assert.equal(output.evidenceActionPlan, null);
+});
+
+test("staging rehearsal runner can write a redacted launch-duty handoff file", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-handoff-"));
+  try {
+    const handoffFile = join(tempDir, "staging-rehearsal-handoff.md");
+    const result = runRehearsal([
+      ...validArgs,
+      "--handoff-file",
+      handoffFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "pass");
+    assert.equal(output.handoffFile.path, handoffFile);
+    assert.equal(output.handoffFile.written, true);
+    assert.equal(existsSync(handoffFile), true);
+
+    const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /# Staging Rehearsal Handoff/);
+    assert.match(handoff, /launch:smoke:staging/);
+    assert.match(handoff, /\/api\/developer\/launch-mainline\/action/);
+    assert.match(handoff, /record_launch_rehearsal_run/);
+    assert.match(handoff, /Record Launch Stabilization Review/);
+    assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
 });

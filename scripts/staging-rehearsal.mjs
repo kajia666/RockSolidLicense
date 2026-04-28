@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,7 +51,8 @@ function parseArgs(argv) {
     storageProfile: null,
     targetEnvFile: null,
     appBackupDir: null,
-    postgresBackupDir: null
+    postgresBackupDir: null,
+    handoffFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -86,6 +88,8 @@ function parseArgs(argv) {
       options.appBackupDir = requireArgValue(name, value, inlineValue);
     } else if (name === "--postgres-backup-dir") {
       options.postgresBackupDir = requireArgValue(name, value, inlineValue);
+    } else if (name === "--handoff-file") {
+      options.handoffFile = requireArgValue(name, value, inlineValue);
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -108,7 +112,8 @@ function parseArgs(argv) {
     storageProfile: readOptionOrEnv(options.storageProfile, "RSL_RECOVERY_STORAGE_PROFILE"),
     targetEnvFile: readOptionOrEnv(options.targetEnvFile, "RSL_RECOVERY_ENV_FILE"),
     appBackupDir: readOptionOrEnv(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR"),
-    postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR")
+    postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR"),
+    handoffFile: readOptionOrEnv(options.handoffFile, "RSL_REHEARSAL_HANDOFF_FILE")
   };
 }
 
@@ -293,6 +298,14 @@ function buildResult(options) {
     },
     evidenceOrder: gatesPassed ? EVIDENCE_ORDER : [],
     evidenceActionPlan: gatesPassed ? buildEvidenceActionPlan(options) : null,
+    ...(options.handoffFile
+      ? {
+        handoffFile: {
+          path: path.resolve(repoRoot, options.handoffFile),
+          written: false
+        }
+      }
+      : {}),
     ...(status === "fail"
       ? {
         failedPhase: firstFailedPhase(phases),
@@ -301,6 +314,94 @@ function buildResult(options) {
         }
       }
       : {})
+  };
+}
+
+function renderCommandList(commands) {
+  if (!commands) {
+    return "- Not available";
+  }
+  if (typeof commands === "string") {
+    return `\`\`\`powershell\n${commands}\n\`\`\``;
+  }
+  return Object.entries(commands)
+    .map(([key, value]) => `- ${key}: \`${value}\``)
+    .join("\n");
+}
+
+function renderEvidenceActions(plan) {
+  if (!plan) {
+    return "- Not available";
+  }
+  return plan.items
+    .map((item) => `${item.order}. ${item.label} - \`${item.operation}\``)
+    .join("\n");
+}
+
+function renderHandoffFile(result) {
+  return [
+    "# Staging Rehearsal Handoff",
+    "",
+    `Generated at: ${result.generatedAt}`,
+    "",
+    "## Lane",
+    "",
+    `- Base URL: ${result.summary.baseUrl}`,
+    `- Product code: ${result.summary.productCode}`,
+    `- Channel: ${result.summary.channel}`,
+    `- Target OS: ${result.summary.targetOs}`,
+    `- Storage profile: ${result.summary.storageProfile}`,
+    `- Rehearsal writes data: ${result.summary.willModifyData ? "yes" : "no"}`,
+    "",
+    "## Gate Status",
+    "",
+    result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
+    "",
+    "## Next Live-Write Smoke Command",
+    "",
+    renderCommandList(result.nextCommands.launchSmoke),
+    "",
+    "## Recovery Commands",
+    "",
+    renderCommandList(result.nextCommands.recovery),
+    "",
+    "## Launch Mainline",
+    "",
+    result.nextCommands.launchMainline || "Not available",
+    "",
+    "## Evidence Action Plan",
+    "",
+    `Endpoint: ${result.evidenceActionPlan?.endpoint || "Not available"}`,
+    `Method: ${result.evidenceActionPlan?.method || "Not available"}`,
+    `Will modify data: ${result.evidenceActionPlan?.willModifyData ? "yes" : "no"}`,
+    "",
+    renderEvidenceActions(result.evidenceActionPlan),
+    "",
+    "## Handling Notes",
+    "",
+    "- This file is generated only after no-write rehearsal gates pass.",
+    "- Password values stay in environment variables and are not written to this handoff.",
+    "- Run the live-write smoke command only when launch duty intentionally allows staging writes.",
+    ""
+  ].join("\n");
+}
+
+function writeHandoffFile(result) {
+  if (!result.handoffFile) {
+    return result;
+  }
+  if (result.status !== "pass") {
+    return result;
+  }
+
+  mkdirSync(path.dirname(result.handoffFile.path), { recursive: true });
+  writeFileSync(result.handoffFile.path, renderHandoffFile(result), "utf8");
+  return {
+    ...result,
+    handoffFile: {
+      ...result.handoffFile,
+      written: true
+    }
   };
 }
 
@@ -328,7 +429,7 @@ function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     json = options.json;
-    const result = buildResult(options);
+    const result = writeHandoffFile(buildResult(options));
     writeResult(result, json);
     if (result.status !== "pass") {
       process.exitCode = 1;

@@ -68,10 +68,11 @@ npm.cmd --silent run staging:rehearsal -- --json `
   --storage-profile postgres-preview `
   --target-env-file /etc/rocksolidlicense/staging.env `
   --app-backup-dir /var/lib/rocksolid/backups `
-  --postgres-backup-dir /var/lib/rocksolid/postgres-backups
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
+  --handoff-file .\artifacts\staging-rehearsal-handoff.md
 ```
 
-The rehearsal runner checks that the staging base URL is HTTPS, the smoke credentials are present and non-default, the product/channel are explicit, and the backup/restore rehearsal command shape is ready. When it passes, the JSON output includes a redacted `nextCommands.launchSmoke` value for the real `launch:smoke:staging` run, so passwords stay in environment variables instead of being printed into handoff notes. It also includes `evidenceActionPlan.items` for the later Launch Mainline evidence receipts, using the real `/api/developer/launch-mainline/action` payloads. If you only need to debug the smoke command gate, run `staging:preflight` directly.
+The rehearsal runner checks that the staging base URL is HTTPS, the smoke credentials are present and non-default, the product/channel are explicit, and the backup/restore rehearsal command shape is ready. When it passes, the JSON output includes a redacted `nextCommands.launchSmoke` value for the real `launch:smoke:staging` run, so passwords stay in environment variables instead of being printed into handoff notes. It also includes `evidenceActionPlan.items` for the later Launch Mainline evidence receipts, using the real `/api/developer/launch-mainline/action` payloads. With `--handoff-file`, the same pass writes a local Markdown handoff pack for launch duty, containing the smoke command, recovery commands, Launch Mainline URL, and evidence order without storing smoke passwords. If you only need to debug the smoke command gate, run `staging:preflight` directly.
 
 To run the same write-path preflight against an already running staging API, use the staging wrapper. It adds `--require-https` so the rehearsal fails before writing if the base URL is accidentally pointed at plain HTTP:
 

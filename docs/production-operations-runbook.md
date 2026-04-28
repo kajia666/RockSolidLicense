@@ -189,7 +189,7 @@ For Redis in this topology, losing runtime state is usually survivable, but expe
 
 ## Manual backup commands
 
-Before a staging recovery drill, run the repository rehearsal runner from a checkout of this project. It does not back up, restore, run smoke, or modify data; it verifies that the selected OS/storage profile has the expected scripts, combines the smoke and recovery gates, prints the next commands to run on the target, and includes `evidenceActionPlan.items` for the later Launch Mainline evidence receipts.
+Before a staging recovery drill, run the repository rehearsal runner from a checkout of this project. It does not back up, restore, run smoke, or modify data; it verifies that the selected OS/storage profile has the expected scripts, combines the smoke and recovery gates, prints the next commands to run on the target, and includes `evidenceActionPlan.items` for the later Launch Mainline evidence receipts. Add `--handoff-file` when launch duty needs a local Markdown pack to carry the smoke command, recovery commands, Launch Mainline URL, and evidence recording order into the staging/live-write step without copying passwords into notes.
 
 Linux PostgreSQL preview example:
 
@@ -206,7 +206,8 @@ npm.cmd --silent run staging:rehearsal -- --json `
   --storage-profile postgres-preview `
   --target-env-file /etc/rocksolidlicense/staging.env `
   --app-backup-dir /var/lib/rocksolid/backups `
-  --postgres-backup-dir /var/lib/rocksolid/postgres-backups
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
+  --handoff-file .\artifacts\staging-rehearsal-handoff.md
 ```
 
 Windows SQLite example:
@@ -223,7 +224,8 @@ npm.cmd --silent run staging:rehearsal -- --json `
   --target-os windows `
   --storage-profile sqlite `
   --target-env-file C:\RockSolidLicense\deploy\windows\rocksolid.env.ps1 `
-  --app-backup-dir C:\RockSolidLicense\backups
+  --app-backup-dir C:\RockSolidLicense\backups `
+  --handoff-file .\artifacts\staging-rehearsal-handoff.md
 ```
 
 Use `recovery:preflight` directly when you only need to inspect the backup/restore command gate. Use `--target-env-file` here rather than `--env-file`; `--env-file` is a Node runtime option in newer Node versions and can be intercepted before the script runs.

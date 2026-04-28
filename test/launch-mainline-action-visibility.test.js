@@ -325,6 +325,22 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       postLaunchHandoffIndex.body,
       /Launch Smoke Kit summary.*\/api\/developer\/launch-smoke-kit\/download\?.*operation=record_post_launch_ops_sweep.*downloadKey=launch_smoke_summary.*format=summary/
     );
+
+    const handoffDownloadRoutes = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=VISIBILITY_ALPHA&channel=stable&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.equal(handoffDownloadRoutes.contentType, "text/plain; charset=utf-8");
+    assert.match(handoffDownloadRoutes.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(
+      handoffDownloadRoutes.body,
+      /launch-review-receipt-visibility-summary.*\/api\/developer\/launch-review\/download\?.*source=launch-smoke.*handoff=first-wave.*format=summary/
+    );
+    assert.match(
+      handoffDownloadRoutes.body,
+      /launch-smoke-receipt-visibility-summary.*\/api\/developer\/launch-smoke-kit\/download\?.*operation=record_post_launch_ops_sweep.*downloadKey=launch_smoke_summary.*format=summary/
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

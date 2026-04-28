@@ -4067,6 +4067,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_stabilization_handoff"
         : normalizedFormat === "post-launch-handoff-index"
           ? "launch_mainline_post_launch_handoff_index"
+        : normalizedFormat === "handoff-download-routes"
+          ? "launch_mainline_handoff_download_routes"
         : normalizedFormat === "first-launch-handoff"
           ? "launch_mainline_first_launch_handoff"
         : normalizedFormat === "initial-launch-ops-readiness"
@@ -15186,6 +15188,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "zip",
     mainlineRouteParams
   );
+  const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
+    productCode: project.code || payload.filters?.productCode || "",
+    channel: manifest.channel || payload.filters?.channel || "stable"
+  });
   const lines = [
     "RockSolid Developer Launch Mainline Handoff Download Routes",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -15253,6 +15259,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       source: nextFollowUp.downloadSource || nextFollowUpDownload.source || null,
       href: nextFollowUp.downloadHref || nextFollowUpDownload.href || null
     }
+  );
+  pushRoute(
+    "launch-review-receipt-visibility-summary",
+    "Launch Review receipt visibility summary",
+    receiptVisibilitySummaryDownloads.launchReviewSummary?.fileName || "launch-review.txt",
+    receiptVisibilitySummaryDownloads.launchReviewSummary || {}
+  );
+  pushRoute(
+    "launch-smoke-receipt-visibility-summary",
+    "Launch Smoke Kit receipt visibility summary",
+    receiptVisibilitySummaryDownloads.launchSmokeSummary?.fileName || "launch-smoke-kit.txt",
+    receiptVisibilitySummaryDownloads.launchSmokeSummary || {}
   );
   if (lifecyclePrimaryDownload.key || lifecyclePrimaryDownload.fileName || lifecyclePrimaryDownload.href) {
     pushRoute(
@@ -15425,7 +15443,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -15513,6 +15531,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.postLaunchHandoffIndexText || buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload)
+    };
+  }
+  if (normalizedFormat === "handoff-download-routes") {
+    return {
+      fileName: "handoff-download-routes.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload)
     };
   }
   if (normalizedFormat === "first-launch-handoff") {

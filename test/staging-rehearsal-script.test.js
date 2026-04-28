@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -578,6 +578,114 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     );
     assert.equal(template.nextCommands.launchRouteMapGate.command, "npm.cmd run launch:route-map-gate");
     assert.doesNotMatch(JSON.stringify(template), /StrongAdmin123!|StrongDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging rehearsal runner can read a redacted closeout input file to narrow readiness gaps", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-closeout-input-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-closeout.json");
+    const closeoutInput = {
+      mode: "staging-closeout-template",
+      decision: "ready-for-full-test-window",
+      acceptanceFields: [
+        {
+          key: "route_map_gate_result",
+          status: "filled",
+          value: {
+            result: "pass",
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt"
+          }
+        },
+        {
+          key: "backup_restore_drill_result",
+          status: "filled",
+          value: {
+            result: "pass",
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt"
+          }
+        },
+        {
+          key: "live_write_smoke_result",
+          status: "filled",
+          value: {
+            result: "pass",
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/live-write-smoke-output.json"
+          }
+        },
+        {
+          key: "launch_smoke_handoff",
+          status: "filled",
+          value: {
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-smoke-handoff.json"
+          }
+        },
+        {
+          key: "launch_mainline_evidence_receipts",
+          status: "filled",
+          value: {
+            receiptIds: ["receipt-1", "receipt-2"]
+          }
+        },
+        {
+          key: "receipt_visibility_review",
+          status: "filled",
+          value: {
+            result: "visible"
+          }
+        },
+        {
+          key: "operator_go_no_go",
+          status: "filled",
+          value: "ready-for-full-test-window"
+        }
+      ]
+    };
+    writeFileSync(closeoutInputFile, `${JSON.stringify(closeoutInput, null, 2)}\n`, "utf8");
+
+    const result = runRehearsal([
+      ...validArgs,
+      "--closeout-input-file",
+      closeoutInputFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.closeoutInput.path, closeoutInputFile);
+    assert.equal(output.closeoutInput.status, "loaded");
+    assert.equal(output.closeoutInput.decision, "ready-for-full-test-window");
+    assert.deepEqual(output.closeoutInput.missingKeys, []);
+    assert.deepEqual(
+      output.closeoutInput.filledKeys,
+      output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.readinessGaps.map((item) => item.key),
+      [
+        "handoff_file_not_requested",
+        "closeout_file_not_requested",
+        "production_signoff_blocked"
+      ]
+    );
+    assert.equal(output.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, true);
+    assert.equal(output.operatorExecutionPlan.readinessSummary.canSignoffProduction, false);
+    assert.equal(output.operatorExecutionPlan.readinessSummary.gapCount, 3);
+    assert.equal(
+      output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "developer_bearer_token_missing"),
+      false
+    );
+    assert.equal(
+      output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "closeout_backfill_pending"),
+      false
+    );
+    assert.equal(
+      output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "full_test_window_blocked"),
+      false
+    );
+    assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

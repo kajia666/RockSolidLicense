@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,7 +54,8 @@ function parseArgs(argv) {
     appBackupDir: null,
     postgresBackupDir: null,
     handoffFile: null,
-    closeoutFile: null
+    closeoutFile: null,
+    closeoutInputFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -94,6 +95,8 @@ function parseArgs(argv) {
       options.handoffFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-file") {
       options.closeoutFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--closeout-input-file") {
+      options.closeoutInputFile = requireArgValue(name, value, inlineValue);
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -118,7 +121,8 @@ function parseArgs(argv) {
     appBackupDir: readOptionOrEnv(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR"),
     postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR"),
     handoffFile: readOptionOrEnv(options.handoffFile, "RSL_REHEARSAL_HANDOFF_FILE"),
-    closeoutFile: readOptionOrEnv(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE")
+    closeoutFile: readOptionOrEnv(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE"),
+    closeoutInputFile: readOptionOrEnv(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE")
   };
 }
 
@@ -520,9 +524,68 @@ function fileOutputStatus(file) {
   return file.written ? "written" : "pending_write";
 }
 
+function isFilledCloseoutField(field) {
+  if (!field || field.status === "pending_operator_entry") {
+    return false;
+  }
+  if (field.value === null || field.value === undefined) {
+    return false;
+  }
+  if (typeof field.value === "string") {
+    return field.value.trim() !== "";
+  }
+  if (Array.isArray(field.value)) {
+    return field.value.length > 0;
+  }
+  if (typeof field.value === "object") {
+    return Object.keys(field.value).length > 0;
+  }
+  return true;
+}
+
+function buildCloseoutInput(closeoutInputFile, closeout = {}) {
+  if (!closeoutInputFile) {
+    return null;
+  }
+  const resolvedPath = path.resolve(repoRoot, closeoutInputFile);
+  const payload = JSON.parse(readFileSync(resolvedPath, "utf8"));
+  const acceptanceFields = Array.isArray(payload.acceptanceFields) ? payload.acceptanceFields : [];
+  const fieldsByKey = new Map(
+    acceptanceFields
+      .filter((field) => field && field.key)
+      .map((field) => [field.key, field])
+  );
+  const requiredKeys = (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
+  const filledKeys = requiredKeys.filter((key) => isFilledCloseoutField(fieldsByKey.get(key)));
+  const missingKeys = requiredKeys.filter((key) => !filledKeys.includes(key));
+  const goNoGoField = fieldsByKey.get("operator_go_no_go");
+  const decision = typeof goNoGoField?.value === "string"
+    ? goNoGoField.value
+    : payload.decision || closeout.decision || null;
+  return {
+    status: "loaded",
+    path: resolvedPath,
+    sourceMode: payload.mode || null,
+    willModifyData: false,
+    decision,
+    fieldCount: acceptanceFields.length,
+    requiredKeys,
+    filledKeys,
+    missingKeys,
+    readyForFullTestWindow: missingKeys.length === 0 && decision === "ready-for-full-test-window",
+    nextAction: missingKeys.length === 0
+      ? "Closeout input is backfilled; confirm operator_go_no_go before entering the full test window."
+      : "Backfill missingKeys in the closeout input before entering the full test window."
+  };
+}
+
 function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } = {}) {
   const outputStatus = new Map(outputFiles.map((item) => [item.key, item.status]));
-  const missingCloseoutKeys = (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
+  const closeoutInput = result.closeoutInput || null;
+  const missingCloseoutKeys = closeoutInput?.missingKeys
+    || (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
+  const hasEvidenceReceipts = Array.isArray(closeoutInput?.filledKeys)
+    && closeoutInput.filledKeys.includes("launch_mainline_evidence_receipts");
   const gaps = [];
   if (outputStatus.get("handoff_file") === "not_requested") {
     gaps.push({
@@ -542,7 +605,7 @@ function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } 
       nextAction: "Re-run staging:rehearsal with --closeout-file before live-write smoke."
     });
   }
-  if (result.evidenceReadiness?.checks?.developerBearerToken !== "present") {
+  if (result.evidenceReadiness?.checks?.developerBearerToken !== "present" && !hasEvidenceReceipts) {
     gaps.push({
       key: "developer_bearer_token_missing",
       severity: "blocker",
@@ -552,22 +615,24 @@ function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } 
       nextAction: `Set $env:${result.evidenceReadiness?.tokenEnv || DEVELOPER_BEARER_TOKEN_ENV} before copying evidence request snippets.`
     });
   }
-  gaps.push({
-    key: "closeout_backfill_pending",
-    severity: "blocker",
-    stepKey: "backfill_closeout_template",
-    missingCloseoutKeys,
-    summary: "Staging closeout is still waiting for redacted result values, artifact paths, receipt IDs, and operator_go_no_go.",
-    nextAction: "Backfill every required closeout key before reserving the full test window."
-  });
-  gaps.push({
-    key: "full_test_window_blocked",
-    severity: "blocker",
-    stepKey: "reserve_full_test_window",
-    command: closeout.fullTestWindowEntry?.command || null,
-    summary: "The full repository test window is blocked until closeout is backfilled.",
-    nextAction: "Run the full test command only after operator_go_no_go is ready-for-full-test-window."
-  });
+  if (missingCloseoutKeys.length > 0 || closeoutInput?.readyForFullTestWindow !== true) {
+    gaps.push({
+      key: "closeout_backfill_pending",
+      severity: "blocker",
+      stepKey: "backfill_closeout_template",
+      missingCloseoutKeys,
+      summary: "Staging closeout is still waiting for redacted result values, artifact paths, receipt IDs, and operator_go_no_go.",
+      nextAction: "Backfill every required closeout key before reserving the full test window."
+    });
+    gaps.push({
+      key: "full_test_window_blocked",
+      severity: "blocker",
+      stepKey: "reserve_full_test_window",
+      command: closeout.fullTestWindowEntry?.command || null,
+      summary: "The full repository test window is blocked until closeout is backfilled.",
+      nextAction: "Run the full test command only after operator_go_no_go is ready-for-full-test-window."
+    });
+  }
   gaps.push({
     key: "production_signoff_blocked",
     severity: "blocker",
@@ -610,7 +675,7 @@ function buildStagingOperatorExecutionPlan(result) {
       status: readinessGaps.length ? "needs_operator_input" : "ready",
       gapCount: readinessGaps.length,
       canRunLiveWriteSmoke: false,
-      canRunFullTestWindow: false,
+      canRunFullTestWindow: result.closeoutInput?.readyForFullTestWindow === true,
       canSignoffProduction: false,
       nextAction: "Resolve readinessGaps in order before live-write smoke, full test window, or production sign-off."
     },
@@ -700,6 +765,7 @@ function buildStagingOperatorExecutionPlan(result) {
       }
     ],
     requiredCloseoutKeys: (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean),
+    closeoutInput: result.closeoutInput || null,
     artifactArchiveRoot: closeout.artifactReceiptLedger?.archiveRoot || null,
     evidenceOperations,
     fullTestWindow: closeout.fullTestWindowEntry || null,
@@ -1047,9 +1113,14 @@ function buildResult(options) {
     ...resultWithBackfill,
     stagingAcceptanceCloseout: gatesPassed ? buildStagingAcceptanceCloseout(resultWithBackfill) : null
   };
-  return {
+  const closeoutInput = gatesPassed ? buildCloseoutInput(options.closeoutInputFile, resultWithCloseout.stagingAcceptanceCloseout) : null;
+  const resultWithCloseoutInput = {
     ...resultWithCloseout,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithCloseout) : null
+    closeoutInput
+  };
+  return {
+    ...resultWithCloseoutInput,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithCloseoutInput) : null
   };
 }
 
@@ -1507,6 +1578,7 @@ function buildCloseoutTemplate(result) {
     }),
     resultBackfillSummary: result.resultBackfillSummary || null,
     artifactReceiptLedger: ledger,
+    closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,
     productionSignoffConditions: closeout.productionSignoffConditions || null,

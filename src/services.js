@@ -4459,6 +4459,68 @@ function buildLaunchMainlineActionReceiptVisibility({
   };
 }
 
+function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
+  if (!visibility || typeof visibility !== "object") {
+    return null;
+  }
+  const workspaces = Object.values(visibility.workspaces || {}).filter((item) => item?.key);
+  const downloads = visibility.downloads && typeof visibility.downloads === "object"
+    ? visibility.downloads
+    : {};
+  const checkpointCards = (Array.isArray(visibility.checkpoints) ? visibility.checkpoints : [])
+    .map((item) => {
+      const download = item?.recommendedDownload || null;
+      return {
+        key: `receipt_visibility_${item?.key || "checkpoint"}`,
+        title: item?.label || "Receipt visibility checkpoint",
+        summary: item?.summary || "Review this receipt checkpoint before handing launch duty onward.",
+        tags: [
+          item?.workspaceAction?.label ? { label: "workspace", value: item.workspaceAction.label, strong: true } : null,
+          download?.format ? { label: "download", value: download.format, strong: true } : null
+        ].filter(Boolean),
+        details: [
+          item?.workspaceAction?.href ? `Workspace: ${item.workspaceAction.href}` : "",
+          download?.href ? `Download: ${download.href}` : ""
+        ].filter(Boolean),
+        controls: [
+          download ? {
+            kind: "download",
+            label: download.label || item?.label || "Download checkpoint",
+            recommendedDownload: download
+          } : null
+        ].filter(Boolean)
+      };
+    })
+    .filter((item) => item.key);
+  return {
+    key: "receipt_visibility",
+    title: "Receipt Visibility",
+    emptyState: "Record a launch-mainline action to see receipt visibility checkpoints here.",
+    cards: [
+      {
+        key: "receipt_visibility_summary",
+        title: visibility.headline || "Receipt visibility ready",
+        summary: "Open these workspaces or downloads to confirm the recorded receipt is visible before the next handoff.",
+        tags: [
+          visibility.status ? { label: "status", value: String(visibility.status).toUpperCase(), strong: true } : null,
+          visibility.recordedReceipt?.operation ? { label: "operation", value: visibility.recordedReceipt.operation, strong: true } : null,
+          visibility.recordedReceipt?.channel ? { label: "channel", value: visibility.recordedReceipt.channel, strong: true } : null
+        ].filter(Boolean),
+        details: [
+          visibility.recordedReceipt?.handoffFileName ? `Receipt handoff: ${visibility.recordedReceipt.handoffFileName}` : "",
+          downloads.launchReceiptNextFollowUp?.fileName ? `Next follow-up: ${downloads.launchReceiptNextFollowUp.fileName}` : ""
+        ].filter(Boolean),
+        controls: workspaces.map((item) => ({
+          kind: "workspace",
+          label: item.label || item.key || "Open workspace",
+          workspaceAction: item
+        }))
+      },
+      ...checkpointCards
+    ]
+  };
+}
+
 function buildLaunchMainlineActionReceiptHandoffText({
   generatedAt = "",
   operation = "",
@@ -6040,12 +6102,18 @@ function buildLaunchMainlineActionReceipt({
   );
   const handoffOperationTag = sanitizeExportNameSegment(normalizedOperation || "bootstrap", "bootstrap");
   const handoffFileName = `rocksolid-launch-mainline-receipt-${handoffScopeTag}-${handoffChannelTag}-${handoffOperationTag}-${buildExportTimestampTag(handoffGeneratedAt)}.txt`;
-  const visibility = buildLaunchMainlineActionReceiptVisibility({
-    operation: normalizedOperation || "bootstrap",
-    operationLabel,
-    handoffFileName,
-    launchMainline
-  });
+  const visibility = normalizedOperation === "record_post_launch_ops_sweep"
+    ? buildLaunchMainlineActionReceiptVisibility({
+      operation: normalizedOperation,
+      operationLabel,
+      handoffFileName,
+      launchMainline
+    })
+    : null;
+  const visibilitySection = buildLaunchMainlineActionReceiptVisibilitySection(visibility);
+  if (visibilitySection) {
+    mainlineLastActionScreen.sections.push(visibilitySection);
+  }
   const handoffText = buildLaunchMainlineActionReceiptHandoffText({
     generatedAt: handoffGeneratedAt,
     operation: normalizedOperation || "bootstrap",

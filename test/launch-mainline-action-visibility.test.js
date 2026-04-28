@@ -143,6 +143,50 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       ]
     );
 
+    const visibilitySection = Array.isArray(actionResult.receipt?.mainlineLastActionScreen?.sections)
+      ? actionResult.receipt.mainlineLastActionScreen.sections.find((item) => item?.key === "receipt_visibility")
+      : null;
+    assert.equal(visibilitySection?.title, "Receipt Visibility");
+    assert.deepEqual(
+      Array.isArray(visibilitySection?.cards) ? visibilitySection.cards.map((item) => item?.key) : [],
+      [
+        "receipt_visibility_summary",
+        "receipt_visibility_developer_ops_summary",
+        "receipt_visibility_launch_receipt_next_follow_up",
+        "receipt_visibility_post_launch_sweep_handoff",
+        "receipt_visibility_post_launch_handoff_index"
+      ]
+    );
+    assert.deepEqual(
+      Array.isArray(visibilitySection?.cards)
+        ? visibilitySection.cards.flatMap((card) =>
+            Array.isArray(card?.controls)
+              ? card.controls.map((control) => ({
+                  kind: control?.kind || null,
+                  workspace: control?.workspaceAction?.key || null,
+                  download: control?.recommendedDownload?.key || null
+                }))
+              : []
+          )
+        : [],
+      [
+        { kind: "workspace", workspace: "ops", download: null },
+        { kind: "workspace", workspace: "launch-mainline", download: null },
+        { kind: "download", workspace: null, download: "ops_summary" },
+        { kind: "download", workspace: null, download: "ops_launch_receipt_next_follow_up" },
+        { kind: "download", workspace: null, download: "launch_mainline_post_launch_sweep_handoff" },
+        { kind: "download", workspace: null, download: "launch_mainline_post_launch_handoff_index" }
+      ]
+    );
+    assert.equal(
+      actionResult.receipt?.mainlineView?.lastActionScreen?.sections?.some((item) => item?.key === "receipt_visibility"),
+      true
+    );
+    assert.equal(
+      actionResult.receipt?.mainlinePage?.lastActionScreen?.sections?.some((item) => item?.key === "receipt_visibility"),
+      true
+    );
+
     assert.match(actionResult.receipt?.handoffText || "", /Receipt Visibility:/);
     assert.match(actionResult.receipt?.handoffText || "", /developer-ops-launch-receipt-next-follow-up\.txt/i);
     assert.match(actionResult.receipt?.handoffText || "", /post-launch-handoff-index/i);

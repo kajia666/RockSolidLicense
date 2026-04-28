@@ -100,7 +100,7 @@ The matching evidence path in `/developer/launch-mainline` should usually be rec
 
 That sequence is useful because it keeps the end-to-end rehearsal, launch-day duty, launch closeout, and early steady-state handoff inside one verifiable chain instead of leaving the last mile to shift notes alone.
 
-When `Record First-Wave Ops Sweep` is captured through `/api/developer/launch-mainline/action`, the returned receipt now also includes a `visibility` block and matching handoff text that point directly to the next four operator review locations: Developer Ops summary, launch receipt next follow-up, post-launch sweep handoff, and post-launch handoff index.
+When `Record First-Wave Ops Sweep` is captured through `/api/developer/launch-mainline/action`, the returned receipt now also includes a `visibility` block, a `receipt_visibility` last-action section, and matching handoff text that point directly to the next four operator review locations: Developer Ops summary, launch receipt next follow-up, post-launch sweep handoff, and post-launch handoff index.
 
 For logging, dashboard, and alert suggestions, also see:
 

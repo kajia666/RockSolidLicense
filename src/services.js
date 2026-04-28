@@ -17555,6 +17555,19 @@ function buildDeveloperOpsLaunchReceiptFollowUpDownload(item = null, scope = {})
   );
 }
 
+function buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_launch_mainline_handoff_routes",
+    "developer-ops-launch-mainline-handoff-routes.txt",
+    "Developer Ops Launch Mainline handoff routes",
+    {
+      source: "developer-ops",
+      format: "launch-mainline-handoff-routes",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsInitialLaunchOpsGate({
   status = "not_started",
   latestReceipt = null,
@@ -18124,6 +18137,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     || mainlineHandoff?.workspaceAction
     || null;
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
+  const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
   const stabilizationHandoffDownload = mainlineHandoff?.downloads?.stabilizationHandoff || null;
   const followUpQueue = followUps
@@ -18158,6 +18172,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   for (const download of [
     primaryDownload,
     firstLaunchHandoffDownload,
+    launchMainlineHandoffRoutesDownload,
     mainlineHandoff?.downloads?.checksums,
     mainlineHandoff?.downloads?.zip
   ]) {

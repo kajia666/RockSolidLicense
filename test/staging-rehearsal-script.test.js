@@ -430,6 +430,49 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
   }
 });
 
+test("staging rehearsal runner can write a redacted closeout template file", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-closeout-"));
+  try {
+    const closeoutFile = join(tempDir, "staging-closeout-template.json");
+    const result = runRehearsal([
+      ...validArgs,
+      "--closeout-file",
+      closeoutFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "pass");
+    assert.equal(output.closeoutFile.path, closeoutFile);
+    assert.equal(output.closeoutFile.written, true);
+    assert.equal(existsSync(closeoutFile), true);
+
+    const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
+    assert.equal(template.mode, "staging-closeout-template");
+    assert.equal(template.status, "awaiting_operator_closeout");
+    assert.equal(template.productCode, "PILOT_ALPHA");
+    assert.equal(template.channel, "stable");
+    assert.equal(template.willModifyData, false);
+    assert.deepEqual(
+      template.acceptanceFields.map((item) => item.key),
+      output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
+    );
+    assert.equal(template.acceptanceFields.every((item) => item.status === "pending_operator_entry"), true);
+    assert.equal(template.acceptanceFields.every((item) => item.value === null), true);
+    const smokeField = template.acceptanceFields.find((item) => item.key === "live_write_smoke_result");
+    assert.equal(smokeField.artifactPath, "artifacts/staging/PILOT_ALPHA/stable/live-write-smoke-output.json");
+    assert.deepEqual(smokeField.receiptOperations, ["record_launch_rehearsal_run"]);
+    assert.equal(template.fullTestWindowEntry.command, "npm.cmd test");
+    assert.equal(template.fullTestWindowEntry.status, "blocked_until_staging_closeout");
+    assert.equal(template.productionSignoffConditions.requiredDecision, "ready-for-production-signoff");
+    assert.equal(template.nextCommands.launchRouteMapGate.command, "npm.cmd run launch:route-map-gate");
+    assert.doesNotMatch(JSON.stringify(template), /StrongAdmin123!|StrongDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging rehearsal runner marks evidence requests ready when bearer token env exists without printing it", () => {
   const result = runRehearsal(validArgs, {
     RSL_DEVELOPER_BEARER_TOKEN: "developer-secret-token"

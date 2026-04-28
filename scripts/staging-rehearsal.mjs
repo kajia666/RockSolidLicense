@@ -53,7 +53,8 @@ function parseArgs(argv) {
     targetEnvFile: null,
     appBackupDir: null,
     postgresBackupDir: null,
-    handoffFile: null
+    handoffFile: null,
+    closeoutFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -91,6 +92,8 @@ function parseArgs(argv) {
       options.postgresBackupDir = requireArgValue(name, value, inlineValue);
     } else if (name === "--handoff-file") {
       options.handoffFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--closeout-file") {
+      options.closeoutFile = requireArgValue(name, value, inlineValue);
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -114,7 +117,8 @@ function parseArgs(argv) {
     targetEnvFile: readOptionOrEnv(options.targetEnvFile, "RSL_RECOVERY_ENV_FILE"),
     appBackupDir: readOptionOrEnv(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR"),
     postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR"),
-    handoffFile: readOptionOrEnv(options.handoffFile, "RSL_REHEARSAL_HANDOFF_FILE")
+    handoffFile: readOptionOrEnv(options.handoffFile, "RSL_REHEARSAL_HANDOFF_FILE"),
+    closeoutFile: readOptionOrEnv(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE")
   };
 }
 
@@ -821,6 +825,14 @@ function buildResult(options) {
         }
       }
       : {}),
+    ...(options.closeoutFile
+      ? {
+        closeoutFile: {
+          path: path.resolve(repoRoot, options.closeoutFile),
+          written: false
+        }
+      }
+      : {}),
     ...(status === "fail"
       ? {
         failedPhase: firstFailedPhase(phases),
@@ -1187,6 +1199,64 @@ function renderHandoffFile(result) {
   ].join("\n");
 }
 
+function buildCloseoutTemplate(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const ledger = closeout.artifactReceiptLedger || {};
+  const ledgerRowsByKey = new Map((ledger.rows || []).map((row) => [row.checkKey, row]));
+  return {
+    mode: "staging-closeout-template",
+    source: "staging-rehearsal",
+    generatedAt: result.generatedAt,
+    status: closeout.status || "not_available",
+    decision: closeout.decision || "pending_staging_results",
+    willModifyData: false,
+    baseUrl: result.summary?.baseUrl || null,
+    productCode: result.summary?.productCode || null,
+    channel: result.summary?.channel || null,
+    targetOs: result.summary?.targetOs || null,
+    storageProfile: result.summary?.storageProfile || null,
+    requiredResultKeys: closeout.requiredResultKeys || [],
+    evidenceOperations: closeout.evidenceOperations || [],
+    archiveRoot: ledger.archiveRoot || null,
+    acceptanceFields: (closeout.acceptanceChecks || []).map((check) => {
+      const row = ledgerRowsByKey.get(check.key) || {};
+      return {
+        key: check.key,
+        label: check.label || null,
+        required: check.required === true,
+        status: "pending_operator_entry",
+        value: null,
+        expectedEvidence: check.expectedEvidence || null,
+        command: check.command || null,
+        commandKeys: check.commandKeys || null,
+        endpoint: check.endpoint || null,
+        operations: check.operations || null,
+        downloads: check.downloads || null,
+        artifactKey: row.artifactKey || null,
+        artifactPath: row.artifactPath || null,
+        receiptOperations: row.receiptOperations || [],
+        allowedDecisions: row.allowedDecisions || null,
+        operatorNote: row.operatorNote || null
+      };
+    }),
+    resultBackfillSummary: result.resultBackfillSummary || null,
+    artifactReceiptLedger: ledger,
+    fullTestWindowEntry: closeout.fullTestWindowEntry || null,
+    productionSignoffConditions: closeout.productionSignoffConditions || null,
+    destinations: closeout.destinations || null,
+    nextCommands: {
+      launchSmoke: result.nextCommands?.launchSmoke || null,
+      recovery: result.nextCommands?.recovery || null,
+      launchRouteMapGate: result.nextCommands?.launchRouteMapGate || null,
+      launchMainline: result.nextCommands?.launchMainline || null,
+      receiptVisibilitySummaries: result.nextCommands?.receiptVisibilitySummaries || null
+    },
+    operatorChecklist: result.operatorChecklist || [],
+    operatorNote: closeout.operatorNote || null,
+    nextAction: closeout.nextAction || null
+  };
+}
+
 function writeHandoffFile(result) {
   if (!result.handoffFile) {
     return result;
@@ -1204,6 +1274,29 @@ function writeHandoffFile(result) {
       written: true
     }
   };
+}
+
+function writeCloseoutFile(result) {
+  if (!result.closeoutFile) {
+    return result;
+  }
+  if (result.status !== "pass") {
+    return result;
+  }
+
+  mkdirSync(path.dirname(result.closeoutFile.path), { recursive: true });
+  writeFileSync(result.closeoutFile.path, `${JSON.stringify(buildCloseoutTemplate(result), null, 2)}\n`, "utf8");
+  return {
+    ...result,
+    closeoutFile: {
+      ...result.closeoutFile,
+      written: true
+    }
+  };
+}
+
+function writeOutputFiles(result) {
+  return writeCloseoutFile(writeHandoffFile(result));
 }
 
 function writeResult(result, json) {
@@ -1234,7 +1327,7 @@ function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     json = options.json;
-    const result = writeHandoffFile(buildResult(options));
+    const result = writeOutputFiles(buildResult(options));
     writeResult(result, json);
     if (result.status !== "pass") {
       process.exitCode = 1;

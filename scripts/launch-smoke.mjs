@@ -248,6 +248,10 @@ function buildLaunchDutyHandoff({
       handoff: "first-wave"
     })
   );
+  const launchMainline = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/developer/launch-mainline", sharedWorkspaceParams)
+  );
   const firstWaveSummary = buildHandoffLink(
     handoffBaseUrl,
     buildRoute("/api/developer/ops/first-wave/recommendations/download", {
@@ -299,6 +303,11 @@ function buildLaunchDutyHandoff({
         key: "developer-ops",
         label: "Developer Ops",
         ...developerOps
+      },
+      launchMainline: {
+        key: "launch-mainline",
+        label: "Launch Mainline Evidence",
+        ...launchMainline
       }
     },
     downloads: {
@@ -359,6 +368,13 @@ function buildLaunchDutyHandoff({
         status: "next",
         route: developerOps.route,
         href: developerOps.href
+      },
+      {
+        key: "open_launch_mainline_evidence",
+        label: "Open Launch Mainline to record the smoke and first-wave evidence chain.",
+        status: "next",
+        route: launchMainline.route,
+        href: launchMainline.href
       }
     ]
   };
@@ -768,6 +784,7 @@ function writeResult(result, json) {
       console.log(`- Open Launch Review: ${result.handoff.nextWorkspace.href || result.handoff.nextWorkspace.route}`);
       console.log(`- Download Ops handoff index: ${result.handoff.downloads.opsHandoffIndex.href || result.handoff.downloads.opsHandoffIndex.route}`);
       console.log(`- Continue Developer Ops watch: ${result.handoff.reviewWorkspaces.developerOps.href || result.handoff.reviewWorkspaces.developerOps.route}`);
+      console.log(`- Open Launch Mainline evidence: ${result.handoff.reviewWorkspaces.launchMainline.href || result.handoff.reviewWorkspaces.launchMainline.route}`);
     }
     return;
   }

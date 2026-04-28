@@ -69,7 +69,7 @@ npm.cmd --silent run staging:rehearsal -- --json `
   --base-url https://staging.example.com
 ```
 
-Do not continue to `launch:smoke:staging --allow-live-writes` until this runner passes. Its output includes the redacted live-write smoke command, the recovery rehearsal commands, the scoped Launch Mainline URL, and the evidence recording order. If you need to debug a single gate, run `staging:preflight` or `recovery:preflight` directly.
+Do not continue to `launch:smoke:staging --allow-live-writes` until this runner passes. Its output includes the redacted live-write smoke command, the recovery rehearsal commands, the scoped Launch Mainline URL, the evidence recording order, and an `evidenceActionPlan` block. That block lists the real `POST /api/developer/launch-mainline/action` payload for each evidence action, including the expected receipt operation, so launch duty can record evidence without translating labels by hand. If you need to debug a single gate, run `staging:preflight` or `recovery:preflight` directly.
 
 Use `--storage-profile sqlite` when the main store is SQLite. The option is named `--target-env-file` instead of `--env-file` because modern Node versions reserve `--env-file` as a runtime flag before the script can parse it.
 
@@ -209,7 +209,7 @@ Use them for these purposes:
 Exit condition:
 
 - the lane has one consistent author-side handoff path from deployment through first-week stabilization
-- `staging:rehearsal` has confirmed the smoke command, recovery command, Launch Mainline URL, and evidence order before any live-write smoke run begins
+- `staging:rehearsal` has confirmed the smoke command, recovery command, Launch Mainline URL, evidence order, and `evidenceActionPlan` payloads before any live-write smoke run begins
 
 ## Phase 5: Evidence Recording Order
 
@@ -227,6 +227,19 @@ Once the lane has actually been rehearsed or observed, record evidence in `/deve
 10. `Record First-Wave Ops Sweep`
 11. `Record Launch Closeout Review`
 12. `Record Launch Stabilization Review`
+
+When using the CLI runner, copy the matching entry from `evidenceActionPlan.items`. Each item already contains:
+
+- `endpoint`
+  `POST /api/developer/launch-mainline/action`
+- `payload.productCode`
+  the selected rehearsal project
+- `payload.channel`
+  the selected rehearsal channel
+- `payload.operation`
+  the backend operation key, such as `record_launch_rehearsal_run` or `record_backup_verification`
+- `expectedReceiptOperation`
+  the receipt operation you should see after the action succeeds
 
 Why this order works:
 

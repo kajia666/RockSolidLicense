@@ -189,7 +189,7 @@ For Redis in this topology, losing runtime state is usually survivable, but expe
 
 ## Manual backup commands
 
-Before a staging recovery drill, run the repository rehearsal runner from a checkout of this project. It does not back up, restore, run smoke, or modify data; it verifies that the selected OS/storage profile has the expected scripts, combines the smoke and recovery gates, and prints the next commands to run on the target:
+Before a staging recovery drill, run the repository rehearsal runner from a checkout of this project. It does not back up, restore, run smoke, or modify data; it verifies that the selected OS/storage profile has the expected scripts, combines the smoke and recovery gates, prints the next commands to run on the target, and includes `evidenceActionPlan.items` for the later Launch Mainline evidence receipts.
 
 Linux PostgreSQL preview example:
 

@@ -80,6 +80,24 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "Record Recovery Drill",
     "Record Backup Verification"
   ]);
+  assert.equal(output.evidenceActionPlan.endpoint, "https://staging.example.com/api/developer/launch-mainline/action");
+  assert.equal(output.evidenceActionPlan.method, "POST");
+  assert.equal(output.evidenceActionPlan.willModifyData, true);
+  assert.deepEqual(
+    output.evidenceActionPlan.items.slice(0, 4).map((item) => item.operation),
+    [
+      "record_launch_rehearsal_run",
+      "record_recovery_drill",
+      "record_backup_verification",
+      "record_operations_walkthrough"
+    ]
+  );
+  assert.deepEqual(output.evidenceActionPlan.items[0].payload, {
+    productCode: "PILOT_ALPHA",
+    channel: "stable",
+    operation: "record_launch_rehearsal_run"
+  });
+  assert.equal(output.evidenceActionPlan.items[0].expectedReceiptOperation, "record_launch_rehearsal_run");
 });
 
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
@@ -98,4 +116,5 @@ test("staging rehearsal runner stops before live-write steps when a no-write gat
   assert.equal(output.preflights.recovery.status, "pass");
   assert.equal(output.nextCommands.launchSmoke, null);
   assert.equal(output.failedPhase.key, "staging_command_preflight");
+  assert.equal(output.evidenceActionPlan, null);
 });

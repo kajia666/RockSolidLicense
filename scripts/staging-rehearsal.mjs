@@ -21,6 +21,21 @@ const EVIDENCE_ORDER = [
   "Record Launch Stabilization Review"
 ];
 
+const EVIDENCE_ACTIONS = [
+  ["Record Launch Rehearsal Run", "record_launch_rehearsal_run"],
+  ["Record Recovery Drill", "record_recovery_drill"],
+  ["Record Backup Verification", "record_backup_verification"],
+  ["Record Operations Walkthrough", "record_operations_walkthrough"],
+  ["Record Deploy Verification", "record_deploy_verification"],
+  ["Record Health Verification", "record_health_verification"],
+  ["Record Rollback Walkthrough", "record_rollback_walkthrough"],
+  ["Record Cutover Walkthrough", "record_cutover_walkthrough"],
+  ["Record Launch Day Readiness Review", "record_launch_day_readiness_review"],
+  ["Record First-Wave Ops Sweep", "record_post_launch_ops_sweep"],
+  ["Record Launch Closeout Review", "record_launch_closeout_review"],
+  ["Record Launch Stabilization Review", "record_launch_stabilization_review"]
+];
+
 function parseArgs(argv) {
   const options = {
     json: false,
@@ -210,6 +225,28 @@ function firstFailedPhase(phases) {
   return phases.find((phase) => phase.status === "blocked" || phase.status === "fail") || null;
 }
 
+function buildEvidenceActionPlan(options) {
+  const endpoint = buildRoute(options.baseUrl, "/api/developer/launch-mainline/action", {});
+  return {
+    endpoint,
+    method: "POST",
+    willModifyData: true,
+    auth: "developer bearer token",
+    items: EVIDENCE_ACTIONS.map(([label, operation], index) => ({
+      key: operation,
+      label,
+      operation,
+      order: index + 1,
+      payload: {
+        productCode: options.productCode,
+        channel: options.channel,
+        operation
+      },
+      expectedReceiptOperation: operation
+    }))
+  };
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -255,6 +292,7 @@ function buildResult(options) {
       launchMainline
     },
     evidenceOrder: gatesPassed ? EVIDENCE_ORDER : [],
+    evidenceActionPlan: gatesPassed ? buildEvidenceActionPlan(options) : null,
     ...(status === "fail"
       ? {
         failedPhase: firstFailedPhase(phases),

@@ -16,6 +16,7 @@
     "staging:rehearsal": "node scripts/staging-rehearsal.mjs",
     "launch:smoke": "node scripts/launch-smoke.mjs",
     "launch:smoke:staging": "node scripts/launch-smoke.mjs --require-https",
+    "launch:route-map-gate": "node scripts/launch-route-map-gate.mjs",
     "test": "node --test --test-concurrency=1 --test-isolation=none"
   }
 }

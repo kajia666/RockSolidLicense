@@ -478,6 +478,37 @@ function buildStagingOperatorChecklist(result) {
   ];
 }
 
+function buildStagingResultBackfillSummary(result) {
+  const productCode = result.summary?.productCode || "";
+  const baseUrl = result.summary?.baseUrl || "";
+  const developerOps = baseUrl
+    ? buildRoute(baseUrl, "/developer/ops", {
+      productCode,
+      source: "staging-rehearsal",
+      handoff: "first-wave"
+    })
+    : null;
+  return {
+    status: "awaiting_staging_execution",
+    willModifyData: false,
+    requiredResultKeys: [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review"
+    ],
+    destinations: {
+      launchMainline: result.nextCommands?.launchMainline || null,
+      developerOps
+    },
+    evidenceEndpoint: result.evidenceActionPlan?.endpoint || null,
+    receiptVisibilityDownloads: result.nextCommands?.receiptVisibilitySummaries || null,
+    operatorNote: "Do not paste passwords or bearer tokens into the result summary; record pass/fail status, receipt IDs, artifact paths, and redacted handoff file names only."
+  };
+}
+
 function buildResult(options) {
   const staging = runJsonScript("staging-preflight.mjs", buildStagingPreflightArgs(options));
   const recovery = runJsonScript("recovery-preflight.mjs", buildRecoveryPreflightArgs(options));
@@ -551,9 +582,11 @@ function buildResult(options) {
       }
       : {})
   };
+  const operatorChecklist = gatesPassed ? buildStagingOperatorChecklist(result) : [];
   return {
     ...result,
-    operatorChecklist: gatesPassed ? buildStagingOperatorChecklist(result) : []
+    operatorChecklist,
+    resultBackfillSummary: gatesPassed ? buildStagingResultBackfillSummary(result) : null
   };
 }
 
@@ -681,6 +714,23 @@ function renderStagingOperatorChecklist(checklist = []) {
     .join("\n");
 }
 
+function renderStagingResultBackfillSummary(summary) {
+  if (!summary) {
+    return "- Not available";
+  }
+  return [
+    `- Status: ${summary.status}`,
+    `- Writes data: ${summary.willModifyData ? "yes" : "no"}`,
+    `- Required result keys: ${(summary.requiredResultKeys || []).join(", ")}`,
+    `- Launch Mainline: ${summary.destinations?.launchMainline || "-"}`,
+    `- Developer Ops: ${summary.destinations?.developerOps || "-"}`,
+    `- Evidence endpoint: ${summary.evidenceEndpoint || "-"}`,
+    `- Launch Review visibility: ${summary.receiptVisibilityDownloads?.launchReviewSummary || "-"}`,
+    `- Launch Smoke visibility: ${summary.receiptVisibilityDownloads?.launchSmokeSummary || "-"}`,
+    `- Operator note: ${summary.operatorNote || "-"}`
+  ].join("\n");
+}
+
 function renderHandoffFile(result) {
   return [
     "# Staging Rehearsal Handoff",
@@ -727,6 +777,10 @@ function renderHandoffFile(result) {
     "## Staging Operator Checklist",
     "",
     renderStagingOperatorChecklist(result.operatorChecklist),
+    "",
+    "## Staging Result Backfill Summary",
+    "",
+    renderStagingResultBackfillSummary(result.resultBackfillSummary),
     "",
     "## Evidence Readiness",
     "",

@@ -208,6 +208,28 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "record_backup_verification"
   ]);
   assert.doesNotMatch(JSON.stringify(output.operatorChecklist), /StrongAdmin123!|StrongDeveloper123!/);
+  assert.equal(output.resultBackfillSummary.status, "awaiting_staging_execution");
+  assert.equal(output.resultBackfillSummary.willModifyData, false);
+  assert.deepEqual(
+    output.resultBackfillSummary.requiredResultKeys,
+    [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review"
+    ]
+  );
+  assert.equal(output.resultBackfillSummary.destinations.launchMainline, output.nextCommands.launchMainline);
+  assert.equal(
+    output.resultBackfillSummary.destinations.developerOps,
+    "https://staging.example.com/developer/ops?productCode=PILOT_ALPHA&source=staging-rehearsal&handoff=first-wave"
+  );
+  assert.equal(output.resultBackfillSummary.evidenceEndpoint, "https://staging.example.com/api/developer/launch-mainline/action");
+  assert.deepEqual(output.resultBackfillSummary.receiptVisibilityDownloads, output.nextCommands.receiptVisibilitySummaries);
+  assert.match(output.resultBackfillSummary.operatorNote, /Do not paste passwords/);
+  assert.doesNotMatch(JSON.stringify(output.resultBackfillSummary), /StrongAdmin123!|StrongDeveloper123!/);
 });
 
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
@@ -274,6 +296,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /2\. Run route-map and download-surface gate/);
     assert.match(handoff, /5\. Run live-write staging smoke/);
     assert.match(handoff, /8\. Record Launch Mainline evidence/);
+    assert.match(handoff, /## Staging Result Backfill Summary/);
+    assert.match(handoff, /route_map_gate_result/);
+    assert.match(handoff, /launch_mainline_evidence_receipts/);
+    assert.match(handoff, /Developer Ops: https:\/\/staging\.example\.com\/developer\/ops\?productCode=PILOT_ALPHA&source=staging-rehearsal&handoff=first-wave/);
     assert.doesNotMatch(handoff, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

@@ -6189,6 +6189,84 @@ function buildLaunchMainlineActionReceipt({
   };
 }
 
+function summarizeLaunchReceiptVisibilityWorkspace(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  return {
+    key: item.key || null,
+    label: item.label || null,
+    autofocus: item.autofocus || null,
+    href: item.href || null
+  };
+}
+
+function summarizeLaunchReceiptVisibilityDownload(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  return {
+    key: item.key || null,
+    label: item.label || null,
+    fileName: item.fileName || null,
+    source: item.source || null,
+    format: item.format || null,
+    href: item.href || null
+  };
+}
+
+function buildLaunchReceiptAuditVisibility(visibility = null) {
+  if (!visibility || typeof visibility !== "object") {
+    return null;
+  }
+  const workspaces = Object.fromEntries(
+    Object.entries(visibility.workspaces || {})
+      .map(([key, item]) => [key, summarizeLaunchReceiptVisibilityWorkspace(item)])
+      .filter(([, item]) => item?.key)
+  );
+  const downloads = Object.fromEntries(
+    Object.entries(visibility.downloads || {})
+      .map(([key, item]) => [key, summarizeLaunchReceiptVisibilityDownload(item)])
+      .filter(([, item]) => item?.key)
+  );
+  const checkpoints = (Array.isArray(visibility.checkpoints) ? visibility.checkpoints : [])
+    .map((item) => {
+      const workspace = summarizeLaunchReceiptVisibilityWorkspace(item?.workspaceAction);
+      const download = summarizeLaunchReceiptVisibilityDownload(item?.recommendedDownload);
+      return {
+        key: item?.key || null,
+        label: item?.label || null,
+        summary: item?.summary || null,
+        workspaceKey: workspace?.key || null,
+        workspaceHref: workspace?.href || null,
+        downloadKey: download?.key || null,
+        downloadFormat: download?.format || null,
+        downloadFileName: download?.fileName || null,
+        downloadHref: download?.href || null
+      };
+    })
+    .filter((item) => item.key);
+  return {
+    status: visibility.status || null,
+    headline: visibility.headline || null,
+    recordedReceipt: visibility.recordedReceipt && typeof visibility.recordedReceipt === "object"
+      ? {
+          operation: visibility.recordedReceipt.operation || null,
+          operationLabel: visibility.recordedReceipt.operationLabel || null,
+          handoffFileName: visibility.recordedReceipt.handoffFileName || null,
+          productCode: visibility.recordedReceipt.productCode || null,
+          channel: visibility.recordedReceipt.channel || null
+        }
+      : null,
+    workspaceKeys: Object.values(workspaces).map((item) => item.key).filter(Boolean),
+    downloadKeys: Object.values(downloads).map((item) => item.key).filter(Boolean),
+    checkpointKeys: checkpoints.map((item) => item.key).filter(Boolean),
+    workspaces,
+    downloads,
+    checkpoints
+  };
+}
+
 function buildLaunchReceiptAuditMetadata(receipt = null) {
   if (!receipt || typeof receipt !== "object") {
     return null;
@@ -6318,16 +6396,7 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           }
         }
       : null,
-    visibility: visibility
-      ? {
-          status: visibility.status || null,
-          workspaceKeys: Object.values(visibility.workspaces || {}).map((item) => item?.key || null).filter(Boolean),
-          downloadKeys: Object.values(visibility.downloads || {}).map((item) => item?.key || null).filter(Boolean),
-          checkpointKeys: Array.isArray(visibility.checkpoints)
-            ? visibility.checkpoints.map((item) => item?.key || null).filter(Boolean)
-            : []
-        }
-      : null,
+    visibility: buildLaunchReceiptAuditVisibility(visibility),
     recapCardKeys: Array.isArray(receipt.mainlineRecapCards)
       ? receipt.mainlineRecapCards.map((item) => item?.key || item?.title || null).filter(Boolean)
       : []
@@ -17054,6 +17123,7 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         initialLaunchOperatorNextDownloadHref: receipt.initialLaunchOperator?.nextDownloadHref || null,
         initialLaunchOperatorWorkspaceKey: receipt.initialLaunchOperator?.workspaceKey || null,
         initialLaunchOperatorWorkspaceAutofocus: receipt.initialLaunchOperator?.workspaceAutofocus || null,
+        receiptVisibility: receipt.visibility || null,
         createdAt: item.createdAt || null
       };
     })

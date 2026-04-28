@@ -45,6 +45,15 @@ async function postJson(baseUrl, route, body, token = null) {
   return json.data;
 }
 
+async function getJson(baseUrl, route, token = null) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+  const json = await response.json();
+  assert.equal(response.ok, true, JSON.stringify(json));
+  return json.data;
+}
+
 test("developer launch mainline action receipt exposes visibility checkpoints for first-wave ops sweep", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -190,6 +199,45 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(actionResult.receipt?.handoffText || "", /Receipt Visibility:/);
     assert.match(actionResult.receipt?.handoffText || "", /developer-ops-launch-receipt-next-follow-up\.txt/i);
     assert.match(actionResult.receipt?.handoffText || "", /post-launch-handoff-index/i);
+
+    const opsExport = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=VISIBILITY_ALPHA&limit=20",
+      ownerSession.token
+    );
+    const latestReceipt = Array.isArray(opsExport.overview?.latestLaunchReceipts)
+      ? opsExport.overview.latestLaunchReceipts.find((item) => item?.operation === "record_post_launch_ops_sweep")
+      : null;
+    assert.equal(latestReceipt?.receiptVisibility?.status, "ready");
+    assert.deepEqual(latestReceipt?.receiptVisibility?.workspaceKeys, ["ops", "launch-mainline"]);
+    assert.deepEqual(
+      latestReceipt?.receiptVisibility?.downloadKeys,
+      [
+        "ops_summary",
+        "ops_launch_receipt_next_follow_up",
+        "launch_mainline_post_launch_sweep_handoff",
+        "launch_mainline_post_launch_handoff_index"
+      ]
+    );
+    assert.match(latestReceipt?.receiptVisibility?.downloads?.developerOpsSummary?.href || "", /format=summary/);
+    assert.match(latestReceipt?.receiptVisibility?.downloads?.launchReceiptNextFollowUp?.href || "", /format=launch-receipt-next-follow-up/);
+    assert.match(latestReceipt?.receiptVisibility?.downloads?.postLaunchSweepHandoff?.href || "", /format=post-launch-sweep-handoff/);
+    assert.match(latestReceipt?.receiptVisibility?.downloads?.postLaunchHandoffIndex?.href || "", /format=post-launch-handoff-index/);
+    assert.deepEqual(
+      Array.isArray(latestReceipt?.receiptVisibility?.checkpoints)
+        ? latestReceipt.receiptVisibility.checkpoints.map((item) => ({
+            key: item?.key || null,
+            workspaceKey: item?.workspaceKey || null,
+            downloadKey: item?.downloadKey || null
+          }))
+        : [],
+      [
+        { key: "developer_ops_summary", workspaceKey: "ops", downloadKey: "ops_summary" },
+        { key: "launch_receipt_next_follow_up", workspaceKey: "ops", downloadKey: "ops_launch_receipt_next_follow_up" },
+        { key: "post_launch_sweep_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_sweep_handoff" },
+        { key: "post_launch_handoff_index", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_handoff_index" }
+      ]
+    );
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

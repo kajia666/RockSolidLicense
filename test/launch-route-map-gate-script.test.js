@@ -30,6 +30,7 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     [
       "launch_mainline_action_visibility",
       "developer_ops_export_and_mainline_action",
+      "launch_download_surface_audit",
       "launch_smoke_script",
       "staging_rehearsal_script",
       "services_syntax_check",
@@ -50,4 +51,16 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     licenseFlowCommand.args[licenseFlowCommand.args.indexOf("--test-name-pattern") + 1],
     /developer launch mainline action can record a first-wave ops sweep/
   );
+
+  const downloadAuditCommand = output.commands.find(
+    (command) => command.key === "launch_download_surface_audit"
+  );
+  assert.ok(downloadAuditCommand);
+  assert.ok(downloadAuditCommand.args.includes("--test-name-pattern"));
+  const downloadPattern = downloadAuditCommand.args[downloadAuditCommand.args.indexOf("--test-name-pattern") + 1];
+  assert.match(downloadPattern, /developer release package export bundles integration/);
+  assert.match(downloadPattern, /developer first-wave recommendations summarize launch inventory/);
+  assert.match(downloadPattern, /developer integration package export is scoped/);
+  assert.match(downloadPattern, /developer operators can manage scoped authorization operations/);
+  assert.match(downloadPattern, /admin ops export bundles platform snapshots/);
 });

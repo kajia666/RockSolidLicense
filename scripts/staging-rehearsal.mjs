@@ -329,7 +329,7 @@ function buildLaunchRouteMapGateCommand() {
     dryRunCommand: "npm.cmd run launch:route-map-gate -- --dry-run --json",
     willModifyData: false,
     willRunFullSuite: false,
-    purpose: "Re-run the Launch Mainline / Launch Smoke / Developer Ops route-map visibility targeted gate before live-write staging smoke."
+    purpose: "Re-run the Launch Mainline / Launch Smoke / Developer Ops route-map visibility and low-frequency download surface targeted gate before live-write staging smoke."
   };
 }
 

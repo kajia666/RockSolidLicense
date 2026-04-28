@@ -15,6 +15,14 @@ const launchMainlinePattern = [
   "developer launch mainline action can record a first-wave ops sweep and refresh post-launch evidence"
 ].join("|");
 
+const launchDownloadSurfacePattern = [
+  "developer release package export bundles integration, versions, and notices inside scope",
+  "developer first-wave recommendations summarize launch inventory, card issuance, and ops actions",
+  "developer integration package export is scoped and includes cpp quickstart snippets",
+  "developer operators can manage scoped authorization operations for assigned projects",
+  "admin ops export bundles platform snapshots and filtered downloadable assets"
+].join("|");
+
 const commands = [
   {
     key: "launch_mainline_action_visibility",
@@ -39,6 +47,20 @@ const commands = [
       "--test-isolation=none",
       "--test-name-pattern",
       launchMainlinePattern,
+      "test/license-flow.test.js"
+    ]
+  },
+  {
+    key: "launch_download_surface_audit",
+    label: "Low-frequency launch download surface audit",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "--test-name-pattern",
+      launchDownloadSurfacePattern,
       "test/license-flow.test.js"
     ]
   },
@@ -111,7 +133,7 @@ function payload(status = "pass") {
     summary: {
       commandCount: commands.length,
       willRunFullSuite: false,
-      scope: "Launch Mainline / Launch Smoke / Developer Ops route-map visibility targeted gate"
+      scope: "Launch Mainline / Launch Smoke / Developer Ops route-map visibility plus launch download surface targeted gate"
     },
     commands: commands.map(publicCommand)
   };

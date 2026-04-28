@@ -29,7 +29,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - Latest backend/API slice: First-Wave Recommendations, Launch Review, and Launch Smoke Kit now pass the selected channel into their internal Developer Ops snapshots; stable and beta launch-duty views no longer silently fall back to the wrong lane when reading latest launch receipts. Post-launch lifecycle receipts and stabilization handoff confirmations now also preserve primary handoff download hrefs through Ops snapshots, Launch Mainline traceability, the post-launch handoff index, and the handoff route map; the route map now calls out the Ops handoff index, Launch Mainline JSON, summary, post-launch handoff index, post-launch lifecycle primary download, checksums, and zip package as critical routes for offline launch-duty review.
 - Latest Ops export slice: Developer Ops route-review primary, next, remaining, section, and continuation downloads now include service-generated `href` values directly in the snapshot payload; Ops export/download routes preserve non-default channel scope; route-review section downloads now return section-specific handoff files instead of falling back to the generic summary; Ops export zip/checksum packages now include the route-review handoff files for offline launch-duty review.
 - Latest verification slice: broader targeted launch-readiness batches now pass across release package export, release mainline follow-up, launch workflow blockers/restock, launch mainline first-launch and post-launch actions, first-wave recommendations, Developer Ops export, launch pages, the `launch:smoke` CLI preflight, account/card/session authorization flows, production gate/security checks, deployment assets, and runtime-state checks. The full `test\license-flow.test.js` pre-staging gate also passed on 2026-04-28 with 80/80 tests, followed by `node --check src\services.js` and `git diff --check`.
-- Latest staging rehearsal slice: the remote launch smoke command now has a `--require-https` gate, a dedicated `launch:smoke:staging` npm script, a no-write `staging:preflight` gate that validates HTTPS base URL, explicit product/channel, non-default smoke credentials, and a no-write `recovery:preflight` gate that validates backup/restore assets and commands for Linux/Windows SQLite or PostgreSQL preview recovery drills.
+- Latest staging rehearsal slice: the remote launch smoke command now has a `--require-https` gate, a dedicated `launch:smoke:staging` npm script, no-write `staging:preflight` and `recovery:preflight` gates, and a no-write `staging:rehearsal` runner that combines smoke command checks, backup/restore command checks, the scoped Launch Mainline URL, and the evidence recording order before any live-write smoke run begins.
 
 Estimated initial pilot-launch readiness: 89%-91%.
 
@@ -52,7 +52,7 @@ Work should continue in short backend/API-first slices. Each slice should end wi
    Broader targeted batches now pass across release package, launch workflow, launch mainline actions, first-wave recommendations, Developer Ops export, launch pages, the `launch:smoke` CLI preflight, account/card/session authorization, production gate/security checks, deployment assets, and runtime-state checks. The 2026-04-28 full `license-flow` gate passed with 80/80 tests plus static checks; the next verification step is staging rehearsal with real-like secrets, storage, HTTPS, and `launch:smoke --base-url`.
 
 5. Prepare staging launch rehearsal.
-   Use a real server-like environment, non-default secrets, HTTPS, persistent storage, backup/restore rehearsal, and one test software-author project. The command-line `launch:smoke` preflight can now run locally against an ephemeral in-memory app; `staging:preflight` checks the remote smoke command shape without writes; `recovery:preflight` checks the backup/restore rehearsal command shape without writes; and `launch:smoke:staging` runs the remote staging path with an HTTPS requirement plus explicit `--allow-live-writes`. Its `handoff` output now carries the scoped Launch Review route, Developer Ops route, first-wave downloads, Ops handoff index, and a four-step operator checklist.
+   Use a real server-like environment, non-default secrets, HTTPS, persistent storage, backup/restore rehearsal, and one test software-author project. The command-line `launch:smoke` preflight can now run locally against an ephemeral in-memory app; `staging:rehearsal` combines the remote smoke command gate and recovery rehearsal command gate without writes; and `launch:smoke:staging` runs the remote staging path with an HTTPS requirement plus explicit `--allow-live-writes`. Its `handoff` output now carries the scoped Launch Review route, Developer Ops route, first-wave downloads, Ops handoff index, and a four-step operator checklist.
 
 ## Overall Project Plan
 
@@ -214,8 +214,8 @@ Minimum remaining work before a controlled pilot:
 3. Run the full repository test suite once before staging rehearsal sign-off.
 4. Prepare staging environment with non-default secrets and public HTTPS.
 5. Run one complete staging rehearsal:
-   release package -> launch workflow -> bootstrap -> first batch setup -> launch review -> `staging:preflight` -> `launch:smoke:staging --base-url https://... --allow-live-writes` -> launch smoke workspace -> launch mainline -> developer ops -> post-launch sweep.
-6. Run `recovery:preflight`, then verify backup/restore and recovery drill on a separate restore target.
+   release package -> launch workflow -> bootstrap -> first batch setup -> launch review -> `staging:rehearsal` -> `launch:smoke:staging --base-url https://... --allow-live-writes` -> launch smoke workspace -> launch mainline -> developer ops -> post-launch sweep.
+6. Use the `staging:rehearsal` recovery commands to verify backup/restore and recovery drill on a separate restore target.
 7. Create first pilot software-author project and first batch of test cards/accounts.
 8. Prepare support and escalation notes for first users.
 
@@ -229,6 +229,7 @@ Current rhythm:
 - Latest staging smoke command check passed on 2026-04-28: `test\launch-smoke-script.test.js` covers the `--require-https` guard, the dedicated `launch:smoke:staging` script, local ephemeral smoke, and remote live-write smoke against a test API.
 - Latest staging command preflight check passed on 2026-04-28: `test\staging-preflight-script.test.js` covers the no-write HTTPS/product/credential gate and verifies the emitted next command does not print smoke passwords.
 - Latest recovery command preflight check passed on 2026-04-28: `test\recovery-preflight-script.test.js` covers unsupported target rejection, Linux PostgreSQL preview command generation, Windows SQLite command generation, and the no-write recovery-drill boundary.
+- Latest staging rehearsal runner check passed on 2026-04-28: `test\staging-rehearsal-script.test.js` covers the combined no-write smoke/recovery gates, live-write blocking on preflight failure, the redacted launch smoke command, Launch Mainline URL, and evidence order.
 - The next major verification step is staging rehearsal against a real-like environment, followed by the full repository test window before sign-off.
 - Run full test suite when either:
   - another 2-4 launch-mainline/backend API commits land, or

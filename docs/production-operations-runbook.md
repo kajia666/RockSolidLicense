@@ -189,32 +189,44 @@ For Redis in this topology, losing runtime state is usually survivable, but expe
 
 ## Manual backup commands
 
-Before a staging recovery drill, run the repository preflight from a checkout of this project. It does not back up, restore, or modify data; it only verifies that the selected OS/storage profile has the expected scripts and prints the next commands to run on the target:
+Before a staging recovery drill, run the repository rehearsal runner from a checkout of this project. It does not back up, restore, run smoke, or modify data; it verifies that the selected OS/storage profile has the expected scripts, combines the smoke and recovery gates, and prints the next commands to run on the target:
 
 Linux PostgreSQL preview example:
 
 ```powershell
-npm.cmd --silent run recovery:preflight -- --json `
+npm.cmd --silent run staging:rehearsal -- --json `
+  --base-url https://staging.example.com `
+  --product-code SMOKE_ALPHA `
+  --channel stable `
+  --admin-username admin@example.com `
+  --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD `
+  --developer-username launch.smoke.owner `
+  --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `
   --target-os linux `
   --storage-profile postgres-preview `
   --target-env-file /etc/rocksolidlicense/staging.env `
   --app-backup-dir /var/lib/rocksolid/backups `
-  --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
-  --base-url https://staging.example.com
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups
 ```
 
 Windows SQLite example:
 
 ```powershell
-npm.cmd --silent run recovery:preflight -- --json `
+npm.cmd --silent run staging:rehearsal -- --json `
+  --base-url https://staging.example.com `
+  --product-code SMOKE_ALPHA `
+  --channel stable `
+  --admin-username admin@example.com `
+  --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD `
+  --developer-username launch.smoke.owner `
+  --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `
   --target-os windows `
   --storage-profile sqlite `
   --target-env-file C:\RockSolidLicense\deploy\windows\rocksolid.env.ps1 `
-  --app-backup-dir C:\RockSolidLicense\backups `
-  --base-url https://staging.example.com
+  --app-backup-dir C:\RockSolidLicense\backups
 ```
 
-Use `--target-env-file` here rather than `--env-file`; `--env-file` is a Node runtime option in newer Node versions and can be intercepted before the script runs.
+Use `recovery:preflight` directly when you only need to inspect the backup/restore command gate. Use `--target-env-file` here rather than `--env-file`; `--env-file` is a Node runtime option in newer Node versions and can be intercepted before the script runs.
 
 Linux:
 

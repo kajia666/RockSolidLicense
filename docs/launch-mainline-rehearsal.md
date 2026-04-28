@@ -50,25 +50,17 @@ Before starting, fix one lane:
 - one intended public entrypoint
 - one intended storage/runtime topology
 
-For a staging API rehearsal, run the no-write command preflight before the live-write smoke step:
+For a staging API rehearsal, run the no-write rehearsal runner before the live-write smoke step:
 
 ```powershell
-npm.cmd --silent run staging:preflight -- --json `
+npm.cmd --silent run staging:rehearsal -- --json `
   --base-url https://staging.example.com `
+  --product-code SMOKE_ALPHA `
+  --channel stable `
   --admin-username admin@example.com `
   --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD `
   --developer-username launch.smoke.owner `
   --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `
-  --product-code SMOKE_ALPHA `
-  --channel stable
-```
-
-Do not continue to `launch:smoke:staging --allow-live-writes` until this preflight passes. Its output includes a redacted next command that keeps smoke passwords in environment variables.
-
-Before the backup/restore portion of the rehearsal, run the no-write recovery preflight for the selected OS and storage profile:
-
-```powershell
-npm.cmd --silent run recovery:preflight -- --json `
   --target-os linux `
   --storage-profile postgres-preview `
   --target-env-file /etc/rocksolidlicense/staging.env `
@@ -76,6 +68,8 @@ npm.cmd --silent run recovery:preflight -- --json `
   --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
   --base-url https://staging.example.com
 ```
+
+Do not continue to `launch:smoke:staging --allow-live-writes` until this runner passes. Its output includes the redacted live-write smoke command, the recovery rehearsal commands, the scoped Launch Mainline URL, and the evidence recording order. If you need to debug a single gate, run `staging:preflight` or `recovery:preflight` directly.
 
 Use `--storage-profile sqlite` when the main store is SQLite. The option is named `--target-env-file` instead of `--env-file` because modern Node versions reserve `--env-file` as a runtime flag before the script can parse it.
 
@@ -215,7 +209,7 @@ Use them for these purposes:
 Exit condition:
 
 - the lane has one consistent author-side handoff path from deployment through first-week stabilization
-- the recovery preflight has confirmed the expected backup, restore, healthcheck, and runbook assets for the selected target OS and storage profile
+- `staging:rehearsal` has confirmed the smoke command, recovery command, Launch Mainline URL, and evidence order before any live-write smoke run begins
 
 ## Phase 5: Evidence Recording Order
 

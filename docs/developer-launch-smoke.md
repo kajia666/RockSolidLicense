@@ -56,16 +56,22 @@ In local ephemeral mode these entries use routes only because the temporary app 
 Before running the remote write-path smoke against staging, run the no-write staging preflight first:
 
 ```powershell
-npm.cmd --silent run staging:preflight -- --json `
+npm.cmd --silent run staging:rehearsal -- --json `
   --base-url https://staging.example.com `
+  --product-code SMOKE_ALPHA `
+  --channel stable `
   --admin-username admin@example.com `
   --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD `
   --developer-username launch.smoke.owner `
   --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `
-  --product-code SMOKE_ALPHA
+  --target-os linux `
+  --storage-profile postgres-preview `
+  --target-env-file /etc/rocksolidlicense/staging.env `
+  --app-backup-dir /var/lib/rocksolid/backups `
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups
 ```
 
-The preflight checks that the staging base URL is HTTPS, the smoke credentials are present and non-default, and the product/channel are explicit. When it passes, the JSON output includes a redacted `nextCommand.powershell` value for the real `launch:smoke:staging` run, so passwords stay in environment variables instead of being printed into handoff notes.
+The rehearsal runner checks that the staging base URL is HTTPS, the smoke credentials are present and non-default, the product/channel are explicit, and the backup/restore rehearsal command shape is ready. When it passes, the JSON output includes a redacted `nextCommands.launchSmoke` value for the real `launch:smoke:staging` run, so passwords stay in environment variables instead of being printed into handoff notes. If you only need to debug the smoke command gate, run `staging:preflight` directly.
 
 To run the same write-path preflight against an already running staging API, use the staging wrapper. It adds `--require-https` so the rehearsal fails before writing if the base URL is accidentally pointed at plain HTTP:
 

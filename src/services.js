@@ -4320,6 +4320,36 @@ function formatLaunchProductionEvidenceLine(evidenceQueue = {}, label = "Product
   ].join(" | ");
 }
 
+function buildLaunchMainlineStagingResultBackfill({
+  productCode = "",
+  channel = "stable",
+  developerOpsWorkspace = null,
+  launchMainlineWorkspace = null
+} = {}) {
+  return {
+    status: "awaiting_staging_result_backfill",
+    willModifyData: false,
+    requiredResultKeys: [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review"
+    ],
+    destinations: {
+      developerOps: developerOpsWorkspace || null,
+      launchMainline: launchMainlineWorkspace || null
+    },
+    evidenceEndpoint: "/api/developer/launch-mainline/action",
+    receiptVisibilityDownloads: buildLaunchDutyReceiptVisibilitySummaryDownloads({
+      productCode,
+      channel
+    }),
+    operatorNote: "Do not paste passwords or bearer tokens into the staging result backfill; record pass/fail status, receipt IDs, artifact paths, and redacted handoff file names only."
+  };
+}
+
 function buildLaunchMainlineActionReceiptVisibility({
   operation = "",
   operationLabel = "",
@@ -4414,6 +4444,12 @@ function buildLaunchMainlineActionReceiptVisibility({
     "handoff-download-routes",
     mainlineRouteParams
   );
+  const stagingResultBackfill = buildLaunchMainlineStagingResultBackfill({
+    productCode: productCode || "",
+    channel,
+    developerOpsWorkspace,
+    launchMainlineWorkspace
+  });
   return {
     status: "ready",
     headline: `${operationLabel || operation || "Launch mainline action"} receipt is now visible in Developer Ops and Launch Mainline follow-up assets.`,
@@ -4435,6 +4471,7 @@ function buildLaunchMainlineActionReceiptVisibility({
       postLaunchHandoffIndex,
       handoffDownloadRoutes
     },
+    stagingResultBackfill,
     checkpoints: [
       {
         key: "developer_ops_summary",
@@ -4483,6 +4520,40 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
   const downloads = visibility.downloads && typeof visibility.downloads === "object"
     ? visibility.downloads
     : {};
+  const stagingBackfill = visibility.stagingResultBackfill && typeof visibility.stagingResultBackfill === "object"
+    ? visibility.stagingResultBackfill
+    : null;
+  const stagingBackfillDownloads = stagingBackfill?.receiptVisibilityDownloads && typeof stagingBackfill.receiptVisibilityDownloads === "object"
+    ? Object.values(stagingBackfill.receiptVisibilityDownloads).filter((item) => item?.key || item?.href)
+    : [];
+  const stagingBackfillCard = stagingBackfill
+    ? {
+        key: "receipt_visibility_staging_result_backfill",
+        title: "Staging Result Backfill",
+        summary: "Carry the staging rehearsal result keys into Launch Mainline and Developer Ops after the real staging run.",
+        tags: [
+          stagingBackfill.status ? { label: "status", value: String(stagingBackfill.status).toUpperCase(), strong: true } : null,
+          { label: "writes", value: stagingBackfill.willModifyData ? "YES" : "NO", strong: stagingBackfill.willModifyData === true },
+          Array.isArray(stagingBackfill.requiredResultKeys)
+            ? { label: "resultKeys", value: stagingBackfill.requiredResultKeys.length, strong: true }
+            : null
+        ].filter(Boolean),
+        details: [
+          Array.isArray(stagingBackfill.requiredResultKeys)
+            ? `Required keys: ${stagingBackfill.requiredResultKeys.join(", ")}`
+            : "",
+          stagingBackfill.destinations?.developerOps?.href ? `Developer Ops: ${stagingBackfill.destinations.developerOps.href}` : "",
+          stagingBackfill.destinations?.launchMainline?.href ? `Launch Mainline: ${stagingBackfill.destinations.launchMainline.href}` : "",
+          stagingBackfill.evidenceEndpoint ? `Evidence endpoint: ${stagingBackfill.evidenceEndpoint}` : "",
+          stagingBackfill.operatorNote ? `Operator note: ${stagingBackfill.operatorNote}` : ""
+        ].filter(Boolean),
+        controls: stagingBackfillDownloads.map((download) => ({
+          kind: "download",
+          label: download.label || download.key || "Download receipt visibility summary",
+          recommendedDownload: download
+        }))
+      }
+    : null;
   const checkpointCards = (Array.isArray(visibility.checkpoints) ? visibility.checkpoints : [])
     .map((item) => {
       const download = item?.recommendedDownload || null;
@@ -4532,8 +4603,9 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
           workspaceAction: item
         }))
       },
+      stagingBackfillCard,
       ...checkpointCards
-    ]
+    ].filter(Boolean)
   };
 }
 
@@ -4678,6 +4750,25 @@ function buildLaunchMainlineActionReceiptHandoffText({
         + `${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"} | href=${item.workspaceAction.href || "-"}` : ""}`
         + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload, { fileSeparator: " | " })}` : ""}`
       );
+    }
+    const stagingBackfill = visibility.stagingResultBackfill && typeof visibility.stagingResultBackfill === "object"
+      ? visibility.stagingResultBackfill
+      : null;
+    if (stagingBackfill) {
+      const stagingBackfillDownloads = Object.values(stagingBackfill.receiptVisibilityDownloads || {})
+        .filter((item) => item?.key || item?.href);
+      lines.push("");
+      lines.push("Staging Result Backfill:");
+      lines.push(`- status: ${stagingBackfill.status || "-"}`);
+      lines.push(`- writesData: ${stagingBackfill.willModifyData ? "yes" : "no"}`);
+      lines.push(`- requiredResultKeys: ${(stagingBackfill.requiredResultKeys || []).join(", ") || "-"}`);
+      lines.push(`- developerOps: ${stagingBackfill.destinations?.developerOps?.href || "-"}`);
+      lines.push(`- launchMainline: ${stagingBackfill.destinations?.launchMainline?.href || "-"}`);
+      lines.push(`- evidenceEndpoint: ${stagingBackfill.evidenceEndpoint || "-"}`);
+      for (const item of stagingBackfillDownloads) {
+        lines.push(`- receiptVisibilityDownload: ${formatLaunchHandoffDownloadText(item, { fileSeparator: " | " })}`);
+      }
+      lines.push(`- operatorNote: ${stagingBackfill.operatorNote || "-"}`);
     }
   }
 
@@ -6231,6 +6322,34 @@ function summarizeLaunchReceiptVisibilityDownload(item = null) {
   };
 }
 
+function summarizeLaunchReceiptStagingResultBackfill(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const destinations = Object.fromEntries(
+    Object.entries(item.destinations || {})
+      .map(([key, value]) => [key, summarizeLaunchReceiptVisibilityWorkspace(value)])
+      .filter(([, value]) => value?.key || value?.href)
+  );
+  const receiptVisibilityDownloads = Object.fromEntries(
+    Object.entries(item.receiptVisibilityDownloads || {})
+      .map(([key, value]) => [key, summarizeLaunchReceiptVisibilityDownload(value)])
+      .filter(([, value]) => value?.key || value?.href)
+  );
+  return {
+    status: item.status || null,
+    willModifyData: item.willModifyData === true,
+    requiredResultKeys: Array.isArray(item.requiredResultKeys)
+      ? item.requiredResultKeys.filter(Boolean)
+      : [],
+    destinationKeys: Object.values(destinations).map((value) => value.key).filter(Boolean),
+    destinations,
+    evidenceEndpoint: item.evidenceEndpoint || null,
+    receiptVisibilityDownloads,
+    operatorNote: item.operatorNote || null
+  };
+}
+
 function buildLaunchReceiptAuditVisibility(visibility = null) {
   if (!visibility || typeof visibility !== "object") {
     return null;
@@ -6279,7 +6398,8 @@ function buildLaunchReceiptAuditVisibility(visibility = null) {
     checkpointKeys: checkpoints.map((item) => item.key).filter(Boolean),
     workspaces,
     downloads,
-    checkpoints
+    checkpoints,
+    stagingResultBackfill: summarizeLaunchReceiptStagingResultBackfill(visibility.stagingResultBackfill)
   };
 }
 
@@ -20529,6 +20649,31 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
       + ` | format=${item.downloadFormat || "-"}`
       + ` | href=${item.downloadHref || "-"}`
     );
+  }
+  const stagingBackfill = visibility.stagingResultBackfill && typeof visibility.stagingResultBackfill === "object"
+    ? visibility.stagingResultBackfill
+    : null;
+  if (stagingBackfill) {
+    const destinations = Object.values(stagingBackfill.destinations || {}).filter((item) => item?.key || item?.href);
+    const receiptVisibilityDownloads = Object.values(stagingBackfill.receiptVisibilityDownloads || {}).filter((item) => item?.key || item?.href);
+    lines.push("Staging Result Backfill:");
+    lines.push(
+      `- status=${stagingBackfill.status || "-"}`
+      + ` | writesData=${stagingBackfill.willModifyData ? "yes" : "no"}`
+      + ` | requiredKeys=${(stagingBackfill.requiredResultKeys || []).join(",") || "-"}`
+    );
+    for (const item of destinations) {
+      lines.push(`- destination=${item.label || item.key || "-"}@${item.autofocus || "-"} | href=${item.href || "-"}`);
+    }
+    lines.push(`- evidenceEndpoint=${stagingBackfill.evidenceEndpoint || "-"}`);
+    for (const item of receiptVisibilityDownloads) {
+      lines.push(
+        `- receiptVisibilityDownload=${item.fileName || item.key || "-"}`
+        + ` | format=${item.format || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+    lines.push(`- operatorNote=${stagingBackfill.operatorNote || "-"}`);
   }
 }
 

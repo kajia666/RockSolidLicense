@@ -626,6 +626,29 @@ function buildCloseoutBackfillGuide(result) {
   };
 }
 
+function buildFullTestWindowReadiness(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const closeoutInput = result.closeoutInput || null;
+  const command = closeout.fullTestWindowEntry?.command || "npm.cmd test";
+  const missingCloseoutKeys = closeoutInput?.missingKeys
+    || (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
+  const canRun = closeoutInput?.readyForFullTestWindow === true;
+  return {
+    status: canRun ? "ready" : "blocked",
+    canRun,
+    command,
+    willRunFullSuite: closeout.fullTestWindowEntry?.willRunFullSuite !== false,
+    willModifyData: false,
+    requiredDecision: closeout.fullTestWindowEntry?.triggerDecision || "ready-for-full-test-window",
+    closeoutInputStatus: closeoutInput?.status || "missing",
+    missingCloseoutKeys,
+    reloadCommand: result.closeoutBackfillGuide?.closeoutInputReload?.command || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+    nextAction: canRun
+      ? `Run ${command} in the reserved full test window, then backfill productionSignoff.`
+      : `Backfill closeout input and reload it before running ${command}.`
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -1268,9 +1291,13 @@ function buildResult(options) {
     ...resultWithCloseoutInput,
     closeoutBackfillGuide: gatesPassed ? buildCloseoutBackfillGuide(resultWithCloseoutInput) : null
   };
-  return {
+  const resultWithFullTestWindowReadiness = {
     ...resultWithCloseoutBackfillGuide,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithCloseoutBackfillGuide) : null
+    fullTestWindowReadiness: gatesPassed ? buildFullTestWindowReadiness(resultWithCloseoutBackfillGuide) : null
+  };
+  return {
+    ...resultWithFullTestWindowReadiness,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithFullTestWindowReadiness) : null
   };
 }
 
@@ -1598,6 +1625,24 @@ function renderFullTestWindowEntry(entry) {
   return lines.join("\n");
 }
 
+function renderFullTestWindowReadiness(readiness) {
+  if (!readiness) {
+    return "- Not available";
+  }
+  return [
+    `- Status: ${readiness.status || "-"}`,
+    `- Can run: ${readiness.canRun ? "yes" : "no"}`,
+    `- Command: \`${readiness.command || "-"}\``,
+    `- Runs full suite: ${readiness.willRunFullSuite ? "yes" : "no"}`,
+    `- Writes data: ${readiness.willModifyData ? "yes" : "no"}`,
+    `- Required decision: ${readiness.requiredDecision || "-"}`,
+    `- Closeout input status: ${readiness.closeoutInputStatus || "-"}`,
+    `- Missing closeout keys: ${(readiness.missingCloseoutKeys || []).join(", ") || "-"}`,
+    `- Reload command: \`${readiness.reloadCommand || "-"}\``,
+    `- Next action: ${readiness.nextAction || "-"}`
+  ].join("\n");
+}
+
 function renderProductionSignoffConditions(signoff) {
   if (!signoff) {
     return "- Not available";
@@ -1689,6 +1734,10 @@ function renderHandoffFile(result) {
     "",
     renderFullTestWindowEntry(result.stagingAcceptanceCloseout?.fullTestWindowEntry),
     "",
+    "## Full Test Window Readiness",
+    "",
+    renderFullTestWindowReadiness(result.fullTestWindowReadiness),
+    "",
     "## Production Sign-Off Conditions",
     "",
     renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
@@ -1759,6 +1808,7 @@ function buildCloseoutTemplate(result) {
     receiptVisibility: buildReceiptVisibilityTemplate(),
     productionSignoff: buildProductionSignoffInputTemplate(closeout.productionSignoffConditions || {}),
     closeoutBackfillGuide: result.closeoutBackfillGuide || buildCloseoutBackfillGuide(result),
+    fullTestWindowReadiness: result.fullTestWindowReadiness || buildFullTestWindowReadiness(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

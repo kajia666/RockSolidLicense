@@ -17701,6 +17701,19 @@ function buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsInitialLaunchReadinessDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_initial_launch_readiness",
+    "developer-ops-initial-launch-readiness.txt",
+    "Developer Ops initial launch readiness",
+    {
+      source: "developer-ops",
+      format: "initial-launch-ops-readiness",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
@@ -17772,6 +17785,97 @@ function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = n
   lines.push(`  - closeoutReload: ${archive.commands?.closeoutReload || "-"}`);
   lines.push(`  - fullTestWindow: ${archive.commands?.fullTestWindow || "-"}`);
   lines.push(`- Next Action: ${archive.nextAction || "-"}`);
+}
+
+function buildDeveloperOpsLaunchDutyActionOrder({
+  status = "unknown",
+  stagingLaunchDutyArchive = null,
+  stagingLaunchDutyArchiveDownload = null,
+  initialLaunchReadinessDownload = null,
+  launchReceiptNextFollowUp = null,
+  primaryDownload = null,
+  primaryWorkspaceAction = null
+} = {}) {
+  const normalizedStatus = String(status || "unknown").trim().toLowerCase() || "unknown";
+  const nextFollowUpStatus = launchReceiptNextFollowUp
+    ? normalizeLaunchReceiptFollowUpPriority(launchReceiptNextFollowUp.priority || normalizedStatus || "review")
+    : normalizedStatus;
+  const copyDownload = (download = null) => {
+    if (!download || typeof download !== "object") {
+      return null;
+    }
+    return {
+      key: download.key || null,
+      label: download.label || download.title || download.key || null,
+      fileName: download.fileName || null,
+      format: download.format || null,
+      href: download.href || null,
+      source: download.source || null
+    };
+  };
+  const steps = [
+    {
+      stepNumber: 1,
+      key: "staging_archive",
+      label: "Download Staging Archive",
+      status: stagingLaunchDutyArchive?.status || "awaiting_staging_archive_index",
+      summary: "Pull the staging archive bridge before the real rehearsal so packet paths and full-test-window commands are visible.",
+      download: copyDownload(stagingLaunchDutyArchiveDownload)
+    },
+    {
+      stepNumber: 2,
+      key: "launch_readiness",
+      label: "Review Launch Readiness",
+      status: normalizedStatus,
+      summary: "Review the current initial-launch gate, blockers, required actions, and handoff files from Developer Ops.",
+      download: copyDownload(initialLaunchReadinessDownload)
+    },
+    {
+      stepNumber: 3,
+      key: "next_follow_up",
+      label: "Record Next Follow-up",
+      status: nextFollowUpStatus,
+      summary: "Open the next Launch Mainline follow-up or keep the next-follow-up handoff attached for the operator.",
+      workspaceAction: primaryWorkspaceAction || null,
+      download: copyDownload(launchReceiptNextFollowUp?.recommendedDownload || primaryDownload)
+    }
+  ];
+  return {
+    mode: "developer-ops-launch-duty-action-order",
+    status: normalizedStatus,
+    operatorSummary: "Staging archive -> Launch readiness -> Next follow-up",
+    primaryStepKey: steps[0].key,
+    finalStepKey: steps[steps.length - 1].key,
+    stepCount: steps.length,
+    downloadCount: steps.filter((item) => item.download?.href).length,
+    steps
+  };
+}
+
+function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = null) {
+  if (!Array.isArray(lines) || !actionOrder || typeof actionOrder !== "object") {
+    return;
+  }
+  const steps = Array.isArray(actionOrder.steps) ? actionOrder.steps : [];
+  lines.push("Launch Duty Action Order:");
+  lines.push(`- Summary: ${actionOrder.operatorSummary || "-"}`);
+  lines.push(`- Status: ${actionOrder.status || "-"}`);
+  lines.push("- Steps:");
+  if (!steps.length) {
+    lines.push("  - none");
+    return;
+  }
+  for (const item of steps) {
+    const download = item.download || {};
+    lines.push(
+      `  - ${item.stepNumber || "-"}. ${item.label || item.key || "-"}`
+      + ` | key=${item.key || "-"}`
+      + ` | status=${item.status || "-"}`
+      + ` | file=${download.fileName || "-"}`
+      + ` | format=${download.format || "-"}`
+      + ` | href=${download.href || "-"}`
+    );
+  }
 }
 
 function buildDeveloperOpsInitialLaunchOpsGate({
@@ -18345,6 +18449,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
   const stagingLaunchDutyArchiveDownload = buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope);
+  const initialLaunchReadinessDownload = buildDeveloperOpsInitialLaunchReadinessDownload(scope);
   const stagingLaunchDutyArchive = buildDeveloperOpsStagingLaunchDutyArchive(scope);
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
   const stabilizationHandoffDownload = mainlineHandoff?.downloads?.stabilizationHandoff || null;
@@ -18382,6 +18487,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     firstLaunchHandoffDownload,
     launchMainlineHandoffRoutesDownload,
     stagingLaunchDutyArchiveDownload,
+    initialLaunchReadinessDownload,
     mainlineHandoff?.downloads?.checksums,
     mainlineHandoff?.downloads?.zip
   ]) {
@@ -18487,6 +18593,15 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     goNoGo,
     stabilizationHandoffConfirmation
   });
+  const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
+    status,
+    stagingLaunchDutyArchive,
+    stagingLaunchDutyArchiveDownload,
+    initialLaunchReadinessDownload,
+    launchReceiptNextFollowUp,
+    primaryDownload,
+    primaryWorkspaceAction
+  });
   return {
     status,
     headline: !latestReceipt
@@ -18541,6 +18656,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     firstLaunchHandoffDownload,
     stagingLaunchDutyArchive,
     stagingLaunchDutyArchiveDownload,
+    initialLaunchReadinessDownload,
+    launchDutyActionOrder,
     gate,
     goNoGo,
     contract,
@@ -20874,6 +20991,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     lines.push(`- workspace: ${initialLaunchOpsReadiness.primaryWorkspaceAction?.label || "-"}@${initialLaunchOpsReadiness.primaryWorkspaceAction?.autofocus || "-"}`);
     lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"}) | href=${initialLaunchOpsReadiness.primaryDownload?.href || "-"}`);
     lines.push(`- firstLaunchHandoff: ${initialLaunchOpsReadiness.firstLaunchHandoffDownload?.fileName || "-"}`);
+    if (initialLaunchOpsReadiness.launchDutyActionOrder) {
+      lines.push("");
+      appendDeveloperOpsLaunchDutyActionOrderLines(lines, initialLaunchOpsReadiness.launchDutyActionOrder);
+    }
     const goNoGo = initialLaunchOpsReadiness.goNoGo || null;
     if (goNoGo) {
       lines.push("");
@@ -21257,6 +21378,10 @@ function buildDeveloperOpsStagingLaunchDutyArchiveText(payload = {}) {
     ""
   ];
   appendDeveloperOpsStagingLaunchDutyArchiveLines(lines, archive);
+  if (readiness.launchDutyActionOrder) {
+    lines.push("");
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, readiness.launchDutyActionOrder);
+  }
   lines.push("");
   lines.push("Operator Order:");
   lines.push("- Generate this bridge from Developer Ops before the real staging rehearsal.");
@@ -21300,6 +21425,10 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     `First Launch Handoff: ${readiness.firstLaunchHandoffDownload?.fileName || "-"} | href=${readiness.firstLaunchHandoffDownload?.href || "-"}`,
     ""
   ];
+  if (readiness.launchDutyActionOrder) {
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, readiness.launchDutyActionOrder);
+    lines.push("");
+  }
   if (readiness.stagingLaunchDutyArchive) {
     appendDeveloperOpsStagingLaunchDutyArchiveLines(lines, readiness.stagingLaunchDutyArchive);
     lines.push("");
@@ -21610,6 +21739,11 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Primary Download: ${readiness.primaryDownload?.fileName || "-"} | format=${readiness.primaryDownload?.format || "-"} | href=${readiness.primaryDownload?.href || "-"}`,
     ""
   ];
+
+  if (readiness.launchDutyActionOrder) {
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, readiness.launchDutyActionOrder);
+    lines.push("");
+  }
 
   lines.push("Follow-up Queue:");
   if (followUpQueue.length) {

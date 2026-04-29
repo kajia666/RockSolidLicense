@@ -2838,6 +2838,26 @@
         throw { code: "UNSUPPORTED_STAGING_ARCHIVE", message: `Unsupported staging launch-duty archive action: ${normalizedAction || "-"}` };
       }
 
+      async function handleLaunchDutyActionOrderAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        if (normalizedAction === "download-step") {
+          const href = String(data.launchDutyDownloadHref || "").trim();
+          if (!href) {
+            throw { code: "MISSING_DOWNLOAD", message: "No launch duty action-order download is available for this step." };
+          }
+          const result = await downloadApiFile(
+            href,
+            data.launchDutyDownloadFileName || "developer-ops-launch-duty-step.txt",
+            data.launchDutyDownloadLabel || "Launch duty action-order step"
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Launch duty step downloaded: ${result.fileName}`);
+          return;
+        }
+        throw { code: "UNSUPPORTED_LAUNCH_DUTY_ORDER", message: `Unsupported launch duty action-order action: ${normalizedAction || "-"}` };
+      }
+
       async function handleStabilizationHandoffAction(action = "", data = {}) {
         const normalizedAction = String(action || "").trim().toLowerCase();
         const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
@@ -4347,6 +4367,50 @@
         `;
       }
 
+      function renderLaunchDutyActionOrder(initialLaunchOpsReadiness = {}) {
+        const item = initialLaunchOpsReadiness?.launchDutyActionOrder;
+        const steps = Array.isArray(item?.steps) ? item.steps : [];
+        if (!item || typeof item !== "object" || !steps.length) {
+          return "";
+        }
+        const status = String(item.status || "unknown").toLowerCase();
+        const stepMarkup = steps.map((step) => {
+          const download = step.download || {};
+          const href = String(download.href || "").trim();
+          const fileName = download.fileName || "developer-ops-launch-duty-step.txt";
+          const attrs = [
+            `data-launch-duty-action-order-action="download-step"`,
+            `data-launch-duty-step-key="${esc(step.key || "")}"`,
+            href ? `data-launch-duty-download-href="${esc(href)}"` : "",
+            `data-launch-duty-download-file-name="${esc(fileName)}"`,
+            `data-launch-duty-download-label="${esc(download.label || step.label || "Launch duty action-order step")}"`
+          ].filter(Boolean).join(" ");
+          return `
+            <div class="snapshot-focus-item">
+              <div class="snapshot-focus-head">
+                <strong>${esc(step.stepNumber || "-")}. ${esc(step.label || step.key || "-")}</strong>
+                <span class="tag ${String(step.status || "").toLowerCase() === "ready" ? "ok" : "warning"}">${esc(String(step.status || "unknown").toUpperCase())}</span>
+              </div>
+              <div class="snapshot-focus-meta">${esc(step.summary || "-")}</div>
+              <div class="snapshot-focus-meta">${esc(fileName)} | ${esc(download.format || "-")}</div>
+              <div class="snapshot-recap-actions">
+                <button type="button" class="snapshot-inline-button" ${attrs} ${(token && href) ? "" : "disabled"}>Download Step</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+        return `
+          <div class="snapshot-recap launch-duty-action-order">
+            <div class="snapshot-recap-head">
+              <strong>Launch Duty Action Order</strong>
+              <span class="tag ${status === "ready" ? "ok" : "warning"}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(item.operatorSummary || "Staging archive -> Launch readiness -> Next follow-up")}</div>
+            <div class="snapshot-focus-list">${stepMarkup}</div>
+          </div>
+        `;
+      }
+
       function renderStabilizationHandoff(initialLaunchOpsReadiness = {}) {
         const item = initialLaunchOpsReadiness?.stabilizationHandoff;
         if (!item || typeof item !== "object") {
@@ -4910,6 +4974,7 @@
           ${renderLastStabilizationHandoffResult()}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
+          ${renderLaunchDutyActionOrder(initialLaunchOpsReadiness)}
           ${renderStagingLaunchDutyArchive(initialLaunchOpsReadiness)}
           ${renderStabilizationHandoff(initialLaunchOpsReadiness)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
@@ -5055,6 +5120,14 @@
         bindRows("#snapshot-overview [data-launch-receipt-next-follow-up-action]", async (data) => {
           try {
             await handleLaunchReceiptNextFollowUpAction(data.launchReceiptNextFollowUpAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-launch-duty-action-order-action]", async (data) => {
+          try {
+            await handleLaunchDutyActionOrderAction(data.launchDutyActionOrderAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });

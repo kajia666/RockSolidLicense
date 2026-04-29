@@ -13834,6 +13834,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--channel stable/);
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--launch-duty-archive-index-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.equal(stagingLaunchDutyArchive.commands.fullTestWindow, "npm.cmd test");
+    const launchDutyActionOrder = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.launchDutyActionOrder;
+    assert.ok(launchDutyActionOrder);
+    assert.equal(launchDutyActionOrder.mode, "developer-ops-launch-duty-action-order");
+    assert.equal(launchDutyActionOrder.status, "review");
+    assert.match(launchDutyActionOrder.operatorSummary, /Staging archive -> Launch readiness -> Next follow-up/);
+    assert.deepEqual(
+      launchDutyActionOrder.steps.map((item) => [item.key, item.status, item.download?.key]),
+      [
+        ["staging_archive", "awaiting_staging_archive_index", "ops_staging_launch_duty_archive"],
+        ["launch_readiness", "review", "ops_initial_launch_readiness"],
+        ["next_follow_up", "review", "ops_launch_receipt_next_follow_up"]
+      ]
+    );
+    assert.match(launchDutyActionOrder.steps[0].download.href, /format=staging-launch-duty-archive/);
+    assert.match(launchDutyActionOrder.steps[1].download.href, /format=initial-launch-ops-readiness/);
+    assert.match(launchDutyActionOrder.steps[2].download.href, /format=launch-receipt-next-follow-up/);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
@@ -14056,6 +14072,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /Staging Launch-Duty Archive:/);
     assert.match(launchReceiptSnapshot.summaryText, /archiveRoot=artifacts\/staging\/EXPORT_ALPHA\/stable/);
     assert.match(launchReceiptSnapshot.summaryText, /launchDutyArchiveIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(launchReceiptSnapshot.summaryText, /Launch Duty Action Order:/);
+    assert.match(launchReceiptSnapshot.summaryText, /Staging archive -> Launch readiness -> Next follow-up/);
+    assert.match(launchReceiptSnapshot.summaryText, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
+    assert.match(launchReceiptSnapshot.summaryText, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
+    assert.match(launchReceiptSnapshot.summaryText, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
     assert.match(
       launchReceiptSnapshot.summaryText,
       new RegExp(
@@ -14234,6 +14255,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(initialLaunchOpsReadinessDownload.body, /profileDrivenDryRun: npm\.cmd run staging:rehearsal/);
     assert.match(initialLaunchOpsReadinessDownload.body, /--launch-duty-archive-index-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Launch Duty Action Order:/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
 
     const stagingLaunchDutyArchiveDownload = await getText(
       baseUrl,
@@ -14249,6 +14274,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(stagingLaunchDutyArchiveDownload.body, /readiness_review_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-readiness-review-packet\.json/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /profileDrivenDryRun: npm\.cmd run staging:rehearsal/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /fullTestWindow: npm\.cmd test/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Duty Action Order:/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Staging archive -> Launch readiness -> Next follow-up/);
 
     const stabilizationHandoffDownload = await getText(
       baseUrl,
@@ -18310,6 +18337,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /download-export-stabilization-handoff-btn/);
     assert.match(html, /download-export-follow-ups-btn/);
     assert.match(html, /initial-launch-ops-readiness/);
+    assert.match(html, /Launch Duty Action Order/);
+    assert.match(html, /launch-duty-action-order/);
+    assert.match(html, /renderLaunchDutyActionOrder/);
+    assert.match(html, /data-launch-duty-action-order-action="download-step"/);
+    assert.match(html, /data-launch-duty-step-key/);
     assert.match(html, /staging-launch-duty-archive/);
     assert.match(html, /renderStagingLaunchDutyArchive/);
     assert.match(html, /data-staging-launch-duty-archive-action="download-archive"/);

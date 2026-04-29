@@ -13759,6 +13759,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptLifecycleFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.match(launchReceiptLifecycleFollowUp.summary, /Post-launch lifecycle status/i);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptFollowUps, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
+    assert.ok(launchReceiptSnapshot.summary.launchReceiptAuditBackfill >= 1);
+    assert.equal(
+      launchReceiptSnapshot.summary.launchReceiptAuditBackfill,
+      launchReceiptSnapshot.auditLogs.filters.launchReceiptBackfill
+    );
     const expectedLaunchReceiptPrioritySummary = launchReceiptSnapshot.overview.launchReceiptFollowUps.reduce((counts, item) => {
       const priority = ["primary", "review", "secondary"].includes(item.priority) ? item.priority : "other";
       counts[priority] += 1;
@@ -14605,6 +14610,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.operation,
       "record_post_launch_ops_sweep"
+    );
+    assert.ok(launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfill >= 1);
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfill,
+      launchMainlineTraceability.opsSnapshot.summary.launchReceiptAuditBackfill
     );
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.handoffFileName,

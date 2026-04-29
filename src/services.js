@@ -16495,6 +16495,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
   const mainlineSummary = payload.mainlineSummary || {};
   const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
+  const launchReceiptAuditBackfill = Number(
+    opsSnapshot.summary?.launchReceiptAuditBackfill
+    ?? opsSnapshot.auditLogs?.filters?.launchReceiptBackfill
+    ?? 0
+  );
   const latestLaunchReceipt = Array.isArray(opsSnapshot.overview?.latestLaunchReceipts) && opsSnapshot.overview.latestLaunchReceipts.length
     ? opsSnapshot.overview.latestLaunchReceipts[0]
     : null;
@@ -16514,6 +16519,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       || null
   );
   return {
+    launchReceiptAuditBackfill,
     latestLaunchReceipt: latestLaunchReceipt
       ? {
           auditLogId: latestLaunchReceipt.auditLogId || null,
@@ -21953,6 +21959,7 @@ function buildDeveloperOpsSnapshotPayload({
     && initialLaunchOpsReadiness.followUpQueue.length
     ? initialLaunchOpsReadiness.followUpQueue
     : launchReceiptFollowUps;
+  const launchReceiptAuditBackfill = Number(auditLogs.filters?.launchReceiptBackfill || 0);
 
   const payload = {
     generatedAt,
@@ -21969,6 +21976,7 @@ function buildDeveloperOpsSnapshotPayload({
       bindings: normalizedBindings.length,
       blocks: normalizedBlocks.length,
       auditLogs: normalizedAuditLogs.length,
+      launchReceiptAuditBackfill,
       launchReceiptFollowUps: launchReceiptFollowUps.length,
       launchReceiptFollowUpPriorities,
       launchReceiptNextFollowUp,

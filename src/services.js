@@ -15265,6 +15265,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const project = manifest.project || {};
   const traceability = payload.postLaunchHandoffTraceability || {};
   const opsFiles = traceability.opsFiles || {};
+  const launchReceiptAuditBackfill = Number(traceability.launchReceiptAuditBackfill || 0);
+  const launchReceiptAuditBackfillStatus = traceability.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const launchDutyActionOrder = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const nextFollowUp = traceability.nextFollowUp || {};
   const nextFollowUpDownload = nextFollowUp.recommendedDownload && typeof nextFollowUp.recommendedDownload === "object"
@@ -15363,6 +15366,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     `Project Code: ${project.code || payload.filters?.productCode || "-"}`,
     `Project Name: ${project.name || "-"}`,
     `Channel: ${manifest.channel || payload.filters?.channel || "stable"}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     ""
   ];
   if (launchDutyActionOrder) {

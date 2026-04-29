@@ -14484,6 +14484,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineHandoffRoutesDownload.body, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
 
     const launchMainlinePostLaunchIndexDownload = await getText(
       baseUrl,

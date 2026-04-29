@@ -897,6 +897,39 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingProfileOperatorPreflight.commands.stagingDryRun, output.stagingEnvironmentBinding.dryRunCommand);
     assert.equal(output.stagingProfileOperatorPreflight.commands.routeMapGate, "npm.cmd run launch:route-map-gate");
     assert.equal(output.stagingProfileOperatorPreflight.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(output.stagingRehearsalExecutionSummary.mode, "staging-rehearsal-execution-summary");
+    assert.equal(output.stagingRehearsalExecutionSummary.status, "blocked_until_secret_env");
+    assert.deepEqual(output.stagingRehearsalExecutionSummary.sourceStatuses, {
+      profilePreflight: "blocked_until_secret_env",
+      executionRunbook: "ready_for_real_staging_dry_run",
+      closeoutReview: "not_loaded",
+      readinessTransition: "blocked_until_closeout_reload",
+      finalPacket: "ready_for_operator_rehearsal"
+    });
+    assert.deepEqual(output.stagingRehearsalExecutionSummary.operatorFocus.missingSecretEnv, ["RSL_DEVELOPER_BEARER_TOKEN"]);
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.closeoutMissingFieldCount, 7);
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canRunDryRun, true);
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canRunLiveWriteSmoke, true);
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canRecordEvidence, false);
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.blockingReasons.map((item) => [item.key, item.status]),
+      [
+        ["missing_secret_env", "blocked"],
+        ["closeout_input", "not_loaded"],
+        ["readiness_transition", "blocked_until_closeout_reload"]
+      ]
+    );
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.orderedNextActions.slice(0, 4),
+      [
+        "set_missing_secret_env",
+        "prepare_secret_env",
+        "generate_rehearsal_outputs",
+        "run_route_map_gate"
+      ]
+    );
+    assert.equal(output.stagingRehearsalExecutionSummary.commands.stagingDryRun, output.stagingEnvironmentBinding.dryRunCommand);
+    assert.equal(output.stagingRehearsalExecutionSummary.commands.closeoutReload, output.stagingProfileOperatorPreflight.commands.closeoutReload);
     assert.equal(output.stagingProfileLaunchPlan.backfillManifest.status, "awaiting_profile_driven_results");
     assert.equal(output.stagingProfileLaunchPlan.backfillManifest.archiveRoot, "artifacts/staging/PROFILE_PRODUCT/stable");
     assert.equal(output.stagingProfileLaunchPlan.backfillManifest.closeoutInputPath, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
@@ -938,6 +971,9 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Missing secret env: RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(handoff, /Can run dry run: yes/);
     assert.match(handoff, /Can record evidence: no/);
+    assert.match(handoff, /## Staging Rehearsal Execution Summary/);
+    assert.match(handoff, /Execution summary status: blocked_until_secret_env/);
+    assert.match(handoff, /Closeout review: not_loaded \(missing=7\)/);
     assert.match(handoff, /Backfill manifest: awaiting_profile_driven_results/);
     assert.match(handoff, /backup_restore_drill_result: run_backup_restore_drill -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/backup-restore-drill\.txt/);
     assert.match(handoff, /launch_mainline_evidence_receipts: record_launch_mainline_evidence -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-mainline-evidence-receipts\.json/);
@@ -945,6 +981,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.deepEqual(template.stagingProfile, output.stagingProfile);
     assert.deepEqual(template.stagingProfileLaunchPlan, output.stagingProfileLaunchPlan);
     assert.deepEqual(template.stagingProfileOperatorPreflight, output.stagingProfileOperatorPreflight);
+    assert.deepEqual(template.stagingRehearsalExecutionSummary, output.stagingRehearsalExecutionSummary);
     assert.equal(output.filledCloseoutInputDraft.mode, "staging-closeout-input-draft");
     assert.equal(output.filledCloseoutInputDraft.status, "draft_replace_before_use");
     assert.equal(output.filledCloseoutInputDraft.exampleOnly, true);
@@ -1039,6 +1076,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /launch:smoke:staging/);
     assert.match(handoff, /## Staging Profile Operator Preflight/);
     assert.match(handoff, /Profile preflight status: profile_not_loaded/);
+    assert.match(handoff, /## Staging Rehearsal Execution Summary/);
+    assert.match(handoff, /Execution summary status: profile_not_loaded/);
     assert.match(handoff, /## Launch Route Map Targeted Gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate -- --dry-run --json/);
@@ -1213,6 +1252,7 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     });
     assert.equal(template.stagingProfileLaunchPlan.status, "profile_not_loaded");
     assert.equal(template.stagingProfileOperatorPreflight.status, "profile_not_loaded");
+    assert.equal(template.stagingRehearsalExecutionSummary.status, "profile_not_loaded");
     assert.deepEqual(
       template.acceptanceFields.map((item) => item.key),
       output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
@@ -1516,6 +1556,13 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.deepEqual(output.fullTestWindowReadiness.missingCloseoutKeys, []);
     assert.equal(output.fullTestWindowReadiness.nextAction, "Run npm.cmd test in the reserved full test window, then backfill productionSignoff.");
     assert.equal(output.stagingReadinessTransition.status, "ready_for_full_test_window");
+    assert.equal(output.stagingRehearsalExecutionSummary.status, "ready_for_full_test_window");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.closeoutMissingFieldCount, 0);
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canEnterFullTestWindow, true);
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.blockingReasons.map((item) => item.key),
+      ["production_signoff_pending"]
+    );
     assert.deepEqual(
       output.stagingReadinessTransition.gates.map((item) => [item.key, item.status, item.canEnter]),
       [

@@ -524,6 +524,110 @@ function buildStagingProfileOperatorPreflight(result) {
   };
 }
 
+function buildStagingRehearsalExecutionSummary(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const profilePreflight = result.stagingProfileOperatorPreflight || buildStagingProfileOperatorPreflight(result);
+  const runbook = result.stagingExecutionRunbook || {};
+  const readinessTransition = result.stagingReadinessTransition || {};
+  const finalPacket = result.finalRehearsalPacket || {};
+  const closeoutReview = runbook.closeoutInputReview
+    || finalPacket.closeoutInputReview
+    || summarizeCloseoutInputReview(result.closeoutInput?.backfillReview, closeout);
+  const commandSequence = Array.isArray(runbook.commandSequence)
+    ? runbook.commandSequence.map((item) => item.key).filter(Boolean)
+    : [];
+  const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv) ? profilePreflight.missingSecretEnv : [];
+  const orderedNextActions = [
+    ...(missingSecretEnv.length ? ["set_missing_secret_env"] : []),
+    ...commandSequence
+  ];
+  const sourceStatuses = {
+    profilePreflight: profilePreflight.status || "not_available",
+    executionRunbook: runbook.status || "not_available",
+    closeoutReview: closeoutReview.status || "not_loaded",
+    readinessTransition: readinessTransition.status || "not_available",
+    finalPacket: finalPacket.status || "not_available"
+  };
+  let status = sourceStatuses.readinessTransition || "not_available";
+  if (sourceStatuses.readinessTransition === "ready_for_launch_day_watch") {
+    status = "ready_for_launch_day_watch";
+  } else if (sourceStatuses.readinessTransition === "ready_for_full_test_window") {
+    status = "ready_for_full_test_window";
+  } else if (sourceStatuses.profilePreflight === "profile_not_loaded" && sourceStatuses.closeoutReview === "not_loaded") {
+    status = "profile_not_loaded";
+  } else if (missingSecretEnv.length) {
+    status = "blocked_until_secret_env";
+  } else if (closeoutReview.safeToEnterFullTestWindow !== true) {
+    status = "blocked_until_closeout_reload";
+  }
+  const blockingReasons = [];
+  if (status === "ready_for_full_test_window") {
+    blockingReasons.push({
+      key: "production_signoff_pending",
+      status: "blocked",
+      nextAction: "Run the full test window, attach sign-off evidence, then reload closeout input for production sign-off."
+    });
+  } else if (status !== "ready_for_launch_day_watch") {
+    if (sourceStatuses.profilePreflight === "profile_not_loaded") {
+      blockingReasons.push({
+        key: "profile_not_loaded",
+        status: "blocked",
+        nextAction: "Load a secret-free staging profile before the real rehearsal."
+      });
+    }
+    if (missingSecretEnv.length) {
+      blockingReasons.push({
+        key: "missing_secret_env",
+        status: "blocked",
+        missing: missingSecretEnv,
+        nextAction: "Set the missing secret environment variables before evidence recording."
+      });
+    }
+    if (closeoutReview.safeToEnterFullTestWindow !== true) {
+      blockingReasons.push({
+        key: "closeout_input",
+        status: closeoutReview.status || "not_loaded",
+        missingFieldCount: closeoutReview.missingFieldCount ?? 0,
+        placeholderKeys: closeoutReview.placeholderKeys || [],
+        nextAction: "Backfill and reload the filled closeout input before the full test window."
+      });
+    }
+    if (!["ready_for_full_test_window", "ready_for_launch_day_watch"].includes(sourceStatuses.readinessTransition)) {
+      blockingReasons.push({
+        key: "readiness_transition",
+        status: sourceStatuses.readinessTransition,
+        nextAction: readinessTransition.nextAction || "Complete the generated staging runbook and closeout reload."
+      });
+    }
+  }
+  return {
+    mode: "staging-rehearsal-execution-summary",
+    status,
+    willModifyData: false,
+    sourceStatuses,
+    operatorFocus: {
+      missingSecretEnv,
+      closeoutPlaceholderKeys: closeoutReview.placeholderKeys || [],
+      closeoutMissingFieldCount: closeoutReview.missingFieldCount ?? 0,
+      canRunDryRun: profilePreflight.canRunDryRun === true,
+      canRunLiveWriteSmoke: profilePreflight.canRunLiveWriteSmoke === true,
+      canRecordEvidence: profilePreflight.canRecordEvidence === true,
+      canEnterFullTestWindow: closeoutReview.safeToEnterFullTestWindow === true
+    },
+    blockingReasons,
+    orderedNextActions,
+    commands: {
+      profileDrivenRehearsal: profilePreflight.commands?.profileDrivenRehearsal || null,
+      stagingDryRun: profilePreflight.commands?.stagingDryRun || null,
+      routeMapGate: profilePreflight.commands?.routeMapGate || null,
+      liveWriteSmoke: profilePreflight.commands?.liveWriteSmoke || null,
+      closeoutReload: profilePreflight.commands?.closeoutReload || null,
+      fullTestWindow: result.fullTestWindowReadiness?.command || closeout.fullTestWindowEntry?.command || "npm.cmd test"
+    },
+    nextAction: blockingReasons[0]?.nextAction || "Start launch-day watch and stabilization handoff from the final rehearsal packet."
+  };
+}
+
 function runJsonScript(scriptName, args) {
   const result = spawnSync(process.execPath, [path.join("scripts", scriptName), "--json", ...args], {
     cwd: repoRoot,
@@ -2737,9 +2841,13 @@ function buildResult(options) {
     ...resultWithLaunchRehearsalBundle,
     finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithLaunchRehearsalBundle) : null
   };
-  return {
+  const resultWithStagingRehearsalExecutionSummary = {
     ...resultWithFinalRehearsalPacket,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithFinalRehearsalPacket) : null
+    stagingRehearsalExecutionSummary: gatesPassed ? buildStagingRehearsalExecutionSummary(resultWithFinalRehearsalPacket) : null
+  };
+  return {
+    ...resultWithStagingRehearsalExecutionSummary,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingRehearsalExecutionSummary) : null
   };
 }
 
@@ -2867,6 +2975,43 @@ function renderStagingProfileOperatorPreflight(preflight) {
     lines.push("- Recommended files:");
     for (const file of preflight.recommendedFiles) {
       lines.push(`  - ${file.key || "-"}: ${file.path || "-"} (${file.status || "-"})`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderStagingRehearsalExecutionSummary(summary) {
+  if (!summary) {
+    return "- Not available";
+  }
+  const focus = summary.operatorFocus || {};
+  const statuses = summary.sourceStatuses || {};
+  const lines = [
+    `- Execution summary status: ${summary.status || "-"}`,
+    `- Writes data by itself: ${summary.willModifyData ? "yes" : "no"}`,
+    `- Source statuses: profilePreflight=${statuses.profilePreflight || "-"}, executionRunbook=${statuses.executionRunbook || "-"}, closeoutReview=${statuses.closeoutReview || "-"}, readinessTransition=${statuses.readinessTransition || "-"}, finalPacket=${statuses.finalPacket || "-"}`,
+    `- Missing secret env: ${(focus.missingSecretEnv || []).join(", ") || "-"}`,
+    `- Closeout review: ${statuses.closeoutReview || "-"} (missing=${focus.closeoutMissingFieldCount ?? 0})`,
+    `- Can run dry run: ${focus.canRunDryRun ? "yes" : "no"}`,
+    `- Can run live-write smoke: ${focus.canRunLiveWriteSmoke ? "yes" : "no"}`,
+    `- Can record evidence: ${focus.canRecordEvidence ? "yes" : "no"}`,
+    `- Can enter full test window: ${focus.canEnterFullTestWindow ? "yes" : "no"}`,
+    `- Ordered next actions: ${(summary.orderedNextActions || []).join(", ") || "-"}`,
+    `- Staging dry run: \`${summary.commands?.stagingDryRun || "-"}\``,
+    `- Closeout reload: \`${summary.commands?.closeoutReload || "-"}\``,
+    `- Next action: ${summary.nextAction || "-"}`
+  ];
+  if (Array.isArray(summary.blockingReasons) && summary.blockingReasons.length) {
+    lines.push("- Blocking reasons:");
+    for (const reason of summary.blockingReasons) {
+      lines.push(`  - ${reason.key || "-"}: ${reason.status || "-"}`);
+      if (Array.isArray(reason.missing) && reason.missing.length) {
+        lines.push(`    - missing: ${reason.missing.join(", ")}`);
+      }
+      if (Array.isArray(reason.placeholderKeys) && reason.placeholderKeys.length) {
+        lines.push(`    - placeholders: ${reason.placeholderKeys.join(", ")}`);
+      }
+      lines.push(`    - nextAction: ${reason.nextAction || "-"}`);
     }
   }
   return lines.join("\n");
@@ -3523,6 +3668,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingProfileOperatorPreflight(result.stagingProfileOperatorPreflight),
     "",
+    "## Staging Rehearsal Execution Summary",
+    "",
+    renderStagingRehearsalExecutionSummary(result.stagingRehearsalExecutionSummary),
+    "",
     "## Gate Status",
     "",
     result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
@@ -3675,6 +3824,7 @@ function buildCloseoutTemplate(result) {
     stagingProfile: result.stagingProfile || summarizeStagingProfile(null),
     stagingProfileLaunchPlan: result.stagingProfileLaunchPlan || null,
     stagingProfileOperatorPreflight: result.stagingProfileOperatorPreflight || buildStagingProfileOperatorPreflight(result),
+    stagingRehearsalExecutionSummary: result.stagingRehearsalExecutionSummary || buildStagingRehearsalExecutionSummary(result),
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
     archiveRoot: ledger.archiveRoot || null,

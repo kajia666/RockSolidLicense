@@ -1253,6 +1253,71 @@ function buildStagingReadinessTransition(result) {
   };
 }
 
+function buildLaunchRehearsalBundle(result) {
+  const environmentBinding = result.stagingEnvironmentBinding || {};
+  const runbook = result.stagingExecutionRunbook || {};
+  const transition = result.stagingReadinessTransition || {};
+  const runRecord = result.stagingRunRecordTemplate || {};
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const fileByKey = new Map((environmentBinding.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  const artifactArchiveRoot = environmentBinding.recommendedOutputFiles?.find((item) => item.key === "artifact_archive_root")?.path
+    || runbook.artifactArchiveRoot
+    || runRecord.archiveRoot
+    || "artifacts/staging/product/stable";
+  const executionOrder = [
+    ...(runbook.commandSequence || []).map((item) => item.key).filter(Boolean),
+    "run_full_test_window",
+    "production_signoff_review",
+    "launch_day_watch",
+    "stabilization_handoff"
+  ];
+  const bundleReady = environmentBinding.status === "ready_for_real_staging_binding"
+    && runbook.status === "ready_for_real_staging_dry_run";
+  return {
+    status: bundleReady ? "ready_for_staging_rehearsal_bundle" : "blocked_until_rehearsal_inputs_ready",
+    willModifyData: false,
+    containsLiveWriteStep: runbook.containsLiveWriteStep === true,
+    liveWriteRequiresApproval: runbook.liveWriteRequiresApproval === true,
+    sourceStatuses: {
+      environmentBinding: environmentBinding.status || null,
+      executionRunbook: runbook.status || null,
+      readinessTransition: transition.status || null
+    },
+    artifactArchiveRoot,
+    files: environmentBinding.recommendedOutputFiles || [],
+    commands: {
+      stagingRehearsalDryRun: environmentBinding.dryRunCommand || null,
+      routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
+      liveWriteSmoke: result.nextCommands?.launchSmoke || null,
+      closeoutReload: transition.reloadStep?.command || result.closeoutBackfillGuide?.closeoutInputReload?.command || null,
+      fullTestWindow: result.fullTestWindowReadiness?.command || closeout.fullTestWindowEntry?.command || "npm.cmd test"
+    },
+    executionOrder,
+    closeout: {
+      requiredKeys: (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean),
+      filledInputPath: fileByKey.get("filled_closeout_input")?.path || null,
+      examplePath: fileByKey.get("filled_closeout_input_example")?.path || null,
+      reloadCommand: transition.reloadStep?.command || result.closeoutBackfillGuide?.closeoutInputReload?.command || null,
+      backfillTargets: runbook.closeoutBackfillTargets || []
+    },
+    readiness: {
+      status: transition.status || null,
+      gates: transition.gates || [],
+      orderedNextActions: transition.orderedNextActions || [],
+      nextAction: transition.nextAction || null
+    },
+    operatorRecord: {
+      archiveRoot: runRecord.archiveRoot || artifactArchiveRoot,
+      requiredRecordKeys: runRecord.requiredRecordKeys || [],
+      recordCount: Array.isArray(runRecord.records) ? runRecord.records.length : 0,
+      closeoutInputReloadCommand: runRecord.closeoutInputReloadCommand || null
+    },
+    nextAction: bundleReady
+      ? "Run the launch rehearsal bundle from executionOrder, keep artifact paths under artifactArchiveRoot, then reload closeout input before the full test window."
+      : "Complete staging environment binding and execution runbook generation before using this launch rehearsal bundle."
+  };
+}
+
 function buildFinalRehearsalPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
@@ -1343,6 +1408,7 @@ function buildFinalRehearsalPacket(result) {
     environmentBindingStatus: result.stagingEnvironmentBinding?.status || null,
     executionRunbookStatus: result.stagingExecutionRunbook?.status || null,
     readinessTransitionStatus: result.stagingReadinessTransition?.status || null,
+    launchRehearsalBundleStatus: result.launchRehearsalBundle?.status || null,
     archiveRoot,
     sourceReadiness,
     commands: {
@@ -2067,9 +2133,13 @@ function buildResult(options) {
     ...resultWithStagingExecutionRunbook,
     stagingReadinessTransition: gatesPassed ? buildStagingReadinessTransition(resultWithStagingExecutionRunbook) : null
   };
-  const resultWithFinalRehearsalPacket = {
+  const resultWithLaunchRehearsalBundle = {
     ...resultWithStagingReadinessTransition,
-    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithStagingReadinessTransition) : null
+    launchRehearsalBundle: gatesPassed ? buildLaunchRehearsalBundle(resultWithStagingReadinessTransition) : null
+  };
+  const resultWithFinalRehearsalPacket = {
+    ...resultWithLaunchRehearsalBundle,
+    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithLaunchRehearsalBundle) : null
   };
   return {
     ...resultWithFinalRehearsalPacket,
@@ -2624,6 +2694,40 @@ function renderStagingReadinessTransition(transition) {
   return lines.join("\n");
 }
 
+function renderLaunchRehearsalBundle(bundle) {
+  if (!bundle) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Bundle status: ${bundle.status || "-"}`,
+    `- Writes data by itself: ${bundle.willModifyData ? "yes" : "no"}`,
+    `- Contains live-write step: ${bundle.containsLiveWriteStep ? "yes" : "no"}`,
+    `- Live-write requires approval: ${bundle.liveWriteRequiresApproval ? "yes" : "no"}`,
+    `- Readiness transition: ${bundle.sourceStatuses?.readinessTransition || "-"}`,
+    `- Artifact archive root: ${bundle.artifactArchiveRoot || "-"}`,
+    `- Dry run: \`${bundle.commands?.stagingRehearsalDryRun || "-"}\``,
+    `- Route-map gate: \`${bundle.commands?.routeMapGate || "-"}\``,
+    `- Live-write smoke: \`${bundle.commands?.liveWriteSmoke || "-"}\``,
+    `- Closeout reload: \`${bundle.commands?.closeoutReload || "-"}\``,
+    `- Full test window: \`${bundle.commands?.fullTestWindow || "-"}\``,
+    `- Execution order: ${(bundle.executionOrder || []).join(", ") || "-"}`,
+    `- Next action: ${bundle.nextAction || "-"}`
+  ];
+  if (Array.isArray(bundle.files) && bundle.files.length) {
+    lines.push("- Files:");
+    for (const file of bundle.files) {
+      lines.push(`  - ${file.key || "-"}: ${file.path || "-"}`);
+    }
+  }
+  if (Array.isArray(bundle.closeout?.backfillTargets) && bundle.closeout.backfillTargets.length) {
+    lines.push("- Closeout targets:");
+    for (const target of bundle.closeout.backfillTargets) {
+      lines.push(`  - ${target.key || "-"} -> ${target.artifactPath || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderFinalRehearsalPacket(packet) {
   if (!packet) {
     return "- Not available";
@@ -2635,6 +2739,7 @@ function renderFinalRehearsalPacket(packet) {
     `- Environment binding status: ${packet.environmentBindingStatus || "-"}`,
     `- Execution runbook status: ${packet.executionRunbookStatus || "-"}`,
     `- Readiness transition status: ${packet.readinessTransitionStatus || "-"}`,
+    `- Launch rehearsal bundle status: ${packet.launchRehearsalBundleStatus || "-"}`,
     `- Archive root: ${packet.archiveRoot || "-"}`,
     `- Staging rehearsal dry run: \`${packet.commands?.stagingRehearsalDryRun || "-"}\``,
     `- Route-map gate: \`${packet.commands?.routeMapGate || "-"}\``,
@@ -2774,6 +2879,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingReadinessTransition(result.stagingReadinessTransition),
     "",
+    "## Launch Rehearsal Bundle",
+    "",
+    renderLaunchRehearsalBundle(result.launchRehearsalBundle),
+    "",
     "## Filled Closeout Input Example",
     "",
     renderFilledCloseoutInputExample(result.filledCloseoutInputExample),
@@ -2860,6 +2969,7 @@ function buildCloseoutTemplate(result) {
     stagingEnvironmentBinding: result.stagingEnvironmentBinding || null,
     stagingExecutionRunbook: result.stagingExecutionRunbook || null,
     stagingReadinessTransition: result.stagingReadinessTransition || null,
+    launchRehearsalBundle: result.launchRehearsalBundle || null,
     filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
     finalRehearsalPacket: result.finalRehearsalPacket || buildFinalRehearsalPacket(result),
     closeoutInput: result.closeoutInput || null,

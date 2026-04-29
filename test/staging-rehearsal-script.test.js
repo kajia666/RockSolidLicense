@@ -899,6 +899,25 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
     assert.deepEqual(template.stagingProfile, output.stagingProfile);
     assert.deepEqual(template.stagingProfileLaunchPlan, output.stagingProfileLaunchPlan);
+    assert.equal(output.filledCloseoutInputDraft.mode, "staging-closeout-input-draft");
+    assert.equal(output.filledCloseoutInputDraft.status, "draft_replace_before_use");
+    assert.equal(output.filledCloseoutInputDraft.exampleOnly, true);
+    assert.equal(output.filledCloseoutInputDraft.source, "stagingProfileLaunchPlan.backfillManifest");
+    assert.equal(output.filledCloseoutInputDraft.copyTo, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(output.filledCloseoutInputDraft.saveAs, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.draft.json");
+    assert.deepEqual(
+      output.filledCloseoutInputDraft.acceptanceFields.map((item) => [item.key, item.sourceStep, item.artifactPath, item.value]),
+      [
+        ["route_map_gate_result", "run_route_map_gate", "artifacts/staging/PROFILE_PRODUCT/stable/route-map-gate-output.txt", null],
+        ["backup_restore_drill_result", "run_backup_restore_drill", "artifacts/staging/PROFILE_PRODUCT/stable/backup-restore-drill.txt", null],
+        ["live_write_smoke_result", "run_live_write_smoke", "artifacts/staging/PROFILE_PRODUCT/stable/live-write-smoke-output.json", null],
+        ["launch_smoke_handoff", "archive_launch_smoke_handoff", "artifacts/staging/PROFILE_PRODUCT/stable/launch-smoke-handoff.json", null],
+        ["launch_mainline_evidence_receipts", "record_launch_mainline_evidence", "artifacts/staging/PROFILE_PRODUCT/stable/launch-mainline-evidence-receipts.json", null],
+        ["receipt_visibility_review", "verify_receipt_visibility", "artifacts/staging/PROFILE_PRODUCT/stable/receipt-visibility-review.txt", null],
+        ["operator_go_no_go", "backfill_filled_closeout_input", "artifacts/staging/PROFILE_PRODUCT/stable/operator-go-no-go.md", null]
+      ]
+    );
+    assert.deepEqual(template.filledCloseoutInputDraft, output.filledCloseoutInputDraft);
     assert.doesNotMatch(JSON.stringify(output), /ProfileAdmin123!|ProfileDeveloper123!/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -1061,6 +1080,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Save as: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.example\.json/);
     assert.match(handoff, /Reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`/);
     assert.match(handoff, /Do not submit without replacing placeholders: yes/);
+    assert.match(handoff, /## Filled Closeout Input Draft/);
+    assert.match(handoff, /Draft status: profile_not_loaded/);
     assert.match(handoff, /## Final Rehearsal Packet/);
     assert.match(handoff, /Packet status: ready_for_operator_rehearsal/);
     assert.match(handoff, /Filled closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
@@ -1168,6 +1189,7 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.productionSignoff.requiredDecision, "ready-for-production-signoff");
     assert.equal(template.productionSignoff.conditions.every((item) => item.status === "pending_operator_entry"), true);
     assert.equal(template.productionSignoff.conditions.every((item) => item.value === null), true);
+    assert.equal(template.filledCloseoutInputDraft.status, "profile_not_loaded");
     assert.equal(template.closeoutBackfillGuide.status, "awaiting_staging_results");
     assert.equal(template.closeoutBackfillGuide.closeoutInputReload.command, "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>");
     assert.deepEqual(

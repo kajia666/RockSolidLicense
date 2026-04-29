@@ -1180,6 +1180,60 @@ function buildFilledCloseoutInputExample(result) {
   };
 }
 
+function buildFilledCloseoutInputDraft(result) {
+  const plan = result.stagingProfileLaunchPlan || {};
+  const manifest = plan.backfillManifest || {};
+  if (manifest.status !== "awaiting_profile_driven_results" || !Array.isArray(manifest.rows) || manifest.rows.length === 0) {
+    return {
+      mode: "staging-closeout-input-draft",
+      status: "profile_not_loaded",
+      exampleOnly: true,
+      willModifyData: false,
+      source: "stagingProfileLaunchPlan.backfillManifest",
+      saveAs: null,
+      copyTo: null,
+      reloadCommand: null,
+      acceptanceFields: [],
+      receiptVisibility: buildReceiptVisibilityTemplate(),
+      productionSignoff: buildProductionSignoffInputTemplate(result.stagingAcceptanceCloseout?.productionSignoffConditions || {}),
+      nextAction: "Load a secret-free staging profile before generating a profile-driven closeout input draft."
+    };
+  }
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const checkByKey = new Map((closeout.acceptanceChecks || []).map((check) => [check.key, check]));
+  return {
+    mode: "staging-closeout-input-draft",
+    status: "draft_replace_before_use",
+    exampleOnly: true,
+    willModifyData: false,
+    source: "stagingProfileLaunchPlan.backfillManifest",
+    saveAs: path.posix.join(manifest.archiveRoot, "filled-closeout-input.draft.json"),
+    copyTo: manifest.closeoutInputPath,
+    reloadCommand: manifest.closeoutInputPath
+      ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${manifest.closeoutInputPath}`
+      : null,
+    doNotSubmitWithoutReplacingPlaceholders: true,
+    decision: null,
+    acceptanceFields: manifest.rows.map((row) => {
+      const check = checkByKey.get(row.closeoutKey) || {};
+      return {
+        key: row.closeoutKey,
+        label: check.label || null,
+        status: "pending_operator_entry",
+        value: null,
+        sourceStep: row.sourceStep,
+        artifactPath: row.artifactPath,
+        receiptOperations: row.receiptOperations || [],
+        expectedEvidence: check.expectedEvidence || null,
+        operatorNote: "Replace null with real redacted staging evidence, then remove exampleOnly before loading this as closeout input."
+      };
+    }),
+    receiptVisibility: buildReceiptVisibilityTemplate(),
+    productionSignoff: buildProductionSignoffInputTemplate(closeout.productionSignoffConditions || {}),
+    nextAction: "Copy this draft to filled-closeout-input.json, replace null values with redacted evidence, remove exampleOnly, then reload the closeout input."
+  };
+}
+
 function formatPowerShellArg(value) {
   const text = String(value ?? "");
   if (text === "") {
@@ -2450,9 +2504,13 @@ function buildResult(options) {
     ...resultWithStagingRunRecordTemplate,
     filledCloseoutInputExample: gatesPassed ? buildFilledCloseoutInputExample(resultWithStagingRunRecordTemplate) : null
   };
-  const resultWithStagingEnvironmentBinding = {
+  const resultWithFilledCloseoutInputDraft = {
     ...resultWithFilledCloseoutInputExample,
-    stagingEnvironmentBinding: gatesPassed ? buildStagingEnvironmentBinding(resultWithFilledCloseoutInputExample, options) : null
+    filledCloseoutInputDraft: gatesPassed ? buildFilledCloseoutInputDraft(resultWithFilledCloseoutInputExample) : null
+  };
+  const resultWithStagingEnvironmentBinding = {
+    ...resultWithFilledCloseoutInputDraft,
+    stagingEnvironmentBinding: gatesPassed ? buildStagingEnvironmentBinding(resultWithFilledCloseoutInputDraft, options) : null
   };
   const resultWithStagingExecutionRunbook = {
     ...resultWithStagingEnvironmentBinding,
@@ -2971,6 +3029,29 @@ function renderFilledCloseoutInputExample(example) {
   ].join("\n");
 }
 
+function renderFilledCloseoutInputDraft(draft) {
+  if (!draft) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Draft status: ${draft.status || "-"}`,
+    `- Example only: ${draft.exampleOnly ? "yes" : "no"}`,
+    `- Source: ${draft.source || "-"}`,
+    `- Save as: ${draft.saveAs || "-"}`,
+    `- Copy to: ${draft.copyTo || "-"}`,
+    `- Reload command: \`${draft.reloadCommand || "-"}\``,
+    `- Do not submit without replacing placeholders: ${draft.doNotSubmitWithoutReplacingPlaceholders ? "yes" : "no"}`,
+    `- Next action: ${draft.nextAction || "-"}`
+  ];
+  if (Array.isArray(draft.acceptanceFields) && draft.acceptanceFields.length) {
+    lines.push("- Draft fields:");
+    for (const field of draft.acceptanceFields) {
+      lines.push(`  - ${field.key || "-"}: ${field.sourceStep || "-"} -> ${field.artifactPath || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderStagingEnvironmentBinding(binding) {
   if (!binding) {
     return "- Not available";
@@ -3264,6 +3345,10 @@ function renderHandoffFile(result) {
     "",
     renderFilledCloseoutInputExample(result.filledCloseoutInputExample),
     "",
+    "## Filled Closeout Input Draft",
+    "",
+    renderFilledCloseoutInputDraft(result.filledCloseoutInputDraft),
+    "",
     "## Final Rehearsal Packet",
     "",
     renderFinalRehearsalPacket(result.finalRehearsalPacket),
@@ -3350,6 +3435,7 @@ function buildCloseoutTemplate(result) {
     stagingReadinessTransition: result.stagingReadinessTransition || null,
     launchRehearsalBundle: result.launchRehearsalBundle || null,
     filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
+    filledCloseoutInputDraft: result.filledCloseoutInputDraft || buildFilledCloseoutInputDraft(result),
     finalRehearsalPacket: result.finalRehearsalPacket || buildFinalRehearsalPacket(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,

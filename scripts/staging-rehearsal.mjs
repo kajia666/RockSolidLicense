@@ -819,6 +819,80 @@ function isFilledCloseoutField(field) {
   return true;
 }
 
+function artifactPathFromCloseoutField(field) {
+  if (!field) {
+    return null;
+  }
+  if (typeof field.artifactPath === "string" && field.artifactPath.trim()) {
+    return field.artifactPath;
+  }
+  if (field.value && typeof field.value === "object" && !Array.isArray(field.value)) {
+    const artifactPath = field.value.artifactPath;
+    return typeof artifactPath === "string" && artifactPath.trim() ? artifactPath : null;
+  }
+  return null;
+}
+
+function buildCloseoutInputBackfillReview(payload, closeout = {}, context = {}) {
+  const acceptanceFields = Array.isArray(context.acceptanceFields)
+    ? context.acceptanceFields
+    : (Array.isArray(payload?.acceptanceFields) ? payload.acceptanceFields : []);
+  const fieldsByKey = context.fieldsByKey instanceof Map
+    ? context.fieldsByKey
+    : new Map(acceptanceFields.filter((field) => field && field.key).map((field) => [field.key, field]));
+  const checks = Array.isArray(closeout.acceptanceChecks) ? closeout.acceptanceChecks : [];
+  const checkByKey = new Map(checks.filter((check) => check && check.key).map((check) => [check.key, check]));
+  const requiredKeys = Array.isArray(context.requiredKeys) && context.requiredKeys.length
+    ? context.requiredKeys
+    : checks.map((item) => item.key).filter(Boolean);
+  const fieldRows = requiredKeys.map((key) => {
+    const field = fieldsByKey.get(key) || null;
+    const check = checkByKey.get(key) || {};
+    const filled = isFilledCloseoutField(field);
+    return {
+      key,
+      label: check.label || null,
+      status: filled ? "filled" : (field ? "missing_value" : "missing_field"),
+      sourceStep: field?.sourceStep || CLOSEOUT_SOURCE_STEPS[key] || "operator_backfill",
+      artifactPath: artifactPathFromCloseoutField(field),
+      receiptOperations: field?.receiptOperations || check.operations || [],
+      expectedEvidence: check.expectedEvidence || null,
+      nextAction: filled
+        ? "Keep the redacted evidence artifact linked for audit."
+        : "Replace the draft placeholder with redacted evidence before the full test window."
+    };
+  });
+  const filledFields = fieldRows.filter((row) => row.status === "filled");
+  const missingFields = fieldRows.filter((row) => row.status !== "filled");
+  const decision = context.decision || payload?.decision || null;
+  const readyForFullTestWindow = missingFields.length === 0 && decision === "ready-for-full-test-window";
+  const sourceMode = payload?.mode || null;
+  const draftPromotionStatus = sourceMode === "staging-closeout-input-draft"
+    ? (missingFields.length === 0 ? "draft_promoted" : "draft_needs_values")
+    : (payload ? "not_draft_source" : "not_loaded");
+  const status = !payload
+    ? "not_loaded"
+    : (readyForFullTestWindow ? "ready_for_full_test_window" : (missingFields.length === 0 ? "decision_pending" : "missing_required_fields"));
+  return {
+    mode: "staging-closeout-input-review",
+    status,
+    sourceMode,
+    draftPromotionStatus,
+    requiredFieldCount: requiredKeys.length,
+    filledFieldCount: filledFields.length,
+    missingFieldCount: missingFields.length,
+    safeToEnterFullTestWindow: readyForFullTestWindow,
+    decision,
+    requiredDecision: "ready-for-full-test-window",
+    placeholderKeys: missingFields.map((item) => item.key),
+    missingFields,
+    fieldRows,
+    nextAction: readyForFullTestWindow
+      ? "Closeout input is ready for the full test window; keep production sign-off fields pending until full suite evidence is attached."
+      : "Replace missing draft placeholders, confirm operator_go_no_go is ready-for-full-test-window, then reload the closeout input."
+  };
+}
+
 function isReceiptVisibilityVisible(value) {
   if (value === true) {
     return true;
@@ -1887,6 +1961,12 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
     && signoffMissingKeys.length === 0
     && productionDecision === closeout.productionSignoffConditions?.requiredDecision
     && readyForReceiptVisibility;
+  const backfillReview = buildCloseoutInputBackfillReview(payload, closeout, {
+    acceptanceFields,
+    fieldsByKey,
+    requiredKeys,
+    decision
+  });
   return {
     status: "loaded",
     path: resolvedPath,
@@ -1907,6 +1987,7 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
     readyForFullTestWindow,
     readyForReceiptVisibility,
     readyForProductionSignoff,
+    backfillReview,
     nextAction: missingKeys.length === 0
       ? "Closeout input is backfilled; confirm operator_go_no_go before entering the full test window."
       : "Backfill missingKeys in the closeout input before entering the full test window."
@@ -2841,6 +2922,29 @@ function renderCloseoutBackfillGuide(guide) {
   ].join("\n");
 }
 
+function renderCloseoutInputBackfillReview(review) {
+  const safeReview = review || buildCloseoutInputBackfillReview(null, {});
+  const lines = [
+    `- Review status: ${safeReview.status || "-"}`,
+    `- Source mode: ${safeReview.sourceMode || "-"}`,
+    `- Draft promotion: ${safeReview.draftPromotionStatus || "-"}`,
+    `- Required fields: ${safeReview.requiredFieldCount ?? 0}`,
+    `- Filled fields: ${safeReview.filledFieldCount ?? 0}`,
+    `- Missing fields: ${safeReview.missingFieldCount ?? 0}`,
+    `- Decision: ${safeReview.decision || "-"}`,
+    `- Safe to enter full test window: ${safeReview.safeToEnterFullTestWindow ? "yes" : "no"}`,
+    `- Next action: ${safeReview.nextAction || "-"}`
+  ];
+  if (Array.isArray(safeReview.missingFields) && safeReview.missingFields.length) {
+    lines.push("- Missing field details:");
+    for (const field of safeReview.missingFields) {
+      lines.push(`  - ${field.key || "-"}: ${field.sourceStep || "-"} -> ${field.artifactPath || "-"}`);
+      lines.push(`    - nextAction: ${field.nextAction || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderArtifactReceiptLedger(ledger) {
   if (!ledger) {
     return "- Not available";
@@ -3297,6 +3401,10 @@ function renderHandoffFile(result) {
     "",
     renderCloseoutBackfillGuide(result.closeoutBackfillGuide),
     "",
+    "## Loaded Closeout Input Review",
+    "",
+    renderCloseoutInputBackfillReview(result.closeoutInput?.backfillReview),
+    "",
     "## Artifact / Receipt Ledger",
     "",
     renderArtifactReceiptLedger(result.stagingAcceptanceCloseout?.artifactReceiptLedger),
@@ -3425,6 +3533,7 @@ function buildCloseoutTemplate(result) {
     receiptVisibility: buildReceiptVisibilityTemplate(),
     productionSignoff: buildProductionSignoffInputTemplate(closeout.productionSignoffConditions || {}),
     closeoutBackfillGuide: result.closeoutBackfillGuide || buildCloseoutBackfillGuide(result),
+    closeoutInputReview: result.closeoutInput?.backfillReview || buildCloseoutInputBackfillReview(null, closeout),
     fullTestWindowReadiness: result.fullTestWindowReadiness || buildFullTestWindowReadiness(result),
     productionSignoffReadiness: result.productionSignoffReadiness || buildProductionSignoffReadiness(result),
     launchDayWatchPlan: result.launchDayWatchPlan || buildLaunchDayWatchPlan(result),

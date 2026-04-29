@@ -1082,6 +1082,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Do not submit without replacing placeholders: yes/);
     assert.match(handoff, /## Filled Closeout Input Draft/);
     assert.match(handoff, /Draft status: profile_not_loaded/);
+    assert.match(handoff, /## Loaded Closeout Input Review/);
+    assert.match(handoff, /Review status: not_loaded/);
     assert.match(handoff, /## Final Rehearsal Packet/);
     assert.match(handoff, /Packet status: ready_for_operator_rehearsal/);
     assert.match(handoff, /Filled closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
@@ -1190,6 +1192,7 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.productionSignoff.conditions.every((item) => item.status === "pending_operator_entry"), true);
     assert.equal(template.productionSignoff.conditions.every((item) => item.value === null), true);
     assert.equal(template.filledCloseoutInputDraft.status, "profile_not_loaded");
+    assert.equal(template.closeoutInputReview.status, "not_loaded");
     assert.equal(template.closeoutBackfillGuide.status, "awaiting_staging_results");
     assert.equal(template.closeoutBackfillGuide.closeoutInputReload.command, "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>");
     assert.deepEqual(
@@ -1423,6 +1426,15 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.closeoutInput.status, "loaded");
     assert.equal(output.closeoutInput.decision, "ready-for-full-test-window");
     assert.deepEqual(output.closeoutInput.missingKeys, []);
+    assert.equal(output.closeoutInput.backfillReview.mode, "staging-closeout-input-review");
+    assert.equal(output.closeoutInput.backfillReview.status, "ready_for_full_test_window");
+    assert.equal(output.closeoutInput.backfillReview.sourceMode, "staging-closeout-template");
+    assert.equal(output.closeoutInput.backfillReview.draftPromotionStatus, "not_draft_source");
+    assert.equal(output.closeoutInput.backfillReview.requiredFieldCount, 7);
+    assert.equal(output.closeoutInput.backfillReview.filledFieldCount, 7);
+    assert.equal(output.closeoutInput.backfillReview.missingFieldCount, 0);
+    assert.equal(output.closeoutInput.backfillReview.safeToEnterFullTestWindow, true);
+    assert.deepEqual(output.closeoutInput.backfillReview.missingFields, []);
     assert.deepEqual(
       output.closeoutInput.filledKeys,
       output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
@@ -1469,6 +1481,123 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(
       output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "full_test_window_blocked"),
       false
+    );
+    assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging rehearsal runner reports unfilled draft promotion fields without clearing readiness", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-draft-review-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-closeout-input.json");
+    const closeoutInput = {
+      mode: "staging-closeout-input-draft",
+      decision: "ready-for-full-test-window",
+      acceptanceFields: [
+        {
+          key: "route_map_gate_result",
+          status: "filled",
+          sourceStep: "run_route_map_gate",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt",
+          value: {
+            result: "pass"
+          }
+        },
+        {
+          key: "backup_restore_drill_result",
+          status: "pending_operator_entry",
+          sourceStep: "run_backup_restore_drill",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt",
+          value: null
+        },
+        {
+          key: "live_write_smoke_result",
+          status: "pending_operator_entry",
+          sourceStep: "run_live_write_smoke",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/live-write-smoke-output.json",
+          value: null
+        },
+        {
+          key: "launch_smoke_handoff",
+          status: "filled",
+          sourceStep: "archive_launch_smoke_handoff",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-smoke-handoff.json",
+          value: {
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-smoke-handoff.json"
+          }
+        },
+        {
+          key: "launch_mainline_evidence_receipts",
+          status: "filled",
+          sourceStep: "record_launch_mainline_evidence",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-mainline-evidence-receipts.json",
+          value: {
+            receiptIds: ["receipt-1"]
+          }
+        },
+        {
+          key: "receipt_visibility_review",
+          status: "filled",
+          sourceStep: "verify_receipt_visibility",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-review.txt",
+          value: {
+            result: "visible"
+          }
+        },
+        {
+          key: "operator_go_no_go",
+          status: "filled",
+          sourceStep: "backfill_filled_closeout_input",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md",
+          value: "ready-for-full-test-window"
+        }
+      ]
+    };
+    writeFileSync(closeoutInputFile, `${JSON.stringify(closeoutInput, null, 2)}\n`, "utf8");
+
+    const result = runRehearsal([
+      ...validArgs,
+      "--closeout-input-file",
+      closeoutInputFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.closeoutInput.readyForFullTestWindow, false);
+    assert.equal(output.closeoutInput.backfillReview.status, "missing_required_fields");
+    assert.equal(output.closeoutInput.backfillReview.sourceMode, "staging-closeout-input-draft");
+    assert.equal(output.closeoutInput.backfillReview.draftPromotionStatus, "draft_needs_values");
+    assert.equal(output.closeoutInput.backfillReview.requiredFieldCount, 7);
+    assert.equal(output.closeoutInput.backfillReview.filledFieldCount, 5);
+    assert.equal(output.closeoutInput.backfillReview.missingFieldCount, 2);
+    assert.equal(output.closeoutInput.backfillReview.safeToEnterFullTestWindow, false);
+    assert.deepEqual(
+      output.closeoutInput.backfillReview.missingFields.map((item) => [item.key, item.sourceStep, item.artifactPath, item.nextAction]),
+      [
+        [
+          "backup_restore_drill_result",
+          "run_backup_restore_drill",
+          "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt",
+          "Replace the draft placeholder with redacted evidence before the full test window."
+        ],
+        [
+          "live_write_smoke_result",
+          "run_live_write_smoke",
+          "artifacts/staging/PILOT_ALPHA/stable/live-write-smoke-output.json",
+          "Replace the draft placeholder with redacted evidence before the full test window."
+        ]
+      ]
+    );
+    assert.deepEqual(output.closeoutInput.backfillReview.placeholderKeys, [
+      "backup_restore_drill_result",
+      "live_write_smoke_result"
+    ]);
+    assert.equal(
+      output.operatorExecutionPlan.readinessGaps.find((item) => item.key === "closeout_backfill_pending").missingCloseoutKeys.length,
+      2
     );
     assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {

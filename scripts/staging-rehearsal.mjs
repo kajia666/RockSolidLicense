@@ -846,12 +846,80 @@ function buildStagingRunRecordTemplate(result) {
   };
 }
 
+function buildFilledCloseoutInputExample(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
+  const archiveRoot = runTemplate.archiveRoot || "artifacts/staging/product/stable";
+  const recordByKey = new Map((runTemplate.records || []).map((record) => [record.key, record]));
+  const exampleStatus = "example_replace_before_use";
+  const exampleValue = (key) => {
+    const record = recordByKey.get(key) || {};
+    if (key === "operator_go_no_go") {
+      return "ready-for-full-test-window";
+    }
+    return {
+      result: "pass",
+      artifactPath: record.artifactPath || path.posix.join(archiveRoot, `${key}.txt`),
+      receiptIds: (record.receiptOperations || []).map((operation) => `<${operation}-receipt-id>`)
+    };
+  };
+  const receiptVisibility = Object.fromEntries(
+    RECEIPT_VISIBILITY_KEYS.map((key) => [
+      key,
+      {
+        status: exampleStatus,
+        value: "visible",
+        evidence: `<${key}-visibility-evidence>`
+      }
+    ])
+  );
+  return {
+    mode: "staging-closeout-input-example",
+    status: "example_only",
+    exampleOnly: true,
+    willModifyData: false,
+    doNotSubmitWithoutReplacingPlaceholders: true,
+    saveAs: path.posix.join(archiveRoot, "filled-closeout-input.example.json"),
+    reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${path.posix.join(archiveRoot, "filled-closeout-input.json")}`,
+    decision: "ready-for-full-test-window",
+    acceptanceFields: (closeout.acceptanceChecks || []).map((check) => {
+      const record = recordByKey.get(check.key) || {};
+      return {
+        key: check.key,
+        status: exampleStatus,
+        value: exampleValue(check.key),
+        artifactPath: record.artifactPath || null,
+        receiptOperations: record.receiptOperations || [],
+        operatorNote: "Replace this example value with real redacted staging evidence before loading it."
+      };
+    }),
+    receiptVisibility,
+    productionSignoff: {
+      decision: closeout.productionSignoffConditions?.requiredDecision || "ready-for-production-signoff",
+      conditions: (closeout.productionSignoffConditions?.conditions || []).map((condition) => ({
+        key: condition.key,
+        status: exampleStatus,
+        value: {
+          result: "pass",
+          evidence: `<${condition.key}-evidence>`
+        },
+        operatorNote: "Replace this example sign-off value with real full-test and sign-off evidence before loading it."
+      })),
+      receiptVisibility
+    },
+    operatorNote: "Copy this shape to filled-closeout-input.json and replace every placeholder/example value with redacted real staging results before using --closeout-input-file."
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
   }
   const resolvedPath = path.resolve(repoRoot, closeoutInputFile);
   const payload = JSON.parse(readFileSync(resolvedPath, "utf8"));
+  if (payload.exampleOnly === true || payload.mode === "staging-closeout-input-example") {
+    throw new Error("Refusing to load example closeout input; copy it to a real filled closeout input file and replace placeholders first.");
+  }
   const acceptanceFields = Array.isArray(payload.acceptanceFields) ? payload.acceptanceFields : [];
   const fieldsByKey = new Map(
     acceptanceFields
@@ -1508,9 +1576,13 @@ function buildResult(options) {
     ...resultWithStabilizationHandoffPlan,
     stagingRunRecordTemplate: gatesPassed ? buildStagingRunRecordTemplate(resultWithStabilizationHandoffPlan) : null
   };
-  return {
+  const resultWithFilledCloseoutInputExample = {
     ...resultWithStagingRunRecordTemplate,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingRunRecordTemplate) : null
+    filledCloseoutInputExample: gatesPassed ? buildFilledCloseoutInputExample(resultWithStagingRunRecordTemplate) : null
+  };
+  return {
+    ...resultWithFilledCloseoutInputExample,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithFilledCloseoutInputExample) : null
   };
 }
 
@@ -1958,6 +2030,23 @@ function renderStagingRunRecordTemplate(template) {
   return lines.join("\n");
 }
 
+function renderFilledCloseoutInputExample(example) {
+  if (!example) {
+    return "- Not available";
+  }
+  return [
+    `- Status: ${example.status || "-"}`,
+    `- Example only: ${example.exampleOnly ? "yes" : "no"}`,
+    `- Save as: ${example.saveAs || "-"}`,
+    `- Reload command: \`${example.reloadCommand || "-"}\``,
+    `- Do not submit without replacing placeholders: ${example.doNotSubmitWithoutReplacingPlaceholders ? "yes" : "no"}`,
+    `- Acceptance field keys: ${(example.acceptanceFields || []).map((item) => item.key).join(", ") || "-"}`,
+    `- Receipt visibility keys: ${Object.keys(example.receiptVisibility || {}).join(", ") || "-"}`,
+    `- Production sign-off decision: ${example.productionSignoff?.decision || "-"}`,
+    `- Operator note: ${example.operatorNote || "-"}`
+  ].join("\n");
+}
+
 function renderProductionSignoffConditions(signoff) {
   if (!signoff) {
     return "- Not available";
@@ -2069,6 +2158,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingRunRecordTemplate(result.stagingRunRecordTemplate),
     "",
+    "## Filled Closeout Input Example",
+    "",
+    renderFilledCloseoutInputExample(result.filledCloseoutInputExample),
+    "",
     "## Production Sign-Off Conditions",
     "",
     renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
@@ -2144,6 +2237,7 @@ function buildCloseoutTemplate(result) {
     launchDayWatchPlan: result.launchDayWatchPlan || buildLaunchDayWatchPlan(result),
     stabilizationHandoffPlan: result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result),
     stagingRunRecordTemplate: result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result),
+    filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

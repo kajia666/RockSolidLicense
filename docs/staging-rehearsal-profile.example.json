@@ -1,0 +1,14 @@
+{
+  "baseUrl": "https://staging.example.com",
+  "productCode": "PILOT_ALPHA",
+  "channel": "stable",
+  "adminUsername": "admin@example.com",
+  "developerUsername": "launch.smoke.owner",
+  "targetOs": "linux",
+  "storageProfile": "postgres-preview",
+  "targetEnvFile": "/etc/rocksolidlicense/staging.env",
+  "appBackupDir": "/var/lib/rocksolid/backups",
+  "postgresBackupDir": "/var/lib/rocksolid/postgres-backups",
+  "handoffFile": "artifacts/staging/PILOT_ALPHA/stable/staging-rehearsal-handoff.md",
+  "closeoutFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json"
+}

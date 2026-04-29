@@ -777,6 +777,106 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.doesNotMatch(JSON.stringify(output.stagingAcceptanceCloseout), /StrongAdmin123!|StrongDeveloper123!/);
 });
 
+test("staging rehearsal runner can load a non-secret staging profile file", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-"));
+  const profileFile = join(tempDir, "staging-profile.json");
+  try {
+    const handoffFile = join(tempDir, "profile-handoff.md");
+    const closeoutFile = join(tempDir, "profile-closeout.json");
+    writeFileSync(profileFile, JSON.stringify({
+      baseUrl: "https://profile-staging.example.com",
+      productCode: "PROFILE_PRODUCT",
+      channel: "beta",
+      adminUsername: "profile-admin@example.com",
+      developerUsername: "profile.developer",
+      targetOs: "linux",
+      storageProfile: "postgres-preview",
+      targetEnvFile: "/etc/rocksolidlicense/profile.env",
+      appBackupDir: "/var/lib/rocksolid/profile-backups",
+      postgresBackupDir: "/var/lib/rocksolid/profile-postgres-backups"
+    }, null, 2));
+
+    const result = runRehearsal([
+      "--profile-file",
+      profileFile,
+      "--channel",
+      "stable",
+      "--handoff-file",
+      handoffFile,
+      "--closeout-file",
+      closeoutFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "ProfileAdmin123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "ProfileDeveloper123!"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "pass");
+    assert.deepEqual(output.stagingProfile, {
+      loaded: true,
+      file: profileFile,
+      providedKeys: [
+        "adminUsername",
+        "appBackupDir",
+        "baseUrl",
+        "channel",
+        "developerUsername",
+        "postgresBackupDir",
+        "productCode",
+        "storageProfile",
+        "targetEnvFile",
+        "targetOs"
+      ],
+      secretPolicy: "passwords_and_bearer_tokens_must_come_from_environment_or_cli"
+    });
+    assert.equal(output.summary.baseUrl, "https://profile-staging.example.com");
+    assert.equal(output.summary.productCode, "PROFILE_PRODUCT");
+    assert.equal(output.summary.channel, "stable");
+    assert.equal(output.summary.storageProfile, "postgres-preview");
+    assert.match(output.nextCommands.launchSmoke, /profile-staging\.example\.com/);
+    assert.match(output.nextCommands.launchSmoke, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
+    assert.equal(output.stagingEnvironmentBinding.environment.targetEnvFile, "/etc/rocksolidlicense/profile.env");
+    assert.equal(output.stagingEnvironmentBinding.environment.appBackupDir, "/var/lib/rocksolid/profile-backups");
+    assert.equal(output.stagingEnvironmentBinding.environment.postgresBackupDir, "/var/lib/rocksolid/profile-postgres-backups");
+    const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, new RegExp(`Staging profile: ${profileFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}`));
+    assert.match(handoff, /Profile keys: adminUsername, appBackupDir, baseUrl, channel, developerUsername, postgresBackupDir, productCode, storageProfile, targetEnvFile, targetOs/);
+    const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
+    assert.deepEqual(template.stagingProfile, output.stagingProfile);
+    assert.doesNotMatch(JSON.stringify(output), /ProfileAdmin123!|ProfileDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("staging rehearsal runner refuses staging profile files containing secret values", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-secret-"));
+  const profileFile = join(tempDir, "staging-profile.json");
+  try {
+    writeFileSync(profileFile, JSON.stringify({
+      baseUrl: "https://profile-staging.example.com",
+      productCode: "PROFILE_PRODUCT",
+      adminPassword: "DoNotStoreThisPassword123!"
+    }, null, 2));
+
+    const result = runRehearsal([
+      "--profile-file",
+      profileFile
+    ]);
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "fail");
+    assert.match(output.error.message, /staging profile cannot contain secret field: adminPassword/);
+    assert.doesNotMatch(JSON.stringify(output), /DoNotStoreThisPassword123!/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("staging rehearsal runner stops before live-write steps when a no-write gate fails", () => {
   const result = runRehearsal([
     ...validArgs.slice(0, 1),
@@ -978,6 +1078,12 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.productCode, "PILOT_ALPHA");
     assert.equal(template.channel, "stable");
     assert.equal(template.willModifyData, false);
+    assert.deepEqual(template.stagingProfile, {
+      loaded: false,
+      file: null,
+      providedKeys: [],
+      secretPolicy: "passwords_and_bearer_tokens_must_come_from_environment_or_cli"
+    });
     assert.deepEqual(
       template.acceptanceFields.map((item) => item.key),
       output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)

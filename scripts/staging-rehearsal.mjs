@@ -47,12 +47,37 @@ const RECEIPT_VISIBILITY_KEYS = [
   "developerOps"
 ];
 
+const PROFILE_ALLOWED_FIELDS = [
+  "baseUrl",
+  "productCode",
+  "channel",
+  "adminUsername",
+  "developerUsername",
+  "targetOs",
+  "storageProfile",
+  "targetEnvFile",
+  "appBackupDir",
+  "postgresBackupDir",
+  "handoffFile",
+  "closeoutFile",
+  "closeoutInputFile"
+];
+
+const PROFILE_SECRET_FIELDS = [
+  "adminPassword",
+  "developerPassword",
+  "developerBearerToken",
+  "bearerToken",
+  "token",
+  "password"
+];
+
 function parseArgs(argv) {
   const options = {
     json: false,
     baseUrl: null,
     productCode: null,
-    channel: "stable",
+    channel: null,
     adminUsername: null,
     adminPassword: null,
     developerUsername: null,
@@ -64,7 +89,8 @@ function parseArgs(argv) {
     postgresBackupDir: null,
     handoffFile: null,
     closeoutFile: null,
-    closeoutInputFile: null
+    closeoutInputFile: null,
+    profileFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -106,6 +132,8 @@ function parseArgs(argv) {
       options.closeoutFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-input-file") {
       options.closeoutInputFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--profile-file") {
+      options.profileFile = requireArgValue(name, value, inlineValue);
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -115,23 +143,28 @@ function parseArgs(argv) {
     }
   }
 
+  const profileFile = readOptionOrEnv(options.profileFile, "RSL_REHEARSAL_PROFILE_FILE");
+  const stagingProfile = loadStagingProfile(profileFile);
+
   return {
     ...options,
-    baseUrl: readOptionOrEnv(options.baseUrl, "RSL_STAGING_BASE_URL"),
-    productCode: readOptionOrEnv(options.productCode, "RSL_SMOKE_PRODUCT_CODE"),
-    channel: readOptionOrEnv(options.channel, "RSL_SMOKE_CHANNEL") || "stable",
-    adminUsername: readOptionOrEnv(options.adminUsername, "RSL_SMOKE_ADMIN_USERNAME"),
+    profileFile,
+    stagingProfile: summarizeStagingProfile(stagingProfile),
+    baseUrl: resolveProfileOption(options.baseUrl, "RSL_STAGING_BASE_URL", stagingProfile, "baseUrl"),
+    productCode: resolveProfileOption(options.productCode, "RSL_SMOKE_PRODUCT_CODE", stagingProfile, "productCode"),
+    channel: resolveProfileOption(options.channel, "RSL_SMOKE_CHANNEL", stagingProfile, "channel", "stable"),
+    adminUsername: resolveProfileOption(options.adminUsername, "RSL_SMOKE_ADMIN_USERNAME", stagingProfile, "adminUsername"),
     adminPassword: readOptionOrEnv(options.adminPassword, "RSL_SMOKE_ADMIN_PASSWORD"),
-    developerUsername: readOptionOrEnv(options.developerUsername, "RSL_SMOKE_DEVELOPER_USERNAME"),
+    developerUsername: resolveProfileOption(options.developerUsername, "RSL_SMOKE_DEVELOPER_USERNAME", stagingProfile, "developerUsername"),
     developerPassword: readOptionOrEnv(options.developerPassword, "RSL_SMOKE_DEVELOPER_PASSWORD"),
-    targetOs: readOptionOrEnv(options.targetOs, "RSL_RECOVERY_TARGET_OS"),
-    storageProfile: readOptionOrEnv(options.storageProfile, "RSL_RECOVERY_STORAGE_PROFILE"),
-    targetEnvFile: readOptionOrEnv(options.targetEnvFile, "RSL_RECOVERY_ENV_FILE"),
-    appBackupDir: readOptionOrEnv(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR"),
-    postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR"),
-    handoffFile: readOptionOrEnv(options.handoffFile, "RSL_REHEARSAL_HANDOFF_FILE"),
-    closeoutFile: readOptionOrEnv(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE"),
-    closeoutInputFile: readOptionOrEnv(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE")
+    targetOs: resolveProfileOption(options.targetOs, "RSL_RECOVERY_TARGET_OS", stagingProfile, "targetOs"),
+    storageProfile: resolveProfileOption(options.storageProfile, "RSL_RECOVERY_STORAGE_PROFILE", stagingProfile, "storageProfile"),
+    targetEnvFile: resolveProfileOption(options.targetEnvFile, "RSL_RECOVERY_ENV_FILE", stagingProfile, "targetEnvFile"),
+    appBackupDir: resolveProfileOption(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR", stagingProfile, "appBackupDir"),
+    postgresBackupDir: resolveProfileOption(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR", stagingProfile, "postgresBackupDir"),
+    handoffFile: resolveProfileOption(options.handoffFile, "RSL_REHEARSAL_HANDOFF_FILE", stagingProfile, "handoffFile"),
+    closeoutFile: resolveProfileOption(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE", stagingProfile, "closeoutFile"),
+    closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile")
   };
 }
 
@@ -149,6 +182,55 @@ function requireArgValue(name, value, inlineValue) {
 function readOptionOrEnv(value, envName) {
   const resolved = value ?? process.env[envName] ?? null;
   return resolved === null ? null : String(resolved).trim();
+}
+
+function resolveProfileOption(value, envName, stagingProfile, key, fallback = null) {
+  const optionOrEnv = readOptionOrEnv(value, envName);
+  if (optionOrEnv) {
+    return optionOrEnv;
+  }
+  const profileValue = stagingProfile?.values?.[key] ?? null;
+  if (profileValue !== null && profileValue !== undefined && String(profileValue).trim() !== "") {
+    return String(profileValue).trim();
+  }
+  return fallback;
+}
+
+function loadStagingProfile(profileFile) {
+  if (!profileFile) {
+    return null;
+  }
+  const resolvedPath = path.resolve(repoRoot, profileFile);
+  const rawProfile = JSON.parse(readFileSync(resolvedPath, "utf8"));
+  if (!rawProfile || typeof rawProfile !== "object" || Array.isArray(rawProfile)) {
+    throw new Error("staging profile must be a JSON object.");
+  }
+  const values = rawProfile.stagingRehearsal && typeof rawProfile.stagingRehearsal === "object" && !Array.isArray(rawProfile.stagingRehearsal)
+    ? rawProfile.stagingRehearsal
+    : rawProfile;
+  for (const secretField of PROFILE_SECRET_FIELDS) {
+    if (Object.hasOwn(values, secretField)) {
+      throw new Error(`staging profile cannot contain secret field: ${secretField}. Use environment variables or CLI flags for secret values.`);
+    }
+  }
+  const unknownKeys = Object.keys(values).filter((key) => !PROFILE_ALLOWED_FIELDS.includes(key));
+  if (unknownKeys.length) {
+    throw new Error(`staging profile contains unsupported field(s): ${unknownKeys.join(", ")}`);
+  }
+  return {
+    file: resolvedPath,
+    values,
+    providedKeys: Object.keys(values).sort()
+  };
+}
+
+function summarizeStagingProfile(stagingProfile) {
+  return {
+    loaded: Boolean(stagingProfile),
+    file: stagingProfile?.file || null,
+    providedKeys: stagingProfile?.providedKeys || [],
+    secretPolicy: "passwords_and_bearer_tokens_must_come_from_environment_or_cli"
+  };
 }
 
 function runJsonScript(scriptName, args) {
@@ -2106,6 +2188,7 @@ function buildResult(options) {
       storageProfile: options.storageProfile,
       willModifyData: false
     },
+    stagingProfile: options.stagingProfile,
     preflights: {
       staging,
       recovery
@@ -2867,6 +2950,8 @@ function renderHandoffFile(result) {
     `- Target OS: ${result.summary.targetOs}`,
     `- Storage profile: ${result.summary.storageProfile}`,
     `- Rehearsal writes data: ${result.summary.willModifyData ? "yes" : "no"}`,
+    `- Staging profile: ${result.stagingProfile?.loaded ? result.stagingProfile.file : "not loaded"}`,
+    `- Profile keys: ${(result.stagingProfile?.providedKeys || []).join(", ") || "-"}`,
     "",
     "## Gate Status",
     "",
@@ -3009,6 +3094,7 @@ function buildCloseoutTemplate(result) {
     channel: result.summary?.channel || null,
     targetOs: result.summary?.targetOs || null,
     storageProfile: result.summary?.storageProfile || null,
+    stagingProfile: result.stagingProfile || summarizeStagingProfile(null),
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
     archiveRoot: ledger.archiveRoot || null,
@@ -3161,6 +3247,12 @@ function main() {
       generatedAt: new Date().toISOString(),
       summary: {
         willModifyData: false
+      },
+      stagingProfile: {
+        loaded: false,
+        file: null,
+        providedKeys: [],
+        secretPolicy: "passwords_and_bearer_tokens_must_come_from_environment_or_cli"
       },
       preflights: {
         staging: null,

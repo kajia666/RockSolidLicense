@@ -418,6 +418,112 @@ function buildStagingProfileLaunchPlan(options) {
   };
 }
 
+function buildStagingProfileOperatorPreflight(result) {
+  const plan = result.stagingProfileLaunchPlan || {};
+  const binding = result.stagingEnvironmentBinding || {};
+  const runbook = result.stagingExecutionRunbook || {};
+  const requiredSecretEnv = Array.isArray(plan.requiredSecretEnv) ? plan.requiredSecretEnv : [];
+  const missingSecretEnv = requiredSecretEnv
+    .filter((item) => item && item.present !== true)
+    .map((item) => item.key)
+    .filter(Boolean);
+  const missingRequiredInputs = Array.isArray(plan.missingRequiredInputs) ? plan.missingRequiredInputs : [];
+  const missingOutputFiles = Array.isArray(plan.missingOutputFiles) ? plan.missingOutputFiles : [];
+  const commandSequence = Array.isArray(runbook.commandSequence)
+    ? runbook.commandSequence.map((item) => item.key).filter(Boolean)
+    : [];
+  const reloadStep = Array.isArray(runbook.commandSequence)
+    ? runbook.commandSequence.find((item) => item.key === "reload_closeout_input")
+    : null;
+  const commands = {
+    profileDrivenRehearsal: plan.recommendedCommand || null,
+    stagingDryRun: binding.dryRunCommand || null,
+    routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
+    liveWriteSmoke: result.nextCommands?.launchSmoke || null,
+    closeoutReload: reloadStep?.command || result.closeoutBackfillGuide?.closeoutInputReload?.command || null
+  };
+  const profileLoaded = Boolean(plan.status) && plan.status !== "profile_not_loaded";
+  const canRunDryRun = profileLoaded
+    && missingRequiredInputs.length === 0
+    && missingOutputFiles.length === 0
+    && Boolean(commands.profileDrivenRehearsal)
+    && Boolean(commands.stagingDryRun);
+  const canRunLiveWriteSmoke = canRunDryRun
+    && !missingSecretEnv.includes(ADMIN_PASSWORD_ENV)
+    && !missingSecretEnv.includes(DEVELOPER_PASSWORD_ENV);
+  const canRecordEvidence = canRunDryRun && !missingSecretEnv.includes(DEVELOPER_BEARER_TOKEN_ENV);
+  let status = "ready_for_real_staging_rehearsal";
+  if (!profileLoaded) {
+    status = "profile_not_loaded";
+  } else if (missingRequiredInputs.length || missingOutputFiles.length) {
+    status = "missing_profile_inputs";
+  } else if (missingSecretEnv.length) {
+    status = "blocked_until_secret_env";
+  }
+  return {
+    mode: "staging-profile-operator-preflight",
+    status,
+    willModifyData: false,
+    profileStatus: plan.status || "unknown",
+    profileFile: plan.profileFile || null,
+    missingRequiredInputs,
+    missingOutputFiles,
+    requiredSecretEnv,
+    missingSecretEnv,
+    canRunDryRun,
+    canRunLiveWriteSmoke,
+    canRecordEvidence,
+    recommendedFiles: binding.recommendedOutputFiles || [],
+    commandSequence,
+    commands,
+    checks: [
+      {
+        key: "profile_file",
+        status: profileLoaded ? "ready" : "missing",
+        nextAction: profileLoaded
+          ? "Keep the secret-free staging profile under versioned launch artifacts."
+          : "Create a secret-free staging profile before running the real rehearsal."
+      },
+      {
+        key: "required_inputs",
+        status: missingRequiredInputs.length === 0 ? "ready" : "missing",
+        missing: missingRequiredInputs,
+        nextAction: missingRequiredInputs.length === 0
+          ? "Required non-secret staging inputs are present."
+          : "Fill missing non-secret profile inputs before generating handoff files."
+      },
+      {
+        key: "output_files",
+        status: missingOutputFiles.length === 0 ? "ready" : "missing",
+        missing: missingOutputFiles,
+        nextAction: missingOutputFiles.length === 0
+          ? "Handoff and closeout output paths are available."
+          : "Provide handoffFile and closeoutFile paths for launch duty artifacts."
+      },
+      {
+        key: "secret_env",
+        status: missingSecretEnv.length === 0 ? "ready" : "missing",
+        missing: missingSecretEnv,
+        nextAction: missingSecretEnv.length === 0
+          ? "Required secret environment variables are present."
+          : "Set missing secret environment variables before live-write smoke and evidence recording."
+      },
+      {
+        key: "runbook_sequence",
+        status: commandSequence.length ? "ready" : "missing",
+        nextAction: commandSequence.length
+          ? "Follow the generated command sequence without skipping the closeout reload."
+          : "Generate the staging execution runbook before the real rehearsal."
+      }
+    ],
+    nextAction: status === "ready_for_real_staging_rehearsal"
+      ? "Run the staging dry run, route-map gate, recovery drill, live-write smoke, evidence recording, and closeout reload in the generated sequence."
+      : status === "blocked_until_secret_env"
+        ? "Set missing secret env vars, then run the profile-driven rehearsal sequence."
+        : "Complete the staging profile and output paths before the real profile-driven rehearsal."
+  };
+}
+
 function runJsonScript(scriptName, args) {
   const result = spawnSync(process.execPath, [path.join("scripts", scriptName), "--json", ...args], {
     cwd: repoRoot,
@@ -2615,9 +2721,13 @@ function buildResult(options) {
     ...resultWithStagingEnvironmentBinding,
     stagingExecutionRunbook: gatesPassed ? buildStagingExecutionRunbook(resultWithStagingEnvironmentBinding) : null
   };
-  const resultWithStagingReadinessTransition = {
+  const resultWithStagingProfileOperatorPreflight = {
     ...resultWithStagingExecutionRunbook,
-    stagingReadinessTransition: gatesPassed ? buildStagingReadinessTransition(resultWithStagingExecutionRunbook) : null
+    stagingProfileOperatorPreflight: gatesPassed ? buildStagingProfileOperatorPreflight(resultWithStagingExecutionRunbook) : null
+  };
+  const resultWithStagingReadinessTransition = {
+    ...resultWithStagingProfileOperatorPreflight,
+    stagingReadinessTransition: gatesPassed ? buildStagingReadinessTransition(resultWithStagingProfileOperatorPreflight) : null
   };
   const resultWithLaunchRehearsalBundle = {
     ...resultWithStagingReadinessTransition,
@@ -2726,6 +2836,37 @@ function renderStagingProfileLaunchPlan(plan) {
       for (const row of plan.backfillManifest.rows) {
         lines.push(`    - ${row.closeoutKey || "-"}: ${row.sourceStep || "-"} -> ${row.artifactPath || "-"}`);
       }
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderStagingProfileOperatorPreflight(preflight) {
+  if (!preflight) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Profile preflight status: ${preflight.status || "-"}`,
+    `- Writes data by itself: ${preflight.willModifyData ? "yes" : "no"}`,
+    `- Profile status: ${preflight.profileStatus || "-"}`,
+    `- Profile file: ${preflight.profileFile || "-"}`,
+    `- Missing required inputs: ${(preflight.missingRequiredInputs || []).join(", ") || "-"}`,
+    `- Missing output files: ${(preflight.missingOutputFiles || []).join(", ") || "-"}`,
+    `- Missing secret env: ${(preflight.missingSecretEnv || []).join(", ") || "-"}`,
+    `- Can run dry run: ${preflight.canRunDryRun ? "yes" : "no"}`,
+    `- Can run live-write smoke: ${preflight.canRunLiveWriteSmoke ? "yes" : "no"}`,
+    `- Can record evidence: ${preflight.canRecordEvidence ? "yes" : "no"}`,
+    `- Command sequence: ${(preflight.commandSequence || []).join(", ") || "-"}`,
+    `- Profile command: \`${preflight.commands?.profileDrivenRehearsal || "-"}\``,
+    `- Staging dry run: \`${preflight.commands?.stagingDryRun || "-"}\``,
+    `- Route-map gate: \`${preflight.commands?.routeMapGate || "-"}\``,
+    `- Closeout reload: \`${preflight.commands?.closeoutReload || "-"}\``,
+    `- Next action: ${preflight.nextAction || "-"}`
+  ];
+  if (Array.isArray(preflight.recommendedFiles) && preflight.recommendedFiles.length) {
+    lines.push("- Recommended files:");
+    for (const file of preflight.recommendedFiles) {
+      lines.push(`  - ${file.key || "-"}: ${file.path || "-"} (${file.status || "-"})`);
     }
   }
   return lines.join("\n");
@@ -3378,6 +3519,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingProfileLaunchPlan(result.stagingProfileLaunchPlan),
     "",
+    "## Staging Profile Operator Preflight",
+    "",
+    renderStagingProfileOperatorPreflight(result.stagingProfileOperatorPreflight),
+    "",
     "## Gate Status",
     "",
     result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
@@ -3529,6 +3674,7 @@ function buildCloseoutTemplate(result) {
     storageProfile: result.summary?.storageProfile || null,
     stagingProfile: result.stagingProfile || summarizeStagingProfile(null),
     stagingProfileLaunchPlan: result.stagingProfileLaunchPlan || null,
+    stagingProfileOperatorPreflight: result.stagingProfileOperatorPreflight || buildStagingProfileOperatorPreflight(result),
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
     archiveRoot: ledger.archiveRoot || null,

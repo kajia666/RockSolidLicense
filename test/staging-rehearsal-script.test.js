@@ -857,6 +857,46 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--channel stable/);
     assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--handoff-file /);
     assert.match(output.stagingProfileLaunchPlan.nextAction, /Set required secret env vars/);
+    assert.equal(output.stagingProfileOperatorPreflight.mode, "staging-profile-operator-preflight");
+    assert.equal(output.stagingProfileOperatorPreflight.status, "blocked_until_secret_env");
+    assert.equal(output.stagingProfileOperatorPreflight.profileStatus, "ready_for_profile_driven_rehearsal");
+    assert.equal(output.stagingProfileOperatorPreflight.profileFile, profileFile);
+    assert.deepEqual(output.stagingProfileOperatorPreflight.missingRequiredInputs, []);
+    assert.deepEqual(output.stagingProfileOperatorPreflight.missingOutputFiles, []);
+    assert.deepEqual(output.stagingProfileOperatorPreflight.missingSecretEnv, ["RSL_DEVELOPER_BEARER_TOKEN"]);
+    assert.equal(output.stagingProfileOperatorPreflight.canRunDryRun, true);
+    assert.equal(output.stagingProfileOperatorPreflight.canRunLiveWriteSmoke, true);
+    assert.equal(output.stagingProfileOperatorPreflight.canRecordEvidence, false);
+    assert.deepEqual(
+      output.stagingProfileOperatorPreflight.recommendedFiles.map((item) => [item.key, item.path, item.status]),
+      [
+        ["handoff_file", handoffFile, "pending_write"],
+        ["closeout_file", closeoutFile, "pending_write"],
+        ["filled_closeout_input", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json", "operator_create"],
+        ["filled_closeout_input_example", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.example.json", "example_only"],
+        ["artifact_archive_root", "artifacts/staging/PROFILE_PRODUCT/stable", "operator_archive"]
+      ]
+    );
+    assert.deepEqual(
+      output.stagingProfileOperatorPreflight.commandSequence,
+      [
+        "prepare_secret_env",
+        "generate_rehearsal_outputs",
+        "run_route_map_gate",
+        "run_backup_restore_drill",
+        "approve_live_write_smoke",
+        "run_live_write_smoke",
+        "archive_launch_smoke_handoff",
+        "record_launch_mainline_evidence",
+        "verify_receipt_visibility",
+        "backfill_filled_closeout_input",
+        "reload_closeout_input"
+      ]
+    );
+    assert.equal(output.stagingProfileOperatorPreflight.commands.profileDrivenRehearsal, output.stagingProfileLaunchPlan.recommendedCommand);
+    assert.equal(output.stagingProfileOperatorPreflight.commands.stagingDryRun, output.stagingEnvironmentBinding.dryRunCommand);
+    assert.equal(output.stagingProfileOperatorPreflight.commands.routeMapGate, "npm.cmd run launch:route-map-gate");
+    assert.equal(output.stagingProfileOperatorPreflight.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(output.stagingProfileLaunchPlan.backfillManifest.status, "awaiting_profile_driven_results");
     assert.equal(output.stagingProfileLaunchPlan.backfillManifest.archiveRoot, "artifacts/staging/PROFILE_PRODUCT/stable");
     assert.equal(output.stagingProfileLaunchPlan.backfillManifest.closeoutInputPath, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
@@ -893,12 +933,18 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
     assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile/);
     assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: missing before_evidence_recording/);
+    assert.match(handoff, /## Staging Profile Operator Preflight/);
+    assert.match(handoff, /Profile preflight status: blocked_until_secret_env/);
+    assert.match(handoff, /Missing secret env: RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.match(handoff, /Can run dry run: yes/);
+    assert.match(handoff, /Can record evidence: no/);
     assert.match(handoff, /Backfill manifest: awaiting_profile_driven_results/);
     assert.match(handoff, /backup_restore_drill_result: run_backup_restore_drill -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/backup-restore-drill\.txt/);
     assert.match(handoff, /launch_mainline_evidence_receipts: record_launch_mainline_evidence -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-mainline-evidence-receipts\.json/);
     const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
     assert.deepEqual(template.stagingProfile, output.stagingProfile);
     assert.deepEqual(template.stagingProfileLaunchPlan, output.stagingProfileLaunchPlan);
+    assert.deepEqual(template.stagingProfileOperatorPreflight, output.stagingProfileOperatorPreflight);
     assert.equal(output.filledCloseoutInputDraft.mode, "staging-closeout-input-draft");
     assert.equal(output.filledCloseoutInputDraft.status, "draft_replace_before_use");
     assert.equal(output.filledCloseoutInputDraft.exampleOnly, true);
@@ -991,6 +1037,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     const handoff = readFileSync(handoffFile, "utf8");
     assert.match(handoff, /# Staging Rehearsal Handoff/);
     assert.match(handoff, /launch:smoke:staging/);
+    assert.match(handoff, /## Staging Profile Operator Preflight/);
+    assert.match(handoff, /Profile preflight status: profile_not_loaded/);
     assert.match(handoff, /## Launch Route Map Targeted Gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate -- --dry-run --json/);
@@ -1164,6 +1212,7 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       secretPolicy: "passwords_and_bearer_tokens_must_come_from_environment_or_cli"
     });
     assert.equal(template.stagingProfileLaunchPlan.status, "profile_not_loaded");
+    assert.equal(template.stagingProfileOperatorPreflight.status, "profile_not_loaded");
     assert.deepEqual(
       template.acceptanceFields.map((item) => item.key),
       output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)

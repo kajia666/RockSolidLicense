@@ -718,6 +718,56 @@ function buildLaunchDayWatchPlan(result) {
   };
 }
 
+function buildStabilizationHandoffPlan(result) {
+  const watchPlan = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
+  const canStartStabilizationHandoff = watchPlan?.canStartCutoverWatch === true;
+  const requiredEvidenceKeys = [
+    "launch_day_watch_summary",
+    "first_wave_incident_log",
+    "receipt_visibility_snapshot",
+    "rollback_signal_review",
+    "stabilization_owner_handoff"
+  ];
+  return {
+    status: canStartStabilizationHandoff ? "ready" : "blocked",
+    canStartStabilizationHandoff,
+    willModifyData: false,
+    sourceWatchStatus: watchPlan?.status || "not_available",
+    requiredWatchWindows: (watchPlan?.watchWindows || []).map((item) => item.key).filter(Boolean),
+    requiredEvidenceKeys,
+    routes: {
+      launchMainline: watchPlan?.routes?.launchMainline || result.nextCommands?.launchMainline || null,
+      developerOps: watchPlan?.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
+      launchReviewSummary: watchPlan?.routes?.launchReviewSummary || result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
+      launchSmokeSummary: watchPlan?.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null
+    },
+    handoffWindows: [
+      {
+        key: "stabilization_owner_handoff",
+        label: "T+2h stabilization owner handoff",
+        status: canStartStabilizationHandoff ? "operator_handoff" : "blocked_until_cutover_watch",
+        summary: "Hand off launch-day watch summary, incidents, receipt snapshots, and rollback signals to the stabilization owner."
+      },
+      {
+        key: "first_wave_closeout",
+        label: "T+24h first-wave closeout",
+        status: canStartStabilizationHandoff ? "operator_closeout" : "blocked_until_stabilization_owner_handoff",
+        summary: "Close first-wave stabilization with unresolved incident list, customer impact notes, and next-duty owner."
+      }
+    ],
+    escalationTriggers: [
+      ...new Set([
+        ...(watchPlan?.escalationTriggers || []),
+        "unresolved_first_wave_incident",
+        "missing_stabilization_owner"
+      ])
+    ],
+    nextAction: canStartStabilizationHandoff
+      ? "Hand off stabilization notes, first-wave incidents, receipt visibility snapshots, and rollback signals to the stabilization owner."
+      : "Complete launch-day watch readiness before starting stabilization handoff."
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -1372,9 +1422,13 @@ function buildResult(options) {
     ...resultWithProductionSignoffReadiness,
     launchDayWatchPlan: gatesPassed ? buildLaunchDayWatchPlan(resultWithProductionSignoffReadiness) : null
   };
-  return {
+  const resultWithStabilizationHandoffPlan = {
     ...resultWithLaunchDayWatchPlan,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithLaunchDayWatchPlan) : null
+    stabilizationHandoffPlan: gatesPassed ? buildStabilizationHandoffPlan(resultWithLaunchDayWatchPlan) : null
+  };
+  return {
+    ...resultWithStabilizationHandoffPlan,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStabilizationHandoffPlan) : null
   };
 }
 
@@ -1769,6 +1823,34 @@ function renderLaunchDayWatchPlan(plan) {
   return lines.join("\n");
 }
 
+function renderStabilizationHandoffPlan(plan) {
+  if (!plan) {
+    return "- Not available";
+  }
+  const routes = plan.routes || {};
+  const handoffWindows = Array.isArray(plan.handoffWindows) ? plan.handoffWindows : [];
+  const lines = [
+    `- Status: ${plan.status || "-"}`,
+    `- Can start stabilization handoff: ${plan.canStartStabilizationHandoff ? "yes" : "no"}`,
+    `- Source watch status: ${plan.sourceWatchStatus || "-"}`,
+    `- Required watch windows: ${(plan.requiredWatchWindows || []).join(", ") || "-"}`,
+    `- Required evidence keys: ${(plan.requiredEvidenceKeys || []).join(", ") || "-"}`,
+    `- Launch Mainline: ${routes.launchMainline || "-"}`,
+    `- Developer Ops: ${routes.developerOps || "-"}`,
+    `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
+    `- Launch Smoke summary: ${routes.launchSmokeSummary || "-"}`,
+    `- Handoff windows: ${handoffWindows.map((item) => item.label || item.key).filter(Boolean).join(", ") || "-"}`,
+    `- Escalation triggers: ${(plan.escalationTriggers || []).join(", ") || "-"}`,
+    `- Next action: ${plan.nextAction || "-"}`
+  ];
+  for (const item of handoffWindows) {
+    lines.push(`  - ${item.key || "-"}: ${item.status || "-"}`);
+    lines.push(`    - label: ${item.label || "-"}`);
+    lines.push(`    - summary: ${item.summary || "-"}`);
+  }
+  return lines.join("\n");
+}
+
 function renderProductionSignoffConditions(signoff) {
   if (!signoff) {
     return "- Not available";
@@ -1872,6 +1954,10 @@ function renderHandoffFile(result) {
     "",
     renderLaunchDayWatchPlan(result.launchDayWatchPlan),
     "",
+    "## Stabilization Handoff Plan",
+    "",
+    renderStabilizationHandoffPlan(result.stabilizationHandoffPlan),
+    "",
     "## Production Sign-Off Conditions",
     "",
     renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
@@ -1945,6 +2031,7 @@ function buildCloseoutTemplate(result) {
     fullTestWindowReadiness: result.fullTestWindowReadiness || buildFullTestWindowReadiness(result),
     productionSignoffReadiness: result.productionSignoffReadiness || buildProductionSignoffReadiness(result),
     launchDayWatchPlan: result.launchDayWatchPlan || buildLaunchDayWatchPlan(result),
+    stabilizationHandoffPlan: result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

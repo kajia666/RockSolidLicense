@@ -296,6 +296,33 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "developer_ops_receipt_mismatch",
     "backup_restore_or_rollback_unclear"
   ]);
+  assert.equal(output.stabilizationHandoffPlan.status, "blocked");
+  assert.equal(output.stabilizationHandoffPlan.canStartStabilizationHandoff, false);
+  assert.equal(output.stabilizationHandoffPlan.sourceWatchStatus, "blocked");
+  assert.deepEqual(output.stabilizationHandoffPlan.requiredWatchWindows, [
+    "cutover_watch",
+    "first_wave_stabilization"
+  ]);
+  assert.deepEqual(output.stabilizationHandoffPlan.requiredEvidenceKeys, [
+    "launch_day_watch_summary",
+    "first_wave_incident_log",
+    "receipt_visibility_snapshot",
+    "rollback_signal_review",
+    "stabilization_owner_handoff"
+  ]);
+  assert.equal(
+    output.stabilizationHandoffPlan.routes.developerOps,
+    "https://staging.example.com/developer/ops?productCode=PILOT_ALPHA&source=staging-rehearsal&handoff=first-wave"
+  );
+  assert.deepEqual(output.stabilizationHandoffPlan.escalationTriggers, [
+    "production_signoff_missing",
+    "receipt_visibility_missing",
+    "launch_mainline_action_failure",
+    "developer_ops_receipt_mismatch",
+    "backup_restore_or_rollback_unclear",
+    "unresolved_first_wave_incident",
+    "missing_stabilization_owner"
+  ]);
   assert.deepEqual(output.operatorExecutionPlan.readinessSummary, {
     status: "needs_operator_input",
     gapCount: 6,
@@ -546,6 +573,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Can start cutover watch: no/);
     assert.match(handoff, /Watch windows: cutover_watch, first_wave_stabilization/);
     assert.match(handoff, /Escalation triggers: production_signoff_missing, receipt_visibility_missing, launch_mainline_action_failure, developer_ops_receipt_mismatch, backup_restore_or_rollback_unclear/);
+    assert.match(handoff, /## Stabilization Handoff Plan/);
+    assert.match(handoff, /Can start stabilization handoff: no/);
+    assert.match(handoff, /Required evidence keys: launch_day_watch_summary, first_wave_incident_log, receipt_visibility_snapshot, rollback_signal_review, stabilization_owner_handoff/);
+    assert.match(handoff, /Handoff windows: T\+2h stabilization owner handoff, T\+24h first-wave closeout/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
@@ -685,6 +716,19 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       "launchSmoke",
       "developerOps"
     ]);
+    assert.equal(template.stabilizationHandoffPlan.status, "blocked");
+    assert.equal(template.stabilizationHandoffPlan.canStartStabilizationHandoff, false);
+    assert.deepEqual(template.stabilizationHandoffPlan.requiredEvidenceKeys, [
+      "launch_day_watch_summary",
+      "first_wave_incident_log",
+      "receipt_visibility_snapshot",
+      "rollback_signal_review",
+      "stabilization_owner_handoff"
+    ]);
+    assert.deepEqual(
+      template.stabilizationHandoffPlan.handoffWindows.map((item) => item.key),
+      ["stabilization_owner_handoff", "first_wave_closeout"]
+    );
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,
@@ -917,6 +961,10 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.deepEqual(output.launchDayWatchPlan.missingSignoffKeys, []);
     assert.deepEqual(output.launchDayWatchPlan.missingReceiptVisibilityKeys, []);
     assert.equal(output.launchDayWatchPlan.nextAction, "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility open.");
+    assert.equal(output.stabilizationHandoffPlan.status, "ready");
+    assert.equal(output.stabilizationHandoffPlan.canStartStabilizationHandoff, true);
+    assert.equal(output.stabilizationHandoffPlan.sourceWatchStatus, "ready");
+    assert.equal(output.stabilizationHandoffPlan.nextAction, "Hand off stabilization notes, first-wave incidents, receipt visibility snapshots, and rollback signals to the stabilization owner.");
     assert.equal(output.operatorExecutionPlan.readinessSummary.gapCount, 2);
     assert.equal(
       output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "production_signoff_blocked"),

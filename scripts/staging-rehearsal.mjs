@@ -61,6 +61,7 @@ const PROFILE_ALLOWED_FIELDS = [
   "handoffFile",
   "closeoutFile",
   "runRecordFile",
+  "filledCloseoutDraftFile",
   "closeoutInputFile"
 ];
 
@@ -87,6 +88,7 @@ const PROFILE_OPTION_FLAGS = {
   handoffFile: "--handoff-file",
   closeoutFile: "--closeout-file",
   runRecordFile: "--run-record-file",
+  filledCloseoutDraftFile: "--filled-closeout-draft-file",
   closeoutInputFile: "--closeout-input-file"
 };
 
@@ -163,6 +165,7 @@ function parseArgs(argv) {
     handoffFile: null,
     closeoutFile: null,
     runRecordFile: null,
+    filledCloseoutDraftFile: null,
     closeoutInputFile: null,
     profileFile: null
   };
@@ -206,6 +209,8 @@ function parseArgs(argv) {
       options.closeoutFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--run-record-file") {
       options.runRecordFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--filled-closeout-draft-file") {
+      options.filledCloseoutDraftFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-input-file") {
       options.closeoutInputFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--profile-file") {
@@ -242,6 +247,7 @@ function parseArgs(argv) {
     handoffFile: resolveProfileOption(options.handoffFile, "RSL_REHEARSAL_HANDOFF_FILE", stagingProfile, "handoffFile"),
     closeoutFile: resolveProfileOption(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE", stagingProfile, "closeoutFile"),
     runRecordFile: resolveProfileOption(options.runRecordFile, "RSL_REHEARSAL_RUN_RECORD_FILE", stagingProfile, "runRecordFile"),
+    filledCloseoutDraftFile: resolveProfileOption(options.filledCloseoutDraftFile, "RSL_REHEARSAL_FILLED_CLOSEOUT_DRAFT_FILE", stagingProfile, "filledCloseoutDraftFile"),
     closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile")
   };
 }
@@ -380,7 +386,7 @@ function buildStagingProfileLaunchPlan(options) {
     "appBackupDir",
     ...(options.storageProfile === "postgres-preview" ? ["postgresBackupDir"] : [])
   ];
-  const outputFiles = ["handoffFile", "closeoutFile", "runRecordFile"];
+  const outputFiles = ["handoffFile", "closeoutFile", "runRecordFile", "filledCloseoutDraftFile"];
   const missingRequiredInputs = requiredInputs.filter((key) => !options[key]);
   const missingOutputFiles = outputFiles.filter((key) => !options[key]);
   const requiredSecretEnv = [
@@ -504,7 +510,7 @@ function buildStagingProfileOperatorPreflight(result) {
         missing: missingOutputFiles,
         nextAction: missingOutputFiles.length === 0
           ? "Handoff and closeout output paths are available."
-          : "Provide handoffFile, closeoutFile, and runRecordFile paths for launch duty artifacts."
+          : "Provide handoffFile, closeoutFile, runRecordFile, and filledCloseoutDraftFile paths for launch duty artifacts."
       },
       {
         key: "secret_env",
@@ -1684,6 +1690,9 @@ function buildStagingEnvironmentBinding(result, options = {}) {
   const closeoutPath = result.closeoutFile?.path || path.posix.join(archiveRoot, "staging-closeout-template.json");
   const runRecordPath = result.runRecordFile?.path || path.posix.join(archiveRoot, "staging-run-record-index.json");
   const filledCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const filledCloseoutDraftPath = result.filledCloseoutDraftFile?.path
+    || result.filledCloseoutInputDraft?.saveAs
+    || path.posix.join(archiveRoot, "filled-closeout-input.draft.json");
   const filledExamplePath = result.filledCloseoutInputExample?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.example.json");
   const environment = {
     baseUrl: result.summary?.baseUrl || options.baseUrl || null,
@@ -1731,7 +1740,9 @@ function buildStagingEnvironmentBinding(result, options = {}) {
     "--closeout-file",
     closeoutPath,
     "--run-record-file",
-    runRecordPath
+    runRecordPath,
+    "--filled-closeout-draft-file",
+    filledCloseoutDraftPath
   ].filter((part) => part !== null && part !== undefined && String(part) !== "");
   return {
     status: "ready_for_real_staging_binding",
@@ -1762,6 +1773,11 @@ function buildStagingEnvironmentBinding(result, options = {}) {
         key: "filled_closeout_input",
         path: filledCloseoutInputPath,
         status: "operator_create"
+      },
+      {
+        key: "filled_closeout_draft",
+        path: filledCloseoutDraftPath,
+        status: result.filledCloseoutDraftFile ? fileOutputStatus(result.filledCloseoutDraftFile) : "example_only"
       },
       {
         key: "filled_closeout_input_example",
@@ -2268,6 +2284,11 @@ function buildFinalRehearsalPacket(result) {
         status: "operator_copy_from_example"
       },
       {
+        key: "filled_closeout_draft",
+        path: result.filledCloseoutDraftFile?.path || result.filledCloseoutInputDraft?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.draft.json"),
+        status: result.filledCloseoutDraftFile ? fileOutputStatus(result.filledCloseoutDraftFile) : "example_only"
+      },
+      {
         key: "filled_closeout_input_example",
         path: filledExample.saveAs || null,
         status: "example_only"
@@ -2485,6 +2506,13 @@ function buildStagingOperatorExecutionPlan(result) {
       status: fileOutputStatus(result.runRecordFile),
       path: result.runRecordFile?.path || null,
       purpose: "Archive the machine-readable record groups, missing keys, reload command, and next operator milestone."
+    },
+    {
+      key: "filled_closeout_draft",
+      label: "Staging filled closeout input draft JSON",
+      status: fileOutputStatus(result.filledCloseoutDraftFile),
+      path: result.filledCloseoutDraftFile?.path || result.filledCloseoutInputDraft?.saveAs || null,
+      purpose: "Copy this redacted draft to filled-closeout-input.json, replace null values with real evidence, remove exampleOnly, then reload closeout input."
     }
   ];
   const readinessGaps = buildOperatorReadinessGaps(result, { closeout, outputFiles });
@@ -2922,6 +2950,14 @@ function buildResult(options) {
       ? {
         runRecordFile: {
           path: path.resolve(repoRoot, options.runRecordFile),
+          written: false
+        }
+      }
+      : {}),
+    ...(options.filledCloseoutDraftFile
+      ? {
+        filledCloseoutDraftFile: {
+          path: path.resolve(repoRoot, options.filledCloseoutDraftFile),
           written: false
         }
       }
@@ -4156,6 +4192,26 @@ function writeRunRecordFile(result) {
   return nextResult;
 }
 
+function writeFilledCloseoutDraftFile(result) {
+  if (!result.filledCloseoutDraftFile) {
+    return result;
+  }
+  if (result.status !== "pass") {
+    return result;
+  }
+
+  const nextResult = {
+    ...result,
+    filledCloseoutDraftFile: {
+      ...result.filledCloseoutDraftFile,
+      written: true
+    }
+  };
+  mkdirSync(path.dirname(result.filledCloseoutDraftFile.path), { recursive: true });
+  writeFileSync(result.filledCloseoutDraftFile.path, `${JSON.stringify(result.filledCloseoutInputDraft, null, 2)}\n`, "utf8");
+  return nextResult;
+}
+
 function refreshOperatorExecutionPlan(result) {
   if (!result.operatorExecutionPlan) {
     return result;
@@ -4167,7 +4223,7 @@ function refreshOperatorExecutionPlan(result) {
 }
 
 function writeOutputFiles(result) {
-  return refreshOperatorExecutionPlan(writeRunRecordFile(writeCloseoutFile(writeHandoffFile(result))));
+  return refreshOperatorExecutionPlan(writeFilledCloseoutDraftFile(writeRunRecordFile(writeCloseoutFile(writeHandoffFile(result)))));
 }
 
 function writeResult(result, json) {

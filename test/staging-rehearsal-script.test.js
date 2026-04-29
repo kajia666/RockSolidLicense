@@ -835,6 +835,28 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.summary.productCode, "PROFILE_PRODUCT");
     assert.equal(output.summary.channel, "stable");
     assert.equal(output.summary.storageProfile, "postgres-preview");
+    assert.equal(output.stagingProfileLaunchPlan.status, "ready_for_profile_driven_rehearsal");
+    assert.equal(output.stagingProfileLaunchPlan.willModifyData, false);
+    assert.equal(output.stagingProfileLaunchPlan.profileFile, profileFile);
+    assert.deepEqual(output.stagingProfileLaunchPlan.cliOverrideKeys, [
+      "channel",
+      "handoffFile",
+      "closeoutFile"
+    ]);
+    assert.deepEqual(output.stagingProfileLaunchPlan.missingRequiredInputs, []);
+    assert.deepEqual(output.stagingProfileLaunchPlan.missingOutputFiles, []);
+    assert.deepEqual(
+      output.stagingProfileLaunchPlan.requiredSecretEnv.map((item) => [item.key, item.phase, item.present]),
+      [
+        ["RSL_SMOKE_ADMIN_PASSWORD", "before_live_write_smoke", true],
+        ["RSL_SMOKE_DEVELOPER_PASSWORD", "before_live_write_smoke", true],
+        ["RSL_DEVELOPER_BEARER_TOKEN", "before_evidence_recording", false]
+      ]
+    );
+    assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /npm\.cmd run staging:rehearsal -- --profile-file /);
+    assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--channel stable/);
+    assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--handoff-file /);
+    assert.match(output.stagingProfileLaunchPlan.nextAction, /Set required secret env vars/);
     assert.match(output.nextCommands.launchSmoke, /profile-staging\.example\.com/);
     assert.match(output.nextCommands.launchSmoke, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
     assert.equal(output.stagingEnvironmentBinding.environment.targetEnvFile, "/etc/rocksolidlicense/profile.env");
@@ -843,8 +865,13 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     const handoff = readFileSync(handoffFile, "utf8");
     assert.match(handoff, new RegExp(`Staging profile: ${profileFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}`));
     assert.match(handoff, /Profile keys: adminUsername, appBackupDir, baseUrl, channel, developerUsername, postgresBackupDir, productCode, storageProfile, targetEnvFile, targetOs/);
+    assert.match(handoff, /## Staging Profile Launch Plan/);
+    assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
+    assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile/);
+    assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: missing before_evidence_recording/);
     const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
     assert.deepEqual(template.stagingProfile, output.stagingProfile);
+    assert.deepEqual(template.stagingProfileLaunchPlan, output.stagingProfileLaunchPlan);
     assert.doesNotMatch(JSON.stringify(output), /ProfileAdmin123!|ProfileDeveloper123!/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -1084,6 +1111,7 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       providedKeys: [],
       secretPolicy: "passwords_and_bearer_tokens_must_come_from_environment_or_cli"
     });
+    assert.equal(template.stagingProfileLaunchPlan.status, "profile_not_loaded");
     assert.deepEqual(
       template.acceptanceFields.map((item) => item.key),
       output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)

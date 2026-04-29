@@ -72,6 +72,22 @@ const PROFILE_SECRET_FIELDS = [
   "password"
 ];
 
+const PROFILE_OPTION_FLAGS = {
+  baseUrl: "--base-url",
+  productCode: "--product-code",
+  channel: "--channel",
+  adminUsername: "--admin-username",
+  developerUsername: "--developer-username",
+  targetOs: "--target-os",
+  storageProfile: "--storage-profile",
+  targetEnvFile: "--target-env-file",
+  appBackupDir: "--app-backup-dir",
+  postgresBackupDir: "--postgres-backup-dir",
+  handoffFile: "--handoff-file",
+  closeoutFile: "--closeout-file",
+  closeoutInputFile: "--closeout-input-file"
+};
+
 function parseArgs(argv) {
   const options = {
     json: false,
@@ -150,6 +166,7 @@ function parseArgs(argv) {
     ...options,
     profileFile,
     stagingProfile: summarizeStagingProfile(stagingProfile),
+    profileCliOverrideKeys: PROFILE_ALLOWED_FIELDS.filter((key) => options[key] !== null && options[key] !== undefined),
     baseUrl: resolveProfileOption(options.baseUrl, "RSL_STAGING_BASE_URL", stagingProfile, "baseUrl"),
     productCode: resolveProfileOption(options.productCode, "RSL_SMOKE_PRODUCT_CODE", stagingProfile, "productCode"),
     channel: resolveProfileOption(options.channel, "RSL_SMOKE_CHANNEL", stagingProfile, "channel", "stable"),
@@ -230,6 +247,87 @@ function summarizeStagingProfile(stagingProfile) {
     file: stagingProfile?.file || null,
     providedKeys: stagingProfile?.providedKeys || [],
     secretPolicy: "passwords_and_bearer_tokens_must_come_from_environment_or_cli"
+  };
+}
+
+function commandValue(value) {
+  const text = String(value || "");
+  if (/[\s"`]/.test(text)) {
+    return `"${text.replace(/"/g, "`\"")}"`;
+  }
+  return text;
+}
+
+function buildProfileDrivenCommand(options) {
+  const parts = ["npm.cmd run staging:rehearsal --"];
+  if (options.profileFile) {
+    parts.push("--profile-file", commandValue(options.profileFile));
+  } else {
+    parts.push("--profile-file", "<staging-profile.json>");
+  }
+  for (const key of options.profileCliOverrideKeys || []) {
+    const flag = PROFILE_OPTION_FLAGS[key];
+    if (flag && options[key]) {
+      parts.push(flag, commandValue(options[key]));
+    }
+  }
+  return parts.join(" ");
+}
+
+function buildStagingProfileLaunchPlan(options) {
+  const profileLoaded = options.stagingProfile?.loaded === true;
+  const requiredInputs = [
+    "baseUrl",
+    "productCode",
+    "channel",
+    "adminUsername",
+    "developerUsername",
+    "targetOs",
+    "storageProfile",
+    "targetEnvFile",
+    "appBackupDir",
+    ...(options.storageProfile === "postgres-preview" ? ["postgresBackupDir"] : [])
+  ];
+  const outputFiles = ["handoffFile", "closeoutFile"];
+  const missingRequiredInputs = requiredInputs.filter((key) => !options[key]);
+  const missingOutputFiles = outputFiles.filter((key) => !options[key]);
+  const requiredSecretEnv = [
+    {
+      key: ADMIN_PASSWORD_ENV,
+      phase: "before_live_write_smoke",
+      present: Boolean(options.adminPassword)
+    },
+    {
+      key: DEVELOPER_PASSWORD_ENV,
+      phase: "before_live_write_smoke",
+      present: Boolean(options.developerPassword)
+    },
+    {
+      key: DEVELOPER_BEARER_TOKEN_ENV,
+      phase: "before_evidence_recording",
+      present: Boolean(process.env[DEVELOPER_BEARER_TOKEN_ENV])
+    }
+  ];
+  const status = !profileLoaded
+    ? "profile_not_loaded"
+    : missingRequiredInputs.length || missingOutputFiles.length
+      ? "needs_profile_completion"
+      : "ready_for_profile_driven_rehearsal";
+  return {
+    status,
+    willModifyData: false,
+    profileFile: options.stagingProfile?.file || null,
+    profileProvidedKeys: options.stagingProfile?.providedKeys || [],
+    cliOverrideKeys: options.profileCliOverrideKeys || [],
+    requiredInputs,
+    outputFiles,
+    missingRequiredInputs,
+    missingOutputFiles,
+    requiredSecretEnv,
+    recommendedCommand: buildProfileDrivenCommand(options),
+    nextAction: profileLoaded
+      ? "Set required secret env vars, run the recommended profile-driven rehearsal command, then review the generated handoff and closeout template before live writes."
+      : "Create a secret-free staging profile from docs/staging-rehearsal-profile.example.json before the real staging rehearsal."
   };
 }
 
@@ -2189,6 +2287,7 @@ function buildResult(options) {
       willModifyData: false
     },
     stagingProfile: options.stagingProfile,
+    stagingProfileLaunchPlan: buildStagingProfileLaunchPlan(options),
     preflights: {
       staging,
       recovery
@@ -2361,6 +2460,29 @@ function renderLaunchRouteMapGate(command) {
     `- Runs full suite: ${command.willRunFullSuite ? "yes" : "no"}`,
     `- Purpose: ${command.purpose}`
   ].join("\n");
+}
+
+function renderStagingProfileLaunchPlan(plan) {
+  if (!plan) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Profile launch plan status: ${plan.status || "-"}`,
+    `- Writes data by itself: ${plan.willModifyData ? "yes" : "no"}`,
+    `- Profile file: ${plan.profileFile || "-"}`,
+    `- CLI override keys: ${(plan.cliOverrideKeys || []).join(", ") || "-"}`,
+    `- Missing required inputs: ${(plan.missingRequiredInputs || []).join(", ") || "-"}`,
+    `- Missing output files: ${(plan.missingOutputFiles || []).join(", ") || "-"}`,
+    `- Recommended command: \`${plan.recommendedCommand || "-"}\``,
+    `- Next action: ${plan.nextAction || "-"}`
+  ];
+  if (Array.isArray(plan.requiredSecretEnv) && plan.requiredSecretEnv.length) {
+    lines.push("- Required secret env:");
+    for (const item of plan.requiredSecretEnv) {
+      lines.push(`  - ${item.key || "-"}: ${item.present ? "set" : "missing"} ${item.phase || "-"}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 function renderStagingEnvironmentReadiness(readiness) {
@@ -2953,6 +3075,10 @@ function renderHandoffFile(result) {
     `- Staging profile: ${result.stagingProfile?.loaded ? result.stagingProfile.file : "not loaded"}`,
     `- Profile keys: ${(result.stagingProfile?.providedKeys || []).join(", ") || "-"}`,
     "",
+    "## Staging Profile Launch Plan",
+    "",
+    renderStagingProfileLaunchPlan(result.stagingProfileLaunchPlan),
+    "",
     "## Gate Status",
     "",
     result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
@@ -3095,6 +3221,7 @@ function buildCloseoutTemplate(result) {
     targetOs: result.summary?.targetOs || null,
     storageProfile: result.summary?.storageProfile || null,
     stagingProfile: result.stagingProfile || summarizeStagingProfile(null),
+    stagingProfileLaunchPlan: result.stagingProfileLaunchPlan || null,
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
     archiveRoot: ledger.archiveRoot || null,

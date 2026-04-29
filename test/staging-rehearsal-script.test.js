@@ -472,10 +472,32 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ]
   );
   assert.doesNotMatch(JSON.stringify(output.stagingExecutionRunbook), /StrongAdmin123!|StrongDeveloper123!/);
+  assert.equal(output.stagingReadinessTransition.status, "blocked_until_closeout_reload");
+  assert.equal(output.stagingReadinessTransition.willModifyData, false);
+  assert.equal(output.stagingReadinessTransition.sourceRunbookStatus, "ready_for_real_staging_dry_run");
+  assert.equal(output.stagingReadinessTransition.closeoutInputStatus, "missing");
+  assert.equal(output.stagingReadinessTransition.reloadStep.command, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.deepEqual(
+    output.stagingReadinessTransition.gates.map((item) => [item.key, item.status, item.canEnter]),
+    [
+      ["full_test_window", "blocked", false],
+      ["production_signoff", "blocked", false],
+      ["launch_day_watch", "blocked", false]
+    ]
+  );
+  assert.deepEqual(output.stagingReadinessTransition.orderedNextActions, [
+    "complete_staging_execution_runbook",
+    "backfill_filled_closeout_input",
+    "reload_closeout_input",
+    "enter_full_test_window_after_ready",
+    "backfill_production_signoff_after_full_test"
+  ]);
+  assert.doesNotMatch(JSON.stringify(output.stagingReadinessTransition), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
   assert.equal(output.finalRehearsalPacket.willModifyData, false);
   assert.equal(output.finalRehearsalPacket.environmentBindingStatus, "ready_for_real_staging_binding");
   assert.equal(output.finalRehearsalPacket.executionRunbookStatus, "ready_for_real_staging_dry_run");
+  assert.equal(output.finalRehearsalPacket.readinessTransitionStatus, "blocked_until_closeout_reload");
   assert.equal(output.finalRehearsalPacket.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
   assert.equal(output.finalRehearsalPacket.commands.stagingRehearsalDryRun, output.stagingEnvironmentBinding.dryRunCommand);
   assert.equal(output.finalRehearsalPacket.commands.routeMapGate, "npm.cmd run launch:route-map-gate");
@@ -783,6 +805,11 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Command sequence: prepare_secret_env, generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, approve_live_write_smoke, run_live_write_smoke, archive_launch_smoke_handoff, record_launch_mainline_evidence, verify_receipt_visibility, backfill_filled_closeout_input, reload_closeout_input/);
     assert.match(handoff, /route_map_gate_result: run_route_map_gate -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
     assert.match(handoff, /operator_go_no_go: backfill_filled_closeout_input -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md/);
+    assert.match(handoff, /## Staging Readiness Transition/);
+    assert.match(handoff, /Transition status: blocked_until_closeout_reload/);
+    assert.match(handoff, /Closeout input status: missing/);
+    assert.match(handoff, /full_test_window: blocked \(canEnter=no\)/);
+    assert.match(handoff, /Ordered next actions: complete_staging_execution_runbook, backfill_filled_closeout_input, reload_closeout_input, enter_full_test_window_after_ready, backfill_production_signoff_after_full_test/);
     assert.match(handoff, /## Filled Closeout Input Example/);
     assert.match(handoff, /Example only: yes/);
     assert.match(handoff, /Save as: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.example\.json/);
@@ -982,9 +1009,12 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       template.stagingExecutionRunbook.closeoutBackfillTargets.find((item) => item.key === "launch_smoke_handoff").sourceStep,
       "archive_launch_smoke_handoff"
     );
+    assert.equal(template.stagingReadinessTransition.status, "blocked_until_closeout_reload");
+    assert.equal(template.stagingReadinessTransition.gates.find((item) => item.key === "full_test_window").canEnter, false);
     assert.equal(template.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
     assert.equal(template.finalRehearsalPacket.environmentBindingStatus, "ready_for_real_staging_binding");
     assert.equal(template.finalRehearsalPacket.executionRunbookStatus, "ready_for_real_staging_dry_run");
+    assert.equal(template.finalRehearsalPacket.readinessTransitionStatus, "blocked_until_closeout_reload");
     assert.equal(template.finalRehearsalPacket.commands.stagingRehearsalDryRun, template.stagingEnvironmentBinding.dryRunCommand);
     assert.equal(template.finalRehearsalPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
     assert.equal(
@@ -1117,6 +1147,22 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.fullTestWindowReadiness.canRun, true);
     assert.deepEqual(output.fullTestWindowReadiness.missingCloseoutKeys, []);
     assert.equal(output.fullTestWindowReadiness.nextAction, "Run npm.cmd test in the reserved full test window, then backfill productionSignoff.");
+    assert.equal(output.stagingReadinessTransition.status, "ready_for_full_test_window");
+    assert.deepEqual(
+      output.stagingReadinessTransition.gates.map((item) => [item.key, item.status, item.canEnter]),
+      [
+        ["full_test_window", "ready", true],
+        ["production_signoff", "blocked", false],
+        ["launch_day_watch", "blocked", false]
+      ]
+    );
+    assert.deepEqual(output.stagingReadinessTransition.orderedNextActions, [
+      "run_full_test_window",
+      "backfill_production_signoff",
+      "reload_closeout_input",
+      "production_signoff_review"
+    ]);
+    assert.equal(output.finalRehearsalPacket.readinessTransitionStatus, "ready_for_full_test_window");
     assert.equal(output.operatorExecutionPlan.readinessSummary.canSignoffProduction, false);
     assert.equal(output.operatorExecutionPlan.readinessSummary.gapCount, 3);
     assert.equal(
@@ -1239,7 +1285,22 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       stabilizationHandoff: "ready"
     });
     assert.equal(output.filledCloseoutInputExample.status, "example_only");
+    assert.equal(output.stagingReadinessTransition.status, "ready_for_launch_day_watch");
+    assert.deepEqual(
+      output.stagingReadinessTransition.gates.map((item) => [item.key, item.status, item.canEnter]),
+      [
+        ["full_test_window", "ready", true],
+        ["production_signoff", "ready", true],
+        ["launch_day_watch", "ready", true]
+      ]
+    );
+    assert.deepEqual(output.stagingReadinessTransition.orderedNextActions, [
+      "archive_production_signoff",
+      "start_launch_day_watch",
+      "prepare_stabilization_handoff"
+    ]);
     assert.equal(output.finalRehearsalPacket.status, "ready_for_launch_day_watch");
+    assert.equal(output.finalRehearsalPacket.readinessTransitionStatus, "ready_for_launch_day_watch");
     assert.deepEqual(output.finalRehearsalPacket.sourceReadiness, {
       fullTestWindow: "ready",
       productionSignoff: "ready",

@@ -1165,6 +1165,94 @@ function buildStagingExecutionRunbook(result) {
   };
 }
 
+function buildStagingReadinessTransition(result) {
+  const runbook = result.stagingExecutionRunbook || {};
+  const fullTestWindow = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
+  const productionSignoff = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const launchDayWatch = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
+  const reloadStep = (runbook.commandSequence || []).find((item) => item.key === "reload_closeout_input") || {};
+  const canRunFullTestWindow = fullTestWindow?.canRun === true;
+  const canSignoffProduction = productionSignoff?.canSignoff === true;
+  const canStartLaunchDayWatch = launchDayWatch?.canStartCutoverWatch === true;
+  let status = "blocked_until_closeout_reload";
+  let orderedNextActions = [
+    "complete_staging_execution_runbook",
+    "backfill_filled_closeout_input",
+    "reload_closeout_input",
+    "enter_full_test_window_after_ready",
+    "backfill_production_signoff_after_full_test"
+  ];
+  let nextAction = "Complete the staging execution runbook, backfill closeout input, and reload it before entering the full test window.";
+  if (canStartLaunchDayWatch) {
+    status = "ready_for_launch_day_watch";
+    orderedNextActions = [
+      "archive_production_signoff",
+      "start_launch_day_watch",
+      "prepare_stabilization_handoff"
+    ];
+    nextAction = "Archive production sign-off evidence, start launch-day watch, and prepare stabilization handoff.";
+  } else if (canRunFullTestWindow) {
+    status = "ready_for_full_test_window";
+    orderedNextActions = [
+      "run_full_test_window",
+      "backfill_production_signoff",
+      "reload_closeout_input",
+      "production_signoff_review"
+    ];
+    nextAction = "Run the full test window, backfill production sign-off evidence, reload closeout input, and review production sign-off.";
+  }
+  return {
+    status,
+    willModifyData: false,
+    sourceRunbookStatus: runbook.status || null,
+    closeoutInputStatus: result.closeoutInput?.status || "missing",
+    reloadStep: {
+      key: "reload_closeout_input",
+      command: reloadStep.command || fullTestWindow?.reloadCommand || productionSignoff?.reloadCommand || null,
+      expectedInputStatus: "loaded",
+      expectedTransitions: [
+        "ready_for_full_test_window",
+        "ready_for_launch_day_watch"
+      ]
+    },
+    gates: [
+      {
+        key: "full_test_window",
+        status: fullTestWindow?.status || "not_available",
+        canEnter: canRunFullTestWindow,
+        command: fullTestWindow?.command || null,
+        requiredDecision: fullTestWindow?.requiredDecision || null,
+        closeoutInputStatus: fullTestWindow?.closeoutInputStatus || "missing",
+        missingCloseoutKeys: fullTestWindow?.missingCloseoutKeys || [],
+        nextAction: fullTestWindow?.nextAction || null
+      },
+      {
+        key: "production_signoff",
+        status: productionSignoff?.status || "not_available",
+        canEnter: canSignoffProduction,
+        requiredDecision: productionSignoff?.requiredDecision || null,
+        productionDecision: productionSignoff?.productionDecision || null,
+        closeoutInputStatus: productionSignoff?.closeoutInputStatus || "missing",
+        missingSignoffKeys: productionSignoff?.missingSignoffKeys || [],
+        missingReceiptVisibilityKeys: productionSignoff?.missingReceiptVisibilityKeys || [],
+        nextAction: productionSignoff?.nextAction || null
+      },
+      {
+        key: "launch_day_watch",
+        status: launchDayWatch?.status || "not_available",
+        canEnter: canStartLaunchDayWatch,
+        requiredDecision: launchDayWatch?.requiredDecision || null,
+        productionDecision: launchDayWatch?.productionDecision || null,
+        missingSignoffKeys: launchDayWatch?.missingSignoffKeys || [],
+        missingReceiptVisibilityKeys: launchDayWatch?.missingReceiptVisibilityKeys || [],
+        nextAction: launchDayWatch?.nextAction || null
+      }
+    ],
+    orderedNextActions,
+    nextAction
+  };
+}
+
 function buildFinalRehearsalPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
@@ -1254,6 +1342,7 @@ function buildFinalRehearsalPacket(result) {
     willModifyData: false,
     environmentBindingStatus: result.stagingEnvironmentBinding?.status || null,
     executionRunbookStatus: result.stagingExecutionRunbook?.status || null,
+    readinessTransitionStatus: result.stagingReadinessTransition?.status || null,
     archiveRoot,
     sourceReadiness,
     commands: {
@@ -1974,9 +2063,13 @@ function buildResult(options) {
     ...resultWithStagingEnvironmentBinding,
     stagingExecutionRunbook: gatesPassed ? buildStagingExecutionRunbook(resultWithStagingEnvironmentBinding) : null
   };
-  const resultWithFinalRehearsalPacket = {
+  const resultWithStagingReadinessTransition = {
     ...resultWithStagingExecutionRunbook,
-    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithStagingExecutionRunbook) : null
+    stagingReadinessTransition: gatesPassed ? buildStagingReadinessTransition(resultWithStagingExecutionRunbook) : null
+  };
+  const resultWithFinalRehearsalPacket = {
+    ...resultWithStagingReadinessTransition,
+    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithStagingReadinessTransition) : null
   };
   return {
     ...resultWithFinalRehearsalPacket,
@@ -2497,6 +2590,40 @@ function renderStagingExecutionRunbook(runbook) {
   return lines.join("\n");
 }
 
+function renderStagingReadinessTransition(transition) {
+  if (!transition) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Transition status: ${transition.status || "-"}`,
+    `- Writes data: ${transition.willModifyData ? "yes" : "no"}`,
+    `- Source runbook status: ${transition.sourceRunbookStatus || "-"}`,
+    `- Closeout input status: ${transition.closeoutInputStatus || "-"}`,
+    `- Reload command: \`${transition.reloadStep?.command || "-"}\``,
+    `- Ordered next actions: ${(transition.orderedNextActions || []).join(", ") || "-"}`,
+    `- Next action: ${transition.nextAction || "-"}`
+  ];
+  if (Array.isArray(transition.gates) && transition.gates.length) {
+    lines.push("- Gates:");
+    for (const gate of transition.gates) {
+      lines.push(`  - ${gate.key || "-"}: ${gate.status || "-"} (canEnter=${gate.canEnter ? "yes" : "no"})`);
+      if (gate.command) {
+        lines.push(`    - command: \`${gate.command}\``);
+      }
+      if (Array.isArray(gate.missingCloseoutKeys) && gate.missingCloseoutKeys.length) {
+        lines.push(`    - missingCloseoutKeys: ${gate.missingCloseoutKeys.join(", ")}`);
+      }
+      if (Array.isArray(gate.missingSignoffKeys) && gate.missingSignoffKeys.length) {
+        lines.push(`    - missingSignoffKeys: ${gate.missingSignoffKeys.join(", ")}`);
+      }
+      if (Array.isArray(gate.missingReceiptVisibilityKeys) && gate.missingReceiptVisibilityKeys.length) {
+        lines.push(`    - missingReceiptVisibilityKeys: ${gate.missingReceiptVisibilityKeys.join(", ")}`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderFinalRehearsalPacket(packet) {
   if (!packet) {
     return "- Not available";
@@ -2507,6 +2634,7 @@ function renderFinalRehearsalPacket(packet) {
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
     `- Environment binding status: ${packet.environmentBindingStatus || "-"}`,
     `- Execution runbook status: ${packet.executionRunbookStatus || "-"}`,
+    `- Readiness transition status: ${packet.readinessTransitionStatus || "-"}`,
     `- Archive root: ${packet.archiveRoot || "-"}`,
     `- Staging rehearsal dry run: \`${packet.commands?.stagingRehearsalDryRun || "-"}\``,
     `- Route-map gate: \`${packet.commands?.routeMapGate || "-"}\``,
@@ -2642,6 +2770,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingExecutionRunbook(result.stagingExecutionRunbook),
     "",
+    "## Staging Readiness Transition",
+    "",
+    renderStagingReadinessTransition(result.stagingReadinessTransition),
+    "",
     "## Filled Closeout Input Example",
     "",
     renderFilledCloseoutInputExample(result.filledCloseoutInputExample),
@@ -2727,6 +2859,7 @@ function buildCloseoutTemplate(result) {
     stagingRunRecordTemplate: result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result),
     stagingEnvironmentBinding: result.stagingEnvironmentBinding || null,
     stagingExecutionRunbook: result.stagingExecutionRunbook || null,
+    stagingReadinessTransition: result.stagingReadinessTransition || null,
     filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
     finalRehearsalPacket: result.finalRehearsalPacket || buildFinalRehearsalPacket(result),
     closeoutInput: result.closeoutInput || null,

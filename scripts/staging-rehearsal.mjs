@@ -88,6 +88,61 @@ const PROFILE_OPTION_FLAGS = {
   closeoutInputFile: "--closeout-input-file"
 };
 
+const CLOSEOUT_SOURCE_STEPS = {
+  route_map_gate_result: "run_route_map_gate",
+  backup_restore_drill_result: "run_backup_restore_drill",
+  live_write_smoke_result: "run_live_write_smoke",
+  launch_smoke_handoff: "archive_launch_smoke_handoff",
+  launch_mainline_evidence_receipts: "record_launch_mainline_evidence",
+  receipt_visibility_review: "verify_receipt_visibility",
+  operator_go_no_go: "backfill_filled_closeout_input"
+};
+
+const PROFILE_BACKFILL_ARTIFACTS = [
+  {
+    closeoutKey: "route_map_gate_result",
+    artifactKey: "route_map_gate_output",
+    fileName: "route-map-gate-output.txt",
+    receiptOperations: []
+  },
+  {
+    closeoutKey: "backup_restore_drill_result",
+    artifactKey: "backup_restore_drill_log",
+    fileName: "backup-restore-drill.txt",
+    receiptOperations: ["record_recovery_drill", "record_backup_verification"]
+  },
+  {
+    closeoutKey: "live_write_smoke_result",
+    artifactKey: "live_write_smoke_output",
+    fileName: "live-write-smoke-output.json",
+    receiptOperations: ["record_launch_rehearsal_run"]
+  },
+  {
+    closeoutKey: "launch_smoke_handoff",
+    artifactKey: "launch_smoke_handoff",
+    fileName: "launch-smoke-handoff.json",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  {
+    closeoutKey: "launch_mainline_evidence_receipts",
+    artifactKey: "launch_mainline_evidence_receipts",
+    fileName: "launch-mainline-evidence-receipts.json",
+    receiptOperations: EVIDENCE_ACTIONS.map(([, operation]) => operation)
+  },
+  {
+    closeoutKey: "receipt_visibility_review",
+    artifactKey: "receipt_visibility_review",
+    fileName: "receipt-visibility-review.txt",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  {
+    closeoutKey: "operator_go_no_go",
+    artifactKey: "operator_go_no_go",
+    fileName: "operator-go-no-go.md",
+    receiptOperations: []
+  }
+];
+
 function parseArgs(argv) {
   const options = {
     json: false,
@@ -274,6 +329,37 @@ function buildProfileDrivenCommand(options) {
   return parts.join(" ");
 }
 
+function buildProfileBackfillManifest(options) {
+  if (options.stagingProfile?.loaded !== true) {
+    return {
+      status: "profile_not_loaded",
+      willModifyData: false,
+      archiveRoot: null,
+      closeoutInputPath: null,
+      rows: [],
+      nextAction: "Load a secret-free staging profile before preparing the profile-driven backfill manifest."
+    };
+  }
+  const productCode = sanitizeArtifactPathSegment(options.productCode, "product");
+  const channel = sanitizeArtifactPathSegment(options.channel || "stable", "stable");
+  const archiveRoot = path.posix.join("artifacts", "staging", productCode, channel);
+  return {
+    status: "awaiting_profile_driven_results",
+    willModifyData: false,
+    archiveRoot,
+    closeoutInputPath: path.posix.join(archiveRoot, "filled-closeout-input.json"),
+    rows: PROFILE_BACKFILL_ARTIFACTS.map((item) => ({
+      closeoutKey: item.closeoutKey,
+      sourceStep: CLOSEOUT_SOURCE_STEPS[item.closeoutKey] || "operator_backfill",
+      artifactKey: item.artifactKey,
+      artifactPath: path.posix.join(archiveRoot, item.fileName),
+      receiptOperations: item.receiptOperations,
+      operatorNote: "Backfill only redacted statuses, artifact paths, receipt IDs, handoff file names, and operator decisions."
+    })),
+    nextAction: "After the profile-driven rehearsal steps run, copy these artifact paths and receipt operations into the closeout template before reloading closeout input."
+  };
+}
+
 function buildStagingProfileLaunchPlan(options) {
   const profileLoaded = options.stagingProfile?.loaded === true;
   const requiredInputs = [
@@ -325,6 +411,7 @@ function buildStagingProfileLaunchPlan(options) {
     missingOutputFiles,
     requiredSecretEnv,
     recommendedCommand: buildProfileDrivenCommand(options),
+    backfillManifest: buildProfileBackfillManifest(options),
     nextAction: profileLoaded
       ? "Set required secret env vars, run the recommended profile-driven rehearsal command, then review the generated handoff and closeout template before live writes."
       : "Create a secret-free staging profile from docs/staging-rehearsal-profile.example.json before the real staging rehearsal."
@@ -1212,15 +1299,6 @@ function buildStagingExecutionRunbook(result) {
   const filledCloseoutInputPath = outputFileByKey.get("filled_closeout_input")?.path
     || path.posix.join(archiveRoot, "filled-closeout-input.json");
   const filledExample = result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result);
-  const sourceStepByCloseoutKey = {
-    route_map_gate_result: "run_route_map_gate",
-    backup_restore_drill_result: "run_backup_restore_drill",
-    live_write_smoke_result: "run_live_write_smoke",
-    launch_smoke_handoff: "archive_launch_smoke_handoff",
-    launch_mainline_evidence_receipts: "record_launch_mainline_evidence",
-    receipt_visibility_review: "verify_receipt_visibility",
-    operator_go_no_go: "backfill_filled_closeout_input"
-  };
   const commandSequence = [
     {
       key: "prepare_secret_env",
@@ -1334,7 +1412,7 @@ function buildStagingExecutionRunbook(result) {
       const row = ledgerRowsByKey.get(check.key) || {};
       return {
         key: check.key,
-        sourceStep: sourceStepByCloseoutKey[check.key] || "operator_backfill",
+        sourceStep: CLOSEOUT_SOURCE_STEPS[check.key] || "operator_backfill",
         artifactPath: row.artifactPath || null,
         receiptOperations: row.receiptOperations || [],
         expectedEvidence: check.expectedEvidence || null,
@@ -2480,6 +2558,17 @@ function renderStagingProfileLaunchPlan(plan) {
     lines.push("- Required secret env:");
     for (const item of plan.requiredSecretEnv) {
       lines.push(`  - ${item.key || "-"}: ${item.present ? "set" : "missing"} ${item.phase || "-"}`);
+    }
+  }
+  if (plan.backfillManifest) {
+    lines.push(`- Backfill manifest: ${plan.backfillManifest.status || "-"}`);
+    lines.push(`  - archiveRoot: ${plan.backfillManifest.archiveRoot || "-"}`);
+    lines.push(`  - closeoutInputPath: ${plan.backfillManifest.closeoutInputPath || "-"}`);
+    if (Array.isArray(plan.backfillManifest.rows) && plan.backfillManifest.rows.length) {
+      lines.push("  - rows:");
+      for (const row of plan.backfillManifest.rows) {
+        lines.push(`    - ${row.closeoutKey || "-"}: ${row.sourceStep || "-"} -> ${row.artifactPath || "-"}`);
+      }
     }
   }
   return lines.join("\n");

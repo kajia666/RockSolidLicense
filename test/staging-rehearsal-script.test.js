@@ -857,6 +857,30 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--channel stable/);
     assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--handoff-file /);
     assert.match(output.stagingProfileLaunchPlan.nextAction, /Set required secret env vars/);
+    assert.equal(output.stagingProfileLaunchPlan.backfillManifest.status, "awaiting_profile_driven_results");
+    assert.equal(output.stagingProfileLaunchPlan.backfillManifest.archiveRoot, "artifacts/staging/PROFILE_PRODUCT/stable");
+    assert.equal(output.stagingProfileLaunchPlan.backfillManifest.closeoutInputPath, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.deepEqual(
+      output.stagingProfileLaunchPlan.backfillManifest.rows.map((item) => [item.closeoutKey, item.sourceStep, item.artifactPath]),
+      [
+        ["route_map_gate_result", "run_route_map_gate", "artifacts/staging/PROFILE_PRODUCT/stable/route-map-gate-output.txt"],
+        ["backup_restore_drill_result", "run_backup_restore_drill", "artifacts/staging/PROFILE_PRODUCT/stable/backup-restore-drill.txt"],
+        ["live_write_smoke_result", "run_live_write_smoke", "artifacts/staging/PROFILE_PRODUCT/stable/live-write-smoke-output.json"],
+        ["launch_smoke_handoff", "archive_launch_smoke_handoff", "artifacts/staging/PROFILE_PRODUCT/stable/launch-smoke-handoff.json"],
+        ["launch_mainline_evidence_receipts", "record_launch_mainline_evidence", "artifacts/staging/PROFILE_PRODUCT/stable/launch-mainline-evidence-receipts.json"],
+        ["receipt_visibility_review", "verify_receipt_visibility", "artifacts/staging/PROFILE_PRODUCT/stable/receipt-visibility-review.txt"],
+        ["operator_go_no_go", "backfill_filled_closeout_input", "artifacts/staging/PROFILE_PRODUCT/stable/operator-go-no-go.md"]
+      ]
+    );
+    assert.deepEqual(
+      output.stagingProfileLaunchPlan.backfillManifest.rows.find((item) => item.closeoutKey === "backup_restore_drill_result").receiptOperations,
+      ["record_recovery_drill", "record_backup_verification"]
+    );
+    assert.ok(
+      output.stagingProfileLaunchPlan.backfillManifest.rows
+        .find((item) => item.closeoutKey === "launch_mainline_evidence_receipts")
+        .receiptOperations.includes("record_launch_stabilization_review")
+    );
     assert.match(output.nextCommands.launchSmoke, /profile-staging\.example\.com/);
     assert.match(output.nextCommands.launchSmoke, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
     assert.equal(output.stagingEnvironmentBinding.environment.targetEnvFile, "/etc/rocksolidlicense/profile.env");
@@ -869,6 +893,9 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
     assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile/);
     assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: missing before_evidence_recording/);
+    assert.match(handoff, /Backfill manifest: awaiting_profile_driven_results/);
+    assert.match(handoff, /backup_restore_drill_result: run_backup_restore_drill -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/backup-restore-drill\.txt/);
+    assert.match(handoff, /launch_mainline_evidence_receipts: record_launch_mainline_evidence -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-mainline-evidence-receipts\.json/);
     const template = JSON.parse(readFileSync(closeoutFile, "utf8"));
     assert.deepEqual(template.stagingProfile, output.stagingProfile);
     assert.deepEqual(template.stagingProfileLaunchPlan, output.stagingProfileLaunchPlan);

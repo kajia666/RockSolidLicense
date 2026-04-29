@@ -64,6 +64,7 @@ const PROFILE_ALLOWED_FIELDS = [
   "artifactManifestFile",
   "closeoutReloadPacketFile",
   "readinessReviewPacketFile",
+  "launchDutyArchiveIndexFile",
   "filledCloseoutDraftFile",
   "closeoutInputFile"
 ];
@@ -94,6 +95,7 @@ const PROFILE_OPTION_FLAGS = {
   artifactManifestFile: "--artifact-manifest-file",
   closeoutReloadPacketFile: "--closeout-reload-packet-file",
   readinessReviewPacketFile: "--readiness-review-packet-file",
+  launchDutyArchiveIndexFile: "--launch-duty-archive-index-file",
   filledCloseoutDraftFile: "--filled-closeout-draft-file",
   closeoutInputFile: "--closeout-input-file"
 };
@@ -174,6 +176,7 @@ function parseArgs(argv) {
     artifactManifestFile: null,
     closeoutReloadPacketFile: null,
     readinessReviewPacketFile: null,
+    launchDutyArchiveIndexFile: null,
     filledCloseoutDraftFile: null,
     closeoutInputFile: null,
     profileFile: null
@@ -224,6 +227,8 @@ function parseArgs(argv) {
       options.closeoutReloadPacketFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--readiness-review-packet-file") {
       options.readinessReviewPacketFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--launch-duty-archive-index-file") {
+      options.launchDutyArchiveIndexFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--filled-closeout-draft-file") {
       options.filledCloseoutDraftFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-input-file") {
@@ -265,6 +270,7 @@ function parseArgs(argv) {
     artifactManifestFile: resolveProfileOption(options.artifactManifestFile, "RSL_REHEARSAL_ARTIFACT_MANIFEST_FILE", stagingProfile, "artifactManifestFile"),
     closeoutReloadPacketFile: resolveProfileOption(options.closeoutReloadPacketFile, "RSL_REHEARSAL_CLOSEOUT_RELOAD_PACKET_FILE", stagingProfile, "closeoutReloadPacketFile"),
     readinessReviewPacketFile: resolveProfileOption(options.readinessReviewPacketFile, "RSL_REHEARSAL_READINESS_REVIEW_PACKET_FILE", stagingProfile, "readinessReviewPacketFile"),
+    launchDutyArchiveIndexFile: resolveProfileOption(options.launchDutyArchiveIndexFile, "RSL_REHEARSAL_LAUNCH_DUTY_ARCHIVE_INDEX_FILE", stagingProfile, "launchDutyArchiveIndexFile"),
     filledCloseoutDraftFile: resolveProfileOption(options.filledCloseoutDraftFile, "RSL_REHEARSAL_FILLED_CLOSEOUT_DRAFT_FILE", stagingProfile, "filledCloseoutDraftFile"),
     closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile")
   };
@@ -404,7 +410,7 @@ function buildStagingProfileLaunchPlan(options) {
     "appBackupDir",
     ...(options.storageProfile === "postgres-preview" ? ["postgresBackupDir"] : [])
   ];
-  const outputFiles = ["handoffFile", "closeoutFile", "runRecordFile", "artifactManifestFile", "closeoutReloadPacketFile", "readinessReviewPacketFile", "filledCloseoutDraftFile"];
+  const outputFiles = ["handoffFile", "closeoutFile", "runRecordFile", "artifactManifestFile", "closeoutReloadPacketFile", "readinessReviewPacketFile", "launchDutyArchiveIndexFile", "filledCloseoutDraftFile"];
   const missingRequiredInputs = requiredInputs.filter((key) => !options[key]);
   const missingOutputFiles = outputFiles.filter((key) => !options[key]);
   const requiredSecretEnv = [
@@ -528,7 +534,7 @@ function buildStagingProfileOperatorPreflight(result) {
         missing: missingOutputFiles,
         nextAction: missingOutputFiles.length === 0
           ? "Handoff and closeout output paths are available."
-          : "Provide handoffFile, closeoutFile, runRecordFile, artifactManifestFile, closeoutReloadPacketFile, readinessReviewPacketFile, and filledCloseoutDraftFile paths for launch duty artifacts."
+          : "Provide handoffFile, closeoutFile, runRecordFile, artifactManifestFile, closeoutReloadPacketFile, readinessReviewPacketFile, launchDutyArchiveIndexFile, and filledCloseoutDraftFile paths for launch duty artifacts."
       },
       {
         key: "secret_env",
@@ -1016,6 +1022,67 @@ function buildStagingReadinessReviewPacket(result) {
           : status === "ready_for_full_test_window"
             ? "Run npm.cmd test in the reserved full test window, then backfill production sign-off evidence."
             : "Reload filled closeout input, then use this packet to decide whether the full test window can start."
+  };
+}
+
+function buildStagingLaunchDutyArchiveIndex(result) {
+  const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
+  const artifactManifest = result.stagingArtifactManifest || buildStagingArtifactManifest(result);
+  const closeoutReloadPacket = result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result);
+  const readinessReviewPacket = result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result);
+  const finalPacket = result.finalRehearsalPacket || buildFinalRehearsalPacket(result);
+  const archiveRoot = readinessReviewPacket.archiveRoot
+    || closeoutReloadPacket.archiveRoot
+    || artifactManifest.archiveRoot
+    || runRecordIndex.archiveRoot
+    || finalPacket.archiveRoot
+    || "artifacts/staging/product/stable";
+  const indexFile = result.launchDutyArchiveIndexFile?.path
+    || bindingFiles.get("launch_duty_archive_index")?.path
+    || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
+  const packetPath = (key, fallback) => bindingFiles.get(key)?.path || fallback || null;
+  return {
+    mode: "staging-launch-duty-archive-index",
+    status: "awaiting_archive_review",
+    willModifyData: false,
+    archiveRoot,
+    indexFile,
+    sourceStatuses: {
+      runRecordIndex: runRecordIndex.status || "not_available",
+      artifactManifest: artifactManifest.status || "not_available",
+      closeoutReloadPacket: closeoutReloadPacket.status || "not_available",
+      readinessReviewPacket: readinessReviewPacket.status || "not_available",
+      finalPacket: finalPacket.status || "not_available"
+    },
+    packets: [
+      {
+        key: "run_record_index",
+        status: runRecordIndex.status || "not_available",
+        path: packetPath("run_record_index", result.runRecordFile?.path)
+      },
+      {
+        key: "artifact_manifest",
+        status: artifactManifest.status || "not_available",
+        path: packetPath("artifact_manifest", result.artifactManifestFile?.path)
+      },
+      {
+        key: "closeout_reload_packet",
+        status: closeoutReloadPacket.status || "not_available",
+        path: packetPath("closeout_reload_packet", closeoutReloadPacket.paths?.packetFile)
+      },
+      {
+        key: "readiness_review_packet",
+        status: readinessReviewPacket.status || "not_available",
+        path: packetPath("readiness_review_packet", readinessReviewPacket.packetFile)
+      }
+    ],
+    commands: {
+      stagingDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
+      closeoutReload: readinessReviewPacket.commands?.closeoutReload || closeoutReloadPacket.commands?.closeoutReload || null,
+      fullTestWindow: readinessReviewPacket.commands?.fullTestWindow || finalPacket.commands?.fullTestWindow || "npm.cmd test"
+    },
+    nextAction: "Archive the listed launch-duty packets, then use readiness review to decide whether the full test window can start."
   };
 }
 
@@ -1940,6 +2007,7 @@ function buildStagingEnvironmentBinding(result, options = {}) {
   const artifactManifestPath = result.artifactManifestFile?.path || path.posix.join(archiveRoot, "staging-artifact-manifest.json");
   const closeoutReloadPacketPath = result.closeoutReloadPacketFile?.path || path.posix.join(archiveRoot, "staging-closeout-reload-packet.json");
   const readinessReviewPacketPath = result.readinessReviewPacketFile?.path || path.posix.join(archiveRoot, "staging-readiness-review-packet.json");
+  const launchDutyArchiveIndexPath = result.launchDutyArchiveIndexFile?.path || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
   const filledCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
   const filledCloseoutDraftPath = result.filledCloseoutDraftFile?.path
     || result.filledCloseoutInputDraft?.saveAs
@@ -1998,6 +2066,8 @@ function buildStagingEnvironmentBinding(result, options = {}) {
     closeoutReloadPacketPath,
     "--readiness-review-packet-file",
     readinessReviewPacketPath,
+    "--launch-duty-archive-index-file",
+    launchDutyArchiveIndexPath,
     "--filled-closeout-draft-file",
     filledCloseoutDraftPath
   ].filter((part) => part !== null && part !== undefined && String(part) !== "");
@@ -2040,6 +2110,11 @@ function buildStagingEnvironmentBinding(result, options = {}) {
         key: "readiness_review_packet",
         path: readinessReviewPacketPath,
         status: result.readinessReviewPacketFile ? fileOutputStatus(result.readinessReviewPacketFile) : "recommended_default"
+      },
+      {
+        key: "launch_duty_archive_index",
+        path: launchDutyArchiveIndexPath,
+        status: result.launchDutyArchiveIndexFile ? fileOutputStatus(result.launchDutyArchiveIndexFile) : "recommended_default"
       },
       {
         key: "filled_closeout_input",
@@ -2566,6 +2641,11 @@ function buildFinalRehearsalPacket(result) {
         status: fileOutputStatus(result.readinessReviewPacketFile)
       },
       {
+        key: "launch_duty_archive_index",
+        path: result.launchDutyArchiveIndexFile?.path || null,
+        status: fileOutputStatus(result.launchDutyArchiveIndexFile)
+      },
+      {
         key: "filled_closeout_input",
         path: filledCloseoutInputPath,
         status: "operator_copy_from_example"
@@ -2814,6 +2894,13 @@ function buildStagingOperatorExecutionPlan(result) {
       status: fileOutputStatus(result.readinessReviewPacketFile),
       path: result.readinessReviewPacketFile?.path || null,
       purpose: "Summarize full-test, production sign-off, launch-day watch, and stabilization readiness after closeout reload."
+    },
+    {
+      key: "launch_duty_archive_index",
+      label: "Staging launch-duty archive index JSON",
+      status: fileOutputStatus(result.launchDutyArchiveIndexFile),
+      path: result.launchDutyArchiveIndexFile?.path || null,
+      purpose: "List the core launch-duty packets, their statuses, archive paths, and handoff commands."
     },
     {
       key: "filled_closeout_draft",
@@ -3286,6 +3373,14 @@ function buildResult(options) {
         }
       }
       : {}),
+    ...(options.launchDutyArchiveIndexFile
+      ? {
+        launchDutyArchiveIndexFile: {
+          path: path.resolve(repoRoot, options.launchDutyArchiveIndexFile),
+          written: false
+        }
+      }
+      : {}),
     ...(options.filledCloseoutDraftFile
       ? {
         filledCloseoutDraftFile: {
@@ -3394,9 +3489,13 @@ function buildResult(options) {
     ...resultWithStagingCloseoutReloadPacket,
     stagingReadinessReviewPacket: gatesPassed ? buildStagingReadinessReviewPacket(resultWithStagingCloseoutReloadPacket) : null
   };
-  return {
+  const resultWithStagingLaunchDutyArchiveIndex = {
     ...resultWithStagingReadinessReviewPacket,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingReadinessReviewPacket) : null
+    stagingLaunchDutyArchiveIndex: gatesPassed ? buildStagingLaunchDutyArchiveIndex(resultWithStagingReadinessReviewPacket) : null
+  };
+  return {
+    ...resultWithStagingLaunchDutyArchiveIndex,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingLaunchDutyArchiveIndex) : null
   };
 }
 
@@ -4419,6 +4518,7 @@ function buildCloseoutTemplate(result) {
     stagingArtifactManifest: result.stagingArtifactManifest || buildStagingArtifactManifest(result),
     stagingCloseoutReloadPacket: result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result),
     stagingReadinessReviewPacket: result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result),
+    stagingLaunchDutyArchiveIndex: result.stagingLaunchDutyArchiveIndex || buildStagingLaunchDutyArchiveIndex(result),
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
     archiveRoot: ledger.archiveRoot || null,
@@ -4599,6 +4699,26 @@ function writeReadinessReviewPacketFile(result) {
   return nextResult;
 }
 
+function writeLaunchDutyArchiveIndexFile(result) {
+  if (!result.launchDutyArchiveIndexFile) {
+    return result;
+  }
+  if (result.status !== "pass") {
+    return result;
+  }
+
+  const nextResult = {
+    ...result,
+    launchDutyArchiveIndexFile: {
+      ...result.launchDutyArchiveIndexFile,
+      written: true
+    }
+  };
+  mkdirSync(path.dirname(result.launchDutyArchiveIndexFile.path), { recursive: true });
+  writeFileSync(result.launchDutyArchiveIndexFile.path, `${JSON.stringify(result.stagingLaunchDutyArchiveIndex, null, 2)}\n`, "utf8");
+  return nextResult;
+}
+
 function writeFilledCloseoutDraftFile(result) {
   if (!result.filledCloseoutDraftFile) {
     return result;
@@ -4631,13 +4751,15 @@ function refreshOperatorExecutionPlan(result) {
 
 function writeOutputFiles(result) {
   return refreshOperatorExecutionPlan(
-    writeReadinessReviewPacketFile(
-      writeCloseoutReloadPacketFile(
-        writeArtifactManifestFile(
-          writeFilledCloseoutDraftFile(
-            writeRunRecordFile(
-              writeCloseoutFile(
-                writeHandoffFile(result)
+    writeLaunchDutyArchiveIndexFile(
+      writeReadinessReviewPacketFile(
+        writeCloseoutReloadPacketFile(
+          writeArtifactManifestFile(
+            writeFilledCloseoutDraftFile(
+              writeRunRecordFile(
+                writeCloseoutFile(
+                  writeHandoffFile(result)
+                )
               )
             )
           )

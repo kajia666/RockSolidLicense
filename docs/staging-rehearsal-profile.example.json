@@ -15,5 +15,6 @@
   "artifactManifestFile": "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json",
   "closeoutReloadPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json",
   "readinessReviewPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json",
+  "launchDutyArchiveIndexFile": "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json",
   "filledCloseoutDraftFile": "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json"
 }

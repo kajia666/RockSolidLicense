@@ -14498,6 +14498,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Traceability:/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Latest Launch Receipt: record_post_launch_ops_sweep/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.ok(launchMainlinePostLaunchIndexDownload.body.includes(latestLaunchReceipt.handoffFileName));
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);

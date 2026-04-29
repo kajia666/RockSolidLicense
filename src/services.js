@@ -16621,6 +16621,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const latestLaunchReceipt = traceability.latestLaunchReceipt || null;
   const launchReceiptNextFollowUp = traceability.nextFollowUp || null;
   const opsFiles = traceability.opsFiles || {};
+  const launchReceiptAuditBackfill = Number(traceability.launchReceiptAuditBackfill || 0);
+  const launchReceiptAuditBackfillStatus = traceability.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const launchDutyActionOrder = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
     productCode: project.code || filters.productCode || "",
@@ -16644,6 +16647,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     `Project Code: ${project.code || filters.productCode || "-"}`,
     `Project Name: ${project.name || "-"}`,
     `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     `Post-Launch Lifecycle: ${String(lifecycle.status || "unknown").toUpperCase()}`,
     `Lifecycle Counts: ready=${lifecycle.readyCount ?? 0} | hold=${lifecycle.holdCount ?? 0} | review=${lifecycle.reviewCount ?? 0}`,
     `Next Lifecycle Action: ${lifecycle.nextAction?.title || lifecycle.nextAction?.label || lifecycle.nextAction?.key || "All post-launch lifecycle phases are aligned."}`,

@@ -414,9 +414,68 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--handoff-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-rehearsal-handoff\.md/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--closeout-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-template\.json/);
   assert.doesNotMatch(JSON.stringify(output.stagingEnvironmentBinding), /StrongAdmin123!|StrongDeveloper123!/);
+  assert.equal(output.stagingExecutionRunbook.status, "ready_for_real_staging_dry_run");
+  assert.equal(output.stagingExecutionRunbook.willModifyData, false);
+  assert.equal(output.stagingExecutionRunbook.containsLiveWriteStep, true);
+  assert.equal(output.stagingExecutionRunbook.liveWriteRequiresApproval, true);
+  assert.equal(output.stagingExecutionRunbook.sourceBindingStatus, "ready_for_real_staging_binding");
+  assert.equal(output.stagingExecutionRunbook.artifactArchiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.deepEqual(
+    output.stagingExecutionRunbook.commandSequence.map((item) => item.key),
+    [
+      "prepare_secret_env",
+      "generate_rehearsal_outputs",
+      "run_route_map_gate",
+      "run_backup_restore_drill",
+      "approve_live_write_smoke",
+      "run_live_write_smoke",
+      "archive_launch_smoke_handoff",
+      "record_launch_mainline_evidence",
+      "verify_receipt_visibility",
+      "backfill_filled_closeout_input",
+      "reload_closeout_input"
+    ]
+  );
+  const runbookSteps = Object.fromEntries(
+    output.stagingExecutionRunbook.commandSequence.map((item) => [item.key, item])
+  );
+  assert.deepEqual(runbookSteps.prepare_secret_env.env, [
+    "RSL_SMOKE_ADMIN_PASSWORD",
+    "RSL_SMOKE_DEVELOPER_PASSWORD",
+    "RSL_DEVELOPER_BEARER_TOKEN"
+  ]);
+  assert.equal(runbookSteps.generate_rehearsal_outputs.command, output.stagingEnvironmentBinding.dryRunCommand);
+  assert.deepEqual(runbookSteps.generate_rehearsal_outputs.outputs, ["handoff_file", "closeout_file"]);
+  assert.equal(runbookSteps.run_route_map_gate.command, "npm.cmd run launch:route-map-gate");
+  assert.deepEqual(runbookSteps.run_backup_restore_drill.commandKeys, [
+    "appBackup",
+    "postgresBackup",
+    "postgresRestoreDryRun",
+    "restoreDrillReminder",
+    "healthcheck"
+  ]);
+  assert.equal(runbookSteps.run_live_write_smoke.willModifyData, true);
+  assert.match(runbookSteps.run_live_write_smoke.command, /launch:smoke:staging/);
+  assert.equal(runbookSteps.record_launch_mainline_evidence.endpoint, output.evidenceActionPlan.endpoint);
+  assert.equal(runbookSteps.backfill_filled_closeout_input.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(runbookSteps.reload_closeout_input.command, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.deepEqual(
+    output.stagingExecutionRunbook.closeoutBackfillTargets.map((item) => [item.key, item.sourceStep, item.artifactPath]),
+    [
+      ["route_map_gate_result", "run_route_map_gate", "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt"],
+      ["backup_restore_drill_result", "run_backup_restore_drill", "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt"],
+      ["live_write_smoke_result", "run_live_write_smoke", "artifacts/staging/PILOT_ALPHA/stable/live-write-smoke-output.json"],
+      ["launch_smoke_handoff", "archive_launch_smoke_handoff", "artifacts/staging/PILOT_ALPHA/stable/launch-smoke-handoff.json"],
+      ["launch_mainline_evidence_receipts", "record_launch_mainline_evidence", "artifacts/staging/PILOT_ALPHA/stable/launch-mainline-evidence-receipts.json"],
+      ["receipt_visibility_review", "verify_receipt_visibility", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-review.txt"],
+      ["operator_go_no_go", "backfill_filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md"]
+    ]
+  );
+  assert.doesNotMatch(JSON.stringify(output.stagingExecutionRunbook), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
   assert.equal(output.finalRehearsalPacket.willModifyData, false);
   assert.equal(output.finalRehearsalPacket.environmentBindingStatus, "ready_for_real_staging_binding");
+  assert.equal(output.finalRehearsalPacket.executionRunbookStatus, "ready_for_real_staging_dry_run");
   assert.equal(output.finalRehearsalPacket.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
   assert.equal(output.finalRehearsalPacket.commands.stagingRehearsalDryRun, output.stagingEnvironmentBinding.dryRunCommand);
   assert.equal(output.finalRehearsalPacket.commands.routeMapGate, "npm.cmd run launch:route-map-gate");
@@ -718,6 +777,12 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.ok(handoff.includes(`Handoff file: ${handoffFile}`));
     assert.match(handoff, /Closeout file: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-template\.json/);
     assert.match(handoff, /Dry run command: `npm\.cmd run staging:rehearsal -- --json/);
+    assert.match(handoff, /## Staging Execution Runbook/);
+    assert.match(handoff, /Runbook status: ready_for_real_staging_dry_run/);
+    assert.match(handoff, /Contains live-write step: yes/);
+    assert.match(handoff, /Command sequence: prepare_secret_env, generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, approve_live_write_smoke, run_live_write_smoke, archive_launch_smoke_handoff, record_launch_mainline_evidence, verify_receipt_visibility, backfill_filled_closeout_input, reload_closeout_input/);
+    assert.match(handoff, /route_map_gate_result: run_route_map_gate -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
+    assert.match(handoff, /operator_go_no_go: backfill_filled_closeout_input -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md/);
     assert.match(handoff, /## Filled Closeout Input Example/);
     assert.match(handoff, /Example only: yes/);
     assert.match(handoff, /Save as: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.example\.json/);
@@ -908,8 +973,18 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     );
     assert.match(template.stagingEnvironmentBinding.dryRunCommand, /--closeout-file /);
     assert.doesNotMatch(JSON.stringify(template.stagingEnvironmentBinding), /StrongAdmin123!|StrongDeveloper123!/);
+    assert.equal(template.stagingExecutionRunbook.status, "ready_for_real_staging_dry_run");
+    assert.equal(
+      template.stagingExecutionRunbook.commandSequence.find((item) => item.key === "generate_rehearsal_outputs").command,
+      template.stagingEnvironmentBinding.dryRunCommand
+    );
+    assert.equal(
+      template.stagingExecutionRunbook.closeoutBackfillTargets.find((item) => item.key === "launch_smoke_handoff").sourceStep,
+      "archive_launch_smoke_handoff"
+    );
     assert.equal(template.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
     assert.equal(template.finalRehearsalPacket.environmentBindingStatus, "ready_for_real_staging_binding");
+    assert.equal(template.finalRehearsalPacket.executionRunbookStatus, "ready_for_real_staging_dry_run");
     assert.equal(template.finalRehearsalPacket.commands.stagingRehearsalDryRun, template.stagingEnvironmentBinding.dryRunCommand);
     assert.equal(template.finalRehearsalPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
     assert.equal(

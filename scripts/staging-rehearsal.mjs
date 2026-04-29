@@ -1019,6 +1019,152 @@ function buildStagingEnvironmentBinding(result, options = {}) {
   };
 }
 
+function buildStagingExecutionRunbook(result) {
+  const binding = result.stagingEnvironmentBinding || null;
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const ledger = closeout.artifactReceiptLedger || {};
+  const ledgerRowsByKey = new Map((ledger.rows || []).map((row) => [row.checkKey, row]));
+  const outputFileByKey = new Map((binding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  const archiveRoot = outputFileByKey.get("artifact_archive_root")?.path
+    || ledger.archiveRoot
+    || result.stagingRunRecordTemplate?.archiveRoot
+    || "artifacts/staging/product/stable";
+  const filledCloseoutInputPath = outputFileByKey.get("filled_closeout_input")?.path
+    || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const filledExample = result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result);
+  const sourceStepByCloseoutKey = {
+    route_map_gate_result: "run_route_map_gate",
+    backup_restore_drill_result: "run_backup_restore_drill",
+    live_write_smoke_result: "run_live_write_smoke",
+    launch_smoke_handoff: "archive_launch_smoke_handoff",
+    launch_mainline_evidence_receipts: "record_launch_mainline_evidence",
+    receipt_visibility_review: "verify_receipt_visibility",
+    operator_go_no_go: "backfill_filled_closeout_input"
+  };
+  const commandSequence = [
+    {
+      key: "prepare_secret_env",
+      status: "operator_prepare",
+      willModifyData: false,
+      env: [
+        binding?.credentialEnv?.adminPassword || ADMIN_PASSWORD_ENV,
+        binding?.credentialEnv?.developerPassword || DEVELOPER_PASSWORD_ENV,
+        binding?.credentialEnv?.developerBearerToken || DEVELOPER_BEARER_TOKEN_ENV
+      ],
+      summary: "Set smoke password env vars and developer bearer token before copying generated commands."
+    },
+    {
+      key: "generate_rehearsal_outputs",
+      status: "operator_execute",
+      willModifyData: false,
+      command: binding?.dryRunCommand || null,
+      outputs: ["handoff_file", "closeout_file"],
+      summary: "Generate the redacted handoff and closeout template from the real staging binding."
+    },
+    {
+      key: "run_route_map_gate",
+      status: "operator_execute",
+      willModifyData: false,
+      command: result.nextCommands?.launchRouteMapGate?.command || null,
+      closeoutKey: "route_map_gate_result",
+      artifactPath: ledgerRowsByKey.get("route_map_gate_result")?.artifactPath || null,
+      summary: "Run targeted route/download visibility tests before staging writes."
+    },
+    {
+      key: "run_backup_restore_drill",
+      status: "operator_execute",
+      willModifyData: false,
+      commandKeys: Object.keys(result.nextCommands?.recovery || {}),
+      closeoutKey: "backup_restore_drill_result",
+      artifactPath: ledgerRowsByKey.get("backup_restore_drill_result")?.artifactPath || null,
+      summary: "Run backup, restore dry-run, and healthcheck commands on a separate restore target."
+    },
+    {
+      key: "approve_live_write_smoke",
+      status: "operator_confirm",
+      willModifyData: false,
+      summary: "Confirm launch duty accepts staging writes before running launch:smoke:staging."
+    },
+    {
+      key: "run_live_write_smoke",
+      status: "operator_execute",
+      willModifyData: true,
+      command: result.nextCommands?.launchSmoke || null,
+      closeoutKey: "live_write_smoke_result",
+      artifactPath: ledgerRowsByKey.get("live_write_smoke_result")?.artifactPath || null,
+      summary: "Run the HTTPS staging smoke command after approval and archive the redacted output."
+    },
+    {
+      key: "archive_launch_smoke_handoff",
+      status: "operator_archive",
+      willModifyData: false,
+      closeoutKey: "launch_smoke_handoff",
+      artifactPath: ledgerRowsByKey.get("launch_smoke_handoff")?.artifactPath || null,
+      summary: "Save the Launch Smoke handoff consumed by Launch Review, Developer Ops, and Launch Mainline."
+    },
+    {
+      key: "record_launch_mainline_evidence",
+      status: "operator_execute",
+      willModifyData: true,
+      endpoint: result.evidenceActionPlan?.endpoint || null,
+      bearerTokenEnv: result.evidenceReadiness?.tokenEnv || DEVELOPER_BEARER_TOKEN_ENV,
+      closeoutKey: "launch_mainline_evidence_receipts",
+      artifactPath: ledgerRowsByKey.get("launch_mainline_evidence_receipts")?.artifactPath || null,
+      summary: "Record Launch Mainline evidence receipts and attach receipt IDs to closeout."
+    },
+    {
+      key: "verify_receipt_visibility",
+      status: "operator_review",
+      willModifyData: false,
+      downloads: result.nextCommands?.receiptVisibilitySummaries || null,
+      closeoutKey: "receipt_visibility_review",
+      artifactPath: ledgerRowsByKey.get("receipt_visibility_review")?.artifactPath || null,
+      summary: "Verify Launch Mainline, Launch Review, Launch Smoke, and Developer Ops receipt visibility."
+    },
+    {
+      key: "backfill_filled_closeout_input",
+      status: "operator_backfill",
+      willModifyData: false,
+      closeoutInputPath: filledCloseoutInputPath,
+      examplePath: outputFileByKey.get("filled_closeout_input_example")?.path || filledExample.saveAs || null,
+      closeoutKey: "operator_go_no_go",
+      artifactPath: ledgerRowsByKey.get("operator_go_no_go")?.artifactPath || null,
+      summary: "Copy the example closeout input, replace placeholders with redacted evidence, and record go/no-go."
+    },
+    {
+      key: "reload_closeout_input",
+      status: "operator_execute",
+      willModifyData: false,
+      command: filledExample.reloadCommand || null,
+      summary: "Reload the filled closeout input and confirm readiness gaps narrow before the full test window."
+    }
+  ];
+  return {
+    status: binding?.status === "ready_for_real_staging_binding"
+      ? "ready_for_real_staging_dry_run"
+      : "blocked_until_environment_binding",
+    willModifyData: false,
+    containsLiveWriteStep: true,
+    liveWriteRequiresApproval: true,
+    sourceBindingStatus: binding?.status || null,
+    artifactArchiveRoot: archiveRoot,
+    outputFiles: binding?.recommendedOutputFiles || [],
+    commandSequence,
+    closeoutBackfillTargets: (closeout.acceptanceChecks || []).map((check) => {
+      const row = ledgerRowsByKey.get(check.key) || {};
+      return {
+        key: check.key,
+        sourceStep: sourceStepByCloseoutKey[check.key] || "operator_backfill",
+        artifactPath: row.artifactPath || null,
+        receiptOperations: row.receiptOperations || [],
+        expectedEvidence: check.expectedEvidence || null,
+        operatorNote: row.operatorNote || null
+      };
+    }),
+    nextAction: "Run the command sequence through receipt visibility review, then backfill and reload the filled closeout input before the full test window."
+  };
+}
+
 function buildFinalRehearsalPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
@@ -1107,6 +1253,7 @@ function buildFinalRehearsalPacket(result) {
     status: readyForLaunchDayWatch ? "ready_for_launch_day_watch" : "ready_for_operator_rehearsal",
     willModifyData: false,
     environmentBindingStatus: result.stagingEnvironmentBinding?.status || null,
+    executionRunbookStatus: result.stagingExecutionRunbook?.status || null,
     archiveRoot,
     sourceReadiness,
     commands: {
@@ -1823,9 +1970,13 @@ function buildResult(options) {
     ...resultWithFilledCloseoutInputExample,
     stagingEnvironmentBinding: gatesPassed ? buildStagingEnvironmentBinding(resultWithFilledCloseoutInputExample, options) : null
   };
-  const resultWithFinalRehearsalPacket = {
+  const resultWithStagingExecutionRunbook = {
     ...resultWithStagingEnvironmentBinding,
-    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithStagingEnvironmentBinding) : null
+    stagingExecutionRunbook: gatesPassed ? buildStagingExecutionRunbook(resultWithStagingEnvironmentBinding) : null
+  };
+  const resultWithFinalRehearsalPacket = {
+    ...resultWithStagingExecutionRunbook,
+    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithStagingExecutionRunbook) : null
   };
   return {
     ...resultWithFinalRehearsalPacket,
@@ -2322,6 +2473,30 @@ function renderStagingEnvironmentBinding(binding) {
   ].join("\n");
 }
 
+function renderStagingExecutionRunbook(runbook) {
+  if (!runbook) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Runbook status: ${runbook.status || "-"}`,
+    `- Writes data by itself: ${runbook.willModifyData ? "yes" : "no"}`,
+    `- Contains live-write step: ${runbook.containsLiveWriteStep ? "yes" : "no"}`,
+    `- Live-write requires approval: ${runbook.liveWriteRequiresApproval ? "yes" : "no"}`,
+    `- Source binding status: ${runbook.sourceBindingStatus || "-"}`,
+    `- Artifact archive root: ${runbook.artifactArchiveRoot || "-"}`,
+    `- Command sequence: ${(runbook.commandSequence || []).map((item) => item.key).join(", ") || "-"}`,
+    `- Next action: ${runbook.nextAction || "-"}`
+  ];
+  if (Array.isArray(runbook.closeoutBackfillTargets) && runbook.closeoutBackfillTargets.length) {
+    lines.push("- Closeout backfill targets:");
+    for (const target of runbook.closeoutBackfillTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.sourceStep || "-"} -> ${target.artifactPath || "-"}`);
+      lines.push(`    - receiptOperations: ${(target.receiptOperations || []).join(", ") || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderFinalRehearsalPacket(packet) {
   if (!packet) {
     return "- Not available";
@@ -2331,6 +2506,7 @@ function renderFinalRehearsalPacket(packet) {
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
     `- Environment binding status: ${packet.environmentBindingStatus || "-"}`,
+    `- Execution runbook status: ${packet.executionRunbookStatus || "-"}`,
     `- Archive root: ${packet.archiveRoot || "-"}`,
     `- Staging rehearsal dry run: \`${packet.commands?.stagingRehearsalDryRun || "-"}\``,
     `- Route-map gate: \`${packet.commands?.routeMapGate || "-"}\``,
@@ -2462,6 +2638,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingEnvironmentBinding(result.stagingEnvironmentBinding),
     "",
+    "## Staging Execution Runbook",
+    "",
+    renderStagingExecutionRunbook(result.stagingExecutionRunbook),
+    "",
     "## Filled Closeout Input Example",
     "",
     renderFilledCloseoutInputExample(result.filledCloseoutInputExample),
@@ -2546,6 +2726,7 @@ function buildCloseoutTemplate(result) {
     stabilizationHandoffPlan: result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result),
     stagingRunRecordTemplate: result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result),
     stagingEnvironmentBinding: result.stagingEnvironmentBinding || null,
+    stagingExecutionRunbook: result.stagingExecutionRunbook || null,
     filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
     finalRehearsalPacket: result.finalRehearsalPacket || buildFinalRehearsalPacket(result),
     closeoutInput: result.closeoutInput || null,

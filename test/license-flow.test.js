@@ -6242,6 +6242,18 @@ test("developer release package export bundles integration, versions, and notice
     );
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
+      const launchReviewDutyOrder = launchReview.reviewSummary.launchDutyActionOrder;
+      assert.ok(launchReviewDutyOrder);
+      assert.equal(launchReviewDutyOrder.mode, "developer-ops-launch-duty-action-order");
+      assert.match(launchReviewDutyOrder.operatorSummary, /Staging archive -> Launch readiness -> Next follow-up/);
+      assert.deepEqual(
+        launchReviewDutyOrder.steps.map((item) => [item.key, item.download?.format]),
+        [
+          ["staging_archive", "staging-launch-duty-archive"],
+          ["launch_readiness", "initial-launch-ops-readiness"],
+          ["next_follow_up", "launch-receipt-next-follow-up"]
+        ]
+      );
       const launchReviewSummaryShortcut = launchReview.reviewSummary.recommendedDownloads?.find((item) => item.key === "launch_review_summary");
       assert.match(launchReviewSummaryShortcut?.href || "", /\/api\/developer\/launch-review\/download\?/);
       assert.match(launchReviewSummaryShortcut?.href || "", /productCode=RELPKG_ALPHA/);
@@ -6312,6 +6324,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /RockSolid Developer Ops Snapshot/);
       assert.match(launchReview.summaryText, /Launch Review Action Plan:/);
       assert.match(launchReview.summaryText, /Launch Review Focus Targets:/);
+      assert.match(launchReview.summaryText, /Launch Review Launch Duty Action Order:/);
+      assert.match(launchReview.summaryText, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
+      assert.match(launchReview.summaryText, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
+      assert.match(launchReview.summaryText, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
       assert.match(launchReview.summaryText, /Launch Review Route Focus:/);
       assert.match(launchReview.summaryText, /Continue launch review sweep/);
       assert.match(launchReview.summaryText, /operation=record_post_launch_ops_sweep/);
@@ -6342,6 +6358,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Ops Actor Filter: account/);
       assert.match(launchReviewSummaryDownload.body, /Launch Workflow Summary:/);
       assert.match(launchReviewSummaryDownload.body, /Ops Snapshot Summary:/);
+      assert.match(launchReviewSummaryDownload.body, /Launch Review Launch Duty Action Order:/);
+      assert.match(launchReviewSummaryDownload.body, /Staging archive -> Launch readiness -> Next follow-up/);
       assert.match(launchReviewSummaryDownload.body, /Launch Review Route Focus:/);
       assert.match(launchReviewSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff/);
@@ -8912,6 +8930,17 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.equal(smokeKit.filters?.routeReason, "Continue smoke receipt follow-up");
     assert.equal(smokeKit.smokeSummary?.startupRequest?.productCode, "BOOT_ALPHA");
     assert.equal(smokeKit.smokeSummary?.recommendedWorkspace?.key, "launch-smoke");
+    const smokeLaunchDutyOrder = smokeKit.smokeSummary?.launchDutyActionOrder;
+    assert.ok(smokeLaunchDutyOrder);
+    assert.equal(smokeLaunchDutyOrder.mode, "developer-ops-launch-duty-action-order");
+    assert.match(smokeLaunchDutyOrder.operatorSummary, /Staging archive -> Launch readiness -> Next follow-up/);
+    assert.deepEqual(
+      smokeLaunchDutyOrder.steps.slice(0, 2).map((item) => [item.key, item.download?.format]),
+      [
+        ["staging_archive", "staging-launch-duty-archive"],
+        ["launch_readiness", "initial-launch-ops-readiness"]
+      ]
+    );
     assert.ok(Array.isArray(smokeKit.smokeSummary?.accountCandidates));
     assert.ok(smokeKit.smokeSummary.accountCandidates.length >= 1);
     assert.ok(Array.isArray(smokeKit.smokeSummary?.rechargeCardCandidates));
@@ -9028,6 +9057,9 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.routeFocus?.controls?.some((item) => item.workspaceAction?.key === "launch-smoke"));
     assert.ok(smokeKit.smokeSummary?.routeFocus?.controls?.some((item) => item.recommendedDownload?.key === "launch_smoke_kit_summary"));
     assert.match(smokeKit.summaryText || "", /Launch Smoke Paths:/);
+    assert.match(smokeKit.summaryText || "", /Launch Smoke Launch Duty Action Order:/);
+    assert.match(smokeKit.summaryText || "", /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
+    assert.match(smokeKit.summaryText || "", /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Route Focus:/);
     assert.match(smokeKit.summaryText || "", /Continue launch smoke sweep/);
     assert.match(smokeKit.summaryText || "", /operation=record_post_launch_ops_sweep/);
@@ -9049,6 +9081,8 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.equal(smokeKitSummaryDownload.status, 200);
     assert.match(smokeKitSummaryDownload.contentDisposition || "", /attachment; filename="rocksolid-developer-launch-smoke-kit-BOOT_ALPHA-stable-.*-summary\.txt"/);
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Paths:/);
+    assert.match(smokeKitSummaryDownload.body, /Launch Smoke Launch Duty Action Order:/);
+    assert.match(smokeKitSummaryDownload.body, /Staging archive -> Launch readiness -> Next follow-up/);
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Route Focus:/);
     assert.match(smokeKitSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
     assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary/);

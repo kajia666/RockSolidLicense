@@ -10908,6 +10908,9 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
   const workflowChecklist = launchWorkflow.workflowChecklist || {};
   const opsSnapshot = payload.opsSnapshot || {};
   const opsOverview = opsSnapshot.overview || {};
+  const launchDutyActionOrder = reviewSummary.launchDutyActionOrder
+    || opsSnapshot.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder
+    || null;
   const lines = [
     "RockSolid Developer Launch Review",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -10957,6 +10960,12 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     opsOverview.latestLaunchReceipts,
     "Launch Review Receipt Visibility:"
   );
+  if (launchDutyActionOrder) {
+    lines.push("");
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
+      title: "Launch Review Launch Duty Action Order:"
+    });
+  }
 
   if (reviewSummary.recommendedWorkspace?.label || reviewSummary.recommendedWorkspace?.key) {
     lines.push("");
@@ -11180,6 +11189,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const workflowSummary = launchWorkflow?.workflowSummary || {};
   const workflowChecklist = launchWorkflow?.workflowChecklist || {};
   const opsOverview = opsSnapshot?.overview || {};
+  const launchDutyActionOrder = opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const reviewMode = String(filters.reviewMode || "matched").trim().toLowerCase() || "matched";
   const routeProductCode = launchWorkflow?.manifest?.project?.code || filters.productCode || null;
   const routeChannel = launchWorkflow?.manifest?.channel || filters.channel || "stable";
@@ -11953,6 +11963,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     workspaceActions,
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
+    launchDutyActionOrder,
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
@@ -12251,6 +12262,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   );
   const routeProductCode = project.code || filters.productCode || null;
   const routeChannel = manifest.channel || filters.channel || "stable";
+  const launchDutyActionOrder = opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const routedOperation = String(filters.operation || "").trim().toLowerCase();
   const routedActionKey = String(filters.actionKey || "").trim();
   const routedDownloadKey = String(filters.downloadKey || "").trim();
@@ -12953,6 +12965,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     rechargeCardCandidates,
     recommendedWorkspace,
     workspaceActions,
+    launchDutyActionOrder,
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     actionPlan,
@@ -12966,6 +12979,9 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
   const smokeSummary = payload.smokeSummary || {};
   const opsSnapshot = payload.opsSnapshot || {};
   const opsOverview = opsSnapshot.overview || {};
+  const launchDutyActionOrder = smokeSummary.launchDutyActionOrder
+    || opsSnapshot.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder
+    || null;
   const formatWorkspaceActionText = (action = null) => {
     if (!action || typeof action !== "object") {
       return "-";
@@ -12999,6 +13015,12 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     opsOverview.latestLaunchReceipts,
     "Launch Smoke Receipt Visibility:"
   );
+  if (launchDutyActionOrder) {
+    lines.push("");
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
+      title: "Launch Smoke Launch Duty Action Order:"
+    });
+  }
 
   if (smokeSummary.routeFocus && typeof smokeSummary.routeFocus === "object") {
     lines.push("");
@@ -17794,6 +17816,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
   initialLaunchReadinessDownload = null,
   launchReceiptNextFollowUp = null,
   primaryDownload = null,
+  nextFollowUpDownload = null,
   primaryWorkspaceAction = null
 } = {}) {
   const normalizedStatus = String(status || "unknown").trim().toLowerCase() || "unknown";
@@ -17837,7 +17860,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
       status: nextFollowUpStatus,
       summary: "Open the next Launch Mainline follow-up or keep the next-follow-up handoff attached for the operator.",
       workspaceAction: primaryWorkspaceAction || null,
-      download: copyDownload(launchReceiptNextFollowUp?.recommendedDownload || primaryDownload)
+      download: copyDownload(launchReceiptNextFollowUp?.recommendedDownload || primaryDownload || nextFollowUpDownload)
     }
   ];
   return {
@@ -17852,12 +17875,13 @@ function buildDeveloperOpsLaunchDutyActionOrder({
   };
 }
 
-function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = null) {
+function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = null, options = {}) {
   if (!Array.isArray(lines) || !actionOrder || typeof actionOrder !== "object") {
     return;
   }
+  const title = options?.title || "Launch Duty Action Order:";
   const steps = Array.isArray(actionOrder.steps) ? actionOrder.steps : [];
-  lines.push("Launch Duty Action Order:");
+  lines.push(title);
   lines.push(`- Summary: ${actionOrder.operatorSummary || "-"}`);
   lines.push(`- Status: ${actionOrder.status || "-"}`);
   lines.push("- Steps:");
@@ -18447,6 +18471,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     || mainlineHandoff?.workspaceAction
     || null;
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
+  const nextFollowUpDownload = primaryDownload || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, launchReceiptNextFollowUp);
   const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
   const stagingLaunchDutyArchiveDownload = buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope);
   const initialLaunchReadinessDownload = buildDeveloperOpsInitialLaunchReadinessDownload(scope);
@@ -18600,6 +18625,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     initialLaunchReadinessDownload,
     launchReceiptNextFollowUp,
     primaryDownload,
+    nextFollowUpDownload,
     primaryWorkspaceAction
   });
   return {

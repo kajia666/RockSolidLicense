@@ -323,6 +323,43 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "unresolved_first_wave_incident",
     "missing_stabilization_owner"
   ]);
+  assert.equal(output.stagingRunRecordTemplate.status, "awaiting_staging_execution");
+  assert.equal(output.stagingRunRecordTemplate.willModifyData, false);
+  assert.equal(output.stagingRunRecordTemplate.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.equal(
+    output.stagingRunRecordTemplate.closeoutInputReloadCommand,
+    "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>"
+  );
+  assert.deepEqual(output.stagingRunRecordTemplate.sourceReadiness, {
+    fullTestWindow: "blocked",
+    productionSignoff: "blocked",
+    launchDayWatch: "blocked",
+    stabilizationHandoff: "blocked"
+  });
+  assert.deepEqual(output.stagingRunRecordTemplate.requiredRecordKeys, [
+    "route_map_gate_result",
+    "backup_restore_drill_result",
+    "live_write_smoke_result",
+    "launch_smoke_handoff",
+    "launch_mainline_evidence_receipts",
+    "receipt_visibility_review",
+    "operator_go_no_go",
+    "launch_day_watch_summary",
+    "first_wave_incident_log",
+    "receipt_visibility_snapshot",
+    "rollback_signal_review",
+    "stabilization_owner_handoff"
+  ]);
+  assert.deepEqual(
+    output.stagingRunRecordTemplate.records.slice(-5).map((item) => [item.key, item.sourcePlan, item.artifactPath]),
+    [
+      ["launch_day_watch_summary", "launchDayWatchPlan", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+      ["first_wave_incident_log", "launchDayWatchPlan", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md"],
+      ["receipt_visibility_snapshot", "launchDayWatchPlan", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt"],
+      ["rollback_signal_review", "stabilizationHandoffPlan", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+      ["stabilization_owner_handoff", "stabilizationHandoffPlan", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+    ]
+  );
   assert.deepEqual(output.operatorExecutionPlan.readinessSummary, {
     status: "needs_operator_input",
     gapCount: 6,
@@ -577,6 +614,11 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Can start stabilization handoff: no/);
     assert.match(handoff, /Required evidence keys: launch_day_watch_summary, first_wave_incident_log, receipt_visibility_snapshot, rollback_signal_review, stabilization_owner_handoff/);
     assert.match(handoff, /Handoff windows: T\+2h stabilization owner handoff, T\+24h first-wave closeout/);
+    assert.match(handoff, /## Staging Run Record Template/);
+    assert.match(handoff, /Archive root: artifacts\/staging\/PILOT_ALPHA\/stable/);
+    assert.match(handoff, /Closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout\.json>`/);
+    assert.match(handoff, /launch_day_watch_summary: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(handoff, /stabilization_owner_handoff: artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
@@ -728,6 +770,19 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.deepEqual(
       template.stabilizationHandoffPlan.handoffWindows.map((item) => item.key),
       ["stabilization_owner_handoff", "first_wave_closeout"]
+    );
+    assert.equal(template.stagingRunRecordTemplate.status, "awaiting_staging_execution");
+    assert.equal(template.stagingRunRecordTemplate.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+    assert.deepEqual(template.stagingRunRecordTemplate.requiredRecordKeys.slice(-5), [
+      "launch_day_watch_summary",
+      "first_wave_incident_log",
+      "receipt_visibility_snapshot",
+      "rollback_signal_review",
+      "stabilization_owner_handoff"
+    ]);
+    assert.equal(
+      template.stagingRunRecordTemplate.records.find((item) => item.key === "stabilization_owner_handoff").artifactPath,
+      "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"
     );
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
     assert.equal(
@@ -965,6 +1020,13 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(output.stabilizationHandoffPlan.canStartStabilizationHandoff, true);
     assert.equal(output.stabilizationHandoffPlan.sourceWatchStatus, "ready");
     assert.equal(output.stabilizationHandoffPlan.nextAction, "Hand off stabilization notes, first-wave incidents, receipt visibility snapshots, and rollback signals to the stabilization owner.");
+    assert.equal(output.stagingRunRecordTemplate.status, "ready_for_stabilization_handoff");
+    assert.deepEqual(output.stagingRunRecordTemplate.sourceReadiness, {
+      fullTestWindow: "ready",
+      productionSignoff: "ready",
+      launchDayWatch: "ready",
+      stabilizationHandoff: "ready"
+    });
     assert.equal(output.operatorExecutionPlan.readinessSummary.gapCount, 2);
     assert.equal(
       output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "production_signoff_blocked"),

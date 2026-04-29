@@ -768,6 +768,84 @@ function buildStabilizationHandoffPlan(result) {
   };
 }
 
+function buildStagingRunRecordTemplate(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const ledger = closeout.artifactReceiptLedger || {};
+  const archiveRoot = ledger.archiveRoot || path.posix.join(
+    "artifacts",
+    "staging",
+    sanitizeArtifactPathSegment(result.summary?.productCode, "product"),
+    sanitizeArtifactPathSegment(result.summary?.channel || "stable", "stable")
+  );
+  const readiness = {
+    fullTestWindow: result.fullTestWindowReadiness?.status || "not_available",
+    productionSignoff: result.productionSignoffReadiness?.status || "not_available",
+    launchDayWatch: result.launchDayWatchPlan?.status || "not_available",
+    stabilizationHandoff: result.stabilizationHandoffPlan?.status || "not_available"
+  };
+  const ledgerRecords = (ledger.rows || []).map((row) => ({
+    key: row.checkKey,
+    sourcePlan: "stagingAcceptanceCloseout",
+    artifactKey: row.artifactKey || null,
+    artifactPath: row.artifactPath || null,
+    receiptOperations: row.receiptOperations || [],
+    operatorNote: row.operatorNote || null
+  }));
+  const extraRecords = [
+    {
+      key: "launch_day_watch_summary",
+      sourcePlan: "launchDayWatchPlan",
+      artifactKey: "launch_day_watch_summary",
+      artifactPath: path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
+      receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+      operatorNote: "Record cutover watch start/end time, owner, route checks, and any operator decisions."
+    },
+    {
+      key: "first_wave_incident_log",
+      sourcePlan: "launchDayWatchPlan",
+      artifactKey: "first_wave_incident_log",
+      artifactPath: path.posix.join(archiveRoot, "first-wave-incident-log.md"),
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      operatorNote: "Record first-wave incidents, customer impact, mitigation, owner, and status."
+    },
+    {
+      key: "receipt_visibility_snapshot",
+      sourcePlan: "launchDayWatchPlan",
+      artifactKey: "receipt_visibility_snapshot",
+      artifactPath: path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt"),
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      operatorNote: "Save Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility snapshots."
+    },
+    {
+      key: "rollback_signal_review",
+      sourcePlan: "stabilizationHandoffPlan",
+      artifactKey: "rollback_signal_review",
+      artifactPath: path.posix.join(archiveRoot, "rollback-signal-review.md"),
+      receiptOperations: ["record_rollback_walkthrough", "record_launch_stabilization_review"],
+      operatorNote: "Record whether rollback signals were observed, dismissed, or escalated."
+    },
+    {
+      key: "stabilization_owner_handoff",
+      sourcePlan: "stabilizationHandoffPlan",
+      artifactKey: "stabilization_owner_handoff",
+      artifactPath: path.posix.join(archiveRoot, "stabilization-owner-handoff.md"),
+      receiptOperations: ["record_launch_stabilization_review"],
+      operatorNote: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
+    }
+  ];
+  const records = [...ledgerRecords, ...extraRecords];
+  return {
+    status: readiness.stabilizationHandoff === "ready" ? "ready_for_stabilization_handoff" : "awaiting_staging_execution",
+    willModifyData: false,
+    archiveRoot,
+    sourceReadiness: readiness,
+    closeoutInputReloadCommand: result.closeoutBackfillGuide?.closeoutInputReload?.command || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+    requiredRecordKeys: records.map((item) => item.key).filter(Boolean),
+    records,
+    operatorNote: "Keep only redacted artifact paths, receipt IDs, route snapshots, incident summaries, and operator decisions in these records."
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -1426,9 +1504,13 @@ function buildResult(options) {
     ...resultWithLaunchDayWatchPlan,
     stabilizationHandoffPlan: gatesPassed ? buildStabilizationHandoffPlan(resultWithLaunchDayWatchPlan) : null
   };
-  return {
+  const resultWithStagingRunRecordTemplate = {
     ...resultWithStabilizationHandoffPlan,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStabilizationHandoffPlan) : null
+    stagingRunRecordTemplate: gatesPassed ? buildStagingRunRecordTemplate(resultWithStabilizationHandoffPlan) : null
+  };
+  return {
+    ...resultWithStagingRunRecordTemplate,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingRunRecordTemplate) : null
   };
 }
 
@@ -1851,6 +1933,31 @@ function renderStabilizationHandoffPlan(plan) {
   return lines.join("\n");
 }
 
+function renderStagingRunRecordTemplate(template) {
+  if (!template) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Status: ${template.status || "-"}`,
+    `- Writes data: ${template.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${template.archiveRoot || "-"}`,
+    `- Closeout reload: \`${template.closeoutInputReloadCommand || "-"}\``,
+    `- Source readiness: fullTestWindow=${template.sourceReadiness?.fullTestWindow || "-"}, productionSignoff=${template.sourceReadiness?.productionSignoff || "-"}, launchDayWatch=${template.sourceReadiness?.launchDayWatch || "-"}, stabilizationHandoff=${template.sourceReadiness?.stabilizationHandoff || "-"}`,
+    `- Required record keys: ${(template.requiredRecordKeys || []).join(", ") || "-"}`,
+    `- Operator note: ${template.operatorNote || "-"}`
+  ];
+  if (Array.isArray(template.records) && template.records.length) {
+    lines.push("- Records:");
+    for (const record of template.records) {
+      lines.push(`  - ${record.key || "-"}: ${record.artifactPath || "-"}`);
+      lines.push(`    - sourcePlan: ${record.sourcePlan || "-"}`);
+      lines.push(`    - receiptOperations: ${(record.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - operatorNote: ${record.operatorNote || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderProductionSignoffConditions(signoff) {
   if (!signoff) {
     return "- Not available";
@@ -1958,6 +2065,10 @@ function renderHandoffFile(result) {
     "",
     renderStabilizationHandoffPlan(result.stabilizationHandoffPlan),
     "",
+    "## Staging Run Record Template",
+    "",
+    renderStagingRunRecordTemplate(result.stagingRunRecordTemplate),
+    "",
     "## Production Sign-Off Conditions",
     "",
     renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
@@ -2032,6 +2143,7 @@ function buildCloseoutTemplate(result) {
     productionSignoffReadiness: result.productionSignoffReadiness || buildProductionSignoffReadiness(result),
     launchDayWatchPlan: result.launchDayWatchPlan || buildLaunchDayWatchPlan(result),
     stabilizationHandoffPlan: result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result),
+    stagingRunRecordTemplate: result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

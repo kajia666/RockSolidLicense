@@ -1059,6 +1059,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Runbook status: ready_for_real_staging_dry_run/);
     assert.match(handoff, /Contains live-write step: yes/);
     assert.match(handoff, /Command sequence: prepare_secret_env, generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, approve_live_write_smoke, run_live_write_smoke, archive_launch_smoke_handoff, record_launch_mainline_evidence, verify_receipt_visibility, backfill_filled_closeout_input, reload_closeout_input/);
+    assert.match(handoff, /Closeout review: not_loaded \(missing=7, safeForFullTest=no\)/);
     assert.match(handoff, /route_map_gate_result: run_route_map_gate -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
     assert.match(handoff, /operator_go_no_go: backfill_filled_closeout_input -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md/);
     assert.match(handoff, /## Staging Readiness Transition/);
@@ -1087,6 +1088,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Final Rehearsal Packet/);
     assert.match(handoff, /Packet status: ready_for_operator_rehearsal/);
     assert.match(handoff, /Filled closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
+    assert.match(handoff, /Closeout review: not_loaded \(missing=7, safeForFullTest=no\)/);
     assert.match(handoff, /Ordered packet steps: generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, run_live_write_smoke, record_launch_mainline_evidence, backfill_filled_closeout_input, reload_closeout_input, run_full_test_window, production_signoff_review, launch_day_watch, stabilization_handoff/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
@@ -1435,6 +1437,18 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.closeoutInput.backfillReview.missingFieldCount, 0);
     assert.equal(output.closeoutInput.backfillReview.safeToEnterFullTestWindow, true);
     assert.deepEqual(output.closeoutInput.backfillReview.missingFields, []);
+    assert.deepEqual(output.stagingExecutionRunbook.closeoutInputReview, {
+      status: "ready_for_full_test_window",
+      draftPromotionStatus: "not_draft_source",
+      missingFieldCount: 0,
+      placeholderKeys: [],
+      safeToEnterFullTestWindow: true
+    });
+    assert.equal(
+      output.stagingExecutionRunbook.commandSequence.find((item) => item.key === "reload_closeout_input").closeoutInputReview.status,
+      "ready_for_full_test_window"
+    );
+    assert.deepEqual(output.finalRehearsalPacket.closeoutInputReview, output.stagingExecutionRunbook.closeoutInputReview);
     assert.deepEqual(
       output.closeoutInput.filledKeys,
       output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
@@ -1574,6 +1588,24 @@ test("staging rehearsal runner reports unfilled draft promotion fields without c
     assert.equal(output.closeoutInput.backfillReview.filledFieldCount, 5);
     assert.equal(output.closeoutInput.backfillReview.missingFieldCount, 2);
     assert.equal(output.closeoutInput.backfillReview.safeToEnterFullTestWindow, false);
+    assert.deepEqual(output.stagingExecutionRunbook.closeoutInputReview, {
+      status: "missing_required_fields",
+      draftPromotionStatus: "draft_needs_values",
+      missingFieldCount: 2,
+      placeholderKeys: [
+        "backup_restore_drill_result",
+        "live_write_smoke_result"
+      ],
+      safeToEnterFullTestWindow: false
+    });
+    assert.deepEqual(output.finalRehearsalPacket.closeoutInputReview, output.stagingExecutionRunbook.closeoutInputReview);
+    assert.deepEqual(
+      output.finalRehearsalPacket.orderedSteps.find((item) => item.key === "reload_closeout_input").closeoutInputReview.placeholderKeys,
+      [
+        "backup_restore_drill_result",
+        "live_write_smoke_result"
+      ]
+    );
     assert.deepEqual(
       output.closeoutInput.backfillReview.missingFields.map((item) => [item.key, item.sourceStep, item.artifactPath, item.nextAction]),
       [

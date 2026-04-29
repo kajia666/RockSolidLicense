@@ -893,6 +893,17 @@ function buildCloseoutInputBackfillReview(payload, closeout = {}, context = {}) 
   };
 }
 
+function summarizeCloseoutInputReview(review, closeout = {}) {
+  const source = review || buildCloseoutInputBackfillReview(null, closeout);
+  return {
+    status: source.status || "not_loaded",
+    draftPromotionStatus: source.draftPromotionStatus || "not_loaded",
+    missingFieldCount: source.missingFieldCount ?? 0,
+    placeholderKeys: Array.isArray(source.placeholderKeys) ? source.placeholderKeys : [],
+    safeToEnterFullTestWindow: source.safeToEnterFullTestWindow === true
+  };
+}
+
 function isReceiptVisibilityVisible(value) {
   if (value === true) {
     return true;
@@ -1427,6 +1438,7 @@ function buildStagingExecutionRunbook(result) {
   const filledCloseoutInputPath = outputFileByKey.get("filled_closeout_input")?.path
     || path.posix.join(archiveRoot, "filled-closeout-input.json");
   const filledExample = result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result);
+  const closeoutInputReview = summarizeCloseoutInputReview(result.closeoutInput?.backfillReview, closeout);
   const commandSequence = [
     {
       key: "prepare_secret_env",
@@ -1522,6 +1534,7 @@ function buildStagingExecutionRunbook(result) {
       status: "operator_execute",
       willModifyData: false,
       command: filledExample.reloadCommand || null,
+      closeoutInputReview,
       summary: "Reload the filled closeout input and confirm readiness gaps narrow before the full test window."
     }
   ];
@@ -1536,6 +1549,7 @@ function buildStagingExecutionRunbook(result) {
     artifactArchiveRoot: archiveRoot,
     outputFiles: binding?.recommendedOutputFiles || [],
     commandSequence,
+    closeoutInputReview,
     closeoutBackfillTargets: (closeout.acceptanceChecks || []).map((check) => {
       const row = ledgerRowsByKey.get(check.key) || {};
       return {
@@ -1792,6 +1806,8 @@ function buildFinalRehearsalPacket(result) {
     && sourceReadiness.productionSignoff === "ready"
     && sourceReadiness.launchDayWatch === "ready"
     && sourceReadiness.stabilizationHandoff === "ready";
+  const closeoutInputReview = result.stagingExecutionRunbook?.closeoutInputReview
+    || summarizeCloseoutInputReview(result.closeoutInput?.backfillReview, closeout);
   const orderedSteps = [
     {
       key: "generate_rehearsal_outputs",
@@ -1832,6 +1848,7 @@ function buildFinalRehearsalPacket(result) {
       key: "reload_closeout_input",
       status: "operator_execute",
       command: filledExample.reloadCommand || null,
+      closeoutInputReview,
       summary: "Reload the filled closeout input and verify readiness gaps narrow before the full test window."
     },
     {
@@ -1866,6 +1883,7 @@ function buildFinalRehearsalPacket(result) {
     launchRehearsalBundleStatus: result.launchRehearsalBundle?.status || null,
     archiveRoot,
     sourceReadiness,
+    closeoutInputReview,
     commands: {
       stagingRehearsalDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
@@ -3188,6 +3206,7 @@ function renderStagingExecutionRunbook(runbook) {
   if (!runbook) {
     return "- Not available";
   }
+  const review = runbook.closeoutInputReview || {};
   const lines = [
     `- Runbook status: ${runbook.status || "-"}`,
     `- Writes data by itself: ${runbook.willModifyData ? "yes" : "no"}`,
@@ -3196,8 +3215,12 @@ function renderStagingExecutionRunbook(runbook) {
     `- Source binding status: ${runbook.sourceBindingStatus || "-"}`,
     `- Artifact archive root: ${runbook.artifactArchiveRoot || "-"}`,
     `- Command sequence: ${(runbook.commandSequence || []).map((item) => item.key).join(", ") || "-"}`,
+    `- Closeout review: ${review.status || "-"} (missing=${review.missingFieldCount ?? 0}, safeForFullTest=${review.safeToEnterFullTestWindow ? "yes" : "no"})`,
     `- Next action: ${runbook.nextAction || "-"}`
   ];
+  if (Array.isArray(review.placeholderKeys) && review.placeholderKeys.length) {
+    lines.push(`- Closeout placeholders: ${review.placeholderKeys.join(", ")}`);
+  }
   if (Array.isArray(runbook.closeoutBackfillTargets) && runbook.closeoutBackfillTargets.length) {
     lines.push("- Closeout backfill targets:");
     for (const target of runbook.closeoutBackfillTargets) {
@@ -3289,6 +3312,7 @@ function renderFinalRehearsalPacket(packet) {
     return "- Not available";
   }
   const fileByKey = new Map((packet.localFiles || []).map((item) => [item.key, item]));
+  const review = packet.closeoutInputReview || {};
   return [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
@@ -3307,6 +3331,7 @@ function renderFinalRehearsalPacket(packet) {
     `- Filled closeout input: ${fileByKey.get("filled_closeout_input")?.path || "-"}`,
     `- Filled closeout input example: ${fileByKey.get("filled_closeout_input_example")?.path || "-"}`,
     `- Source readiness: fullTestWindow=${packet.sourceReadiness?.fullTestWindow || "-"}, productionSignoff=${packet.sourceReadiness?.productionSignoff || "-"}, launchDayWatch=${packet.sourceReadiness?.launchDayWatch || "-"}, stabilizationHandoff=${packet.sourceReadiness?.stabilizationHandoff || "-"}`,
+    `- Closeout review: ${review.status || "-"} (missing=${review.missingFieldCount ?? 0}, safeForFullTest=${review.safeToEnterFullTestWindow ? "yes" : "no"})`,
     `- Ordered packet steps: ${(packet.orderedSteps || []).map((item) => item.key).join(", ") || "-"}`,
     `- Next action: ${packet.nextAction || "-"}`
   ].join("\n");

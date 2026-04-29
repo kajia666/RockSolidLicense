@@ -649,6 +649,29 @@ function buildFullTestWindowReadiness(result) {
   };
 }
 
+function buildProductionSignoffReadiness(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const closeoutInput = result.closeoutInput || null;
+  const requiredSignoffKeys = (closeout.productionSignoffConditions?.conditions || [])
+    .map((item) => item.key)
+    .filter(Boolean);
+  const canSignoff = closeoutInput?.readyForProductionSignoff === true;
+  return {
+    status: canSignoff ? "ready" : "blocked",
+    canSignoff,
+    requiredDecision: closeout.productionSignoffConditions?.requiredDecision || "ready-for-production-signoff",
+    productionDecision: closeoutInput?.productionDecision || null,
+    closeoutInputStatus: closeoutInput?.status || "missing",
+    readyForFullTestWindow: closeoutInput?.readyForFullTestWindow === true,
+    missingSignoffKeys: closeoutInput?.signoffMissingKeys || requiredSignoffKeys,
+    missingReceiptVisibilityKeys: closeoutInput?.missingReceiptVisibilityKeys || RECEIPT_VISIBILITY_KEYS,
+    reloadCommand: result.closeoutBackfillGuide?.closeoutInputReload?.command || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+    nextAction: canSignoff
+      ? "Production sign-off is ready; keep the closeout artifact with release evidence before cutover."
+      : "Backfill full-test evidence, production sign-off conditions, production decision, and receipt visibility before cutover."
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -1295,9 +1318,13 @@ function buildResult(options) {
     ...resultWithCloseoutBackfillGuide,
     fullTestWindowReadiness: gatesPassed ? buildFullTestWindowReadiness(resultWithCloseoutBackfillGuide) : null
   };
-  return {
+  const resultWithProductionSignoffReadiness = {
     ...resultWithFullTestWindowReadiness,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithFullTestWindowReadiness) : null
+    productionSignoffReadiness: gatesPassed ? buildProductionSignoffReadiness(resultWithFullTestWindowReadiness) : null
+  };
+  return {
+    ...resultWithProductionSignoffReadiness,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithProductionSignoffReadiness) : null
   };
 }
 
@@ -1643,6 +1670,24 @@ function renderFullTestWindowReadiness(readiness) {
   ].join("\n");
 }
 
+function renderProductionSignoffReadiness(readiness) {
+  if (!readiness) {
+    return "- Not available";
+  }
+  return [
+    `- Status: ${readiness.status || "-"}`,
+    `- Can sign off: ${readiness.canSignoff ? "yes" : "no"}`,
+    `- Required decision: ${readiness.requiredDecision || "-"}`,
+    `- Production decision: ${readiness.productionDecision || "-"}`,
+    `- Closeout input status: ${readiness.closeoutInputStatus || "-"}`,
+    `- Full test window ready: ${readiness.readyForFullTestWindow ? "yes" : "no"}`,
+    `- Missing sign-off keys: ${(readiness.missingSignoffKeys || []).join(", ") || "-"}`,
+    `- Missing receipt visibility keys: ${(readiness.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
+    `- Reload command: \`${readiness.reloadCommand || "-"}\``,
+    `- Next action: ${readiness.nextAction || "-"}`
+  ].join("\n");
+}
+
 function renderProductionSignoffConditions(signoff) {
   if (!signoff) {
     return "- Not available";
@@ -1738,6 +1783,10 @@ function renderHandoffFile(result) {
     "",
     renderFullTestWindowReadiness(result.fullTestWindowReadiness),
     "",
+    "## Production Sign-Off Readiness",
+    "",
+    renderProductionSignoffReadiness(result.productionSignoffReadiness),
+    "",
     "## Production Sign-Off Conditions",
     "",
     renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
@@ -1809,6 +1858,7 @@ function buildCloseoutTemplate(result) {
     productionSignoff: buildProductionSignoffInputTemplate(closeout.productionSignoffConditions || {}),
     closeoutBackfillGuide: result.closeoutBackfillGuide || buildCloseoutBackfillGuide(result),
     fullTestWindowReadiness: result.fullTestWindowReadiness || buildFullTestWindowReadiness(result),
+    productionSignoffReadiness: result.productionSignoffReadiness || buildProductionSignoffReadiness(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

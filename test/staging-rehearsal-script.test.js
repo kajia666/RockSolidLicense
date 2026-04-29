@@ -218,6 +218,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["closeout_file", "not_requested"],
       ["run_record_index", "not_requested"],
       ["artifact_manifest", "not_requested"],
+      ["closeout_reload_packet", "not_requested"],
       ["filled_closeout_draft", "not_requested"]
     ]
   );
@@ -411,6 +412,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["closeout_file", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json", "recommended_default"],
       ["run_record_index", "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json", "recommended_default"],
       ["artifact_manifest", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json", "recommended_default"],
+      ["closeout_reload_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json", "recommended_default"],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json", "example_only"],
       ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json", "example_only"],
@@ -425,6 +427,39 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   });
   assert.equal(output.stagingArtifactManifest.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingArtifactManifest.nextAction, "Generate and archive the listed rehearsal artifacts, then fill closeout evidence from the draft before reloading closeout input.");
+  assert.equal(output.stagingCloseoutReloadPacket.mode, "staging-closeout-reload-packet");
+  assert.equal(output.stagingCloseoutReloadPacket.status, "awaiting_closeout_backfill");
+  assert.equal(output.stagingCloseoutReloadPacket.willModifyData, false);
+  assert.equal(output.stagingCloseoutReloadPacket.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.deepEqual(output.stagingCloseoutReloadPacket.paths, {
+    packetFile: "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json",
+    filledCloseoutDraftFile: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json",
+    filledCloseoutInputFile: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+    closeoutTemplateFile: "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json"
+  });
+  assert.deepEqual(output.stagingCloseoutReloadPacket.sourceStatuses, {
+    closeoutInput: "not_loaded",
+    closeoutReview: "not_loaded",
+    readinessTransition: "blocked_until_closeout_reload",
+    finalPacket: "ready_for_operator_rehearsal",
+    artifactManifest: "awaiting_artifact_generation"
+  });
+  assert.deepEqual(
+    output.stagingCloseoutReloadPacket.missingCloseoutKeys,
+    output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
+  );
+  assert.deepEqual(
+    output.stagingCloseoutReloadPacket.operatorSteps.map((item) => item.key),
+    [
+      "promote_filled_closeout_draft",
+      "backfill_required_evidence",
+      "remove_example_only_guard",
+      "reload_closeout_input",
+      "review_full_test_window_readiness"
+    ]
+  );
+  assert.equal(output.stagingCloseoutReloadPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(output.stagingCloseoutReloadPacket.nextAction, "Backfill the real filled closeout input, reload it, then review full-test-window readiness before running npm.cmd test.");
   assert.equal(output.filledCloseoutInputExample.mode, "staging-closeout-input-example");
   assert.equal(output.filledCloseoutInputExample.status, "example_only");
   assert.equal(output.filledCloseoutInputExample.exampleOnly, true);
@@ -469,6 +504,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["closeout_file", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json", "recommended_default"],
       ["run_record_index", "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json", "recommended_default"],
       ["artifact_manifest", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json", "recommended_default"],
+      ["closeout_reload_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json", "recommended_default"],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json", "example_only"],
       ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json", "example_only"],
@@ -483,6 +519,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--closeout-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-template\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--run-record-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--artifact-manifest-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifact-manifest\.json/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--closeout-reload-packet-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-reload-packet\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--filled-closeout-draft-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.draft\.json/);
   assert.doesNotMatch(JSON.stringify(output.stagingEnvironmentBinding), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.stagingExecutionRunbook.status, "ready_for_real_staging_dry_run");
@@ -667,6 +704,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["closeout_file", null],
       ["run_record_index", null],
       ["artifact_manifest", null],
+      ["closeout_reload_packet", null],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json"],
       ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json"],
@@ -859,6 +897,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     const closeoutFile = join(tempDir, "profile-closeout.json");
     const runRecordFile = join(tempDir, "profile-run-record-index.json");
     const artifactManifestFile = join(tempDir, "profile-artifact-manifest.json");
+    const closeoutReloadPacketFile = join(tempDir, "profile-closeout-reload-packet.json");
     const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
     writeFileSync(profileFile, JSON.stringify({
       baseUrl: "https://profile-staging.example.com",
@@ -886,6 +925,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       runRecordFile,
       "--artifact-manifest-file",
       artifactManifestFile,
+      "--closeout-reload-packet-file",
+      closeoutReloadPacketFile,
       "--filled-closeout-draft-file",
       filledCloseoutDraftFile
     ], {
@@ -927,6 +968,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       "closeoutFile",
       "runRecordFile",
       "artifactManifestFile",
+      "closeoutReloadPacketFile",
       "filledCloseoutDraftFile"
     ]);
     assert.deepEqual(output.stagingProfileLaunchPlan.missingRequiredInputs, []);
@@ -960,6 +1002,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         ["closeout_file", closeoutFile, "pending_write"],
         ["run_record_index", runRecordFile, "pending_write"],
         ["artifact_manifest", artifactManifestFile, "pending_write"],
+        ["closeout_reload_packet", closeoutReloadPacketFile, "pending_write"],
         ["filled_closeout_input", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json", "operator_create"],
         ["filled_closeout_draft", filledCloseoutDraftFile, "pending_write"],
         ["filled_closeout_input_example", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.example.json", "example_only"],
@@ -1053,7 +1096,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Profile keys: adminUsername, appBackupDir, baseUrl, channel, developerUsername, postgresBackupDir, productCode, storageProfile, targetEnvFile, targetOs/);
     assert.match(handoff, /## Staging Profile Launch Plan/);
     assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
-    assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, artifactManifestFile, filledCloseoutDraftFile/);
+    assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, artifactManifestFile, closeoutReloadPacketFile, filledCloseoutDraftFile/);
     assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: missing before_evidence_recording/);
     assert.match(handoff, /## Staging Profile Operator Preflight/);
     assert.match(handoff, /Profile preflight status: blocked_until_secret_env/);
@@ -1081,6 +1124,14 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.artifactManifestFile.written, true);
     assert.equal(existsSync(artifactManifestFile), true);
     assert.deepEqual(JSON.parse(readFileSync(artifactManifestFile, "utf8")), output.stagingArtifactManifest);
+    assert.deepEqual(template.stagingCloseoutReloadPacket, output.stagingCloseoutReloadPacket);
+    assert.equal(output.closeoutReloadPacketFile.path, closeoutReloadPacketFile);
+    assert.equal(output.closeoutReloadPacketFile.written, true);
+    assert.equal(existsSync(closeoutReloadPacketFile), true);
+    assert.deepEqual(JSON.parse(readFileSync(closeoutReloadPacketFile, "utf8")), output.stagingCloseoutReloadPacket);
+    assert.equal(output.stagingCloseoutReloadPacket.paths.packetFile, closeoutReloadPacketFile);
+    assert.equal(output.stagingCloseoutReloadPacket.paths.filledCloseoutDraftFile, filledCloseoutDraftFile);
+    assert.equal(output.stagingCloseoutReloadPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(output.filledCloseoutDraftFile.path, filledCloseoutDraftFile);
     assert.equal(output.filledCloseoutDraftFile.written, true);
     assert.equal(existsSync(filledCloseoutDraftFile), true);

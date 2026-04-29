@@ -13,5 +13,6 @@
   "closeoutFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json",
   "runRecordFile": "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json",
   "artifactManifestFile": "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json",
+  "closeoutReloadPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json",
   "filledCloseoutDraftFile": "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json"
 }

@@ -62,6 +62,7 @@ const PROFILE_ALLOWED_FIELDS = [
   "closeoutFile",
   "runRecordFile",
   "artifactManifestFile",
+  "closeoutReloadPacketFile",
   "filledCloseoutDraftFile",
   "closeoutInputFile"
 ];
@@ -90,6 +91,7 @@ const PROFILE_OPTION_FLAGS = {
   closeoutFile: "--closeout-file",
   runRecordFile: "--run-record-file",
   artifactManifestFile: "--artifact-manifest-file",
+  closeoutReloadPacketFile: "--closeout-reload-packet-file",
   filledCloseoutDraftFile: "--filled-closeout-draft-file",
   closeoutInputFile: "--closeout-input-file"
 };
@@ -168,6 +170,7 @@ function parseArgs(argv) {
     closeoutFile: null,
     runRecordFile: null,
     artifactManifestFile: null,
+    closeoutReloadPacketFile: null,
     filledCloseoutDraftFile: null,
     closeoutInputFile: null,
     profileFile: null
@@ -214,6 +217,8 @@ function parseArgs(argv) {
       options.runRecordFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--artifact-manifest-file") {
       options.artifactManifestFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--closeout-reload-packet-file") {
+      options.closeoutReloadPacketFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--filled-closeout-draft-file") {
       options.filledCloseoutDraftFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-input-file") {
@@ -253,6 +258,7 @@ function parseArgs(argv) {
     closeoutFile: resolveProfileOption(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE", stagingProfile, "closeoutFile"),
     runRecordFile: resolveProfileOption(options.runRecordFile, "RSL_REHEARSAL_RUN_RECORD_FILE", stagingProfile, "runRecordFile"),
     artifactManifestFile: resolveProfileOption(options.artifactManifestFile, "RSL_REHEARSAL_ARTIFACT_MANIFEST_FILE", stagingProfile, "artifactManifestFile"),
+    closeoutReloadPacketFile: resolveProfileOption(options.closeoutReloadPacketFile, "RSL_REHEARSAL_CLOSEOUT_RELOAD_PACKET_FILE", stagingProfile, "closeoutReloadPacketFile"),
     filledCloseoutDraftFile: resolveProfileOption(options.filledCloseoutDraftFile, "RSL_REHEARSAL_FILLED_CLOSEOUT_DRAFT_FILE", stagingProfile, "filledCloseoutDraftFile"),
     closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile")
   };
@@ -392,7 +398,7 @@ function buildStagingProfileLaunchPlan(options) {
     "appBackupDir",
     ...(options.storageProfile === "postgres-preview" ? ["postgresBackupDir"] : [])
   ];
-  const outputFiles = ["handoffFile", "closeoutFile", "runRecordFile", "artifactManifestFile", "filledCloseoutDraftFile"];
+  const outputFiles = ["handoffFile", "closeoutFile", "runRecordFile", "artifactManifestFile", "closeoutReloadPacketFile", "filledCloseoutDraftFile"];
   const missingRequiredInputs = requiredInputs.filter((key) => !options[key]);
   const missingOutputFiles = outputFiles.filter((key) => !options[key]);
   const requiredSecretEnv = [
@@ -516,7 +522,7 @@ function buildStagingProfileOperatorPreflight(result) {
         missing: missingOutputFiles,
         nextAction: missingOutputFiles.length === 0
           ? "Handoff and closeout output paths are available."
-          : "Provide handoffFile, closeoutFile, runRecordFile, artifactManifestFile, and filledCloseoutDraftFile paths for launch duty artifacts."
+          : "Provide handoffFile, closeoutFile, runRecordFile, artifactManifestFile, closeoutReloadPacketFile, and filledCloseoutDraftFile paths for launch duty artifacts."
       },
       {
         key: "secret_env",
@@ -814,6 +820,105 @@ function buildStagingArtifactManifest(result) {
         || null
     },
     nextAction: "Generate and archive the listed rehearsal artifacts, then fill closeout evidence from the draft before reloading closeout input."
+  };
+}
+
+function buildStagingCloseoutReloadPacket(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
+  const artifactManifest = result.stagingArtifactManifest || buildStagingArtifactManifest(result);
+  const finalPacket = result.finalRehearsalPacket || buildFinalRehearsalPacket(result);
+  const closeoutReview = result.stagingExecutionRunbook?.closeoutInputReview
+    || finalPacket.closeoutInputReview
+    || summarizeCloseoutInputReview(result.closeoutInput?.backfillReview, closeout);
+  const archiveRoot = artifactManifest.archiveRoot
+    || runRecordIndex.archiveRoot
+    || finalPacket.archiveRoot
+    || "artifacts/staging/product/stable";
+  const filledCloseoutInputFile = bindingFiles.get("filled_closeout_input")?.path
+    || runRecordIndex.closeoutProgress?.closeoutInputPath
+    || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const filledCloseoutDraftFile = result.filledCloseoutDraftFile?.path
+    || bindingFiles.get("filled_closeout_draft")?.path
+    || result.filledCloseoutInputDraft?.saveAs
+    || path.posix.join(archiveRoot, "filled-closeout-input.draft.json");
+  const closeoutTemplateFile = result.closeoutFile?.path
+    || bindingFiles.get("closeout_file")?.path
+    || path.posix.join(archiveRoot, "staging-closeout-template.json");
+  const packetFile = result.closeoutReloadPacketFile?.path
+    || bindingFiles.get("closeout_reload_packet")?.path
+    || path.posix.join(archiveRoot, "staging-closeout-reload-packet.json");
+  const requiredCloseoutKeys = (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
+  const missingCloseoutKeys = Array.isArray(result.closeoutInput?.missingKeys)
+    ? result.closeoutInput.missingKeys
+    : requiredCloseoutKeys;
+  const closeoutReload = finalPacket.commands?.closeoutReload
+    || runRecordIndex.closeoutProgress?.reloadCommand
+    || result.filledCloseoutInputDraft?.reloadCommand
+    || `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`;
+  let status = "awaiting_closeout_backfill";
+  if (result.closeoutInput?.readyForFullTestWindow === true) {
+    status = "ready_for_full_test_window";
+  } else if (result.closeoutInput) {
+    status = "reload_needs_backfill";
+  }
+  return {
+    mode: "staging-closeout-reload-packet",
+    status,
+    willModifyData: false,
+    archiveRoot,
+    paths: {
+      packetFile,
+      filledCloseoutDraftFile,
+      filledCloseoutInputFile,
+      closeoutTemplateFile
+    },
+    sourceStatuses: {
+      closeoutInput: result.closeoutInput?.status || "not_loaded",
+      closeoutReview: closeoutReview.status || "not_loaded",
+      readinessTransition: result.stagingReadinessTransition?.status || "not_available",
+      finalPacket: finalPacket.status || "not_available",
+      artifactManifest: artifactManifest.status || "not_available"
+    },
+    requiredCloseoutKeys,
+    missingCloseoutKeys,
+    closeoutReview,
+    commands: {
+      closeoutReload,
+      fullTestWindow: finalPacket.commands?.fullTestWindow || closeout.fullTestWindowEntry?.command || "npm.cmd test"
+    },
+    operatorSteps: [
+      {
+        key: "promote_filled_closeout_draft",
+        status: "operator_copy",
+        from: filledCloseoutDraftFile,
+        to: filledCloseoutInputFile
+      },
+      {
+        key: "backfill_required_evidence",
+        status: missingCloseoutKeys.length ? "operator_backfill" : "ready",
+        missingCloseoutKeys
+      },
+      {
+        key: "remove_example_only_guard",
+        status: "operator_confirm",
+        expected: "exampleOnly must be absent or false before reload."
+      },
+      {
+        key: "reload_closeout_input",
+        status: "operator_execute",
+        command: closeoutReload
+      },
+      {
+        key: "review_full_test_window_readiness",
+        status: result.closeoutInput?.readyForFullTestWindow === true ? "ready" : "blocked",
+        command: finalPacket.commands?.fullTestWindow || closeout.fullTestWindowEntry?.command || "npm.cmd test"
+      }
+    ],
+    nextAction: result.closeoutInput?.readyForFullTestWindow === true
+      ? "Run npm.cmd test in the reserved full test window, then attach production sign-off evidence."
+      : "Backfill the real filled closeout input, reload it, then review full-test-window readiness before running npm.cmd test."
   };
 }
 
@@ -1736,6 +1841,7 @@ function buildStagingEnvironmentBinding(result, options = {}) {
   const closeoutPath = result.closeoutFile?.path || path.posix.join(archiveRoot, "staging-closeout-template.json");
   const runRecordPath = result.runRecordFile?.path || path.posix.join(archiveRoot, "staging-run-record-index.json");
   const artifactManifestPath = result.artifactManifestFile?.path || path.posix.join(archiveRoot, "staging-artifact-manifest.json");
+  const closeoutReloadPacketPath = result.closeoutReloadPacketFile?.path || path.posix.join(archiveRoot, "staging-closeout-reload-packet.json");
   const filledCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
   const filledCloseoutDraftPath = result.filledCloseoutDraftFile?.path
     || result.filledCloseoutInputDraft?.saveAs
@@ -1790,6 +1896,8 @@ function buildStagingEnvironmentBinding(result, options = {}) {
     runRecordPath,
     "--artifact-manifest-file",
     artifactManifestPath,
+    "--closeout-reload-packet-file",
+    closeoutReloadPacketPath,
     "--filled-closeout-draft-file",
     filledCloseoutDraftPath
   ].filter((part) => part !== null && part !== undefined && String(part) !== "");
@@ -1822,6 +1930,11 @@ function buildStagingEnvironmentBinding(result, options = {}) {
         key: "artifact_manifest",
         path: artifactManifestPath,
         status: result.artifactManifestFile ? fileOutputStatus(result.artifactManifestFile) : "recommended_default"
+      },
+      {
+        key: "closeout_reload_packet",
+        path: closeoutReloadPacketPath,
+        status: result.closeoutReloadPacketFile ? fileOutputStatus(result.closeoutReloadPacketFile) : "recommended_default"
       },
       {
         key: "filled_closeout_input",
@@ -2338,6 +2451,11 @@ function buildFinalRehearsalPacket(result) {
         status: fileOutputStatus(result.artifactManifestFile)
       },
       {
+        key: "closeout_reload_packet",
+        path: result.closeoutReloadPacketFile?.path || null,
+        status: fileOutputStatus(result.closeoutReloadPacketFile)
+      },
+      {
         key: "filled_closeout_input",
         path: filledCloseoutInputPath,
         status: "operator_copy_from_example"
@@ -2572,6 +2690,13 @@ function buildStagingOperatorExecutionPlan(result) {
       status: fileOutputStatus(result.artifactManifestFile),
       path: result.artifactManifestFile?.path || null,
       purpose: "Bundle the generated artifact paths, file statuses, readiness state, and key commands for staging archive review."
+    },
+    {
+      key: "closeout_reload_packet",
+      label: "Staging closeout reload packet JSON",
+      status: fileOutputStatus(result.closeoutReloadPacketFile),
+      path: result.closeoutReloadPacketFile?.path || null,
+      purpose: "Show how to promote the draft, backfill real evidence, reload closeout input, and review full-test readiness."
     },
     {
       key: "filled_closeout_draft",
@@ -3028,6 +3153,14 @@ function buildResult(options) {
         }
       }
       : {}),
+    ...(options.closeoutReloadPacketFile
+      ? {
+        closeoutReloadPacketFile: {
+          path: path.resolve(repoRoot, options.closeoutReloadPacketFile),
+          written: false
+        }
+      }
+      : {}),
     ...(options.filledCloseoutDraftFile
       ? {
         filledCloseoutDraftFile: {
@@ -3128,9 +3261,13 @@ function buildResult(options) {
     ...resultWithStagingRehearsalRunRecordIndex,
     stagingArtifactManifest: gatesPassed ? buildStagingArtifactManifest(resultWithStagingRehearsalRunRecordIndex) : null
   };
-  return {
+  const resultWithStagingCloseoutReloadPacket = {
     ...resultWithStagingArtifactManifest,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingArtifactManifest) : null
+    stagingCloseoutReloadPacket: gatesPassed ? buildStagingCloseoutReloadPacket(resultWithStagingArtifactManifest) : null
+  };
+  return {
+    ...resultWithStagingCloseoutReloadPacket,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingCloseoutReloadPacket) : null
   };
 }
 
@@ -4151,6 +4288,7 @@ function buildCloseoutTemplate(result) {
     stagingRehearsalExecutionSummary: result.stagingRehearsalExecutionSummary || buildStagingRehearsalExecutionSummary(result),
     stagingRehearsalRunRecordIndex: result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result),
     stagingArtifactManifest: result.stagingArtifactManifest || buildStagingArtifactManifest(result),
+    stagingCloseoutReloadPacket: result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result),
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
     archiveRoot: ledger.archiveRoot || null,
@@ -4291,6 +4429,26 @@ function writeArtifactManifestFile(result) {
   return nextResult;
 }
 
+function writeCloseoutReloadPacketFile(result) {
+  if (!result.closeoutReloadPacketFile) {
+    return result;
+  }
+  if (result.status !== "pass") {
+    return result;
+  }
+
+  const nextResult = {
+    ...result,
+    closeoutReloadPacketFile: {
+      ...result.closeoutReloadPacketFile,
+      written: true
+    }
+  };
+  mkdirSync(path.dirname(result.closeoutReloadPacketFile.path), { recursive: true });
+  writeFileSync(result.closeoutReloadPacketFile.path, `${JSON.stringify(result.stagingCloseoutReloadPacket, null, 2)}\n`, "utf8");
+  return nextResult;
+}
+
 function writeFilledCloseoutDraftFile(result) {
   if (!result.filledCloseoutDraftFile) {
     return result;
@@ -4323,11 +4481,13 @@ function refreshOperatorExecutionPlan(result) {
 
 function writeOutputFiles(result) {
   return refreshOperatorExecutionPlan(
-    writeArtifactManifestFile(
-      writeFilledCloseoutDraftFile(
-        writeRunRecordFile(
-          writeCloseoutFile(
-            writeHandoffFile(result)
+    writeCloseoutReloadPacketFile(
+      writeArtifactManifestFile(
+        writeFilledCloseoutDraftFile(
+          writeRunRecordFile(
+            writeCloseoutFile(
+              writeHandoffFile(result)
+            )
           )
         )
       )

@@ -628,6 +628,137 @@ function buildStagingRehearsalExecutionSummary(result) {
   };
 }
 
+function buildStagingRehearsalRunRecordIndex(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
+  const executionSummary = result.stagingRehearsalExecutionSummary || buildStagingRehearsalExecutionSummary(result);
+  const finalPacket = result.finalRehearsalPacket || {};
+  const closeoutInput = result.closeoutInput || null;
+  const archiveRoot = runTemplate.archiveRoot || finalPacket.archiveRoot || "artifacts/staging/product/stable";
+  const packetFileByKey = new Map((finalPacket.localFiles || []).map((item) => [item.key, item]));
+  const closeoutInputPath = packetFileByKey.get("filled_closeout_input")?.path
+    || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const requiredRecordKeys = (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
+  const filledRecordKeys = Array.isArray(closeoutInput?.filledKeys) ? closeoutInput.filledKeys : [];
+  const missingRecordKeys = Array.isArray(closeoutInput?.missingKeys)
+    ? closeoutInput.missingKeys
+    : requiredRecordKeys.filter((key) => !filledRecordKeys.includes(key));
+  const requiredSignoffKeys = (closeout.productionSignoffConditions?.conditions || [])
+    .map((item) => item.key)
+    .filter(Boolean);
+  const filledSignoffKeys = Array.isArray(closeoutInput?.signoffFilledKeys) ? closeoutInput.signoffFilledKeys : [];
+  const missingSignoffKeys = Array.isArray(closeoutInput?.signoffMissingKeys)
+    ? closeoutInput.signoffMissingKeys
+    : requiredSignoffKeys.filter((key) => !filledSignoffKeys.includes(key));
+  const missingReceiptVisibilityKeys = Array.isArray(closeoutInput?.missingReceiptVisibilityKeys)
+    ? closeoutInput.missingReceiptVisibilityKeys
+    : RECEIPT_VISIBILITY_KEYS;
+  const watchAndStabilizationKeys = [
+    ...new Set([
+      ...(result.launchDayWatchPlan?.requiredEvidenceKeys || []),
+      ...(result.stabilizationHandoffPlan?.requiredEvidenceKeys || [])
+    ])
+  ];
+  const recordsByKey = new Map((runTemplate.records || []).map((item) => [item.key, item]));
+  const summarizeRecords = (keys) => keys.map((key) => {
+    const record = recordsByKey.get(key) || {};
+    return {
+      key,
+      sourcePlan: record.sourcePlan || null,
+      artifactPath: record.artifactPath || null,
+      receiptOperations: record.receiptOperations || []
+    };
+  });
+  const preFullTestStatus = missingRecordKeys.length === 0 && closeoutInput?.readyForFullTestWindow === true
+    ? "ready_for_full_test_window"
+    : "awaiting_operator_evidence";
+  const productionSignoffStatus = closeoutInput?.readyForProductionSignoff === true
+    ? "ready_for_production_signoff"
+    : "blocked_until_full_test_window";
+  const launchDayStatus = closeoutInput?.readyForProductionSignoff === true
+    && result.stagingReadinessTransition?.status === "ready_for_launch_day_watch"
+    ? "ready_for_launch_day_watch"
+    : "blocked_until_production_signoff";
+  let status = "awaiting_evidence_backfill";
+  if (launchDayStatus === "ready_for_launch_day_watch") {
+    status = "ready_for_launch_day_watch";
+  } else if (preFullTestStatus === "ready_for_full_test_window") {
+    status = "ready_for_full_test_window";
+  }
+  const orderedOperatorMilestones = [
+    "generate_rehearsal_outputs",
+    "collect_pre_full_test_records",
+    "backfill_filled_closeout_input",
+    "reload_closeout_input",
+    "run_full_test_window",
+    "backfill_production_signoff",
+    "production_signoff_review",
+    "start_launch_day_watch",
+    "prepare_stabilization_handoff"
+  ];
+  const nextAction = status === "ready_for_launch_day_watch"
+    ? "Start launch-day watch, then hand off stabilization records and rollback signal review."
+    : status === "ready_for_full_test_window"
+      ? "Run the full test window, backfill production sign-off evidence, then reload closeout input."
+      : "Collect the missing pre-full-test record artifacts, backfill filled-closeout-input.json, then reload closeout input.";
+  return {
+    mode: "staging-rehearsal-run-record-index",
+    status,
+    willModifyData: false,
+    archiveRoot,
+    sourceStatuses: {
+      runRecordTemplate: runTemplate.status || "not_available",
+      executionSummary: executionSummary.status || "not_available",
+      finalPacket: finalPacket.status || "not_available",
+      closeoutInput: closeoutInput?.status || "not_loaded"
+    },
+    recordCount: Array.isArray(runTemplate.records) ? runTemplate.records.length : 0,
+    closeoutProgress: {
+      requiredRecordKeys,
+      filledRecordKeys,
+      missingRecordKeys,
+      missingRecordCount: missingRecordKeys.length,
+      closeoutInputPath,
+      reloadCommand: finalPacket.commands?.closeoutReload
+        || runTemplate.closeoutInputReloadCommand
+        || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>"
+    },
+    signoffProgress: {
+      requiredSignoffKeys,
+      filledSignoffKeys,
+      missingSignoffKeys,
+      missingReceiptVisibilityKeys,
+      productionDecision: closeoutInput?.productionDecision || null,
+      requiredDecision: closeout.productionSignoffConditions?.requiredDecision || null
+    },
+    recordGroups: [
+      {
+        key: "pre_full_test_closeout",
+        status: preFullTestStatus,
+        recordCount: requiredRecordKeys.length,
+        missingRecordKeys,
+        records: summarizeRecords(requiredRecordKeys)
+      },
+      {
+        key: "production_signoff",
+        status: productionSignoffStatus,
+        recordCount: requiredSignoffKeys.length,
+        missingSignoffKeys,
+        missingReceiptVisibilityKeys,
+        records: requiredSignoffKeys.map((key) => ({ key }))
+      },
+      {
+        key: "launch_day_watch_and_stabilization",
+        status: launchDayStatus,
+        recordCount: watchAndStabilizationKeys.length,
+        records: summarizeRecords(watchAndStabilizationKeys)
+      }
+    ],
+    orderedOperatorMilestones,
+    nextAction
+  };
+}
+
 function runJsonScript(scriptName, args) {
   const result = spawnSync(process.execPath, [path.join("scripts", scriptName), "--json", ...args], {
     cwd: repoRoot,
@@ -2845,9 +2976,13 @@ function buildResult(options) {
     ...resultWithFinalRehearsalPacket,
     stagingRehearsalExecutionSummary: gatesPassed ? buildStagingRehearsalExecutionSummary(resultWithFinalRehearsalPacket) : null
   };
-  return {
+  const resultWithStagingRehearsalRunRecordIndex = {
     ...resultWithStagingRehearsalExecutionSummary,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingRehearsalExecutionSummary) : null
+    stagingRehearsalRunRecordIndex: gatesPassed ? buildStagingRehearsalRunRecordIndex(resultWithStagingRehearsalExecutionSummary) : null
+  };
+  return {
+    ...resultWithStagingRehearsalRunRecordIndex,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingRehearsalRunRecordIndex) : null
   };
 }
 
@@ -3460,6 +3595,43 @@ function renderFilledCloseoutInputDraft(draft) {
   return lines.join("\n");
 }
 
+function renderStagingRehearsalRunRecordIndex(index) {
+  if (!index) {
+    return "- Not available";
+  }
+  const statuses = index.sourceStatuses || {};
+  const closeout = index.closeoutProgress || {};
+  const signoff = index.signoffProgress || {};
+  const lines = [
+    `- Run record index status: ${index.status || "-"}`,
+    `- Writes data by itself: ${index.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${index.archiveRoot || "-"}`,
+    `- Source statuses: runRecordTemplate=${statuses.runRecordTemplate || "-"}, executionSummary=${statuses.executionSummary || "-"}, finalPacket=${statuses.finalPacket || "-"}, closeoutInput=${statuses.closeoutInput || "-"}`,
+    `- Total records: ${index.recordCount ?? 0}`,
+    `- Closeout progress: missing=${closeout.missingRecordCount ?? 0}, filled=${(closeout.filledRecordKeys || []).length}`,
+    `- Missing closeout keys: ${(closeout.missingRecordKeys || []).join(", ") || "-"}`,
+    `- Closeout input path: \`${closeout.closeoutInputPath || "-"}\``,
+    `- Reload command: \`${closeout.reloadCommand || "-"}\``,
+    `- Sign-off progress: missing=${(signoff.missingSignoffKeys || []).length}, receiptVisibilityMissing=${(signoff.missingReceiptVisibilityKeys || []).length}`,
+    `- Ordered milestones: ${(index.orderedOperatorMilestones || []).join(", ") || "-"}`,
+    "- Record groups:"
+  ];
+  for (const group of index.recordGroups || []) {
+    lines.push(`  - ${group.key || "-"}: ${group.status || "-"} (records=${group.recordCount ?? 0})`);
+    if (Array.isArray(group.missingRecordKeys) && group.missingRecordKeys.length) {
+      lines.push(`    - missingRecordKeys: ${group.missingRecordKeys.join(", ")}`);
+    }
+    if (Array.isArray(group.missingSignoffKeys) && group.missingSignoffKeys.length) {
+      lines.push(`    - missingSignoffKeys: ${group.missingSignoffKeys.join(", ")}`);
+    }
+    if (Array.isArray(group.missingReceiptVisibilityKeys) && group.missingReceiptVisibilityKeys.length) {
+      lines.push(`    - missingReceiptVisibilityKeys: ${group.missingReceiptVisibilityKeys.join(", ")}`);
+    }
+  }
+  lines.push(`- Next action: ${index.nextAction || "-"}`);
+  return lines.join("\n");
+}
+
 function renderStagingEnvironmentBinding(binding) {
   if (!binding) {
     return "- Not available";
@@ -3752,6 +3924,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingRunRecordTemplate(result.stagingRunRecordTemplate),
     "",
+    "## Staging Rehearsal Run Record Index",
+    "",
+    renderStagingRehearsalRunRecordIndex(result.stagingRehearsalRunRecordIndex),
+    "",
     "## Staging Environment Binding",
     "",
     renderStagingEnvironmentBinding(result.stagingEnvironmentBinding),
@@ -3825,6 +4001,7 @@ function buildCloseoutTemplate(result) {
     stagingProfileLaunchPlan: result.stagingProfileLaunchPlan || null,
     stagingProfileOperatorPreflight: result.stagingProfileOperatorPreflight || buildStagingProfileOperatorPreflight(result),
     stagingRehearsalExecutionSummary: result.stagingRehearsalExecutionSummary || buildStagingRehearsalExecutionSummary(result),
+    stagingRehearsalRunRecordIndex: result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result),
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
     archiveRoot: ledger.archiveRoot || null,

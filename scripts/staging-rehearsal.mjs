@@ -911,6 +911,135 @@ function buildFilledCloseoutInputExample(result) {
   };
 }
 
+function buildFinalRehearsalPacket(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
+  const filledExample = result.filledCloseoutInputExample || buildFilledCloseoutInputExample({
+    ...result,
+    stagingRunRecordTemplate: runTemplate
+  });
+  const archiveRoot = runTemplate.archiveRoot || "artifacts/staging/product/stable";
+  const filledCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const sourceReadiness = runTemplate.sourceReadiness || {
+    fullTestWindow: result.fullTestWindowReadiness?.status || "not_available",
+    productionSignoff: result.productionSignoffReadiness?.status || "not_available",
+    launchDayWatch: result.launchDayWatchPlan?.status || "not_available",
+    stabilizationHandoff: result.stabilizationHandoffPlan?.status || "not_available"
+  };
+  const readyForLaunchDayWatch = sourceReadiness.fullTestWindow === "ready"
+    && sourceReadiness.productionSignoff === "ready"
+    && sourceReadiness.launchDayWatch === "ready"
+    && sourceReadiness.stabilizationHandoff === "ready";
+  const orderedSteps = [
+    {
+      key: "generate_rehearsal_outputs",
+      status: "operator_generate",
+      summary: "Generate or archive the Markdown handoff, closeout template, filled closeout input copy, and staging artifact record paths."
+    },
+    {
+      key: "run_route_map_gate",
+      status: "operator_execute",
+      command: result.nextCommands?.launchRouteMapGate?.command || null,
+      summary: "Run the targeted Launch Mainline / Launch Smoke / Developer Ops route-map gate before live writes."
+    },
+    {
+      key: "run_backup_restore_drill",
+      status: "operator_execute",
+      commandKeys: Object.keys(result.nextCommands?.recovery || {}),
+      summary: "Run backup and restore drill commands on a separate restore target."
+    },
+    {
+      key: "run_live_write_smoke",
+      status: "operator_execute",
+      command: result.nextCommands?.launchSmoke || null,
+      summary: "Run the HTTPS live-write staging smoke only after operator approval."
+    },
+    {
+      key: "record_launch_mainline_evidence",
+      status: "operator_execute",
+      endpoint: result.evidenceActionPlan?.endpoint || null,
+      summary: "Record Launch Mainline evidence receipts and attach redacted receipt IDs."
+    },
+    {
+      key: "backfill_filled_closeout_input",
+      status: "operator_backfill",
+      path: filledCloseoutInputPath,
+      summary: "Copy the example to the real filled closeout input path and replace every placeholder with redacted staging evidence."
+    },
+    {
+      key: "reload_closeout_input",
+      status: "operator_execute",
+      command: filledExample.reloadCommand || null,
+      summary: "Reload the filled closeout input and verify readiness gaps narrow before the full test window."
+    },
+    {
+      key: "run_full_test_window",
+      status: "operator_execute",
+      command: closeout.fullTestWindowEntry?.command || "npm.cmd test",
+      summary: "Run the full repository test suite in the reserved test window after closeout reload."
+    },
+    {
+      key: "production_signoff_review",
+      status: "operator_review",
+      requiredDecision: closeout.productionSignoffConditions?.requiredDecision || null,
+      summary: "Review production sign-off evidence and receipt visibility before cutover."
+    },
+    {
+      key: "launch_day_watch",
+      status: "operator_watch",
+      summary: "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, and Launch Smoke routes open."
+    },
+    {
+      key: "stabilization_handoff",
+      status: "operator_handoff",
+      summary: "Hand off stabilization records, incidents, receipt snapshots, and rollback signals."
+    }
+  ];
+  return {
+    status: readyForLaunchDayWatch ? "ready_for_launch_day_watch" : "ready_for_operator_rehearsal",
+    willModifyData: false,
+    archiveRoot,
+    sourceReadiness,
+    commands: {
+      routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
+      liveWriteSmoke: result.nextCommands?.launchSmoke || null,
+      closeoutReload: filledExample.reloadCommand || null,
+      fullTestWindow: closeout.fullTestWindowEntry?.command || "npm.cmd test"
+    },
+    localFiles: [
+      {
+        key: "handoff_file",
+        path: result.handoffFile?.path || null,
+        status: fileOutputStatus(result.handoffFile)
+      },
+      {
+        key: "closeout_file",
+        path: result.closeoutFile?.path || null,
+        status: fileOutputStatus(result.closeoutFile)
+      },
+      {
+        key: "filled_closeout_input",
+        path: filledCloseoutInputPath,
+        status: "operator_copy_from_example"
+      },
+      {
+        key: "filled_closeout_input_example",
+        path: filledExample.saveAs || null,
+        status: "example_only"
+      },
+      {
+        key: "artifact_archive_root",
+        path: archiveRoot,
+        status: "operator_archive"
+      }
+    ],
+    orderedSteps,
+    nextAction: readyForLaunchDayWatch
+      ? "Start launch-day watch and stabilization handoff with the packet artifacts open."
+      : "Generate handoff and closeout files, run the ordered rehearsal steps, then reload the filled closeout input before the full test window."
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -1580,9 +1709,13 @@ function buildResult(options) {
     ...resultWithStagingRunRecordTemplate,
     filledCloseoutInputExample: gatesPassed ? buildFilledCloseoutInputExample(resultWithStagingRunRecordTemplate) : null
   };
-  return {
+  const resultWithFinalRehearsalPacket = {
     ...resultWithFilledCloseoutInputExample,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithFilledCloseoutInputExample) : null
+    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithFilledCloseoutInputExample) : null
+  };
+  return {
+    ...resultWithFinalRehearsalPacket,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithFinalRehearsalPacket) : null
   };
 }
 
@@ -2047,6 +2180,29 @@ function renderFilledCloseoutInputExample(example) {
   ].join("\n");
 }
 
+function renderFinalRehearsalPacket(packet) {
+  if (!packet) {
+    return "- Not available";
+  }
+  const fileByKey = new Map((packet.localFiles || []).map((item) => [item.key, item]));
+  return [
+    `- Packet status: ${packet.status || "-"}`,
+    `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${packet.archiveRoot || "-"}`,
+    `- Route-map gate: \`${packet.commands?.routeMapGate || "-"}\``,
+    `- Live-write smoke: \`${packet.commands?.liveWriteSmoke || "-"}\``,
+    `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
+    `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
+    `- Handoff file: ${fileByKey.get("handoff_file")?.path || "-"}`,
+    `- Closeout file: ${fileByKey.get("closeout_file")?.path || "-"}`,
+    `- Filled closeout input: ${fileByKey.get("filled_closeout_input")?.path || "-"}`,
+    `- Filled closeout input example: ${fileByKey.get("filled_closeout_input_example")?.path || "-"}`,
+    `- Source readiness: fullTestWindow=${packet.sourceReadiness?.fullTestWindow || "-"}, productionSignoff=${packet.sourceReadiness?.productionSignoff || "-"}, launchDayWatch=${packet.sourceReadiness?.launchDayWatch || "-"}, stabilizationHandoff=${packet.sourceReadiness?.stabilizationHandoff || "-"}`,
+    `- Ordered packet steps: ${(packet.orderedSteps || []).map((item) => item.key).join(", ") || "-"}`,
+    `- Next action: ${packet.nextAction || "-"}`
+  ].join("\n");
+}
+
 function renderProductionSignoffConditions(signoff) {
   if (!signoff) {
     return "- Not available";
@@ -2162,6 +2318,10 @@ function renderHandoffFile(result) {
     "",
     renderFilledCloseoutInputExample(result.filledCloseoutInputExample),
     "",
+    "## Final Rehearsal Packet",
+    "",
+    renderFinalRehearsalPacket(result.finalRehearsalPacket),
+    "",
     "## Production Sign-Off Conditions",
     "",
     renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
@@ -2238,6 +2398,7 @@ function buildCloseoutTemplate(result) {
     stabilizationHandoffPlan: result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result),
     stagingRunRecordTemplate: result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result),
     filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
+    finalRehearsalPacket: result.finalRehearsalPacket || buildFinalRehearsalPacket(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

@@ -145,6 +145,7 @@
             <button class="secondary" id="download-export-summary-btn">Download Summary</button>
             <button class="secondary" id="download-export-next-follow-up-btn">Download Next Follow-up</button>
             <button class="secondary" id="download-export-initial-launch-readiness-btn">Download Launch Readiness</button>
+            <button class="secondary" id="download-export-staging-archive-btn">Download Staging Archive</button>
             <button class="secondary" id="download-export-stabilization-handoff-btn">Download Stabilization Handoff</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
@@ -2817,6 +2818,26 @@
         throw { code: "UNSUPPORTED_NEXT_FOLLOW_UP", message: `Unsupported next launch receipt follow-up action: ${normalizedAction || "-"}` };
       }
 
+      async function handleStagingLaunchDutyArchiveAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        if (normalizedAction === "download-archive") {
+          const href = String(data.stagingArchiveDownloadHref || "").trim();
+          if (!href) {
+            throw { code: "MISSING_DOWNLOAD", message: "No staging launch-duty archive download is available." };
+          }
+          const result = await downloadApiFile(
+            href,
+            data.stagingArchiveDownloadFileName || "developer-ops-staging-launch-duty-archive.txt",
+            data.stagingArchiveDownloadLabel || "Staging launch-duty archive"
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Staging launch-duty archive downloaded: ${result.fileName}`);
+          return;
+        }
+        throw { code: "UNSUPPORTED_STAGING_ARCHIVE", message: `Unsupported staging launch-duty archive action: ${normalizedAction || "-"}` };
+      }
+
       async function handleStabilizationHandoffAction(action = "", data = {}) {
         const normalizedAction = String(action || "").trim().toLowerCase();
         const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
@@ -4284,6 +4305,48 @@
         `;
       }
 
+      function renderStagingLaunchDutyArchive(initialLaunchOpsReadiness = {}) {
+        const item = initialLaunchOpsReadiness?.stagingLaunchDutyArchive;
+        if (!item || typeof item !== "object") {
+          return "";
+        }
+        const download = initialLaunchOpsReadiness.stagingLaunchDutyArchiveDownload || {};
+        const files = item.files || {};
+        const packetFiles = Array.isArray(item.packetFiles) ? item.packetFiles.slice(0, 4) : [];
+        const status = String(item.status || "unknown").toLowerCase();
+        const downloadHref = String(download.href || "").trim();
+        const downloadFileName = download.fileName || "developer-ops-staging-launch-duty-archive.txt";
+        const actionAttrs = [
+          downloadHref ? `data-staging-archive-download-href="${esc(downloadHref)}"` : "",
+          `data-staging-archive-download-file-name="${esc(downloadFileName)}"`,
+          `data-staging-archive-download-label="${esc(download.label || "Staging launch-duty archive")}"`
+        ].filter(Boolean).join(" ");
+        const fileDetails = [
+          `archiveRoot=${esc(item.archiveRoot || "-")}`,
+          `launchDutyArchiveIndex=${esc(files.launchDutyArchiveIndex || "-")}`,
+          `readinessReview=${esc(files.readinessReviewPacket || "-")}`
+        ].join(" | ");
+        const commandDetails = [
+          `dryRun=${esc(item.commands?.profileDrivenDryRun || "-")}`,
+          `fullTest=${esc(item.commands?.fullTestWindow || "-")}`
+        ].join(" | ");
+        return `
+          <div class="snapshot-recap staging-launch-duty-archive">
+            <div class="snapshot-recap-head">
+              <strong>Staging Launch-Duty Archive</strong>
+              <span class="tag ${status === "ready" ? "ok" : "warning"}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">Backend/API bridge for the staging archive index and launch-duty packet paths before the full test window.</div>
+            <div class="snapshot-focus-meta">${fileDetails}</div>
+            <div class="snapshot-focus-meta">${commandDetails}</div>
+            <div class="snapshot-recap-actions">
+              <button type="button" class="snapshot-inline-button" data-staging-launch-duty-archive-action="download-archive" ${actionAttrs} ${(token && downloadHref) ? "" : "disabled"}>Download Staging Archive</button>
+            </div>
+            ${packetFiles.length ? `<ul class="snapshot-list">${packetFiles.map((packet) => `<li>${esc(packet.key || "-")}: ${esc(packet.path || "-")}</li>`).join("")}</ul>` : ""}
+          </div>
+        `;
+      }
+
       function renderStabilizationHandoff(initialLaunchOpsReadiness = {}) {
         const item = initialLaunchOpsReadiness?.stabilizationHandoff;
         if (!item || typeof item !== "object") {
@@ -4847,6 +4910,7 @@
           ${renderLastStabilizationHandoffResult()}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
+          ${renderStagingLaunchDutyArchive(initialLaunchOpsReadiness)}
           ${renderStabilizationHandoff(initialLaunchOpsReadiness)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
           ${renderPreparedFocus()}
@@ -4991,6 +5055,14 @@
         bindRows("#snapshot-overview [data-launch-receipt-next-follow-up-action]", async (data) => {
           try {
             await handleLaunchReceiptNextFollowUpAction(data.launchReceiptNextFollowUpAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-staging-launch-duty-archive-action]", async (data) => {
+          try {
+            await handleStagingLaunchDutyArchiveAction(data.stagingLaunchDutyArchiveAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
@@ -5588,6 +5660,7 @@
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-next-follow-up-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-next-follow-up", "developer-ops-launch-receipt-next-follow-up.txt", "Launch receipt next follow-up"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-initial-launch-readiness-btn").addEventListener("click", async () => { try { await handleExportDownload("initial-launch-ops-readiness", "developer-ops-initial-launch-readiness.txt", "Initial launch ops readiness"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-staging-archive-btn").addEventListener("click", async () => { try { await handleExportDownload("staging-launch-duty-archive", "developer-ops-staging-launch-duty-archive.txt", "Staging launch-duty archive"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-stabilization-handoff-btn").addEventListener("click", async () => { try { await handleExportDownload("stabilization-handoff", "developer-ops-stabilization-handoff.txt", "Stabilization handoff"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

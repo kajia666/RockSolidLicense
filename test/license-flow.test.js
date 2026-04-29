@@ -18302,12 +18302,18 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Next Follow-up/);
     assert.match(html, /Download Launch Readiness/);
+    assert.match(html, /Download Staging Archive/);
     assert.match(html, /Download Follow-up CSV/);
     assert.match(html, /download-export-next-follow-up-btn/);
     assert.match(html, /download-export-initial-launch-readiness-btn/);
+    assert.match(html, /download-export-staging-archive-btn/);
     assert.match(html, /download-export-stabilization-handoff-btn/);
     assert.match(html, /download-export-follow-ups-btn/);
     assert.match(html, /initial-launch-ops-readiness/);
+    assert.match(html, /staging-launch-duty-archive/);
+    assert.match(html, /renderStagingLaunchDutyArchive/);
+    assert.match(html, /data-staging-launch-duty-archive-action="download-archive"/);
+    assert.match(html, /data-staging-archive-download-href/);
     assert.match(html, /stabilization-handoff/);
     assert.match(html, /launch-receipt-next-follow-up/);
     assert.match(html, /launch-receipt-follow-ups/);

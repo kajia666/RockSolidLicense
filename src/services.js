@@ -14767,6 +14767,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const project = manifest.project || {};
   const filters = payload.filters || {};
   const mainlineSummary = payload.mainlineSummary || {};
+  const launchReceiptAuditBackfill = Number(payload.opsSnapshot?.auditLogs?.filters?.launchReceiptBackfill || 0);
   const formatWorkspaceActionParams = (params = null) => {
     const entries = params && typeof params === "object"
       ? Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
@@ -14786,6 +14787,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     `Project Code: ${project.code || filters.productCode || "-"}`,
     `Project Name: ${project.name || "-"}`,
     `Channel: ${manifest.channel || filters.channel || "-"}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
     ""
   ];
   appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
@@ -20985,6 +20987,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const initialLaunchOpsReadiness = summary.initialLaunchOpsReadiness || null;
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
+  const launchReceiptAuditBackfill = Number(payload.auditLogs?.filters?.launchReceiptBackfill || 0);
   const lines = [
     "RockSolid Developer Ops Snapshot",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -21000,6 +21003,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Audit Actor Filter: ${scope.actorType || "-"}`,
     `Audit Entity Filter: ${scope.entityType || "-"}`,
     `Audit Limit: ${scope.auditLimit ?? 0}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
     "",
     `Projects: ${summary.projects ?? 0}`,
     `Accounts: ${summary.accounts ?? 0}`,

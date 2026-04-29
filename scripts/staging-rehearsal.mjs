@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const ADMIN_PASSWORD_ENV = "RSL_SMOKE_ADMIN_PASSWORD";
+const DEVELOPER_PASSWORD_ENV = "RSL_SMOKE_DEVELOPER_PASSWORD";
 const DEVELOPER_BEARER_TOKEN_ENV = "RSL_DEVELOPER_BEARER_TOKEN";
 
 const EVIDENCE_ORDER = [
@@ -911,6 +913,112 @@ function buildFilledCloseoutInputExample(result) {
   };
 }
 
+function formatPowerShellArg(value) {
+  const text = String(value ?? "");
+  if (text === "") {
+    return "''";
+  }
+  if (/[\s"'|&;<>()[\]{}]/.test(text)) {
+    return `'${text.replace(/'/g, "''")}'`;
+  }
+  return text;
+}
+
+function buildStagingEnvironmentBinding(result, options = {}) {
+  const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
+  const archiveRoot = runTemplate.archiveRoot || "artifacts/staging/product/stable";
+  const handoffPath = result.handoffFile?.path || path.posix.join(archiveRoot, "staging-rehearsal-handoff.md");
+  const closeoutPath = result.closeoutFile?.path || path.posix.join(archiveRoot, "staging-closeout-template.json");
+  const filledCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const filledExamplePath = result.filledCloseoutInputExample?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.example.json");
+  const environment = {
+    baseUrl: result.summary?.baseUrl || options.baseUrl || null,
+    productCode: result.summary?.productCode || options.productCode || null,
+    channel: result.summary?.channel || options.channel || null,
+    targetOs: result.summary?.targetOs || options.targetOs || null,
+    storageProfile: result.summary?.storageProfile || options.storageProfile || null,
+    targetEnvFile: options.targetEnvFile || null,
+    appBackupDir: options.appBackupDir || null,
+    postgresBackupDir: options.postgresBackupDir || null
+  };
+  const commandParts = [
+    "npm.cmd",
+    "run",
+    "staging:rehearsal",
+    "--",
+    "--json",
+    "--base-url",
+    environment.baseUrl,
+    "--product-code",
+    environment.productCode,
+    "--channel",
+    environment.channel,
+    "--admin-username",
+    options.adminUsername,
+    "--admin-password",
+    `$env:${ADMIN_PASSWORD_ENV}`,
+    "--developer-username",
+    options.developerUsername,
+    "--developer-password",
+    `$env:${DEVELOPER_PASSWORD_ENV}`,
+    "--target-os",
+    environment.targetOs,
+    "--storage-profile",
+    environment.storageProfile,
+    "--target-env-file",
+    environment.targetEnvFile,
+    "--app-backup-dir",
+    environment.appBackupDir,
+    ...(environment.postgresBackupDir
+      ? ["--postgres-backup-dir", environment.postgresBackupDir]
+      : []),
+    "--handoff-file",
+    handoffPath,
+    "--closeout-file",
+    closeoutPath
+  ].filter((part) => part !== null && part !== undefined && String(part) !== "");
+  return {
+    status: "ready_for_real_staging_binding",
+    willModifyData: false,
+    environment,
+    credentialEnv: {
+      adminPassword: ADMIN_PASSWORD_ENV,
+      developerPassword: DEVELOPER_PASSWORD_ENV,
+      developerBearerToken: DEVELOPER_BEARER_TOKEN_ENV
+    },
+    recommendedOutputFiles: [
+      {
+        key: "handoff_file",
+        path: handoffPath,
+        status: result.handoffFile ? fileOutputStatus(result.handoffFile) : "recommended_default"
+      },
+      {
+        key: "closeout_file",
+        path: closeoutPath,
+        status: result.closeoutFile ? fileOutputStatus(result.closeoutFile) : "recommended_default"
+      },
+      {
+        key: "filled_closeout_input",
+        path: filledCloseoutInputPath,
+        status: "operator_create"
+      },
+      {
+        key: "filled_closeout_input_example",
+        path: filledExamplePath,
+        status: "example_only"
+      },
+      {
+        key: "artifact_archive_root",
+        path: archiveRoot,
+        status: "operator_archive"
+      }
+    ],
+    dryRunCommand: commandParts.map(formatPowerShellArg).join(" "),
+    nextAction: "Verify these real staging values, generate handoff and closeout files under the artifact archive root, then run this dry-run command before live-write smoke.",
+    operatorNote: "This binding is safe to store: it references password and bearer-token environment variable names only, not raw secret values."
+  };
+}
+
 function buildFinalRehearsalPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
@@ -998,9 +1106,11 @@ function buildFinalRehearsalPacket(result) {
   return {
     status: readyForLaunchDayWatch ? "ready_for_launch_day_watch" : "ready_for_operator_rehearsal",
     willModifyData: false,
+    environmentBindingStatus: result.stagingEnvironmentBinding?.status || null,
     archiveRoot,
     sourceReadiness,
     commands: {
+      stagingRehearsalDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
       liveWriteSmoke: result.nextCommands?.launchSmoke || null,
       closeoutReload: filledExample.reloadCommand || null,
@@ -1709,9 +1819,13 @@ function buildResult(options) {
     ...resultWithStagingRunRecordTemplate,
     filledCloseoutInputExample: gatesPassed ? buildFilledCloseoutInputExample(resultWithStagingRunRecordTemplate) : null
   };
-  const resultWithFinalRehearsalPacket = {
+  const resultWithStagingEnvironmentBinding = {
     ...resultWithFilledCloseoutInputExample,
-    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithFilledCloseoutInputExample) : null
+    stagingEnvironmentBinding: gatesPassed ? buildStagingEnvironmentBinding(resultWithFilledCloseoutInputExample, options) : null
+  };
+  const resultWithFinalRehearsalPacket = {
+    ...resultWithStagingEnvironmentBinding,
+    finalRehearsalPacket: gatesPassed ? buildFinalRehearsalPacket(resultWithStagingEnvironmentBinding) : null
   };
   return {
     ...resultWithFinalRehearsalPacket,
@@ -2180,6 +2294,34 @@ function renderFilledCloseoutInputExample(example) {
   ].join("\n");
 }
 
+function renderStagingEnvironmentBinding(binding) {
+  if (!binding) {
+    return "- Not available";
+  }
+  const fileByKey = new Map((binding.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  return [
+    `- Binding status: ${binding.status || "-"}`,
+    `- Writes data: ${binding.willModifyData ? "yes" : "no"}`,
+    `- Base URL: ${binding.environment?.baseUrl || "-"}`,
+    `- Product code: ${binding.environment?.productCode || "-"}`,
+    `- Channel: ${binding.environment?.channel || "-"}`,
+    `- Target OS: ${binding.environment?.targetOs || "-"}`,
+    `- Storage profile: ${binding.environment?.storageProfile || "-"}`,
+    `- Target env file: ${binding.environment?.targetEnvFile || "-"}`,
+    `- App backup dir: ${binding.environment?.appBackupDir || "-"}`,
+    `- Postgres backup dir: ${binding.environment?.postgresBackupDir || "-"}`,
+    `- Admin password env: ${binding.credentialEnv?.adminPassword || "-"}`,
+    `- Developer password env: ${binding.credentialEnv?.developerPassword || "-"}`,
+    `- Developer bearer token env: ${binding.credentialEnv?.developerBearerToken || "-"}`,
+    `- Handoff file: ${fileByKey.get("handoff_file")?.path || "-"}`,
+    `- Closeout file: ${fileByKey.get("closeout_file")?.path || "-"}`,
+    `- Filled closeout input: ${fileByKey.get("filled_closeout_input")?.path || "-"}`,
+    `- Artifact archive root: ${fileByKey.get("artifact_archive_root")?.path || "-"}`,
+    `- Dry run command: \`${binding.dryRunCommand || "-"}\``,
+    `- Next action: ${binding.nextAction || "-"}`
+  ].join("\n");
+}
+
 function renderFinalRehearsalPacket(packet) {
   if (!packet) {
     return "- Not available";
@@ -2188,7 +2330,9 @@ function renderFinalRehearsalPacket(packet) {
   return [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
+    `- Environment binding status: ${packet.environmentBindingStatus || "-"}`,
     `- Archive root: ${packet.archiveRoot || "-"}`,
+    `- Staging rehearsal dry run: \`${packet.commands?.stagingRehearsalDryRun || "-"}\``,
     `- Route-map gate: \`${packet.commands?.routeMapGate || "-"}\``,
     `- Live-write smoke: \`${packet.commands?.liveWriteSmoke || "-"}\``,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
@@ -2314,6 +2458,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingRunRecordTemplate(result.stagingRunRecordTemplate),
     "",
+    "## Staging Environment Binding",
+    "",
+    renderStagingEnvironmentBinding(result.stagingEnvironmentBinding),
+    "",
     "## Filled Closeout Input Example",
     "",
     renderFilledCloseoutInputExample(result.filledCloseoutInputExample),
@@ -2397,6 +2545,7 @@ function buildCloseoutTemplate(result) {
     launchDayWatchPlan: result.launchDayWatchPlan || buildLaunchDayWatchPlan(result),
     stabilizationHandoffPlan: result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result),
     stagingRunRecordTemplate: result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result),
+    stagingEnvironmentBinding: result.stagingEnvironmentBinding || null,
     filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
     finalRehearsalPacket: result.finalRehearsalPacket || buildFinalRehearsalPacket(result),
     closeoutInput: result.closeoutInput || null,

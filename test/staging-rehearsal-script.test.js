@@ -380,9 +380,45 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     output.filledCloseoutInputExample.productionSignoff.conditions.map((item) => item.key),
     output.stagingAcceptanceCloseout.productionSignoffConditions.conditions.map((item) => item.key)
   );
+  assert.equal(output.stagingEnvironmentBinding.status, "ready_for_real_staging_binding");
+  assert.equal(output.stagingEnvironmentBinding.willModifyData, false);
+  assert.deepEqual(output.stagingEnvironmentBinding.environment, {
+    baseUrl: "https://staging.example.com",
+    productCode: "PILOT_ALPHA",
+    channel: "stable",
+    targetOs: "linux",
+    storageProfile: "postgres-preview",
+    targetEnvFile: "/etc/rocksolidlicense/staging.env",
+    appBackupDir: "/var/lib/rocksolid/backups",
+    postgresBackupDir: "/var/lib/rocksolid/postgres-backups"
+  });
+  assert.deepEqual(output.stagingEnvironmentBinding.credentialEnv, {
+    adminPassword: "RSL_SMOKE_ADMIN_PASSWORD",
+    developerPassword: "RSL_SMOKE_DEVELOPER_PASSWORD",
+    developerBearerToken: "RSL_DEVELOPER_BEARER_TOKEN"
+  });
+  assert.deepEqual(
+    output.stagingEnvironmentBinding.recommendedOutputFiles.map((item) => [item.key, item.path, item.status]),
+    [
+      ["handoff_file", "artifacts/staging/PILOT_ALPHA/stable/staging-rehearsal-handoff.md", "recommended_default"],
+      ["closeout_file", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json", "recommended_default"],
+      ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
+      ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json", "example_only"],
+      ["artifact_archive_root", "artifacts/staging/PILOT_ALPHA/stable", "operator_archive"]
+    ]
+  );
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /npm\.cmd run staging:rehearsal -- --json/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--base-url https:\/\/staging\.example\.com/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--admin-password \$env:RSL_SMOKE_ADMIN_PASSWORD/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--developer-password \$env:RSL_SMOKE_DEVELOPER_PASSWORD/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--handoff-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-rehearsal-handoff\.md/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--closeout-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-template\.json/);
+  assert.doesNotMatch(JSON.stringify(output.stagingEnvironmentBinding), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
   assert.equal(output.finalRehearsalPacket.willModifyData, false);
+  assert.equal(output.finalRehearsalPacket.environmentBindingStatus, "ready_for_real_staging_binding");
   assert.equal(output.finalRehearsalPacket.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.equal(output.finalRehearsalPacket.commands.stagingRehearsalDryRun, output.stagingEnvironmentBinding.dryRunCommand);
   assert.equal(output.finalRehearsalPacket.commands.routeMapGate, "npm.cmd run launch:route-map-gate");
   assert.equal(output.finalRehearsalPacket.commands.fullTestWindow, "npm.cmd test");
   assert.equal(
@@ -675,6 +711,13 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout\.json>`/);
     assert.match(handoff, /launch_day_watch_summary: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
     assert.match(handoff, /stabilization_owner_handoff: artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+    assert.match(handoff, /## Staging Environment Binding/);
+    assert.match(handoff, /Binding status: ready_for_real_staging_binding/);
+    assert.match(handoff, /Admin password env: RSL_SMOKE_ADMIN_PASSWORD/);
+    assert.match(handoff, /Developer password env: RSL_SMOKE_DEVELOPER_PASSWORD/);
+    assert.ok(handoff.includes(`Handoff file: ${handoffFile}`));
+    assert.match(handoff, /Closeout file: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-template\.json/);
+    assert.match(handoff, /Dry run command: `npm\.cmd run staging:rehearsal -- --json/);
     assert.match(handoff, /## Filled Closeout Input Example/);
     assert.match(handoff, /Example only: yes/);
     assert.match(handoff, /Save as: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.example\.json/);
@@ -858,7 +901,16 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     );
     assert.equal(template.filledCloseoutInputExample.receiptVisibility.developerOps.value, "visible");
     assert.equal(template.filledCloseoutInputExample.productionSignoff.decision, "ready-for-production-signoff");
+    assert.equal(template.stagingEnvironmentBinding.status, "ready_for_real_staging_binding");
+    assert.equal(
+      template.stagingEnvironmentBinding.recommendedOutputFiles.find((item) => item.key === "closeout_file").path,
+      closeoutFile
+    );
+    assert.match(template.stagingEnvironmentBinding.dryRunCommand, /--closeout-file /);
+    assert.doesNotMatch(JSON.stringify(template.stagingEnvironmentBinding), /StrongAdmin123!|StrongDeveloper123!/);
     assert.equal(template.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
+    assert.equal(template.finalRehearsalPacket.environmentBindingStatus, "ready_for_real_staging_binding");
+    assert.equal(template.finalRehearsalPacket.commands.stagingRehearsalDryRun, template.stagingEnvironmentBinding.dryRunCommand);
     assert.equal(template.finalRehearsalPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
     assert.equal(
       template.finalRehearsalPacket.localFiles.find((item) => item.key === "closeout_file").path,

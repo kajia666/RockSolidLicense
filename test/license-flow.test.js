@@ -14437,6 +14437,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(handoffIndexDownload.contentType, "text/plain; charset=utf-8");
     assert.match(handoffIndexDownload.contentDisposition || "", /developer-ops-handoff-index\.txt/);
     assert.match(handoffIndexDownload.body, /RockSolid Developer Ops Launch Handoff Index/);
+    assert.match(handoffIndexDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(handoffIndexDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(handoffIndexDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(handoffIndexDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(handoffIndexDownload.body, /Initial Launch Ops Readiness: REVIEW/);
     assert.match(handoffIndexDownload.body, /Next Follow-up: \[REVIEW\]\[production_evidence\]/);
     assert.match(handoffIndexDownload.body, /Follow-up Queue:/);

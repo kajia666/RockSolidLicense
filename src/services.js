@@ -21799,6 +21799,13 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const gate = readiness.gate || {};
   const followUpQueue = Array.isArray(readiness.followUpQueue) ? readiness.followUpQueue : [];
   const recommendedDownloads = Array.isArray(readiness.recommendedDownloads) ? readiness.recommendedDownloads : [];
+  const launchReceiptAuditBackfill = Number(
+    summary.launchReceiptAuditBackfill
+    ?? payload.auditLogs?.filters?.launchReceiptBackfill
+    ?? 0
+  );
+  const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const includedFiles = [
     payload.fileName || "developer-ops.json",
     payload.summaryFileName || "developer-ops-summary.txt",
@@ -21822,6 +21829,10 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Generated At: ${payload.generatedAt || ""}`,
     `Project Filter: ${scope.productCode || "-"}`,
     `Audit Event Filter: ${scope.eventType || "-"}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     `Initial Launch Ops Readiness: ${String(readiness.status || "unknown").toUpperCase()}`,
     `Gate Decision: ${String(gate.decision || "unknown").toUpperCase()}`,
     `Can Enter Initial Launch: ${gate.canEnterInitialLaunch === true ? "yes" : "no"}`,

@@ -10,5 +10,6 @@
   "appBackupDir": "/var/lib/rocksolid/backups",
   "postgresBackupDir": "/var/lib/rocksolid/postgres-backups",
   "handoffFile": "artifacts/staging/PILOT_ALPHA/stable/staging-rehearsal-handoff.md",
-  "closeoutFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json"
+  "closeoutFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json",
+  "runRecordFile": "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json"
 }

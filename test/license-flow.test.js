@@ -14451,6 +14451,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /launch-mainline-post-launch-handoff-index.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-handoff-index/
     );
 
+    const launchMainlineHandoffRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      operatorSession.token
+    );
+    assert.equal(launchMainlineHandoffRoutesDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchMainlineHandoffRoutesDownload.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Mainline Launch Duty Action Order:/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
+
     const launchMainlinePostLaunchIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -14458,6 +14470,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.equal(launchMainlinePostLaunchIndexDownload.contentType, "text/plain; charset=utf-8");
     assert.match(launchMainlinePostLaunchIndexDownload.body, /RockSolid Developer Launch Mainline Post-Launch Handoff Index/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Mainline Launch Duty Action Order:/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Traceability:/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Latest Launch Receipt: record_post_launch_ops_sweep/);
     assert.ok(launchMainlinePostLaunchIndexDownload.body.includes(latestLaunchReceipt.handoffFileName));
@@ -14541,6 +14557,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     const launchMainlineTraceabilityZipText = launchMainlineTraceabilityZip.body.toString("latin1");
     assert.match(launchMainlineTraceabilityZipText, /handoff-download-routes\.txt/);
     assert.match(launchMainlineTraceabilityZipText, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(launchMainlineTraceabilityZipText, /Launch Mainline Launch Duty Action Order:/);
     assert.match(
       launchMainlineTraceabilityZipText,
       /launch-mainline-json: .*\.json.*format=json.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=json/

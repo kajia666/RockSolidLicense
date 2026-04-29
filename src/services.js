@@ -15257,6 +15257,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const project = manifest.project || {};
   const traceability = payload.postLaunchHandoffTraceability || {};
   const opsFiles = traceability.opsFiles || {};
+  const launchDutyActionOrder = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const nextFollowUp = traceability.nextFollowUp || {};
   const nextFollowUpDownload = nextFollowUp.recommendedDownload && typeof nextFollowUp.recommendedDownload === "object"
     ? nextFollowUp.recommendedDownload
@@ -15354,9 +15355,15 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     `Project Code: ${project.code || payload.filters?.productCode || "-"}`,
     `Project Name: ${project.name || "-"}`,
     `Channel: ${manifest.channel || payload.filters?.channel || "stable"}`,
-    "",
-    "Critical Handoff Routes:"
+    ""
   ];
+  if (launchDutyActionOrder) {
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
+      title: "Launch Mainline Launch Duty Action Order:"
+    });
+    lines.push("");
+  }
+  lines.push("Critical Handoff Routes:");
   const pushRoute = (key, label, path, download = {}) => {
     lines.push(
       `- ${key}: ${path || "-"}`
@@ -16585,6 +16592,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const latestLaunchReceipt = traceability.latestLaunchReceipt || null;
   const launchReceiptNextFollowUp = traceability.nextFollowUp || null;
   const opsFiles = traceability.opsFiles || {};
+  const launchDutyActionOrder = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
     productCode: project.code || filters.productCode || "",
     channel: manifest.channel || filters.channel || "stable"
@@ -16613,6 +16621,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     `Primary Lifecycle Download: ${formatLaunchHandoffDownloadText(lifecycle.primaryRecommendedDownload, { fileSeparator: " | " })}`,
     ""
   ];
+
+  if (launchDutyActionOrder) {
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
+      title: "Launch Mainline Launch Duty Action Order:"
+    });
+    lines.push("");
+  }
 
   lines.push("Lifecycle Phase Statuses:");
   if (phases.length) {
@@ -25583,6 +25598,27 @@ function queryAuditLogRows(db, filters = {}) {
     total: items.length,
     filters: normalizedFilters
   };
+}
+
+function shouldBackfillLaunchReceiptAuditRows(filters = {}) {
+  return !filters.eventType
+    && !filters.actorType
+    && !filters.entityType
+    && !filters.username
+    && !filters.search;
+}
+
+function mergeAuditLogRows(primaryItems = [], backfillItems = []) {
+  const rowsById = new Map();
+  for (const item of [...primaryItems, ...backfillItems]) {
+    if (!item?.id || rowsById.has(item.id)) {
+      continue;
+    }
+    rowsById.set(item.id, item);
+  }
+  return Array.from(rowsById.values()).sort((left, right) =>
+    snapshotDateMs(right.created_at || right.createdAt) - snapshotDateMs(left.created_at || left.createdAt)
+  );
 }
 
 async function queryNetworkRuleRows(db, store, filters = {}) {
@@ -35428,6 +35464,28 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           productCodes: scopedProductCodes
         }))
       ]);
+      const launchReceiptAuditLogs = shouldBackfillLaunchReceiptAuditRows(normalizedFilters)
+        ? queryAuditLogRows(db, {
+            eventType: "product.launch-mainline.action",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
+      const mergedAuditLogItems = launchReceiptAuditLogs.items?.length
+        ? mergeAuditLogRows(auditLogs.items || [], launchReceiptAuditLogs.items)
+        : null;
+      const effectiveAuditLogs = launchReceiptAuditLogs.items?.length
+        ? {
+            ...auditLogs,
+            items: mergedAuditLogItems,
+            total: mergedAuditLogItems.length,
+            filters: {
+              ...(auditLogs.filters || {}),
+              launchReceiptBackfill: launchReceiptAuditLogs.items.length
+            }
+          }
+        : auditLogs;
 
       return buildDeveloperOpsSnapshotPayload({
         developer: buildDeveloperIdentityPayload(session),
@@ -35443,7 +35501,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         sessions,
         bindings,
         blocks,
-        auditLogs
+        auditLogs: effectiveAuditLogs
       });
     },
 

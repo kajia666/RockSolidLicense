@@ -217,6 +217,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["handoff_file", "not_requested"],
       ["closeout_file", "not_requested"],
       ["run_record_index", "not_requested"],
+      ["artifact_manifest", "not_requested"],
       ["filled_closeout_draft", "not_requested"]
     ]
   );
@@ -399,6 +400,31 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ]
   );
   assert.equal(output.stagingRehearsalRunRecordIndex.nextAction, "Collect the missing pre-full-test record artifacts, backfill filled-closeout-input.json, then reload closeout input.");
+  assert.equal(output.stagingArtifactManifest.mode, "staging-artifact-manifest");
+  assert.equal(output.stagingArtifactManifest.status, "awaiting_artifact_generation");
+  assert.equal(output.stagingArtifactManifest.willModifyData, false);
+  assert.equal(output.stagingArtifactManifest.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.deepEqual(
+    output.stagingArtifactManifest.files.map((item) => [item.key, item.path, item.status]),
+    [
+      ["handoff_file", "artifacts/staging/PILOT_ALPHA/stable/staging-rehearsal-handoff.md", "recommended_default"],
+      ["closeout_file", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json", "recommended_default"],
+      ["run_record_index", "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json", "recommended_default"],
+      ["artifact_manifest", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json", "recommended_default"],
+      ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
+      ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json", "example_only"],
+      ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json", "example_only"],
+      ["artifact_archive_root", "artifacts/staging/PILOT_ALPHA/stable", "operator_archive"]
+    ]
+  );
+  assert.deepEqual(output.stagingArtifactManifest.sourceStatuses, {
+    profilePreflight: "profile_not_loaded",
+    executionSummary: "profile_not_loaded",
+    runRecordIndex: "awaiting_evidence_backfill",
+    finalPacket: "ready_for_operator_rehearsal"
+  });
+  assert.equal(output.stagingArtifactManifest.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(output.stagingArtifactManifest.nextAction, "Generate and archive the listed rehearsal artifacts, then fill closeout evidence from the draft before reloading closeout input.");
   assert.equal(output.filledCloseoutInputExample.mode, "staging-closeout-input-example");
   assert.equal(output.filledCloseoutInputExample.status, "example_only");
   assert.equal(output.filledCloseoutInputExample.exampleOnly, true);
@@ -442,6 +468,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["handoff_file", "artifacts/staging/PILOT_ALPHA/stable/staging-rehearsal-handoff.md", "recommended_default"],
       ["closeout_file", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json", "recommended_default"],
       ["run_record_index", "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json", "recommended_default"],
+      ["artifact_manifest", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json", "recommended_default"],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json", "example_only"],
       ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json", "example_only"],
@@ -455,6 +482,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--handoff-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-rehearsal-handoff\.md/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--closeout-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-template\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--run-record-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--artifact-manifest-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifact-manifest\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--filled-closeout-draft-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.draft\.json/);
   assert.doesNotMatch(JSON.stringify(output.stagingEnvironmentBinding), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.stagingExecutionRunbook.status, "ready_for_real_staging_dry_run");
@@ -638,6 +666,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["handoff_file", null],
       ["closeout_file", null],
       ["run_record_index", null],
+      ["artifact_manifest", null],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json"],
       ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json"],
@@ -829,6 +858,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     const handoffFile = join(tempDir, "profile-handoff.md");
     const closeoutFile = join(tempDir, "profile-closeout.json");
     const runRecordFile = join(tempDir, "profile-run-record-index.json");
+    const artifactManifestFile = join(tempDir, "profile-artifact-manifest.json");
     const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
     writeFileSync(profileFile, JSON.stringify({
       baseUrl: "https://profile-staging.example.com",
@@ -854,6 +884,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       closeoutFile,
       "--run-record-file",
       runRecordFile,
+      "--artifact-manifest-file",
+      artifactManifestFile,
       "--filled-closeout-draft-file",
       filledCloseoutDraftFile
     ], {
@@ -894,6 +926,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       "handoffFile",
       "closeoutFile",
       "runRecordFile",
+      "artifactManifestFile",
       "filledCloseoutDraftFile"
     ]);
     assert.deepEqual(output.stagingProfileLaunchPlan.missingRequiredInputs, []);
@@ -926,6 +959,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         ["handoff_file", handoffFile, "pending_write"],
         ["closeout_file", closeoutFile, "pending_write"],
         ["run_record_index", runRecordFile, "pending_write"],
+        ["artifact_manifest", artifactManifestFile, "pending_write"],
         ["filled_closeout_input", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json", "operator_create"],
         ["filled_closeout_draft", filledCloseoutDraftFile, "pending_write"],
         ["filled_closeout_input_example", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.example.json", "example_only"],
@@ -1019,7 +1053,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Profile keys: adminUsername, appBackupDir, baseUrl, channel, developerUsername, postgresBackupDir, productCode, storageProfile, targetEnvFile, targetOs/);
     assert.match(handoff, /## Staging Profile Launch Plan/);
     assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
-    assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, filledCloseoutDraftFile/);
+    assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, artifactManifestFile, filledCloseoutDraftFile/);
     assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: missing before_evidence_recording/);
     assert.match(handoff, /## Staging Profile Operator Preflight/);
     assert.match(handoff, /Profile preflight status: blocked_until_secret_env/);
@@ -1042,6 +1076,11 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.runRecordFile.written, true);
     assert.equal(existsSync(runRecordFile), true);
     assert.deepEqual(JSON.parse(readFileSync(runRecordFile, "utf8")), output.stagingRehearsalRunRecordIndex);
+    assert.deepEqual(template.stagingArtifactManifest, output.stagingArtifactManifest);
+    assert.equal(output.artifactManifestFile.path, artifactManifestFile);
+    assert.equal(output.artifactManifestFile.written, true);
+    assert.equal(existsSync(artifactManifestFile), true);
+    assert.deepEqual(JSON.parse(readFileSync(artifactManifestFile, "utf8")), output.stagingArtifactManifest);
     assert.equal(output.filledCloseoutDraftFile.path, filledCloseoutDraftFile);
     assert.equal(output.filledCloseoutDraftFile.written, true);
     assert.equal(existsSync(filledCloseoutDraftFile), true);

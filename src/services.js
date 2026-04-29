@@ -21494,10 +21494,21 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     mainlineHandoff: payload.mainlineHandoff || null
   });
   const gate = readiness.gate || {};
+  const launchReceiptAuditBackfill = Number(
+    summary.launchReceiptAuditBackfill
+    ?? payload.auditLogs?.filters?.launchReceiptBackfill
+    ?? 0
+  );
+  const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const lines = [
     "RockSolid Developer Ops Initial Launch Readiness",
     `Generated At: ${payload.generatedAt || ""}`,
     `Project Filter: ${scope.productCode || "-"}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     `Status: ${String(readiness.status || "unknown").toUpperCase()}`,
     `Gate Decision: ${String(gate.decision || "unknown").toUpperCase()}`,
     `Can Enter Initial Launch: ${gate.canEnterInitialLaunch === true ? "yes" : "no"}`,

@@ -14246,6 +14246,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchOpsReadinessDownload.contentType, "text/plain; charset=utf-8");
     assert.match(initialLaunchOpsReadinessDownload.contentDisposition || "", /developer-ops-initial-launch-readiness\.txt/);
     assert.match(initialLaunchOpsReadinessDownload.body, /RockSolid Developer Ops Initial Launch Readiness/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(initialLaunchOpsReadinessDownload.body, /Status: REVIEW/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Gate Decision: HOLD/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Can Enter Initial Launch: no/);

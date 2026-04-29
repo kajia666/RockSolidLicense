@@ -270,6 +270,32 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
     nextAction: "Backfill full-test evidence, production sign-off conditions, production decision, and receipt visibility before cutover."
   });
+  assert.equal(output.launchDayWatchPlan.status, "blocked");
+  assert.equal(output.launchDayWatchPlan.canStartCutoverWatch, false);
+  assert.equal(output.launchDayWatchPlan.requiredDecision, "ready-for-production-signoff");
+  assert.equal(output.launchDayWatchPlan.productionDecision, null);
+  assert.deepEqual(output.launchDayWatchPlan.missingSignoffKeys, output.productionSignoffReadiness.missingSignoffKeys);
+  assert.deepEqual(output.launchDayWatchPlan.missingReceiptVisibilityKeys, [
+    "launchMainline",
+    "launchReview",
+    "launchSmoke",
+    "developerOps"
+  ]);
+  assert.deepEqual(
+    output.launchDayWatchPlan.watchWindows.map((item) => item.key),
+    ["cutover_watch", "first_wave_stabilization"]
+  );
+  assert.equal(
+    output.launchDayWatchPlan.routes.developerOps,
+    "https://staging.example.com/developer/ops?productCode=PILOT_ALPHA&source=staging-rehearsal&handoff=first-wave"
+  );
+  assert.deepEqual(output.launchDayWatchPlan.escalationTriggers, [
+    "production_signoff_missing",
+    "receipt_visibility_missing",
+    "launch_mainline_action_failure",
+    "developer_ops_receipt_mismatch",
+    "backup_restore_or_rollback_unclear"
+  ]);
   assert.deepEqual(output.operatorExecutionPlan.readinessSummary, {
     status: "needs_operator_input",
     gapCount: 6,
@@ -516,6 +542,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Can sign off: no/);
     assert.match(handoff, /Missing sign-off keys: full_test_window_passed, staging_artifacts_archived, launch_mainline_receipts_visible, backup_restore_drill_passed, rollback_path_confirmed, operator_signoff_recorded/);
     assert.match(handoff, /Missing receipt visibility keys: launchMainline, launchReview, launchSmoke, developerOps/);
+    assert.match(handoff, /## Launch Day Watch Plan/);
+    assert.match(handoff, /Can start cutover watch: no/);
+    assert.match(handoff, /Watch windows: cutover_watch, first_wave_stabilization/);
+    assert.match(handoff, /Escalation triggers: production_signoff_missing, receipt_visibility_missing, launch_mainline_action_failure, developer_ops_receipt_mismatch, backup_restore_or_rollback_unclear/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
@@ -638,6 +668,18 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       template.productionSignoffConditions.conditions.map((item) => item.key)
     );
     assert.deepEqual(template.productionSignoffReadiness.missingReceiptVisibilityKeys, [
+      "launchMainline",
+      "launchReview",
+      "launchSmoke",
+      "developerOps"
+    ]);
+    assert.equal(template.launchDayWatchPlan.status, "blocked");
+    assert.equal(template.launchDayWatchPlan.canStartCutoverWatch, false);
+    assert.deepEqual(
+      template.launchDayWatchPlan.watchWindows.map((item) => item.key),
+      ["cutover_watch", "first_wave_stabilization"]
+    );
+    assert.deepEqual(template.launchDayWatchPlan.missingReceiptVisibilityKeys, [
       "launchMainline",
       "launchReview",
       "launchSmoke",
@@ -870,6 +912,11 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.deepEqual(output.productionSignoffReadiness.missingSignoffKeys, []);
     assert.deepEqual(output.productionSignoffReadiness.missingReceiptVisibilityKeys, []);
     assert.equal(output.productionSignoffReadiness.nextAction, "Production sign-off is ready; keep the closeout artifact with release evidence before cutover.");
+    assert.equal(output.launchDayWatchPlan.status, "ready");
+    assert.equal(output.launchDayWatchPlan.canStartCutoverWatch, true);
+    assert.deepEqual(output.launchDayWatchPlan.missingSignoffKeys, []);
+    assert.deepEqual(output.launchDayWatchPlan.missingReceiptVisibilityKeys, []);
+    assert.equal(output.launchDayWatchPlan.nextAction, "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility open.");
     assert.equal(output.operatorExecutionPlan.readinessSummary.gapCount, 2);
     assert.equal(
       output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "production_signoff_blocked"),

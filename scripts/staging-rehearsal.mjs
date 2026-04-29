@@ -672,6 +672,52 @@ function buildProductionSignoffReadiness(result) {
   };
 }
 
+function buildLaunchDayWatchPlan(result) {
+  const readiness = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const canStartCutoverWatch = readiness?.canSignoff === true;
+  return {
+    status: canStartCutoverWatch ? "ready" : "blocked",
+    canStartCutoverWatch,
+    willModifyData: false,
+    watchStartGate: "production_signoff_readiness",
+    requiredDecision: readiness?.requiredDecision || "ready-for-production-signoff",
+    productionDecision: readiness?.productionDecision || null,
+    closeoutInputStatus: readiness?.closeoutInputStatus || "missing",
+    missingSignoffKeys: readiness?.missingSignoffKeys || [],
+    missingReceiptVisibilityKeys: readiness?.missingReceiptVisibilityKeys || [],
+    routes: {
+      launchMainline: result.nextCommands?.launchMainline || null,
+      developerOps: result.resultBackfillSummary?.destinations?.developerOps || null,
+      launchReviewSummary: result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
+      launchSmokeSummary: result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null
+    },
+    watchWindows: [
+      {
+        key: "cutover_watch",
+        status: canStartCutoverWatch ? "operator_watch" : "blocked_until_production_signoff",
+        window: "T-30m through T+2h",
+        summary: "Keep Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility open during cutover."
+      },
+      {
+        key: "first_wave_stabilization",
+        status: canStartCutoverWatch ? "operator_handoff" : "blocked_until_cutover_watch_started",
+        window: "T+2h through T+24h",
+        summary: "Hand off first-wave incidents, receipt mismatches, rollback signals, and stabilization notes into Developer Ops."
+      }
+    ],
+    escalationTriggers: [
+      "production_signoff_missing",
+      "receipt_visibility_missing",
+      "launch_mainline_action_failure",
+      "developer_ops_receipt_mismatch",
+      "backup_restore_or_rollback_unclear"
+    ],
+    nextAction: canStartCutoverWatch
+      ? "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility open."
+      : "Do not start launch-day watch until production sign-off readiness is ready."
+  };
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -1322,9 +1368,13 @@ function buildResult(options) {
     ...resultWithFullTestWindowReadiness,
     productionSignoffReadiness: gatesPassed ? buildProductionSignoffReadiness(resultWithFullTestWindowReadiness) : null
   };
-  return {
+  const resultWithLaunchDayWatchPlan = {
     ...resultWithProductionSignoffReadiness,
-    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithProductionSignoffReadiness) : null
+    launchDayWatchPlan: gatesPassed ? buildLaunchDayWatchPlan(resultWithProductionSignoffReadiness) : null
+  };
+  return {
+    ...resultWithLaunchDayWatchPlan,
+    operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithLaunchDayWatchPlan) : null
   };
 }
 
@@ -1688,6 +1738,37 @@ function renderProductionSignoffReadiness(readiness) {
   ].join("\n");
 }
 
+function renderLaunchDayWatchPlan(plan) {
+  if (!plan) {
+    return "- Not available";
+  }
+  const routes = plan.routes || {};
+  const watchWindows = Array.isArray(plan.watchWindows) ? plan.watchWindows : [];
+  const lines = [
+    `- Status: ${plan.status || "-"}`,
+    `- Can start cutover watch: ${plan.canStartCutoverWatch ? "yes" : "no"}`,
+    `- Watch start gate: ${plan.watchStartGate || "-"}`,
+    `- Required decision: ${plan.requiredDecision || "-"}`,
+    `- Production decision: ${plan.productionDecision || "-"}`,
+    `- Closeout input status: ${plan.closeoutInputStatus || "-"}`,
+    `- Missing sign-off keys: ${(plan.missingSignoffKeys || []).join(", ") || "-"}`,
+    `- Missing receipt visibility keys: ${(plan.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
+    `- Launch Mainline: ${routes.launchMainline || "-"}`,
+    `- Developer Ops: ${routes.developerOps || "-"}`,
+    `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
+    `- Launch Smoke summary: ${routes.launchSmokeSummary || "-"}`,
+    `- Watch windows: ${watchWindows.map((item) => item.key).filter(Boolean).join(", ") || "-"}`,
+    `- Escalation triggers: ${(plan.escalationTriggers || []).join(", ") || "-"}`,
+    `- Next action: ${plan.nextAction || "-"}`
+  ];
+  for (const item of watchWindows) {
+    lines.push(`  - ${item.key || "-"}: ${item.status || "-"}`);
+    lines.push(`    - window: ${item.window || "-"}`);
+    lines.push(`    - summary: ${item.summary || "-"}`);
+  }
+  return lines.join("\n");
+}
+
 function renderProductionSignoffConditions(signoff) {
   if (!signoff) {
     return "- Not available";
@@ -1787,6 +1868,10 @@ function renderHandoffFile(result) {
     "",
     renderProductionSignoffReadiness(result.productionSignoffReadiness),
     "",
+    "## Launch Day Watch Plan",
+    "",
+    renderLaunchDayWatchPlan(result.launchDayWatchPlan),
+    "",
     "## Production Sign-Off Conditions",
     "",
     renderProductionSignoffConditions(result.stagingAcceptanceCloseout?.productionSignoffConditions),
@@ -1859,6 +1944,7 @@ function buildCloseoutTemplate(result) {
     closeoutBackfillGuide: result.closeoutBackfillGuide || buildCloseoutBackfillGuide(result),
     fullTestWindowReadiness: result.fullTestWindowReadiness || buildFullTestWindowReadiness(result),
     productionSignoffReadiness: result.productionSignoffReadiness || buildProductionSignoffReadiness(result),
+    launchDayWatchPlan: result.launchDayWatchPlan || buildLaunchDayWatchPlan(result),
     closeoutInput: result.closeoutInput || null,
     operatorExecutionPlan: result.operatorExecutionPlan || null,
     fullTestWindowEntry: closeout.fullTestWindowEntry || null,

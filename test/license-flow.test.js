@@ -13814,6 +13814,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
       item.key === "launch_mainline_checksums" && item.format === "checksums"
     ));
+    const stagingLaunchDutyArchive = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.stagingLaunchDutyArchive;
+    assert.ok(stagingLaunchDutyArchive);
+    assert.equal(stagingLaunchDutyArchive.mode, "developer-ops-staging-launch-duty-archive");
+    assert.equal(stagingLaunchDutyArchive.status, "awaiting_staging_archive_index");
+    assert.equal(stagingLaunchDutyArchive.archiveRoot, "artifacts/staging/EXPORT_ALPHA/stable");
+    assert.equal(stagingLaunchDutyArchive.files.launchDutyArchiveIndex, "artifacts/staging/EXPORT_ALPHA/stable/staging-launch-duty-archive-index.json");
+    assert.deepEqual(
+      stagingLaunchDutyArchive.packetFiles.map((item) => [item.key, item.path]),
+      [
+        ["run_record_index", "artifacts/staging/EXPORT_ALPHA/stable/staging-run-record-index.json"],
+        ["artifact_manifest", "artifacts/staging/EXPORT_ALPHA/stable/staging-artifact-manifest.json"],
+        ["closeout_reload_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-closeout-reload-packet.json"],
+        ["readiness_review_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-readiness-review-packet.json"]
+      ]
+    );
+    assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /npm\.cmd run staging:rehearsal/);
+    assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--product-code EXPORT_ALPHA/);
+    assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--channel stable/);
+    assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--launch-duty-archive-index-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.equal(stagingLaunchDutyArchive.commands.fullTestWindow, "npm.cmd test");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
@@ -14033,6 +14053,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
     assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));
     assert.match(launchReceiptSnapshot.summaryText, /opsIndex=handoff-index\.txt/);
+    assert.match(launchReceiptSnapshot.summaryText, /Staging Launch-Duty Archive:/);
+    assert.match(launchReceiptSnapshot.summaryText, /archiveRoot=artifacts\/staging\/EXPORT_ALPHA\/stable/);
+    assert.match(launchReceiptSnapshot.summaryText, /launchDutyArchiveIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(
       launchReceiptSnapshot.summaryText,
       new RegExp(
@@ -14205,6 +14228,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-first-launch-handoff\.txt.*format=first-launch-handoff/);
     assert.match(initialLaunchOpsReadinessDownload.body, /developer-ops-launch-mainline-handoff-routes\.txt.*format=launch-mainline-handoff-routes/);
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-sha256\.txt.*format=checksums/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Staging Launch-Duty Archive:/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Status: awaiting_staging_archive_index/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Archive Root: artifacts\/staging\/EXPORT_ALPHA\/stable/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /profileDrivenDryRun: npm\.cmd run staging:rehearsal/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /--launch-duty-archive-index-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+
+    const stagingLaunchDutyArchiveDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=staging-launch-duty-archive",
+      operatorSession.token
+    );
+    assert.equal(stagingLaunchDutyArchiveDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(stagingLaunchDutyArchiveDownload.contentDisposition || "", /developer-ops-staging-launch-duty-archive\.txt/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /RockSolid Developer Ops Staging Launch-Duty Archive/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Archive Root: artifacts\/staging\/EXPORT_ALPHA\/stable/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /run_record_index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /readiness_review_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-readiness-review-packet\.json/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /profileDrivenDryRun: npm\.cmd run staging:rehearsal/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /fullTestWindow: npm\.cmd test/);
 
     const stabilizationHandoffDownload = await getText(
       baseUrl,
@@ -14319,8 +14363,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(handoffIndexDownload.body, /launch-mainline-first-launch-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /developer-ops-launch-mainline-handoff-routes\.txt.*format=launch-mainline-handoff-routes/);
+    assert.match(handoffIndexDownload.body, /Staging Launch-Duty Archive:/);
+    assert.match(handoffIndexDownload.body, /staging-launch-duty-archive-index\.json/);
     assert.match(handoffIndexDownload.body, /Included Files:/);
     assert.match(handoffIndexDownload.body, /initial-launch-ops-readiness\.txt/);
+    assert.match(handoffIndexDownload.body, /staging-launch-duty-archive\.txt/);
     assert.match(handoffIndexDownload.body, /stabilization-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(handoffIndexDownload.body, /launch-mainline-handoff-routes\.txt/);
@@ -14737,6 +14784,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /handoff-index\.txt/);
     assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
     assert.match(checksumsDownload.body, /initial-launch-ops-readiness\.txt/);
+    assert.match(checksumsDownload.body, /staging-launch-duty-archive\.txt/);
     assert.match(checksumsDownload.body, /stabilization-handoff\.txt/);
     assert.match(checksumsDownload.body, /launch-mainline-handoff-routes\.txt/);
     assert.match(checksumsDownload.body, /route-review\/developer-ops-primary-session-summary\.txt/);
@@ -14757,6 +14805,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(zipText, /handoff-index\.txt/);
     assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
+    assert.match(zipText, /staging-launch-duty-archive\.txt/);
+    assert.match(zipText, /staging-launch-duty-archive-index\.json/);
     assert.match(zipText, /launch-mainline-handoff-routes\.txt/);
     assert.match(zipText, /route-review\/developer-ops-primary-session-summary\.txt/);
     assert.match(zipText, /route-review\/developer-ops-next-audit-summary\.txt/);

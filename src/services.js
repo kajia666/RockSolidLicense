@@ -17688,6 +17688,92 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_staging_launch_duty_archive",
+    "developer-ops-staging-launch-duty-archive.txt",
+    "Developer Ops staging launch-duty archive",
+    {
+      source: "developer-ops",
+      format: "staging-launch-duty-archive",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
+function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
+  const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
+  const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
+  const archiveRoot = `artifacts/staging/${productCode}/${channel}`;
+  const file = (fileName) => `${archiveRoot}/${fileName}`;
+  const profileFile = "docs/staging-rehearsal-profile.example.json";
+  const files = {
+    handoff: file("staging-rehearsal-handoff.md"),
+    closeoutTemplate: file("staging-closeout-template.json"),
+    runRecordIndex: file("staging-run-record-index.json"),
+    artifactManifest: file("staging-artifact-manifest.json"),
+    closeoutReloadPacket: file("staging-closeout-reload-packet.json"),
+    readinessReviewPacket: file("staging-readiness-review-packet.json"),
+    launchDutyArchiveIndex: file("staging-launch-duty-archive-index.json"),
+    filledCloseoutInput: file("filled-closeout-input.json"),
+    filledCloseoutDraft: file("filled-closeout-input.draft.json")
+  };
+  const packetFiles = [
+    ["run_record_index", files.runRecordIndex],
+    ["artifact_manifest", files.artifactManifest],
+    ["closeout_reload_packet", files.closeoutReloadPacket],
+    ["readiness_review_packet", files.readinessReviewPacket]
+  ].map(([key, path]) => ({ key, path }));
+  const profileDrivenArgs = [
+    "--profile-file", profileFile,
+    "--product-code", productCode,
+    "--channel", channel,
+    "--handoff-file", files.handoff,
+    "--closeout-file", files.closeoutTemplate,
+    "--run-record-file", files.runRecordIndex,
+    "--artifact-manifest-file", files.artifactManifest,
+    "--closeout-reload-packet-file", files.closeoutReloadPacket,
+    "--readiness-review-packet-file", files.readinessReviewPacket,
+    "--launch-duty-archive-index-file", files.launchDutyArchiveIndex,
+    "--filled-closeout-draft-file", files.filledCloseoutDraft
+  ];
+  return {
+    mode: "developer-ops-staging-launch-duty-archive",
+    status: "awaiting_staging_archive_index",
+    projectCode: scope.productCode || null,
+    channel,
+    archiveRoot,
+    profileFile,
+    files,
+    packetFiles,
+    commands: {
+      profileDrivenDryRun: `npm.cmd run staging:rehearsal -- ${profileDrivenArgs.join(" ")}`,
+      closeoutReload: `npm.cmd run staging:rehearsal -- --profile-file ${profileFile} --product-code ${productCode} --channel ${channel} --closeout-input-file ${files.filledCloseoutInput}`,
+      fullTestWindow: "npm.cmd test"
+    },
+    nextAction: "Run staging rehearsal with the non-secret profile, archive the launch-duty index, then reload closeout before opening the full test window."
+  };
+}
+
+function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = null) {
+  if (!Array.isArray(lines) || !archive) {
+    return;
+  }
+  lines.push("Staging Launch-Duty Archive:");
+  lines.push(`- Status: ${archive.status || "-"}`);
+  lines.push(`- Archive Root: ${archive.archiveRoot || "-"}`);
+  lines.push(`- Launch Duty Archive Index: ${archive.files?.launchDutyArchiveIndex || archive.indexFile || "-"}`);
+  lines.push("- Packet Files:");
+  for (const item of Array.isArray(archive.packetFiles) ? archive.packetFiles : []) {
+    lines.push(`  - ${item.key || "-"}: ${item.path || "-"}`);
+  }
+  lines.push("- Commands:");
+  lines.push(`  - profileDrivenDryRun: ${archive.commands?.profileDrivenDryRun || "-"}`);
+  lines.push(`  - closeoutReload: ${archive.commands?.closeoutReload || "-"}`);
+  lines.push(`  - fullTestWindow: ${archive.commands?.fullTestWindow || "-"}`);
+  lines.push(`- Next Action: ${archive.nextAction || "-"}`);
+}
+
 function buildDeveloperOpsInitialLaunchOpsGate({
   status = "not_started",
   latestReceipt = null,
@@ -18258,6 +18344,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     || null;
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
+  const stagingLaunchDutyArchiveDownload = buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope);
+  const stagingLaunchDutyArchive = buildDeveloperOpsStagingLaunchDutyArchive(scope);
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
   const stabilizationHandoffDownload = mainlineHandoff?.downloads?.stabilizationHandoff || null;
   const followUpQueue = followUps
@@ -18293,6 +18381,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     firstLaunchHandoffDownload,
     launchMainlineHandoffRoutesDownload,
+    stagingLaunchDutyArchiveDownload,
     mainlineHandoff?.downloads?.checksums,
     mainlineHandoff?.downloads?.zip
   ]) {
@@ -18450,6 +18539,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryWorkspaceAction,
     primaryDownload,
     firstLaunchHandoffDownload,
+    stagingLaunchDutyArchive,
+    stagingLaunchDutyArchiveDownload,
     gate,
     goNoGo,
     contract,
@@ -20928,6 +21019,17 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push(`- firstWaveConfirmation=${firstWaveConfirmation.status || "-"} | audit=${firstWaveConfirmation.auditLogId || "-"} | decision=${firstWaveConfirmation.decision || "-"} | by=${firstWaveConfirmation.confirmedBy?.username || "-"}`);
       }
     }
+    const stagingArchive = initialLaunchOpsReadiness.stagingLaunchDutyArchive || null;
+    if (stagingArchive) {
+      lines.push("");
+      lines.push("Staging Launch-Duty Archive:");
+      lines.push(
+        `- status=${stagingArchive.status || "-"}`
+        + ` | archiveRoot=${stagingArchive.archiveRoot || "-"}`
+        + ` | launchDutyArchiveIndex=${stagingArchive.files?.launchDutyArchiveIndex || "-"}`
+      );
+      lines.push(`- command=${stagingArchive.commands?.profileDrivenDryRun || "-"}`);
+    }
   }
 
   if (overview && typeof overview === "object" && Object.keys(overview).length) {
@@ -21135,6 +21237,35 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsStagingLaunchDutyArchiveText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const archive = readiness.stagingLaunchDutyArchive || buildDeveloperOpsStagingLaunchDutyArchive(scope);
+  const lines = [
+    "RockSolid Developer Ops Staging Launch-Duty Archive",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Channel: ${archive.channel || scope.channel || "stable"}`,
+    ""
+  ];
+  appendDeveloperOpsStagingLaunchDutyArchiveLines(lines, archive);
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push("- Generate this bridge from Developer Ops before the real staging rehearsal.");
+  lines.push("- Run profileDrivenDryRun with real non-secret staging inputs and secret env vars set outside the profile.");
+  lines.push("- Archive staging-launch-duty-archive-index.json beside the listed packet files before the closeout reload.");
+  lines.push("- Keep this bridge with handoff-index.txt so API reviewers and staging operators use the same product/channel archive paths.");
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -21169,6 +21300,10 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     `First Launch Handoff: ${readiness.firstLaunchHandoffDownload?.fileName || "-"} | href=${readiness.firstLaunchHandoffDownload?.href || "-"}`,
     ""
   ];
+  if (readiness.stagingLaunchDutyArchive) {
+    appendDeveloperOpsStagingLaunchDutyArchiveLines(lines, readiness.stagingLaunchDutyArchive);
+    lines.push("");
+  }
   const contract = readiness.contract || null;
   if (contract) {
     lines.push("Contract:");
@@ -21450,6 +21585,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "handoff-index.txt",
     "launch-receipt-next-follow-up.txt",
     "initial-launch-ops-readiness.txt",
+    "staging-launch-duty-archive.txt",
     "stabilization-handoff.txt",
     "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
@@ -21505,6 +21641,12 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     }
   } else {
     lines.push("- none");
+  }
+
+  const stagingArchive = readiness.stagingLaunchDutyArchive || null;
+  if (stagingArchive) {
+    lines.push("");
+    appendDeveloperOpsStagingLaunchDutyArchiveLines(lines, stagingArchive);
   }
 
   const firstWaveHandoffConfirmation = readiness.firstWaveHandoffConfirmation || readiness.traceability?.firstWaveHandoffConfirmation || null;
@@ -21763,6 +21905,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "initial-launch-ops-readiness.txt",
       body: buildDeveloperOpsInitialLaunchOpsReadinessText(payload)
+    },
+    {
+      path: "staging-launch-duty-archive.txt",
+      body: buildDeveloperOpsStagingLaunchDutyArchiveText(payload)
     },
     {
       path: "stabilization-handoff.txt",
@@ -22487,7 +22633,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "stabilization-handoff"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -22546,6 +22692,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-initial-launch-readiness.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsInitialLaunchOpsReadinessText(payload)
+    };
+  }
+
+  if (normalizedFormat === "staging-launch-duty-archive") {
+    return {
+      fileName: "developer-ops-staging-launch-duty-archive.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsStagingLaunchDutyArchiveText(payload)
     };
   }
 

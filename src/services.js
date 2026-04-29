@@ -16491,6 +16491,19 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
   return lines.join("\n");
 }
 
+function buildLaunchReceiptAuditBackfillStatus(count = 0) {
+  const normalizedCount = Math.max(Number(count || 0), 0);
+  const used = normalizedCount > 0;
+  return {
+    used,
+    count: normalizedCount,
+    source: used ? "launch-mainline-action-audit-backfill" : "snapshot-audit-filter",
+    operatorHint: used
+      ? "Recent Launch Mainline action receipts were added to protect first-wave traceability."
+      : "No Launch Mainline action receipt backfill was needed for this snapshot."
+  };
+}
+
 function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
   const mainlineSummary = payload.mainlineSummary || {};
@@ -16500,6 +16513,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
     ?? opsSnapshot.auditLogs?.filters?.launchReceiptBackfill
     ?? 0
   );
+  const launchReceiptAuditBackfillStatus = buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const latestLaunchReceipt = Array.isArray(opsSnapshot.overview?.latestLaunchReceipts) && opsSnapshot.overview.latestLaunchReceipts.length
     ? opsSnapshot.overview.latestLaunchReceipts[0]
     : null;
@@ -16520,6 +16534,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   );
   return {
     launchReceiptAuditBackfill,
+    launchReceiptAuditBackfillStatus,
     latestLaunchReceipt: latestLaunchReceipt
       ? {
           auditLogId: latestLaunchReceipt.auditLogId || null,
@@ -21960,6 +21975,7 @@ function buildDeveloperOpsSnapshotPayload({
     ? initialLaunchOpsReadiness.followUpQueue
     : launchReceiptFollowUps;
   const launchReceiptAuditBackfill = Number(auditLogs.filters?.launchReceiptBackfill || 0);
+  const launchReceiptAuditBackfillStatus = buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
 
   const payload = {
     generatedAt,
@@ -21977,6 +21993,7 @@ function buildDeveloperOpsSnapshotPayload({
       blocks: normalizedBlocks.length,
       auditLogs: normalizedAuditLogs.length,
       launchReceiptAuditBackfill,
+      launchReceiptAuditBackfillStatus,
       launchReceiptFollowUps: launchReceiptFollowUps.length,
       launchReceiptFollowUpPriorities,
       launchReceiptNextFollowUp,

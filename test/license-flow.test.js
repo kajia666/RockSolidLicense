@@ -13764,6 +13764,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReceiptSnapshot.summary.launchReceiptAuditBackfill,
       launchReceiptSnapshot.auditLogs.filters.launchReceiptBackfill
     );
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptAuditBackfillStatus.used, true);
+    assert.equal(
+      launchReceiptSnapshot.summary.launchReceiptAuditBackfillStatus.count,
+      launchReceiptSnapshot.summary.launchReceiptAuditBackfill
+    );
+    assert.equal(
+      launchReceiptSnapshot.summary.launchReceiptAuditBackfillStatus.source,
+      "launch-mainline-action-audit-backfill"
+    );
+    assert.match(
+      launchReceiptSnapshot.summary.launchReceiptAuditBackfillStatus.operatorHint,
+      /Launch Mainline action receipts/i
+    );
     const expectedLaunchReceiptPrioritySummary = launchReceiptSnapshot.overview.launchReceiptFollowUps.reduce((counts, item) => {
       const priority = ["primary", "review", "secondary"].includes(item.priority) ? item.priority : "other";
       counts[priority] += 1;
@@ -14615,6 +14628,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfill,
       launchMainlineTraceability.opsSnapshot.summary.launchReceiptAuditBackfill
+    );
+    assert.equal(launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfillStatus.used, true);
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfillStatus.count,
+      launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfill
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfillStatus.source,
+      "launch-mainline-action-audit-backfill"
+    );
+    assert.match(
+      launchMainlineTraceability.postLaunchHandoffTraceability.launchReceiptAuditBackfillStatus.operatorHint,
+      /Launch Mainline action receipts/i
     );
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.handoffFileName,

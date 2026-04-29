@@ -14193,6 +14193,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSummaryDownload.body, /Latest Launch Receipts:/);
     assert.match(launchReceiptSummaryDownload.body, /record_post_launch_ops_sweep/i);
     assert.match(launchReceiptSummaryDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(launchReceiptSummaryDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(launchReceiptSummaryDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(launchReceiptSummaryDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
 
     const launchReceiptFollowUpsCsvDownload = await getText(
       baseUrl,
@@ -14782,6 +14785,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Post-Launch Handoff Traceability:/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Latest Launch Receipt: record_post_launch_ops_sweep/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.ok(launchMainlineTraceabilitySummaryDownload.body.includes(latestLaunchReceipt.handoffFileName));
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);

@@ -14768,6 +14768,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const filters = payload.filters || {};
   const mainlineSummary = payload.mainlineSummary || {};
   const launchReceiptAuditBackfill = Number(payload.opsSnapshot?.auditLogs?.filters?.launchReceiptBackfill || 0);
+  const launchReceiptAuditBackfillStatus = payload.postLaunchHandoffTraceability?.launchReceiptAuditBackfillStatus
+    || payload.opsSnapshot?.summary?.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const formatWorkspaceActionParams = (params = null) => {
     const entries = params && typeof params === "object"
       ? Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
@@ -14788,6 +14791,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     `Project Name: ${project.name || "-"}`,
     `Channel: ${manifest.channel || filters.channel || "-"}`,
     `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     ""
   ];
   appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
@@ -21009,6 +21015,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
   const launchReceiptAuditBackfill = Number(payload.auditLogs?.filters?.launchReceiptBackfill || 0);
+  const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const lines = [
     "RockSolid Developer Ops Snapshot",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -21025,6 +21033,9 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Audit Entity Filter: ${scope.entityType || "-"}`,
     `Audit Limit: ${scope.auditLimit ?? 0}`,
     `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     "",
     `Projects: ${summary.projects ?? 0}`,
     `Accounts: ${summary.accounts ?? 0}`,

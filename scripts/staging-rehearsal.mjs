@@ -1253,6 +1253,74 @@ function buildStagingReadinessTransition(result) {
   };
 }
 
+function buildLaunchRehearsalExtensionPoints() {
+  const coreRequiredTests = [
+    "staging rehearsal runner is exposed as an npm script and combines no-write gates",
+    "staging rehearsal runner can write a redacted launch-duty handoff file",
+    "staging rehearsal runner can write a redacted closeout template file"
+  ];
+  return {
+    status: "ready_for_incremental_extensions",
+    willModifyData: false,
+    supportedAdditions: [
+      {
+        key: "additional_output_file",
+        builder: "buildStagingEnvironmentBinding",
+        summary: "Add new local output paths or archive destinations through the environment binding first.",
+        affectedOutputs: [
+          "stagingEnvironmentBinding.recommendedOutputFiles",
+          "launchRehearsalBundle.files",
+          "finalRehearsalPacket.localFiles"
+        ],
+        requiredTests: coreRequiredTests
+      },
+      {
+        key: "additional_execution_step",
+        builder: "buildStagingExecutionRunbook",
+        summary: "Add new operator execution steps through the staging runbook before mirroring them into bundle order.",
+        affectedOutputs: [
+          "stagingExecutionRunbook.commandSequence",
+          "launchRehearsalBundle.executionOrder",
+          "finalRehearsalPacket.orderedSteps"
+        ],
+        requiredTests: coreRequiredTests
+      },
+      {
+        key: "additional_closeout_key",
+        builder: "buildStagingAcceptanceCloseout",
+        summary: "Add new closeout evidence keys through acceptance checks so reload, gaps, and bundle closeout stay aligned.",
+        affectedOutputs: [
+          "stagingAcceptanceCloseout.acceptanceChecks",
+          "stagingExecutionRunbook.closeoutBackfillTargets",
+          "launchRehearsalBundle.closeout.requiredKeys"
+        ],
+        requiredTests: coreRequiredTests
+      },
+      {
+        key: "additional_readiness_gate",
+        builder: "buildStagingReadinessTransition",
+        summary: "Add new go/no-go gates through readiness transition so operator blockers and launch-day states remain explainable.",
+        affectedOutputs: [
+          "stagingReadinessTransition.gates",
+          "launchRehearsalBundle.readiness.gates",
+          "operatorExecutionPlan.readinessGaps"
+        ],
+        requiredTests: coreRequiredTests
+      }
+    ],
+    extensionWorkflow: [
+      "add_builder_field",
+      "mirror_in_launch_rehearsal_bundle",
+      "add_rehearsal_assertion",
+      "add_handoff_rendering",
+      "add_closeout_template_assertion",
+      "run_staging_rehearsal_targeted_test",
+      "run_launch_route_map_gate"
+    ],
+    nextAction: "Add new launch features by extending the named builder first, then mirror the field into the bundle and tests."
+  };
+}
+
 function buildLaunchRehearsalBundle(result) {
   const environmentBinding = result.stagingEnvironmentBinding || {};
   const runbook = result.stagingExecutionRunbook || {};
@@ -1312,8 +1380,9 @@ function buildLaunchRehearsalBundle(result) {
       recordCount: Array.isArray(runRecord.records) ? runRecord.records.length : 0,
       closeoutInputReloadCommand: runRecord.closeoutInputReloadCommand || null
     },
+    extensionPoints: buildLaunchRehearsalExtensionPoints(),
     nextAction: bundleReady
-      ? "Run the launch rehearsal bundle from executionOrder, keep artifact paths under artifactArchiveRoot, then reload closeout input before the full test window."
+      ? "Run the launch rehearsal bundle from executionOrder, keep artifact paths under artifactArchiveRoot, reload closeout input before the full test window, and use extensionPoints for incremental launch features."
       : "Complete staging environment binding and execution runbook generation before using this launch rehearsal bundle."
   };
 }
@@ -2711,8 +2780,16 @@ function renderLaunchRehearsalBundle(bundle) {
     `- Closeout reload: \`${bundle.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${bundle.commands?.fullTestWindow || "-"}\``,
     `- Execution order: ${(bundle.executionOrder || []).join(", ") || "-"}`,
+    `- Extension status: ${bundle.extensionPoints?.status || "-"}`,
+    `- Extension workflow: ${(bundle.extensionPoints?.extensionWorkflow || []).join(", ") || "-"}`,
     `- Next action: ${bundle.nextAction || "-"}`
   ];
+  if (Array.isArray(bundle.extensionPoints?.supportedAdditions) && bundle.extensionPoints.supportedAdditions.length) {
+    lines.push("- Extension points:");
+    for (const point of bundle.extensionPoints.supportedAdditions) {
+      lines.push(`  - ${point.key || "-"}: ${point.builder || "-"}`);
+    }
+  }
   if (Array.isArray(bundle.files) && bundle.files.length) {
     lines.push("- Files:");
     for (const file of bundle.files) {

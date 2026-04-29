@@ -549,6 +549,31 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     output.stagingReadinessTransition.gates.map((item) => [item.key, item.status, item.canEnter])
   );
   assert.equal(output.launchRehearsalBundle.operatorRecord.requiredRecordKeys.length, output.stagingRunRecordTemplate.requiredRecordKeys.length);
+  assert.equal(output.launchRehearsalBundle.extensionPoints.status, "ready_for_incremental_extensions");
+  assert.equal(output.launchRehearsalBundle.extensionPoints.willModifyData, false);
+  assert.deepEqual(
+    output.launchRehearsalBundle.extensionPoints.supportedAdditions.map((item) => [item.key, item.builder]),
+    [
+      ["additional_output_file", "buildStagingEnvironmentBinding"],
+      ["additional_execution_step", "buildStagingExecutionRunbook"],
+      ["additional_closeout_key", "buildStagingAcceptanceCloseout"],
+      ["additional_readiness_gate", "buildStagingReadinessTransition"]
+    ]
+  );
+  assert.deepEqual(output.launchRehearsalBundle.extensionPoints.extensionWorkflow, [
+    "add_builder_field",
+    "mirror_in_launch_rehearsal_bundle",
+    "add_rehearsal_assertion",
+    "add_handoff_rendering",
+    "add_closeout_template_assertion",
+    "run_staging_rehearsal_targeted_test",
+    "run_launch_route_map_gate"
+  ]);
+  assert.ok(
+    output.launchRehearsalBundle.extensionPoints.supportedAdditions
+      .find((item) => item.key === "additional_closeout_key")
+      .affectedOutputs.includes("launchRehearsalBundle.closeout.requiredKeys")
+  );
   assert.doesNotMatch(JSON.stringify(output.launchRehearsalBundle), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
   assert.equal(output.finalRehearsalPacket.willModifyData, false);
@@ -874,6 +899,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Execution order: prepare_secret_env, generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, approve_live_write_smoke, run_live_write_smoke, archive_launch_smoke_handoff, record_launch_mainline_evidence, verify_receipt_visibility, backfill_filled_closeout_input, reload_closeout_input, run_full_test_window, production_signoff_review, launch_day_watch, stabilization_handoff/);
     assert.match(handoff, /Closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`/);
     assert.match(handoff, /route_map_gate_result -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
+    assert.match(handoff, /Extension status: ready_for_incremental_extensions/);
+    assert.match(handoff, /additional_execution_step: buildStagingExecutionRunbook/);
+    assert.match(handoff, /Extension workflow: add_builder_field, mirror_in_launch_rehearsal_bundle, add_rehearsal_assertion, add_handoff_rendering, add_closeout_template_assertion, run_staging_rehearsal_targeted_test, run_launch_route_map_gate/);
     assert.match(handoff, /## Filled Closeout Input Example/);
     assert.match(handoff, /Example only: yes/);
     assert.match(handoff, /Save as: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.example\.json/);
@@ -1083,6 +1111,15 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       "launch_day_watch",
       "stabilization_handoff"
     ]);
+    assert.equal(template.launchRehearsalBundle.extensionPoints.status, "ready_for_incremental_extensions");
+    assert.deepEqual(
+      template.launchRehearsalBundle.extensionPoints.supportedAdditions.find((item) => item.key === "additional_execution_step").affectedOutputs,
+      [
+        "stagingExecutionRunbook.commandSequence",
+        "launchRehearsalBundle.executionOrder",
+        "finalRehearsalPacket.orderedSteps"
+      ]
+    );
     assert.equal(template.finalRehearsalPacket.status, "ready_for_operator_rehearsal");
     assert.equal(template.finalRehearsalPacket.environmentBindingStatus, "ready_for_real_staging_binding");
     assert.equal(template.finalRehearsalPacket.executionRunbookStatus, "ready_for_real_staging_dry_run");

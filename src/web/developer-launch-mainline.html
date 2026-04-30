@@ -276,6 +276,10 @@
           <h2>Staging Archive Launch Runway</h2>
           <div id="mainline-launch-runway-box" class="hint">Generate a launch mainline package to inspect staging closeout, full-test-window, production sign-off, and launch-day watch handoff here.</div>
         </article>
+        <article class="card">
+          <h2>Launch-Day Watch</h2>
+          <div id="mainline-launch-day-watch-box" class="hint">Generate a launch mainline package to inspect launch-day watch readiness, first-wave checkpoints, and handoff downloads here.</div>
+        </article>
       </section>
 
       <section class="wide">
@@ -772,6 +776,17 @@
           : null;
       }
 
+      function currentMainlineLaunchDayWatchPanel() {
+        const page = currentMainlinePage();
+        if (page.launchDayWatchPanel && typeof page.launchDayWatchPanel === "object") {
+          return page.launchDayWatchPanel;
+        }
+        const summaryPanel = currentMainlineSummary().launchDayWatchPanel;
+        return summaryPanel && typeof summaryPanel === "object"
+          ? summaryPanel
+          : null;
+      }
+
       function mainlineLaunchRunwayEvidenceControls(action = currentMainlineLaunchRunwayNextEvidenceAction()) {
         if (!action || typeof action !== "object") {
           return [];
@@ -802,6 +817,46 @@
             recommendedDownload
           } : null
         ].filter(Boolean);
+      }
+
+      function mainlineLaunchDayWatchControls(panel = currentMainlineLaunchDayWatchPanel()) {
+        if (!panel || typeof panel !== "object") {
+          return [];
+        }
+        if (Array.isArray(panel.controls) && panel.controls.length) {
+          return panel.controls;
+        }
+        return [
+          panel.primaryWorkspaceAction ? {
+            kind: "workspace",
+            label: panel.launchDayWatchReady ? "Enter Launch-Day Watch" : "Open Ops Workspace",
+            workspaceAction: panel.primaryWorkspaceAction
+          } : null,
+          panel.primaryDownload ? {
+            kind: "download",
+            label: "Download Launch-Day Watch Handoff",
+            recommendedDownload: panel.primaryDownload
+          } : null,
+          panel.secondaryDownload ? {
+            kind: "download",
+            label: "Download Operations Handoff",
+            recommendedDownload: panel.secondaryDownload
+          } : null
+        ].filter(Boolean);
+      }
+
+      function formatLaunchDayWatchCheckpointLabel(key = "") {
+        const normalized = String(key || "").trim().toLowerCase();
+        if (normalized === "confirm_runtime_alerting") {
+          return "Confirm runtime alerting";
+        }
+        if (normalized === "review_first_wave_sessions") {
+          return "Review first-wave sessions";
+        }
+        if (normalized === "record_post_launch_ops_sweep") {
+          return "Record post-launch ops sweep";
+        }
+        return normalized || "-";
       }
 
       function currentLastMainlineReceipt() {
@@ -1215,6 +1270,66 @@
         `;
       }
 
+      function renderLaunchDayWatchPanel() {
+        const panel = currentMainlineLaunchDayWatchPanel();
+        if (!panel) {
+          return '<div class="hint">Generate Launch Mainline to inspect launch-day watch readiness here.</div>';
+        }
+        const controls = mainlineLaunchDayWatchControls(panel);
+        const checkpoints = Array.isArray(panel.firstWaveCheckpoints) ? panel.firstWaveCheckpoints : [];
+        const tags = [
+          panel.status ? { label: "status", value: panel.status, strong: panel.launchDayWatchReady === true } : null,
+          { label: "ready", value: panel.launchDayWatchReady === true ? "yes" : "no", strong: panel.launchDayWatchReady === true },
+          panel.pendingEvidenceCount !== undefined ? { label: "pendingEvidence", value: panel.pendingEvidenceCount, strong: Number(panel.pendingEvidenceCount || 0) > 0 } : null,
+          panel.pendingEvidenceOperationCount !== undefined ? { label: "pendingOps", value: panel.pendingEvidenceOperationCount, strong: Number(panel.pendingEvidenceOperationCount || 0) > 0 } : null,
+          panel.watchEntry ? { label: "watchEntry", value: panel.watchEntry, strong: false } : null
+        ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+        const nextActionMarkup = panel.nextActionKey || panel.nextActionOperation
+          ? `<div class="hint">Next Gatekeeper Action: ${esc(panel.nextActionKey || "-")} | operation=${esc(panel.nextActionOperation || "-")}</div>`
+          : "";
+        const downloadsMarkup = `
+          <div class="hint">
+            Primary Download: ${esc(panel.primaryDownload?.label || panel.primaryDownload?.key || "-")}
+            | format=${esc(panel.primaryDownload?.format || "-")}
+            | Secondary Download: ${esc(panel.secondaryDownload?.label || panel.secondaryDownload?.key || "-")}
+            | format=${esc(panel.secondaryDownload?.format || "-")}
+          </div>
+        `;
+        const checkpointsMarkup = checkpoints.length
+          ? `
+            <div class="hint">
+              First-Wave Checkpoints:
+              <br>${checkpoints.map((item, index) => `${index + 1}. ${esc(formatLaunchDayWatchCheckpointLabel(item))} | key=${esc(item || "-")}`).join("<br>")}
+            </div>
+          `
+          : "";
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(panel.label || "Launch-Day Watch")}</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint" data-mainline-launch-day-watch-status="${esc(panel.status || "-")}">
+              ${esc(panel.summary || "Keep launch-day watch status, first-wave checkpoints, and handoff downloads visible here.")}
+            </div>
+            <div class="hint">
+              Launch-Day Watch Entry: ${esc(panel.watchEntry || "-")}
+              | ready=${esc(panel.launchDayWatchReady === true ? "true" : "false")}
+              | pendingEvidence=${esc(panel.pendingEvidenceCount ?? "-")}
+              | pendingEvidenceOperations=${esc(panel.pendingEvidenceOperationCount ?? "-")}
+            </div>
+            ${nextActionMarkup}
+            ${downloadsMarkup}
+            ${checkpointsMarkup}
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-launch-day-watch-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const screen = currentMainlineLastActionScreen();
         const sections = Array.isArray(screen.sections) ? screen.sections : [];
@@ -1345,6 +1460,7 @@
         el("mainline-next-evidence-box").innerHTML = renderNextProductionEvidenceAction();
         el("mainline-operator-action-manifest-box").innerHTML = renderOperatorActionManifestActions();
         el("mainline-launch-runway-box").innerHTML = renderMainlineLaunchRunway();
+        el("mainline-launch-day-watch-box").innerHTML = renderLaunchDayWatchPanel();
         el("mainline-hero-controls-box").innerHTML = renderHeroControls();
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = page.summaryText || "No launch mainline summary yet.";
@@ -1530,6 +1646,7 @@
         el("mainline-next-evidence-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the next production evidence action here.</div>';
         el("mainline-operator-action-manifest-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect initial launch operator actions here.</div>';
         el("mainline-launch-runway-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect staging closeout, full-test-window, production sign-off, and launch-day watch handoff here.</div>';
+        el("mainline-launch-day-watch-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect launch-day watch readiness, first-wave checkpoints, and handoff downloads here.</div>';
         el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
         el("route-focus-box").innerHTML = renderRouteFocus();
         setOutput("Waiting for actions...");
@@ -1598,6 +1715,18 @@
         if (runwayFollowUpButton) {
           const controlIndex = Number(runwayFollowUpButton.dataset.mainlineRunwayFollowupControlIndex || -1);
           const controls = mainlineLaunchRunwayEvidenceControls();
+          try {
+            await executeMainlineControl(controls[controlIndex] || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
+        const launchDayWatchButton = event.target.closest("[data-mainline-launch-day-watch-control-index]");
+        if (launchDayWatchButton) {
+          const controlIndex = Number(launchDayWatchButton.dataset.mainlineLaunchDayWatchControlIndex || -1);
+          const controls = mainlineLaunchDayWatchControls();
           try {
             await executeMainlineControl(controls[controlIndex] || null);
           } catch (error) {

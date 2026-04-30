@@ -5387,6 +5387,27 @@ function buildLaunchMainlineActionReceipt({
       || item?.setupAction?.key
       || item?.setupAction?.operation
     );
+  const mainlineLaunchDayWatchPanel = launchMainline?.mainlineSummary?.launchDayWatchPanel && typeof launchMainline.mainlineSummary.launchDayWatchPanel === "object"
+    ? {
+        ...launchMainline.mainlineSummary.launchDayWatchPanel,
+        primaryWorkspaceAction: launchMainline.mainlineSummary.launchDayWatchPanel.primaryWorkspaceAction || null,
+        primaryDownload: launchMainline.mainlineSummary.launchDayWatchPanel.primaryDownload || null,
+        secondaryDownload: launchMainline.mainlineSummary.launchDayWatchPanel.secondaryDownload || null,
+        supportingDownload: launchMainline.mainlineSummary.launchDayWatchPanel.supportingDownload || null,
+        firstWaveCheckpoints: Array.isArray(launchMainline.mainlineSummary.launchDayWatchPanel.firstWaveCheckpoints)
+          ? launchMainline.mainlineSummary.launchDayWatchPanel.firstWaveCheckpoints.filter((item) => String(item || "").trim() !== "")
+          : [],
+        controls: Array.isArray(launchMainline.mainlineSummary.launchDayWatchPanel.controls)
+          ? launchMainline.mainlineSummary.launchDayWatchPanel.controls.map((control) => ({
+              kind: control?.kind || null,
+              label: control?.label || control?.workspaceAction?.label || control?.recommendedDownload?.label || control?.setupAction?.label || control?.kind || "Action",
+              workspaceAction: control?.workspaceAction || null,
+              recommendedDownload: control?.recommendedDownload || null,
+              setupAction: control?.setupAction || null
+            }))
+          : []
+      }
+    : null;
   const mainlineScreen = {
     heroControls: mainlineHeroControls,
     sections: mainlineSections
@@ -6203,6 +6224,7 @@ function buildLaunchMainlineActionReceipt({
     heroControls: mainlineHeroControls,
     form: mainlineForm,
     routeFocus: mainlineRouteFocus,
+    launchDayWatchPanel: mainlineLaunchDayWatchPanel,
     sections: mainlineSections,
     lastActionScreen: mainlineLastActionScreen
   };
@@ -6210,6 +6232,7 @@ function buildLaunchMainlineActionReceipt({
     heroControls: mainlineView.heroControls,
     form: mainlineForm,
     routeFocus: mainlineRouteFocus,
+    launchDayWatchPanel: mainlineView.launchDayWatchPanel,
     sections: mainlineView.sections,
     lastActionScreen: mainlineView.lastActionScreen,
     summaryText: launchMainline?.summaryText || ""
@@ -14136,6 +14159,100 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const launchRunwayNextEvidenceAction = launchRunway?.checklistState?.nextEvidenceAction && typeof launchRunway.checklistState.nextEvidenceAction === "object"
     ? launchRunway.checklistState.nextEvidenceAction
     : null;
+  const launchDayWatchPanel = launchRunway?.heroStatus
+    ? (() => {
+        const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
+          ? launchRunway.checklistState
+          : null;
+        const pendingEvidenceCount = Number(checklistState?.pendingEvidenceCount || 0);
+        const pendingEvidenceOperationCount = Number(checklistState?.pendingEvidenceOperationCount || 0);
+        const launchDayWatchReady = pendingEvidenceCount === 0 && pendingEvidenceOperationCount === 0;
+        const primaryWorkspaceAction = createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params);
+        const primaryDownload = postLaunchSweepHandoffDownload || operationsHandoffDownload || firstLaunchHandoffDownload || null;
+        const secondaryDownload = operationsHandoffDownload || firstLaunchHandoffDownload || primaryDownload || null;
+        const supportingDownload = firstLaunchHandoffDownload || secondaryDownload || primaryDownload || null;
+        const controls = launchDayWatchReady
+          ? [
+              {
+                kind: "workspace",
+                label: "Enter Launch-Day Watch",
+                workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Enter Launch-Day Watch", params)
+              },
+              primaryDownload ? {
+                kind: "download",
+                label: "Download Launch-Day Watch Handoff",
+                recommendedDownload: primaryDownload
+              } : null,
+              secondaryDownload && secondaryDownload.key !== primaryDownload?.key ? {
+                kind: "download",
+                label: "Download Operations Handoff",
+                recommendedDownload: secondaryDownload
+              } : null,
+              supportingDownload
+              && supportingDownload.key !== primaryDownload?.key
+              && supportingDownload.key !== secondaryDownload?.key ? {
+                kind: "download",
+                label: "Download First Launch Handoff",
+                recommendedDownload: supportingDownload
+              } : null
+            ]
+          : [
+              launchRunwayNextEvidenceAction?.setupAction ? {
+                kind: "setup",
+                label: "Record Remaining Runway Evidence",
+                setupAction: launchRunwayNextEvidenceAction.setupAction
+              } : null,
+              launchRunwayNextEvidenceAction?.recommendedDownload ? {
+                kind: "download",
+                label: "Download Remaining Runway Handoff",
+                recommendedDownload: launchRunwayNextEvidenceAction.recommendedDownload
+              } : null,
+              primaryWorkspaceAction ? {
+                kind: "workspace",
+                label: "Open Ops Workspace",
+                workspaceAction: primaryWorkspaceAction
+              } : null,
+              primaryDownload ? {
+                kind: "download",
+                label: "Download Launch-Day Watch Handoff",
+                recommendedDownload: primaryDownload
+              } : null,
+              secondaryDownload && secondaryDownload.key !== primaryDownload?.key ? {
+                kind: "download",
+                label: "Download Operations Handoff",
+                recommendedDownload: secondaryDownload
+              } : null
+            ];
+        return {
+          status: launchDayWatchReady ? "ready_for_launch_day_watch" : "blocked_by_runway_evidence",
+          label: launchDayWatchReady ? "Launch-Day Watch Ready" : "Launch-Day Watch Blocked",
+          summary: launchDayWatchReady
+            ? "Runway evidence is complete. Enter launch-day watch after production sign-off and keep the first-wave checkpoints close."
+            : "Record the remaining runway evidence before entering launch-day watch on production sign-off.",
+          launchDayWatchReady,
+          watchEntry: launchRunway?.launchDayWatchEntry || launchRunway?.heroStatus?.launchDayWatchEntry || "enter_after_production_signoff",
+          pendingEvidenceCount,
+          pendingEvidenceOperationCount,
+          nextActionKey: launchDayWatchReady ? null : (launchRunwayNextEvidenceAction?.actionKey || launchRunwayNextEvidenceAction?.setupAction?.key || null),
+          nextActionOperation: launchDayWatchReady ? null : (launchRunwayNextEvidenceAction?.operation || launchRunwayNextEvidenceAction?.setupAction?.operation || null),
+          primaryWorkspaceAction,
+          primaryDownload,
+          secondaryDownload,
+          supportingDownload,
+          firstWaveCheckpoints: [
+            "confirm_runtime_alerting",
+            "review_first_wave_sessions",
+            "record_post_launch_ops_sweep"
+          ],
+          controls: controls.filter((item) =>
+            item?.workspaceAction?.key
+            || item?.recommendedDownload?.key
+            || item?.setupAction?.key
+            || item?.setupAction?.operation
+          )
+        };
+      })()
+    : null;
   const launchRunwayHeroControls = launchRunway?.heroStatus
     ? (launchRunwayNextEvidenceAction
       ? [
@@ -14927,11 +15044,24 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     heroControls: heroControls.map((item) => ensureLaunchMainlineControlHrefs(item, params)),
     sections
   };
+  const ensuredLaunchDayWatchPanel = launchDayWatchPanel && typeof launchDayWatchPanel === "object"
+    ? {
+        ...launchDayWatchPanel,
+        primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(launchDayWatchPanel.primaryWorkspaceAction, params),
+        primaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.primaryDownload, params),
+        secondaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.secondaryDownload, params),
+        supportingDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.supportingDownload, params),
+        controls: Array.isArray(launchDayWatchPanel.controls)
+          ? launchDayWatchPanel.controls.map((item) => ensureLaunchMainlineControlHrefs(item, params))
+          : []
+      }
+    : null;
   const mainlineView = {
     heroControls: screen.heroControls,
     form,
     routeFocus,
     sections: screen.sections,
+    launchDayWatchPanel: ensuredLaunchDayWatchPanel,
     lastActionScreen: {
       sections: []
     }
@@ -14941,6 +15071,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     form,
     routeFocus,
     sections: mainlineView.sections,
+    launchDayWatchPanel: mainlineView.launchDayWatchPanel,
     lastActionScreen: mainlineView.lastActionScreen,
     summaryText: ""
   };
@@ -14960,6 +15091,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
     launchRunway,
+    launchDayWatchPanel: ensuredLaunchDayWatchPanel,
     continuation,
     stages,
     overviewCards,
@@ -15102,6 +15234,46 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
         + `${item.evidenceRecordedAt ? ` | evidenceRecordedAt=${item.evidenceRecordedAt}` : ""}`
       );
     }
+  }
+  return true;
+}
+
+function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = null, formatWorkspaceActionText = (value) => value || "-") {
+  if (!Array.isArray(lines) || !launchDayWatchPanel || typeof launchDayWatchPanel !== "object") {
+    return false;
+  }
+  lines.push("");
+  lines.push("Launch-Day Watch Panel:");
+  lines.push(`- status: ${launchDayWatchPanel.status || "-"}`);
+  lines.push(`- label: ${launchDayWatchPanel.label || "-"}`);
+  lines.push(`- summary: ${launchDayWatchPanel.summary || "-"}`);
+  lines.push(
+    `- ready: ${launchDayWatchPanel.launchDayWatchReady === true}`
+    + ` | watchEntry=${launchDayWatchPanel.watchEntry || "-"}`
+    + ` | pendingEvidence=${Number(launchDayWatchPanel.pendingEvidenceCount || 0)}`
+    + ` | pendingEvidenceOperations=${Number(launchDayWatchPanel.pendingEvidenceOperationCount || 0)}`
+  );
+  if (launchDayWatchPanel.nextActionKey || launchDayWatchPanel.nextActionOperation) {
+    lines.push(`- nextAction: ${launchDayWatchPanel.nextActionKey || "-"} | operation=${launchDayWatchPanel.nextActionOperation || "-"}`);
+  }
+  lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(launchDayWatchPanel.primaryWorkspaceAction)}`);
+  lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(launchDayWatchPanel.primaryDownload, { fileSeparator: " | " })}`);
+  if (launchDayWatchPanel.secondaryDownload) {
+    lines.push(`- secondaryDownload: ${formatLaunchHandoffDownloadText(launchDayWatchPanel.secondaryDownload, { fileSeparator: " | " })}`);
+  }
+  if (launchDayWatchPanel.supportingDownload) {
+    lines.push(`- supportingDownload: ${formatLaunchHandoffDownloadText(launchDayWatchPanel.supportingDownload, { fileSeparator: " | " })}`);
+  }
+  if (Array.isArray(launchDayWatchPanel.firstWaveCheckpoints) && launchDayWatchPanel.firstWaveCheckpoints.length) {
+    lines.push(`- firstWaveCheckpoints: ${launchDayWatchPanel.firstWaveCheckpoints.join(", ")}`);
+  }
+  for (const control of Array.isArray(launchDayWatchPanel.controls) ? launchDayWatchPanel.controls : []) {
+    lines.push(
+      `- control: ${control?.label || control?.kind || "Action"}`
+      + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+      + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
+      + `${control?.setupAction ? ` | setup=${control.setupAction.label || control.setupAction.key || "-"}@${control.setupAction.mode || "recommended"}:${control.setupAction.operation || "-"}` : ""}`
+    );
   }
   return true;
 }
@@ -15326,6 +15498,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       );
     }
   }
+  appendLaunchDayWatchPanelTextLines(lines, mainlineSummary.launchDayWatchPanel, formatWorkspaceActionText);
   appendMainlineLaunchRunwayTextLines(lines, mainlineSummary.launchRunway);
   if (mainlineSummary.routeFocus && typeof mainlineSummary.routeFocus === "object") {
     lines.push("Mainline Route Focus:");

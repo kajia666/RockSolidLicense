@@ -751,6 +751,52 @@
         };
       }
 
+      function currentMainlineLaunchRunwayNextEvidenceAction() {
+        const { launchRunway } = currentMainlineLaunchRunway();
+        const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
+          ? launchRunway.checklistState
+          : null;
+        const nextAction = checklistState?.nextEvidenceAction && typeof checklistState.nextEvidenceAction === "object"
+          ? checklistState.nextEvidenceAction
+          : null;
+        if (nextAction?.setupAction?.operation || nextAction?.actionKey || nextAction?.recommendedDownload?.key || nextAction?.downloadHref) {
+          return nextAction;
+        }
+        return null;
+      }
+
+      function mainlineLaunchRunwayEvidenceControls(action = currentMainlineLaunchRunwayNextEvidenceAction()) {
+        if (!action || typeof action !== "object") {
+          return [];
+        }
+        const setupAction = action.setupAction || (action.actionKey && action.operation ? {
+          key: action.actionKey,
+          label: action.label || "Record Runway Evidence",
+          summary: action.summary || "Record the next Launch Mainline runway evidence item.",
+          mode: action.mode || "evidence",
+          operation: action.operation
+        } : null);
+        const recommendedDownload = action.recommendedDownload || (action.downloadKey || action.downloadHref ? {
+          key: action.downloadKey || "launch_mainline_summary",
+          label: action.downloadLabel || "Download Runway Handoff",
+          fileName: action.downloadFileName || "",
+          format: action.downloadFormat || "summary",
+          href: action.downloadHref || ""
+        } : null);
+        return [
+          setupAction ? {
+            kind: "setup",
+            label: "Record Runway Evidence",
+            setupAction
+          } : null,
+          recommendedDownload ? {
+            kind: "download",
+            label: "Download Runway Handoff",
+            recommendedDownload
+          } : null
+        ].filter(Boolean);
+      }
+
       function currentLastMainlineReceipt() {
         return lastMainlineActionResult?.receipt && typeof lastMainlineActionResult.receipt === "object"
           ? lastMainlineActionResult.receipt
@@ -1037,9 +1083,8 @@
         const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
           ? launchRunway.checklistState
           : null;
-        const nextEvidenceAction = checklistState?.nextEvidenceAction && typeof checklistState.nextEvidenceAction === "object"
-          ? checklistState.nextEvidenceAction
-          : null;
+        const nextEvidenceAction = currentMainlineLaunchRunwayNextEvidenceAction();
+        const nextEvidenceControls = mainlineLaunchRunwayEvidenceControls(nextEvidenceAction);
         const checklistStateMarkup = checklistState
           ? `
             <div class="hint" data-mainline-launch-runway-checklist-state="${esc(checklistState.status || "-")}">
@@ -1058,6 +1103,21 @@
               ${Array.isArray(checklistState.evidenceOperations) && checklistState.evidenceOperations.length
                 ? `<br>${checklistState.evidenceOperations.map((item) => `evidenceOperation=${esc(item.operation || "-")} | status=${esc(item.status || "-")} | items=${esc(item.itemCount ?? "-")} | recordedAt=${esc(item.recordedAt || "-")}`).join("<br>")}`
                 : ""}
+            </div>
+          `
+          : "";
+        const nextEvidenceActionMarkup = nextEvidenceAction
+          ? `
+            <div class="hint" data-mainline-launch-runway-next-evidence-action="${esc(nextEvidenceAction.actionKey || nextEvidenceAction.setupAction?.key || "-")}">
+              Next Runway Evidence Action: ${esc(nextEvidenceAction.label || nextEvidenceAction.setupAction?.label || "Record Runway Evidence")}
+              | operation=${esc(nextEvidenceAction.operation || nextEvidenceAction.setupAction?.operation || "-")}
+              | download=${esc(nextEvidenceAction.downloadKey || nextEvidenceAction.recommendedDownload?.key || "-")}
+              | downloadFormat=${esc(nextEvidenceAction.downloadFormat || nextEvidenceAction.recommendedDownload?.format || "-")}
+              ${nextEvidenceControls.length ? `
+                <div class="actions" style="margin-top: 10px;">
+                  ${nextEvidenceControls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-launch-runway-evidence-control-index="${controlIndex}">${esc(control.label || control.setupAction?.label || control.recommendedDownload?.label || control.kind || "Action")}</button>`).join("")}
+                </div>
+              ` : ""}
             </div>
           `
           : "";
@@ -1092,6 +1152,7 @@
             </div>
             <div class="hint">Current Gate: ${esc(currentGate || "-")} | Launch-Day Watch Entry: ${esc(watchEntry || "-")}</div>
             ${checklistStateMarkup}
+            ${nextEvidenceActionMarkup}
             ${checklistMarkup}
             <div class="actions">
               <button type="button" class="secondary" data-mainline-launch-runway-action="copy-closeout-reload" data-mainline-launch-runway-copy-label="Copy Closeout Reload" data-mainline-launch-runway-copy-value="${esc(closeoutReload)}" ${closeoutReload ? "" : "disabled"}>Copy Closeout Reload</button>
@@ -1457,6 +1518,18 @@
               launchRunwayButton.dataset.mainlineLaunchRunwayCopyLabel,
               launchRunwayButton.dataset.mainlineLaunchRunwayCopyValue
             );
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
+        const launchRunwayEvidenceButton = event.target.closest("[data-mainline-launch-runway-evidence-control-index]");
+        if (launchRunwayEvidenceButton) {
+          const controlIndex = Number(launchRunwayEvidenceButton.dataset.mainlineLaunchRunwayEvidenceControlIndex || -1);
+          const controls = mainlineLaunchRunwayEvidenceControls();
+          try {
+            await executeMainlineControl(controls[controlIndex] || null);
           } catch (error) {
             setStatus(error.message, "danger");
             setOutput({ error: error.message });

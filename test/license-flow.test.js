@@ -8739,6 +8739,130 @@ test("developer launch mainline action can record a launch rehearsal run and ref
   }
 });
 
+test("developer launch runway next evidence action advances after each evidence receipt", async () => {
+  const { app, baseUrl, tempDir } = await startServer({
+    adminPassword: "MainlineRunwayAdvanceAdmin123!",
+    serverTokenSecret: "mainline-runway-advance-server-secret"
+  });
+
+  try {
+    const adminSession = await postJson(baseUrl, "/api/admin/login", {
+      username: "admin",
+      password: "MainlineRunwayAdvanceAdmin123!"
+    });
+
+    const owner = await postJson(
+      baseUrl,
+      "/api/admin/developers",
+      {
+        username: "runway.advance.owner",
+        password: "LaunchMainlineRunwayAdvanceOwner123!",
+        displayName: "Launch Mainline Runway Advance Owner"
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "MAINLINE_RUNWAY_ADVANCE",
+        name: "Mainline Runway Advance App",
+        ownerDeveloperId: owner.id,
+        featureConfig: {
+          allowRegister: true,
+          allowAccountLogin: true,
+          allowCardLogin: true,
+          allowCardRecharge: true
+        }
+      },
+      adminSession.token
+    );
+
+    const ownerSession = await postJson(baseUrl, "/api/developer/login", {
+      username: "runway.advance.owner",
+      password: "LaunchMainlineRunwayAdvanceOwner123!"
+    });
+
+    const checklistStateFrom = (payload) => payload?.launchMainline?.mainlineSummary?.launchRunway?.checklistState
+      || payload?.mainlineSummary?.launchRunway?.checklistState
+      || null;
+
+    const beforeMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=MAINLINE_RUNWAY_ADVANCE&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      checklistStateFrom(beforeMainline)?.nextEvidenceAction?.operation,
+      "record_launch_rehearsal_run"
+    );
+    assert.equal(
+      checklistStateFrom(beforeMainline)?.nextEvidenceAction?.downloadFormat,
+      "rehearsal-guide"
+    );
+
+    const rehearsalResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_RUNWAY_ADVANCE",
+        channel: "stable",
+        operation: "record_launch_rehearsal_run"
+      },
+      ownerSession.token
+    );
+    const afterRehearsalState = checklistStateFrom(rehearsalResult);
+    assert.equal(afterRehearsalState?.recordedEvidenceOperationCount, 1);
+    assert.equal(afterRehearsalState?.pendingEvidenceOperationCount, 2);
+    assert.equal(afterRehearsalState?.nextEvidenceAction?.operation, "record_launch_day_readiness_review");
+    assert.equal(afterRehearsalState?.nextEvidenceAction?.downloadFormat, "operations-handoff");
+    assert.equal(
+      afterRehearsalState?.evidenceOperations?.find((item) => item.operation === "record_launch_rehearsal_run")?.status,
+      "recorded"
+    );
+
+    const readinessResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_RUNWAY_ADVANCE",
+        channel: "stable",
+        operation: "record_launch_day_readiness_review"
+      },
+      ownerSession.token
+    );
+    const afterReadinessState = checklistStateFrom(readinessResult);
+    assert.equal(afterReadinessState?.recordedEvidenceOperationCount, 2);
+    assert.equal(afterReadinessState?.pendingEvidenceOperationCount, 1);
+    assert.equal(afterReadinessState?.recordedEvidenceCount, 5);
+    assert.equal(afterReadinessState?.pendingEvidenceCount, 1);
+    assert.equal(afterReadinessState?.nextEvidenceAction?.operation, "record_post_launch_ops_sweep");
+    assert.equal(afterReadinessState?.nextEvidenceAction?.downloadFormat, "post-launch-sweep-handoff");
+
+    const sweepResult = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "MAINLINE_RUNWAY_ADVANCE",
+        channel: "stable",
+        operation: "record_post_launch_ops_sweep"
+      },
+      ownerSession.token
+    );
+    const afterSweepState = checklistStateFrom(sweepResult);
+    assert.equal(afterSweepState?.status, "evidence_recorded");
+    assert.equal(afterSweepState?.recordedEvidenceOperationCount, 3);
+    assert.equal(afterSweepState?.pendingEvidenceOperationCount, 0);
+    assert.equal(afterSweepState?.recordedEvidenceCount, 6);
+    assert.equal(afterSweepState?.pendingEvidenceCount, 0);
+    assert.equal(afterSweepState?.nextEvidenceAction, null);
+  } finally {
+    await app.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("launch workflow routes login-path blockers to project authorization presets", async () => {
   const { app, baseUrl, tempDir } = await startServer();
 
@@ -17803,11 +17927,17 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /currentMainlineLaunchDutyActionOrder/);
     assert.match(html, /renderMainlineLaunchRunway/);
     assert.match(html, /copyMainlineLaunchRunwayValue/);
+    assert.match(html, /currentMainlineLaunchRunwayNextEvidenceAction/);
+    assert.match(html, /mainlineLaunchRunwayEvidenceControls/);
     assert.match(html, /data-mainline-launch-runway-checklist/);
     assert.match(html, /operatorChecklist/);
     assert.match(html, /checklistState/);
     assert.match(html, /nextEvidenceAction/);
     assert.match(html, /downloadFormat/);
+    assert.match(html, /data-mainline-launch-runway-next-evidence-action/);
+    assert.match(html, /data-mainline-launch-runway-evidence-control-index/);
+    assert.match(html, /Record Runway Evidence/);
+    assert.match(html, /Download Runway Handoff/);
     assert.match(html, /pendingEvidenceCount/);
     assert.match(html, /nextPendingEvidenceOperation/);
     assert.match(html, /evidenceOperation/);

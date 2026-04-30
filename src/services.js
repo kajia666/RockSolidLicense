@@ -5408,11 +5408,24 @@ function buildLaunchMainlineActionReceipt({
           : []
       }
     : null;
-  const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabilizationHandoffPanel && typeof launchMainline.mainlineSummary.stabilizationHandoffPanel === "object"
-    ? {
-        ...launchMainline.mainlineSummary.stabilizationHandoffPanel,
-        primaryWorkspaceAction: launchMainline.mainlineSummary.stabilizationHandoffPanel.primaryWorkspaceAction || null,
-        primaryDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.primaryDownload || null,
+const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabilizationHandoffPanel && typeof launchMainline.mainlineSummary.stabilizationHandoffPanel === "object"
+  ? {
+    ...launchMainline.mainlineSummary.stabilizationHandoffPanel,
+    steadyStateHandoff: launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff && typeof launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff === "object"
+      ? {
+          ...launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff,
+          workspaceAction: launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.workspaceAction || null,
+          opsDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.opsDownload || null,
+          mainlineDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.mainlineDownload || null,
+          indexDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.indexDownload || null,
+          routeMapDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.routeMapDownload || null,
+          checklist: Array.isArray(launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.checklist)
+            ? launchMainline.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.checklist.filter((item) => String(item || "").trim() !== "")
+            : []
+        }
+      : null,
+    primaryWorkspaceAction: launchMainline.mainlineSummary.stabilizationHandoffPanel.primaryWorkspaceAction || null,
+    primaryDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.primaryDownload || null,
         indexDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.indexDownload || null,
         routeMapDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.routeMapDownload || null,
         checklist: Array.isArray(launchMainline.mainlineSummary.stabilizationHandoffPanel.checklist)
@@ -14435,6 +14448,28 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           : nextActionOperation
             ? "pending_next_action"
             : "pending_confirmation";
+        const steadyStateWorkspaceAction = createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Steady-State Ops Workspace", params);
+        const steadyStateHandoff = {
+          status: confirmation?.status === "confirmed"
+            ? "ready_for_steady_state"
+            : nextActionOperation
+              ? "waiting_for_stabilization_action"
+              : "waiting_for_confirmation",
+          nextStep: confirmation?.status === "confirmed" ? "monitor_steady_state_ops" : "confirm_stabilization_handoff",
+          confirmationAuditLogId: confirmation?.auditLogId || null,
+          confirmedBy: confirmation?.confirmedBy?.username || null,
+          workspaceAction: steadyStateWorkspaceAction,
+          opsDownload: confirmation?.opsDownloads?.stabilizationHandoff || null,
+          mainlineDownload: confirmation?.launchMainlineDownloads?.stabilizationHandoff || stabilizationHandoffDownload || null,
+          indexDownload: postLaunchHandoffIndexDownload || null,
+          routeMapDownload: handoffDownloadRoutesDownload || null,
+          checklist: [
+            "Keep the Developer Ops stabilization handoff attached to the steady-state lane.",
+            "Keep the Launch Mainline stabilization handoff and route map with the handoff package.",
+            "Monitor sessions, heartbeat, audit, card redemption, and device signals from Developer Ops.",
+            "Escalate only if steady-state signals drift from the launch-day watch baseline."
+          ]
+        };
         const controls = dedupeSummaryPanelControls([
           nextActionSetupAction && (
             nextActionOperation === "first_batch_setup"
@@ -14444,6 +14479,21 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             kind: "setup",
             label: "Record Stabilization Next Action",
             setupAction: nextActionSetupAction
+          } : null,
+          confirmation?.status === "confirmed" && steadyStateHandoff.workspaceAction ? {
+            kind: "workspace",
+            label: "Open Steady-State Ops Workspace",
+            workspaceAction: steadyStateHandoff.workspaceAction
+          } : null,
+          confirmation?.status === "confirmed" && steadyStateHandoff.opsDownload ? {
+            kind: "download",
+            label: "Download Steady-State Ops Handoff",
+            recommendedDownload: steadyStateHandoff.opsDownload
+          } : null,
+          confirmation?.status === "confirmed" && steadyStateHandoff.routeMapDownload ? {
+            kind: "download",
+            label: "Download Steady-State Route Map",
+            recommendedDownload: steadyStateHandoff.routeMapDownload
           } : null,
           primaryWorkspaceAction ? {
             kind: "workspace",
@@ -14497,6 +14547,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           confirmationStatus: confirmation?.status || null,
           confirmationAuditLogId: confirmation?.auditLogId || null,
           confirmationBy: confirmation?.confirmedBy?.username || null,
+          steadyStateHandoff,
           primaryWorkspaceAction,
           primaryDownload: stabilizationHandoffDownload || null,
           indexDownload: postLaunchHandoffIndexDownload || null,
@@ -15320,8 +15371,18 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     : null;
   const ensuredStabilizationHandoffPanel = stabilizationHandoffPanel && typeof stabilizationHandoffPanel === "object"
     ? {
-        ...stabilizationHandoffPanel,
-        primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(stabilizationHandoffPanel.primaryWorkspaceAction, params),
+      ...stabilizationHandoffPanel,
+      steadyStateHandoff: stabilizationHandoffPanel.steadyStateHandoff && typeof stabilizationHandoffPanel.steadyStateHandoff === "object"
+        ? {
+            ...stabilizationHandoffPanel.steadyStateHandoff,
+            workspaceAction: ensureLaunchWorkflowWorkspaceHref(stabilizationHandoffPanel.steadyStateHandoff.workspaceAction, params),
+            opsDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.steadyStateHandoff.opsDownload, params),
+            mainlineDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.steadyStateHandoff.mainlineDownload, params),
+            indexDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.steadyStateHandoff.indexDownload, params),
+            routeMapDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.steadyStateHandoff.routeMapDownload, params)
+          }
+        : null,
+      primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(stabilizationHandoffPanel.primaryWorkspaceAction, params),
         primaryDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.primaryDownload, params),
         indexDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.indexDownload, params),
         routeMapDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.routeMapDownload, params),
@@ -15608,6 +15669,26 @@ function appendStabilizationHandoffPanelTextLines(lines = [], stabilizationHando
     + ` | audit=${stabilizationHandoffPanel.confirmationAuditLogId || "-"}`
     + ` | by=${stabilizationHandoffPanel.confirmationBy || "-"}`
   );
+  const steadyStateHandoff = stabilizationHandoffPanel.steadyStateHandoff && typeof stabilizationHandoffPanel.steadyStateHandoff === "object"
+    ? stabilizationHandoffPanel.steadyStateHandoff
+    : null;
+  if (steadyStateHandoff) {
+    lines.push(
+      `- steadyState: status=${steadyStateHandoff.status || "-"}`
+      + ` | next=${steadyStateHandoff.nextStep || "-"}`
+      + ` | audit=${steadyStateHandoff.confirmationAuditLogId || "-"}`
+      + ` | by=${steadyStateHandoff.confirmedBy || "-"}`
+    );
+    lines.push(`- steadyStateWorkspace: ${formatWorkspaceActionText(steadyStateHandoff.workspaceAction)}`);
+    lines.push(`- steadyStateOpsDownload: ${formatLaunchHandoffDownloadText(steadyStateHandoff.opsDownload, { fileSeparator: " | " })}`);
+    lines.push(`- steadyStateMainlineDownload: ${formatLaunchHandoffDownloadText(steadyStateHandoff.mainlineDownload, { fileSeparator: " | " })}`);
+    lines.push(`- steadyStateRouteMap: ${formatLaunchHandoffDownloadText(steadyStateHandoff.routeMapDownload, { fileSeparator: " | " })}`);
+    if (Array.isArray(steadyStateHandoff.checklist) && steadyStateHandoff.checklist.length) {
+      for (const item of steadyStateHandoff.checklist) {
+        lines.push(`  - steadyStateChecklist: ${item}`);
+      }
+    }
+  }
   lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(stabilizationHandoffPanel.primaryWorkspaceAction)}`);
   lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(stabilizationHandoffPanel.primaryDownload, { fileSeparator: " | " })}`);
   lines.push(`- indexDownload: ${formatLaunchHandoffDownloadText(stabilizationHandoffPanel.indexDownload, { fileSeparator: " | " })}`);

@@ -1401,9 +1401,12 @@
         }
         const controls = mainlineStabilizationHandoffControls(panel);
         const checklist = Array.isArray(panel.checklist) ? panel.checklist : [];
+        const steadyStateHandoff = panel.steadyStateHandoff && typeof panel.steadyStateHandoff === "object" ? panel.steadyStateHandoff : null;
+        const steadyStateChecklist = Array.isArray(steadyStateHandoff?.checklist) ? steadyStateHandoff.checklist : [];
         const tags = [
           panel.status ? { label: "status", value: panel.status, strong: panel.status === "confirmed" } : null,
           panel.confirmationStatus ? { label: "confirmation", value: panel.confirmationStatus, strong: panel.confirmationStatus === "confirmed" } : null,
+          steadyStateHandoff?.status ? { label: "steadyState", value: steadyStateHandoff.status, strong: steadyStateHandoff.status === "ready_for_steady_state" } : null,
           panel.lifecycleStatus ? { label: "lifecycle", value: panel.lifecycleStatus, strong: false } : null,
           panel.decision ? { label: "decision", value: panel.decision, strong: false } : null
         ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
@@ -1432,6 +1435,21 @@
             | Route Map: ${esc(panel.routeMapDownload?.label || panel.routeMapDownload?.key || "-")}
           </div>
         `;
+        const steadyStateMarkup = steadyStateHandoff
+          ? `
+            <div class="hint">
+              Steady-State Handoff: status=${esc(steadyStateHandoff.status || "-")}
+              | next=${esc(steadyStateHandoff.nextStep || "-")}
+              | audit=${esc(steadyStateHandoff.confirmationAuditLogId || "-")}
+              | by=${esc(steadyStateHandoff.confirmedBy || "-")}
+              <br>Workspace: ${esc(steadyStateHandoff.workspaceAction?.label || steadyStateHandoff.workspaceAction?.key || "-")}
+              | Ops Download: ${esc(steadyStateHandoff.opsDownload?.label || steadyStateHandoff.opsDownload?.key || "-")}
+              | Mainline Download: ${esc(steadyStateHandoff.mainlineDownload?.label || steadyStateHandoff.mainlineDownload?.key || "-")}
+              | Route Map: ${esc(steadyStateHandoff.routeMapDownload?.label || steadyStateHandoff.routeMapDownload?.key || "-")}
+              ${steadyStateChecklist.length ? `<br>${steadyStateChecklist.map((item, index) => `${index + 1}. ${esc(item || "-")}`).join("<br>")}` : ""}
+            </div>
+          `
+          : "";
         const checklistMarkup = checklist.length
           ? `
             <div class="hint">
@@ -1450,6 +1468,7 @@
             ${confirmationMarkup}
             ${lifecycleMarkup}
             ${nextActionMarkup}
+            ${steadyStateMarkup}
             ${downloadsMarkup}
             ${checklistMarkup}
             ${controls.length ? `

@@ -15588,6 +15588,42 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmationStatus: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationStatus,
       confirmationAuditLogId: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationAuditLogId,
       confirmationBy: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationBy,
+      steadyStateHandoff: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.steadyStateHandoff
+        ? {
+            status: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.status,
+            nextStep: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.nextStep,
+            confirmationAuditLogId: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.confirmationAuditLogId,
+            confirmedBy: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.confirmedBy,
+            workspaceAction: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.workspaceAction
+              ? {
+                  key: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.workspaceAction.key,
+                  autofocus: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.workspaceAction.autofocus,
+                  label: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.workspaceAction.label
+                }
+              : null,
+            opsDownload: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.opsDownload
+              ? {
+                  key: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.opsDownload.key,
+                  format: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.opsDownload.format
+                }
+              : null,
+            mainlineDownload: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.mainlineDownload
+              ? {
+                  key: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.mainlineDownload.key,
+                  format: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.mainlineDownload.format
+                }
+              : null,
+            routeMapDownload: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.routeMapDownload
+              ? {
+                  key: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.routeMapDownload.key,
+                  format: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.routeMapDownload.format
+                }
+              : null,
+            checklistCount: Array.isArray(launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.checklist)
+              ? launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.checklist.length
+              : 0
+          }
+        : null,
       primaryDownload: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.primaryDownload
         ? {
             key: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.primaryDownload.key,
@@ -15605,6 +15641,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmationStatus: "confirmed",
       confirmationAuditLogId: stabilizationConfirmation.auditLogId,
       confirmationBy: "ops.export.operator",
+      steadyStateHandoff: {
+        status: "ready_for_steady_state",
+        nextStep: "monitor_steady_state_ops",
+        confirmationAuditLogId: stabilizationConfirmation.auditLogId,
+        confirmedBy: "ops.export.operator",
+        workspaceAction: {
+          key: "ops",
+          autofocus: "snapshot",
+          label: "Open Steady-State Ops Workspace"
+        },
+        opsDownload: {
+          key: "ops_stabilization_handoff",
+          format: "stabilization-handoff"
+        },
+        mainlineDownload: {
+          key: "launch_mainline_stabilization_handoff",
+          format: "stabilization-handoff"
+        },
+        routeMapDownload: {
+          key: "launch_mainline_handoff_download_routes",
+          format: "handoff-download-routes"
+        },
+        checklistCount: 4
+      },
       primaryDownload: {
         key: "launch_mainline_stabilization_handoff",
         format: "stabilization-handoff"
@@ -15618,11 +15678,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item?.label === "Download Stabilization Handoff"
       && item?.recommendedDownload?.key === "launch_mainline_stabilization_handoff"
     ));
+    assert.ok(launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.controls?.some((item) =>
+      item?.label === "Open Steady-State Ops Workspace"
+      && item?.workspaceAction?.key === "ops"
+    ));
+    assert.ok(launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.controls?.some((item) =>
+      item?.label === "Download Steady-State Ops Handoff"
+      && item?.recommendedDownload?.key === "ops_stabilization_handoff"
+    ));
     assert.match(launchMainlineTraceability.summaryText, /Stabilization Handoff Panel:/);
     assert.match(
       launchMainlineTraceability.summaryText,
       new RegExp(`- confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`)
     );
+    assert.match(
+      launchMainlineTraceability.summaryText,
+      new RegExp(`- steadyState: status=ready_for_steady_state \\| next=monitor_steady_state_ops \\| audit=${stabilizationConfirmation.auditLogId}`)
+    );
+    assert.match(launchMainlineTraceability.summaryText, /- steadyStateOpsDownload: Developer Ops stabilization handoff/);
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.recommendedDownload.href,
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadHref
@@ -18455,6 +18528,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /data-mainline-launch-day-watch-status/);
     assert.match(html, /watchCheckIn/);
     assert.match(html, /Watch Check-In/);
+    assert.match(html, /steadyStateHandoff/);
+    assert.match(html, /Steady-State Handoff/);
     assert.match(html, /data-mainline-stabilization-handoff-status/);
     assert.match(html, /Runway Evidence Pending/);
     assert.match(html, /Runway Evidence Recorded/);

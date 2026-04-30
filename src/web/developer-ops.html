@@ -4416,6 +4416,71 @@
         `;
       }
 
+      function renderOperationalExceptionSignals(initialLaunchOpsReadiness = {}) {
+        const traceability = initialLaunchOpsReadiness?.traceability || {};
+        const operationalExceptionEntry = initialLaunchOpsReadiness?.operationalExceptionEntry
+          || traceability.operationalExceptionEntry
+          || null;
+        const operationalExceptionCloseout = initialLaunchOpsReadiness?.operationalExceptionCloseout
+          || traceability.operationalExceptionCloseout
+          || null;
+        if (!operationalExceptionEntry && !operationalExceptionCloseout) {
+          return "";
+        }
+        const reasons = Array.isArray(operationalExceptionEntry?.reasons)
+          ? operationalExceptionEntry.reasons
+          : [];
+        const closeoutCriteria = Array.isArray(operationalExceptionCloseout?.closeoutCriteria)
+          ? operationalExceptionCloseout.closeoutCriteria
+          : [];
+        const entryStatus = String(operationalExceptionEntry?.status || "unknown").toLowerCase();
+        const closeoutStatus = String(operationalExceptionCloseout?.status || "unknown").toLowerCase();
+        const entryStatusClass = entryStatus === "open" ? "warning" : "ok";
+        const closeoutStatusClass = operationalExceptionCloseout?.canClose === true ? "ok" : "warning";
+        const entryDetails = [
+          `severity=${esc(operationalExceptionEntry?.severity || "-")}`,
+          `stage=${esc(operationalExceptionEntry?.stage || "-")}`,
+          `operation=${esc(operationalExceptionEntry?.operation || "-")}`,
+          `action=${esc(operationalExceptionEntry?.actionKey || "-")}`,
+          `download=${esc(operationalExceptionEntry?.download?.fileName || operationalExceptionEntry?.downloadKey || "-")}`,
+          `watch=${esc(operationalExceptionEntry?.launchDayWatchStatus || "-")}`,
+          `stabilization=${esc(operationalExceptionEntry?.stabilizationStatus || "-")}`,
+          `audit=${esc(operationalExceptionEntry?.confirmationAuditLogId || operationalExceptionEntry?.latestReceiptAuditLogId || "-")}`
+        ].join(" | ");
+        const closeoutDetails = [
+          `canClose=${operationalExceptionCloseout?.canClose === true ? "yes" : "no"}`,
+          `review=${operationalExceptionCloseout?.reviewRequired === true ? "required" : "optional"}`,
+          `reasons=${esc(operationalExceptionCloseout?.blockingReasonCount ?? closeoutCriteria.length ?? 0)}`,
+          `next=${esc(operationalExceptionCloseout?.nextOperation || "-")}`,
+          `action=${esc(operationalExceptionCloseout?.nextActionKey || "-")}`,
+          `download=${esc(operationalExceptionCloseout?.downloadKey || "-")}`
+        ].join(" | ");
+        return `
+          <div class="snapshot-recap operational-exception-signals">
+            ${operationalExceptionEntry ? `
+              <div class="snapshot-recap" data-operational-exception-entry="${esc(entryStatus)}">
+                <div class="snapshot-recap-head">
+                  <strong>Operational Exception Entry</strong>
+                  <span class="tag ${entryStatusClass}">${esc(entryStatus.toUpperCase())}</span>
+                </div>
+                <div class="hint">${entryDetails}</div>
+                <ul class="snapshot-list">${reasons.length ? reasons.map((item) => `<li><strong>${esc(item.key || "-")}</strong> ${esc(item.status || "-")} | count=${esc(item.count ?? "-")} | ${esc(item.summary || "-")}</li>`).join("") : "<li>No open exception reasons.</li>"}</ul>
+              </div>
+            ` : ""}
+            ${operationalExceptionCloseout ? `
+              <div class="snapshot-recap" data-operational-exception-closeout="${esc(closeoutStatus)}">
+                <div class="snapshot-recap-head">
+                  <strong>Operational Exception Closeout</strong>
+                  <span class="tag ${closeoutStatusClass}">${esc(closeoutStatus.toUpperCase())}</span>
+                </div>
+                <div class="hint">${closeoutDetails}</div>
+                <ul class="snapshot-list">${closeoutCriteria.length ? closeoutCriteria.map((item) => `<li><strong>${esc(item.key || "-")}</strong> ${esc(item.status || "-")} | ${esc(item.summary || "-")}</li>`).join("") : "<li>No closeout criteria are available.</li>"}</ul>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
       function renderStagingLaunchDutyArchive(initialLaunchOpsReadiness = {}) {
         const item = initialLaunchOpsReadiness?.stagingLaunchDutyArchive;
         if (!item || typeof item !== "object") {
@@ -5107,6 +5172,7 @@
           ${renderLastStabilizationHandoffResult()}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
+          ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
           ${renderLaunchDutyActionOrder(initialLaunchOpsReadiness)}
           ${renderStagingLaunchDutyArchive(initialLaunchOpsReadiness)}
           ${renderStabilizationHandoff(initialLaunchOpsReadiness)}

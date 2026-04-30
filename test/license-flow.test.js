@@ -20028,6 +20028,12 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /firstWaveConfirmationChain/);
     assert.match(html, /First-Wave Confirmation Chain/);
     assert.match(html, /data-first-wave-confirmation-chain/);
+    assert.match(html, /operationalExceptionEntry/);
+    assert.match(html, /Operational Exception Entry/);
+    assert.match(html, /data-operational-exception-entry/);
+    assert.match(html, /operationalExceptionCloseout/);
+    assert.match(html, /Operational Exception Closeout/);
+    assert.match(html, /data-operational-exception-closeout/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);
   } finally {
     await app.close();

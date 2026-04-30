@@ -277,6 +277,10 @@
           <div id="mainline-launch-runway-box" class="hint">Generate a launch mainline package to inspect staging closeout, full-test-window, production sign-off, and launch-day watch handoff here.</div>
         </article>
         <article class="card">
+          <h2>Operational Readiness</h2>
+          <div id="mainline-operational-readiness-box" class="hint">Generate a launch mainline package to inspect Ready to Operate versus Still Needs Evidence status here.</div>
+        </article>
+        <article class="card">
           <h2>Launch-Day Watch</h2>
           <div id="mainline-launch-day-watch-box" class="hint">Generate a launch mainline package to inspect launch-day watch readiness, first-wave checkpoints, and handoff downloads here.</div>
         </article>
@@ -802,6 +806,17 @@
           : null;
       }
 
+      function currentMainlineOperationalReadiness() {
+        const page = currentMainlinePage();
+        if (page.operationalReadiness && typeof page.operationalReadiness === "object") {
+          return page.operationalReadiness;
+        }
+        const summaryReadiness = currentMainlineSummary().operationalReadiness;
+        return summaryReadiness && typeof summaryReadiness === "object"
+          ? summaryReadiness
+          : null;
+      }
+
       function mainlineLaunchRunwayEvidenceControls(action = currentMainlineLaunchRunwayNextEvidenceAction()) {
         if (!action || typeof action !== "object") {
           return [];
@@ -830,6 +845,37 @@
             kind: "download",
             label: "Download Runway Handoff",
             recommendedDownload
+          } : null
+        ].filter(Boolean);
+      }
+
+      function mainlineOperationalReadinessControls(readiness = currentMainlineOperationalReadiness()) {
+        if (!readiness || typeof readiness !== "object") {
+          return [];
+        }
+        if (Array.isArray(readiness.controls) && readiness.controls.length) {
+          return readiness.controls;
+        }
+        return [
+          readiness.primaryWorkspaceAction ? {
+            kind: "workspace",
+            label: readiness.readyToOperate ? "Open Ready-to-Operate Workspace" : "Open Operational Workspace",
+            workspaceAction: readiness.primaryWorkspaceAction
+          } : null,
+          readiness.primaryDownload ? {
+            kind: "download",
+            label: "Download Operational Handoff",
+            recommendedDownload: readiness.primaryDownload
+          } : null,
+          readiness.supportingDownload ? {
+            kind: "download",
+            label: "Download Supporting Operational Handoff",
+            recommendedDownload: readiness.supportingDownload
+          } : null,
+          readiness.routeMapDownload ? {
+            kind: "download",
+            label: "Download Operational Route Map",
+            recommendedDownload: readiness.routeMapDownload
           } : null
         ].filter(Boolean);
       }
@@ -1316,6 +1362,80 @@
         `;
       }
 
+      function renderOperationalReadiness() {
+        const readiness = currentMainlineOperationalReadiness();
+        if (!readiness) {
+          return '<div class="hint">Generate Launch Mainline to inspect Ready to Operate versus Still Needs Evidence status here.</div>';
+        }
+        const controls = mainlineOperationalReadinessControls(readiness);
+        const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
+        const checklist = Array.isArray(readiness.checklist) ? readiness.checklist : [];
+        const tags = [
+          readiness.status ? { label: "status", value: readiness.status, strong: readiness.readyToOperate === true } : null,
+          { label: "ready", value: readiness.readyToOperate === true ? "yes" : "no", strong: readiness.readyToOperate === true },
+          readiness.blockingCount !== undefined ? { label: "evidence", value: readiness.blockingCount, strong: Number(readiness.blockingCount || 0) > 0 } : null,
+          readiness.blockingOperationCount !== undefined ? { label: "ops", value: readiness.blockingOperationCount, strong: Number(readiness.blockingOperationCount || 0) > 0 } : null,
+          readiness.watchCheckInStatus ? { label: "watch", value: readiness.watchCheckInStatus, strong: readiness.watchCheckInStatus === "checked_in" } : null,
+          readiness.steadyStateStatus ? { label: "steady", value: readiness.steadyStateStatus, strong: readiness.steadyStateStatus === "ready_for_steady_state" } : null
+        ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+        const nextActionMarkup = readiness.nextActionKey || readiness.nextActionOperation
+          ? `<div class="hint">Next Operational Action: ${esc(readiness.nextActionKey || "-")} | operation=${esc(readiness.nextActionOperation || "-")}</div>`
+          : "";
+        const downloadsMarkup = `
+          <div class="hint">
+            Primary Download: ${esc(readiness.primaryDownload?.label || readiness.primaryDownload?.key || "-")}
+            | format=${esc(readiness.primaryDownload?.format || "-")}
+            | Supporting Download: ${esc(readiness.supportingDownload?.label || readiness.supportingDownload?.key || "-")}
+            | format=${esc(readiness.supportingDownload?.format || "-")}
+            | Route Map: ${esc(readiness.routeMapDownload?.label || readiness.routeMapDownload?.key || "-")}
+          </div>
+        `;
+        const checksMarkup = checks.length
+          ? `
+            <div class="hint">
+              Readiness Checks:
+              <br>${checks.map((item, index) => `${index + 1}. ${esc(item?.label || item?.key || "check")} | status=${esc(item?.status || "-")} | ${esc(item?.summary || "-")}`).join("<br>")}
+            </div>
+          `
+          : "";
+        const checklistMarkup = checklist.length
+          ? `
+            <div class="hint">
+              Operator Checklist:
+              <br>${checklist.map((item, index) => `${index + 1}. ${esc(item || "-")}`).join("<br>")}
+            </div>
+          `
+          : "";
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(readiness.label || "Operational Readiness")}</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint" data-mainline-operational-readiness-status="${esc(readiness.status || "-")}">
+              ${esc(readiness.summary || "Keep launch operational readiness visible here.")}
+            </div>
+            <div class="hint">
+              Ready to Operate: ${esc(readiness.readyToOperate === true ? "true" : "false")}
+              | Still Needs Evidence: ${esc(Number(readiness.blockingCount || 0) > 0 ? "true" : "false")}
+              | watchReady=${esc(readiness.watchReady === true ? "true" : "false")}
+              | watchCheckIn=${esc(readiness.watchCheckInStatus || "-")}
+              | stabilization=${esc(readiness.stabilizationStatus || "-")}
+              | steadyState=${esc(readiness.steadyStateStatus || "-")}
+            </div>
+            ${nextActionMarkup}
+            ${downloadsMarkup}
+            ${checksMarkup}
+            ${checklistMarkup}
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-operational-readiness-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
       function renderLaunchDayWatchPanel() {
         const panel = currentMainlineLaunchDayWatchPanel();
         if (!panel) {
@@ -1610,6 +1730,7 @@
         el("mainline-next-evidence-box").innerHTML = renderNextProductionEvidenceAction();
         el("mainline-operator-action-manifest-box").innerHTML = renderOperatorActionManifestActions();
         el("mainline-launch-runway-box").innerHTML = renderMainlineLaunchRunway();
+        el("mainline-operational-readiness-box").innerHTML = renderOperationalReadiness();
         el("mainline-launch-day-watch-box").innerHTML = renderLaunchDayWatchPanel();
         el("mainline-stabilization-handoff-box").innerHTML = renderStabilizationHandoffPanel();
         el("mainline-hero-controls-box").innerHTML = renderHeroControls();
@@ -1797,6 +1918,7 @@
         el("mainline-next-evidence-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the next production evidence action here.</div>';
         el("mainline-operator-action-manifest-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect initial launch operator actions here.</div>';
         el("mainline-launch-runway-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect staging closeout, full-test-window, production sign-off, and launch-day watch handoff here.</div>';
+        el("mainline-operational-readiness-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect Ready to Operate versus Still Needs Evidence status here.</div>';
         el("mainline-launch-day-watch-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect launch-day watch readiness, first-wave checkpoints, and handoff downloads here.</div>';
         el("mainline-stabilization-handoff-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect stabilization handoff status, confirmation, and traceability downloads here.</div>';
         el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
@@ -1867,6 +1989,18 @@
         if (runwayFollowUpButton) {
           const controlIndex = Number(runwayFollowUpButton.dataset.mainlineRunwayFollowupControlIndex || -1);
           const controls = mainlineLaunchRunwayEvidenceControls();
+          try {
+            await executeMainlineControl(controls[controlIndex] || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
+        const operationalReadinessButton = event.target.closest("[data-mainline-operational-readiness-control-index]");
+        if (operationalReadinessButton) {
+          const controlIndex = Number(operationalReadinessButton.dataset.mainlineOperationalReadinessControlIndex || -1);
+          const controls = mainlineOperationalReadinessControls();
           try {
             await executeMainlineControl(controls[controlIndex] || null);
           } catch (error) {

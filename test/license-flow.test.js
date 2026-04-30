@@ -6848,6 +6848,67 @@ test("developer release package export bundles integration, versions, and notice
         item?.label === "Download Handoff Route Map"
         && item?.recommendedDownload?.key === "launch_mainline_handoff_download_routes"
       ));
+      const operationalReadiness = launchMainline.mainlineSummary.operationalReadiness;
+      assert.ok(operationalReadiness);
+      assert.deepEqual({
+        status: operationalReadiness.status,
+        label: operationalReadiness.label,
+        readyToOperate: operationalReadiness.readyToOperate,
+        blockingCount: operationalReadiness.blockingCount,
+        blockingOperationCount: operationalReadiness.blockingOperationCount,
+        watchReady: operationalReadiness.watchReady,
+        watchCheckInStatus: operationalReadiness.watchCheckInStatus,
+        stabilizationStatus: operationalReadiness.stabilizationStatus,
+        steadyStateStatus: operationalReadiness.steadyStateStatus,
+        nextActionKey: operationalReadiness.nextActionKey,
+        nextActionOperation: operationalReadiness.nextActionOperation,
+        primaryWorkspaceAction: operationalReadiness.primaryWorkspaceAction
+          ? {
+              key: operationalReadiness.primaryWorkspaceAction.key,
+              autofocus: operationalReadiness.primaryWorkspaceAction.autofocus,
+              label: operationalReadiness.primaryWorkspaceAction.label
+            }
+          : null,
+        primaryDownload: operationalReadiness.primaryDownload
+          ? {
+              key: operationalReadiness.primaryDownload.key,
+              format: operationalReadiness.primaryDownload.format
+            }
+          : null,
+        checkCount: Array.isArray(operationalReadiness.checks) ? operationalReadiness.checks.length : 0
+      }, {
+        status: "still_needs_evidence",
+        label: "Still Needs Evidence",
+        readyToOperate: false,
+        blockingCount: 6,
+        blockingOperationCount: 3,
+        watchReady: false,
+        watchCheckInStatus: "waiting_for_runway_evidence",
+        stabilizationStatus: stabilizationHandoffPanel.status,
+        steadyStateStatus: stabilizationHandoffPanel.steadyStateHandoff?.status || null,
+        nextActionKey: "launch_mainline_record_launch_rehearsal_run",
+        nextActionOperation: "record_launch_rehearsal_run",
+        primaryWorkspaceAction: {
+          key: "ops",
+          autofocus: "snapshot",
+          label: "Open Ops Workspace"
+        },
+        primaryDownload: {
+          key: "launch_mainline_rehearsal_guide",
+          format: "rehearsal-guide"
+        },
+        checkCount: 5
+      });
+      assert.ok(operationalReadiness.controls?.some((item) =>
+        item?.label === "Record Operational Readiness Action"
+        && item?.setupAction?.operation === "record_launch_rehearsal_run"
+      ));
+      assert.ok(operationalReadiness.controls?.some((item) =>
+        item?.label === "Download Operational Handoff"
+        && item?.recommendedDownload?.key === "launch_mainline_rehearsal_guide"
+      ));
+      assert.match(launchMainline.summaryText, /Operational Readiness:/);
+      assert.match(launchMainline.summaryText, /- status: still_needs_evidence \| label=Still Needs Evidence \| ready=false/);
       assert.ok(launchMainline.mainlineSummary.heroControls.some((item) =>
         item?.label === "Record Next Runway Evidence"
         && item?.setupAction?.operation === "record_launch_rehearsal_run"
@@ -15686,6 +15747,45 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item?.label === "Download Steady-State Ops Handoff"
       && item?.recommendedDownload?.key === "ops_stabilization_handoff"
     ));
+    const operationalReadiness = launchMainlineTraceability.mainlineSummary.operationalReadiness;
+    assert.ok(operationalReadiness);
+    assert.deepEqual({
+      status: operationalReadiness.status,
+      readyToOperate: operationalReadiness.readyToOperate,
+      watchCheckInStatus: operationalReadiness.watchCheckInStatus,
+      stabilizationStatus: operationalReadiness.stabilizationStatus,
+      steadyStateStatus: operationalReadiness.steadyStateStatus,
+      primaryWorkspaceAction: operationalReadiness.primaryWorkspaceAction
+        ? {
+            key: operationalReadiness.primaryWorkspaceAction.key,
+            autofocus: operationalReadiness.primaryWorkspaceAction.autofocus,
+            label: operationalReadiness.primaryWorkspaceAction.label
+          }
+        : null,
+      supportingDownload: operationalReadiness.supportingDownload
+        ? {
+            key: operationalReadiness.supportingDownload.key,
+            format: operationalReadiness.supportingDownload.format
+          }
+        : null
+    }, {
+      status: "still_needs_evidence",
+      readyToOperate: false,
+      watchCheckInStatus: "waiting_for_runway_evidence",
+      stabilizationStatus: "confirmed",
+      steadyStateStatus: "ready_for_steady_state",
+      primaryWorkspaceAction: {
+        key: "ops",
+        autofocus: "snapshot",
+        label: "Open Steady-State Ops Workspace"
+      },
+      supportingDownload: {
+        key: "ops_stabilization_handoff",
+        format: "stabilization-handoff"
+      }
+    });
+    assert.match(launchMainlineTraceability.summaryText, /Operational Readiness:/);
+    assert.match(launchMainlineTraceability.summaryText, /steadyState=ready_for_steady_state/);
     assert.match(launchMainlineTraceability.summaryText, /Stabilization Handoff Panel:/);
     assert.match(
       launchMainlineTraceability.summaryText,
@@ -18518,13 +18618,20 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Run Routed Operation/);
     assert.match(html, /mainlineHeroControls/);
     assert.match(html, /currentMainlineLaunchRunwayHeroStatus/);
+    assert.match(html, /currentMainlineOperationalReadiness/);
     assert.match(html, /currentMainlineLaunchDayWatchPanel/);
     assert.match(html, /currentMainlineStabilizationHandoffPanel/);
     assert.match(html, /data-mainline-launch-runway-hero-status/);
+    assert.match(html, /mainline-operational-readiness-box/);
     assert.match(html, /mainline-launch-day-watch-box/);
     assert.match(html, /mainline-stabilization-handoff-box/);
+    assert.match(html, /renderOperationalReadiness/);
     assert.match(html, /renderLaunchDayWatchPanel/);
     assert.match(html, /renderStabilizationHandoffPanel/);
+    assert.match(html, /data-mainline-operational-readiness-status/);
+    assert.match(html, /Operational Readiness/);
+    assert.match(html, /Ready to Operate/);
+    assert.match(html, /Still Needs Evidence/);
     assert.match(html, /data-mainline-launch-day-watch-status/);
     assert.match(html, /watchCheckIn/);
     assert.match(html, /Watch Check-In/);

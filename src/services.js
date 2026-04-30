@@ -5387,6 +5387,35 @@ function buildLaunchMainlineActionReceipt({
       || item?.setupAction?.key
       || item?.setupAction?.operation
     );
+  const mainlineOperationalReadiness = launchMainline?.mainlineSummary?.operationalReadiness && typeof launchMainline.mainlineSummary.operationalReadiness === "object"
+    ? {
+        ...launchMainline.mainlineSummary.operationalReadiness,
+        primaryWorkspaceAction: launchMainline.mainlineSummary.operationalReadiness.primaryWorkspaceAction || null,
+        primaryDownload: launchMainline.mainlineSummary.operationalReadiness.primaryDownload || null,
+        supportingDownload: launchMainline.mainlineSummary.operationalReadiness.supportingDownload || null,
+        routeMapDownload: launchMainline.mainlineSummary.operationalReadiness.routeMapDownload || null,
+        checks: Array.isArray(launchMainline.mainlineSummary.operationalReadiness.checks)
+          ? launchMainline.mainlineSummary.operationalReadiness.checks.map((item) => ({
+              key: item?.key || null,
+              label: item?.label || item?.key || "check",
+              status: item?.status || null,
+              summary: item?.summary || "-"
+            })).filter((item) => item.key || item.summary)
+          : [],
+        checklist: Array.isArray(launchMainline.mainlineSummary.operationalReadiness.checklist)
+          ? launchMainline.mainlineSummary.operationalReadiness.checklist.filter((item) => String(item || "").trim() !== "")
+          : [],
+        controls: Array.isArray(launchMainline.mainlineSummary.operationalReadiness.controls)
+          ? launchMainline.mainlineSummary.operationalReadiness.controls.map((control) => ({
+              kind: control?.kind || null,
+              label: control?.label || control?.workspaceAction?.label || control?.recommendedDownload?.label || control?.setupAction?.label || control?.kind || "Action",
+              workspaceAction: control?.workspaceAction || null,
+              recommendedDownload: control?.recommendedDownload || null,
+              setupAction: control?.setupAction || null
+            }))
+          : []
+      }
+    : null;
   const mainlineLaunchDayWatchPanel = launchMainline?.mainlineSummary?.launchDayWatchPanel && typeof launchMainline.mainlineSummary.launchDayWatchPanel === "object"
     ? {
         ...launchMainline.mainlineSummary.launchDayWatchPanel,
@@ -6258,6 +6287,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     heroControls: mainlineHeroControls,
     form: mainlineForm,
     routeFocus: mainlineRouteFocus,
+    operationalReadiness: mainlineOperationalReadiness,
     launchDayWatchPanel: mainlineLaunchDayWatchPanel,
     stabilizationHandoffPanel: mainlineStabilizationHandoffPanel,
     sections: mainlineSections,
@@ -6267,6 +6297,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     heroControls: mainlineView.heroControls,
     form: mainlineForm,
     routeFocus: mainlineRouteFocus,
+    operationalReadiness: mainlineView.operationalReadiness,
     launchDayWatchPanel: mainlineView.launchDayWatchPanel,
     stabilizationHandoffPanel: mainlineView.stabilizationHandoffPanel,
     sections: mainlineView.sections,
@@ -15391,11 +15422,208 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           : []
       }
     : null;
+  const operationalReadiness = (() => {
+    const launchPanel = ensuredLaunchDayWatchPanel;
+    const stabilizationPanel = ensuredStabilizationHandoffPanel;
+    if (!launchPanel && !stabilizationPanel && !launchRunway?.checklistState) {
+      return null;
+    }
+    const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
+      ? launchRunway.checklistState
+      : null;
+    const pendingEvidenceCount = Number(launchPanel?.pendingEvidenceCount ?? checklistState?.pendingEvidenceCount ?? 0);
+    const pendingEvidenceOperationCount = Number(launchPanel?.pendingEvidenceOperationCount ?? checklistState?.pendingEvidenceOperationCount ?? 0);
+    const runwayBlocked = pendingEvidenceCount > 0 || pendingEvidenceOperationCount > 0;
+    const watchReady = launchPanel?.launchDayWatchReady === true || (!runwayBlocked && !!launchPanel);
+    const watchCheckIn = launchPanel?.watchCheckIn && typeof launchPanel.watchCheckIn === "object"
+      ? launchPanel.watchCheckIn
+      : null;
+    const watchCheckInStatus = watchCheckIn?.status || (watchReady ? "ready_for_check_in" : "waiting_for_runway_evidence");
+    const stabilizationStatus = stabilizationPanel?.status || null;
+    const steadyStateHandoff = stabilizationPanel?.steadyStateHandoff && typeof stabilizationPanel.steadyStateHandoff === "object"
+      ? stabilizationPanel.steadyStateHandoff
+      : null;
+    const steadyStateStatus = steadyStateHandoff?.status || null;
+    const stabilizationConfirmed = stabilizationStatus === "confirmed" || stabilizationPanel?.confirmationStatus === "confirmed";
+    const steadyStateReady = steadyStateStatus === "ready_for_steady_state";
+    const status = runwayBlocked
+      ? "still_needs_evidence"
+      : watchCheckInStatus !== "checked_in"
+        ? "needs_watch_check_in"
+        : !stabilizationConfirmed
+          ? "needs_stabilization_handoff"
+          : steadyStateReady
+            ? "ready_to_operate"
+            : "needs_operational_review";
+    const label = status === "ready_to_operate"
+      ? "Ready to Operate"
+      : status === "needs_watch_check_in"
+        ? "Needs Watch Check-In"
+        : status === "needs_stabilization_handoff"
+          ? "Needs Stabilization Handoff"
+          : status === "needs_operational_review"
+            ? "Needs Operational Review"
+            : "Still Needs Evidence";
+    const summary = status === "ready_to_operate"
+      ? "Runway evidence, launch-day watch check-in, stabilization handoff, and steady-state handoff are aligned for operations."
+      : status === "needs_watch_check_in"
+        ? "Runway evidence is complete; record the launch-day watch check-in before stabilization handoff."
+        : status === "needs_stabilization_handoff"
+          ? "Launch-day watch is checked in; complete the stabilization handoff before steady-state operations."
+          : status === "needs_operational_review"
+            ? "Core launch operations are close, but steady-state handoff still needs an operator review."
+            : `Record ${pendingEvidenceCount} remaining runway evidence item${pendingEvidenceCount === 1 ? "" : "s"} across ${pendingEvidenceOperationCount} operation${pendingEvidenceOperationCount === 1 ? "" : "s"} before launch-day watch.`;
+    const nextActionSource = status === "still_needs_evidence"
+      ? launchRunwayNextEvidenceAction
+      : status === "needs_watch_check_in"
+        ? {
+            actionKey: watchCheckIn?.actionKey || "launch_mainline_record_post_launch_ops_sweep",
+            operation: watchCheckIn?.operation || "record_post_launch_ops_sweep",
+            label: "Record First-Wave Ops Sweep",
+            summary: "Capture the first-wave ops sweep check-in before stabilization."
+          }
+        : status === "needs_stabilization_handoff"
+          ? {
+              actionKey: stabilizationPanel?.nextActionKey || null,
+              operation: stabilizationPanel?.nextActionOperation || null,
+              label: "Record Stabilization Next Action",
+              summary: stabilizationPanel?.summary || "Complete the queued stabilization handoff action."
+            }
+          : null;
+    const nextActionOperation = String(
+      nextActionSource?.setupAction?.operation || nextActionSource?.operation || ""
+    ).trim().toLowerCase() || null;
+    const nextActionKey = nextActionSource?.actionKey
+      || nextActionSource?.setupAction?.key
+      || nextActionSource?.key
+      || null;
+    const nextActionSetupAction = nextActionSource?.setupAction && typeof nextActionSource.setupAction === "object"
+      ? nextActionSource.setupAction
+      : nextActionKey && nextActionOperation
+        ? {
+            key: nextActionKey,
+            label: nextActionSource?.label || "Record Operational Readiness Action",
+            summary: nextActionSource?.summary || "Record the next operational readiness action from Launch Mainline.",
+            mode: nextActionOperation.startsWith("record_") ? "evidence" : "recommended",
+            operation: nextActionOperation
+          }
+        : null;
+    const readyWorkspaceAction = steadyStateReady ? steadyStateHandoff?.workspaceAction || null : null;
+    const primaryWorkspaceAction = readyWorkspaceAction
+      || launchPanel?.primaryWorkspaceAction
+      || stabilizationPanel?.primaryWorkspaceAction
+      || createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params);
+    const primaryDownload = status === "still_needs_evidence"
+      ? (nextActionSource?.recommendedDownload || launchPanel?.primaryDownload || stabilizationPanel?.primaryDownload || null)
+      : status === "needs_watch_check_in"
+        ? (watchCheckIn?.primaryHandoffDownload || launchPanel?.primaryDownload || null)
+        : status === "needs_stabilization_handoff"
+          ? (stabilizationPanel?.primaryDownload || launchPanel?.primaryDownload || null)
+          : (steadyStateHandoff?.opsDownload || stabilizationPanel?.primaryDownload || launchPanel?.primaryDownload || null);
+    const supportingDownload = steadyStateHandoff?.opsDownload
+      || stabilizationPanel?.primaryDownload
+      || launchPanel?.primaryDownload
+      || null;
+    const routeMapDownload = steadyStateHandoff?.routeMapDownload || stabilizationPanel?.routeMapDownload || null;
+    const checks = [
+      {
+        key: "runway_evidence",
+        label: "Runway Evidence",
+        status: runwayBlocked ? "blocked" : "ready",
+        summary: runwayBlocked
+          ? `${pendingEvidenceCount} evidence item${pendingEvidenceCount === 1 ? "" : "s"} remain across ${pendingEvidenceOperationCount} operation${pendingEvidenceOperationCount === 1 ? "" : "s"}.`
+          : "Runway evidence is complete."
+      },
+      {
+        key: "launch_day_watch",
+        label: "Launch-Day Watch",
+        status: watchReady ? "ready" : "blocked",
+        summary: launchPanel?.summary || "Launch-day watch state is not available yet."
+      },
+      {
+        key: "watch_check_in",
+        label: "Watch Check-In",
+        status: watchCheckInStatus,
+        summary: watchCheckIn?.recordedAt
+          ? `Recorded at ${watchCheckIn.recordedAt}.`
+          : "First-wave ops sweep check-in is still open."
+      },
+      {
+        key: "stabilization_handoff",
+        label: "Stabilization Handoff",
+        status: stabilizationStatus || "not_ready",
+        summary: stabilizationPanel?.summary || "Stabilization handoff is not available yet."
+      },
+      {
+        key: "steady_state_handoff",
+        label: "Steady-State Handoff",
+        status: steadyStateStatus || "not_ready",
+        summary: steadyStateReady
+          ? "Steady-state handoff is ready for Developer Ops monitoring."
+          : "Steady-state handoff waits on stabilization confirmation."
+      }
+    ];
+    const checklist = [
+      "Clear all staging archive runway evidence before launch-day watch.",
+      "Record the first-wave ops sweep check-in after production sign-off.",
+      "Confirm stabilization handoff in Developer Ops.",
+      "Keep the steady-state ops handoff and route map attached for monitoring."
+    ];
+    const controls = dedupeSummaryPanelControls([
+      nextActionSetupAction ? {
+        kind: "setup",
+        label: "Record Operational Readiness Action",
+        setupAction: nextActionSetupAction
+      } : null,
+      primaryWorkspaceAction ? {
+        kind: "workspace",
+        label: status === "ready_to_operate" ? "Open Ready-to-Operate Workspace" : "Open Operational Workspace",
+        workspaceAction: primaryWorkspaceAction
+      } : null,
+      primaryDownload ? {
+        kind: "download",
+        label: "Download Operational Handoff",
+        recommendedDownload: primaryDownload
+      } : null,
+      supportingDownload && supportingDownload.key !== primaryDownload?.key ? {
+        kind: "download",
+        label: "Download Supporting Operational Handoff",
+        recommendedDownload: supportingDownload
+      } : null,
+      routeMapDownload && routeMapDownload.key !== primaryDownload?.key && routeMapDownload.key !== supportingDownload?.key ? {
+        kind: "download",
+        label: "Download Operational Route Map",
+        recommendedDownload: routeMapDownload
+      } : null
+    ].filter(Boolean)).map((item) => ensureLaunchMainlineControlHrefs(item, params));
+    return {
+      status,
+      label,
+      summary,
+      readyToOperate: status === "ready_to_operate",
+      blockingCount: pendingEvidenceCount,
+      blockingOperationCount: pendingEvidenceOperationCount,
+      watchReady,
+      watchCheckInStatus,
+      stabilizationStatus,
+      steadyStateStatus,
+      nextActionKey,
+      nextActionOperation,
+      primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(primaryWorkspaceAction, params),
+      primaryDownload: ensureLaunchWorkflowDownloadHref(primaryDownload, params),
+      supportingDownload: ensureLaunchWorkflowDownloadHref(supportingDownload, params),
+      routeMapDownload: ensureLaunchWorkflowDownloadHref(routeMapDownload, params),
+      checks,
+      checklist,
+      controls
+    };
+  })();
   const mainlineView = {
     heroControls: screen.heroControls,
     form,
     routeFocus,
     sections: screen.sections,
+    operationalReadiness,
     launchDayWatchPanel: ensuredLaunchDayWatchPanel,
     stabilizationHandoffPanel: ensuredStabilizationHandoffPanel,
     lastActionScreen: {
@@ -15407,6 +15635,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     form,
     routeFocus,
     sections: mainlineView.sections,
+    operationalReadiness: mainlineView.operationalReadiness,
     launchDayWatchPanel: mainlineView.launchDayWatchPanel,
     stabilizationHandoffPanel: mainlineView.stabilizationHandoffPanel,
     lastActionScreen: mainlineView.lastActionScreen,
@@ -15428,6 +15657,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
     launchRunway,
+    operationalReadiness,
     launchDayWatchPanel: ensuredLaunchDayWatchPanel,
     stabilizationHandoffPanel: ensuredStabilizationHandoffPanel,
     continuation,
@@ -15572,6 +15802,54 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
         + `${item.evidenceRecordedAt ? ` | evidenceRecordedAt=${item.evidenceRecordedAt}` : ""}`
       );
     }
+  }
+  return true;
+}
+
+function appendOperationalReadinessTextLines(lines = [], operationalReadiness = null, formatWorkspaceActionText = (value) => value || "-") {
+  if (!Array.isArray(lines) || !operationalReadiness || typeof operationalReadiness !== "object") {
+    return false;
+  }
+  lines.push("");
+  lines.push("Operational Readiness:");
+  lines.push(
+    `- status: ${operationalReadiness.status || "-"}`
+    + ` | label=${operationalReadiness.label || "-"}`
+    + ` | ready=${operationalReadiness.readyToOperate === true}`
+  );
+  lines.push(`- summary: ${operationalReadiness.summary || "-"}`);
+  lines.push(
+    `- blockers: evidence=${Number(operationalReadiness.blockingCount || 0)}`
+    + ` | operations=${Number(operationalReadiness.blockingOperationCount || 0)}`
+    + ` | watchReady=${operationalReadiness.watchReady === true}`
+    + ` | watchCheckIn=${operationalReadiness.watchCheckInStatus || "-"}`
+    + ` | stabilization=${operationalReadiness.stabilizationStatus || "-"}`
+    + ` | steadyState=${operationalReadiness.steadyStateStatus || "-"}`
+  );
+  if (operationalReadiness.nextActionKey || operationalReadiness.nextActionOperation) {
+    lines.push(`- nextAction: ${operationalReadiness.nextActionKey || "-"} | operation=${operationalReadiness.nextActionOperation || "-"}`);
+  }
+  lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(operationalReadiness.primaryWorkspaceAction)}`);
+  lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(operationalReadiness.primaryDownload, { fileSeparator: " | " })}`);
+  if (operationalReadiness.supportingDownload) {
+    lines.push(`- supportingDownload: ${formatLaunchHandoffDownloadText(operationalReadiness.supportingDownload, { fileSeparator: " | " })}`);
+  }
+  if (operationalReadiness.routeMapDownload) {
+    lines.push(`- routeMapDownload: ${formatLaunchHandoffDownloadText(operationalReadiness.routeMapDownload, { fileSeparator: " | " })}`);
+  }
+  for (const check of Array.isArray(operationalReadiness.checks) ? operationalReadiness.checks : []) {
+    lines.push(`- check: ${check?.key || "-"} | ${check?.status || "-"} | ${check?.summary || "-"}`);
+  }
+  for (const item of Array.isArray(operationalReadiness.checklist) ? operationalReadiness.checklist : []) {
+    lines.push(`- checklist: ${item}`);
+  }
+  for (const control of Array.isArray(operationalReadiness.controls) ? operationalReadiness.controls : []) {
+    lines.push(
+      `- control: ${control?.label || control?.kind || "Action"}`
+      + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+      + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
+      + `${control?.setupAction ? ` | setup=${control.setupAction.label || control.setupAction.key || "-"}@${control.setupAction.mode || "recommended"}:${control.setupAction.operation || "-"}` : ""}`
+    );
   }
   return true;
 }
@@ -15929,6 +16207,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       );
     }
   }
+  appendOperationalReadinessTextLines(lines, mainlineSummary.operationalReadiness, formatWorkspaceActionText);
   appendLaunchDayWatchPanelTextLines(lines, mainlineSummary.launchDayWatchPanel, formatWorkspaceActionText);
   appendStabilizationHandoffPanelTextLines(lines, mainlineSummary.stabilizationHandoffPanel, formatWorkspaceActionText);
   appendMainlineLaunchRunwayTextLines(lines, mainlineSummary.launchRunway);

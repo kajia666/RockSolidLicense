@@ -4332,7 +4332,18 @@
         }
         const download = initialLaunchOpsReadiness.stagingLaunchDutyArchiveDownload || {};
         const files = item.files || {};
-        const packetFiles = Array.isArray(item.packetFiles) ? item.packetFiles.slice(0, 4) : [];
+        const packetFiles = Array.isArray(item.packetFiles) ? item.packetFiles.slice(0, 6) : [];
+        const packetCompleteness = item.packetCompleteness || {};
+        const packetCompletenessStatus = String(packetCompleteness.status || "unknown").toLowerCase();
+        const expectedPacketCount = Number.isFinite(Number(packetCompleteness.expectedCount))
+          ? Number(packetCompleteness.expectedCount)
+          : packetFiles.length;
+        const listedPacketCount = Number.isFinite(Number(packetCompleteness.listedCount))
+          ? Number(packetCompleteness.listedCount)
+          : packetFiles.filter((packet) => String(packet.path || "").trim()).length;
+        const missingPacketKeys = Array.isArray(packetCompleteness.missingKeys) && packetCompleteness.missingKeys.length
+          ? packetCompleteness.missingKeys.join(", ")
+          : "-";
         const status = String(item.status || "unknown").toLowerCase();
         const downloadHref = String(download.href || "").trim();
         const downloadFileName = download.fileName || "developer-ops-staging-launch-duty-archive.txt";
@@ -4350,6 +4361,11 @@
           `dryRun=${esc(item.commands?.profileDrivenDryRun || "-")}`,
           `fullTest=${esc(item.commands?.fullTestWindow || "-")}`
         ].join(" | ");
+        const completenessDetails = [
+          `Packet Completeness: ${esc(packetCompletenessStatus.toUpperCase())}`,
+          `${esc(String(listedPacketCount))}/${esc(String(expectedPacketCount))}`,
+          `missing=${esc(missingPacketKeys)}`
+        ].join(" | ");
         return `
           <div class="snapshot-recap staging-launch-duty-archive">
             <div class="snapshot-recap-head">
@@ -4358,6 +4374,7 @@
             </div>
             <div class="hint">Backend/API bridge for the staging archive index and launch-duty packet paths before the full test window.</div>
             <div class="snapshot-focus-meta">${fileDetails}</div>
+            <div class="snapshot-focus-meta" data-staging-packet-completeness-status="${esc(packetCompletenessStatus)}">${completenessDetails}</div>
             <div class="snapshot-focus-meta">${commandDetails}</div>
             <div class="snapshot-recap-actions">
               <button type="button" class="snapshot-inline-button" data-staging-launch-duty-archive-action="download-archive" ${actionAttrs} ${(token && downloadHref) ? "" : "disabled"}>Download Staging Archive</button>

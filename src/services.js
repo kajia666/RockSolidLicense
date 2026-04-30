@@ -17866,6 +17866,24 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
     ["readiness_review_packet", files.readinessReviewPacket],
     ["production_signoff_packet", files.productionSignoffPacket]
   ].map(([key, path]) => ({ key, path }));
+  const requiredPacketKeys = packetFiles.map((item) => item.key);
+  const presentPacketKeys = packetFiles
+    .filter((item) => String(item.path || "").trim())
+    .map((item) => item.key);
+  const missingPacketKeys = requiredPacketKeys.filter((key) => !presentPacketKeys.includes(key));
+  const packetCompleteness = {
+    mode: "staging-launch-duty-packet-completeness",
+    status: missingPacketKeys.length ? "missing_packets" : "complete",
+    expectedCount: requiredPacketKeys.length,
+    listedCount: presentPacketKeys.length,
+    missingCount: missingPacketKeys.length,
+    requiredKeys: requiredPacketKeys,
+    presentKeys: presentPacketKeys,
+    missingKeys: missingPacketKeys,
+    nextAction: missingPacketKeys.length
+      ? `Fill the missing packet paths before closeout reload: ${missingPacketKeys.join(", ")}.`
+      : "Archive the six listed packet files before closeout reload, then keep the archive index beside them for launch readiness review."
+  };
   const profileDrivenArgs = [
     "--profile-file", profileFile,
     "--product-code", productCode,
@@ -17890,6 +17908,7 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
     profileFile,
     files,
     packetFiles,
+    packetCompleteness,
     commands: {
       profileDrivenDryRun: `npm.cmd run staging:rehearsal -- ${profileDrivenArgs.join(" ")}`,
       closeoutReload: `npm.cmd run staging:rehearsal -- --profile-file ${profileFile} --product-code ${productCode} --channel ${channel} --closeout-input-file ${files.filledCloseoutInput}`,
@@ -17910,6 +17929,21 @@ function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = n
   lines.push("- Packet Files:");
   for (const item of Array.isArray(archive.packetFiles) ? archive.packetFiles : []) {
     lines.push(`  - ${item.key || "-"}: ${item.path || "-"}`);
+  }
+  const packetCompleteness = archive.packetCompleteness || null;
+  if (packetCompleteness && typeof packetCompleteness === "object") {
+    const expectedCount = Number.isFinite(Number(packetCompleteness.expectedCount))
+      ? Number(packetCompleteness.expectedCount)
+      : 0;
+    const listedCount = Number.isFinite(Number(packetCompleteness.listedCount))
+      ? Number(packetCompleteness.listedCount)
+      : 0;
+    const missingKeys = Array.isArray(packetCompleteness.missingKeys) && packetCompleteness.missingKeys.length
+      ? packetCompleteness.missingKeys.join(", ")
+      : "-";
+    lines.push(`- Packet Completeness: ${packetCompleteness.status || "-"} (${listedCount}/${expectedCount})`);
+    lines.push(`- Missing Packet Keys: ${missingKeys}`);
+    lines.push(`- Next Packet Action: ${packetCompleteness.nextAction || "-"}`);
   }
   lines.push("- Commands:");
   lines.push(`  - profileDrivenDryRun: ${archive.commands?.profileDrivenDryRun || "-"}`);
@@ -21293,6 +21327,19 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | archiveRoot=${stagingArchive.archiveRoot || "-"}`
         + ` | launchDutyArchiveIndex=${stagingArchive.files?.launchDutyArchiveIndex || "-"}`
       );
+      const packetCompleteness = stagingArchive.packetCompleteness || null;
+      if (packetCompleteness && typeof packetCompleteness === "object") {
+        const expectedCount = Number.isFinite(Number(packetCompleteness.expectedCount))
+          ? Number(packetCompleteness.expectedCount)
+          : 0;
+        const listedCount = Number.isFinite(Number(packetCompleteness.listedCount))
+          ? Number(packetCompleteness.listedCount)
+          : 0;
+        const missingKeys = Array.isArray(packetCompleteness.missingKeys) && packetCompleteness.missingKeys.length
+          ? packetCompleteness.missingKeys.join(",")
+          : "-";
+        lines.push(`- packetCompleteness=${packetCompleteness.status || "-"} | listed=${listedCount}/${expectedCount} | missing=${missingKeys}`);
+      }
       lines.push(`- command=${stagingArchive.commands?.profileDrivenDryRun || "-"}`);
     }
   }

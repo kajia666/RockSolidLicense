@@ -13885,6 +13885,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ["production_signoff_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-production-signoff-packet.json"]
       ]
     );
+    assert.equal(stagingLaunchDutyArchive.packetCompleteness.mode, "staging-launch-duty-packet-completeness");
+    assert.equal(stagingLaunchDutyArchive.packetCompleteness.status, "complete");
+    assert.equal(stagingLaunchDutyArchive.packetCompleteness.expectedCount, 6);
+    assert.equal(stagingLaunchDutyArchive.packetCompleteness.listedCount, 6);
+    assert.equal(stagingLaunchDutyArchive.packetCompleteness.missingCount, 0);
+    assert.deepEqual(stagingLaunchDutyArchive.packetCompleteness.missingKeys, []);
+    assert.deepEqual(
+      stagingLaunchDutyArchive.packetCompleteness.presentKeys,
+      ["run_record_index", "artifact_manifest", "backup_restore_packet", "closeout_reload_packet", "readiness_review_packet", "production_signoff_packet"]
+    );
+    assert.match(stagingLaunchDutyArchive.packetCompleteness.nextAction, /Archive the six listed packet files before closeout reload/i);
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /npm\.cmd run staging:rehearsal/);
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--product-code EXPORT_ALPHA/);
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--channel stable/);
@@ -14130,6 +14141,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /Staging Launch-Duty Archive:/);
     assert.match(launchReceiptSnapshot.summaryText, /archiveRoot=artifacts\/staging\/EXPORT_ALPHA\/stable/);
     assert.match(launchReceiptSnapshot.summaryText, /launchDutyArchiveIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(launchReceiptSnapshot.summaryText, /packetCompleteness=complete \| listed=6\/6 \| missing=-/);
     assert.match(launchReceiptSnapshot.summaryText, /Launch Duty Action Order:/);
     assert.match(launchReceiptSnapshot.summaryText, /Staging archive -> Launch readiness -> Next follow-up/);
     assert.match(launchReceiptSnapshot.summaryText, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
@@ -14324,6 +14336,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /Status: awaiting_staging_archive_index/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Archive Root: artifacts\/staging\/EXPORT_ALPHA\/stable/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Packet Completeness: complete \(6\/6\)/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Missing Packet Keys: -/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Next Packet Action: Archive the six listed packet files before closeout reload/);
     assert.match(initialLaunchOpsReadinessDownload.body, /backup_restore_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json/);
     assert.match(initialLaunchOpsReadinessDownload.body, /production_signoff_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(initialLaunchOpsReadinessDownload.body, /profileDrivenDryRun: npm\.cmd run staging:rehearsal/);
@@ -14349,6 +14364,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(stagingLaunchDutyArchiveDownload.body, /Archive Root: artifacts\/staging\/EXPORT_ALPHA\/stable/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Packet Completeness: complete \(6\/6\)/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Missing Packet Keys: -/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Next Packet Action: Archive the six listed packet files before closeout reload/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /run_record_index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /backup_restore_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /readiness_review_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-readiness-review-packet\.json/);
@@ -18529,6 +18547,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-launch-duty-step-key/);
     assert.match(html, /staging-launch-duty-archive/);
     assert.match(html, /renderStagingLaunchDutyArchive/);
+    assert.match(html, /packetCompleteness/);
+    assert.match(html, /Packet Completeness/);
+    assert.match(html, /data-staging-packet-completeness-status/);
     assert.match(html, /data-staging-launch-duty-archive-action="download-archive"/);
     assert.match(html, /data-staging-archive-download-href/);
     assert.match(html, /stabilization-handoff/);

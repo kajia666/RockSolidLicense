@@ -14477,6 +14477,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /launch-mainline-handoff-routes\.txt/);
     assert.match(handoffIndexDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
 
+    const launchReceiptBackfillStatusDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=launch-receipt-backfill-status",
+      operatorSession.token
+    );
+    assert.equal(launchReceiptBackfillStatusDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchReceiptBackfillStatusDownload.contentDisposition || "", /launch-receipt-backfill-status\.txt/);
+    assert.match(launchReceiptBackfillStatusDownload.body, /RockSolid Developer Ops Launch Receipt Backfill Status/);
+    assert.match(launchReceiptBackfillStatusDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(launchReceiptBackfillStatusDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(launchReceiptBackfillStatusDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(launchReceiptBackfillStatusDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
+
     const opsLaunchMainlineRouteMapDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&format=launch-mainline-handoff-routes",

@@ -13479,6 +13479,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations
       : null)
     || null;
+  const stagingLaunchDutyArchive = initialLaunchOpsReadiness?.stagingLaunchDutyArchive && typeof initialLaunchOpsReadiness.stagingLaunchDutyArchive === "object"
+    ? initialLaunchOpsReadiness.stagingLaunchDutyArchive
+    : null;
   const stagingArchiveLaunchRunway = stagingArchiveNextOperations?.launchRunway && typeof stagingArchiveNextOperations.launchRunway === "object"
     ? stagingArchiveNextOperations.launchRunway
     : null;
@@ -13519,6 +13522,71 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       value: stagingArchiveNextOperations?.productionSignoffPacket
     })
   ].filter(Boolean);
+  const buildLaunchRunwayChecklistItem = ({
+    key = "",
+    label = "",
+    gate = "",
+    kind = "text",
+    value = "",
+    required = true
+  } = {}) => {
+    const normalizedValue = String(value || "").trim();
+    if (!key || !normalizedValue) {
+      return null;
+    }
+    return {
+      key,
+      label: label || key,
+      gate: gate || "review",
+      kind,
+      required: required !== false,
+      value: normalizedValue
+    };
+  };
+  const launchRunwayOperatorChecklist = [
+    buildLaunchRunwayChecklistItem({
+      key: "profile_driven_dry_run",
+      label: "Run profile-driven staging dry run",
+      gate: "before_closeout_reload",
+      kind: "command",
+      value: stagingLaunchDutyArchive?.commands?.profileDrivenDryRun
+    }),
+    buildLaunchRunwayChecklistItem({
+      key: "filled_closeout_input",
+      label: "Confirm filled closeout input",
+      gate: "closeout_reload",
+      kind: "artifact_path",
+      value: stagingLaunchDutyArchive?.files?.filledCloseoutInput
+    }),
+    buildLaunchRunwayChecklistItem({
+      key: "closeout_reload",
+      label: "Reload closeout input",
+      gate: "closeout_reload",
+      kind: "command",
+      value: stagingArchiveNextOperations?.closeoutReload
+    }),
+    buildLaunchRunwayChecklistItem({
+      key: "full_test_window",
+      label: "Run guarded full test window",
+      gate: "full_test_window",
+      kind: "command",
+      value: stagingArchiveNextOperations?.fullTestWindow
+    }),
+    buildLaunchRunwayChecklistItem({
+      key: "production_signoff_packet",
+      label: "Review production sign-off packet",
+      gate: "production_signoff",
+      kind: "artifact_path",
+      value: stagingArchiveNextOperations?.productionSignoffPacket
+    }),
+    buildLaunchRunwayChecklistItem({
+      key: "launch_day_watch_entry",
+      label: "Enter launch-day watch",
+      gate: "launch_day_watch",
+      kind: "watch_entry",
+      value: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff"
+    })
+  ].filter(Boolean);
   const launchRunway = stagingArchiveNextOperations || stagingArchiveLaunchRunway || launchRunwayCopyActions.length
     ? {
         source: "developer-ops-launch-duty-action-order",
@@ -13530,7 +13598,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           ? stagingArchiveLaunchRunway.sequence
           : ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
         nextAction: stagingArchiveNextOperations?.nextAction || null,
-        copyActions: launchRunwayCopyActions
+        copyActions: launchRunwayCopyActions,
+        operatorChecklist: launchRunwayOperatorChecklist
       }
     : null;
   const productionHandoffDownload = createLaunchMainlineDownloadShortcut(
@@ -14701,6 +14770,13 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
   }
   for (const item of Array.isArray(launchRunway.copyActions) ? launchRunway.copyActions : []) {
     lines.push(`- action=${item.label || item.key || "-"} | kind=${item.kind || "text"} | value=${item.value || "-"}`);
+  }
+  const checklist = Array.isArray(launchRunway.operatorChecklist) ? launchRunway.operatorChecklist : [];
+  if (checklist.length) {
+    lines.push("Mainline Launch Runway Checklist:");
+    for (const item of checklist) {
+      lines.push(`- checklist=${item.key || "-"} | gate=${item.gate || "-"} | kind=${item.kind || "text"} | value=${item.value || "-"}`);
+    }
   }
   return true;
 }

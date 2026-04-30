@@ -1033,6 +1033,14 @@
         const closeoutReload = String(nextOperations?.closeoutReload || "").trim();
         const fullTestWindow = String(nextOperations?.fullTestWindow || "").trim();
         const productionSignoffPacket = String(nextOperations?.productionSignoffPacket || "").trim();
+        const operatorChecklist = Array.isArray(launchRunway?.operatorChecklist) ? launchRunway.operatorChecklist : [];
+        const checklistMarkup = operatorChecklist.length
+          ? `
+            <div class="hint" data-mainline-launch-runway-checklist="operator-checklist">
+              ${operatorChecklist.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "Checklist item")} | gate=${esc(item.gate || "-")} | kind=${esc(item.kind || "text")} | value=${esc(item.value || "-")}`).join("<br>")}
+            </div>
+          `
+          : "";
         const tags = [
           currentGate ? { label: "gate", value: currentGate, strong: true } : null,
           actionOrder?.status ? { label: "status", value: actionOrder.status, strong: false } : null,
@@ -1049,6 +1057,7 @@
               ${esc(sequence || "closeout_reload -> full_test_window -> production_signoff -> launch_day_watch")}
             </div>
             <div class="hint">Current Gate: ${esc(currentGate || "-")} | Launch-Day Watch Entry: ${esc(watchEntry || "-")}</div>
+            ${checklistMarkup}
             <div class="actions">
               <button type="button" class="secondary" data-mainline-launch-runway-action="copy-closeout-reload" data-mainline-launch-runway-copy-label="Copy Closeout Reload" data-mainline-launch-runway-copy-value="${esc(closeoutReload)}" ${closeoutReload ? "" : "disabled"}>Copy Closeout Reload</button>
               <button type="button" class="secondary" data-mainline-launch-runway-action="copy-full-test-window" data-mainline-launch-runway-copy-label="Copy Full Test Window" data-mainline-launch-runway-copy-value="${esc(fullTestWindow)}" ${fullTestWindow ? "" : "disabled"}>Copy Full Test Window</button>

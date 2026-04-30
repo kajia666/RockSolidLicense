@@ -1037,6 +1037,9 @@
         const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
           ? launchRunway.checklistState
           : null;
+        const nextEvidenceAction = checklistState?.nextEvidenceAction && typeof checklistState.nextEvidenceAction === "object"
+          ? checklistState.nextEvidenceAction
+          : null;
         const checklistStateMarkup = checklistState
           ? `
             <div class="hint" data-mainline-launch-runway-checklist-state="${esc(checklistState.status || "-")}">
@@ -1049,6 +1052,9 @@
               | recordedEvidenceOperations=${esc(checklistState.recordedEvidenceOperationCount ?? "-")}
               | pendingEvidenceOperations=${esc(checklistState.pendingEvidenceOperationCount ?? "-")}
               | nextPendingEvidenceOperation=${esc(checklistState.nextPendingEvidenceOperation || "-")}
+              | nextEvidenceAction=${esc(nextEvidenceAction?.actionKey || "-")}
+              | download=${esc(nextEvidenceAction?.downloadKey || "-")}
+              | downloadFormat=${esc(nextEvidenceAction?.downloadFormat || "-")}
               ${Array.isArray(checklistState.evidenceOperations) && checklistState.evidenceOperations.length
                 ? `<br>${checklistState.evidenceOperations.map((item) => `evidenceOperation=${esc(item.operation || "-")} | status=${esc(item.status || "-")} | items=${esc(item.itemCount ?? "-")} | recordedAt=${esc(item.recordedAt || "-")}`).join("<br>")}`
                 : ""}

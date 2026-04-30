@@ -13654,6 +13654,67 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       evidenceOperation: "record_post_launch_ops_sweep"
     })
   ].filter(Boolean);
+  const buildLaunchRunwayNextEvidenceAction = (operation = "") => {
+    const normalizedOperation = String(operation || "").trim();
+    const descriptors = {
+      record_launch_rehearsal_run: {
+        actionKey: "launch_mainline_record_launch_rehearsal_run",
+        label: "Record Launch Rehearsal Run",
+        summary: "Capture a realistic end-to-end launch rehearsal run for this lane before rollout.",
+        downloadLabel: "Launch mainline rehearsal guide",
+        downloadFileName: "developer-launch-mainline-rehearsal-guide.txt",
+        downloadFormat: "rehearsal-guide"
+      },
+      record_launch_day_readiness_review: {
+        actionKey: "launch_mainline_record_launch_day_readiness_review",
+        label: "Record Launch Day Readiness Review",
+        summary: "Capture a fresh launch-day readiness review before entering production sign-off and watch.",
+        downloadLabel: "Launch mainline operations handoff",
+        downloadFileName: "developer-launch-mainline-operations-handoff.txt",
+        downloadFormat: "operations-handoff"
+      },
+      record_post_launch_ops_sweep: {
+        actionKey: "launch_mainline_record_post_launch_ops_sweep",
+        label: "Record First-Wave Ops Sweep",
+        summary: "Capture the first-wave ops sweep before handing the lane into closeout and stabilization.",
+        downloadLabel: "Launch mainline post-launch sweep handoff",
+        downloadFileName: "developer-launch-mainline-post-launch-sweep-handoff.txt",
+        downloadFormat: "post-launch-sweep-handoff"
+      }
+    };
+    const descriptor = descriptors[normalizedOperation];
+    if (!descriptor) {
+      return null;
+    }
+    const setupAction = createLaunchWorkflowSetupAction({
+      key: descriptor.actionKey,
+      label: descriptor.label,
+      summary: descriptor.summary,
+      mode: "evidence",
+      operation: normalizedOperation
+    });
+    const recommendedDownload = ensureLaunchWorkflowDownloadHref(
+      createLaunchMainlineDownloadShortcut(
+        descriptor.downloadLabel,
+        descriptor.downloadFileName,
+        descriptor.downloadFormat,
+        params
+      ),
+      params
+    );
+    return {
+      operation: normalizedOperation,
+      actionKey: setupAction?.key || descriptor.actionKey,
+      label: setupAction?.label || descriptor.label,
+      summary: setupAction?.summary || descriptor.summary,
+      mode: setupAction?.mode || "evidence",
+      downloadKey: recommendedDownload?.key || null,
+      downloadFormat: recommendedDownload?.format || descriptor.downloadFormat,
+      downloadHref: recommendedDownload?.href || null,
+      setupAction,
+      recommendedDownload
+    };
+  };
   const buildLaunchRunwayChecklistState = (items = []) => {
     const checklist = Array.isArray(items) ? items : [];
     const pendingEvidenceItems = checklist.filter((item) =>
@@ -13685,6 +13746,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     const recordedEvidenceOperationCount = evidenceOperations.filter((item) => item.status === "recorded").length;
     const pendingEvidenceOperationCount = evidenceOperations.filter((item) => item.status !== "recorded").length;
     const nextPendingEvidence = pendingEvidenceItems[0] || null;
+    const nextEvidenceAction = buildLaunchRunwayNextEvidenceAction(nextPendingEvidence?.evidenceOperation || "");
     const recordedEvidenceCount = checklist.filter((item) =>
       String(item?.evidenceStatus || "").trim().toLowerCase() === "recorded"
     ).length;
@@ -13703,6 +13765,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       nextPendingEvidenceKey: nextPendingEvidence?.key || null,
       nextPendingEvidenceOperation: nextPendingEvidence?.evidenceOperation || null,
       nextPendingEvidenceLabel: nextPendingEvidence?.evidenceLabel || null,
+      nextEvidenceAction,
       evidenceOperations
     };
   };
@@ -14913,6 +14976,20 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
         `- nextPendingEvidence: ${checklistState.nextPendingEvidenceKey || "-"}`
         + ` | operation=${checklistState.nextPendingEvidenceOperation || "-"}`
         + ` | label=${checklistState.nextPendingEvidenceLabel || "-"}`
+      );
+    }
+    const nextEvidenceAction = checklistState.nextEvidenceAction && typeof checklistState.nextEvidenceAction === "object"
+      ? checklistState.nextEvidenceAction
+      : null;
+    if (nextEvidenceAction) {
+      const nextEvidenceActionDownload = nextEvidenceAction.recommendedDownload && typeof nextEvidenceAction.recommendedDownload === "object"
+        ? nextEvidenceAction.recommendedDownload
+        : null;
+      lines.push(
+        `- nextEvidenceAction: operation=${nextEvidenceAction.operation || "-"}`
+        + ` | action=${nextEvidenceAction.actionKey || nextEvidenceAction.setupAction?.key || "-"}`
+        + ` | download=${nextEvidenceAction.downloadKey || nextEvidenceActionDownload?.key || "-"}`
+        + `${nextEvidenceAction.downloadHref || nextEvidenceActionDownload?.href ? ` | href=${nextEvidenceAction.downloadHref || nextEvidenceActionDownload?.href}` : ""}`
       );
     }
     for (const item of Array.isArray(checklistState.evidenceOperations) ? checklistState.evidenceOperations : []) {

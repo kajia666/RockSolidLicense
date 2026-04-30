@@ -6560,7 +6560,20 @@ test("developer release package export bundles integration, versions, and notice
           ["launch_day_watch_entry", "queued_after_signoff", "enter_watch", "record_post_launch_ops_sweep"]
         ]
       );
-      assert.deepEqual(mainlineLaunchRunway.checklistState, {
+      const launchRunwayChecklistState = mainlineLaunchRunway.checklistState;
+      const launchRunwayNextEvidenceAction = launchRunwayChecklistState?.nextEvidenceAction || null;
+      assert.deepEqual({
+        ...launchRunwayChecklistState,
+        nextEvidenceAction: launchRunwayNextEvidenceAction
+          ? {
+              operation: launchRunwayNextEvidenceAction.operation,
+              actionKey: launchRunwayNextEvidenceAction.actionKey,
+              label: launchRunwayNextEvidenceAction.label,
+              downloadKey: launchRunwayNextEvidenceAction.downloadKey,
+              downloadFormat: launchRunwayNextEvidenceAction.downloadFormat
+            }
+          : null
+      }, {
         status: "pending_evidence",
         totalCount: 6,
         requiredCount: 6,
@@ -6574,6 +6587,13 @@ test("developer release package export bundles integration, versions, and notice
         nextPendingEvidenceKey: "profile_driven_dry_run",
         nextPendingEvidenceOperation: "record_launch_rehearsal_run",
         nextPendingEvidenceLabel: "Launch Rehearsal Run",
+        nextEvidenceAction: {
+          operation: "record_launch_rehearsal_run",
+          actionKey: "launch_mainline_record_launch_rehearsal_run",
+          label: "Record Launch Rehearsal Run",
+          downloadKey: "launch_mainline_rehearsal_guide",
+          downloadFormat: "rehearsal-guide"
+        },
         evidenceOperations: [
           {
             operation: "record_launch_rehearsal_run",
@@ -6598,6 +6618,11 @@ test("developer release package export bundles integration, versions, and notice
           }
         ]
       });
+      assert.match(launchRunwayNextEvidenceAction?.downloadHref || "", /format=rehearsal-guide/);
+      assert.equal(
+        launchRunwayNextEvidenceAction?.recommendedDownload?.href,
+        launchRunwayNextEvidenceAction?.downloadHref
+      );
       assert.match(
         mainlineLaunchRunway.operatorChecklist.find((item) => item.key === "profile_driven_dry_run")?.value || "",
         /npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable/
@@ -6647,6 +6672,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- status: pending_evidence/);
       assert.match(launchMainline.summaryText, /- counts: total=6 \| required=6 \| ready=5 \| queued=1 \| recordedEvidence=0 \| pendingEvidence=6 \| recordedEvidenceOperations=0 \| pendingEvidenceOperations=3/);
       assert.match(launchMainline.summaryText, /- nextPendingEvidence: profile_driven_dry_run \| operation=record_launch_rehearsal_run \| label=Launch Rehearsal Run/);
+      assert.match(launchMainline.summaryText, /- nextEvidenceAction: operation=record_launch_rehearsal_run \| action=launch_mainline_record_launch_rehearsal_run \| download=launch_mainline_rehearsal_guide \| href=.*format=rehearsal-guide/);
       assert.match(launchMainline.summaryText, /- evidenceOperation=record_launch_day_readiness_review \| status=pending \| items=4 \| recordedAt=-/);
       assert.match(launchMainline.summaryText, /Mainline Launch Runway Checklist:/);
       assert.match(launchMainline.summaryText, /- checklist=profile_driven_dry_run \| gate=before_closeout_reload \| kind=command \| value=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable/);
@@ -6719,6 +6745,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway Checklist State:/);
       assert.match(launchMainlineSummaryDownload.body, /pendingEvidence=6/);
       assert.match(launchMainlineSummaryDownload.body, /pendingEvidenceOperations=3/);
+      assert.match(launchMainlineSummaryDownload.body, /nextEvidenceAction: operation=record_launch_rehearsal_run \| action=launch_mainline_record_launch_rehearsal_run \| download=launch_mainline_rehearsal_guide/);
       assert.match(launchMainlineSummaryDownload.body, /evidenceOperation=record_post_launch_ops_sweep \| status=pending \| items=1 \| recordedAt=-/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway Checklist:/);
       assert.match(launchMainlineSummaryDownload.body, /profile_driven_dry_run/);
@@ -13858,6 +13885,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOpsRunwayState?.pendingEvidenceCount, 5);
     assert.equal(launchOpsRunwayState?.recordedEvidenceOperationCount, 1);
     assert.equal(launchOpsRunwayState?.pendingEvidenceOperationCount, 2);
+    const launchOpsRunwayNextEvidenceAction = launchOpsRunwayState?.nextEvidenceAction || null;
+    assert.deepEqual({
+      operation: launchOpsRunwayNextEvidenceAction?.operation || null,
+      actionKey: launchOpsRunwayNextEvidenceAction?.actionKey || null,
+      label: launchOpsRunwayNextEvidenceAction?.label || null,
+      downloadKey: launchOpsRunwayNextEvidenceAction?.downloadKey || null,
+      downloadFormat: launchOpsRunwayNextEvidenceAction?.downloadFormat || null
+    }, {
+      operation: "record_launch_rehearsal_run",
+      actionKey: "launch_mainline_record_launch_rehearsal_run",
+      label: "Record Launch Rehearsal Run",
+      downloadKey: "launch_mainline_rehearsal_guide",
+      downloadFormat: "rehearsal-guide"
+    });
+    assert.match(launchOpsRunwayNextEvidenceAction?.downloadHref || "", /format=rehearsal-guide/);
     assert.equal(
       launchOpsRunwayState?.evidenceOperations?.find((item) => item.operation === "record_post_launch_ops_sweep")?.status,
       "recorded"
@@ -14897,7 +14939,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.equal(launchMainlineTraceability.mainlineSummary.launchRunway?.checklistState?.recordedEvidenceOperationCount, 1);
     assert.equal(launchMainlineTraceability.mainlineSummary.launchRunway?.checklistState?.pendingEvidenceOperationCount, 2);
+    assert.equal(
+      launchMainlineTraceability.mainlineSummary.launchRunway?.checklistState?.nextEvidenceAction?.actionKey,
+      "launch_mainline_record_launch_rehearsal_run"
+    );
     assert.match(launchMainlineTraceability.summaryText, /recordedEvidenceOperations=1 \| pendingEvidenceOperations=2/);
+    assert.match(launchMainlineTraceability.summaryText, /nextEvidenceAction: operation=record_launch_rehearsal_run \| action=launch_mainline_record_launch_rehearsal_run \| download=launch_mainline_rehearsal_guide/);
     assert.match(launchMainlineTraceability.summaryText, /evidenceOperation=record_post_launch_ops_sweep \| status=recorded \| items=1 \| recordedAt=/);
     assert.ok(launchMainlineTraceability.postLaunchHandoffTraceability);
     assert.equal(
@@ -17759,6 +17806,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /data-mainline-launch-runway-checklist/);
     assert.match(html, /operatorChecklist/);
     assert.match(html, /checklistState/);
+    assert.match(html, /nextEvidenceAction/);
+    assert.match(html, /downloadFormat/);
     assert.match(html, /pendingEvidenceCount/);
     assert.match(html, /nextPendingEvidenceOperation/);
     assert.match(html, /evidenceOperation/);

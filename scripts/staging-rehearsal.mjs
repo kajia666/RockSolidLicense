@@ -62,6 +62,7 @@ const PROFILE_ALLOWED_FIELDS = [
   "closeoutFile",
   "runRecordFile",
   "artifactManifestFile",
+  "backupRestorePacketFile",
   "closeoutReloadPacketFile",
   "readinessReviewPacketFile",
   "productionSignoffPacketFile",
@@ -94,6 +95,7 @@ const PROFILE_OPTION_FLAGS = {
   closeoutFile: "--closeout-file",
   runRecordFile: "--run-record-file",
   artifactManifestFile: "--artifact-manifest-file",
+  backupRestorePacketFile: "--backup-restore-packet-file",
   closeoutReloadPacketFile: "--closeout-reload-packet-file",
   readinessReviewPacketFile: "--readiness-review-packet-file",
   productionSignoffPacketFile: "--production-signoff-packet-file",
@@ -176,6 +178,7 @@ function parseArgs(argv) {
     closeoutFile: null,
     runRecordFile: null,
     artifactManifestFile: null,
+    backupRestorePacketFile: null,
     closeoutReloadPacketFile: null,
     readinessReviewPacketFile: null,
     productionSignoffPacketFile: null,
@@ -226,6 +229,8 @@ function parseArgs(argv) {
       options.runRecordFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--artifact-manifest-file") {
       options.artifactManifestFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--backup-restore-packet-file") {
+      options.backupRestorePacketFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-reload-packet-file") {
       options.closeoutReloadPacketFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--readiness-review-packet-file") {
@@ -273,6 +278,7 @@ function parseArgs(argv) {
     closeoutFile: resolveProfileOption(options.closeoutFile, "RSL_REHEARSAL_CLOSEOUT_FILE", stagingProfile, "closeoutFile"),
     runRecordFile: resolveProfileOption(options.runRecordFile, "RSL_REHEARSAL_RUN_RECORD_FILE", stagingProfile, "runRecordFile"),
     artifactManifestFile: resolveProfileOption(options.artifactManifestFile, "RSL_REHEARSAL_ARTIFACT_MANIFEST_FILE", stagingProfile, "artifactManifestFile"),
+    backupRestorePacketFile: resolveProfileOption(options.backupRestorePacketFile, "RSL_REHEARSAL_BACKUP_RESTORE_PACKET_FILE", stagingProfile, "backupRestorePacketFile"),
     closeoutReloadPacketFile: resolveProfileOption(options.closeoutReloadPacketFile, "RSL_REHEARSAL_CLOSEOUT_RELOAD_PACKET_FILE", stagingProfile, "closeoutReloadPacketFile"),
     readinessReviewPacketFile: resolveProfileOption(options.readinessReviewPacketFile, "RSL_REHEARSAL_READINESS_REVIEW_PACKET_FILE", stagingProfile, "readinessReviewPacketFile"),
     productionSignoffPacketFile: resolveProfileOption(options.productionSignoffPacketFile, "RSL_REHEARSAL_PRODUCTION_SIGNOFF_PACKET_FILE", stagingProfile, "productionSignoffPacketFile"),
@@ -1031,6 +1037,94 @@ function buildStagingReadinessReviewPacket(result) {
   };
 }
 
+function buildStagingBackupRestoreDrillPacket(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const binding = result.stagingEnvironmentBinding || {};
+  const bindingFiles = new Map((binding.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
+  const runbook = result.stagingExecutionRunbook || {};
+  const archiveRoot = runRecordIndex.archiveRoot
+    || bindingFiles.get("artifact_archive_root")?.path
+    || closeout.artifactReceiptLedger?.archiveRoot
+    || "artifacts/staging/product/stable";
+  const ledgerRowsByKey = new Map((closeout.artifactReceiptLedger?.rows || []).map((row) => [row.checkKey, row]));
+  const ledgerRow = ledgerRowsByKey.get("backup_restore_drill_result") || {};
+  const packetFile = result.backupRestorePacketFile?.path
+    || bindingFiles.get("backup_restore_packet")?.path
+    || path.posix.join(archiveRoot, "staging-backup-restore-drill-packet.json");
+  const artifactPath = ledgerRow.artifactPath || path.posix.join(archiveRoot, "backup-restore-drill.txt");
+  const commands = result.nextCommands?.recovery || {};
+  const commandKeys = Object.keys(commands);
+  const closeoutInputPath = bindingFiles.get("filled_closeout_input")?.path
+    || runRecordIndex.closeoutProgress?.closeoutInputPath
+    || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const closeoutReloadCommand = runRecordIndex.closeoutProgress?.reloadCommand
+    || result.closeoutBackfillGuide?.closeoutInputReload?.command
+    || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  return {
+    mode: "staging-backup-restore-drill-operator-packet",
+    status: "awaiting_backup_restore_drill",
+    willModifyData: false,
+    archiveRoot,
+    packetFile,
+    closeoutKey: "backup_restore_drill_result",
+    artifactPath,
+    receiptOperations: ledgerRow.receiptOperations || ["record_recovery_drill", "record_backup_verification"],
+    commandKeys,
+    commands,
+    environment: {
+      targetOs: result.summary?.targetOs || null,
+      storageProfile: result.summary?.storageProfile || null,
+      targetEnvFile: binding.environment?.targetEnvFile || null,
+      appBackupDir: binding.environment?.appBackupDir || null,
+      postgresBackupDir: binding.environment?.postgresBackupDir || null
+    },
+    sourceStatuses: {
+      recoveryPreflight: result.preflights?.recovery?.status || "not_available",
+      environmentReadiness: result.environmentReadiness?.status || "not_available",
+      executionRunbook: runbook.status || "not_available",
+      closeoutInput: result.closeoutInput?.status || "not_loaded"
+    },
+    operatorSteps: [
+      {
+        key: "run_app_backup",
+        status: commands.appBackup ? "operator_execute" : "not_available",
+        command: commands.appBackup || null
+      },
+      {
+        key: "run_postgres_backup",
+        status: commands.postgresBackup ? "operator_execute" : "not_available",
+        command: commands.postgresBackup || null
+      },
+      {
+        key: "run_postgres_restore_dry_run",
+        status: commands.postgresRestoreDryRun ? "operator_execute" : "not_available",
+        command: commands.postgresRestoreDryRun || null
+      },
+      {
+        key: "record_recovery_drill_receipt",
+        status: "operator_execute",
+        receiptOperation: "record_recovery_drill",
+        endpoint: result.evidenceActionPlan?.endpoint || null
+      },
+      {
+        key: "record_backup_verification_receipt",
+        status: "operator_execute",
+        receiptOperation: "record_backup_verification",
+        endpoint: result.evidenceActionPlan?.endpoint || null
+      },
+      {
+        key: "backfill_closeout_key",
+        status: "operator_backfill",
+        closeoutKey: "backup_restore_drill_result",
+        artifactPath
+      }
+    ],
+    closeoutReloadCommand,
+    nextAction: "Run the backup/restore drill commands on the restore target, record recovery and backup verification receipts, then backfill backup_restore_drill_result."
+  };
+}
+
 function buildStagingProductionSignoffPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
@@ -1155,6 +1249,7 @@ function buildStagingLaunchDutyArchiveIndex(result) {
   const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
   const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
   const artifactManifest = result.stagingArtifactManifest || buildStagingArtifactManifest(result);
+  const backupRestorePacket = result.stagingBackupRestoreDrillPacket || buildStagingBackupRestoreDrillPacket(result);
   const closeoutReloadPacket = result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result);
   const readinessReviewPacket = result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result);
   const productionSignoffPacket = result.stagingProductionSignoffPacket || buildStagingProductionSignoffPacket(result);
@@ -1178,6 +1273,7 @@ function buildStagingLaunchDutyArchiveIndex(result) {
     sourceStatuses: {
       runRecordIndex: runRecordIndex.status || "not_available",
       artifactManifest: artifactManifest.status || "not_available",
+      backupRestorePacket: backupRestorePacket.status || "not_available",
       closeoutReloadPacket: closeoutReloadPacket.status || "not_available",
       readinessReviewPacket: readinessReviewPacket.status || "not_available",
       productionSignoffPacket: productionSignoffPacket.status || "not_available",
@@ -1193,6 +1289,11 @@ function buildStagingLaunchDutyArchiveIndex(result) {
         key: "artifact_manifest",
         status: artifactManifest.status || "not_available",
         path: packetPath("artifact_manifest", result.artifactManifestFile?.path)
+      },
+      {
+        key: "backup_restore_packet",
+        status: backupRestorePacket.status || "not_available",
+        path: packetPath("backup_restore_packet", backupRestorePacket.packetFile)
       },
       {
         key: "closeout_reload_packet",
@@ -2138,6 +2239,7 @@ function buildStagingEnvironmentBinding(result, options = {}) {
   const closeoutPath = result.closeoutFile?.path || path.posix.join(archiveRoot, "staging-closeout-template.json");
   const runRecordPath = result.runRecordFile?.path || path.posix.join(archiveRoot, "staging-run-record-index.json");
   const artifactManifestPath = result.artifactManifestFile?.path || path.posix.join(archiveRoot, "staging-artifact-manifest.json");
+  const backupRestorePacketPath = result.backupRestorePacketFile?.path || path.posix.join(archiveRoot, "staging-backup-restore-drill-packet.json");
   const closeoutReloadPacketPath = result.closeoutReloadPacketFile?.path || path.posix.join(archiveRoot, "staging-closeout-reload-packet.json");
   const readinessReviewPacketPath = result.readinessReviewPacketFile?.path || path.posix.join(archiveRoot, "staging-readiness-review-packet.json");
   const productionSignoffPacketPath = result.productionSignoffPacketFile?.path || path.posix.join(archiveRoot, "staging-production-signoff-packet.json");
@@ -2196,6 +2298,8 @@ function buildStagingEnvironmentBinding(result, options = {}) {
     runRecordPath,
     "--artifact-manifest-file",
     artifactManifestPath,
+    "--backup-restore-packet-file",
+    backupRestorePacketPath,
     "--closeout-reload-packet-file",
     closeoutReloadPacketPath,
     "--readiness-review-packet-file",
@@ -2236,6 +2340,11 @@ function buildStagingEnvironmentBinding(result, options = {}) {
         key: "artifact_manifest",
         path: artifactManifestPath,
         status: result.artifactManifestFile ? fileOutputStatus(result.artifactManifestFile) : "recommended_default"
+      },
+      {
+        key: "backup_restore_packet",
+        path: backupRestorePacketPath,
+        status: result.backupRestorePacketFile ? fileOutputStatus(result.backupRestorePacketFile) : "recommended_default"
       },
       {
         key: "closeout_reload_packet",
@@ -2772,6 +2881,11 @@ function buildFinalRehearsalPacket(result) {
         status: fileOutputStatus(result.artifactManifestFile)
       },
       {
+        key: "backup_restore_packet",
+        path: result.backupRestorePacketFile?.path || null,
+        status: fileOutputStatus(result.backupRestorePacketFile)
+      },
+      {
         key: "closeout_reload_packet",
         path: result.closeoutReloadPacketFile?.path || null,
         status: fileOutputStatus(result.closeoutReloadPacketFile)
@@ -3026,6 +3140,13 @@ function buildStagingOperatorExecutionPlan(result) {
       status: fileOutputStatus(result.artifactManifestFile),
       path: result.artifactManifestFile?.path || null,
       purpose: "Bundle the generated artifact paths, file statuses, readiness state, and key commands for staging archive review."
+    },
+    {
+      key: "backup_restore_packet",
+      label: "Staging backup/restore drill packet JSON",
+      status: fileOutputStatus(result.backupRestorePacketFile),
+      path: result.backupRestorePacketFile?.path || null,
+      purpose: "Centralize backup/restore drill commands, closeout key, recovery receipts, and artifact path before staging sign-off."
     },
     {
       key: "closeout_reload_packet",
@@ -3510,6 +3631,14 @@ function buildResult(options) {
         }
       }
       : {}),
+    ...(options.backupRestorePacketFile
+      ? {
+        backupRestorePacketFile: {
+          path: path.resolve(repoRoot, options.backupRestorePacketFile),
+          written: false
+        }
+      }
+      : {}),
     ...(options.closeoutReloadPacketFile
       ? {
         closeoutReloadPacketFile: {
@@ -3642,9 +3771,13 @@ function buildResult(options) {
     ...resultWithStagingRehearsalRunRecordIndex,
     stagingArtifactManifest: gatesPassed ? buildStagingArtifactManifest(resultWithStagingRehearsalRunRecordIndex) : null
   };
-  const resultWithStagingCloseoutReloadPacket = {
+  const resultWithStagingBackupRestoreDrillPacket = {
     ...resultWithStagingArtifactManifest,
-    stagingCloseoutReloadPacket: gatesPassed ? buildStagingCloseoutReloadPacket(resultWithStagingArtifactManifest) : null
+    stagingBackupRestoreDrillPacket: gatesPassed ? buildStagingBackupRestoreDrillPacket(resultWithStagingArtifactManifest) : null
+  };
+  const resultWithStagingCloseoutReloadPacket = {
+    ...resultWithStagingBackupRestoreDrillPacket,
+    stagingCloseoutReloadPacket: gatesPassed ? buildStagingCloseoutReloadPacket(resultWithStagingBackupRestoreDrillPacket) : null
   };
   const resultWithStagingReadinessReviewPacket = {
     ...resultWithStagingCloseoutReloadPacket,
@@ -4149,6 +4282,37 @@ function renderProductionSignoffReadiness(readiness) {
   ].join("\n");
 }
 
+function renderStagingBackupRestoreDrillPacket(packet) {
+  if (!packet) {
+    return "- Not available";
+  }
+  const environment = packet.environment || {};
+  const lines = [
+    `- Packet status: ${packet.status || "-"}`,
+    `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${packet.archiveRoot || "-"}`,
+    `- Packet file: ${packet.packetFile || "-"}`,
+    `- Closeout key: ${packet.closeoutKey || "-"}`,
+    `- Artifact path: ${packet.artifactPath || "-"}`,
+    `- Receipt operations: ${(packet.receiptOperations || []).join(", ") || "-"}`,
+    `- Command keys: ${(packet.commandKeys || []).join(", ") || "-"}`,
+    `- Target OS: ${environment.targetOs || "-"}`,
+    `- Storage profile: ${environment.storageProfile || "-"}`,
+    `- Target env file: ${environment.targetEnvFile || "-"}`,
+    `- App backup dir: ${environment.appBackupDir || "-"}`,
+    `- Postgres backup dir: ${environment.postgresBackupDir || "-"}`,
+    `- Closeout reload: \`${packet.closeoutReloadCommand || "-"}\``,
+    `- Next action: ${packet.nextAction || "-"}`
+  ];
+  if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
+    lines.push("- Operator steps:");
+    for (const step of packet.operatorSteps) {
+      lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderStagingProductionSignoffPacket(packet) {
   if (!packet) {
     return "- Not available";
@@ -4361,6 +4525,7 @@ function renderStagingEnvironmentBinding(binding) {
     `- Developer bearer token env: ${binding.credentialEnv?.developerBearerToken || "-"}`,
     `- Handoff file: ${fileByKey.get("handoff_file")?.path || "-"}`,
     `- Closeout file: ${fileByKey.get("closeout_file")?.path || "-"}`,
+    `- Backup/restore packet: ${fileByKey.get("backup_restore_packet")?.path || "-"}`,
     `- Production sign-off packet: ${fileByKey.get("production_signoff_packet")?.path || "-"}`,
     `- Filled closeout input: ${fileByKey.get("filled_closeout_input")?.path || "-"}`,
     `- Artifact archive root: ${fileByKey.get("artifact_archive_root")?.path || "-"}`,
@@ -4621,6 +4786,10 @@ function renderHandoffFile(result) {
     "",
     renderProductionSignoffReadiness(result.productionSignoffReadiness),
     "",
+    "## Staging Backup / Restore Drill Packet",
+    "",
+    renderStagingBackupRestoreDrillPacket(result.stagingBackupRestoreDrillPacket),
+    "",
     "## Staging Production Sign-Off Packet",
     "",
     renderStagingProductionSignoffPacket(result.stagingProductionSignoffPacket),
@@ -4716,6 +4885,7 @@ function buildCloseoutTemplate(result) {
     stagingRehearsalExecutionSummary: result.stagingRehearsalExecutionSummary || buildStagingRehearsalExecutionSummary(result),
     stagingRehearsalRunRecordIndex: result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result),
     stagingArtifactManifest: result.stagingArtifactManifest || buildStagingArtifactManifest(result),
+    stagingBackupRestoreDrillPacket: result.stagingBackupRestoreDrillPacket || buildStagingBackupRestoreDrillPacket(result),
     stagingCloseoutReloadPacket: result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result),
     stagingReadinessReviewPacket: result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result),
     stagingProductionSignoffPacket: result.stagingProductionSignoffPacket || buildStagingProductionSignoffPacket(result),
@@ -4860,6 +5030,26 @@ function writeArtifactManifestFile(result) {
   return nextResult;
 }
 
+function writeBackupRestorePacketFile(result) {
+  if (!result.backupRestorePacketFile) {
+    return result;
+  }
+  if (result.status !== "pass") {
+    return result;
+  }
+
+  const nextResult = {
+    ...result,
+    backupRestorePacketFile: {
+      ...result.backupRestorePacketFile,
+      written: true
+    }
+  };
+  mkdirSync(path.dirname(result.backupRestorePacketFile.path), { recursive: true });
+  writeFileSync(result.backupRestorePacketFile.path, `${JSON.stringify(result.stagingBackupRestoreDrillPacket, null, 2)}\n`, "utf8");
+  return nextResult;
+}
+
 function writeCloseoutReloadPacketFile(result) {
   if (!result.closeoutReloadPacketFile) {
     return result;
@@ -4976,11 +5166,13 @@ function writeOutputFiles(result) {
       writeProductionSignoffPacketFile(
         writeReadinessReviewPacketFile(
           writeCloseoutReloadPacketFile(
-            writeArtifactManifestFile(
-              writeFilledCloseoutDraftFile(
-                writeRunRecordFile(
-                  writeCloseoutFile(
-                    writeHandoffFile(result)
+            writeBackupRestorePacketFile(
+              writeArtifactManifestFile(
+                writeFilledCloseoutDraftFile(
+                  writeRunRecordFile(
+                    writeCloseoutFile(
+                      writeHandoffFile(result)
+                    )
                   )
                 )
               )

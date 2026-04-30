@@ -13,6 +13,7 @@
   "closeoutFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json",
   "runRecordFile": "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json",
   "artifactManifestFile": "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json",
+  "backupRestorePacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-backup-restore-drill-packet.json",
   "closeoutReloadPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json",
   "readinessReviewPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json",
   "productionSignoffPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",

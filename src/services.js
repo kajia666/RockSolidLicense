@@ -14223,6 +14223,37 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const primaryDownload = postLaunchSweepHandoffDownload || operationsHandoffDownload || firstLaunchHandoffDownload || null;
         const secondaryDownload = operationsHandoffDownload || firstLaunchHandoffDownload || primaryDownload || null;
         const supportingDownload = firstLaunchHandoffDownload || secondaryDownload || primaryDownload || null;
+        const latestLaunchReceipt = Array.isArray(opsOverview.latestLaunchReceipts) && opsOverview.latestLaunchReceipts.length
+          ? opsOverview.latestLaunchReceipts[0]
+          : null;
+        const launchReceiptNextFollowUp = opsSnapshot?.summary?.launchReceiptNextFollowUp && typeof opsSnapshot.summary.launchReceiptNextFollowUp === "object"
+          ? opsSnapshot.summary.launchReceiptNextFollowUp
+          : null;
+        const watchReceiptDownload = buildDeveloperOpsLaunchReceiptNextFollowUpDownload(params, launchReceiptNextFollowUp);
+        const watchCheckInAction = {
+          key: "launch_mainline_record_post_launch_ops_sweep",
+          label: "Record First-Wave Ops Sweep",
+          summary: "Capture the first-wave ops sweep check-in before handing launch-day watch into stabilization.",
+          mode: "evidence",
+          operation: "record_post_launch_ops_sweep"
+        };
+        const watchCheckInStatus = launchDayWatchReady
+          ? (postLaunchOpsSweepEvidence?.createdAt ? "checked_in" : "ready_for_check_in")
+          : "waiting_for_runway_evidence";
+        const watchCheckIn = {
+          status: watchCheckInStatus,
+          actionKey: watchCheckInAction.key,
+          operation: watchCheckInAction.operation,
+          evidenceKey: "post_launch_ops_sweep",
+          recordedAt: postLaunchOpsSweepEvidence?.createdAt || null,
+          latestReceiptOperation: latestLaunchReceipt?.operation || null,
+          latestReceiptHandoffFileName: latestLaunchReceipt?.handoffFileName || null,
+          nextFollowUpActionKey: launchReceiptNextFollowUp?.actionKey || null,
+          nextFollowUpOperation: launchReceiptNextFollowUp?.operationToRecord || launchReceiptNextFollowUp?.operation || null,
+          nextFollowUpDownloadKey: launchReceiptNextFollowUp?.downloadKey || null,
+          receiptDownload: watchReceiptDownload || null,
+          primaryHandoffDownload: primaryDownload || null
+        };
         const controls = launchDayWatchReady
           ? [
               {
@@ -14230,10 +14261,20 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                 label: "Enter Launch-Day Watch",
                 workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Enter Launch-Day Watch", params)
               },
+              watchCheckIn.status !== "checked_in" ? {
+                kind: "setup",
+                label: "Record Watch Check-In",
+                setupAction: watchCheckInAction
+              } : null,
               primaryDownload ? {
                 kind: "download",
                 label: "Download Launch-Day Watch Handoff",
                 recommendedDownload: primaryDownload
+              } : null,
+              watchReceiptDownload ? {
+                kind: "download",
+                label: "Download Watch Receipt Follow-up",
+                recommendedDownload: watchReceiptDownload
               } : null,
               secondaryDownload && secondaryDownload.key !== primaryDownload?.key ? {
                 kind: "download",
@@ -14269,6 +14310,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                 label: "Download Launch-Day Watch Handoff",
                 recommendedDownload: primaryDownload
               } : null,
+              watchReceiptDownload ? {
+                kind: "download",
+                label: "Download Watch Receipt Follow-up",
+                recommendedDownload: watchReceiptDownload
+              } : null,
               secondaryDownload && secondaryDownload.key !== primaryDownload?.key ? {
                 kind: "download",
                 label: "Download Operations Handoff",
@@ -14287,6 +14333,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           pendingEvidenceOperationCount,
           nextActionKey: launchDayWatchReady ? null : (launchRunwayNextEvidenceAction?.actionKey || launchRunwayNextEvidenceAction?.setupAction?.key || null),
           nextActionOperation: launchDayWatchReady ? null : (launchRunwayNextEvidenceAction?.operation || launchRunwayNextEvidenceAction?.setupAction?.operation || null),
+          watchCheckIn,
           primaryWorkspaceAction,
           primaryDownload,
           secondaryDownload,
@@ -15254,10 +15301,17 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   };
   const ensuredLaunchDayWatchPanel = launchDayWatchPanel && typeof launchDayWatchPanel === "object"
     ? {
-        ...launchDayWatchPanel,
-        primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(launchDayWatchPanel.primaryWorkspaceAction, params),
-        primaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.primaryDownload, params),
-        secondaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.secondaryDownload, params),
+      ...launchDayWatchPanel,
+      watchCheckIn: launchDayWatchPanel.watchCheckIn && typeof launchDayWatchPanel.watchCheckIn === "object"
+        ? {
+            ...launchDayWatchPanel.watchCheckIn,
+            receiptDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.watchCheckIn.receiptDownload, params),
+            primaryHandoffDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.watchCheckIn.primaryHandoffDownload, params)
+          }
+        : null,
+      primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(launchDayWatchPanel.primaryWorkspaceAction, params),
+      primaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.primaryDownload, params),
+      secondaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.secondaryDownload, params),
         supportingDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.supportingDownload, params),
         controls: Array.isArray(launchDayWatchPanel.controls)
           ? launchDayWatchPanel.controls.map((item) => ensureLaunchMainlineControlHrefs(item, params))
@@ -15478,6 +15532,33 @@ function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = nu
   );
   if (launchDayWatchPanel.nextActionKey || launchDayWatchPanel.nextActionOperation) {
     lines.push(`- nextAction: ${launchDayWatchPanel.nextActionKey || "-"} | operation=${launchDayWatchPanel.nextActionOperation || "-"}`);
+  }
+  const watchCheckIn = launchDayWatchPanel.watchCheckIn && typeof launchDayWatchPanel.watchCheckIn === "object"
+    ? launchDayWatchPanel.watchCheckIn
+    : null;
+  if (watchCheckIn) {
+    lines.push(
+      `- watchCheckIn: status=${watchCheckIn.status || "-"}`
+      + ` | action=${watchCheckIn.actionKey || "-"}`
+      + ` | operation=${watchCheckIn.operation || "-"}`
+      + ` | evidence=${watchCheckIn.evidenceKey || "-"}`
+      + ` | recordedAt=${watchCheckIn.recordedAt || "-"}`
+    );
+    if (watchCheckIn.latestReceiptOperation || watchCheckIn.latestReceiptHandoffFileName) {
+      lines.push(
+        `- watchReceipt: latestOperation=${watchCheckIn.latestReceiptOperation || "-"}`
+        + ` | handoff=${watchCheckIn.latestReceiptHandoffFileName || "-"}`
+      );
+    }
+    if (watchCheckIn.nextFollowUpActionKey || watchCheckIn.nextFollowUpOperation || watchCheckIn.nextFollowUpDownloadKey) {
+      lines.push(
+        `- watchNextFollowUp: action=${watchCheckIn.nextFollowUpActionKey || "-"}`
+        + ` | operation=${watchCheckIn.nextFollowUpOperation || "-"}`
+        + ` | download=${watchCheckIn.nextFollowUpDownloadKey || "-"}`
+      );
+    }
+    lines.push(`- watchReceiptDownload: ${formatLaunchHandoffDownloadText(watchCheckIn.receiptDownload, { fileSeparator: " | " })}`);
+    lines.push(`- watchPrimaryHandoffDownload: ${formatLaunchHandoffDownloadText(watchCheckIn.primaryHandoffDownload, { fileSeparator: " | " })}`);
   }
   lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(launchDayWatchPanel.primaryWorkspaceAction)}`);
   lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(launchDayWatchPanel.primaryDownload, { fileSeparator: " | " })}`);

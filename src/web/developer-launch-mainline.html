@@ -1323,9 +1323,11 @@
         }
         const controls = mainlineLaunchDayWatchControls(panel);
         const checkpoints = Array.isArray(panel.firstWaveCheckpoints) ? panel.firstWaveCheckpoints : [];
+        const watchCheckIn = panel.watchCheckIn && typeof panel.watchCheckIn === "object" ? panel.watchCheckIn : null;
         const tags = [
           panel.status ? { label: "status", value: panel.status, strong: panel.launchDayWatchReady === true } : null,
           { label: "ready", value: panel.launchDayWatchReady === true ? "yes" : "no", strong: panel.launchDayWatchReady === true },
+          watchCheckIn?.status ? { label: "checkIn", value: watchCheckIn.status, strong: watchCheckIn.status === "checked_in" } : null,
           panel.pendingEvidenceCount !== undefined ? { label: "pendingEvidence", value: panel.pendingEvidenceCount, strong: Number(panel.pendingEvidenceCount || 0) > 0 } : null,
           panel.pendingEvidenceOperationCount !== undefined ? { label: "pendingOps", value: panel.pendingEvidenceOperationCount, strong: Number(panel.pendingEvidenceOperationCount || 0) > 0 } : null,
           panel.watchEntry ? { label: "watchEntry", value: panel.watchEntry, strong: false } : null
@@ -1341,6 +1343,21 @@
             | format=${esc(panel.secondaryDownload?.format || "-")}
           </div>
         `;
+        const watchCheckInMarkup = watchCheckIn
+          ? `
+            <div class="hint">
+              Watch Check-In: status=${esc(watchCheckIn.status || "-")}
+              | action=${esc(watchCheckIn.actionKey || "-")}
+              | operation=${esc(watchCheckIn.operation || "-")}
+              | evidence=${esc(watchCheckIn.evidenceKey || "-")}
+              | recordedAt=${esc(watchCheckIn.recordedAt || "-")}
+              <br>Receipt Follow-up: ${esc(watchCheckIn.receiptDownload?.label || watchCheckIn.receiptDownload?.key || "-")}
+              | format=${esc(watchCheckIn.receiptDownload?.format || "-")}
+              | Primary Handoff: ${esc(watchCheckIn.primaryHandoffDownload?.label || watchCheckIn.primaryHandoffDownload?.key || "-")}
+              | format=${esc(watchCheckIn.primaryHandoffDownload?.format || "-")}
+            </div>
+          `
+          : "";
         const checkpointsMarkup = checkpoints.length
           ? `
             <div class="hint">
@@ -1365,6 +1382,7 @@
               | pendingEvidenceOperations=${esc(panel.pendingEvidenceOperationCount ?? "-")}
             </div>
             ${nextActionMarkup}
+            ${watchCheckInMarkup}
             ${downloadsMarkup}
             ${checkpointsMarkup}
             ${controls.length ? `

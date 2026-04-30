@@ -6643,6 +6643,27 @@ test("developer release package export bundles integration, versions, and notice
         pendingEvidenceOperationCount: launchMainline.mainlineSummary.launchDayWatchPanel?.pendingEvidenceOperationCount,
         nextActionKey: launchMainline.mainlineSummary.launchDayWatchPanel?.nextActionKey,
         nextActionOperation: launchMainline.mainlineSummary.launchDayWatchPanel?.nextActionOperation,
+        watchCheckIn: launchMainline.mainlineSummary.launchDayWatchPanel?.watchCheckIn
+          ? {
+              status: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.status,
+              actionKey: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.actionKey,
+              operation: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.operation,
+              evidenceKey: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.evidenceKey,
+              recordedAt: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.recordedAt || null,
+              receiptDownload: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.receiptDownload
+                ? {
+                    key: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.receiptDownload.key,
+                    format: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.receiptDownload.format
+                  }
+                : null,
+              primaryHandoffDownload: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.primaryHandoffDownload
+                ? {
+                    key: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.primaryHandoffDownload.key,
+                    format: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.primaryHandoffDownload.format
+                  }
+                : null
+            }
+          : null,
         primaryWorkspaceAction: launchMainline.mainlineSummary.launchDayWatchPanel?.primaryWorkspaceAction
           ? {
               key: launchMainline.mainlineSummary.launchDayWatchPanel.primaryWorkspaceAction.key,
@@ -6673,6 +6694,21 @@ test("developer release package export bundles integration, versions, and notice
         pendingEvidenceOperationCount: 3,
         nextActionKey: "launch_mainline_record_launch_rehearsal_run",
         nextActionOperation: "record_launch_rehearsal_run",
+        watchCheckIn: {
+          status: "waiting_for_runway_evidence",
+          actionKey: "launch_mainline_record_post_launch_ops_sweep",
+          operation: "record_post_launch_ops_sweep",
+          evidenceKey: "post_launch_ops_sweep",
+          recordedAt: null,
+          receiptDownload: {
+            key: "ops_launch_receipt_next_follow_up",
+            format: "launch-receipt-next-follow-up"
+          },
+          primaryHandoffDownload: {
+            key: "launch_mainline_post_launch_sweep_handoff",
+            format: "post-launch-sweep-handoff"
+          }
+        },
         primaryWorkspaceAction: {
           key: "ops",
           autofocus: "snapshot",
@@ -6856,6 +6892,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- status: blocked_by_runway_evidence/);
       assert.match(launchMainline.summaryText, /- ready: false \| watchEntry=enter_after_production_signoff \| pendingEvidence=6 \| pendingEvidenceOperations=3/);
       assert.match(launchMainline.summaryText, /- nextAction: launch_mainline_record_launch_rehearsal_run \| operation=record_launch_rehearsal_run/);
+      assert.match(launchMainline.summaryText, /- watchCheckIn: status=waiting_for_runway_evidence \| action=launch_mainline_record_post_launch_ops_sweep \| operation=record_post_launch_ops_sweep \| evidence=post_launch_ops_sweep \| recordedAt=-/);
+      assert.match(launchMainline.summaryText, /- watchReceiptDownload: Launch receipt next follow-up/);
       assert.match(launchMainline.summaryText, /- primaryWorkspace: Open Ops Workspace@snapshot/);
       assert.match(launchMainline.summaryText, /- primaryDownload: Launch mainline post-launch sweep handoff/);
       assert.match(launchMainline.summaryText, /- firstWaveCheckpoints: confirm_runtime_alerting, review_first_wave_sessions, record_post_launch_ops_sweep/);
@@ -9089,6 +9127,27 @@ test("developer launch runway next evidence action advances after each evidence 
       pendingEvidenceOperationCount: sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.pendingEvidenceOperationCount,
       nextActionKey: sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.nextActionKey,
       nextActionOperation: sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.nextActionOperation,
+      watchCheckIn: sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.watchCheckIn
+        ? {
+            status: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.status,
+            actionKey: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.actionKey,
+            operation: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.operation,
+            evidenceKey: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.evidenceKey,
+            recordedAt: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.recordedAt || null,
+            receiptDownload: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.receiptDownload
+              ? {
+                  key: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.receiptDownload.key,
+                  format: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.receiptDownload.format
+                }
+              : null,
+            primaryHandoffDownload: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.primaryHandoffDownload
+              ? {
+                  key: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.primaryHandoffDownload.key,
+                  format: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.primaryHandoffDownload.format
+                }
+              : null
+          }
+        : null,
       primaryWorkspaceAction: sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.primaryWorkspaceAction
         ? {
             key: sweepResult.launchMainline.mainlineSummary.launchDayWatchPanel.primaryWorkspaceAction.key,
@@ -9119,6 +9178,21 @@ test("developer launch runway next evidence action advances after each evidence 
       pendingEvidenceOperationCount: 0,
       nextActionKey: null,
       nextActionOperation: null,
+      watchCheckIn: {
+        status: "checked_in",
+        actionKey: "launch_mainline_record_post_launch_ops_sweep",
+        operation: "record_post_launch_ops_sweep",
+        evidenceKey: "post_launch_ops_sweep",
+        recordedAt: sweepResult.result.recordedEvidence.createdAt,
+        receiptDownload: {
+          key: "ops_launch_receipt_next_follow_up",
+          format: "launch-receipt-next-follow-up"
+        },
+        primaryHandoffDownload: {
+          key: "launch_mainline_post_launch_sweep_handoff",
+          format: "post-launch-sweep-handoff"
+        }
+      },
       primaryWorkspaceAction: {
         key: "ops",
         autofocus: "snapshot",
@@ -9145,6 +9219,10 @@ test("developer launch runway next evidence action advances after each evidence 
     assert.ok(sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.controls?.some((item) =>
       item?.label === "Download Launch-Day Watch Handoff"
       && item?.recommendedDownload?.key === "launch_mainline_post_launch_sweep_handoff"
+    ));
+    assert.ok(sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.controls?.some((item) =>
+      item?.label === "Download Watch Receipt Follow-up"
+      && item?.recommendedDownload?.key === "ops_launch_receipt_next_follow_up"
     ));
     assert.equal(
       sweepResult.launchMainline?.mainlineSummary?.heroControls?.some((item) =>
@@ -18375,6 +18453,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /renderLaunchDayWatchPanel/);
     assert.match(html, /renderStabilizationHandoffPanel/);
     assert.match(html, /data-mainline-launch-day-watch-status/);
+    assert.match(html, /watchCheckIn/);
+    assert.match(html, /Watch Check-In/);
     assert.match(html, /data-mainline-stabilization-handoff-status/);
     assert.match(html, /Runway Evidence Pending/);
     assert.match(html, /Runway Evidence Recorded/);

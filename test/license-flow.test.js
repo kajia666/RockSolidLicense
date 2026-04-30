@@ -13951,6 +13951,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchDutyActionOrder.steps[0].download.href, /format=staging-launch-duty-archive/);
     assert.match(launchDutyActionOrder.steps[1].download.href, /format=initial-launch-ops-readiness/);
     assert.match(launchDutyActionOrder.steps[2].download.href, /format=launch-receipt-next-follow-up/);
+    assert.deepEqual(
+      launchDutyActionOrder.stagingArchiveNextOperations.launchRunway.sequence,
+      ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"]
+    );
+    assert.equal(launchDutyActionOrder.stagingArchiveNextOperations.launchRunway.currentGate, "ready_for_closeout_reload");
+    assert.equal(launchDutyActionOrder.stagingArchiveNextOperations.launchRunway.launchDayWatchEntry, "enter_after_production_signoff");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
@@ -18591,6 +18597,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Launch Duty Action Order/);
     assert.match(html, /launch-duty-action-order/);
     assert.match(html, /renderLaunchDutyActionOrder/);
+    assert.match(html, /launchRunway/);
+    assert.match(html, /Staging Archive Launch Runway/);
+    assert.match(html, /data-launch-runway-current-gate/);
+    assert.match(html, /enter_after_production_signoff/);
     assert.match(html, /data-launch-duty-action-order-action="download-step"/);
     assert.match(html, /data-launch-duty-step-key/);
     assert.match(html, /staging-launch-duty-archive/);

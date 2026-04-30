@@ -4391,6 +4391,22 @@
           return "";
         }
         const status = String(item.status || "unknown").toLowerCase();
+        const launchRunway = item.stagingArchiveNextOperations?.launchRunway || {};
+        const runwaySequence = Array.isArray(launchRunway.sequence) && launchRunway.sequence.length
+          ? launchRunway.sequence.join(" -> ")
+          : "";
+        const runwayCurrentGate = String(launchRunway.currentGate || item.stagingArchiveNextOperations?.status || "").trim();
+        const runwayWatchEntry = String(launchRunway.launchDayWatchEntry || "").trim();
+        const runwayMarkup = runwaySequence
+          ? `
+            <div class="snapshot-focus-meta" data-launch-runway-current-gate="${esc(runwayCurrentGate || "-")}">
+              Staging Archive Launch Runway: ${esc(runwaySequence)}
+            </div>
+            <div class="snapshot-focus-meta">
+              Current Gate: ${esc(runwayCurrentGate || "-")} | Launch-Day Watch Entry: ${esc(runwayWatchEntry || "enter_after_production_signoff")}
+            </div>
+          `
+          : "";
         const stepMarkup = steps.map((step) => {
           const download = step.download || {};
           const href = String(download.href || "").trim();
@@ -4423,6 +4439,7 @@
               <span class="tag ${status === "ready" ? "ok" : "warning"}">${esc(status.toUpperCase())}</span>
             </div>
             <div class="hint">${esc(item.operatorSummary || "Staging archive -> Launch readiness -> Next follow-up")}</div>
+            ${runwayMarkup}
             <div class="snapshot-focus-list">${stepMarkup}</div>
           </div>
         `;

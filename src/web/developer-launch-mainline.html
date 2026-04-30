@@ -765,6 +765,13 @@
         return null;
       }
 
+      function currentMainlineLaunchRunwayHeroStatus() {
+        const { launchRunway } = currentMainlineLaunchRunway();
+        return launchRunway?.heroStatus && typeof launchRunway.heroStatus === "object"
+          ? launchRunway.heroStatus
+          : null;
+      }
+
       function mainlineLaunchRunwayEvidenceControls(action = currentMainlineLaunchRunwayNextEvidenceAction()) {
         if (!action || typeof action !== "object") {
           return [];
@@ -1261,14 +1268,19 @@
       function renderHeroControls() {
         const page = currentMainlinePage();
         const mainlineHeroControls = Array.isArray(page.heroControls) ? page.heroControls : [];
-        if (!mainlineHeroControls.length) {
-          return '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
-        }
-        return mainlineHeroControls.map((item, index) => `
+        const runwayHeroStatus = currentMainlineLaunchRunwayHeroStatus();
+        const runwayHeroLabel = runwayHeroStatus?.label || (runwayHeroStatus?.status === "evidence_recorded" ? "Runway Evidence Recorded" : "Runway Evidence Pending");
+        const runwayHeroStatusMarkup = runwayHeroStatus
+          ? `<div class="pill" data-mainline-launch-runway-hero-status="${esc(runwayHeroStatus.status || "-")}">Runway: ${esc(runwayHeroLabel)} | pendingEvidence=${esc(runwayHeroStatus.pendingEvidenceCount ?? "-")} | next=${esc(runwayHeroStatus.nextActionOperation || runwayHeroStatus.launchDayWatchEntry || "-")}</div>`
+          : "";
+        const controlsMarkup = mainlineHeroControls.length
+          ? mainlineHeroControls.map((item, index) => `
           <button type="button" class="secondary" data-mainline-hero-control-index="${index}">
-            ${esc(item.label || item.workspaceAction?.label || item.recommendedDownload?.label || item.kind || "Action")}
+            ${esc(item.label || item.workspaceAction?.label || item.recommendedDownload?.label || item.bootstrapAction?.label || item.setupAction?.label || item.kind || "Action")}
           </button>
-        `).join("");
+        `).join("")
+          : '<button class="secondary" type="button" disabled>Generate Launch Mainline to load unified hero actions</button>';
+        return `${runwayHeroStatusMarkup}${controlsMarkup}`;
       }
 
       function renderMainline() {

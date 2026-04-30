@@ -5376,9 +5376,17 @@ function buildLaunchMainlineActionReceipt({
       kind: item?.kind || null,
       label: item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action",
       workspaceAction: item?.workspaceAction || null,
-      recommendedDownload: item?.recommendedDownload || null
+      recommendedDownload: item?.recommendedDownload || null,
+      bootstrapAction: item?.bootstrapAction || null,
+      setupAction: item?.setupAction || null
     }))
-    .filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
+    .filter((item) =>
+      item?.workspaceAction?.key
+      || item?.recommendedDownload?.key
+      || item?.bootstrapAction?.key
+      || item?.setupAction?.key
+      || item?.setupAction?.operation
+    );
   const mainlineScreen = {
     heroControls: mainlineHeroControls,
     sections: mainlineSections
@@ -5518,11 +5526,19 @@ function buildLaunchMainlineActionReceipt({
     ...mainlineContinuationActions,
     ...mainlineHeroControls.map((item) => ({
       kind: item?.kind || null,
-      label: item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action",
+      label: item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.bootstrapAction?.label || item?.setupAction?.label || item?.kind || "Action",
       workspaceAction: item?.workspaceAction || null,
-      recommendedDownload: item?.recommendedDownload || null
+      recommendedDownload: item?.recommendedDownload || null,
+      bootstrapAction: item?.bootstrapAction || null,
+      setupAction: item?.setupAction || null
     }))
-  ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
+  ].filter((item) =>
+    item?.workspaceAction?.key
+    || item?.recommendedDownload?.key
+    || item?.bootstrapAction?.key
+    || item?.setupAction?.key
+    || item?.setupAction?.operation
+  );
   const productionFollowUpChecks = [];
   const pushProductionFollowUpCheck = (item = null) => {
     const key = item?.key || "";
@@ -13770,6 +13786,41 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     };
   };
   const launchRunwayChecklistState = buildLaunchRunwayChecklistState(launchRunwayOperatorChecklist);
+  const buildLaunchRunwayHeroStatus = (checklistState = null) => {
+    if (!checklistState || typeof checklistState !== "object") {
+      return null;
+    }
+    const pendingEvidenceCount = Number(checklistState.pendingEvidenceCount || 0);
+    const pendingEvidenceOperationCount = Number(checklistState.pendingEvidenceOperationCount || 0);
+    const totalCount = Number(checklistState.totalCount || 0);
+    const nextAction = checklistState.nextEvidenceAction && typeof checklistState.nextEvidenceAction === "object"
+      ? checklistState.nextEvidenceAction
+      : null;
+    const launchDayWatchEntry = stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff";
+    if (pendingEvidenceCount > 0) {
+      return {
+        status: "pending_evidence",
+        label: "Runway Evidence Pending",
+        summary: `${pendingEvidenceCount} runway evidence items are pending across ${pendingEvidenceOperationCount} operations. Next: ${nextAction?.label || "Record runway evidence"}.`,
+        pendingEvidenceCount,
+        pendingEvidenceOperationCount,
+        nextActionKey: nextAction?.actionKey || nextAction?.setupAction?.key || null,
+        nextActionOperation: nextAction?.operation || nextAction?.setupAction?.operation || null,
+        launchDayWatchEntry
+      };
+    }
+    return {
+      status: "evidence_recorded",
+      label: "Runway Evidence Recorded",
+      summary: `All ${totalCount} runway evidence items are recorded. Enter launch-day watch after production sign-off.`,
+      pendingEvidenceCount,
+      pendingEvidenceOperationCount,
+      nextActionKey: null,
+      nextActionOperation: null,
+      launchDayWatchEntry
+    };
+  };
+  const launchRunwayHeroStatus = buildLaunchRunwayHeroStatus(launchRunwayChecklistState);
   const launchRunway = stagingArchiveNextOperations || stagingArchiveLaunchRunway || launchRunwayCopyActions.length
     ? {
         source: "developer-ops-launch-duty-action-order",
@@ -13783,7 +13834,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         nextAction: stagingArchiveNextOperations?.nextAction || null,
         copyActions: launchRunwayCopyActions,
         operatorChecklist: launchRunwayOperatorChecklist,
-        checklistState: launchRunwayChecklistState
+        checklistState: launchRunwayChecklistState,
+        heroStatus: launchRunwayHeroStatus
       }
     : null;
   const productionHandoffDownload = createLaunchMainlineDownloadShortcut(
@@ -14081,7 +14133,38 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Checksums", "developer-launch-mainline-sha256.txt", "checksums", params),
     createLaunchMainlineDownloadShortcut("Download Launch Mainline Zip", "developer-launch-mainline.zip", "zip", params)
   ].filter((item) => item?.key);
+  const launchRunwayNextEvidenceAction = launchRunway?.checklistState?.nextEvidenceAction && typeof launchRunway.checklistState.nextEvidenceAction === "object"
+    ? launchRunway.checklistState.nextEvidenceAction
+    : null;
+  const launchRunwayHeroControls = launchRunway?.heroStatus
+    ? (launchRunwayNextEvidenceAction
+      ? [
+          launchRunwayNextEvidenceAction.setupAction ? {
+            kind: "setup",
+            label: "Record Next Runway Evidence",
+            setupAction: launchRunwayNextEvidenceAction.setupAction
+          } : null,
+          launchRunwayNextEvidenceAction.recommendedDownload ? {
+            kind: "download",
+            label: "Download Next Runway Handoff",
+            recommendedDownload: launchRunwayNextEvidenceAction.recommendedDownload
+          } : null
+        ].filter(Boolean)
+      : [
+          {
+            kind: "workspace",
+            label: "Enter Launch-Day Watch",
+            workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Enter Launch-Day Watch", params)
+          },
+          {
+            kind: "download",
+            label: "Download Launch-Day Watch Handoff",
+            recommendedDownload: postLaunchSweepHandoffDownload || operationsHandoffDownload
+          }
+        ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key))
+    : [];
   const heroControls = [
+    ...launchRunwayHeroControls,
     ...workspaceActions.map((item) => ({
       kind: "workspace",
       label: item?.label || item?.key || "Open workspace",
@@ -14092,7 +14175,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       label: item?.label || item?.key || "Download",
       recommendedDownload: item
     }))
-  ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key);
+  ].filter((item) =>
+    item?.workspaceAction?.key
+    || item?.recommendedDownload?.key
+    || item?.bootstrapAction?.key
+    || item?.setupAction?.key
+    || item?.setupAction?.operation
+  );
   const gateRank = (status = "unknown") => {
     const normalized = normalizeLaunchMainlineGateStatus(status);
     if (normalized === "hold") {
@@ -15232,6 +15321,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         `- ${item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action"}`
         + `${item?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
         + `${item?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
+        + `${item?.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}:${item.bootstrapAction.operation || "bootstrap"}` : ""}`
+        + `${item?.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
       );
     }
   }

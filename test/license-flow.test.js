@@ -6623,6 +6623,25 @@ test("developer release package export bundles integration, versions, and notice
         launchRunwayNextEvidenceAction?.recommendedDownload?.href,
         launchRunwayNextEvidenceAction?.downloadHref
       );
+      assert.deepEqual(mainlineLaunchRunway.heroStatus, {
+        status: "pending_evidence",
+        label: "Runway Evidence Pending",
+        summary: "6 runway evidence items are pending across 3 operations. Next: Record Launch Rehearsal Run.",
+        pendingEvidenceCount: 6,
+        pendingEvidenceOperationCount: 3,
+        nextActionKey: "launch_mainline_record_launch_rehearsal_run",
+        nextActionOperation: "record_launch_rehearsal_run",
+        launchDayWatchEntry: "enter_after_production_signoff"
+      });
+      assert.ok(launchMainline.mainlineSummary.heroControls.some((item) =>
+        item?.label === "Record Next Runway Evidence"
+        && item?.setupAction?.operation === "record_launch_rehearsal_run"
+      ));
+      assert.ok(launchMainline.mainlineSummary.heroControls.some((item) =>
+        item?.label === "Download Next Runway Handoff"
+        && item?.recommendedDownload?.key === "launch_mainline_rehearsal_guide"
+        && /format=rehearsal-guide/.test(item?.recommendedDownload?.href || "")
+      ));
       assert.match(
         mainlineLaunchRunway.operatorChecklist.find((item) => item.key === "profile_driven_dry_run")?.value || "",
         /npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable/
@@ -6652,6 +6671,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Mainline Recommended Download:/);
       assert.match(launchMainline.summaryText, /Mainline Continuation:/);
       assert.match(launchMainline.summaryText, /Mainline Hero Controls:/);
+      assert.match(launchMainline.summaryText, /Record Next Runway Evidence[\s\S]*setup=Record Launch Rehearsal Run@evidence:record_launch_rehearsal_run/);
+      assert.match(launchMainline.summaryText, /Download Next Runway Handoff[\s\S]*download=Launch mainline rehearsal guide/);
       assert.match(launchMainline.summaryText, /Open Release Workspace/);
       assert.match(launchMainline.summaryText, /Download Launch Mainline Summary/);
       assert.match(launchMainline.summaryText, /Mainline Route Focus:/);
@@ -8857,6 +8878,31 @@ test("developer launch runway next evidence action advances after each evidence 
     assert.equal(afterSweepState?.recordedEvidenceCount, 6);
     assert.equal(afterSweepState?.pendingEvidenceCount, 0);
     assert.equal(afterSweepState?.nextEvidenceAction, null);
+    assert.deepEqual(sweepResult.launchMainline?.mainlineSummary?.launchRunway?.heroStatus, {
+      status: "evidence_recorded",
+      label: "Runway Evidence Recorded",
+      summary: "All 6 runway evidence items are recorded. Enter launch-day watch after production sign-off.",
+      pendingEvidenceCount: 0,
+      pendingEvidenceOperationCount: 0,
+      nextActionKey: null,
+      nextActionOperation: null,
+      launchDayWatchEntry: "enter_after_production_signoff"
+    });
+    assert.equal(
+      sweepResult.launchMainline?.mainlineSummary?.heroControls?.some((item) =>
+        item?.label === "Record Next Runway Evidence"
+      ),
+      false
+    );
+    assert.ok(sweepResult.launchMainline?.mainlineSummary?.heroControls?.some((item) =>
+      item?.label === "Enter Launch-Day Watch"
+      && item?.workspaceAction?.key === "ops"
+    ));
+    assert.ok(sweepResult.launchMainline?.mainlineSummary?.heroControls?.some((item) =>
+      item?.label === "Download Launch-Day Watch Handoff"
+      && item?.recommendedDownload?.key === "launch_mainline_post_launch_sweep_handoff"
+      && /format=post-launch-sweep-handoff/.test(item?.recommendedDownload?.href || "")
+    ));
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -10529,10 +10575,18 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
         ? actionResult.launchMainline.mainlineSummary.heroControls.map((item) => ({
             kind: item?.kind || null,
-            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            key:
+              item?.workspaceAction?.key
+              || item?.recommendedDownload?.key
+              || item?.bootstrapAction?.key
+              || item?.setupAction?.key
+              || item?.setupAction?.operation
+              || null
           }))
         : [],
       [
+        { kind: "setup", key: "launch_mainline_record_launch_rehearsal_run" },
+        { kind: "download", key: "launch_mainline_rehearsal_guide" },
         ...(Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
           ? actionResult.launchMainline.mainlineSummary.workspaceActions.slice(0, 5).map((item) => ({
               kind: "workspace",
@@ -10553,7 +10607,9 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           ? /^\/developer\//.test(String(item.workspaceAction.href || ""))
           : item?.recommendedDownload?.key
             ? /^\/api\/developer\//.test(String(item.recommendedDownload.href || ""))
-            : false
+            : item?.setupAction?.operation
+              ? true
+              : false
       )
     );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
@@ -11076,7 +11132,13 @@ test("developer launch mainline action can bootstrap starter launch assets and r
       Array.isArray(actionResult.receipt?.mainlineFollowUpActions)
         ? actionResult.receipt.mainlineFollowUpActions.map((item) => ({
             kind: item?.kind || null,
-            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            key:
+              item?.workspaceAction?.key
+              || item?.recommendedDownload?.key
+              || item?.bootstrapAction?.key
+              || item?.setupAction?.key
+              || item?.setupAction?.operation
+              || null
           }))
         : [],
       [
@@ -11085,13 +11147,21 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           ? actionResult.receipt.mainlineHeroControls.map((item) => ({
               kind: item?.kind || null,
               workspaceAction: item?.workspaceAction || null,
-              recommendedDownload: item?.recommendedDownload || null
+              recommendedDownload: item?.recommendedDownload || null,
+              bootstrapAction: item?.bootstrapAction || null,
+              setupAction: item?.setupAction || null
             }))
           : [])
       ]
         .map((item) => ({
           kind: item?.kind || null,
-          key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          key:
+            item?.workspaceAction?.key
+            || item?.recommendedDownload?.key
+            || item?.bootstrapAction?.key
+            || item?.setupAction?.key
+            || item?.setupAction?.operation
+            || null
         }))
         .filter((item) => item.key)
     );
@@ -11877,10 +11947,18 @@ test("developer launch mainline action can create first launch batches and retur
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.heroControls)
         ? actionResult.launchMainline.mainlineSummary.heroControls.map((item) => ({
             kind: item?.kind || null,
-            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            key:
+              item?.workspaceAction?.key
+              || item?.recommendedDownload?.key
+              || item?.bootstrapAction?.key
+              || item?.setupAction?.key
+              || item?.setupAction?.operation
+              || null
           }))
         : [],
       [
+        { kind: "setup", key: "launch_mainline_record_launch_rehearsal_run" },
+        { kind: "download", key: "launch_mainline_rehearsal_guide" },
         ...(Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
           ? actionResult.launchMainline.mainlineSummary.workspaceActions.slice(0, 5).map((item) => ({
               kind: "workspace",
@@ -11901,7 +11979,9 @@ test("developer launch mainline action can create first launch batches and retur
           ? /^\/developer\//.test(String(item.workspaceAction.href || ""))
           : item?.recommendedDownload?.key
             ? /^\/api\/developer\//.test(String(item.recommendedDownload.href || ""))
-            : false
+            : item?.setupAction?.operation
+              ? true
+              : false
       )
     );
     assert.equal(actionResult.receipt?.mainlinePrimaryAction?.key, actionResult.launchMainline?.mainlineSummary?.primaryAction?.key);
@@ -12446,7 +12526,13 @@ test("developer launch mainline action can create first launch batches and retur
       Array.isArray(actionResult.receipt?.mainlineFollowUpActions)
         ? actionResult.receipt.mainlineFollowUpActions.map((item) => ({
             kind: item?.kind || null,
-            key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+            key:
+              item?.workspaceAction?.key
+              || item?.recommendedDownload?.key
+              || item?.bootstrapAction?.key
+              || item?.setupAction?.key
+              || item?.setupAction?.operation
+              || null
           }))
         : [],
       [
@@ -12455,13 +12541,21 @@ test("developer launch mainline action can create first launch batches and retur
           ? actionResult.receipt.mainlineHeroControls.map((item) => ({
               kind: item?.kind || null,
               workspaceAction: item?.workspaceAction || null,
-              recommendedDownload: item?.recommendedDownload || null
+              recommendedDownload: item?.recommendedDownload || null,
+              bootstrapAction: item?.bootstrapAction || null,
+              setupAction: item?.setupAction || null
             }))
           : [])
       ]
         .map((item) => ({
           kind: item?.kind || null,
-          key: item?.workspaceAction?.key || item?.recommendedDownload?.key || null
+          key:
+            item?.workspaceAction?.key
+            || item?.recommendedDownload?.key
+            || item?.bootstrapAction?.key
+            || item?.setupAction?.key
+            || item?.setupAction?.operation
+            || null
         }))
         .filter((item) => item.key)
     );
@@ -17974,6 +18068,10 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /buildRoutedMainlineOperationControl/);
     assert.match(html, /Run Routed Operation/);
     assert.match(html, /mainlineHeroControls/);
+    assert.match(html, /currentMainlineLaunchRunwayHeroStatus/);
+    assert.match(html, /data-mainline-launch-runway-hero-status/);
+    assert.match(html, /Runway Evidence Pending/);
+    assert.match(html, /Runway Evidence Recorded/);
     assert.match(html, /currentMainlineSections/);
     assert.match(html, /mainlineScreen/);
     assert.match(html, /currentMainlineLastActionScreen/);

@@ -17606,6 +17606,14 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /mainline-operator-action-manifest-box/);
     assert.match(html, /currentMainlineOperatorActionManifest/);
     assert.match(html, /renderOperatorActionManifestActions/);
+    assert.match(html, /Staging Archive Launch Runway/);
+    assert.match(html, /mainline-launch-runway-box/);
+    assert.match(html, /currentMainlineLaunchDutyActionOrder/);
+    assert.match(html, /renderMainlineLaunchRunway/);
+    assert.match(html, /copyMainlineLaunchRunwayValue/);
+    assert.match(html, /data-mainline-launch-runway-action="copy-closeout-reload"/);
+    assert.match(html, /data-mainline-launch-runway-action="copy-full-test-window"/);
+    assert.match(html, /data-mainline-launch-runway-action="copy-production-signoff-packet"/);
     assert.match(html, /initialLaunchOperatorActionManifest/);
     assert.match(html, /operatorActionManifest/);
     assert.match(html, /remainingEvidenceChecks/);

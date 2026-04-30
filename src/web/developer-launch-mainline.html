@@ -272,6 +272,10 @@
           <h2>Initial Launch Operator Actions</h2>
           <div id="mainline-operator-action-manifest-box" class="hint">Generate a launch mainline package to inspect initial launch operator actions here.</div>
         </article>
+        <article class="card">
+          <h2>Staging Archive Launch Runway</h2>
+          <div id="mainline-launch-runway-box" class="hint">Generate a launch mainline package to inspect staging closeout, full-test-window, production sign-off, and launch-day watch handoff here.</div>
+        </article>
       </section>
 
       <section class="wide">
@@ -696,6 +700,39 @@
         return null;
       }
 
+      function currentMainlineLaunchDutyActionOrder() {
+        const summaryOrder = currentMainlineSummary().initialLaunchOpsReadiness?.launchDutyActionOrder;
+        if (summaryOrder && typeof summaryOrder === "object") {
+          return summaryOrder;
+        }
+        const directSummaryOrder = currentMainlineSummary().launchDutyActionOrder;
+        if (directSummaryOrder && typeof directSummaryOrder === "object") {
+          return directSummaryOrder;
+        }
+        const opsOrder = currentMainline?.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder;
+        if (opsOrder && typeof opsOrder === "object") {
+          return opsOrder;
+        }
+        return null;
+      }
+
+      function currentMainlineLaunchRunway() {
+        const actionOrder = currentMainlineLaunchDutyActionOrder();
+        const nextOperations = actionOrder?.stagingArchiveNextOperations
+          || (Array.isArray(actionOrder?.steps)
+            ? actionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations
+            : null)
+          || null;
+        const launchRunway = nextOperations?.launchRunway && typeof nextOperations.launchRunway === "object"
+          ? nextOperations.launchRunway
+          : null;
+        return {
+          actionOrder,
+          nextOperations,
+          launchRunway
+        };
+      }
+
       function currentLastMainlineReceipt() {
         return lastMainlineActionResult?.receipt && typeof lastMainlineActionResult.receipt === "object"
           ? lastMainlineActionResult.receipt
@@ -946,6 +983,64 @@
         `;
       }
 
+      async function copyMainlineLaunchRunwayValue(label = "", value = "") {
+        const text = String(value || "").trim();
+        const title = String(label || "Launch runway value").trim() || "Launch runway value";
+        if (!text) {
+          throw new Error(`${title} is not available yet.`);
+        }
+        let copied = false;
+        if (navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          } catch (error) {
+            copied = false;
+          }
+        }
+        setOutput({ mainlineLaunchRunwayCopy: { label: title, value: text, copied } });
+        setStatus(copied ? `${title} copied to clipboard.` : `${title} is ready to copy from the output panel.`);
+      }
+
+      function renderMainlineLaunchRunway() {
+        const { actionOrder, nextOperations, launchRunway } = currentMainlineLaunchRunway();
+        const sequence = Array.isArray(launchRunway?.sequence) && launchRunway.sequence.length
+          ? launchRunway.sequence.join(" -> ")
+          : "";
+        if (!actionOrder && !sequence && !nextOperations) {
+          return '<div class="hint">Generate Launch Mainline to inspect the staging archive launch runway here.</div>';
+        }
+        const currentGate = String(launchRunway?.currentGate || nextOperations?.status || "").trim();
+        const watchEntry = String(launchRunway?.launchDayWatchEntry || "enter_after_production_signoff").trim();
+        const closeoutReload = String(nextOperations?.closeoutReload || "").trim();
+        const fullTestWindow = String(nextOperations?.fullTestWindow || "").trim();
+        const productionSignoffPacket = String(nextOperations?.productionSignoffPacket || "").trim();
+        const tags = [
+          currentGate ? { label: "gate", value: currentGate, strong: true } : null,
+          actionOrder?.status ? { label: "status", value: actionOrder.status, strong: false } : null,
+          actionOrder?.stepCount ? { label: "steps", value: actionOrder.stepCount, strong: false } : null,
+          actionOrder?.downloadCount ? { label: "downloads", value: actionOrder.downloadCount, strong: false } : null
+        ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">Staging archive launch runway</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint" data-mainline-launch-runway-current-gate="${esc(currentGate || "-")}">
+              ${esc(sequence || "closeout_reload -> full_test_window -> production_signoff -> launch_day_watch")}
+            </div>
+            <div class="hint">Current Gate: ${esc(currentGate || "-")} | Launch-Day Watch Entry: ${esc(watchEntry || "-")}</div>
+            <div class="actions">
+              <button type="button" class="secondary" data-mainline-launch-runway-action="copy-closeout-reload" data-mainline-launch-runway-copy-label="Copy Closeout Reload" data-mainline-launch-runway-copy-value="${esc(closeoutReload)}" ${closeoutReload ? "" : "disabled"}>Copy Closeout Reload</button>
+              <button type="button" class="secondary" data-mainline-launch-runway-action="copy-full-test-window" data-mainline-launch-runway-copy-label="Copy Full Test Window" data-mainline-launch-runway-copy-value="${esc(fullTestWindow)}" ${fullTestWindow ? "" : "disabled"}>Copy Full Test Window</button>
+              <button type="button" class="secondary" data-mainline-launch-runway-action="copy-production-signoff-packet" data-mainline-launch-runway-copy-label="Copy Sign-off Packet" data-mainline-launch-runway-copy-value="${esc(productionSignoffPacket)}" ${productionSignoffPacket ? "" : "disabled"}>Copy Sign-off Packet</button>
+            </div>
+            <div class="hint">${esc(nextOperations?.nextAction || actionOrder?.operatorSummary || "Run closeout reload, reserve the guarded full-test-window, then review production sign-off before launch-day watch.")}</div>
+          </div>
+        `;
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const screen = currentMainlineLastActionScreen();
         const sections = Array.isArray(screen.sections) ? screen.sections : [];
@@ -1068,6 +1163,7 @@
         el("route-focus-box").innerHTML = renderRouteFocus();
         el("mainline-next-evidence-box").innerHTML = renderNextProductionEvidenceAction();
         el("mainline-operator-action-manifest-box").innerHTML = renderOperatorActionManifestActions();
+        el("mainline-launch-runway-box").innerHTML = renderMainlineLaunchRunway();
         el("mainline-hero-controls-box").innerHTML = renderHeroControls();
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = page.summaryText || "No launch mainline summary yet.";
@@ -1252,6 +1348,7 @@
         el("stage-gates-box").innerHTML = '<div class="hint">Generate a launch mainline package to compare stage gates here.</div>';
         el("mainline-next-evidence-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect the next production evidence action here.</div>';
         el("mainline-operator-action-manifest-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect initial launch operator actions here.</div>';
+        el("mainline-launch-runway-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect staging closeout, full-test-window, production sign-off, and launch-day watch handoff here.</div>';
         el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
         el("route-focus-box").innerHTML = renderRouteFocus();
         setOutput("Waiting for actions...");
@@ -1291,6 +1388,19 @@
         setOutput({ error: error.message });
       }));
       document.addEventListener("click", async (event) => {
+        const launchRunwayButton = event.target.closest("[data-mainline-launch-runway-action]");
+        if (launchRunwayButton) {
+          try {
+            await copyMainlineLaunchRunwayValue(
+              launchRunwayButton.dataset.mainlineLaunchRunwayCopyLabel,
+              launchRunwayButton.dataset.mainlineLaunchRunwayCopyValue
+            );
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
         const operatorActionButton = event.target.closest("[data-mainline-operator-action-index]");
         if (operatorActionButton) {
           const actionIndex = Number(operatorActionButton.dataset.mainlineOperatorActionIndex || -1);

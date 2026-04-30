@@ -6588,6 +6588,9 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
   const lifecycle = receipt.postLaunchLifecycleSummary && typeof receipt.postLaunchLifecycleSummary === "object"
     ? receipt.postLaunchLifecycleSummary
     : null;
+  const operationalReadiness = receipt.mainlineOperationalReadiness && typeof receipt.mainlineOperationalReadiness === "object"
+    ? receipt.mainlineOperationalReadiness
+    : null;
   const lifecycleNextAction = lifecycle?.nextAction && typeof lifecycle.nextAction === "object"
     ? lifecycle.nextAction
     : null;
@@ -6672,6 +6675,27 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           primaryDownloadFormat: lifecyclePrimaryDownload?.format || null,
           primaryDownloadFileName: lifecyclePrimaryDownload?.fileName || null,
           primaryDownloadHref: lifecyclePrimaryDownload?.href || null
+        }
+      : null,
+    operationalReadiness: operationalReadiness
+      ? {
+          status: operationalReadiness.status || null,
+          label: operationalReadiness.label || null,
+          readyToOperate: operationalReadiness.readyToOperate === true,
+          blockingCount: Number(operationalReadiness.blockingCount || 0),
+          blockingOperationCount: Number(operationalReadiness.blockingOperationCount || 0),
+          watchReady: operationalReadiness.watchReady === true,
+          watchCheckInStatus: operationalReadiness.watchCheckInStatus || null,
+          stabilizationStatus: operationalReadiness.stabilizationStatus || null,
+          steadyStateStatus: operationalReadiness.steadyStateStatus || null,
+          nextActionKey: operationalReadiness.nextActionKey || null,
+          nextOperation: operationalReadiness.nextActionOperation || null,
+          primaryWorkspaceKey: operationalReadiness.primaryWorkspaceAction?.key || null,
+          primaryWorkspaceAutofocus: operationalReadiness.primaryWorkspaceAction?.autofocus || null,
+          primaryDownloadKey: operationalReadiness.primaryDownload?.key || null,
+          primaryDownloadFormat: operationalReadiness.primaryDownload?.format || null,
+          primaryDownloadFileName: operationalReadiness.primaryDownload?.fileName || null,
+          primaryDownloadHref: operationalReadiness.primaryDownload?.href || null
         }
       : null,
     initialLaunchOperator: initialLaunchOperator
@@ -18725,6 +18749,11 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "mainlineGateStatus",
       "evidenceRemainingCount",
       "postLaunchLifecycleStatus",
+      "operationalReadinessStatus",
+      "operationalReadinessLabel",
+      "operationalReadinessReady",
+      "operationalReadinessNextOperation",
+      "operationalReadinessPrimaryDownloadKey",
       "summary",
       "createdAt"
     ],
@@ -18746,6 +18775,11 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       item.mainlineGateStatus,
       item.evidenceRemainingCount,
       item.postLaunchLifecycleStatus,
+      item.operationalReadinessStatus,
+      item.operationalReadinessLabel,
+      item.operationalReadinessReady,
+      item.operationalReadinessNextOperation,
+      item.operationalReadinessPrimaryDownloadKey,
       item.summary,
       item.createdAt
     ])
@@ -18835,6 +18869,23 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         postLaunchLifecyclePrimaryDownloadFormat: receipt.postLaunchLifecycle?.primaryDownloadFormat || null,
         postLaunchLifecyclePrimaryDownloadFileName: receipt.postLaunchLifecycle?.primaryDownloadFileName || null,
         postLaunchLifecyclePrimaryDownloadHref: receipt.postLaunchLifecycle?.primaryDownloadHref || null,
+        operationalReadinessStatus: receipt.operationalReadiness?.status || null,
+        operationalReadinessLabel: receipt.operationalReadiness?.label || null,
+        operationalReadinessReady: receipt.operationalReadiness?.readyToOperate === true,
+        operationalReadinessBlockingCount: receipt.operationalReadiness?.blockingCount ?? null,
+        operationalReadinessBlockingOperationCount: receipt.operationalReadiness?.blockingOperationCount ?? null,
+        operationalReadinessWatchReady: receipt.operationalReadiness?.watchReady === true,
+        operationalReadinessWatchCheckInStatus: receipt.operationalReadiness?.watchCheckInStatus || null,
+        operationalReadinessStabilizationStatus: receipt.operationalReadiness?.stabilizationStatus || null,
+        operationalReadinessSteadyStateStatus: receipt.operationalReadiness?.steadyStateStatus || null,
+        operationalReadinessNextActionKey: receipt.operationalReadiness?.nextActionKey || null,
+        operationalReadinessNextOperation: receipt.operationalReadiness?.nextOperation || null,
+        operationalReadinessPrimaryWorkspaceKey: receipt.operationalReadiness?.primaryWorkspaceKey || null,
+        operationalReadinessPrimaryWorkspaceAutofocus: receipt.operationalReadiness?.primaryWorkspaceAutofocus || null,
+        operationalReadinessPrimaryDownloadKey: receipt.operationalReadiness?.primaryDownloadKey || null,
+        operationalReadinessPrimaryDownloadFormat: receipt.operationalReadiness?.primaryDownloadFormat || null,
+        operationalReadinessPrimaryDownloadFileName: receipt.operationalReadiness?.primaryDownloadFileName || null,
+        operationalReadinessPrimaryDownloadHref: receipt.operationalReadiness?.primaryDownloadHref || null,
         initialLaunchOperatorDecision: receipt.initialLaunchOperator?.decision || null,
         initialLaunchOperatorStatus: receipt.initialLaunchOperator?.status || null,
         initialLaunchOperatorPrimaryActionKey: receipt.initialLaunchOperator?.primaryActionKey || null,
@@ -19050,6 +19101,11 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       mainlineGateStatus: receipt.mainlineGateStatus || null,
       evidenceRemainingCount: receipt.productionEvidenceRemainingCount ?? null,
       postLaunchLifecycleStatus: receipt.postLaunchLifecycleStatus || null,
+      operationalReadinessStatus: receipt.operationalReadinessStatus || null,
+      operationalReadinessLabel: receipt.operationalReadinessLabel || null,
+      operationalReadinessReady: receipt.operationalReadinessReady === true,
+      operationalReadinessNextOperation: receipt.operationalReadinessNextOperation || null,
+      operationalReadinessPrimaryDownloadKey: receipt.operationalReadinessPrimaryDownloadKey || null,
       createdAt: receipt.createdAt || receipt.handoffGeneratedAt || null
     });
   };
@@ -19145,6 +19201,11 @@ function buildLaunchReceiptNextFollowUp(items = []) {
     downloadKey: selected.downloadKey || null,
     handoffFileName: selected.handoffFileName || null,
     mainlineGateStatus: selected.mainlineGateStatus || null,
+    operationalReadinessStatus: selected.operationalReadinessStatus || null,
+    operationalReadinessLabel: selected.operationalReadinessLabel || null,
+    operationalReadinessReady: selected.operationalReadinessReady === true,
+    operationalReadinessNextOperation: selected.operationalReadinessNextOperation || null,
+    operationalReadinessPrimaryDownloadKey: selected.operationalReadinessPrimaryDownloadKey || null,
     createdAt: selected.createdAt || null
   };
 }
@@ -19168,6 +19229,8 @@ function formatLaunchReceiptNextFollowUp(item = null) {
     downloadFileName ? `file=${downloadFileName}` : "",
     downloadFormat ? `format=${downloadFormat}` : "",
     downloadHref ? `href=${downloadHref}` : "",
+    item.operationalReadinessStatus ? `readiness=${item.operationalReadinessStatus}` : "",
+    item.operationalReadinessNextOperation ? `readinessNext=${item.operationalReadinessNextOperation}` : "",
     `handoff=${item.handoffFileName || "-"}`
   ].filter(Boolean).join(" | ");
 }
@@ -22853,7 +22916,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.latestLaunchReceipts) && overview.latestLaunchReceipts.length) {
       lines.push("Latest Launch Receipts:");
       for (const item of overview.latestLaunchReceipts) {
-        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
+        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | readiness=${item.operationalReadinessStatus || "-"} | readinessNext=${item.operationalReadinessNextOperation || "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
         appendDeveloperOpsReceiptVisibilityText(lines, item);
       }
     }
@@ -22880,6 +22943,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | format=${item.downloadFormat || recommendedDownload?.format || "-"}`
           + ` | href=${item.downloadHref || recommendedDownload?.href || "-"}`
           + ` | handoff=${item.handoffFileName || "-"}`
+          + ` | readiness=${item.operationalReadinessStatus || "-"}`
+          + ` | readinessNext=${item.operationalReadinessNextOperation || "-"}`
           + ` | ${item.summary || "-"}`
         );
       }
@@ -23028,6 +23093,9 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Download Key: ${item.downloadKey || "-"}`);
   lines.push(`Handoff File: ${item.handoffFileName || "-"}`);
   lines.push(`Mainline Gate: ${item.mainlineGateStatus || "-"}`);
+  lines.push(`Operational Readiness: ${item.operationalReadinessStatus || "-"}`);
+  lines.push(`Operational Readiness Next: ${item.operationalReadinessNextOperation || "-"}`);
+  lines.push(`Operational Readiness Download: ${item.operationalReadinessPrimaryDownloadKey || "-"}`);
   lines.push(`Created At: ${item.createdAt || "-"}`);
   lines.push(`Recommended Action: ${recommendedAction?.key || "-"}`);
   lines.push(`Action Operation: ${recommendedAction?.operation || "-"}`);

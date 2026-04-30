@@ -2542,16 +2542,19 @@
             item.productionEvidenceRemainingCount !== null && item.productionEvidenceRemainingCount !== undefined
               ? renderTag(`evidenceRemaining:${item.productionEvidenceRemainingCount}`)
               : "",
-            item.postLaunchLifecycleStatus ? renderTag(`lifecycle:${item.postLaunchLifecycleStatus}`) : ""
+            item.postLaunchLifecycleStatus ? renderTag(`lifecycle:${item.postLaunchLifecycleStatus}`) : "",
+            item.operationalReadinessStatus ? renderTag(`readiness:${item.operationalReadinessStatus}`) : ""
           ].filter(Boolean).join("");
           const details = [
             `handoff=${esc(item.handoffFileName || "-")}`,
             `duty=${esc(item.firstLaunchDutyHandoffDownloadKey || "-")}`,
             `next=${esc(item.productionEvidenceNextActionKey || item.postLaunchLifecycleNextActionKey || "-")}`,
+            `readiness=${esc(item.operationalReadinessStatus || "-")}`,
+            `readinessNext=${esc(item.operationalReadinessNextOperation || "-")}`,
             `at=${esc(formatTime(item.createdAt || item.handoffGeneratedAt))}`
           ].join(" | ");
           return `
-            <div class="snapshot-recap">
+            <div class="snapshot-recap" data-launch-receipt-readiness-status="${esc(item.operationalReadinessStatus || "-")}">
               <strong>${esc(item.operationLabel || item.operation || "Launch receipt")}</strong>
               <div class="audit-meta">${tags || renderTag("launch-receipt")}</div>
               <div class="hint">${details}</div>
@@ -2620,7 +2623,7 @@
       }
 
       function renderLaunchReceiptOperatorSummary(item = null) {
-        if (!item?.initialLaunchOperatorNextOperation && !item?.initialLaunchOperatorPrimaryActionKey) {
+        if (!item?.initialLaunchOperatorNextOperation && !item?.initialLaunchOperatorPrimaryActionKey && !item?.operationalReadinessStatus) {
           return "";
         }
         const tags = [
@@ -2629,13 +2632,17 @@
           item.initialLaunchOperatorPrimaryActionKey ? renderTag(`primary:${item.initialLaunchOperatorPrimaryActionKey}`, true) : "",
           item.initialLaunchOperatorActionCount !== null && item.initialLaunchOperatorActionCount !== undefined
             ? renderTag(`actions:${item.initialLaunchOperatorActionCount}`)
-            : ""
+            : "",
+          item.operationalReadinessStatus ? renderTag(`readiness:${item.operationalReadinessStatus}`) : ""
         ].filter(Boolean).join("");
         const details = [
           `operation=${esc(item.initialLaunchOperatorNextOperation || "-")}`,
           `action=${esc(item.initialLaunchOperatorNextActionKey || "-")}`,
           `download=${esc(item.initialLaunchOperatorNextDownloadFileName || item.initialLaunchOperatorNextDownloadKey || "-")}`,
-          `workspace=${esc(item.initialLaunchOperatorWorkspaceKey || "-")}@${esc(item.initialLaunchOperatorWorkspaceAutofocus || "-")}`
+          `workspace=${esc(item.initialLaunchOperatorWorkspaceKey || "-")}@${esc(item.initialLaunchOperatorWorkspaceAutofocus || "-")}`,
+          `readiness=${esc(item.operationalReadinessStatus || "-")}`,
+          `readinessNext=${esc(item.operationalReadinessNextOperation || "-")}`,
+          `readinessDownload=${esc(item.operationalReadinessPrimaryDownloadKey || "-")}`
         ].join(" | ");
         const operatorDownloadHref = String(item.initialLaunchOperatorNextDownloadHref || "").trim();
         const actionAttrs = [
@@ -2646,11 +2653,14 @@
           item.initialLaunchOperatorNextDownloadKey ? `data-operator-download-key="${esc(item.initialLaunchOperatorNextDownloadKey)}"` : "",
           item.initialLaunchOperatorNextDownloadFileName ? `data-operator-download-file-name="${esc(item.initialLaunchOperatorNextDownloadFileName)}"` : "",
           operatorDownloadHref ? `data-operator-download-href="${esc(operatorDownloadHref)}"` : "",
-          item.initialLaunchOperatorWorkspaceAutofocus ? `data-operator-workspace-autofocus="${esc(item.initialLaunchOperatorWorkspaceAutofocus)}"` : ""
+          item.initialLaunchOperatorWorkspaceAutofocus ? `data-operator-workspace-autofocus="${esc(item.initialLaunchOperatorWorkspaceAutofocus)}"` : "",
+          item.operationalReadinessStatus ? `data-operational-readiness-status="${esc(item.operationalReadinessStatus)}"` : "",
+          item.operationalReadinessNextOperation ? `data-operational-readiness-next-operation="${esc(item.operationalReadinessNextOperation)}"` : "",
+          item.operationalReadinessPrimaryDownloadKey ? `data-operational-readiness-download-key="${esc(item.operationalReadinessPrimaryDownloadKey)}"` : ""
         ].filter(Boolean).join(" ");
         return `
           <div class="hint">
-            <strong>Initial Operator Next</strong>
+            <strong>Initial Operator Next / Operational Readiness</strong>
             <div class="audit-meta">${tags || renderTag("initial-operator")}</div>
             <div>${details}</div>
             <div class="snapshot-recap-actions" style="margin-top:8px;">
@@ -2675,13 +2685,16 @@
             item.mainlineGateStatus ? renderTag(`gate:${String(item.mainlineGateStatus).toUpperCase()}`) : "",
             item.evidenceRemainingCount !== null && item.evidenceRemainingCount !== undefined
               ? renderTag(`evidenceRemaining:${item.evidenceRemainingCount}`)
-              : ""
+              : "",
+            item.operationalReadinessStatus ? renderTag(`readiness:${item.operationalReadinessStatus}`) : ""
           ].filter(Boolean).join("");
           const details = [
             `action=${esc(item.actionKey || "-")}`,
             `operation=${esc(item.operationToRecord || item.operation || "-")}`,
             `download=${esc(item.downloadFileName || item.downloadKey || "-")}`,
-            `handoff=${esc(item.handoffFileName || "-")}`
+            `handoff=${esc(item.handoffFileName || "-")}`,
+            `readiness=${esc(item.operationalReadinessStatus || "-")}`,
+            `readinessNext=${esc(item.operationalReadinessNextOperation || "-")}`
           ].join(" | ");
           const recommendedDownload = item.recommendedDownload || {};
           const downloadHref = String(item.downloadHref || recommendedDownload.href || "").trim();
@@ -2728,6 +2741,8 @@
           recommendedAction.operation || item.operationToRecord || item.operation
             ? `operation=${recommendedAction.operation || item.operationToRecord || item.operation}`
             : "",
+          item.operationalReadinessStatus ? `readiness=${item.operationalReadinessStatus}` : "",
+          item.operationalReadinessNextOperation ? `readinessNext=${item.operationalReadinessNextOperation}` : "",
           workspaceAction?.href ? "workspace=ready" : "",
           recommendedDownload?.href ? "download=ready" : ""
         ].filter(Boolean);

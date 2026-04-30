@@ -14565,6 +14565,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.handoffFileName, launchOpsAction.receipt.handoffFileName);
     assert.equal(latestLaunchReceipt.hasHandoffText, true);
     assert.equal(latestLaunchReceipt.handoffText, undefined);
+    assert.equal(latestLaunchReceipt.operationalReadinessStatus, launchOpsAction.receipt.mainlineOperationalReadiness.status);
+    assert.equal(latestLaunchReceipt.operationalReadinessLabel, "Still Needs Evidence");
+    assert.equal(latestLaunchReceipt.operationalReadinessReady, false);
+    assert.equal(latestLaunchReceipt.operationalReadinessNextOperation, "record_launch_rehearsal_run");
+    assert.equal(latestLaunchReceipt.operationalReadinessPrimaryDownloadKey, "launch_mainline_rehearsal_guide");
     assert.equal(latestLaunchReceipt.initialLaunchOperatorDecision, "no_go");
     assert.equal(latestLaunchReceipt.initialLaunchOperatorPrimaryActionKey, "launch_mainline_follow_up");
     assert.equal(latestLaunchReceipt.initialLaunchOperatorActionCount, 1);
@@ -14605,6 +14610,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptEvidenceFollowUp.actionKey, latestLaunchReceipt.productionEvidenceNextActionKey);
     assert.equal(launchReceiptEvidenceFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptEvidenceFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.equal(launchReceiptEvidenceFollowUp.operationalReadinessStatus, "still_needs_evidence");
+    assert.equal(launchReceiptEvidenceFollowUp.operationalReadinessNextOperation, "record_launch_rehearsal_run");
     assert.match(launchReceiptEvidenceFollowUp.summary, /production evidence checks remain/i);
     const launchReceiptLifecycleFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.operation === "record_post_launch_ops_sweep" && item.stage === "post_launch_lifecycle"
@@ -14617,6 +14624,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptLifecycleFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.match(launchReceiptLifecycleFollowUp.summary, /Post-launch lifecycle status/i);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptFollowUps, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
+    assert.match(launchReceiptSnapshot.summaryText, /readiness=still_needs_evidence/);
+    assert.match(launchReceiptSnapshot.summaryText, /readinessNext=record_launch_rehearsal_run/);
     assert.ok(launchReceiptSnapshot.summary.launchReceiptAuditBackfill >= 1);
     assert.equal(
       launchReceiptSnapshot.summary.launchReceiptAuditBackfill,
@@ -19798,7 +19807,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Latest Launch Receipts/);
     assert.match(html, /latestLaunchReceipts/);
     assert.match(html, /renderLatestLaunchReceipts/);
+    assert.match(html, /operationalReadinessStatus/);
+    assert.match(html, /data-launch-receipt-readiness-status/);
+    assert.match(html, /Operational Readiness/);
     assert.match(html, /renderLaunchReceiptOperatorSummary/);
+    assert.match(html, /operationalReadinessNextOperation/);
     assert.match(html, /initialLaunchOperatorNextOperation/);
     assert.match(html, /initialLaunchOperatorNextDownloadFileName/);
     assert.match(html, /Initial Operator Next/);

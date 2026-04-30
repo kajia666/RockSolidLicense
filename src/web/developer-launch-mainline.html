@@ -718,6 +718,24 @@
 
       function currentMainlineLaunchRunway() {
         const actionOrder = currentMainlineLaunchDutyActionOrder();
+        const summaryRunway = currentMainlineSummary().launchRunway && typeof currentMainlineSummary().launchRunway === "object"
+          ? currentMainlineSummary().launchRunway
+          : null;
+        if (summaryRunway) {
+          const copyActions = Array.isArray(summaryRunway.copyActions) ? summaryRunway.copyActions : [];
+          const copyValue = (key = "") => copyActions.find((item) => item?.key === key)?.value || "";
+          return {
+            actionOrder,
+            nextOperations: {
+              status: summaryRunway.status || summaryRunway.currentGate || "",
+              closeoutReload: copyValue("closeout_reload"),
+              fullTestWindow: copyValue("full_test_window"),
+              productionSignoffPacket: copyValue("production_signoff_packet"),
+              nextAction: summaryRunway.nextAction || ""
+            },
+            launchRunway: summaryRunway
+          };
+        }
         const nextOperations = actionOrder?.stagingArchiveNextOperations
           || (Array.isArray(actionOrder?.steps)
             ? actionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations

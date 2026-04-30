@@ -6508,6 +6508,36 @@ test("developer release package export bundles integration, versions, and notice
         item.key === "launch_mainline_initial_launch_ops_readiness"
         && item.source === "developer-launch-mainline"
       ));
+      const mainlineLaunchRunway = launchMainline.mainlineSummary.launchRunway;
+      assert.ok(mainlineLaunchRunway);
+      assert.equal(mainlineLaunchRunway.source, "developer-ops-launch-duty-action-order");
+      assert.equal(mainlineLaunchRunway.status, "ready_for_closeout_reload");
+      assert.equal(mainlineLaunchRunway.currentGate, "ready_for_closeout_reload");
+      assert.equal(mainlineLaunchRunway.launchDayWatchEntry, "enter_after_production_signoff");
+      assert.deepEqual(
+        mainlineLaunchRunway.sequence,
+        ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"]
+      );
+      assert.deepEqual(
+        mainlineLaunchRunway.copyActions.map((item) => [item.key, item.kind]),
+        [
+          ["closeout_reload", "command"],
+          ["full_test_window", "command"],
+          ["production_signoff_packet", "artifact_path"]
+        ]
+      );
+      assert.match(
+        mainlineLaunchRunway.copyActions.find((item) => item.key === "closeout_reload")?.value || "",
+        /npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable --closeout-input-file artifacts\/staging\/RELPKG_ALPHA\/stable\/filled-closeout-input\.json/
+      );
+      assert.equal(
+        mainlineLaunchRunway.copyActions.find((item) => item.key === "full_test_window")?.value,
+        "npm.cmd test"
+      );
+      assert.equal(
+        mainlineLaunchRunway.copyActions.find((item) => item.key === "production_signoff_packet")?.value,
+        "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+      );
       assert.ok(
         launchMainline.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
         < launchMainline.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
@@ -6540,6 +6570,11 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Mainline Recommended Download: .*href=.*\/api\/developer\/launch-mainline\/download\?/);
       assert.match(launchMainline.summaryText, /Mainline Continuation:[\s\S]*recommendedDownload: .*href=.*\/api\/developer\//);
       assert.match(launchMainline.summaryText, /control: Download Launch Mainline Summary \| download=.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/);
+      assert.match(launchMainline.summaryText, /Mainline Launch Runway:/);
+      assert.match(launchMainline.summaryText, /- sequence: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
+      assert.match(launchMainline.summaryText, /- action=Copy Closeout Reload \| kind=command \| value=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable --closeout-input-file artifacts\/staging\/RELPKG_ALPHA\/stable\/filled-closeout-input\.json/);
+      assert.match(launchMainline.summaryText, /- action=Copy Full Test Window \| kind=command \| value=npm\.cmd test/);
+      assert.match(launchMainline.summaryText, /- action=Copy Sign-off Packet \| kind=artifact_path \| value=artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchMainline.summaryText, /Run Routed Operation/);
       assert.match(launchMainline.summaryText, /Mainline Next Actions:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
@@ -6597,6 +6632,10 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
       assert.match(launchMainlineSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-sweep-handoff/);
       assert.match(launchMainlineSummaryDownload.body, /control: Download Launch Mainline Summary \| download=.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/);
+      assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway:/);
+      assert.match(launchMainlineSummaryDownload.body, /Copy Closeout Reload/);
+      assert.match(launchMainlineSummaryDownload.body, /Copy Full Test Window/);
+      assert.match(launchMainlineSummaryDownload.body, /Copy Sign-off Packet/);
       assert.match(launchMainlineSummaryDownload.body, /Run Routed Operation/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Next Actions:/);
       assert.match(launchMainlineSummaryDownload.body, /Stage Gates:/);

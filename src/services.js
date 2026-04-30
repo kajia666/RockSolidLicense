@@ -13473,6 +13473,66 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "initial-launch-ops-readiness",
     params
   );
+  const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
+  const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
+    || (Array.isArray(launchDutyActionOrder?.steps)
+      ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations
+      : null)
+    || null;
+  const stagingArchiveLaunchRunway = stagingArchiveNextOperations?.launchRunway && typeof stagingArchiveNextOperations.launchRunway === "object"
+    ? stagingArchiveNextOperations.launchRunway
+    : null;
+  const buildLaunchRunwayCopyAction = ({
+    key = "",
+    label = "",
+    kind = "text",
+    value = ""
+  } = {}) => {
+    const normalizedValue = String(value || "").trim();
+    if (!key || !normalizedValue) {
+      return null;
+    }
+    return {
+      key,
+      label: label || key,
+      kind,
+      value: normalizedValue
+    };
+  };
+  const launchRunwayCopyActions = [
+    buildLaunchRunwayCopyAction({
+      key: "closeout_reload",
+      label: "Copy Closeout Reload",
+      kind: "command",
+      value: stagingArchiveNextOperations?.closeoutReload
+    }),
+    buildLaunchRunwayCopyAction({
+      key: "full_test_window",
+      label: "Copy Full Test Window",
+      kind: "command",
+      value: stagingArchiveNextOperations?.fullTestWindow
+    }),
+    buildLaunchRunwayCopyAction({
+      key: "production_signoff_packet",
+      label: "Copy Sign-off Packet",
+      kind: "artifact_path",
+      value: stagingArchiveNextOperations?.productionSignoffPacket
+    })
+  ].filter(Boolean);
+  const launchRunway = stagingArchiveNextOperations || stagingArchiveLaunchRunway || launchRunwayCopyActions.length
+    ? {
+        source: "developer-ops-launch-duty-action-order",
+        mode: stagingArchiveLaunchRunway?.mode || "staging-archive-launch-runway",
+        status: stagingArchiveNextOperations?.status || stagingArchiveLaunchRunway?.currentGate || "unknown",
+        currentGate: stagingArchiveLaunchRunway?.currentGate || stagingArchiveNextOperations?.status || "unknown",
+        launchDayWatchEntry: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff",
+        sequence: Array.isArray(stagingArchiveLaunchRunway?.sequence) && stagingArchiveLaunchRunway.sequence.length
+          ? stagingArchiveLaunchRunway.sequence
+          : ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
+        nextAction: stagingArchiveNextOperations?.nextAction || null,
+        copyActions: launchRunwayCopyActions
+      }
+    : null;
   const productionHandoffDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline production handoff",
     "developer-launch-mainline-production-handoff.txt",
@@ -14557,6 +14617,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
+    launchRunway,
     continuation,
     stages,
     overviewCards,
@@ -14618,6 +14679,29 @@ function appendPostLaunchLifecycleTextLines(lines = [], mainlineSummary = {}) {
   lines.push(`- Primary Lifecycle Download: ${formatLaunchHandoffDownloadText(lifecycle.primaryRecommendedDownload, { fileSeparator: " | " })}`);
   lines.push(`- Lifecycle Workspace Actions: ${labelList(workspaceActions)}`);
   lines.push(`- Lifecycle Recommended Downloads: ${downloadList(recommendedDownloads)}`);
+  return true;
+}
+
+function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
+  if (!Array.isArray(lines) || !launchRunway || typeof launchRunway !== "object") {
+    return false;
+  }
+  const sequence = Array.isArray(launchRunway.sequence) && launchRunway.sequence.length
+    ? launchRunway.sequence.join(" -> ")
+    : "-";
+  lines.push("");
+  lines.push("Mainline Launch Runway:");
+  lines.push(`- source: ${launchRunway.source || "-"}`);
+  lines.push(`- status: ${launchRunway.status || "-"}`);
+  lines.push(`- currentGate: ${launchRunway.currentGate || "-"}`);
+  lines.push(`- launchDayWatchEntry: ${launchRunway.launchDayWatchEntry || "-"}`);
+  lines.push(`- sequence: ${sequence}`);
+  if (launchRunway.nextAction) {
+    lines.push(`- nextAction: ${launchRunway.nextAction}`);
+  }
+  for (const item of Array.isArray(launchRunway.copyActions) ? launchRunway.copyActions : []) {
+    lines.push(`- action=${item.label || item.key || "-"} | kind=${item.kind || "text"} | value=${item.value || "-"}`);
+  }
   return true;
 }
 
@@ -14839,6 +14923,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       );
     }
   }
+  appendMainlineLaunchRunwayTextLines(lines, mainlineSummary.launchRunway);
   if (mainlineSummary.routeFocus && typeof mainlineSummary.routeFocus === "object") {
     lines.push("Mainline Route Focus:");
     lines.push(`- title: ${mainlineSummary.routeFocus.title || "-"}`);

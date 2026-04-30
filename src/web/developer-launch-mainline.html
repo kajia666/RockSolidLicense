@@ -280,6 +280,10 @@
           <h2>Launch-Day Watch</h2>
           <div id="mainline-launch-day-watch-box" class="hint">Generate a launch mainline package to inspect launch-day watch readiness, first-wave checkpoints, and handoff downloads here.</div>
         </article>
+        <article class="card">
+          <h2>Stabilization Handoff</h2>
+          <div id="mainline-stabilization-handoff-box" class="hint">Generate a launch mainline package to inspect stabilization handoff status, confirmation, and traceability downloads here.</div>
+        </article>
       </section>
 
       <section class="wide">
@@ -787,6 +791,17 @@
           : null;
       }
 
+      function currentMainlineStabilizationHandoffPanel() {
+        const page = currentMainlinePage();
+        if (page.stabilizationHandoffPanel && typeof page.stabilizationHandoffPanel === "object") {
+          return page.stabilizationHandoffPanel;
+        }
+        const summaryPanel = currentMainlineSummary().stabilizationHandoffPanel;
+        return summaryPanel && typeof summaryPanel === "object"
+          ? summaryPanel
+          : null;
+      }
+
       function mainlineLaunchRunwayEvidenceControls(action = currentMainlineLaunchRunwayNextEvidenceAction()) {
         if (!action || typeof action !== "object") {
           return [];
@@ -857,6 +872,37 @@
           return "Record post-launch ops sweep";
         }
         return normalized || "-";
+      }
+
+      function mainlineStabilizationHandoffControls(panel = currentMainlineStabilizationHandoffPanel()) {
+        if (!panel || typeof panel !== "object") {
+          return [];
+        }
+        if (Array.isArray(panel.controls) && panel.controls.length) {
+          return panel.controls;
+        }
+        return [
+          panel.primaryWorkspaceAction ? {
+            kind: "workspace",
+            label: "Open Ops Workspace",
+            workspaceAction: panel.primaryWorkspaceAction
+          } : null,
+          panel.primaryDownload ? {
+            kind: "download",
+            label: "Download Stabilization Handoff",
+            recommendedDownload: panel.primaryDownload
+          } : null,
+          panel.indexDownload ? {
+            kind: "download",
+            label: "Download Post-Launch Handoff Index",
+            recommendedDownload: panel.indexDownload
+          } : null,
+          panel.routeMapDownload ? {
+            kind: "download",
+            label: "Download Handoff Route Map",
+            recommendedDownload: panel.routeMapDownload
+          } : null
+        ].filter(Boolean);
       }
 
       function currentLastMainlineReceipt() {
@@ -1330,6 +1376,73 @@
         `;
       }
 
+      function renderStabilizationHandoffPanel() {
+        const panel = currentMainlineStabilizationHandoffPanel();
+        if (!panel) {
+          return '<div class="hint">Generate Launch Mainline to inspect stabilization handoff readiness here.</div>';
+        }
+        const controls = mainlineStabilizationHandoffControls(panel);
+        const checklist = Array.isArray(panel.checklist) ? panel.checklist : [];
+        const tags = [
+          panel.status ? { label: "status", value: panel.status, strong: panel.status === "confirmed" } : null,
+          panel.confirmationStatus ? { label: "confirmation", value: panel.confirmationStatus, strong: panel.confirmationStatus === "confirmed" } : null,
+          panel.lifecycleStatus ? { label: "lifecycle", value: panel.lifecycleStatus, strong: false } : null,
+          panel.decision ? { label: "decision", value: panel.decision, strong: false } : null
+        ].filter(Boolean).map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+        const nextActionMarkup = panel.nextActionKey || panel.nextActionOperation
+          ? `<div class="hint">Next Stabilization Action: ${esc(panel.nextActionKey || "-")} | operation=${esc(panel.nextActionOperation || "-")}</div>`
+          : "";
+        const confirmationMarkup = `
+          <div class="hint" data-mainline-stabilization-handoff-status="${esc(panel.status || "-")}">
+            Confirmation: ${esc(panel.confirmationStatus || "-")}
+            | audit=${esc(panel.confirmationAuditLogId || "-")}
+            | by=${esc(panel.confirmationBy || "-")}
+          </div>
+        `;
+        const lifecycleMarkup = `
+          <div class="hint">
+            Lifecycle: status=${esc(panel.lifecycleStatus || "-")}
+            | next=${esc(panel.lifecycleNextOperation || "-")}
+            | latestReceipt=${esc(panel.latestReceiptOperation || "-")}
+            | latestOperator=${esc(panel.latestOperatorOperation || "-")}
+          </div>
+        `;
+        const downloadsMarkup = `
+          <div class="hint">
+            Primary Download: ${esc(panel.primaryDownload?.label || panel.primaryDownload?.key || "-")}
+            | Index Download: ${esc(panel.indexDownload?.label || panel.indexDownload?.key || "-")}
+            | Route Map: ${esc(panel.routeMapDownload?.label || panel.routeMapDownload?.key || "-")}
+          </div>
+        `;
+        const checklistMarkup = checklist.length
+          ? `
+            <div class="hint">
+              Handoff Checklist:
+              <br>${checklist.map((item, index) => `${index + 1}. ${esc(item || "-")}`).join("<br>")}
+            </div>
+          `
+          : "";
+        return `
+          <div class="item">
+            <div class="item-head">
+              <div class="item-title">${esc(panel.label || "Stabilization Handoff")}</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint">${esc(panel.summary || "Keep stabilization handoff state and traceability downloads visible here.")}</div>
+            ${confirmationMarkup}
+            ${lifecycleMarkup}
+            ${nextActionMarkup}
+            ${downloadsMarkup}
+            ${checklistMarkup}
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-stabilization-handoff-control-index="${controlIndex}">${esc(control.label || control.workspaceAction?.label || control.recommendedDownload?.label || control.setupAction?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
       function renderLastMainlineFollowUp(result = null) {
         const screen = currentMainlineLastActionScreen();
         const sections = Array.isArray(screen.sections) ? screen.sections : [];
@@ -1461,6 +1574,7 @@
         el("mainline-operator-action-manifest-box").innerHTML = renderOperatorActionManifestActions();
         el("mainline-launch-runway-box").innerHTML = renderMainlineLaunchRunway();
         el("mainline-launch-day-watch-box").innerHTML = renderLaunchDayWatchPanel();
+        el("mainline-stabilization-handoff-box").innerHTML = renderStabilizationHandoffPanel();
         el("mainline-hero-controls-box").innerHTML = renderHeroControls();
         el("mainline-followup-box").innerHTML = renderLastMainlineFollowUp(lastMainlineActionResult);
         el("mainline-summary").textContent = page.summaryText || "No launch mainline summary yet.";
@@ -1647,6 +1761,7 @@
         el("mainline-operator-action-manifest-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect initial launch operator actions here.</div>';
         el("mainline-launch-runway-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect staging closeout, full-test-window, production sign-off, and launch-day watch handoff here.</div>';
         el("mainline-launch-day-watch-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect launch-day watch readiness, first-wave checkpoints, and handoff downloads here.</div>';
+        el("mainline-stabilization-handoff-box").innerHTML = '<div class="hint">Generate a launch mainline package to inspect stabilization handoff status, confirmation, and traceability downloads here.</div>';
         el("mainline-followup-box").innerHTML = 'Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.';
         el("route-focus-box").innerHTML = renderRouteFocus();
         setOutput("Waiting for actions...");
@@ -1727,6 +1842,18 @@
         if (launchDayWatchButton) {
           const controlIndex = Number(launchDayWatchButton.dataset.mainlineLaunchDayWatchControlIndex || -1);
           const controls = mainlineLaunchDayWatchControls();
+          try {
+            await executeMainlineControl(controls[controlIndex] || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
+        const stabilizationHandoffButton = event.target.closest("[data-mainline-stabilization-handoff-control-index]");
+        if (stabilizationHandoffButton) {
+          const controlIndex = Number(stabilizationHandoffButton.dataset.mainlineStabilizationHandoffControlIndex || -1);
+          const controls = mainlineStabilizationHandoffControls();
           try {
             await executeMainlineControl(controls[controlIndex] || null);
           } catch (error) {

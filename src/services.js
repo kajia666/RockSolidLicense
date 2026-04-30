@@ -5408,6 +5408,27 @@ function buildLaunchMainlineActionReceipt({
           : []
       }
     : null;
+  const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabilizationHandoffPanel && typeof launchMainline.mainlineSummary.stabilizationHandoffPanel === "object"
+    ? {
+        ...launchMainline.mainlineSummary.stabilizationHandoffPanel,
+        primaryWorkspaceAction: launchMainline.mainlineSummary.stabilizationHandoffPanel.primaryWorkspaceAction || null,
+        primaryDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.primaryDownload || null,
+        indexDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.indexDownload || null,
+        routeMapDownload: launchMainline.mainlineSummary.stabilizationHandoffPanel.routeMapDownload || null,
+        checklist: Array.isArray(launchMainline.mainlineSummary.stabilizationHandoffPanel.checklist)
+          ? launchMainline.mainlineSummary.stabilizationHandoffPanel.checklist.filter((item) => String(item || "").trim() !== "")
+          : [],
+        controls: Array.isArray(launchMainline.mainlineSummary.stabilizationHandoffPanel.controls)
+          ? launchMainline.mainlineSummary.stabilizationHandoffPanel.controls.map((control) => ({
+              kind: control?.kind || null,
+              label: control?.label || control?.workspaceAction?.label || control?.recommendedDownload?.label || control?.setupAction?.label || control?.kind || "Action",
+              workspaceAction: control?.workspaceAction || null,
+              recommendedDownload: control?.recommendedDownload || null,
+              setupAction: control?.setupAction || null
+            }))
+          : []
+      }
+    : null;
   const mainlineScreen = {
     heroControls: mainlineHeroControls,
     sections: mainlineSections
@@ -6225,6 +6246,7 @@ function buildLaunchMainlineActionReceipt({
     form: mainlineForm,
     routeFocus: mainlineRouteFocus,
     launchDayWatchPanel: mainlineLaunchDayWatchPanel,
+    stabilizationHandoffPanel: mainlineStabilizationHandoffPanel,
     sections: mainlineSections,
     lastActionScreen: mainlineLastActionScreen
   };
@@ -6233,6 +6255,7 @@ function buildLaunchMainlineActionReceipt({
     form: mainlineForm,
     routeFocus: mainlineRouteFocus,
     launchDayWatchPanel: mainlineView.launchDayWatchPanel,
+    stabilizationHandoffPanel: mainlineView.stabilizationHandoffPanel,
     sections: mainlineView.sections,
     lastActionScreen: mainlineView.lastActionScreen,
     summaryText: launchMainline?.summaryText || ""
@@ -13915,6 +13938,18 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "post-launch-sweep-handoff",
     params
   );
+  const postLaunchHandoffIndexDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline post-launch handoff index",
+    "developer-launch-mainline-post-launch-handoff-index.txt",
+    "post-launch-handoff-index",
+    params
+  );
+  const handoffDownloadRoutesDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline handoff download routes",
+    "handoff-download-routes.txt",
+    "handoff-download-routes",
+    params
+  );
   const opsContinuationWorkspaceAction = createLaunchWorkflowOpsRouteActionShortcut(
     opsPrimaryWorkspaceAction,
     opsRouteReview.continuation?.primaryAction,
@@ -14159,6 +14194,23 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const launchRunwayNextEvidenceAction = launchRunway?.checklistState?.nextEvidenceAction && typeof launchRunway.checklistState.nextEvidenceAction === "object"
     ? launchRunway.checklistState.nextEvidenceAction
     : null;
+  const dedupeSummaryPanelControls = (items = []) => {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      const controlKey = [
+        item?.kind || "",
+        item?.workspaceAction?.key || "",
+        item?.recommendedDownload?.key || "",
+        item?.bootstrapAction?.key || "",
+        item?.setupAction?.operation || item?.setupAction?.key || ""
+      ].join(":");
+      if (!controlKey || seen.has(controlKey)) {
+        return false;
+      }
+      seen.add(controlKey);
+      return true;
+    });
+  };
   const launchDayWatchPanel = launchRunway?.heroStatus
     ? (() => {
         const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
@@ -14250,6 +14302,160 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             || item?.setupAction?.key
             || item?.setupAction?.operation
           )
+        };
+      })()
+    : null;
+  const stabilizationHandoffPanel = (
+    (initialLaunchOpsReadiness?.stabilizationHandoff && typeof initialLaunchOpsReadiness.stabilizationHandoff === "object")
+    || (productionGate?.postLaunchLifecycle && typeof productionGate.postLaunchLifecycle === "object")
+    || (Array.isArray(productionGate?.checks) && productionGate.checks.some((item) =>
+      item?.key === "production_stabilization_handoff" || item?.key === "production_launch_stabilization_review_recent"
+    ))
+  )
+    ? (() => {
+        const stabilizationHandoff = initialLaunchOpsReadiness?.stabilizationHandoff && typeof initialLaunchOpsReadiness.stabilizationHandoff === "object"
+          ? initialLaunchOpsReadiness.stabilizationHandoff
+          : null;
+        const productionPostLaunchLifecycle = productionGate?.postLaunchLifecycle && typeof productionGate.postLaunchLifecycle === "object"
+          ? productionGate.postLaunchLifecycle
+          : null;
+        const productionChecks = Array.isArray(productionGate?.checks) ? productionGate.checks : [];
+        const stabilizationHandoffCheck = productionChecks.find((item) => item?.key === "production_stabilization_handoff") || null;
+        const stabilizationEvidenceCheck = productionChecks.find((item) => item?.key === "production_launch_stabilization_review_recent") || null;
+        const derivedStabilizationLifecyclePhase = (() => {
+          const handoffStatus = String(stabilizationHandoffCheck?.status || "").trim().toLowerCase();
+          const evidenceStatus = String(stabilizationEvidenceCheck?.status || "").trim().toLowerCase();
+          const phaseStatus = [handoffStatus, evidenceStatus].some((item) => item === "block")
+            ? "hold"
+            : [handoffStatus, evidenceStatus].some((item) => item && item !== "pass")
+              ? "review"
+              : (handoffStatus || evidenceStatus ? "ready" : null);
+          const nextAction = [stabilizationEvidenceCheck, stabilizationHandoffCheck].find((item) =>
+            item && String(item.status || "").trim().toLowerCase() !== "pass"
+          ) || null;
+          const workspaceAction = nextAction?.workspaceAction
+            || stabilizationHandoffCheck?.workspaceAction
+            || stabilizationEvidenceCheck?.workspaceAction
+            || null;
+          return phaseStatus || nextAction || workspaceAction
+            ? {
+                key: "stabilization",
+                label: "Stabilization",
+                status: phaseStatus,
+                nextAction,
+                workspaceAction
+              }
+            : null;
+        })();
+        const stabilizationLifecyclePhase = Array.isArray(productionPostLaunchLifecycle?.phases)
+          ? productionPostLaunchLifecycle.phases.find((item) => String(item?.key || "").trim().toLowerCase() === "stabilization") || null
+          : derivedStabilizationLifecyclePhase;
+        const confirmation = stabilizationHandoff?.confirmation && typeof stabilizationHandoff.confirmation === "object"
+          ? stabilizationHandoff.confirmation
+          : null;
+        const nextAction = [
+          stabilizationHandoff?.nextAction && typeof stabilizationHandoff.nextAction === "object"
+            ? stabilizationHandoff.nextAction
+            : null,
+          stabilizationLifecyclePhase?.nextAction && typeof stabilizationLifecyclePhase.nextAction === "object"
+            ? stabilizationLifecyclePhase.nextAction
+            : null,
+          productionPostLaunchLifecycle?.nextAction && typeof productionPostLaunchLifecycle.nextAction === "object"
+            ? productionPostLaunchLifecycle.nextAction
+            : null
+        ].find((item) => item && typeof item === "object") || null;
+        const nextActionSetupAction = nextAction?.setupAction && typeof nextAction.setupAction === "object"
+          ? nextAction.setupAction
+          : nextAction?.actionKey && String(nextAction?.operation || "").trim()
+            ? {
+                key: nextAction.actionKey,
+                label: nextAction.title || "Record Stabilization Next Action",
+                summary: nextAction.title
+                  ? `Keep stabilization moving by recording ${nextAction.title} from Launch Mainline.`
+                  : "Keep stabilization moving by recording the next Launch Mainline follow-up.",
+                mode: String(nextAction.operation || "").trim().toLowerCase().startsWith("record_") ? "evidence" : "recommended",
+                operation: String(nextAction.operation || "").trim().toLowerCase()
+              }
+          : null;
+        const nextActionOperation = String(nextActionSetupAction?.operation || nextAction?.operation || "").trim().toLowerCase() || null;
+        const primaryWorkspaceAction = initialLaunchOpsReadiness?.primaryWorkspaceAction
+          || stabilizationLifecyclePhase?.workspaceAction
+          || productionPostLaunchLifecycle?.primaryWorkspaceAction
+          || nextAction?.workspaceAction
+          || createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Ops Workspace", params);
+        const panelStatus = confirmation?.status === "confirmed"
+          ? "confirmed"
+          : nextActionOperation
+            ? "pending_next_action"
+            : "pending_confirmation";
+        const controls = dedupeSummaryPanelControls([
+          nextActionSetupAction && (
+            nextActionOperation === "first_batch_setup"
+            || nextActionOperation === "restock"
+            || nextActionOperation.startsWith("record_")
+          ) ? {
+            kind: "setup",
+            label: "Record Stabilization Next Action",
+            setupAction: nextActionSetupAction
+          } : null,
+          primaryWorkspaceAction ? {
+            kind: "workspace",
+            label: primaryWorkspaceAction.label
+              || (confirmation?.status === "confirmed" ? "Open Steady-State Ops Workspace" : "Open Ops Workspace"),
+            workspaceAction: primaryWorkspaceAction
+          } : null,
+          stabilizationHandoffDownload ? {
+            kind: "download",
+            label: "Download Stabilization Handoff",
+            recommendedDownload: stabilizationHandoffDownload
+          } : null,
+          postLaunchHandoffIndexDownload ? {
+            kind: "download",
+            label: "Download Post-Launch Handoff Index",
+            recommendedDownload: postLaunchHandoffIndexDownload
+          } : null,
+          handoffDownloadRoutesDownload ? {
+            kind: "download",
+            label: "Download Handoff Route Map",
+            recommendedDownload: handoffDownloadRoutesDownload
+          } : null
+        ].filter(Boolean));
+        return {
+          status: panelStatus,
+          label: confirmation?.status === "confirmed"
+            ? "Stabilization Handoff Confirmed"
+            : nextActionOperation
+              ? "Stabilization Handoff Pending Next Action"
+              : "Stabilization Handoff Pending Confirmation",
+          summary: confirmation?.status === "confirmed"
+            ? "Developer Ops has confirmed the stabilization handoff. Keep the handoff bundle and traceability files attached for steady-state monitoring."
+            : nextActionOperation
+              ? `${nextAction?.title || nextAction?.label || nextActionOperation} is still queued before stabilization handoff can be confirmed.`
+              : "Launch Mainline is aligned for steady monitoring. Confirm the stabilization handoff in Developer Ops before handing off the lane.",
+          decision: stabilizationHandoff?.decision || null,
+          lifecycleStatus: stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleStatus
+            || stabilizationLifecyclePhase?.status
+            || productionPostLaunchLifecycle?.status
+            || null,
+          lifecycleNextOperation: stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleNextOperation
+            || stabilizationLifecyclePhase?.nextAction?.setupAction?.operation
+            || stabilizationLifecyclePhase?.nextAction?.operation
+            || productionPostLaunchLifecycle?.nextAction?.setupAction?.operation
+            || productionPostLaunchLifecycle?.nextAction?.operation
+            || null,
+          latestReceiptOperation: stabilizationHandoff?.latestLaunchReceipt?.operation || null,
+          latestOperatorOperation: stabilizationHandoff?.latestOperatorActionReceipt?.operation || null,
+          nextActionKey: nextAction?.actionKey || nextActionSetupAction?.key || nextAction?.key || null,
+          nextActionOperation,
+          confirmationStatus: confirmation?.status || null,
+          confirmationAuditLogId: confirmation?.auditLogId || null,
+          confirmationBy: confirmation?.confirmedBy?.username || null,
+          primaryWorkspaceAction,
+          primaryDownload: stabilizationHandoffDownload || null,
+          indexDownload: postLaunchHandoffIndexDownload || null,
+          routeMapDownload: handoffDownloadRoutesDownload || null,
+          checklist: Array.isArray(stabilizationHandoff?.checklist) ? stabilizationHandoff.checklist.filter(Boolean) : [],
+          controls
         };
       })()
     : null;
@@ -14412,6 +14618,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stabilizationHandoffDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchHandoffIndexDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(handoffDownloadRoutesDownload, params));
   const orderedRecommendedDownloads = frontloadLaunchMainlineRehearsalDownload(recommendedDownloads);
   const overallGate = buildLaunchMainlineGatePayload({
     status: preferredStage?.gate?.status || "ready",
@@ -15056,12 +15264,25 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           : []
       }
     : null;
+  const ensuredStabilizationHandoffPanel = stabilizationHandoffPanel && typeof stabilizationHandoffPanel === "object"
+    ? {
+        ...stabilizationHandoffPanel,
+        primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(stabilizationHandoffPanel.primaryWorkspaceAction, params),
+        primaryDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.primaryDownload, params),
+        indexDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.indexDownload, params),
+        routeMapDownload: ensureLaunchWorkflowDownloadHref(stabilizationHandoffPanel.routeMapDownload, params),
+        controls: Array.isArray(stabilizationHandoffPanel.controls)
+          ? stabilizationHandoffPanel.controls.map((item) => ensureLaunchMainlineControlHrefs(item, params))
+          : []
+      }
+    : null;
   const mainlineView = {
     heroControls: screen.heroControls,
     form,
     routeFocus,
     sections: screen.sections,
     launchDayWatchPanel: ensuredLaunchDayWatchPanel,
+    stabilizationHandoffPanel: ensuredStabilizationHandoffPanel,
     lastActionScreen: {
       sections: []
     }
@@ -15072,6 +15293,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     routeFocus,
     sections: mainlineView.sections,
     launchDayWatchPanel: mainlineView.launchDayWatchPanel,
+    stabilizationHandoffPanel: mainlineView.stabilizationHandoffPanel,
     lastActionScreen: mainlineView.lastActionScreen,
     summaryText: ""
   };
@@ -15092,6 +15314,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsReadinessDownload,
     launchRunway,
     launchDayWatchPanel: ensuredLaunchDayWatchPanel,
+    stabilizationHandoffPanel: ensuredStabilizationHandoffPanel,
     continuation,
     stages,
     overviewCards,
@@ -15268,6 +15491,52 @@ function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = nu
     lines.push(`- firstWaveCheckpoints: ${launchDayWatchPanel.firstWaveCheckpoints.join(", ")}`);
   }
   for (const control of Array.isArray(launchDayWatchPanel.controls) ? launchDayWatchPanel.controls : []) {
+    lines.push(
+      `- control: ${control?.label || control?.kind || "Action"}`
+      + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
+      + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
+      + `${control?.setupAction ? ` | setup=${control.setupAction.label || control.setupAction.key || "-"}@${control.setupAction.mode || "recommended"}:${control.setupAction.operation || "-"}` : ""}`
+    );
+  }
+  return true;
+}
+
+function appendStabilizationHandoffPanelTextLines(lines = [], stabilizationHandoffPanel = null, formatWorkspaceActionText = (value) => value || "-") {
+  if (!Array.isArray(lines) || !stabilizationHandoffPanel || typeof stabilizationHandoffPanel !== "object") {
+    return false;
+  }
+  lines.push("");
+  lines.push("Stabilization Handoff Panel:");
+  lines.push(`- status: ${stabilizationHandoffPanel.status || "-"}`);
+  lines.push(`- label: ${stabilizationHandoffPanel.label || "-"}`);
+  lines.push(`- summary: ${stabilizationHandoffPanel.summary || "-"}`);
+  lines.push(
+    `- decision: ${stabilizationHandoffPanel.decision || "-"}`
+    + ` | lifecycleStatus=${stabilizationHandoffPanel.lifecycleStatus || "-"}`
+    + ` | lifecycleNext=${stabilizationHandoffPanel.lifecycleNextOperation || "-"}`
+  );
+  lines.push(
+    `- latestReceipt: ${stabilizationHandoffPanel.latestReceiptOperation || "-"}`
+    + ` | latestOperator=${stabilizationHandoffPanel.latestOperatorOperation || "-"}`
+  );
+  if (stabilizationHandoffPanel.nextActionKey || stabilizationHandoffPanel.nextActionOperation) {
+    lines.push(`- nextAction: ${stabilizationHandoffPanel.nextActionKey || "-"} | operation=${stabilizationHandoffPanel.nextActionOperation || "-"}`);
+  }
+  lines.push(
+    `- confirmation: ${stabilizationHandoffPanel.confirmationStatus || "-"}`
+    + ` | audit=${stabilizationHandoffPanel.confirmationAuditLogId || "-"}`
+    + ` | by=${stabilizationHandoffPanel.confirmationBy || "-"}`
+  );
+  lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(stabilizationHandoffPanel.primaryWorkspaceAction)}`);
+  lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(stabilizationHandoffPanel.primaryDownload, { fileSeparator: " | " })}`);
+  lines.push(`- indexDownload: ${formatLaunchHandoffDownloadText(stabilizationHandoffPanel.indexDownload, { fileSeparator: " | " })}`);
+  lines.push(`- routeMapDownload: ${formatLaunchHandoffDownloadText(stabilizationHandoffPanel.routeMapDownload, { fileSeparator: " | " })}`);
+  if (Array.isArray(stabilizationHandoffPanel.checklist) && stabilizationHandoffPanel.checklist.length) {
+    for (const item of stabilizationHandoffPanel.checklist) {
+      lines.push(`- checklist: ${item}`);
+    }
+  }
+  for (const control of Array.isArray(stabilizationHandoffPanel.controls) ? stabilizationHandoffPanel.controls : []) {
     lines.push(
       `- control: ${control?.label || control?.kind || "Action"}`
       + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
@@ -15499,6 +15768,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     }
   }
   appendLaunchDayWatchPanelTextLines(lines, mainlineSummary.launchDayWatchPanel, formatWorkspaceActionText);
+  appendStabilizationHandoffPanelTextLines(lines, mainlineSummary.stabilizationHandoffPanel, formatWorkspaceActionText);
   appendMainlineLaunchRunwayTextLines(lines, mainlineSummary.launchRunway);
   if (mainlineSummary.routeFocus && typeof mainlineSummary.routeFocus === "object") {
     lines.push("Mainline Route Focus:");

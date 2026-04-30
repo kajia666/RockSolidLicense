@@ -6700,6 +6700,118 @@ test("developer release package export bundles integration, versions, and notice
         item?.label === "Download Launch-Day Watch Handoff"
         && item?.recommendedDownload?.key === "launch_mainline_post_launch_sweep_handoff"
       ));
+      const stabilizationHandoff = launchMainline.mainlineSummary.initialLaunchOpsReadiness?.stabilizationHandoff || null;
+      const stabilizationLifecyclePhase = Array.isArray(launchMainline.mainlineSummary.productionGate?.postLaunchLifecycle?.phases)
+        ? launchMainline.mainlineSummary.productionGate.postLaunchLifecycle.phases.find((item) => item?.key === "stabilization") || null
+        : null;
+      const stabilizationPanelNextAction = stabilizationHandoff?.nextAction
+        || stabilizationLifecyclePhase?.nextAction
+        || null;
+      const stabilizationPanelWorkspaceAction = launchMainline.mainlineSummary.initialLaunchOpsReadiness?.primaryWorkspaceAction
+        || stabilizationLifecyclePhase?.workspaceAction
+        || stabilizationPanelNextAction?.workspaceAction
+        || null;
+      const stabilizationHandoffPanel = launchMainline.mainlineSummary.stabilizationHandoffPanel;
+      assert.ok(stabilizationHandoffPanel);
+      assert.deepEqual({
+        status: stabilizationHandoffPanel?.status,
+        confirmationStatus: stabilizationHandoffPanel?.confirmationStatus,
+        decision: stabilizationHandoffPanel?.decision,
+        lifecycleStatus: stabilizationHandoffPanel?.lifecycleStatus,
+        lifecycleNextOperation: stabilizationHandoffPanel?.lifecycleNextOperation,
+        latestReceiptOperation: stabilizationHandoffPanel?.latestReceiptOperation,
+        latestOperatorOperation: stabilizationHandoffPanel?.latestOperatorOperation,
+        nextActionOperation: stabilizationHandoffPanel?.nextActionOperation,
+        nextActionKey: stabilizationHandoffPanel?.nextActionKey,
+        primaryWorkspaceAction: stabilizationHandoffPanel?.primaryWorkspaceAction
+          ? {
+              key: stabilizationHandoffPanel.primaryWorkspaceAction.key,
+              autofocus: stabilizationHandoffPanel.primaryWorkspaceAction.autofocus,
+              label: stabilizationHandoffPanel.primaryWorkspaceAction.label
+            }
+          : null,
+        primaryDownload: stabilizationHandoffPanel?.primaryDownload
+          ? {
+              key: stabilizationHandoffPanel.primaryDownload.key,
+              format: stabilizationHandoffPanel.primaryDownload.format
+            }
+          : null,
+        indexDownload: stabilizationHandoffPanel?.indexDownload
+          ? {
+              key: stabilizationHandoffPanel.indexDownload.key,
+              format: stabilizationHandoffPanel.indexDownload.format
+            }
+          : null,
+        routeMapDownload: stabilizationHandoffPanel?.routeMapDownload
+          ? {
+              key: stabilizationHandoffPanel.routeMapDownload.key,
+              format: stabilizationHandoffPanel.routeMapDownload.format
+            }
+          : null,
+        checklistCount: Array.isArray(stabilizationHandoffPanel?.checklist) ? stabilizationHandoffPanel.checklist.length : 0
+      }, {
+        status: stabilizationHandoff?.confirmation?.status === "confirmed"
+          ? "confirmed"
+          : (stabilizationPanelNextAction?.setupAction?.operation || stabilizationPanelNextAction?.operation)
+            ? "pending_next_action"
+            : "pending_confirmation",
+        confirmationStatus: stabilizationHandoff?.confirmation?.status || null,
+        decision: stabilizationHandoff?.decision || null,
+        lifecycleStatus: stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleStatus
+          || stabilizationLifecyclePhase?.status
+          || launchMainline.mainlineSummary.productionGate?.postLaunchLifecycle?.status
+          || null,
+        lifecycleNextOperation: stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleNextOperation
+          || stabilizationLifecyclePhase?.nextAction?.setupAction?.operation
+          || stabilizationLifecyclePhase?.nextAction?.operation
+          || launchMainline.mainlineSummary.productionGate?.postLaunchLifecycle?.nextAction?.setupAction?.operation
+          || launchMainline.mainlineSummary.productionGate?.postLaunchLifecycle?.nextAction?.operation
+          || null,
+        latestReceiptOperation: stabilizationHandoff?.latestLaunchReceipt?.operation || null,
+        latestOperatorOperation: stabilizationHandoff?.latestOperatorActionReceipt?.operation || null,
+        nextActionOperation: stabilizationPanelNextAction?.setupAction?.operation || stabilizationPanelNextAction?.operation || null,
+        nextActionKey: stabilizationHandoff?.nextAction?.actionKey
+          || stabilizationPanelNextAction?.actionKey
+          || stabilizationPanelNextAction?.setupAction?.key
+          || stabilizationPanelNextAction?.key
+          || null,
+        primaryWorkspaceAction: stabilizationPanelWorkspaceAction
+          ? {
+              key: stabilizationPanelWorkspaceAction.key,
+              autofocus: stabilizationPanelWorkspaceAction.autofocus,
+              label: stabilizationPanelWorkspaceAction.label
+            }
+          : null,
+        primaryDownload: {
+          key: "launch_mainline_stabilization_handoff",
+          format: "stabilization-handoff"
+        },
+        indexDownload: {
+          key: "launch_mainline_post_launch_handoff_index",
+          format: "post-launch-handoff-index"
+        },
+        routeMapDownload: {
+          key: "launch_mainline_handoff_download_routes",
+          format: "handoff-download-routes"
+        },
+        checklistCount: Array.isArray(stabilizationHandoff?.checklist) ? stabilizationHandoff.checklist.length : 0
+      });
+      assert.ok(stabilizationHandoffPanel?.controls?.some((item) =>
+        item?.label === "Download Stabilization Handoff"
+        && item?.recommendedDownload?.key === "launch_mainline_stabilization_handoff"
+      ));
+      assert.ok(stabilizationHandoffPanel?.controls?.some((item) =>
+        item?.label === "Record Stabilization Next Action"
+        && item?.setupAction?.operation === (stabilizationPanelNextAction?.setupAction?.operation || stabilizationPanelNextAction?.operation || null)
+      ));
+      assert.ok(stabilizationHandoffPanel?.controls?.some((item) =>
+        item?.label === "Download Post-Launch Handoff Index"
+        && item?.recommendedDownload?.key === "launch_mainline_post_launch_handoff_index"
+      ));
+      assert.ok(stabilizationHandoffPanel?.controls?.some((item) =>
+        item?.label === "Download Handoff Route Map"
+        && item?.recommendedDownload?.key === "launch_mainline_handoff_download_routes"
+      ));
       assert.ok(launchMainline.mainlineSummary.heroControls.some((item) =>
         item?.label === "Record Next Runway Evidence"
         && item?.setupAction?.operation === "record_launch_rehearsal_run"
@@ -6747,6 +6859,11 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- primaryWorkspace: Open Ops Workspace@snapshot/);
       assert.match(launchMainline.summaryText, /- primaryDownload: Launch mainline post-launch sweep handoff/);
       assert.match(launchMainline.summaryText, /- firstWaveCheckpoints: confirm_runtime_alerting, review_first_wave_sessions, record_post_launch_ops_sweep/);
+      assert.match(launchMainline.summaryText, /Stabilization Handoff Panel:/);
+      assert.match(launchMainline.summaryText, /- status: pending_next_action/);
+      assert.match(launchMainline.summaryText, /- primaryDownload: Launch mainline stabilization handoff/);
+      assert.match(launchMainline.summaryText, /- indexDownload: Launch Mainline post-launch handoff index/);
+      assert.match(launchMainline.summaryText, /- routeMapDownload: Launch Mainline handoff download routes/);
       assert.match(launchMainline.summaryText, /Open Release Workspace/);
       assert.match(launchMainline.summaryText, /Download Launch Mainline Summary/);
       assert.match(launchMainline.summaryText, /Mainline Route Focus:/);
@@ -15388,6 +15505,46 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadHref,
       /\/api\/developer\/ops\/export\/download\?/
     );
+    assert.deepEqual({
+      status: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.status,
+      confirmationStatus: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationStatus,
+      confirmationAuditLogId: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationAuditLogId,
+      confirmationBy: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationBy,
+      primaryDownload: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.primaryDownload
+        ? {
+            key: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.primaryDownload.key,
+            format: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.primaryDownload.format
+          }
+        : null,
+      indexDownload: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.indexDownload
+        ? {
+            key: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.indexDownload.key,
+            format: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.indexDownload.format
+          }
+        : null
+    }, {
+      status: "confirmed",
+      confirmationStatus: "confirmed",
+      confirmationAuditLogId: stabilizationConfirmation.auditLogId,
+      confirmationBy: "ops.export.operator",
+      primaryDownload: {
+        key: "launch_mainline_stabilization_handoff",
+        format: "stabilization-handoff"
+      },
+      indexDownload: {
+        key: "launch_mainline_post_launch_handoff_index",
+        format: "post-launch-handoff-index"
+      }
+    });
+    assert.ok(launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.controls?.some((item) =>
+      item?.label === "Download Stabilization Handoff"
+      && item?.recommendedDownload?.key === "launch_mainline_stabilization_handoff"
+    ));
+    assert.match(launchMainlineTraceability.summaryText, /Stabilization Handoff Panel:/);
+    assert.match(
+      launchMainlineTraceability.summaryText,
+      new RegExp(`- confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`)
+    );
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.recommendedDownload.href,
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadHref
@@ -18211,13 +18368,18 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /mainlineHeroControls/);
     assert.match(html, /currentMainlineLaunchRunwayHeroStatus/);
     assert.match(html, /currentMainlineLaunchDayWatchPanel/);
+    assert.match(html, /currentMainlineStabilizationHandoffPanel/);
     assert.match(html, /data-mainline-launch-runway-hero-status/);
     assert.match(html, /mainline-launch-day-watch-box/);
+    assert.match(html, /mainline-stabilization-handoff-box/);
     assert.match(html, /renderLaunchDayWatchPanel/);
+    assert.match(html, /renderStabilizationHandoffPanel/);
     assert.match(html, /data-mainline-launch-day-watch-status/);
+    assert.match(html, /data-mainline-stabilization-handoff-status/);
     assert.match(html, /Runway Evidence Pending/);
     assert.match(html, /Runway Evidence Recorded/);
     assert.match(html, /Launch-Day Watch/);
+    assert.match(html, /Stabilization Handoff/);
     assert.match(html, /currentMainlineSections/);
     assert.match(html, /mainlineScreen/);
     assert.match(html, /currentMainlineLastActionScreen/);

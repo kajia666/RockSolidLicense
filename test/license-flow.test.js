@@ -9027,6 +9027,34 @@ test("developer launch mainline action can record a launch rehearsal run and ref
       && Array.isArray(item.details)
       && item.details.some((detail) => /Evidence queue:/i.test(String(detail || "")))
     ));
+    assert.equal(
+      actionResult.receipt?.mainlineOperationalReadiness?.status,
+      actionResult.launchMainline?.mainlineSummary?.operationalReadiness?.status
+    );
+    assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.status, "still_needs_evidence");
+    assert.equal(
+      actionResult.receipt?.mainlineOperationalReadiness?.nextActionOperation,
+      "record_launch_day_readiness_review"
+    );
+    assert.ok(actionResult.receipt.mainlineRecapCards.some((item) =>
+      item?.key === "operational_readiness"
+      && /Still Needs Evidence/i.test(String(item.title || ""))
+      && Array.isArray(item.details)
+      && item.details.some((detail) => /Next operational action: record_launch_day_readiness_review/i.test(String(detail || "")))
+      && Array.isArray(item.controls)
+      && item.controls.some((control) =>
+        control?.label === "Record Operational Readiness Action"
+        && control?.setupAction?.operation === "record_launch_day_readiness_review"
+      )
+    ));
+    assert.ok(actionResult.receipt.mainlineLastActionScreen?.sections?.some((section) =>
+      section?.key === "recap"
+      && Array.isArray(section.cards)
+      && section.cards.some((card) => card?.key === "operational_readiness")
+    ));
+    assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:/);
+    assert.match(actionResult.receipt?.handoffText || "", /- status: still_needs_evidence \| label=Still Needs Evidence \| ready=false/);
+    assert.match(actionResult.receipt?.handoffText || "", /- nextAction: .*operation=record_launch_day_readiness_review/);
     assert.ok(Array.isArray(actionResult.followUp.actions));
     assert.ok(actionResult.followUp.actions.some((item) =>
       item?.recommendedDownload?.key === "launch_mainline_rehearsal_guide"

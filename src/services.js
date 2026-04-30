@@ -4621,6 +4621,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
   mainlineOverallGate = null,
   mainlinePrimaryAction = null,
   mainlineRecommendedDownload = null,
+  mainlineOperationalReadiness = null,
   mainlineEvidenceQueue = null,
   firstLaunchInventoryQueue = null,
   firstLaunchOpsQueue = null,
@@ -4641,6 +4642,12 @@ function buildLaunchMainlineActionReceiptHandoffText({
     `Message: ${result?.message || `${operationLabel || operation || "Launch action"} completed.`}`,
     `Follow-up: ${followUp?.summary || "-"}`
   ];
+  const formatWorkspaceActionText = (action = null) => {
+    if (!action || typeof action !== "object") {
+      return "-";
+    }
+    return `${action.label || action.key || "-"}@${action.autofocus || "-"}${action.href ? ` | href=${action.href}` : ""}`;
+  };
 
   lines.push("");
   lines.push("Mainline Gate:");
@@ -4648,6 +4655,29 @@ function buildLaunchMainlineActionReceiptHandoffText({
   lines.push(`- headline: ${mainlineOverallGate?.headline || "-"}`);
   lines.push(`- primaryAction: ${mainlinePrimaryAction?.title || mainlinePrimaryAction?.label || mainlinePrimaryAction?.key || followUp?.primaryAction?.label || "-"}`);
   lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(mainlineRecommendedDownload, { fileSeparator: " | " })}`);
+
+  if (mainlineOperationalReadiness && typeof mainlineOperationalReadiness === "object") {
+    lines.push("");
+    lines.push("Operational Readiness After Action:");
+    lines.push(
+      `- status: ${mainlineOperationalReadiness.status || "-"}`
+      + ` | label=${mainlineOperationalReadiness.label || "-"}`
+      + ` | ready=${mainlineOperationalReadiness.readyToOperate === true}`
+    );
+    lines.push(`- summary: ${mainlineOperationalReadiness.summary || "-"}`);
+    lines.push(
+      `- blockers: evidence=${Number(mainlineOperationalReadiness.blockingCount || 0)}`
+      + ` | operations=${Number(mainlineOperationalReadiness.blockingOperationCount || 0)}`
+      + ` | watchCheckIn=${mainlineOperationalReadiness.watchCheckInStatus || "-"}`
+      + ` | stabilization=${mainlineOperationalReadiness.stabilizationStatus || "-"}`
+      + ` | steadyState=${mainlineOperationalReadiness.steadyStateStatus || "-"}`
+    );
+    if (mainlineOperationalReadiness.nextActionKey || mainlineOperationalReadiness.nextActionOperation) {
+      lines.push(`- nextAction: ${mainlineOperationalReadiness.nextActionKey || "-"} | operation=${mainlineOperationalReadiness.nextActionOperation || "-"}`);
+    }
+    lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(mainlineOperationalReadiness.primaryWorkspaceAction)}`);
+    lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(mainlineOperationalReadiness.primaryDownload, { fileSeparator: " | " })}`);
+  }
 
   if (mainlineEvidenceQueue) {
     lines.push("");
@@ -6197,6 +6227,34 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
       ].filter(Boolean),
       controls: []
     },
+    mainlineOperationalReadiness ? {
+      key: "operational_readiness",
+      title: mainlineOperationalReadiness.label || "Operational Readiness",
+      summary: mainlineOperationalReadiness.summary || "Review operational readiness after this Launch Mainline action.",
+      tags: [
+        mainlineOperationalReadiness.status
+          ? { label: "status", value: String(mainlineOperationalReadiness.status).toUpperCase(), strong: mainlineOperationalReadiness.readyToOperate === true }
+          : null,
+        { label: "ready", value: mainlineOperationalReadiness.readyToOperate === true ? "YES" : "NO", strong: mainlineOperationalReadiness.readyToOperate === true },
+        { label: "evidence", value: Number(mainlineOperationalReadiness.blockingCount || 0), strong: Number(mainlineOperationalReadiness.blockingCount || 0) > 0 },
+        mainlineOperationalReadiness.watchCheckInStatus ? { label: "watch", value: mainlineOperationalReadiness.watchCheckInStatus, strong: mainlineOperationalReadiness.watchCheckInStatus === "checked_in" } : null,
+        mainlineOperationalReadiness.steadyStateStatus ? { label: "steady", value: mainlineOperationalReadiness.steadyStateStatus, strong: mainlineOperationalReadiness.steadyStateStatus === "ready_for_steady_state" } : null
+      ].filter(Boolean),
+      details: [
+        mainlineOperationalReadiness.nextActionOperation
+          ? `Next operational action: ${mainlineOperationalReadiness.nextActionOperation}`
+          : "Next operational action: none",
+        `Watch check-in: ${mainlineOperationalReadiness.watchCheckInStatus || "-"}`,
+        `Stabilization: ${mainlineOperationalReadiness.stabilizationStatus || "-"}`,
+        `Steady-state: ${mainlineOperationalReadiness.steadyStateStatus || "-"}`,
+        mainlineOperationalReadiness.primaryDownload
+          ? `Operational handoff: ${mainlineOperationalReadiness.primaryDownload.label || mainlineOperationalReadiness.primaryDownload.key || "-"}`
+          : ""
+      ].filter(Boolean),
+      controls: Array.isArray(mainlineOperationalReadiness.controls)
+        ? mainlineOperationalReadiness.controls
+        : []
+    } : null,
     {
       key: "mainline_status",
       title: mainlineOverallGate?.headline || "Unified launch mainline status",
@@ -6342,6 +6400,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     mainlineOverallGate,
     mainlinePrimaryAction,
     mainlineRecommendedDownload,
+    mainlineOperationalReadiness,
     mainlineEvidenceQueue,
     firstLaunchInventoryQueue,
     firstLaunchOpsQueue,
@@ -6371,6 +6430,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     mainlineOverallGate,
     mainlinePrimaryAction,
     mainlineRecommendedDownload,
+    mainlineOperationalReadiness,
     mainlineContinuation,
     mainlineNextActions,
     mainlineEvidenceQueue,

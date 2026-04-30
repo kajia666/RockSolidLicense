@@ -17985,6 +17985,12 @@ function buildDeveloperOpsLaunchDutyActionOrder({
         closeoutReload: stagingLaunchDutyArchive.commands?.closeoutReload || null,
         fullTestWindow: stagingLaunchDutyArchive.commands?.fullTestWindow || null,
         productionSignoffPacket: stagingLaunchDutyArchive.files?.productionSignoffPacket || null,
+        launchRunway: {
+          mode: "staging-archive-launch-runway",
+          currentGate: stagingLaunchDutyArchive.packetCompleteness?.missingCount ? "waiting_for_packet_paths" : "ready_for_closeout_reload",
+          sequence: ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
+          launchDayWatchEntry: "enter_after_production_signoff"
+        },
         nextAction: stagingLaunchDutyArchive.packetCompleteness?.missingCount
           ? stagingLaunchDutyArchive.packetCompleteness.nextAction || "Fill missing staging packet paths before closeout reload."
           : "Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off."
@@ -18067,6 +18073,15 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
     lines.push(`- Staging Archive Closeout Reload: ${stagingArchiveNextOperations.closeoutReload || "-"}`);
     lines.push(`- Staging Archive Production Signoff Packet: ${stagingArchiveNextOperations.productionSignoffPacket || "-"}`);
     lines.push(`- Staging Archive Full Test Window: ${stagingArchiveNextOperations.fullTestWindow || "-"}`);
+    const launchRunway = stagingArchiveNextOperations.launchRunway || null;
+    if (launchRunway && typeof launchRunway === "object") {
+      const sequence = Array.isArray(launchRunway.sequence) && launchRunway.sequence.length
+        ? launchRunway.sequence.join(" -> ")
+        : "-";
+      lines.push(`- Staging Archive Launch Runway: ${sequence}`);
+      lines.push(`- Staging Archive Runway Current Gate: ${launchRunway.currentGate || "-"}`);
+      lines.push(`- Staging Archive Launch-Day Watch Entry: ${launchRunway.launchDayWatchEntry || "-"}`);
+    }
     lines.push(`- Staging Archive Next Readiness Step: ${stagingArchiveNextOperations.nextAction || "-"}`);
   }
   lines.push("- Steps:");

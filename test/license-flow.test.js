@@ -6333,6 +6333,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /Staging Archive Closeout Reload: npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable --closeout-input-file artifacts\/staging\/RELPKG_ALPHA\/stable\/filled-closeout-input\.json/);
       assert.match(launchReview.summaryText, /Staging Archive Production Signoff Packet: artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchReview.summaryText, /Staging Archive Full Test Window: npm\.cmd test/);
+      assert.match(launchReview.summaryText, /Staging Archive Launch Runway: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
+      assert.match(launchReview.summaryText, /Staging Archive Runway Current Gate: ready_for_closeout_reload/);
+      assert.match(launchReview.summaryText, /Staging Archive Launch-Day Watch Entry: enter_after_production_signoff/);
       assert.match(launchReview.summaryText, /Launch Review Route Focus:/);
       assert.match(launchReview.summaryText, /Continue launch review sweep/);
       assert.match(launchReview.summaryText, /operation=record_post_launch_ops_sweep/);
@@ -6370,6 +6373,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Staging Archive Closeout Reload: npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable --closeout-input-file artifacts\/staging\/RELPKG_ALPHA\/stable\/filled-closeout-input\.json/);
       assert.match(launchReviewSummaryDownload.body, /Staging Archive Production Signoff Packet: artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchReviewSummaryDownload.body, /Staging Archive Full Test Window: npm\.cmd test/);
+      assert.match(launchReviewSummaryDownload.body, /Staging Archive Launch Runway: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
+      assert.match(launchReviewSummaryDownload.body, /Staging Archive Runway Current Gate: ready_for_closeout_reload/);
+      assert.match(launchReviewSummaryDownload.body, /Staging Archive Launch-Day Watch Entry: enter_after_production_signoff/);
       assert.match(launchReviewSummaryDownload.body, /Launch Review Route Focus:/);
       assert.match(launchReviewSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff/);
@@ -9075,6 +9081,9 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(smokeKit.summaryText || "", /Staging Archive Closeout Reload: npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code BOOT_ALPHA --channel stable --closeout-input-file artifacts\/staging\/BOOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(smokeKit.summaryText || "", /Staging Archive Production Signoff Packet: artifacts\/staging\/BOOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(smokeKit.summaryText || "", /Staging Archive Full Test Window: npm\.cmd test/);
+    assert.match(smokeKit.summaryText || "", /Staging Archive Launch Runway: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
+    assert.match(smokeKit.summaryText || "", /Staging Archive Runway Current Gate: ready_for_closeout_reload/);
+    assert.match(smokeKit.summaryText || "", /Staging Archive Launch-Day Watch Entry: enter_after_production_signoff/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Route Focus:/);
     assert.match(smokeKit.summaryText || "", /Continue launch smoke sweep/);
     assert.match(smokeKit.summaryText || "", /operation=record_post_launch_ops_sweep/);
@@ -9103,6 +9112,9 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(smokeKitSummaryDownload.body, /Staging Archive Closeout Reload: npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code BOOT_ALPHA --channel stable --closeout-input-file artifacts\/staging\/BOOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(smokeKitSummaryDownload.body, /Staging Archive Production Signoff Packet: artifacts\/staging\/BOOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(smokeKitSummaryDownload.body, /Staging Archive Full Test Window: npm\.cmd test/);
+    assert.match(smokeKitSummaryDownload.body, /Staging Archive Launch Runway: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
+    assert.match(smokeKitSummaryDownload.body, /Staging Archive Runway Current Gate: ready_for_closeout_reload/);
+    assert.match(smokeKitSummaryDownload.body, /Staging Archive Launch-Day Watch Entry: enter_after_production_signoff/);
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Route Focus:/);
     assert.match(smokeKitSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
     assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary/);
@@ -14579,6 +14591,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Closeout Reload: npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code EXPORT_ALPHA --channel stable --closeout-input-file artifacts\/staging\/EXPORT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Production Signoff Packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Full Test Window: npm\.cmd test/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Launch Runway: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Runway Current Gate: ready_for_closeout_reload/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Launch-Day Watch Entry: enter_after_production_signoff/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
@@ -14600,6 +14615,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Staging Archive Closeout Reload: npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code EXPORT_ALPHA --channel stable --closeout-input-file artifacts\/staging\/EXPORT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Staging Archive Production Signoff Packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Staging Archive Full Test Window: npm\.cmd test/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Staging Archive Launch Runway: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Staging Archive Runway Current Gate: ready_for_closeout_reload/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Staging Archive Launch-Day Watch Entry: enter_after_production_signoff/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Traceability:/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Latest Launch Receipt: record_post_launch_ops_sweep/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);

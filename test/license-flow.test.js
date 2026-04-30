@@ -14725,6 +14725,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.downloadHref, /format=launch-receipt-next-follow-up/);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.operation, "record_post_launch_ops_sweep");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.latestReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
+    const launchDayWatchReceipt = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt;
+    assert.ok(launchDayWatchReceipt);
+    assert.equal(launchDayWatchReceipt.version, "developer-ops-launch-day-watch-receipt/v1");
+    assert.equal(launchDayWatchReceipt.status, latestLaunchReceipt.operationalReadinessWatchCheckInStatus);
+    assert.equal(launchDayWatchReceipt.receiptRecorded, true);
+    assert.equal(launchDayWatchReceipt.operation, "record_post_launch_ops_sweep");
+    assert.equal(launchDayWatchReceipt.auditLogId, latestLaunchReceipt.auditLogId);
+    assert.equal(launchDayWatchReceipt.productCode, "EXPORT_ALPHA");
+    assert.equal(launchDayWatchReceipt.channel, "stable");
+    assert.equal(launchDayWatchReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.equal(launchDayWatchReceipt.nextActionKey, latestLaunchReceipt.operationalReadinessNextActionKey);
+    assert.equal(launchDayWatchReceipt.nextOperation, latestLaunchReceipt.operationalReadinessNextOperation);
+    assert.equal(launchDayWatchReceipt.primaryDownloadKey, latestLaunchReceipt.operationalReadinessPrimaryDownloadKey);
+    assert.equal(launchDayWatchReceipt.stabilizationNextOperation, latestLaunchReceipt.postLaunchLifecycleNextOperation);
+    assert.deepEqual(launchDayWatchReceipt.operatorHandoffFiles, {
+      readiness: "initial-launch-ops-readiness.txt",
+      handoffIndex: "handoff-index.txt",
+      nextFollowUp: "launch-receipt-next-follow-up.txt",
+      postLaunchIndex: "post-launch-handoff-index",
+      routeMap: "handoff-download-routes.txt"
+    });
     assert.ok(Array.isArray(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue));
     assert.equal(
       launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpQueue.length,
@@ -14970,6 +14991,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       initialLaunchOpsTraceability.nextFollowUp.recommendedDownload.href,
       initialLaunchOpsTraceability.nextFollowUp.downloadHref
     );
+    assert.equal(initialLaunchOpsTraceability.launchDayWatchReceipt.auditLogId, latestLaunchReceipt.auditLogId);
+    assert.equal(initialLaunchOpsTraceability.launchDayWatchReceipt.operation, "record_post_launch_ops_sweep");
     assert.equal(initialLaunchOpsTraceability.opsFiles.handoffIndex, "handoff-index.txt");
     assert.equal(initialLaunchOpsTraceability.opsFiles.initialLaunchOpsReadiness, "initial-launch-ops-readiness.txt");
     assert.equal(initialLaunchOpsTraceability.opsFiles.launchReceiptNextFollowUp, "launch-receipt-next-follow-up.txt");
@@ -15044,6 +15067,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /version=initial-launch-stabilization-handoff\/v1/);
     assert.match(launchReceiptSnapshot.summaryText, /latestOperator=record_post_launch_ops_sweep/);
     assert.match(launchReceiptSnapshot.summaryText, /postLaunchStatus=/);
+    assert.match(launchReceiptSnapshot.summaryText, /Launch-Day Watch Receipt:/);
+    assert.match(launchReceiptSnapshot.summaryText, /status=waiting_for_runway_evidence/);
+    assert.match(launchReceiptSnapshot.summaryText, /receiptRecorded=true/);
+    assert.match(launchReceiptSnapshot.summaryText, /next=record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:/);
     assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
     assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));
@@ -15236,6 +15263,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /- Version: initial-launch-stabilization-handoff\/v1/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Latest Operator: record_post_launch_ops_sweep/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Post-Launch: status=/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /Launch-Day Watch Receipt:/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Status: waiting_for_runway_evidence \| receiptRecorded=true/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Latest Receipt: record_post_launch_ops_sweep/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Next: action=launch_mainline_record_launch_rehearsal_run \| operation=record_launch_rehearsal_run/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Follow-up Queue:/);
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[production_evidence\\].*operation=${latestLaunchReceipt.productionEvidenceNextOperation}.*download=${latestLaunchReceipt.firstLaunchDutyPrimaryDownloadKey || "-"}`));
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[post_launch_lifecycle\\].*operation=${latestLaunchReceipt.postLaunchLifecycleNextOperation}.*download=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`));
@@ -15411,6 +15442,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /launch-receipt-backfill-status\.txt.*format=launch-receipt-backfill-status/);
     assert.match(handoffIndexDownload.body, /launch-mainline-first-launch-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /developer-ops-launch-mainline-handoff-routes\.txt.*format=launch-mainline-handoff-routes/);
+    assert.match(handoffIndexDownload.body, /Launch-Day Watch Receipt:/);
+    assert.match(handoffIndexDownload.body, /receiptRecorded=true/);
+    assert.match(handoffIndexDownload.body, /latestReceipt=record_post_launch_ops_sweep/);
     assert.match(handoffIndexDownload.body, /Staging Launch-Duty Archive:/);
     assert.match(handoffIndexDownload.body, /staging-launch-duty-archive-index\.json/);
     assert.match(handoffIndexDownload.body, /Included Files:/);

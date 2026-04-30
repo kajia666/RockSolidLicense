@@ -19730,6 +19730,73 @@ function buildDeveloperOpsInitialLaunchOpsGate({
   };
 }
 
+function buildDeveloperOpsLaunchDayWatchReceiptPayload({
+  latestReceipt = null,
+  launchReceiptNextFollowUp = null,
+  traceability = {}
+} = {}) {
+  if (!latestReceipt || typeof latestReceipt !== "object") {
+    return null;
+  }
+  const operation = latestReceipt.operation || null;
+  const status = latestReceipt.operationalReadinessWatchCheckInStatus
+    || (operation === "record_post_launch_ops_sweep" ? "receipt_recorded" : "unknown");
+  const opsFiles = traceability.opsFiles || {};
+  const launchMainlineFiles = traceability.launchMainlineFiles || {};
+  const nextOperation = latestReceipt.operationalReadinessNextOperation
+    || launchReceiptNextFollowUp?.operationToRecord
+    || launchReceiptNextFollowUp?.operation
+    || null;
+  const nextActionKey = latestReceipt.operationalReadinessNextActionKey
+    || launchReceiptNextFollowUp?.actionKey
+    || null;
+  const primaryDownloadKey = latestReceipt.operationalReadinessPrimaryDownloadKey
+    || launchReceiptNextFollowUp?.downloadKey
+    || null;
+  return {
+    version: "developer-ops-launch-day-watch-receipt/v1",
+    status,
+    receiptRecorded: operation === "record_post_launch_ops_sweep",
+    auditLogId: latestReceipt.auditLogId || null,
+    productCode: latestReceipt.productCode || null,
+    channel: latestReceipt.channel || "stable",
+    operation,
+    operationLabel: latestReceipt.operationLabel || null,
+    handoffFileName: latestReceipt.handoffFileName || null,
+    recordedAt: latestReceipt.createdAt || latestReceipt.handoffGeneratedAt || null,
+    watchReady: latestReceipt.operationalReadinessWatchReady === true,
+    readinessStatus: latestReceipt.operationalReadinessStatus || null,
+    readinessLabel: latestReceipt.operationalReadinessLabel || null,
+    nextActionKey,
+    nextOperation,
+    primaryDownloadKey,
+    primaryDownloadFileName: latestReceipt.operationalReadinessPrimaryDownloadFileName
+      || launchReceiptNextFollowUp?.downloadFileName
+      || launchReceiptNextFollowUp?.recommendedDownload?.fileName
+      || null,
+    primaryDownloadFormat: latestReceipt.operationalReadinessPrimaryDownloadFormat
+      || launchReceiptNextFollowUp?.downloadFormat
+      || launchReceiptNextFollowUp?.recommendedDownload?.format
+      || null,
+    primaryDownloadHref: latestReceipt.operationalReadinessPrimaryDownloadHref
+      || launchReceiptNextFollowUp?.downloadHref
+      || launchReceiptNextFollowUp?.recommendedDownload?.href
+      || null,
+    stabilizationStatus: latestReceipt.operationalReadinessStabilizationStatus || null,
+    steadyStateStatus: latestReceipt.operationalReadinessSteadyStateStatus || null,
+    stabilizationNextOperation: latestReceipt.postLaunchLifecycleNextOperation || null,
+    postLaunchLifecycleStatus: latestReceipt.postLaunchLifecycleStatus || null,
+    operatorHandoffFiles: {
+      readiness: opsFiles.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
+      handoffIndex: opsFiles.handoffIndex || "handoff-index.txt",
+      nextFollowUp: opsFiles.launchReceiptNextFollowUp || "launch-receipt-next-follow-up.txt",
+      postLaunchIndex: launchMainlineFiles.postLaunchHandoffIndex || "post-launch-handoff-index",
+      routeMap: launchMainlineFiles.handoffDownloadRoutes || "handoff-download-routes.txt"
+    },
+    summary: `Launch-day watch receipt ${status}; next=${nextOperation || "-"}; stabilizationNext=${latestReceipt.postLaunchLifecycleNextOperation || "-"}.`
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
@@ -19776,6 +19843,10 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation),
+    launchDayWatchReceipt: buildDeveloperOpsLaunchDayWatchReceiptPayload({
+      latestReceipt,
+      launchReceiptNextFollowUp
+    }),
     opsFiles: {
       handoffIndex: "handoff-index.txt",
       initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
@@ -20305,6 +20376,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationHandoffConfirmation,
     firstWaveHandoffConfirmation
   });
+  const launchDayWatchReceipt = buildDeveloperOpsLaunchDayWatchReceiptPayload({
+    latestReceipt,
+    launchReceiptNextFollowUp,
+    traceability
+  });
   const contract = buildDeveloperOpsInitialLaunchContract({
     scope,
     status,
@@ -20426,6 +20502,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operatorActionReceipts,
     latestOperatorActionReceipt: operatorActionReceipts[0] || null,
     stabilizationHandoff,
+    launchDayWatchReceipt,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -22965,6 +23042,32 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         );
       }
     }
+    const launchDayWatchReceipt = initialLaunchOpsReadiness.launchDayWatchReceipt
+      || initialLaunchOpsReadiness.traceability?.launchDayWatchReceipt
+      || null;
+    if (launchDayWatchReceipt) {
+      lines.push("");
+      lines.push("Launch-Day Watch Receipt:");
+      lines.push(
+        `- status=${launchDayWatchReceipt.status || "-"}`
+        + ` | receiptRecorded=${launchDayWatchReceipt.receiptRecorded === true}`
+        + ` | audit=${launchDayWatchReceipt.auditLogId || "-"}`
+      );
+      lines.push(
+        `- latestReceipt=${launchDayWatchReceipt.operation || "-"}`
+        + ` | handoff=${launchDayWatchReceipt.handoffFileName || "-"}`
+        + ` | recordedAt=${launchDayWatchReceipt.recordedAt || "-"}`
+      );
+      lines.push(
+        `- action=${launchDayWatchReceipt.nextActionKey || "-"}`
+        + ` | next=${launchDayWatchReceipt.nextOperation || "-"}`
+        + ` | download=${launchDayWatchReceipt.primaryDownloadKey || "-"}`
+      );
+      lines.push(
+        `- stabilizationNext=${launchDayWatchReceipt.stabilizationNextOperation || "-"}`
+        + ` | postLaunchStatus=${launchDayWatchReceipt.postLaunchLifecycleStatus || "-"}`
+      );
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {
@@ -23386,6 +23489,18 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     }
     lines.push("");
   }
+  const launchDayWatchReceipt = readiness.launchDayWatchReceipt
+    || readiness.traceability?.launchDayWatchReceipt
+    || null;
+  if (launchDayWatchReceipt) {
+    lines.push("Launch-Day Watch Receipt:");
+    lines.push(`- Status: ${launchDayWatchReceipt.status || "-"} | receiptRecorded=${launchDayWatchReceipt.receiptRecorded === true}`);
+    lines.push(`- Latest Receipt: ${launchDayWatchReceipt.operation || "-"} | handoff=${launchDayWatchReceipt.handoffFileName || "-"} | recordedAt=${launchDayWatchReceipt.recordedAt || "-"}`);
+    lines.push(`- Next: action=${launchDayWatchReceipt.nextActionKey || "-"} | operation=${launchDayWatchReceipt.nextOperation || "-"} | download=${launchDayWatchReceipt.primaryDownloadKey || "-"}`);
+    lines.push(`- Stabilization: status=${launchDayWatchReceipt.stabilizationStatus || "-"} | next=${launchDayWatchReceipt.stabilizationNextOperation || "-"} | postLaunch=${launchDayWatchReceipt.postLaunchLifecycleStatus || "-"}`);
+    lines.push(`- Files: readiness=${launchDayWatchReceipt.operatorHandoffFiles?.readiness || "-"} | handoffIndex=${launchDayWatchReceipt.operatorHandoffFiles?.handoffIndex || "-"} | nextFollowUp=${launchDayWatchReceipt.operatorHandoffFiles?.nextFollowUp || "-"} | postLaunchIndex=${launchDayWatchReceipt.operatorHandoffFiles?.postLaunchIndex || "-"}`);
+    lines.push("");
+  }
   const formatGateDownloadText = (item = {}) => {
     const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
       ? item.recommendedDownload
@@ -23712,6 +23827,25 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     }
   } else {
     lines.push("- none");
+  }
+
+  const launchDayWatchReceipt = readiness.launchDayWatchReceipt
+    || readiness.traceability?.launchDayWatchReceipt
+    || null;
+  if (launchDayWatchReceipt) {
+    lines.push("");
+    lines.push("Launch-Day Watch Receipt:");
+    lines.push(
+      `- status=${launchDayWatchReceipt.status || "-"}`
+      + ` | receiptRecorded=${launchDayWatchReceipt.receiptRecorded === true}`
+      + ` | audit=${launchDayWatchReceipt.auditLogId || "-"}`
+    );
+    lines.push(
+      `- latestReceipt=${launchDayWatchReceipt.operation || "-"}`
+      + ` | handoff=${launchDayWatchReceipt.handoffFileName || "-"}`
+      + ` | next=${launchDayWatchReceipt.nextOperation || "-"}`
+      + ` | download=${launchDayWatchReceipt.primaryDownloadKey || "-"}`
+    );
   }
 
   const stagingArchive = readiness.stagingLaunchDutyArchive || null;

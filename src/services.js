@@ -21662,10 +21662,21 @@ function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
     mainlineHandoff: payload.mainlineHandoff || null
   });
   const handoff = readiness.stabilizationHandoff || null;
+  const launchReceiptAuditBackfill = Number(
+    summary.launchReceiptAuditBackfill
+    ?? payload.auditLogs?.filters?.launchReceiptBackfill
+    ?? 0
+  );
+  const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const lines = [
     "RockSolid Developer Ops Stabilization Handoff",
     `Generated At: ${payload.generatedAt || ""}`,
     `Project Filter: ${scope.productCode || "-"}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     `Status: ${String(handoff?.status || readiness.status || "unknown").toUpperCase()}`,
     `Decision: ${String(handoff?.decision || readiness.goNoGo?.decision || readiness.gate?.decision || "unknown").toUpperCase()}`,
     ""

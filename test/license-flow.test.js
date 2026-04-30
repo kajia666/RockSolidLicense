@@ -14345,6 +14345,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(stabilizationHandoffDownload.contentType, "text/plain; charset=utf-8");
     assert.match(stabilizationHandoffDownload.contentDisposition || "", /developer-ops-stabilization-handoff\.txt/);
     assert.match(stabilizationHandoffDownload.body, /RockSolid Developer Ops Stabilization Handoff/);
+    assert.match(stabilizationHandoffDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(stabilizationHandoffDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(stabilizationHandoffDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(stabilizationHandoffDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(stabilizationHandoffDownload.body, /Version: initial-launch-stabilization-handoff\/v1/);
     assert.match(stabilizationHandoffDownload.body, /Latest Operator: record_post_launch_ops_sweep/);
     assert.match(stabilizationHandoffDownload.body, new RegExp(`Next Action: ${latestLaunchReceipt.productionEvidenceNextOperation}`));

@@ -17766,6 +17766,19 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope = {}, item = n
   );
 }
 
+function buildDeveloperOpsLaunchReceiptBackfillStatusDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_launch_receipt_backfill_status",
+    "launch-receipt-backfill-status.txt",
+    "Launch receipt backfill status",
+    {
+      source: "developer-ops",
+      format: "launch-receipt-backfill-status",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsLaunchReceiptFollowUpDownload(item = null, scope = {}) {
   const downloadKey = String(item?.downloadKey || "").trim();
   if (!downloadKey) {
@@ -18562,6 +18575,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     || null;
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const nextFollowUpDownload = primaryDownload || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, launchReceiptNextFollowUp);
+  const backfillStatusDownload = buildDeveloperOpsLaunchReceiptBackfillStatusDownload(scope);
   const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
   const stagingLaunchDutyArchiveDownload = buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope);
   const initialLaunchReadinessDownload = buildDeveloperOpsInitialLaunchReadinessDownload(scope);
@@ -18599,6 +18613,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const seenRecommendedDownloads = new Set();
   for (const download of [
     primaryDownload,
+    backfillStatusDownload,
     firstLaunchHandoffDownload,
     launchMainlineHandoffRoutesDownload,
     stagingLaunchDutyArchiveDownload,

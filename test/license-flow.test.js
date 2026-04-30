@@ -14310,6 +14310,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, new RegExp(`\\[post_launch_lifecycle\\].*operation=${latestLaunchReceipt.postLaunchLifecycleNextOperation}.*download=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`));
     assert.match(initialLaunchOpsReadinessDownload.body, /Recommended Downloads:/);
     assert.match(initialLaunchOpsReadinessDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt.*format=launch-receipt-next-follow-up/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /launch-receipt-backfill-status\.txt.*format=launch-receipt-backfill-status/);
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-first-launch-handoff\.txt.*format=first-launch-handoff/);
     assert.match(initialLaunchOpsReadinessDownload.body, /developer-ops-launch-mainline-handoff-routes\.txt.*format=launch-mainline-handoff-routes/);
     assert.match(initialLaunchOpsReadinessDownload.body, /launch-mainline-sha256\.txt.*format=checksums/);
@@ -14464,6 +14465,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, new RegExp(`\\[post_launch_lifecycle\\].*operation=${latestLaunchReceipt.postLaunchLifecycleNextOperation}`));
     assert.match(handoffIndexDownload.body, /Recommended Downloads:/);
     assert.match(handoffIndexDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(handoffIndexDownload.body, /launch-receipt-backfill-status\.txt.*format=launch-receipt-backfill-status/);
     assert.match(handoffIndexDownload.body, /launch-mainline-first-launch-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /developer-ops-launch-mainline-handoff-routes\.txt.*format=launch-mainline-handoff-routes/);
     assert.match(handoffIndexDownload.body, /Staging Launch-Duty Archive:/);

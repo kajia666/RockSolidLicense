@@ -14890,6 +14890,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(primaryRouteReviewDownload.contentType, "text/plain; charset=utf-8");
     assert.match(primaryRouteReviewDownload.contentDisposition || "", /developer-ops-primary-session-summary\.txt/);
     assert.match(primaryRouteReviewDownload.body, /Route Review Primary Match/);
+    assert.match(primaryRouteReviewDownload.body, /Launch Receipt Audit Backfill: \d+/);
+    assert.match(primaryRouteReviewDownload.body, /Launch Receipt Audit Backfill Status: NOT_USED/);
+    assert.match(primaryRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
+    assert.match(primaryRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
     assert.match(primaryRouteReviewDownload.body, /action=Open Session Control/);
 
     const nextRouteReviewDownload = await getText(
@@ -14900,6 +14904,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(nextRouteReviewDownload.contentType, "text/plain; charset=utf-8");
     assert.match(nextRouteReviewDownload.contentDisposition || "", /developer-ops-next-audit-summary\.txt/);
     assert.match(nextRouteReviewDownload.body, /Route Review Next Match/);
+    assert.match(nextRouteReviewDownload.body, /Launch Receipt Audit Backfill: \d+/);
+    assert.match(nextRouteReviewDownload.body, /Launch Receipt Audit Backfill Status: NOT_USED/);
+    assert.match(nextRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
+    assert.match(nextRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
     assert.match(nextRouteReviewDownload.body, /action=Review Audit/);
 
     const remainingRouteReviewDownload = await getText(
@@ -14910,7 +14918,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(remainingRouteReviewDownload.contentType, "text/plain; charset=utf-8");
     assert.match(remainingRouteReviewDownload.contentDisposition || "", /developer-ops-remaining-summary\.txt/);
     assert.match(remainingRouteReviewDownload.body, /Route Review Remaining Matches/);
+    assert.match(remainingRouteReviewDownload.body, /Launch Receipt Audit Backfill: \d+/);
+    assert.match(remainingRouteReviewDownload.body, /Launch Receipt Audit Backfill Status: NOT_USED/);
+    assert.match(remainingRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
+    assert.match(remainingRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
     assert.match(remainingRouteReviewDownload.body, /Review Audit/);
+
+    const sectionRouteReviewDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_ALPHA&eventType=session.revoke&format=route-review-section-sessions",
+      operatorSession.token
+    );
+    assert.equal(sectionRouteReviewDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(sectionRouteReviewDownload.contentDisposition || "", /developer-ops-sessions-summary\.txt/);
+    assert.match(sectionRouteReviewDownload.body, /Route Review Section: sessions/);
+    assert.match(sectionRouteReviewDownload.body, /Launch Receipt Audit Backfill: \d+/);
+    assert.match(sectionRouteReviewDownload.body, /Launch Receipt Audit Backfill Status: NOT_USED/);
+    assert.match(sectionRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
+    assert.match(sectionRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
+    assert.match(sectionRouteReviewDownload.body, /Open Session Control/);
 
     const firstLaunchHandoffDownload = await getText(
       baseUrl,

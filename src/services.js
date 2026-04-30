@@ -16517,6 +16517,21 @@ function buildLaunchReceiptAuditBackfillStatus(count = 0) {
   };
 }
 
+function appendLaunchReceiptAuditBackfillStatusText(lines, payload = {}) {
+  const summary = payload.summary || {};
+  const launchReceiptAuditBackfill = Number(
+    summary.launchReceiptAuditBackfill
+    ?? payload.auditLogs?.filters?.launchReceiptBackfill
+    ?? 0
+  );
+  const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
+  lines.push(`Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`);
+  lines.push(`Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`);
+  lines.push(`Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`);
+  lines.push(`Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`);
+}
+
 function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
   const mainlineSummary = payload.mainlineSummary || {};
@@ -22295,6 +22310,7 @@ function buildDeveloperOpsRouteReviewMatchSummaryText(payload = {}, target = "pr
     `Route Review Focus: ${routeReview.focus || "-"}`,
     `Route Review Counts: accounts:${routeReview.matchedCounts?.accounts ?? 0} | entitlements:${routeReview.matchedCounts?.entitlements ?? 0} | sessions:${routeReview.matchedCounts?.sessions ?? 0} | devices:${routeReview.matchedCounts?.devices ?? 0} | audit:${routeReview.matchedCounts?.audit ?? 0}`
   ];
+  appendLaunchReceiptAuditBackfillStatusText(lines, payload);
   if (Array.isArray(routeReview.highlightedEvents) && routeReview.highlightedEvents.length) {
     lines.push(`Route Review Events: ${routeReview.highlightedEvents.join(", ")}`);
   }
@@ -22334,6 +22350,7 @@ function buildDeveloperOpsRouteReviewRemainingSummaryText(payload = {}) {
     `Route Review Counts: accounts:${routeReview.matchedCounts?.accounts ?? 0} | entitlements:${routeReview.matchedCounts?.entitlements ?? 0} | sessions:${routeReview.matchedCounts?.sessions ?? 0} | devices:${routeReview.matchedCounts?.devices ?? 0} | audit:${routeReview.matchedCounts?.audit ?? 0}`,
     `Route Review Total Matches: ${routeReview.totalMatches ?? 0}`
   ];
+  appendLaunchReceiptAuditBackfillStatusText(lines, payload);
   if (Array.isArray(routeReview.highlightedEvents) && routeReview.highlightedEvents.length) {
     lines.push(`Route Review Events: ${routeReview.highlightedEvents.join(", ")}`);
   }
@@ -22402,6 +22419,7 @@ function buildDeveloperOpsRouteReviewSectionSummaryText(payload = {}, section = 
     `Route Review Section: ${normalizedSection || "-"}`,
     `Section Count: ${sectionPayload.count ?? sectionMatches.length}`
   ];
+  appendLaunchReceiptAuditBackfillStatusText(lines, payload);
   lines.push("");
   lines.push("Section Matches:");
   if (!sectionMatches.length) {

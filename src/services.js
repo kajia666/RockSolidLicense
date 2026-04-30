@@ -16532,6 +16532,23 @@ function appendLaunchReceiptAuditBackfillStatusText(lines, payload = {}) {
   lines.push(`Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`);
 }
 
+function buildDeveloperOpsLaunchReceiptBackfillStatusText(payload = {}) {
+  const scope = payload.scope || {};
+  const lines = [
+    "RockSolid Developer Ops Launch Receipt Backfill Status",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Channel: ${scope.channel || "-"}`
+  ];
+  appendLaunchReceiptAuditBackfillStatusText(lines, payload);
+  lines.push("");
+  lines.push("Operator Note:");
+  lines.push("- Use this file as the offline backfill diagnostic anchor before reviewing Launch Mainline receipt follow-ups.");
+  lines.push("- USED means recent Launch Mainline action receipts were added to preserve first-wave traceability.");
+  lines.push("- NOT_USED means the current snapshot or explicit audit filter did not require protective receipt backfill.");
+  return lines.join("\n");
+}
+
 function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
   const mainlineSummary = payload.mainlineSummary || {};
@@ -21873,6 +21890,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     payload.summaryFileName || "developer-ops-summary.txt",
     "handoff-index.txt",
     "launch-receipt-next-follow-up.txt",
+    "launch-receipt-backfill-status.txt",
     "initial-launch-ops-readiness.txt",
     "staging-launch-duty-archive.txt",
     "stabilization-handoff.txt",
@@ -22203,6 +22221,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "launch-receipt-next-follow-up.txt",
       body: buildDeveloperOpsLaunchReceiptNextFollowUpText(payload)
+    },
+    {
+      path: "launch-receipt-backfill-status.txt",
+      body: buildDeveloperOpsLaunchReceiptBackfillStatusText(payload)
     },
     {
       path: "initial-launch-ops-readiness.txt",

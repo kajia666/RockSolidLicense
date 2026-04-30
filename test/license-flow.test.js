@@ -14473,6 +14473,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /staging-launch-duty-archive\.txt/);
     assert.match(handoffIndexDownload.body, /stabilization-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /launch-receipt-next-follow-up\.txt/);
+    assert.match(handoffIndexDownload.body, /launch-receipt-backfill-status\.txt/);
     assert.match(handoffIndexDownload.body, /launch-mainline-handoff-routes\.txt/);
     assert.match(handoffIndexDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
 
@@ -14963,6 +14964,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(checksumsDownload.body, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(checksumsDownload.body, /handoff-index\.txt/);
     assert.match(checksumsDownload.body, /launch-receipt-next-follow-up\.txt/);
+    assert.match(checksumsDownload.body, /launch-receipt-backfill-status\.txt/);
     assert.match(checksumsDownload.body, /initial-launch-ops-readiness\.txt/);
     assert.match(checksumsDownload.body, /staging-launch-duty-archive\.txt/);
     assert.match(checksumsDownload.body, /stabilization-handoff\.txt/);
@@ -14985,6 +14987,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /csv\/launch-receipt-follow-ups\.csv/);
     assert.match(zipText, /handoff-index\.txt/);
     assert.match(zipText, /launch-receipt-next-follow-up\.txt/);
+    assert.match(zipText, /launch-receipt-backfill-status\.txt/);
     assert.match(zipText, /staging-launch-duty-archive\.txt/);
     assert.match(zipText, /staging-launch-duty-archive-index\.json/);
     assert.match(zipText, /launch-mainline-handoff-routes\.txt/);

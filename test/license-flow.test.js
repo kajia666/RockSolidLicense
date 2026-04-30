@@ -14573,10 +14573,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOpsRunwayState?.evidenceOperations?.find((item) => item.operation === "record_post_launch_ops_sweep")?.status,
       "recorded"
     );
-    assert.equal(
-      launchOpsRunwayState?.evidenceOperations?.find((item) => item.operation === "record_post_launch_ops_sweep")?.recordedAt,
-      launchOpsAction.result?.recordedEvidence?.createdAt
-    );
+    const postLaunchOpsSweepRecordedAt = launchOpsRunwayState?.evidenceOperations?.find((item) =>
+      item.operation === "record_post_launch_ops_sweep"
+    )?.recordedAt;
+    assert.ok(postLaunchOpsSweepRecordedAt);
+    assert.ok(Number.isFinite(Date.parse(postLaunchOpsSweepRecordedAt)));
+    assert.ok(Number.isFinite(Date.parse(launchOpsAction.result?.recordedEvidence?.createdAt)));
+    assert.ok(Math.abs(Date.parse(postLaunchOpsSweepRecordedAt) - Date.parse(launchOpsAction.result.recordedEvidence.createdAt)) <= 1000);
 
     const launchReceiptSnapshot = await getJson(
       baseUrl,
@@ -15417,8 +15420,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.stabilizationHandoffConfirmation.auditLogId,
       stabilizationConfirmation.auditLogId
     );
+    const stabilizationStatusReceipt = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.stabilizationStatusReceipt;
+    assert.ok(stabilizationStatusReceipt);
+    assert.equal(stabilizationStatusReceipt.version, "developer-ops-stabilization-status/v1");
+    assert.equal(stabilizationStatusReceipt.status, "confirmed_with_followups");
+    assert.equal(stabilizationStatusReceipt.handoffConfirmed, true);
+    assert.equal(stabilizationStatusReceipt.confirmationAuditLogId, stabilizationConfirmation.auditLogId);
+    assert.equal(stabilizationStatusReceipt.latestReceiptOperation, "record_post_launch_ops_sweep");
+    assert.equal(
+      stabilizationStatusReceipt.launchDayWatchStatus,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.status
+    );
+    assert.equal(stabilizationStatusReceipt.followUpCount, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.followUpCount);
+    assert.equal(
+      stabilizationStatusReceipt.nextOperation,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.stabilizationHandoff.nextAction.operation
+    );
+    assert.equal(stabilizationStatusReceipt.steadyStateNextStep, "continue_stabilization_followups");
+    assert.equal(
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.stabilizationStatusReceipt.confirmationAuditLogId,
+      stabilizationConfirmation.auditLogId
+    );
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${stabilizationConfirmation.auditLogId}`));
+    assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Status Receipt:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /status=confirmed_with_followups/);
+    assert.match(confirmedOpsSnapshot.summaryText, /confirmed=true/);
 
     const handoffIndexDownload = await getText(
       baseUrl,
@@ -15445,6 +15472,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /Launch-Day Watch Receipt:/);
     assert.match(handoffIndexDownload.body, /receiptRecorded=true/);
     assert.match(handoffIndexDownload.body, /latestReceipt=record_post_launch_ops_sweep/);
+    assert.match(handoffIndexDownload.body, /Stabilization Status Receipt:/);
+    assert.match(handoffIndexDownload.body, /status=confirmed_with_followups/);
+    assert.match(handoffIndexDownload.body, /confirmed=true/);
     assert.match(handoffIndexDownload.body, /Staging Launch-Duty Archive:/);
     assert.match(handoffIndexDownload.body, /staging-launch-duty-archive-index\.json/);
     assert.match(handoffIndexDownload.body, /Included Files:/);

@@ -17938,6 +17938,11 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /data-mainline-launch-runway-evidence-control-index/);
     assert.match(html, /Record Runway Evidence/);
     assert.match(html, /Download Runway Handoff/);
+    assert.match(html, /renderRunwayEvidenceActionFollowUp/);
+    assert.match(html, /data-mainline-runway-followup/);
+    assert.match(html, /data-mainline-runway-followup-control-index/);
+    assert.match(html, /Next Runway Evidence Action/);
+    assert.match(html, /Runway Evidence Follow-up/);
     assert.match(html, /pendingEvidenceCount/);
     assert.match(html, /nextPendingEvidenceOperation/);
     assert.match(html, /evidenceOperation/);

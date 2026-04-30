@@ -863,6 +863,50 @@
         `;
       }
 
+      function renderRunwayEvidenceActionFollowUp(result = null) {
+        const operation = String(result?.operation || "").trim();
+        if (!operation.startsWith("record_")) {
+          return "";
+        }
+        const { launchRunway } = currentMainlineLaunchRunway();
+        const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
+          ? launchRunway.checklistState
+          : null;
+        if (!checklistState) {
+          return "";
+        }
+        const nextAction = currentMainlineLaunchRunwayNextEvidenceAction();
+        const controls = mainlineLaunchRunwayEvidenceControls(nextAction);
+        const recordedEvidence = result?.result?.recordedEvidence && typeof result.result.recordedEvidence === "object"
+          ? result.result.recordedEvidence
+          : null;
+        const tags = [
+          { label: "operation", value: operation, strong: true },
+          { label: "checklist", value: checklistState.status || "-", strong: checklistState.status === "evidence_recorded" },
+          { label: "pendingEvidence", value: Number(checklistState.pendingEvidenceCount || 0), strong: Number(checklistState.pendingEvidenceCount || 0) > 0 },
+          { label: "pendingOps", value: Number(checklistState.pendingEvidenceOperationCount || 0), strong: Number(checklistState.pendingEvidenceOperationCount || 0) > 0 }
+        ].map((tag) => renderTag(`${tag.label}:${tag.value}`, tag.strong === true)).join("");
+        const nextActionText = nextAction
+          ? `Next Runway Evidence Action: ${nextAction.label || nextAction.setupAction?.label || "Record Runway Evidence"} | operation=${nextAction.operation || nextAction.setupAction?.operation || "-"} | download=${nextAction.downloadKey || nextAction.recommendedDownload?.key || "-"} | downloadFormat=${nextAction.downloadFormat || nextAction.recommendedDownload?.format || "-"}`
+          : "Next Runway Evidence Action: all runway evidence is recorded.";
+        return `
+          <div class="item" data-mainline-runway-followup="${esc(operation)}">
+            <div class="item-head">
+              <div class="item-title">Runway Evidence Follow-up</div>
+              <div class="audit-meta">${tags}</div>
+            </div>
+            <div class="hint">${esc(result?.message || result?.operationLabel || "Runway evidence was recorded and Launch Mainline has reloaded.")}</div>
+            <div class="hint">${esc(nextActionText)}</div>
+            <div class="hint">Recorded Evidence: ${esc(recordedEvidence?.key || "-")} | recordedAt=${esc(recordedEvidence?.createdAt || "-")}</div>
+            ${controls.length ? `
+              <div class="actions">
+                ${controls.map((control, controlIndex) => `<button type="button" class="secondary" data-mainline-runway-followup-control-index="${controlIndex}">${esc(control.label || control.setupAction?.label || control.recommendedDownload?.label || control.kind || "Action")}</button>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
       function renderMainlineSectionCard(sectionKey = "", card = null) {
         if (!card?.key) {
           return "";
@@ -1167,11 +1211,13 @@
       function renderLastMainlineFollowUp(result = null) {
         const screen = currentMainlineLastActionScreen();
         const sections = Array.isArray(screen.sections) ? screen.sections : [];
-        if (!sections.length) {
+        const runwayFollowUpMarkup = renderRunwayEvidenceActionFollowUp(result);
+        if (!sections.length && !runwayFollowUpMarkup) {
           return "Run Launch Bootstrap, First Batch Setup, or Inventory Refill from this unified mainline workspace to keep the next follow-up visible here.";
         }
         return `
           <div class="list">
+            ${runwayFollowUpMarkup}
             ${sections.map((section) => `
               <div class="item">
                 <div class="item-head">
@@ -1527,6 +1573,18 @@
         const launchRunwayEvidenceButton = event.target.closest("[data-mainline-launch-runway-evidence-control-index]");
         if (launchRunwayEvidenceButton) {
           const controlIndex = Number(launchRunwayEvidenceButton.dataset.mainlineLaunchRunwayEvidenceControlIndex || -1);
+          const controls = mainlineLaunchRunwayEvidenceControls();
+          try {
+            await executeMainlineControl(controls[controlIndex] || null);
+          } catch (error) {
+            setStatus(error.message, "danger");
+            setOutput({ error: error.message });
+          }
+          return;
+        }
+        const runwayFollowUpButton = event.target.closest("[data-mainline-runway-followup-control-index]");
+        if (runwayFollowUpButton) {
+          const controlIndex = Number(runwayFollowUpButton.dataset.mainlineRunwayFollowupControlIndex || -1);
           const controls = mainlineLaunchRunwayEvidenceControls();
           try {
             await executeMainlineControl(controls[controlIndex] || null);

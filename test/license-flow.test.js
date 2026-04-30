@@ -15441,11 +15441,33 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.stabilizationStatusReceipt.confirmationAuditLogId,
       stabilizationConfirmation.auditLogId
     );
+    const operationalExceptionEntry = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.operationalExceptionEntry;
+    assert.ok(operationalExceptionEntry);
+    assert.equal(operationalExceptionEntry.version, "developer-ops-operational-exception-entry/v1");
+    assert.equal(operationalExceptionEntry.status, "open");
+    assert.equal(operationalExceptionEntry.severity, "review");
+    assert.equal(operationalExceptionEntry.stage, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.stage);
+    assert.equal(operationalExceptionEntry.actionKey, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.actionKey);
+    assert.equal(operationalExceptionEntry.operation, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.operationToRecord);
+    assert.equal(operationalExceptionEntry.downloadKey, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key);
+    assert.equal(operationalExceptionEntry.launchDayWatchStatus, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.status);
+    assert.equal(operationalExceptionEntry.stabilizationStatus, stabilizationStatusReceipt.status);
+    assert.equal(operationalExceptionEntry.confirmationAuditLogId, stabilizationConfirmation.auditLogId);
+    assert.equal(operationalExceptionEntry.workspaceAction.key, "launch-mainline");
+    assert.equal(operationalExceptionEntry.download.fileName, "developer-ops-launch-receipt-next-follow-up.txt");
+    assert.ok(operationalExceptionEntry.reasons.some((item) => item.key === "launch_receipt_followups"));
+    assert.equal(
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.operationalExceptionEntry.operation,
+      operationalExceptionEntry.operation
+    );
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Status Receipt:/);
     assert.match(confirmedOpsSnapshot.summaryText, /status=confirmed_with_followups/);
     assert.match(confirmedOpsSnapshot.summaryText, /confirmed=true/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Operational Exception Entry:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /status=open/);
+    assert.match(confirmedOpsSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
 
     const handoffIndexDownload = await getText(
       baseUrl,
@@ -15475,6 +15497,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /Stabilization Status Receipt:/);
     assert.match(handoffIndexDownload.body, /status=confirmed_with_followups/);
     assert.match(handoffIndexDownload.body, /confirmed=true/);
+    assert.match(handoffIndexDownload.body, /Operational Exception Entry:/);
+    assert.match(handoffIndexDownload.body, /status=open/);
+    assert.match(handoffIndexDownload.body, /operation=record_launch_rehearsal_run/);
     assert.match(handoffIndexDownload.body, /Staging Launch-Duty Archive:/);
     assert.match(handoffIndexDownload.body, /staging-launch-duty-archive-index\.json/);
     assert.match(handoffIndexDownload.body, /Included Files:/);

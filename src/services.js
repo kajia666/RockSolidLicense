@@ -19877,6 +19877,109 @@ function buildDeveloperOpsStabilizationStatusReceiptPayload({
   };
 }
 
+function buildDeveloperOpsOperationalExceptionEntryPayload({
+  latestReceipt = null,
+  launchReceiptNextFollowUp = null,
+  primaryWorkspaceAction = null,
+  primaryDownload = null,
+  launchDayWatchReceipt = null,
+  stabilizationStatusReceipt = null,
+  followUpQueue = []
+} = {}) {
+  const followUps = Array.isArray(followUpQueue) ? followUpQueue : [];
+  const operation = launchReceiptNextFollowUp?.operationToRecord
+    || launchReceiptNextFollowUp?.operation
+    || stabilizationStatusReceipt?.nextOperation
+    || latestReceipt?.operationalReadinessNextOperation
+    || null;
+  const actionKey = launchReceiptNextFollowUp?.actionKey
+    || stabilizationStatusReceipt?.nextActionKey
+    || latestReceipt?.operationalReadinessNextActionKey
+    || null;
+  const downloadKey = primaryDownload?.key
+    || launchReceiptNextFollowUp?.recommendedDownload?.key
+    || launchReceiptNextFollowUp?.downloadKey
+    || stabilizationStatusReceipt?.downloadKey
+    || latestReceipt?.operationalReadinessPrimaryDownloadKey
+    || null;
+  const reasons = [];
+  if (followUps.length || launchReceiptNextFollowUp) {
+    reasons.push({
+      key: "launch_receipt_followups",
+      status: followUps.length ? "open" : "queued",
+      count: followUps.length,
+      summary: followUps.length
+        ? `${followUps.length} launch receipt follow-up${followUps.length === 1 ? "" : "s"} remain.`
+        : "The next launch receipt follow-up is queued."
+    });
+  }
+  if (launchDayWatchReceipt && launchDayWatchReceipt.status !== "checked_in") {
+    reasons.push({
+      key: "launch_day_watch",
+      status: launchDayWatchReceipt.status || "unknown",
+      summary: "Launch-day watch is not fully checked in."
+    });
+  }
+  if (stabilizationStatusReceipt && stabilizationStatusReceipt.status !== "ready_for_steady_state") {
+    reasons.push({
+      key: "stabilization_status",
+      status: stabilizationStatusReceipt.status || "unknown",
+      summary: "Stabilization is not ready for steady-state monitoring yet."
+    });
+  }
+  if (!operation && !actionKey && !downloadKey && !reasons.length) {
+    return null;
+  }
+  const severity = reasons.some((item) => item.status === "blocked" || item.status === "missing")
+    ? "blocker"
+    : "review";
+  return {
+    version: "developer-ops-operational-exception-entry/v1",
+    status: reasons.length ? "open" : "monitor",
+    severity,
+    stage: launchReceiptNextFollowUp?.stage || stabilizationStatusReceipt?.status || null,
+    title: launchReceiptNextFollowUp?.title || "Continue operational exception handling",
+    summary: launchReceiptNextFollowUp?.summary
+      || stabilizationStatusReceipt?.summary
+      || "Use this entry to route the next operational follow-up back through Launch Mainline.",
+    productCode: latestReceipt?.productCode || launchReceiptNextFollowUp?.productCode || stabilizationStatusReceipt?.productCode || null,
+    channel: latestReceipt?.channel || launchReceiptNextFollowUp?.channel || stabilizationStatusReceipt?.channel || "stable",
+    actionKey,
+    operation,
+    downloadKey,
+    latestReceiptOperation: latestReceipt?.operation || stabilizationStatusReceipt?.latestReceiptOperation || null,
+    latestReceiptAuditLogId: latestReceipt?.auditLogId || null,
+    launchDayWatchStatus: launchDayWatchReceipt?.status || latestReceipt?.operationalReadinessWatchCheckInStatus || null,
+    stabilizationStatus: stabilizationStatusReceipt?.status || null,
+    confirmationAuditLogId: stabilizationStatusReceipt?.confirmationAuditLogId || null,
+    workspaceAction: primaryWorkspaceAction
+      ? {
+          key: primaryWorkspaceAction.key || null,
+          label: primaryWorkspaceAction.label || null,
+          href: primaryWorkspaceAction.href || null,
+          autofocus: primaryWorkspaceAction.autofocus || null,
+          params: primaryWorkspaceAction.params && typeof primaryWorkspaceAction.params === "object"
+            ? { ...primaryWorkspaceAction.params }
+            : {}
+        }
+      : null,
+    download: primaryDownload
+      ? {
+          key: primaryDownload.key || null,
+          label: primaryDownload.label || primaryDownload.title || primaryDownload.key || null,
+          fileName: primaryDownload.fileName || null,
+          format: primaryDownload.format || null,
+          href: primaryDownload.href || null,
+          source: primaryDownload.source || null
+        }
+      : null,
+    reasons,
+    operatorHint: operation
+      ? `Record or review ${operation} before closing the operational exception.`
+      : "Review the current operational follow-up before closing the exception."
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
@@ -19931,6 +20034,10 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
       latestReceipt,
       launchReceiptNextFollowUp,
       stabilizationHandoffConfirmation
+    }),
+    operationalExceptionEntry: buildDeveloperOpsOperationalExceptionEntryPayload({
+      latestReceipt,
+      launchReceiptNextFollowUp
     }),
     opsFiles: {
       handoffIndex: "handoff-index.txt",
@@ -20519,6 +20626,15 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchDayWatchReceipt,
     followUpQueue
   });
+  const operationalExceptionEntry = buildDeveloperOpsOperationalExceptionEntryPayload({
+    latestReceipt,
+    launchReceiptNextFollowUp,
+    primaryWorkspaceAction,
+    primaryDownload,
+    launchDayWatchReceipt,
+    stabilizationStatusReceipt,
+    followUpQueue
+  });
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
     stagingLaunchDutyArchive,
@@ -20597,6 +20713,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationHandoff,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
+    operationalExceptionEntry,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -23181,6 +23298,29 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | steadyNext=${stabilizationStatusReceipt.steadyStateNextStep || "-"}`
       );
     }
+    const operationalExceptionEntry = initialLaunchOpsReadiness.operationalExceptionEntry
+      || initialLaunchOpsReadiness.traceability?.operationalExceptionEntry
+      || null;
+    if (operationalExceptionEntry) {
+      lines.push("");
+      lines.push("Operational Exception Entry:");
+      lines.push(
+        `- status=${operationalExceptionEntry.status || "-"}`
+        + ` | severity=${operationalExceptionEntry.severity || "-"}`
+        + ` | stage=${operationalExceptionEntry.stage || "-"}`
+        + ` | operation=${operationalExceptionEntry.operation || "-"}`
+      );
+      lines.push(
+        `- action=${operationalExceptionEntry.actionKey || "-"}`
+        + ` | download=${operationalExceptionEntry.download?.fileName || operationalExceptionEntry.downloadKey || "-"}`
+        + ` | workspace=${operationalExceptionEntry.workspaceAction?.label || "-"}@${operationalExceptionEntry.workspaceAction?.autofocus || "-"}`
+      );
+      lines.push(
+        `- watch=${operationalExceptionEntry.launchDayWatchStatus || "-"}`
+        + ` | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"}`
+        + ` | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`
+      );
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {
@@ -23626,6 +23766,24 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Files: readiness=${stabilizationStatusReceipt.operatorHandoffFiles?.readiness || "-"} | handoffIndex=${stabilizationStatusReceipt.operatorHandoffFiles?.handoffIndex || "-"} | nextFollowUp=${stabilizationStatusReceipt.operatorHandoffFiles?.nextFollowUp || "-"} | postLaunchIndex=${stabilizationStatusReceipt.operatorHandoffFiles?.postLaunchIndex || "-"}`);
     lines.push("");
   }
+  const operationalExceptionEntry = readiness.operationalExceptionEntry
+    || readiness.traceability?.operationalExceptionEntry
+    || null;
+  if (operationalExceptionEntry) {
+    lines.push("Operational Exception Entry:");
+    lines.push(`- Status: ${operationalExceptionEntry.status || "-"} | severity=${operationalExceptionEntry.severity || "-"} | stage=${operationalExceptionEntry.stage || "-"}`);
+    lines.push(`- Next: action=${operationalExceptionEntry.actionKey || "-"} | operation=${operationalExceptionEntry.operation || "-"} | download=${operationalExceptionEntry.downloadKey || "-"}`);
+    lines.push(`- Workspace: ${operationalExceptionEntry.workspaceAction?.label || "-"} | href=${operationalExceptionEntry.workspaceAction?.href || "-"}`);
+    lines.push(`- Download: ${operationalExceptionEntry.download?.fileName || "-"} | format=${operationalExceptionEntry.download?.format || "-"} | href=${operationalExceptionEntry.download?.href || "-"}`);
+    lines.push(`- Signals: watch=${operationalExceptionEntry.launchDayWatchStatus || "-"} | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"} | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`);
+    if (Array.isArray(operationalExceptionEntry.reasons) && operationalExceptionEntry.reasons.length) {
+      lines.push("- Reasons:");
+      for (const item of operationalExceptionEntry.reasons) {
+        lines.push(`  - ${item.key || "-"} | status=${item.status || "-"} | count=${item.count ?? "-"} | ${item.summary || "-"}`);
+      }
+    }
+    lines.push("");
+  }
   const formatGateDownloadText = (item = {}) => {
     const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
       ? item.recommendedDownload
@@ -23990,6 +24148,25 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | watch=${stabilizationStatusReceipt.launchDayWatchStatus || "-"}`
       + ` | next=${stabilizationStatusReceipt.nextOperation || "-"}`
       + ` | steadyNext=${stabilizationStatusReceipt.steadyStateNextStep || "-"}`
+    );
+  }
+
+  const operationalExceptionEntry = readiness.operationalExceptionEntry
+    || readiness.traceability?.operationalExceptionEntry
+    || null;
+  if (operationalExceptionEntry) {
+    lines.push("");
+    lines.push("Operational Exception Entry:");
+    lines.push(
+      `- status=${operationalExceptionEntry.status || "-"}`
+      + ` | severity=${operationalExceptionEntry.severity || "-"}`
+      + ` | stage=${operationalExceptionEntry.stage || "-"}`
+      + ` | operation=${operationalExceptionEntry.operation || "-"}`
+    );
+    lines.push(
+      `- action=${operationalExceptionEntry.actionKey || "-"}`
+      + ` | download=${operationalExceptionEntry.download?.fileName || operationalExceptionEntry.downloadKey || "-"}`
+      + ` | workspace=${operationalExceptionEntry.workspaceAction?.label || "-"}@${operationalExceptionEntry.workspaceAction?.autofocus || "-"}`
     );
   }
 

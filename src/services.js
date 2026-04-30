@@ -13654,6 +13654,30 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       evidenceOperation: "record_post_launch_ops_sweep"
     })
   ].filter(Boolean);
+  const buildLaunchRunwayChecklistState = (items = []) => {
+    const checklist = Array.isArray(items) ? items : [];
+    const pendingEvidenceItems = checklist.filter((item) =>
+      item?.evidenceOperation && String(item.evidenceStatus || "").trim().toLowerCase() !== "recorded"
+    );
+    const nextPendingEvidence = pendingEvidenceItems[0] || null;
+    const recordedEvidenceCount = checklist.filter((item) =>
+      String(item?.evidenceStatus || "").trim().toLowerCase() === "recorded"
+    ).length;
+    const pendingEvidenceCount = pendingEvidenceItems.length;
+    return {
+      status: pendingEvidenceCount ? "pending_evidence" : "evidence_recorded",
+      totalCount: checklist.length,
+      requiredCount: checklist.filter((item) => item?.required !== false).length,
+      readyActionCount: checklist.filter((item) => /^ready_/i.test(String(item?.status || ""))).length,
+      queuedActionCount: checklist.filter((item) => /queued/i.test(String(item?.status || ""))).length,
+      recordedEvidenceCount,
+      pendingEvidenceCount,
+      nextPendingEvidenceKey: nextPendingEvidence?.key || null,
+      nextPendingEvidenceOperation: nextPendingEvidence?.evidenceOperation || null,
+      nextPendingEvidenceLabel: nextPendingEvidence?.evidenceLabel || null
+    };
+  };
+  const launchRunwayChecklistState = buildLaunchRunwayChecklistState(launchRunwayOperatorChecklist);
   const launchRunway = stagingArchiveNextOperations || stagingArchiveLaunchRunway || launchRunwayCopyActions.length
     ? {
         source: "developer-ops-launch-duty-action-order",
@@ -13666,7 +13690,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           : ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
         nextAction: stagingArchiveNextOperations?.nextAction || null,
         copyActions: launchRunwayCopyActions,
-        operatorChecklist: launchRunwayOperatorChecklist
+        operatorChecklist: launchRunwayOperatorChecklist,
+        checklistState: launchRunwayChecklistState
       }
     : null;
   const productionHandoffDownload = createLaunchMainlineDownloadShortcut(
@@ -14837,6 +14862,28 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
   }
   for (const item of Array.isArray(launchRunway.copyActions) ? launchRunway.copyActions : []) {
     lines.push(`- action=${item.label || item.key || "-"} | kind=${item.kind || "text"} | value=${item.value || "-"}`);
+  }
+  const checklistState = launchRunway.checklistState && typeof launchRunway.checklistState === "object"
+    ? launchRunway.checklistState
+    : null;
+  if (checklistState) {
+    lines.push("Mainline Launch Runway Checklist State:");
+    lines.push(`- status: ${checklistState.status || "-"}`);
+    lines.push(
+      `- counts: total=${Number(checklistState.totalCount || 0)}`
+      + ` | required=${Number(checklistState.requiredCount || 0)}`
+      + ` | ready=${Number(checklistState.readyActionCount || 0)}`
+      + ` | queued=${Number(checklistState.queuedActionCount || 0)}`
+      + ` | recordedEvidence=${Number(checklistState.recordedEvidenceCount || 0)}`
+      + ` | pendingEvidence=${Number(checklistState.pendingEvidenceCount || 0)}`
+    );
+    if (checklistState.nextPendingEvidenceOperation || checklistState.nextPendingEvidenceKey) {
+      lines.push(
+        `- nextPendingEvidence: ${checklistState.nextPendingEvidenceKey || "-"}`
+        + ` | operation=${checklistState.nextPendingEvidenceOperation || "-"}`
+        + ` | label=${checklistState.nextPendingEvidenceLabel || "-"}`
+      );
+    }
   }
   const checklist = Array.isArray(launchRunway.operatorChecklist) ? launchRunway.operatorChecklist : [];
   if (checklist.length) {

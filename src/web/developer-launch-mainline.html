@@ -1034,6 +1034,22 @@
         const fullTestWindow = String(nextOperations?.fullTestWindow || "").trim();
         const productionSignoffPacket = String(nextOperations?.productionSignoffPacket || "").trim();
         const operatorChecklist = Array.isArray(launchRunway?.operatorChecklist) ? launchRunway.operatorChecklist : [];
+        const checklistState = launchRunway?.checklistState && typeof launchRunway.checklistState === "object"
+          ? launchRunway.checklistState
+          : null;
+        const checklistStateMarkup = checklistState
+          ? `
+            <div class="hint" data-mainline-launch-runway-checklist-state="${esc(checklistState.status || "-")}">
+              Checklist State: ${esc(checklistState.status || "-")}
+              | total=${esc(checklistState.totalCount ?? "-")}
+              | ready=${esc(checklistState.readyActionCount ?? "-")}
+              | queued=${esc(checklistState.queuedActionCount ?? "-")}
+              | recordedEvidence=${esc(checklistState.recordedEvidenceCount ?? "-")}
+              | pendingEvidenceCount=${esc(checklistState.pendingEvidenceCount ?? "-")}
+              | nextPendingEvidenceOperation=${esc(checklistState.nextPendingEvidenceOperation || "-")}
+            </div>
+          `
+          : "";
         const checklistMarkup = operatorChecklist.length
           ? `
             <div class="hint" data-mainline-launch-runway-checklist="operator-checklist">
@@ -1048,6 +1064,8 @@
           : "";
         const tags = [
           currentGate ? { label: "gate", value: currentGate, strong: true } : null,
+          checklistState?.status ? { label: "checklist", value: checklistState.status, strong: checklistState.status === "evidence_recorded" } : null,
+          checklistState?.pendingEvidenceCount !== undefined ? { label: "pendingEvidence", value: checklistState.pendingEvidenceCount, strong: false } : null,
           actionOrder?.status ? { label: "status", value: actionOrder.status, strong: false } : null,
           actionOrder?.stepCount ? { label: "steps", value: actionOrder.stepCount, strong: false } : null,
           actionOrder?.downloadCount ? { label: "downloads", value: actionOrder.downloadCount, strong: false } : null
@@ -1062,6 +1080,7 @@
               ${esc(sequence || "closeout_reload -> full_test_window -> production_signoff -> launch_day_watch")}
             </div>
             <div class="hint">Current Gate: ${esc(currentGate || "-")} | Launch-Day Watch Entry: ${esc(watchEntry || "-")}</div>
+            ${checklistStateMarkup}
             ${checklistMarkup}
             <div class="actions">
               <button type="button" class="secondary" data-mainline-launch-runway-action="copy-closeout-reload" data-mainline-launch-runway-copy-label="Copy Closeout Reload" data-mainline-launch-runway-copy-value="${esc(closeoutReload)}" ${closeoutReload ? "" : "disabled"}>Copy Closeout Reload</button>

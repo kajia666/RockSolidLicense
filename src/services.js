@@ -21461,11 +21461,22 @@ function buildDeveloperOpsStagingLaunchDutyArchiveText(payload = {}) {
     mainlineHandoff: payload.mainlineHandoff || null
   });
   const archive = readiness.stagingLaunchDutyArchive || buildDeveloperOpsStagingLaunchDutyArchive(scope);
+  const launchReceiptAuditBackfill = Number(
+    summary.launchReceiptAuditBackfill
+    ?? payload.auditLogs?.filters?.launchReceiptBackfill
+    ?? 0
+  );
+  const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const lines = [
     "RockSolid Developer Ops Staging Launch-Duty Archive",
     `Generated At: ${payload.generatedAt || ""}`,
     `Project Filter: ${scope.productCode || "-"}`,
     `Channel: ${archive.channel || scope.channel || "stable"}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     ""
   ];
   appendDeveloperOpsStagingLaunchDutyArchiveLines(lines, archive);

@@ -14328,6 +14328,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(stagingLaunchDutyArchiveDownload.contentType, "text/plain; charset=utf-8");
     assert.match(stagingLaunchDutyArchiveDownload.contentDisposition || "", /developer-ops-staging-launch-duty-archive\.txt/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /RockSolid Developer Ops Staging Launch-Duty Archive/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(stagingLaunchDutyArchiveDownload.body, /Archive Root: artifacts\/staging\/EXPORT_ALPHA\/stable/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /run_record_index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json/);

@@ -2838,8 +2838,31 @@
         throw { code: "UNSUPPORTED_STAGING_ARCHIVE", message: `Unsupported staging launch-duty archive action: ${normalizedAction || "-"}` };
       }
 
+      async function copyLaunchDutyRunwayValue(label = "", value = "") {
+        const text = String(value || "").trim();
+        const title = String(label || "Launch runway value").trim() || "Launch runway value";
+        if (!text) {
+          throw { code: "MISSING_RUNWAY_VALUE", message: `${title} is not available yet.` };
+        }
+        let copied = false;
+        if (navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          } catch (error) {
+            copied = false;
+          }
+        }
+        setOutput({ launchRunwayCopy: { label: title, value: text, copied } });
+        setStatus(copied ? `${title} copied to clipboard.` : `${title} is ready to copy from the output panel.`);
+      }
+
       async function handleLaunchDutyActionOrderAction(action = "", data = {}) {
         const normalizedAction = String(action || "").trim().toLowerCase();
+        if (normalizedAction.startsWith("copy-")) {
+          await copyLaunchDutyRunwayValue(data.launchRunwayCopyLabel, data.launchRunwayCopyValue);
+          return;
+        }
         if (normalizedAction === "download-step") {
           const href = String(data.launchDutyDownloadHref || "").trim();
           if (!href) {
@@ -4397,6 +4420,9 @@
           : "";
         const runwayCurrentGate = String(launchRunway.currentGate || item.stagingArchiveNextOperations?.status || "").trim();
         const runwayWatchEntry = String(launchRunway.launchDayWatchEntry || "").trim();
+        const closeoutReload = String(item.stagingArchiveNextOperations?.closeoutReload || "").trim();
+        const fullTestWindow = String(item.stagingArchiveNextOperations?.fullTestWindow || "").trim();
+        const productionSignoffPacket = String(item.stagingArchiveNextOperations?.productionSignoffPacket || "").trim();
         const runwayMarkup = runwaySequence
           ? `
             <div class="snapshot-focus-meta" data-launch-runway-current-gate="${esc(runwayCurrentGate || "-")}">
@@ -4404,6 +4430,11 @@
             </div>
             <div class="snapshot-focus-meta">
               Current Gate: ${esc(runwayCurrentGate || "-")} | Launch-Day Watch Entry: ${esc(runwayWatchEntry || "enter_after_production_signoff")}
+            </div>
+            <div class="snapshot-recap-actions">
+              <button type="button" class="snapshot-inline-button" data-launch-duty-action-order-action="copy-closeout-reload" data-launch-runway-action="copy-closeout-reload" data-launch-runway-copy-label="Copy Closeout Reload" data-launch-runway-copy-value="${esc(closeoutReload)}" ${closeoutReload ? "" : "disabled"}>Copy Closeout Reload</button>
+              <button type="button" class="snapshot-inline-button" data-launch-duty-action-order-action="copy-full-test-window" data-launch-runway-action="copy-full-test-window" data-launch-runway-copy-label="Copy Full Test Window" data-launch-runway-copy-value="${esc(fullTestWindow)}" ${fullTestWindow ? "" : "disabled"}>Copy Full Test Window</button>
+              <button type="button" class="snapshot-inline-button" data-launch-duty-action-order-action="copy-production-signoff-packet" data-launch-runway-action="copy-production-signoff-packet" data-launch-runway-copy-label="Copy Sign-off Packet" data-launch-runway-copy-value="${esc(productionSignoffPacket)}" ${productionSignoffPacket ? "" : "disabled"}>Copy Sign-off Packet</button>
             </div>
           `
           : "";

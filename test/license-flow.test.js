@@ -18601,6 +18601,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Staging Archive Launch Runway/);
     assert.match(html, /data-launch-runway-current-gate/);
     assert.match(html, /enter_after_production_signoff/);
+    assert.match(html, /data-launch-runway-action="copy-closeout-reload"/);
+    assert.match(html, /data-launch-runway-action="copy-full-test-window"/);
+    assert.match(html, /data-launch-runway-action="copy-production-signoff-packet"/);
+    assert.match(html, /copyLaunchDutyRunwayValue/);
     assert.match(html, /data-launch-duty-action-order-action="download-step"/);
     assert.match(html, /data-launch-duty-step-key/);
     assert.match(html, /staging-launch-duty-archive/);

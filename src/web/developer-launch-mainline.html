@@ -1037,7 +1037,12 @@
         const checklistMarkup = operatorChecklist.length
           ? `
             <div class="hint" data-mainline-launch-runway-checklist="operator-checklist">
-              ${operatorChecklist.map((item, index) => `${index + 1}. ${esc(item.label || item.key || "Checklist item")} | gate=${esc(item.gate || "-")} | kind=${esc(item.kind || "text")} | value=${esc(item.value || "-")}`).join("<br>")}
+              ${operatorChecklist.map((item, index) => {
+                const evidence = item.evidenceOperation
+                  ? `${item.evidenceOperation}${item.evidenceStatus ? `:${item.evidenceStatus}` : ""}`
+                  : "-";
+                return `${index + 1}. ${esc(item.label || item.key || "Checklist item")} | gate=${esc(item.gate || "-")} | status=${esc(item.status || "-")} | completion=${esc(item.completion || "-")} | evidence=${esc(evidence)} | kind=${esc(item.kind || "text")} | value=${esc(item.value || "-")}`;
+              }).join("<br>")}
             </div>
           `
           : "";

@@ -6549,6 +6549,17 @@ test("developer release package export bundles integration, versions, and notice
           ["launch_day_watch_entry", "watch_entry", "launch_day_watch"]
         ]
       );
+      assert.deepEqual(
+        mainlineLaunchRunway.operatorChecklist.map((item) => [item.key, item.status, item.completion, item.evidenceOperation]),
+        [
+          ["profile_driven_dry_run", "ready_to_run", "run_command", "record_launch_rehearsal_run"],
+          ["filled_closeout_input", "ready_to_confirm", "confirm_artifact", "record_launch_day_readiness_review"],
+          ["closeout_reload", "ready_to_run", "run_command", "record_launch_day_readiness_review"],
+          ["full_test_window", "ready_to_run", "run_command", "record_launch_day_readiness_review"],
+          ["production_signoff_packet", "ready_to_review", "review_artifact", "record_launch_day_readiness_review"],
+          ["launch_day_watch_entry", "queued_after_signoff", "enter_watch", "record_post_launch_ops_sweep"]
+        ]
+      );
       assert.match(
         mainlineLaunchRunway.operatorChecklist.find((item) => item.key === "profile_driven_dry_run")?.value || "",
         /npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable/
@@ -6596,8 +6607,11 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- action=Copy Sign-off Packet \| kind=artifact_path \| value=artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchMainline.summaryText, /Mainline Launch Runway Checklist:/);
       assert.match(launchMainline.summaryText, /- checklist=profile_driven_dry_run \| gate=before_closeout_reload \| kind=command \| value=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable/);
+      assert.match(launchMainline.summaryText, /- checklist=profile_driven_dry_run \| gate=before_closeout_reload \| status=ready_to_run \| completion=run_command \| evidence=record_launch_rehearsal_run/);
       assert.match(launchMainline.summaryText, /- checklist=filled_closeout_input \| gate=closeout_reload \| kind=artifact_path \| value=artifacts\/staging\/RELPKG_ALPHA\/stable\/filled-closeout-input\.json/);
+      assert.match(launchMainline.summaryText, /- checklist=production_signoff_packet \| gate=production_signoff \| status=ready_to_review \| completion=review_artifact \| evidence=record_launch_day_readiness_review/);
       assert.match(launchMainline.summaryText, /- checklist=launch_day_watch_entry \| gate=launch_day_watch \| kind=watch_entry \| value=enter_after_production_signoff/);
+      assert.match(launchMainline.summaryText, /- checklist=launch_day_watch_entry \| gate=launch_day_watch \| status=queued_after_signoff \| completion=enter_watch \| evidence=record_post_launch_ops_sweep/);
       assert.match(launchMainline.summaryText, /Run Routed Operation/);
       assert.match(launchMainline.summaryText, /Mainline Next Actions:/);
       assert.match(launchMainline.summaryText, /Stage Gates:/);
@@ -17679,6 +17693,8 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /copyMainlineLaunchRunwayValue/);
     assert.match(html, /data-mainline-launch-runway-checklist/);
     assert.match(html, /operatorChecklist/);
+    assert.match(html, /evidenceOperation/);
+    assert.match(html, /completion/);
     assert.match(html, /data-mainline-launch-runway-action="copy-closeout-reload"/);
     assert.match(html, /data-mainline-launch-runway-action="copy-full-test-window"/);
     assert.match(html, /data-mainline-launch-runway-action="copy-production-signoff-packet"/);

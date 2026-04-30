@@ -13522,25 +13522,74 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       value: stagingArchiveNextOperations?.productionSignoffPacket
     })
   ].filter(Boolean);
+  const launchRunwayEvidenceStates = {
+    record_launch_rehearsal_run: {
+      label: "Launch Rehearsal Run",
+      recordedAt: String(launchRehearsalRunEvidence?.createdAt || "").trim() || null
+    },
+    record_launch_day_readiness_review: {
+      label: "Launch Day Readiness Review",
+      recordedAt: String(
+        launchDayReadinessReviewEvidence?.createdAt
+        || launchCloseoutReviewEvidence?.createdAt
+        || launchStabilizationReviewEvidence?.createdAt
+        || ""
+      ).trim() || null
+    },
+    record_post_launch_ops_sweep: {
+      label: "First-Wave Ops Sweep",
+      recordedAt: String(
+        postLaunchOpsSweepEvidence?.createdAt
+        || launchCloseoutReviewEvidence?.createdAt
+        || launchStabilizationReviewEvidence?.createdAt
+        || ""
+      ).trim() || null
+    }
+  };
+  const resolveLaunchRunwayEvidenceState = (operation = "") => {
+    const normalizedOperation = String(operation || "").trim();
+    if (!normalizedOperation) {
+      return null;
+    }
+    return launchRunwayEvidenceStates[normalizedOperation] || {
+      label: normalizedOperation,
+      recordedAt: null
+    };
+  };
   const buildLaunchRunwayChecklistItem = ({
     key = "",
     label = "",
     gate = "",
     kind = "text",
     value = "",
-    required = true
+    required = true,
+    status = "",
+    completion = "",
+    evidenceOperation = "",
+    evidenceLabel = ""
   } = {}) => {
     const normalizedValue = String(value || "").trim();
     if (!key || !normalizedValue) {
       return null;
     }
+    const normalizedEvidenceOperation = String(evidenceOperation || "").trim();
+    const evidenceState = resolveLaunchRunwayEvidenceState(normalizedEvidenceOperation);
+    const evidenceRecordedAt = String(evidenceState?.recordedAt || "").trim();
     return {
       key,
       label: label || key,
       gate: gate || "review",
       kind,
       required: required !== false,
-      value: normalizedValue
+      value: normalizedValue,
+      status: status || "ready_to_review",
+      completion: completion || "confirm",
+      evidenceOperation: normalizedEvidenceOperation || null,
+      evidenceLabel: evidenceLabel || evidenceState?.label || null,
+      evidenceStatus: normalizedEvidenceOperation
+        ? (evidenceRecordedAt ? "recorded" : "pending")
+        : "not_required",
+      evidenceRecordedAt: evidenceRecordedAt || null
     };
   };
   const launchRunwayOperatorChecklist = [
@@ -13549,42 +13598,60 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       label: "Run profile-driven staging dry run",
       gate: "before_closeout_reload",
       kind: "command",
-      value: stagingLaunchDutyArchive?.commands?.profileDrivenDryRun
+      value: stagingLaunchDutyArchive?.commands?.profileDrivenDryRun,
+      status: "ready_to_run",
+      completion: "run_command",
+      evidenceOperation: "record_launch_rehearsal_run"
     }),
     buildLaunchRunwayChecklistItem({
       key: "filled_closeout_input",
       label: "Confirm filled closeout input",
       gate: "closeout_reload",
       kind: "artifact_path",
-      value: stagingLaunchDutyArchive?.files?.filledCloseoutInput
+      value: stagingLaunchDutyArchive?.files?.filledCloseoutInput,
+      status: "ready_to_confirm",
+      completion: "confirm_artifact",
+      evidenceOperation: "record_launch_day_readiness_review"
     }),
     buildLaunchRunwayChecklistItem({
       key: "closeout_reload",
       label: "Reload closeout input",
       gate: "closeout_reload",
       kind: "command",
-      value: stagingArchiveNextOperations?.closeoutReload
+      value: stagingArchiveNextOperations?.closeoutReload,
+      status: "ready_to_run",
+      completion: "run_command",
+      evidenceOperation: "record_launch_day_readiness_review"
     }),
     buildLaunchRunwayChecklistItem({
       key: "full_test_window",
       label: "Run guarded full test window",
       gate: "full_test_window",
       kind: "command",
-      value: stagingArchiveNextOperations?.fullTestWindow
+      value: stagingArchiveNextOperations?.fullTestWindow,
+      status: "ready_to_run",
+      completion: "run_command",
+      evidenceOperation: "record_launch_day_readiness_review"
     }),
     buildLaunchRunwayChecklistItem({
       key: "production_signoff_packet",
       label: "Review production sign-off packet",
       gate: "production_signoff",
       kind: "artifact_path",
-      value: stagingArchiveNextOperations?.productionSignoffPacket
+      value: stagingArchiveNextOperations?.productionSignoffPacket,
+      status: "ready_to_review",
+      completion: "review_artifact",
+      evidenceOperation: "record_launch_day_readiness_review"
     }),
     buildLaunchRunwayChecklistItem({
       key: "launch_day_watch_entry",
       label: "Enter launch-day watch",
       gate: "launch_day_watch",
       kind: "watch_entry",
-      value: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff"
+      value: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff",
+      status: "queued_after_signoff",
+      completion: "enter_watch",
+      evidenceOperation: "record_post_launch_ops_sweep"
     })
   ].filter(Boolean);
   const launchRunway = stagingArchiveNextOperations || stagingArchiveLaunchRunway || launchRunwayCopyActions.length
@@ -14776,6 +14843,12 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
     lines.push("Mainline Launch Runway Checklist:");
     for (const item of checklist) {
       lines.push(`- checklist=${item.key || "-"} | gate=${item.gate || "-"} | kind=${item.kind || "text"} | value=${item.value || "-"}`);
+      lines.push(
+        `- checklist=${item.key || "-"} | gate=${item.gate || "-"} | status=${item.status || "-"}`
+        + ` | completion=${item.completion || "-"} | evidence=${item.evidenceOperation || "-"}`
+        + ` | evidenceStatus=${item.evidenceStatus || "-"}`
+        + `${item.evidenceRecordedAt ? ` | evidenceRecordedAt=${item.evidenceRecordedAt}` : ""}`
+      );
     }
   }
   return true;

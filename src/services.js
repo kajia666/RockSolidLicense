@@ -13659,6 +13659,31 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     const pendingEvidenceItems = checklist.filter((item) =>
       item?.evidenceOperation && String(item.evidenceStatus || "").trim().toLowerCase() !== "recorded"
     );
+    const evidenceOperationMap = new Map();
+    for (const item of checklist) {
+      const operation = String(item?.evidenceOperation || "").trim();
+      if (!operation) {
+        continue;
+      }
+      const current = evidenceOperationMap.get(operation) || {
+        operation,
+        label: item?.evidenceLabel || operation,
+        status: "pending",
+        itemCount: 0,
+        recordedAt: null
+      };
+      current.itemCount += 1;
+      if (!current.recordedAt && item?.evidenceRecordedAt) {
+        current.recordedAt = item.evidenceRecordedAt;
+      }
+      if (String(item?.evidenceStatus || "").trim().toLowerCase() === "recorded") {
+        current.status = "recorded";
+      }
+      evidenceOperationMap.set(operation, current);
+    }
+    const evidenceOperations = Array.from(evidenceOperationMap.values());
+    const recordedEvidenceOperationCount = evidenceOperations.filter((item) => item.status === "recorded").length;
+    const pendingEvidenceOperationCount = evidenceOperations.filter((item) => item.status !== "recorded").length;
     const nextPendingEvidence = pendingEvidenceItems[0] || null;
     const recordedEvidenceCount = checklist.filter((item) =>
       String(item?.evidenceStatus || "").trim().toLowerCase() === "recorded"
@@ -13672,9 +13697,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       queuedActionCount: checklist.filter((item) => /queued/i.test(String(item?.status || ""))).length,
       recordedEvidenceCount,
       pendingEvidenceCount,
+      evidenceOperationCount: evidenceOperations.length,
+      recordedEvidenceOperationCount,
+      pendingEvidenceOperationCount,
       nextPendingEvidenceKey: nextPendingEvidence?.key || null,
       nextPendingEvidenceOperation: nextPendingEvidence?.evidenceOperation || null,
-      nextPendingEvidenceLabel: nextPendingEvidence?.evidenceLabel || null
+      nextPendingEvidenceLabel: nextPendingEvidence?.evidenceLabel || null,
+      evidenceOperations
     };
   };
   const launchRunwayChecklistState = buildLaunchRunwayChecklistState(launchRunwayOperatorChecklist);
@@ -14876,12 +14905,22 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
       + ` | queued=${Number(checklistState.queuedActionCount || 0)}`
       + ` | recordedEvidence=${Number(checklistState.recordedEvidenceCount || 0)}`
       + ` | pendingEvidence=${Number(checklistState.pendingEvidenceCount || 0)}`
+      + ` | recordedEvidenceOperations=${Number(checklistState.recordedEvidenceOperationCount || 0)}`
+      + ` | pendingEvidenceOperations=${Number(checklistState.pendingEvidenceOperationCount || 0)}`
     );
     if (checklistState.nextPendingEvidenceOperation || checklistState.nextPendingEvidenceKey) {
       lines.push(
         `- nextPendingEvidence: ${checklistState.nextPendingEvidenceKey || "-"}`
         + ` | operation=${checklistState.nextPendingEvidenceOperation || "-"}`
         + ` | label=${checklistState.nextPendingEvidenceLabel || "-"}`
+      );
+    }
+    for (const item of Array.isArray(checklistState.evidenceOperations) ? checklistState.evidenceOperations : []) {
+      lines.push(
+        `- evidenceOperation=${item.operation || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | items=${Number(item.itemCount || 0)}`
+        + ` | recordedAt=${item.recordedAt || "-"}`
       );
     }
   }

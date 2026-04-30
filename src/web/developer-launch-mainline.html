@@ -1046,7 +1046,12 @@
               | queued=${esc(checklistState.queuedActionCount ?? "-")}
               | recordedEvidence=${esc(checklistState.recordedEvidenceCount ?? "-")}
               | pendingEvidenceCount=${esc(checklistState.pendingEvidenceCount ?? "-")}
+              | recordedEvidenceOperations=${esc(checklistState.recordedEvidenceOperationCount ?? "-")}
+              | pendingEvidenceOperations=${esc(checklistState.pendingEvidenceOperationCount ?? "-")}
               | nextPendingEvidenceOperation=${esc(checklistState.nextPendingEvidenceOperation || "-")}
+              ${Array.isArray(checklistState.evidenceOperations) && checklistState.evidenceOperations.length
+                ? `<br>${checklistState.evidenceOperations.map((item) => `evidenceOperation=${esc(item.operation || "-")} | status=${esc(item.status || "-")} | items=${esc(item.itemCount ?? "-")} | recordedAt=${esc(item.recordedAt || "-")}`).join("<br>")}`
+                : ""}
             </div>
           `
           : "";

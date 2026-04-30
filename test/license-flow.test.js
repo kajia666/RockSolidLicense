@@ -6568,9 +6568,35 @@ test("developer release package export bundles integration, versions, and notice
         queuedActionCount: 1,
         recordedEvidenceCount: 0,
         pendingEvidenceCount: 6,
+        evidenceOperationCount: 3,
+        recordedEvidenceOperationCount: 0,
+        pendingEvidenceOperationCount: 3,
         nextPendingEvidenceKey: "profile_driven_dry_run",
         nextPendingEvidenceOperation: "record_launch_rehearsal_run",
-        nextPendingEvidenceLabel: "Launch Rehearsal Run"
+        nextPendingEvidenceLabel: "Launch Rehearsal Run",
+        evidenceOperations: [
+          {
+            operation: "record_launch_rehearsal_run",
+            label: "Launch Rehearsal Run",
+            status: "pending",
+            itemCount: 1,
+            recordedAt: null
+          },
+          {
+            operation: "record_launch_day_readiness_review",
+            label: "Launch Day Readiness Review",
+            status: "pending",
+            itemCount: 4,
+            recordedAt: null
+          },
+          {
+            operation: "record_post_launch_ops_sweep",
+            label: "First-Wave Ops Sweep",
+            status: "pending",
+            itemCount: 1,
+            recordedAt: null
+          }
+        ]
       });
       assert.match(
         mainlineLaunchRunway.operatorChecklist.find((item) => item.key === "profile_driven_dry_run")?.value || "",
@@ -6619,8 +6645,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- action=Copy Sign-off Packet \| kind=artifact_path \| value=artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchMainline.summaryText, /Mainline Launch Runway Checklist State:/);
       assert.match(launchMainline.summaryText, /- status: pending_evidence/);
-      assert.match(launchMainline.summaryText, /- counts: total=6 \| required=6 \| ready=5 \| queued=1 \| recordedEvidence=0 \| pendingEvidence=6/);
+      assert.match(launchMainline.summaryText, /- counts: total=6 \| required=6 \| ready=5 \| queued=1 \| recordedEvidence=0 \| pendingEvidence=6 \| recordedEvidenceOperations=0 \| pendingEvidenceOperations=3/);
       assert.match(launchMainline.summaryText, /- nextPendingEvidence: profile_driven_dry_run \| operation=record_launch_rehearsal_run \| label=Launch Rehearsal Run/);
+      assert.match(launchMainline.summaryText, /- evidenceOperation=record_launch_day_readiness_review \| status=pending \| items=4 \| recordedAt=-/);
       assert.match(launchMainline.summaryText, /Mainline Launch Runway Checklist:/);
       assert.match(launchMainline.summaryText, /- checklist=profile_driven_dry_run \| gate=before_closeout_reload \| kind=command \| value=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable/);
       assert.match(launchMainline.summaryText, /- checklist=profile_driven_dry_run \| gate=before_closeout_reload \| status=ready_to_run \| completion=run_command \| evidence=record_launch_rehearsal_run/);
@@ -6691,6 +6718,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Copy Sign-off Packet/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway Checklist State:/);
       assert.match(launchMainlineSummaryDownload.body, /pendingEvidence=6/);
+      assert.match(launchMainlineSummaryDownload.body, /pendingEvidenceOperations=3/);
+      assert.match(launchMainlineSummaryDownload.body, /evidenceOperation=record_post_launch_ops_sweep \| status=pending \| items=1 \| recordedAt=-/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway Checklist:/);
       assert.match(launchMainlineSummaryDownload.body, /profile_driven_dry_run/);
       assert.match(launchMainlineSummaryDownload.body, /filled_closeout_input/);
@@ -13823,6 +13852,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok((launchOpsAction.receipt.handoffText || "").includes(`format=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadFormat}`));
     assert.ok((launchOpsAction.receipt.handoffText || "").includes(`source=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadSource}`));
     assert.ok((launchOpsAction.receipt.handoffText || "").includes(`href=${launchOpsAction.receipt.initialLaunchOperatorActionReceipt.nextDownloadHref}`));
+    const launchOpsRunwayState = launchOpsAction.launchMainline?.mainlineSummary?.launchRunway?.checklistState;
+    assert.equal(launchOpsRunwayState?.status, "pending_evidence");
+    assert.equal(launchOpsRunwayState?.recordedEvidenceCount, 1);
+    assert.equal(launchOpsRunwayState?.pendingEvidenceCount, 5);
+    assert.equal(launchOpsRunwayState?.recordedEvidenceOperationCount, 1);
+    assert.equal(launchOpsRunwayState?.pendingEvidenceOperationCount, 2);
+    assert.equal(
+      launchOpsRunwayState?.evidenceOperations?.find((item) => item.operation === "record_post_launch_ops_sweep")?.status,
+      "recorded"
+    );
+    assert.equal(
+      launchOpsRunwayState?.evidenceOperations?.find((item) => item.operation === "record_post_launch_ops_sweep")?.recordedAt,
+      launchOpsAction.result?.recordedEvidence?.createdAt
+    );
 
     const launchReceiptSnapshot = await getJson(
       baseUrl,
@@ -14852,6 +14895,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/launch-mainline?productCode=EXPORT_ALPHA&channel=stable&reviewMode=matched",
       operatorSession.token
     );
+    assert.equal(launchMainlineTraceability.mainlineSummary.launchRunway?.checklistState?.recordedEvidenceOperationCount, 1);
+    assert.equal(launchMainlineTraceability.mainlineSummary.launchRunway?.checklistState?.pendingEvidenceOperationCount, 2);
+    assert.match(launchMainlineTraceability.summaryText, /recordedEvidenceOperations=1 \| pendingEvidenceOperations=2/);
+    assert.match(launchMainlineTraceability.summaryText, /evidenceOperation=record_post_launch_ops_sweep \| status=recorded \| items=1 \| recordedAt=/);
     assert.ok(launchMainlineTraceability.postLaunchHandoffTraceability);
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.latestLaunchReceipt.operation,

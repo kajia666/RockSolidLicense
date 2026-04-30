@@ -14220,6 +14220,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptNextFollowUpDownload.contentType, "text/plain; charset=utf-8");
     assert.match(launchReceiptNextFollowUpDownload.contentDisposition || "", /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchReceiptNextFollowUpDownload.body, /RockSolid Developer Ops Launch Receipt Next Follow-up/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(launchReceiptNextFollowUpDownload.body, /Priority: REVIEW/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Stage: production_evidence/);
     assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Action Key: ${latestLaunchReceipt.productionEvidenceNextActionKey}`));

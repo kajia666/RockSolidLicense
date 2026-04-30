@@ -21389,6 +21389,13 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   const recommendedWorkspace = recommendedAction?.workspaceAction || null;
   const recommendedDownload = item?.recommendedDownload
     || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, item);
+  const launchReceiptAuditBackfill = Number(
+    summary.launchReceiptAuditBackfill
+    ?? payload.auditLogs?.filters?.launchReceiptBackfill
+    ?? 0
+  );
+  const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
   const latestLaunchReceipts = Array.isArray(overview.latestLaunchReceipts)
     ? overview.latestLaunchReceipts
     : [];
@@ -21408,6 +21415,10 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
     `Project Filter: ${scope.productCode || "-"}`,
     `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`,
     `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(summary.launchReceiptFollowUpPriorities || {})}`,
+    `Launch Receipt Audit Backfill: ${launchReceiptAuditBackfill}`,
+    `Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`,
+    `Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`,
+    `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     ""
   ];
 

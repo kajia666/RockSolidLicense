@@ -17979,6 +17979,17 @@ function buildDeveloperOpsLaunchDutyActionOrder({
       source: download.source || null
     };
   };
+  const stagingArchiveNextOperations = stagingLaunchDutyArchive && typeof stagingLaunchDutyArchive === "object"
+    ? {
+        status: stagingLaunchDutyArchive.packetCompleteness?.missingCount ? "waiting_for_packet_paths" : "ready_for_closeout_reload",
+        closeoutReload: stagingLaunchDutyArchive.commands?.closeoutReload || null,
+        fullTestWindow: stagingLaunchDutyArchive.commands?.fullTestWindow || null,
+        productionSignoffPacket: stagingLaunchDutyArchive.files?.productionSignoffPacket || null,
+        nextAction: stagingLaunchDutyArchive.packetCompleteness?.missingCount
+          ? stagingLaunchDutyArchive.packetCompleteness.nextAction || "Fill missing staging packet paths before closeout reload."
+          : "Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off."
+      }
+    : null;
   const steps = [
     {
       stepNumber: 1,
@@ -17987,6 +17998,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
       status: stagingLaunchDutyArchive?.status || "awaiting_staging_archive_index",
       summary: "Pull the staging archive bridge before the real rehearsal so packet paths and full-test-window commands are visible.",
       packetCompleteness: stagingLaunchDutyArchive?.packetCompleteness || null,
+      nextOperations: stagingArchiveNextOperations,
       download: copyDownload(stagingLaunchDutyArchiveDownload)
     },
     {
@@ -18012,6 +18024,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
     status: normalizedStatus,
     operatorSummary: "Staging archive -> Launch readiness -> Next follow-up",
     stagingArchivePacketCompleteness: stagingLaunchDutyArchive?.packetCompleteness || null,
+    stagingArchiveNextOperations,
     primaryStepKey: steps[0].key,
     finalStepKey: steps[steps.length - 1].key,
     stepCount: steps.length,
@@ -18045,6 +18058,16 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
     lines.push(`- Staging Archive Packet Completeness: ${stagingArchivePacketCompleteness.status || "-"} (${listedCount}/${expectedCount})`);
     lines.push(`- Staging Archive Missing Packet Keys: ${missingKeys}`);
     lines.push(`- Staging Archive Next Packet Action: ${stagingArchivePacketCompleteness.nextAction || "-"}`);
+  }
+  const stagingArchiveNextOperations = actionOrder.stagingArchiveNextOperations
+    || steps.find((item) => item?.key === "staging_archive")?.nextOperations
+    || null;
+  if (stagingArchiveNextOperations && typeof stagingArchiveNextOperations === "object") {
+    lines.push(`- Staging Archive Next Operations: ${stagingArchiveNextOperations.status || "-"}`);
+    lines.push(`- Staging Archive Closeout Reload: ${stagingArchiveNextOperations.closeoutReload || "-"}`);
+    lines.push(`- Staging Archive Production Signoff Packet: ${stagingArchiveNextOperations.productionSignoffPacket || "-"}`);
+    lines.push(`- Staging Archive Full Test Window: ${stagingArchiveNextOperations.fullTestWindow || "-"}`);
+    lines.push(`- Staging Archive Next Readiness Step: ${stagingArchiveNextOperations.nextAction || "-"}`);
   }
   lines.push("- Steps:");
   if (!steps.length) {

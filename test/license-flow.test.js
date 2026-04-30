@@ -15474,6 +15474,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(operationalExceptionCloseout.closeoutCriteria.some((item) =>
       item.key === "resolve_launch_receipt_followups" && item.status === "open"
     ));
+    assert.equal(operationalExceptionCloseout.resolutionAction.key, "operational_exception_resolution");
+    assert.equal(operationalExceptionCloseout.resolutionAction.endpoint, "/api/developer/launch-mainline/action");
+    assert.equal(operationalExceptionCloseout.resolutionAction.method, "POST");
+    assert.equal(operationalExceptionCloseout.resolutionAction.operation, operationalExceptionEntry.operation);
+    assert.equal(operationalExceptionCloseout.resolutionAction.actionKey, operationalExceptionEntry.actionKey);
+    assert.equal(operationalExceptionCloseout.resolutionAction.body.operation, operationalExceptionEntry.operation);
+    assert.equal(operationalExceptionCloseout.resolutionAction.body.productCode, "EXPORT_ALPHA");
+    assert.equal(operationalExceptionCloseout.resolutionAction.workspaceAction.href, operationalExceptionEntry.workspaceAction.href);
+    assert.equal(operationalExceptionCloseout.resolutionAction.recommendedDownload.href, operationalExceptionEntry.download.href);
+    assert.equal(operationalExceptionCloseout.closeoutReviewAction.key, "operational_exception_closeout_review");
+    assert.equal(operationalExceptionCloseout.closeoutReviewAction.endpoint, "/api/developer/launch-mainline/action");
+    assert.equal(operationalExceptionCloseout.closeoutReviewAction.method, "POST");
+    assert.equal(operationalExceptionCloseout.closeoutReviewAction.enabled, false);
+    assert.equal(operationalExceptionCloseout.closeoutReviewAction.operation, "record_launch_closeout_review");
+    assert.equal(operationalExceptionCloseout.closeoutReviewAction.body.operation, "record_launch_closeout_review");
+    assert.equal(operationalExceptionCloseout.closeoutReviewAction.body.productCode, "EXPORT_ALPHA");
+    assert.match(operationalExceptionCloseout.closeoutReviewAction.workspaceAction.href, /operation=record_launch_closeout_review/);
+    assert.match(operationalExceptionCloseout.closeoutReviewAction.recommendedDownload.href, /format=closeout-handoff/);
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.operationalExceptionCloseout.status,
       "awaiting_resolution"
@@ -15489,6 +15507,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(confirmedOpsSnapshot.summaryText, /Operational Exception Closeout:/);
     assert.match(confirmedOpsSnapshot.summaryText, /status=awaiting_resolution/);
     assert.match(confirmedOpsSnapshot.summaryText, /canClose=false/);
+    assert.match(confirmedOpsSnapshot.summaryText, /resolutionAction=record_launch_rehearsal_run/);
+    assert.match(confirmedOpsSnapshot.summaryText, /closeoutReview=record_launch_closeout_review/);
 
     const handoffIndexDownload = await getText(
       baseUrl,
@@ -20034,6 +20054,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /operationalExceptionCloseout/);
     assert.match(html, /Operational Exception Closeout/);
     assert.match(html, /data-operational-exception-closeout/);
+    assert.match(html, /handleOperationalExceptionAction/);
+    assert.match(html, /data-operational-exception-action/);
+    assert.match(html, /Open Exception Workspace/);
+    assert.match(html, /Download Exception Handoff/);
+    assert.match(html, /Record Closeout Review/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);
   } finally {
     await app.close();

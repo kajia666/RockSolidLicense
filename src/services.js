@@ -20029,6 +20029,108 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
       ];
   const blockingReasonCount = reasons.length;
   const canClose = operationalExceptionEntry.status !== "open" && blockingReasonCount === 0;
+  const productCode = operationalExceptionEntry.productCode || null;
+  const channel = operationalExceptionEntry.channel || "stable";
+  const nextOperation = operationalExceptionEntry.operation || null;
+  const nextActionKey = operationalExceptionEntry.actionKey || null;
+  const nextDownloadKey = operationalExceptionEntry.downloadKey || operationalExceptionEntry.download?.key || null;
+  const cloneWorkspaceAction = (workspaceAction = null) => workspaceAction && typeof workspaceAction === "object"
+    ? {
+        key: workspaceAction.key || null,
+        label: workspaceAction.label || null,
+        href: workspaceAction.href || null,
+        autofocus: workspaceAction.autofocus || null,
+        params: workspaceAction.params && typeof workspaceAction.params === "object"
+          ? { ...workspaceAction.params }
+          : {}
+      }
+    : null;
+  const cloneDownload = (download = null) => download && typeof download === "object"
+    ? {
+        key: download.key || null,
+        label: download.label || download.title || download.key || null,
+        fileName: download.fileName || null,
+        format: download.format || null,
+        href: download.href || null,
+        source: download.source || null
+      }
+    : null;
+  const resolutionAction = {
+    key: "operational_exception_resolution",
+    label: "Resolve Operational Exception",
+    summary: "Route the next open operational exception reason back through Launch Mainline before closeout.",
+    status: canClose ? "complete" : "required",
+    endpoint: "/api/developer/launch-mainline/action",
+    method: "POST",
+    enabled: Boolean(productCode && nextOperation),
+    productCode,
+    channel,
+    operation: nextOperation,
+    actionKey: nextActionKey,
+    downloadKey: nextDownloadKey,
+    body: {
+      productCode,
+      channel,
+      operation: nextOperation,
+      actionKey: nextActionKey,
+      downloadKey: nextDownloadKey
+    },
+    workspaceAction: cloneWorkspaceAction(operationalExceptionEntry.workspaceAction),
+    recommendedDownload: cloneDownload(operationalExceptionEntry.download)
+  };
+  const closeoutOperation = "record_launch_closeout_review";
+  const closeoutActionKey = "operational_exception_closeout_review";
+  const closeoutDownloadKey = "launch_mainline_closeout_handoff";
+  const closeoutParams = {
+    productCode,
+    channel,
+    operation: closeoutOperation,
+    actionKey: closeoutActionKey,
+    downloadKey: closeoutDownloadKey,
+    routeTitle: "Record Operational Exception Closeout",
+    routeReason: canClose
+      ? "Operational exception is ready for closeout review."
+      : "Review closeout criteria before recording launch closeout."
+  };
+  const closeoutReviewAction = {
+    key: "operational_exception_closeout_review",
+    label: "Record Closeout Review",
+    summary: canClose
+      ? "Record the Launch Mainline closeout review after reviewer sign-off."
+      : "Resolve the operational exception criteria before recording closeout review.",
+    status: canClose ? "ready" : "blocked",
+    endpoint: "/api/developer/launch-mainline/action",
+    method: "POST",
+    enabled: Boolean(canClose && productCode),
+    productCode,
+    channel,
+    operation: closeoutOperation,
+    actionKey: closeoutActionKey,
+    downloadKey: closeoutDownloadKey,
+    body: {
+      productCode,
+      channel,
+      operation: closeoutOperation,
+      actionKey: closeoutActionKey,
+      downloadKey: closeoutDownloadKey
+    },
+    workspaceAction: productCode
+      ? createLaunchWorkflowWorkspaceShortcut(
+          "launch-mainline",
+          "summary",
+          "Open Closeout Review",
+          closeoutParams
+        )
+      : null,
+    recommendedDownload: productCode
+      ? createLaunchMainlineDownloadShortcut(
+          "Launch Mainline closeout handoff",
+          "launch-mainline-closeout-handoff.txt",
+          "closeout-handoff",
+          closeoutParams
+        )
+      : null
+  };
   return {
     version: "developer-ops-operational-exception-closeout/v1",
     status: canClose ? "ready_to_close" : "awaiting_resolution",
@@ -20045,6 +20147,8 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
     downloadHref: operationalExceptionEntry.download?.href || null,
     confirmationAuditLogId: operationalExceptionEntry.confirmationAuditLogId || null,
     latestReceiptAuditLogId: operationalExceptionEntry.latestReceiptAuditLogId || null,
+    resolutionAction,
+    closeoutReviewAction,
     closeoutCriteria,
     operatorHint: canClose
       ? "Operational exception can be closed after reviewer sign-off."
@@ -23421,6 +23525,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | action=${operationalExceptionCloseout.nextActionKey || "-"}`
         + ` | download=${operationalExceptionCloseout.downloadKey || "-"}`
       );
+      lines.push(
+        `- actions: resolutionAction=${operationalExceptionCloseout.resolutionAction?.operation || "-"}`
+        + ` | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"}`
+        + ` | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`
+      );
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -23893,6 +24002,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Status: ${operationalExceptionCloseout.status || "-"} | canClose=${operationalExceptionCloseout.canClose === true} | reviewRequired=${operationalExceptionCloseout.reviewRequired === true}`);
     lines.push(`- Next: action=${operationalExceptionCloseout.nextActionKey || "-"} | operation=${operationalExceptionCloseout.nextOperation || "-"} | download=${operationalExceptionCloseout.downloadKey || "-"}`);
     lines.push(`- Source: exception=${operationalExceptionCloseout.sourceExceptionStatus || "-"} | severity=${operationalExceptionCloseout.severity || "-"} | reasons=${operationalExceptionCloseout.blockingReasonCount ?? 0}`);
+    lines.push(`- Actions: resolutionAction=${operationalExceptionCloseout.resolutionAction?.operation || "-"} | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"} | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`);
     if (Array.isArray(operationalExceptionCloseout.closeoutCriteria) && operationalExceptionCloseout.closeoutCriteria.length) {
       lines.push("- Closeout Criteria:");
       for (const item of operationalExceptionCloseout.closeoutCriteria) {
@@ -24303,6 +24413,11 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       `- next=${operationalExceptionCloseout.nextOperation || "-"}`
       + ` | action=${operationalExceptionCloseout.nextActionKey || "-"}`
       + ` | download=${operationalExceptionCloseout.downloadKey || "-"}`
+    );
+    lines.push(
+      `- actions: resolutionAction=${operationalExceptionCloseout.resolutionAction?.operation || "-"}`
+      + ` | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"}`
+      + ` | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`
     );
   }
 

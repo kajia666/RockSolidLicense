@@ -2986,6 +2986,74 @@
         throw { code: "UNSUPPORTED_STABILIZATION_HANDOFF", message: `Unsupported stabilization handoff action: ${normalizedAction || "-"}` };
       }
 
+      async function handleOperationalExceptionAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
+        const channel = String(data.channel || requestedChannel || "stable").trim() || "stable";
+        const operation = String(data.operationalExceptionOperation || "").trim();
+        const actionKey = String(data.operationalExceptionActionKey || "").trim();
+        const downloadKey = String(data.operationalExceptionDownloadKey || "").trim();
+        if (normalizedAction === "open-resolution" || normalizedAction === "open-closeout-review") {
+          const href = String(data.operationalExceptionWorkspaceHref || "").trim();
+          if (href) {
+            window.location.href = href;
+            return;
+          }
+          if (!productCode) {
+            throw { code: "MISSING_PROJECT", message: "Select or route a project before opening this operational exception workspace." };
+          }
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+            productCode,
+            channel,
+            autofocus: "summary",
+            routeTitle: normalizedAction === "open-closeout-review" ? "Record Operational Exception Closeout" : "Resolve Operational Exception",
+            routeReason: operation || actionKey || "Continue operational exception handling",
+            ...(operation ? { operation } : {}),
+            ...(actionKey ? { actionKey } : {}),
+            ...(downloadKey ? { downloadKey } : {})
+          });
+          return;
+        }
+        if (normalizedAction === "download-resolution" || normalizedAction === "download-closeout-handoff") {
+          const href = String(data.operationalExceptionDownloadHref || "").trim();
+          if (!href) {
+            throw { code: "MISSING_DOWNLOAD", message: "No operational exception handoff download is available." };
+          }
+          const result = await downloadApiFile(
+            href,
+            data.operationalExceptionDownloadFileName || "operational-exception-handoff.txt"
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Operational exception handoff downloaded: ${result.fileName}`);
+          return;
+        }
+        if (normalizedAction === "record-closeout-review") {
+          if (String(data.operationalExceptionEnabled || "").trim() !== "true") {
+            throw { code: "CLOSEOUT_NOT_READY", message: "Resolve operational exception criteria before recording closeout review." };
+          }
+          if (!productCode || !operation) {
+            throw { code: "MISSING_CLOSEOUT_ACTION", message: "Closeout review action is missing project or operation details." };
+          }
+          const endpoint = String(data.operationalExceptionEndpoint || "/api/developer/launch-mainline/action").trim();
+          const result = await api(endpoint, {
+            method: "POST",
+            body: {
+              productCode,
+              channel,
+              operation,
+              ...(actionKey ? { actionKey } : {}),
+              ...(downloadKey ? { downloadKey } : {})
+            }
+          });
+          setOutput(result);
+          await refreshOps(false);
+          setStatus(result?.message || "Operational exception closeout review recorded.");
+          return;
+        }
+        throw { code: "UNSUPPORTED_OPERATIONAL_EXCEPTION", message: `Unsupported operational exception action: ${normalizedAction || "-"}` };
+      }
+
       async function handleLaunchReceiptOperatorAction(action = "", data = {}) {
         const normalizedAction = String(action || "").trim().toLowerCase();
         const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
@@ -4455,6 +4523,28 @@
           `action=${esc(operationalExceptionCloseout?.nextActionKey || "-")}`,
           `download=${esc(operationalExceptionCloseout?.downloadKey || "-")}`
         ].join(" | ");
+        const buildExceptionActionAttrs = (action = null, actionName = "") => {
+          if (!action || typeof action !== "object") {
+            return "";
+          }
+          const workspace = action.workspaceAction || {};
+          const download = action.recommendedDownload || {};
+          return [
+            `data-operational-exception-action="${esc(actionName)}"`,
+            action.productCode ? `data-product-code="${esc(action.productCode)}"` : "",
+            action.channel ? `data-channel="${esc(action.channel)}"` : "",
+            action.operation ? `data-operational-exception-operation="${esc(action.operation)}"` : "",
+            action.actionKey ? `data-operational-exception-action-key="${esc(action.actionKey)}"` : "",
+            action.downloadKey ? `data-operational-exception-download-key="${esc(action.downloadKey)}"` : "",
+            action.endpoint ? `data-operational-exception-endpoint="${esc(action.endpoint)}"` : "",
+            `data-operational-exception-enabled="${action.enabled === true ? "true" : "false"}"`,
+            workspace.href ? `data-operational-exception-workspace-href="${esc(workspace.href)}"` : "",
+            download.href ? `data-operational-exception-download-href="${esc(download.href)}"` : "",
+            download.fileName ? `data-operational-exception-download-file-name="${esc(download.fileName)}"` : ""
+          ].filter(Boolean).join(" ");
+        };
+        const resolutionAction = operationalExceptionCloseout?.resolutionAction || null;
+        const closeoutReviewAction = operationalExceptionCloseout?.closeoutReviewAction || null;
         return `
           <div class="snapshot-recap operational-exception-signals">
             ${operationalExceptionEntry ? `
@@ -4465,6 +4555,12 @@
                 </div>
                 <div class="hint">${entryDetails}</div>
                 <ul class="snapshot-list">${reasons.length ? reasons.map((item) => `<li><strong>${esc(item.key || "-")}</strong> ${esc(item.status || "-")} | count=${esc(item.count ?? "-")} | ${esc(item.summary || "-")}</li>`).join("") : "<li>No open exception reasons.</li>"}</ul>
+                ${resolutionAction ? `
+                  <div class="snapshot-recap-actions">
+                    <button type="button" class="snapshot-inline-button" ${buildExceptionActionAttrs(resolutionAction, "open-resolution")} ${resolutionAction.workspaceAction?.href ? "" : "disabled"}>Open Exception Workspace</button>
+                    <button type="button" class="snapshot-inline-button" ${buildExceptionActionAttrs(resolutionAction, "download-resolution")} ${(token && resolutionAction.recommendedDownload?.href) ? "" : "disabled"}>Download Exception Handoff</button>
+                  </div>
+                ` : ""}
               </div>
             ` : ""}
             ${operationalExceptionCloseout ? `
@@ -4475,6 +4571,13 @@
                 </div>
                 <div class="hint">${closeoutDetails}</div>
                 <ul class="snapshot-list">${closeoutCriteria.length ? closeoutCriteria.map((item) => `<li><strong>${esc(item.key || "-")}</strong> ${esc(item.status || "-")} | ${esc(item.summary || "-")}</li>`).join("") : "<li>No closeout criteria are available.</li>"}</ul>
+                ${closeoutReviewAction ? `
+                  <div class="snapshot-recap-actions">
+                    <button type="button" class="snapshot-inline-button" ${buildExceptionActionAttrs(closeoutReviewAction, "open-closeout-review")} ${closeoutReviewAction.workspaceAction?.href ? "" : "disabled"}>Open Closeout Review</button>
+                    <button type="button" class="snapshot-inline-button" ${buildExceptionActionAttrs(closeoutReviewAction, "download-closeout-handoff")} ${(token && closeoutReviewAction.recommendedDownload?.href) ? "" : "disabled"}>Download Closeout Handoff</button>
+                    <button type="button" class="snapshot-inline-button" ${buildExceptionActionAttrs(closeoutReviewAction, "record-closeout-review")} ${(token && closeoutReviewAction.enabled === true) ? "" : "disabled"}>Record Closeout Review</button>
+                  </div>
+                ` : ""}
               </div>
             ` : ""}
           </div>
@@ -5343,6 +5446,14 @@
         bindRows("#snapshot-overview [data-stabilization-handoff-action]", async (data) => {
           try {
             await handleStabilizationHandoffAction(data.stabilizationHandoffAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-operational-exception-action]", async (data) => {
+          try {
+            await handleOperationalExceptionAction(data.operationalExceptionAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });

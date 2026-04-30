@@ -220,6 +220,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["artifact_manifest", "not_requested"],
       ["closeout_reload_packet", "not_requested"],
       ["readiness_review_packet", "not_requested"],
+      ["production_signoff_packet", "not_requested"],
       ["launch_duty_archive_index", "not_requested"],
       ["filled_closeout_draft", "not_requested"]
     ]
@@ -276,6 +277,49 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
     nextAction: "Backfill full-test evidence, production sign-off conditions, production decision, and receipt visibility before cutover."
   });
+  assert.equal(output.stagingProductionSignoffPacket.mode, "staging-production-signoff-operator-packet");
+  assert.equal(output.stagingProductionSignoffPacket.status, "blocked_until_closeout_reload");
+  assert.equal(output.stagingProductionSignoffPacket.willModifyData, false);
+  assert.equal(output.stagingProductionSignoffPacket.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.equal(output.stagingProductionSignoffPacket.packetFile, "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json");
+  assert.deepEqual(output.stagingProductionSignoffPacket.sourceStatuses, {
+    fullTestWindow: "blocked",
+    productionSignoff: "blocked",
+    readinessReviewPacket: "blocked_until_closeout_reload",
+    runRecordIndex: "awaiting_evidence_backfill",
+    launchDayWatch: "blocked"
+  });
+  assert.deepEqual(output.stagingProductionSignoffPacket.decision, {
+    requiredDecision: "ready-for-production-signoff",
+    productionDecision: null,
+    canSignoff: false,
+    readyForFullTestWindow: false,
+    closeoutInputStatus: "missing"
+  });
+  assert.deepEqual(
+    output.stagingProductionSignoffPacket.missingSignoffKeys,
+    output.stagingAcceptanceCloseout.productionSignoffConditions.conditions.map((item) => item.key)
+  );
+  assert.deepEqual(output.stagingProductionSignoffPacket.missingReceiptVisibilityKeys, [
+    "launchMainline",
+    "launchReview",
+    "launchSmoke",
+    "developerOps"
+  ]);
+  assert.equal(output.stagingProductionSignoffPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(output.stagingProductionSignoffPacket.commands.fullTestWindow, "npm.cmd test");
+  assert.deepEqual(
+    output.stagingProductionSignoffPacket.operatorSteps.map((item) => [item.key, item.status]),
+    [
+      ["run_full_test_window", "blocked_until_closeout_reload"],
+      ["backfill_production_signoff", "blocked_until_full_test_window"],
+      ["verify_receipt_visibility", "operator_backfill"],
+      ["reload_closeout_input", "operator_execute"],
+      ["archive_production_signoff", "blocked_until_signoff_ready"],
+      ["start_launch_day_watch", "blocked_until_signoff_ready"]
+    ]
+  );
+  assert.equal(output.stagingProductionSignoffPacket.nextAction, "Reload closeout input, run the full test window when ready, then backfill production sign-off evidence and receipt visibility.");
   assert.equal(output.launchDayWatchPlan.status, "blocked");
   assert.equal(output.launchDayWatchPlan.canStartCutoverWatch, false);
   assert.equal(output.launchDayWatchPlan.requiredDecision, "ready-for-production-signoff");
@@ -416,6 +460,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["artifact_manifest", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json", "recommended_default"],
       ["closeout_reload_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json", "recommended_default"],
       ["readiness_review_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json", "recommended_default"],
+      ["production_signoff_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json", "recommended_default"],
       ["launch_duty_archive_index", "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json", "recommended_default"],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json", "example_only"],
@@ -507,6 +552,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     artifactManifest: "awaiting_artifact_generation",
     closeoutReloadPacket: "awaiting_closeout_backfill",
     readinessReviewPacket: "blocked_until_closeout_reload",
+    productionSignoffPacket: "blocked_until_closeout_reload",
     finalPacket: "ready_for_operator_rehearsal"
   });
   assert.deepEqual(
@@ -515,7 +561,8 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["run_record_index", "awaiting_evidence_backfill", "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json"],
       ["artifact_manifest", "awaiting_artifact_generation", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json"],
       ["closeout_reload_packet", "awaiting_closeout_backfill", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json"],
-      ["readiness_review_packet", "blocked_until_closeout_reload", "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json"]
+      ["readiness_review_packet", "blocked_until_closeout_reload", "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json"],
+      ["production_signoff_packet", "blocked_until_closeout_reload", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"]
     ]
   );
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
@@ -567,6 +614,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["artifact_manifest", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json", "recommended_default"],
       ["closeout_reload_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json", "recommended_default"],
       ["readiness_review_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json", "recommended_default"],
+      ["production_signoff_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json", "recommended_default"],
       ["launch_duty_archive_index", "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json", "recommended_default"],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json", "example_only"],
@@ -584,6 +632,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--artifact-manifest-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifact-manifest\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--closeout-reload-packet-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-reload-packet\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--readiness-review-packet-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-readiness-review-packet\.json/);
+  assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--production-signoff-packet-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--launch-duty-archive-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
   assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--filled-closeout-draft-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.draft\.json/);
   assert.doesNotMatch(JSON.stringify(output.stagingEnvironmentBinding), /StrongAdmin123!|StrongDeveloper123!/);
@@ -771,6 +820,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["artifact_manifest", null],
       ["closeout_reload_packet", null],
       ["readiness_review_packet", null],
+      ["production_signoff_packet", null],
       ["launch_duty_archive_index", null],
       ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"],
       ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json"],
@@ -966,6 +1016,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     const artifactManifestFile = join(tempDir, "profile-artifact-manifest.json");
     const closeoutReloadPacketFile = join(tempDir, "profile-closeout-reload-packet.json");
     const readinessReviewPacketFile = join(tempDir, "profile-readiness-review-packet.json");
+    const productionSignoffPacketFile = join(tempDir, "profile-production-signoff-packet.json");
     const launchDutyArchiveIndexFile = join(tempDir, "profile-launch-duty-archive-index.json");
     const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
     writeFileSync(profileFile, JSON.stringify({
@@ -998,6 +1049,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       closeoutReloadPacketFile,
       "--readiness-review-packet-file",
       readinessReviewPacketFile,
+      "--production-signoff-packet-file",
+      productionSignoffPacketFile,
       "--launch-duty-archive-index-file",
       launchDutyArchiveIndexFile,
       "--filled-closeout-draft-file",
@@ -1043,6 +1096,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       "artifactManifestFile",
       "closeoutReloadPacketFile",
       "readinessReviewPacketFile",
+      "productionSignoffPacketFile",
       "launchDutyArchiveIndexFile",
       "filledCloseoutDraftFile"
     ]);
@@ -1079,6 +1133,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         ["artifact_manifest", artifactManifestFile, "pending_write"],
         ["closeout_reload_packet", closeoutReloadPacketFile, "pending_write"],
         ["readiness_review_packet", readinessReviewPacketFile, "pending_write"],
+        ["production_signoff_packet", productionSignoffPacketFile, "pending_write"],
         ["launch_duty_archive_index", launchDutyArchiveIndexFile, "pending_write"],
         ["filled_closeout_input", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json", "operator_create"],
         ["filled_closeout_draft", filledCloseoutDraftFile, "pending_write"],
@@ -1173,7 +1228,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Profile keys: adminUsername, appBackupDir, baseUrl, channel, developerUsername, postgresBackupDir, productCode, storageProfile, targetEnvFile, targetOs/);
     assert.match(handoff, /## Staging Profile Launch Plan/);
     assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
-    assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, artifactManifestFile, closeoutReloadPacketFile, readinessReviewPacketFile, launchDutyArchiveIndexFile, filledCloseoutDraftFile/);
+    assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, artifactManifestFile, closeoutReloadPacketFile, readinessReviewPacketFile, productionSignoffPacketFile, launchDutyArchiveIndexFile, filledCloseoutDraftFile/);
     assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: missing before_evidence_recording/);
     assert.match(handoff, /## Staging Profile Operator Preflight/);
     assert.match(handoff, /Profile preflight status: blocked_until_secret_env/);
@@ -1217,6 +1272,13 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingReadinessReviewPacket.packetFile, readinessReviewPacketFile);
     assert.equal(output.stagingReadinessReviewPacket.sourceStatuses.closeoutReloadPacket, "awaiting_closeout_backfill");
     assert.equal(output.stagingReadinessReviewPacket.gates.find((item) => item.key === "production_signoff").requiredDecision, "ready-for-production-signoff");
+    assert.deepEqual(template.stagingProductionSignoffPacket, output.stagingProductionSignoffPacket);
+    assert.equal(output.productionSignoffPacketFile.path, productionSignoffPacketFile);
+    assert.equal(output.productionSignoffPacketFile.written, true);
+    assert.equal(existsSync(productionSignoffPacketFile), true);
+    assert.deepEqual(JSON.parse(readFileSync(productionSignoffPacketFile, "utf8")), output.stagingProductionSignoffPacket);
+    assert.equal(output.stagingProductionSignoffPacket.packetFile, productionSignoffPacketFile);
+    assert.equal(output.stagingProductionSignoffPacket.sourceStatuses.readinessReviewPacket, "blocked_until_closeout_reload");
     assert.deepEqual(template.stagingLaunchDutyArchiveIndex, output.stagingLaunchDutyArchiveIndex);
     assert.equal(output.launchDutyArchiveIndexFile.path, launchDutyArchiveIndexFile);
     assert.equal(output.launchDutyArchiveIndexFile.written, true);
@@ -1225,7 +1287,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingLaunchDutyArchiveIndex.indexFile, launchDutyArchiveIndexFile);
     assert.deepEqual(
       output.stagingLaunchDutyArchiveIndex.packets.map((item) => item.key),
-      ["run_record_index", "artifact_manifest", "closeout_reload_packet", "readiness_review_packet"]
+      ["run_record_index", "artifact_manifest", "closeout_reload_packet", "readiness_review_packet", "production_signoff_packet"]
     );
     assert.equal(output.filledCloseoutDraftFile.path, filledCloseoutDraftFile);
     assert.equal(output.filledCloseoutDraftFile.written, true);
@@ -2126,6 +2188,28 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       "start_launch_day_watch",
       "prepare_stabilization_handoff"
     ]);
+    assert.equal(output.stagingProductionSignoffPacket.status, "ready_for_launch_day_watch");
+    assert.deepEqual(output.stagingProductionSignoffPacket.decision, {
+      requiredDecision: "ready-for-production-signoff",
+      productionDecision: "ready-for-production-signoff",
+      canSignoff: true,
+      readyForFullTestWindow: true,
+      closeoutInputStatus: "loaded"
+    });
+    assert.deepEqual(output.stagingProductionSignoffPacket.missingSignoffKeys, []);
+    assert.deepEqual(output.stagingProductionSignoffPacket.missingReceiptVisibilityKeys, []);
+    assert.deepEqual(
+      output.stagingProductionSignoffPacket.operatorSteps.map((item) => [item.key, item.status]),
+      [
+        ["run_full_test_window", "complete"],
+        ["backfill_production_signoff", "complete"],
+        ["verify_receipt_visibility", "complete"],
+        ["reload_closeout_input", "operator_execute"],
+        ["archive_production_signoff", "ready"],
+        ["start_launch_day_watch", "ready"]
+      ]
+    );
+    assert.equal(output.stagingProductionSignoffPacket.nextAction, "Archive production sign-off packet, then start launch-day watch and stabilization handoff.");
     assert.equal(output.finalRehearsalPacket.status, "ready_for_launch_day_watch");
     assert.equal(output.finalRehearsalPacket.readinessTransitionStatus, "ready_for_launch_day_watch");
     assert.deepEqual(output.finalRehearsalPacket.sourceReadiness, {

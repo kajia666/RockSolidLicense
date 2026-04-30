@@ -64,6 +64,7 @@ const PROFILE_ALLOWED_FIELDS = [
   "artifactManifestFile",
   "closeoutReloadPacketFile",
   "readinessReviewPacketFile",
+  "productionSignoffPacketFile",
   "launchDutyArchiveIndexFile",
   "filledCloseoutDraftFile",
   "closeoutInputFile"
@@ -95,6 +96,7 @@ const PROFILE_OPTION_FLAGS = {
   artifactManifestFile: "--artifact-manifest-file",
   closeoutReloadPacketFile: "--closeout-reload-packet-file",
   readinessReviewPacketFile: "--readiness-review-packet-file",
+  productionSignoffPacketFile: "--production-signoff-packet-file",
   launchDutyArchiveIndexFile: "--launch-duty-archive-index-file",
   filledCloseoutDraftFile: "--filled-closeout-draft-file",
   closeoutInputFile: "--closeout-input-file"
@@ -176,6 +178,7 @@ function parseArgs(argv) {
     artifactManifestFile: null,
     closeoutReloadPacketFile: null,
     readinessReviewPacketFile: null,
+    productionSignoffPacketFile: null,
     launchDutyArchiveIndexFile: null,
     filledCloseoutDraftFile: null,
     closeoutInputFile: null,
@@ -227,6 +230,8 @@ function parseArgs(argv) {
       options.closeoutReloadPacketFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--readiness-review-packet-file") {
       options.readinessReviewPacketFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--production-signoff-packet-file") {
+      options.productionSignoffPacketFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--launch-duty-archive-index-file") {
       options.launchDutyArchiveIndexFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--filled-closeout-draft-file") {
@@ -270,6 +275,7 @@ function parseArgs(argv) {
     artifactManifestFile: resolveProfileOption(options.artifactManifestFile, "RSL_REHEARSAL_ARTIFACT_MANIFEST_FILE", stagingProfile, "artifactManifestFile"),
     closeoutReloadPacketFile: resolveProfileOption(options.closeoutReloadPacketFile, "RSL_REHEARSAL_CLOSEOUT_RELOAD_PACKET_FILE", stagingProfile, "closeoutReloadPacketFile"),
     readinessReviewPacketFile: resolveProfileOption(options.readinessReviewPacketFile, "RSL_REHEARSAL_READINESS_REVIEW_PACKET_FILE", stagingProfile, "readinessReviewPacketFile"),
+    productionSignoffPacketFile: resolveProfileOption(options.productionSignoffPacketFile, "RSL_REHEARSAL_PRODUCTION_SIGNOFF_PACKET_FILE", stagingProfile, "productionSignoffPacketFile"),
     launchDutyArchiveIndexFile: resolveProfileOption(options.launchDutyArchiveIndexFile, "RSL_REHEARSAL_LAUNCH_DUTY_ARCHIVE_INDEX_FILE", stagingProfile, "launchDutyArchiveIndexFile"),
     filledCloseoutDraftFile: resolveProfileOption(options.filledCloseoutDraftFile, "RSL_REHEARSAL_FILLED_CLOSEOUT_DRAFT_FILE", stagingProfile, "filledCloseoutDraftFile"),
     closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile")
@@ -1025,12 +1031,133 @@ function buildStagingReadinessReviewPacket(result) {
   };
 }
 
+function buildStagingProductionSignoffPacket(result) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  const fullTestWindow = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
+  const productionSignoff = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const readinessReviewPacket = result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result);
+  const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
+  const launchDayWatch = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
+  const archiveRoot = readinessReviewPacket.archiveRoot
+    || runRecordIndex.archiveRoot
+    || result.finalRehearsalPacket?.archiveRoot
+    || "artifacts/staging/product/stable";
+  const packetFile = result.productionSignoffPacketFile?.path
+    || bindingFiles.get("production_signoff_packet")?.path
+    || path.posix.join(archiveRoot, "staging-production-signoff-packet.json");
+  const closeoutInputPath = bindingFiles.get("filled_closeout_input")?.path
+    || runRecordIndex.closeoutProgress?.closeoutInputPath
+    || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const closeoutReload = readinessReviewPacket.commands?.closeoutReload
+    || runRecordIndex.closeoutProgress?.reloadCommand
+    || productionSignoff.reloadCommand
+    || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  const canRunFullTestWindow = fullTestWindow.canRun === true;
+  const canSignoff = productionSignoff.canSignoff === true;
+  let status = "blocked_until_closeout_reload";
+  if (canSignoff) {
+    status = "ready_for_launch_day_watch";
+  } else if (canRunFullTestWindow) {
+    status = "ready_for_full_test_window";
+  } else if (result.closeoutInput?.status === "loaded") {
+    status = "blocked_until_signoff_backfill";
+  }
+  const missingSignoffKeys = productionSignoff.missingSignoffKeys || [];
+  const missingReceiptVisibilityKeys = productionSignoff.missingReceiptVisibilityKeys || [];
+  const requiredSignoffKeys = (closeout.productionSignoffConditions?.conditions || [])
+    .map((item) => item.key)
+    .filter(Boolean);
+  const signoffConditions = (closeout.productionSignoffConditions?.conditions || []).map((item) => ({
+    key: item.key,
+    status: canSignoff ? "filled" : missingSignoffKeys.includes(item.key) ? "missing" : "filled",
+    evidence: item.evidence || null
+  }));
+  return {
+    mode: "staging-production-signoff-operator-packet",
+    status,
+    willModifyData: false,
+    archiveRoot,
+    packetFile,
+    closeoutInputPath,
+    sourceStatuses: {
+      fullTestWindow: fullTestWindow.status || "not_available",
+      productionSignoff: productionSignoff.status || "not_available",
+      readinessReviewPacket: readinessReviewPacket.status || "not_available",
+      runRecordIndex: runRecordIndex.status || "not_available",
+      launchDayWatch: launchDayWatch.status || "not_available"
+    },
+    decision: {
+      requiredDecision: productionSignoff.requiredDecision || "ready-for-production-signoff",
+      productionDecision: productionSignoff.productionDecision || null,
+      canSignoff,
+      readyForFullTestWindow: productionSignoff.readyForFullTestWindow === true,
+      closeoutInputStatus: productionSignoff.closeoutInputStatus || "missing"
+    },
+    requiredSignoffKeys,
+    requiredReceiptVisibilityKeys: RECEIPT_VISIBILITY_KEYS,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    signoffConditions,
+    routes: {
+      launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
+      developerOps: launchDayWatch.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
+      launchReviewSummary: launchDayWatch.routes?.launchReviewSummary || result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
+      launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null
+    },
+    commands: {
+      closeoutReload,
+      fullTestWindow: fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test"
+    },
+    operatorSteps: [
+      {
+        key: "run_full_test_window",
+        status: canSignoff ? "complete" : canRunFullTestWindow ? "operator_execute" : "blocked_until_closeout_reload",
+        command: fullTestWindow.command || "npm.cmd test"
+      },
+      {
+        key: "backfill_production_signoff",
+        status: canSignoff ? "complete" : canRunFullTestWindow ? "operator_backfill" : "blocked_until_full_test_window",
+        requiredSignoffKeys,
+        missingSignoffKeys
+      },
+      {
+        key: "verify_receipt_visibility",
+        status: canSignoff && missingReceiptVisibilityKeys.length === 0 ? "complete" : "operator_backfill",
+        requiredReceiptVisibilityKeys: RECEIPT_VISIBILITY_KEYS,
+        missingReceiptVisibilityKeys
+      },
+      {
+        key: "reload_closeout_input",
+        status: "operator_execute",
+        command: closeoutReload
+      },
+      {
+        key: "archive_production_signoff",
+        status: canSignoff ? "ready" : "blocked_until_signoff_ready",
+        packetFile
+      },
+      {
+        key: "start_launch_day_watch",
+        status: launchDayWatch.canStartCutoverWatch === true ? "ready" : "blocked_until_signoff_ready",
+        routes: launchDayWatch.routes || {}
+      }
+    ],
+    nextAction: canSignoff
+      ? "Archive production sign-off packet, then start launch-day watch and stabilization handoff."
+      : canRunFullTestWindow
+        ? "Run the full test window, backfill production sign-off conditions, reload closeout input, and re-check this packet."
+        : "Reload closeout input, run the full test window when ready, then backfill production sign-off evidence and receipt visibility."
+  };
+}
+
 function buildStagingLaunchDutyArchiveIndex(result) {
   const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
   const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
   const artifactManifest = result.stagingArtifactManifest || buildStagingArtifactManifest(result);
   const closeoutReloadPacket = result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result);
   const readinessReviewPacket = result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result);
+  const productionSignoffPacket = result.stagingProductionSignoffPacket || buildStagingProductionSignoffPacket(result);
   const finalPacket = result.finalRehearsalPacket || buildFinalRehearsalPacket(result);
   const archiveRoot = readinessReviewPacket.archiveRoot
     || closeoutReloadPacket.archiveRoot
@@ -1053,6 +1180,7 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       artifactManifest: artifactManifest.status || "not_available",
       closeoutReloadPacket: closeoutReloadPacket.status || "not_available",
       readinessReviewPacket: readinessReviewPacket.status || "not_available",
+      productionSignoffPacket: productionSignoffPacket.status || "not_available",
       finalPacket: finalPacket.status || "not_available"
     },
     packets: [
@@ -1075,6 +1203,11 @@ function buildStagingLaunchDutyArchiveIndex(result) {
         key: "readiness_review_packet",
         status: readinessReviewPacket.status || "not_available",
         path: packetPath("readiness_review_packet", readinessReviewPacket.packetFile)
+      },
+      {
+        key: "production_signoff_packet",
+        status: productionSignoffPacket.status || "not_available",
+        path: packetPath("production_signoff_packet", productionSignoffPacket.packetFile)
       }
     ],
     commands: {
@@ -2007,6 +2140,7 @@ function buildStagingEnvironmentBinding(result, options = {}) {
   const artifactManifestPath = result.artifactManifestFile?.path || path.posix.join(archiveRoot, "staging-artifact-manifest.json");
   const closeoutReloadPacketPath = result.closeoutReloadPacketFile?.path || path.posix.join(archiveRoot, "staging-closeout-reload-packet.json");
   const readinessReviewPacketPath = result.readinessReviewPacketFile?.path || path.posix.join(archiveRoot, "staging-readiness-review-packet.json");
+  const productionSignoffPacketPath = result.productionSignoffPacketFile?.path || path.posix.join(archiveRoot, "staging-production-signoff-packet.json");
   const launchDutyArchiveIndexPath = result.launchDutyArchiveIndexFile?.path || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
   const filledCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
   const filledCloseoutDraftPath = result.filledCloseoutDraftFile?.path
@@ -2066,6 +2200,8 @@ function buildStagingEnvironmentBinding(result, options = {}) {
     closeoutReloadPacketPath,
     "--readiness-review-packet-file",
     readinessReviewPacketPath,
+    "--production-signoff-packet-file",
+    productionSignoffPacketPath,
     "--launch-duty-archive-index-file",
     launchDutyArchiveIndexPath,
     "--filled-closeout-draft-file",
@@ -2110,6 +2246,11 @@ function buildStagingEnvironmentBinding(result, options = {}) {
         key: "readiness_review_packet",
         path: readinessReviewPacketPath,
         status: result.readinessReviewPacketFile ? fileOutputStatus(result.readinessReviewPacketFile) : "recommended_default"
+      },
+      {
+        key: "production_signoff_packet",
+        path: productionSignoffPacketPath,
+        status: result.productionSignoffPacketFile ? fileOutputStatus(result.productionSignoffPacketFile) : "recommended_default"
       },
       {
         key: "launch_duty_archive_index",
@@ -2641,6 +2782,11 @@ function buildFinalRehearsalPacket(result) {
         status: fileOutputStatus(result.readinessReviewPacketFile)
       },
       {
+        key: "production_signoff_packet",
+        path: result.productionSignoffPacketFile?.path || null,
+        status: fileOutputStatus(result.productionSignoffPacketFile)
+      },
+      {
         key: "launch_duty_archive_index",
         path: result.launchDutyArchiveIndexFile?.path || null,
         status: fileOutputStatus(result.launchDutyArchiveIndexFile)
@@ -2894,6 +3040,13 @@ function buildStagingOperatorExecutionPlan(result) {
       status: fileOutputStatus(result.readinessReviewPacketFile),
       path: result.readinessReviewPacketFile?.path || null,
       purpose: "Summarize full-test, production sign-off, launch-day watch, and stabilization readiness after closeout reload."
+    },
+    {
+      key: "production_signoff_packet",
+      label: "Staging production sign-off packet JSON",
+      status: fileOutputStatus(result.productionSignoffPacketFile),
+      path: result.productionSignoffPacketFile?.path || null,
+      purpose: "Centralize production sign-off decision, missing sign-off fields, receipt visibility, reload command, and launch-day watch entry."
     },
     {
       key: "launch_duty_archive_index",
@@ -3373,6 +3526,14 @@ function buildResult(options) {
         }
       }
       : {}),
+    ...(options.productionSignoffPacketFile
+      ? {
+        productionSignoffPacketFile: {
+          path: path.resolve(repoRoot, options.productionSignoffPacketFile),
+          written: false
+        }
+      }
+      : {}),
     ...(options.launchDutyArchiveIndexFile
       ? {
         launchDutyArchiveIndexFile: {
@@ -3489,9 +3650,13 @@ function buildResult(options) {
     ...resultWithStagingCloseoutReloadPacket,
     stagingReadinessReviewPacket: gatesPassed ? buildStagingReadinessReviewPacket(resultWithStagingCloseoutReloadPacket) : null
   };
-  const resultWithStagingLaunchDutyArchiveIndex = {
+  const resultWithStagingProductionSignoffPacket = {
     ...resultWithStagingReadinessReviewPacket,
-    stagingLaunchDutyArchiveIndex: gatesPassed ? buildStagingLaunchDutyArchiveIndex(resultWithStagingReadinessReviewPacket) : null
+    stagingProductionSignoffPacket: gatesPassed ? buildStagingProductionSignoffPacket(resultWithStagingReadinessReviewPacket) : null
+  };
+  const resultWithStagingLaunchDutyArchiveIndex = {
+    ...resultWithStagingProductionSignoffPacket,
+    stagingLaunchDutyArchiveIndex: gatesPassed ? buildStagingLaunchDutyArchiveIndex(resultWithStagingProductionSignoffPacket) : null
   };
   return {
     ...resultWithStagingLaunchDutyArchiveIndex,
@@ -3984,6 +4149,36 @@ function renderProductionSignoffReadiness(readiness) {
   ].join("\n");
 }
 
+function renderStagingProductionSignoffPacket(packet) {
+  if (!packet) {
+    return "- Not available";
+  }
+  const decision = packet.decision || {};
+  const lines = [
+    `- Packet status: ${packet.status || "-"}`,
+    `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${packet.archiveRoot || "-"}`,
+    `- Packet file: ${packet.packetFile || "-"}`,
+    `- Closeout input: ${packet.closeoutInputPath || "-"}`,
+    `- Required decision: ${decision.requiredDecision || "-"}`,
+    `- Production decision: ${decision.productionDecision || "-"}`,
+    `- Can sign off: ${decision.canSignoff ? "yes" : "no"}`,
+    `- Full test window ready: ${decision.readyForFullTestWindow ? "yes" : "no"}`,
+    `- Missing sign-off keys: ${(packet.missingSignoffKeys || []).join(", ") || "-"}`,
+    `- Missing receipt visibility keys: ${(packet.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
+    `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
+    `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
+    `- Next action: ${packet.nextAction || "-"}`
+  ];
+  if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
+    lines.push("- Operator steps:");
+    for (const step of packet.operatorSteps) {
+      lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderLaunchDayWatchPlan(plan) {
   if (!plan) {
     return "- Not available";
@@ -4166,6 +4361,7 @@ function renderStagingEnvironmentBinding(binding) {
     `- Developer bearer token env: ${binding.credentialEnv?.developerBearerToken || "-"}`,
     `- Handoff file: ${fileByKey.get("handoff_file")?.path || "-"}`,
     `- Closeout file: ${fileByKey.get("closeout_file")?.path || "-"}`,
+    `- Production sign-off packet: ${fileByKey.get("production_signoff_packet")?.path || "-"}`,
     `- Filled closeout input: ${fileByKey.get("filled_closeout_input")?.path || "-"}`,
     `- Artifact archive root: ${fileByKey.get("artifact_archive_root")?.path || "-"}`,
     `- Dry run command: \`${binding.dryRunCommand || "-"}\``,
@@ -4425,6 +4621,10 @@ function renderHandoffFile(result) {
     "",
     renderProductionSignoffReadiness(result.productionSignoffReadiness),
     "",
+    "## Staging Production Sign-Off Packet",
+    "",
+    renderStagingProductionSignoffPacket(result.stagingProductionSignoffPacket),
+    "",
     "## Launch Day Watch Plan",
     "",
     renderLaunchDayWatchPlan(result.launchDayWatchPlan),
@@ -4518,6 +4718,7 @@ function buildCloseoutTemplate(result) {
     stagingArtifactManifest: result.stagingArtifactManifest || buildStagingArtifactManifest(result),
     stagingCloseoutReloadPacket: result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result),
     stagingReadinessReviewPacket: result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result),
+    stagingProductionSignoffPacket: result.stagingProductionSignoffPacket || buildStagingProductionSignoffPacket(result),
     stagingLaunchDutyArchiveIndex: result.stagingLaunchDutyArchiveIndex || buildStagingLaunchDutyArchiveIndex(result),
     requiredResultKeys: closeout.requiredResultKeys || [],
     evidenceOperations: closeout.evidenceOperations || [],
@@ -4699,6 +4900,26 @@ function writeReadinessReviewPacketFile(result) {
   return nextResult;
 }
 
+function writeProductionSignoffPacketFile(result) {
+  if (!result.productionSignoffPacketFile) {
+    return result;
+  }
+  if (result.status !== "pass") {
+    return result;
+  }
+
+  const nextResult = {
+    ...result,
+    productionSignoffPacketFile: {
+      ...result.productionSignoffPacketFile,
+      written: true
+    }
+  };
+  mkdirSync(path.dirname(result.productionSignoffPacketFile.path), { recursive: true });
+  writeFileSync(result.productionSignoffPacketFile.path, `${JSON.stringify(result.stagingProductionSignoffPacket, null, 2)}\n`, "utf8");
+  return nextResult;
+}
+
 function writeLaunchDutyArchiveIndexFile(result) {
   if (!result.launchDutyArchiveIndexFile) {
     return result;
@@ -4752,13 +4973,15 @@ function refreshOperatorExecutionPlan(result) {
 function writeOutputFiles(result) {
   return refreshOperatorExecutionPlan(
     writeLaunchDutyArchiveIndexFile(
-      writeReadinessReviewPacketFile(
-        writeCloseoutReloadPacketFile(
-          writeArtifactManifestFile(
-            writeFilledCloseoutDraftFile(
-              writeRunRecordFile(
-                writeCloseoutFile(
-                  writeHandoffFile(result)
+      writeProductionSignoffPacketFile(
+        writeReadinessReviewPacketFile(
+          writeCloseoutReloadPacketFile(
+            writeArtifactManifestFile(
+              writeFilledCloseoutDraftFile(
+                writeRunRecordFile(
+                  writeCloseoutFile(
+                    writeHandoffFile(result)
+                  )
                 )
               )
             )

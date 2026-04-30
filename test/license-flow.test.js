@@ -15460,6 +15460,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.operationalExceptionEntry.operation,
       operationalExceptionEntry.operation
     );
+    const operationalExceptionCloseout = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.operationalExceptionCloseout;
+    assert.ok(operationalExceptionCloseout);
+    assert.equal(operationalExceptionCloseout.version, "developer-ops-operational-exception-closeout/v1");
+    assert.equal(operationalExceptionCloseout.status, "awaiting_resolution");
+    assert.equal(operationalExceptionCloseout.canClose, false);
+    assert.equal(operationalExceptionCloseout.reviewRequired, true);
+    assert.equal(operationalExceptionCloseout.sourceExceptionStatus, "open");
+    assert.equal(operationalExceptionCloseout.blockingReasonCount, operationalExceptionEntry.reasons.length);
+    assert.equal(operationalExceptionCloseout.nextOperation, operationalExceptionEntry.operation);
+    assert.equal(operationalExceptionCloseout.nextActionKey, operationalExceptionEntry.actionKey);
+    assert.equal(operationalExceptionCloseout.closeoutCriteria.length, 3);
+    assert.ok(operationalExceptionCloseout.closeoutCriteria.some((item) =>
+      item.key === "resolve_launch_receipt_followups" && item.status === "open"
+    ));
+    assert.equal(
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.operationalExceptionCloseout.status,
+      "awaiting_resolution"
+    );
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Status Receipt:/);
@@ -15468,6 +15486,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(confirmedOpsSnapshot.summaryText, /Operational Exception Entry:/);
     assert.match(confirmedOpsSnapshot.summaryText, /status=open/);
     assert.match(confirmedOpsSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Operational Exception Closeout:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /status=awaiting_resolution/);
+    assert.match(confirmedOpsSnapshot.summaryText, /canClose=false/);
 
     const handoffIndexDownload = await getText(
       baseUrl,
@@ -15500,6 +15521,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /Operational Exception Entry:/);
     assert.match(handoffIndexDownload.body, /status=open/);
     assert.match(handoffIndexDownload.body, /operation=record_launch_rehearsal_run/);
+    assert.match(handoffIndexDownload.body, /Operational Exception Closeout:/);
+    assert.match(handoffIndexDownload.body, /status=awaiting_resolution/);
+    assert.match(handoffIndexDownload.body, /canClose=false/);
     assert.match(handoffIndexDownload.body, /Staging Launch-Duty Archive:/);
     assert.match(handoffIndexDownload.body, /staging-launch-duty-archive-index\.json/);
     assert.match(handoffIndexDownload.body, /Included Files:/);

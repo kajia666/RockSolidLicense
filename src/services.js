@@ -19980,12 +19980,100 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
   };
 }
 
+function buildDeveloperOpsOperationalExceptionCloseoutPayload({
+  operationalExceptionEntry = null
+} = {}) {
+  if (!operationalExceptionEntry || typeof operationalExceptionEntry !== "object") {
+    return null;
+  }
+  const reasons = Array.isArray(operationalExceptionEntry.reasons)
+    ? operationalExceptionEntry.reasons
+    : [];
+  const buildCriterion = (reason = {}) => {
+    const reasonKey = reason.key || "operational_exception";
+    if (reasonKey === "launch_receipt_followups") {
+      return {
+        key: "resolve_launch_receipt_followups",
+        status: reason.status || "open",
+        summary: "Resolve or re-record the queued launch receipt follow-ups before closeout."
+      };
+    }
+    if (reasonKey === "launch_day_watch") {
+      return {
+        key: "verify_launch_day_watch",
+        status: reason.status || "open",
+        summary: "Verify launch-day watch is checked in before closeout."
+      };
+    }
+    if (reasonKey === "stabilization_status") {
+      return {
+        key: "confirm_stabilization_status",
+        status: reason.status || "open",
+        summary: "Confirm stabilization is ready for steady-state monitoring before closeout."
+      };
+    }
+    return {
+      key: `resolve_${reasonKey}`,
+      status: reason.status || "open",
+      summary: reason.summary || "Resolve this operational exception reason before closeout."
+    };
+  };
+  const closeoutCriteria = reasons.length
+    ? reasons.map(buildCriterion)
+    : [
+        {
+          key: "verify_operational_monitoring",
+          status: "ready",
+          summary: "Operational exception has no open reasons; verify monitoring before closeout."
+        }
+      ];
+  const blockingReasonCount = reasons.length;
+  const canClose = operationalExceptionEntry.status !== "open" && blockingReasonCount === 0;
+  return {
+    version: "developer-ops-operational-exception-closeout/v1",
+    status: canClose ? "ready_to_close" : "awaiting_resolution",
+    canClose,
+    reviewRequired: !canClose,
+    sourceExceptionStatus: operationalExceptionEntry.status || null,
+    severity: operationalExceptionEntry.severity || null,
+    stage: operationalExceptionEntry.stage || null,
+    blockingReasonCount,
+    nextActionKey: operationalExceptionEntry.actionKey || null,
+    nextOperation: operationalExceptionEntry.operation || null,
+    downloadKey: operationalExceptionEntry.downloadKey || operationalExceptionEntry.download?.key || null,
+    workspaceHref: operationalExceptionEntry.workspaceAction?.href || null,
+    downloadHref: operationalExceptionEntry.download?.href || null,
+    confirmationAuditLogId: operationalExceptionEntry.confirmationAuditLogId || null,
+    latestReceiptAuditLogId: operationalExceptionEntry.latestReceiptAuditLogId || null,
+    closeoutCriteria,
+    operatorHint: canClose
+      ? "Operational exception can be closed after reviewer sign-off."
+      : "Keep this operational exception open until all closeout criteria are resolved."
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
   stabilizationHandoffConfirmation = null,
   firstWaveHandoffConfirmation = null
 } = {}) {
+  const launchDayWatchReceipt = buildDeveloperOpsLaunchDayWatchReceiptPayload({
+    latestReceipt,
+    launchReceiptNextFollowUp
+  });
+  const stabilizationStatusReceipt = buildDeveloperOpsStabilizationStatusReceiptPayload({
+    latestReceipt,
+    launchReceiptNextFollowUp,
+    stabilizationHandoffConfirmation
+  });
+  const operationalExceptionEntry = buildDeveloperOpsOperationalExceptionEntryPayload({
+    latestReceipt,
+    launchReceiptNextFollowUp
+  });
+  const operationalExceptionCloseout = buildDeveloperOpsOperationalExceptionCloseoutPayload({
+    operationalExceptionEntry
+  });
   return {
     latestLaunchReceipt: latestReceipt
       ? {
@@ -20026,19 +20114,10 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation),
-    launchDayWatchReceipt: buildDeveloperOpsLaunchDayWatchReceiptPayload({
-      latestReceipt,
-      launchReceiptNextFollowUp
-    }),
-    stabilizationStatusReceipt: buildDeveloperOpsStabilizationStatusReceiptPayload({
-      latestReceipt,
-      launchReceiptNextFollowUp,
-      stabilizationHandoffConfirmation
-    }),
-    operationalExceptionEntry: buildDeveloperOpsOperationalExceptionEntryPayload({
-      latestReceipt,
-      launchReceiptNextFollowUp
-    }),
+    launchDayWatchReceipt,
+    stabilizationStatusReceipt,
+    operationalExceptionEntry,
+    operationalExceptionCloseout,
     opsFiles: {
       handoffIndex: "handoff-index.txt",
       initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
@@ -20635,6 +20714,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationStatusReceipt,
     followUpQueue
   });
+  const operationalExceptionCloseout = buildDeveloperOpsOperationalExceptionCloseoutPayload({
+    operationalExceptionEntry
+  });
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
     stagingLaunchDutyArchive,
@@ -20714,6 +20796,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
     operationalExceptionEntry,
+    operationalExceptionCloseout,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -23321,6 +23404,24 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`
       );
     }
+    const operationalExceptionCloseout = initialLaunchOpsReadiness.operationalExceptionCloseout
+      || initialLaunchOpsReadiness.traceability?.operationalExceptionCloseout
+      || null;
+    if (operationalExceptionCloseout) {
+      lines.push("");
+      lines.push("Operational Exception Closeout:");
+      lines.push(
+        `- status=${operationalExceptionCloseout.status || "-"}`
+        + ` | canClose=${operationalExceptionCloseout.canClose === true}`
+        + ` | reviewRequired=${operationalExceptionCloseout.reviewRequired === true}`
+        + ` | reasons=${operationalExceptionCloseout.blockingReasonCount ?? 0}`
+      );
+      lines.push(
+        `- next=${operationalExceptionCloseout.nextOperation || "-"}`
+        + ` | action=${operationalExceptionCloseout.nextActionKey || "-"}`
+        + ` | download=${operationalExceptionCloseout.downloadKey || "-"}`
+      );
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {
@@ -23784,6 +23885,22 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     }
     lines.push("");
   }
+  const operationalExceptionCloseout = readiness.operationalExceptionCloseout
+    || readiness.traceability?.operationalExceptionCloseout
+    || null;
+  if (operationalExceptionCloseout) {
+    lines.push("Operational Exception Closeout:");
+    lines.push(`- Status: ${operationalExceptionCloseout.status || "-"} | canClose=${operationalExceptionCloseout.canClose === true} | reviewRequired=${operationalExceptionCloseout.reviewRequired === true}`);
+    lines.push(`- Next: action=${operationalExceptionCloseout.nextActionKey || "-"} | operation=${operationalExceptionCloseout.nextOperation || "-"} | download=${operationalExceptionCloseout.downloadKey || "-"}`);
+    lines.push(`- Source: exception=${operationalExceptionCloseout.sourceExceptionStatus || "-"} | severity=${operationalExceptionCloseout.severity || "-"} | reasons=${operationalExceptionCloseout.blockingReasonCount ?? 0}`);
+    if (Array.isArray(operationalExceptionCloseout.closeoutCriteria) && operationalExceptionCloseout.closeoutCriteria.length) {
+      lines.push("- Closeout Criteria:");
+      for (const item of operationalExceptionCloseout.closeoutCriteria) {
+        lines.push(`  - ${item.key || "-"} | status=${item.status || "-"} | ${item.summary || "-"}`);
+      }
+    }
+    lines.push("");
+  }
   const formatGateDownloadText = (item = {}) => {
     const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
       ? item.recommendedDownload
@@ -24167,6 +24284,25 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       `- action=${operationalExceptionEntry.actionKey || "-"}`
       + ` | download=${operationalExceptionEntry.download?.fileName || operationalExceptionEntry.downloadKey || "-"}`
       + ` | workspace=${operationalExceptionEntry.workspaceAction?.label || "-"}@${operationalExceptionEntry.workspaceAction?.autofocus || "-"}`
+    );
+  }
+
+  const operationalExceptionCloseout = readiness.operationalExceptionCloseout
+    || readiness.traceability?.operationalExceptionCloseout
+    || null;
+  if (operationalExceptionCloseout) {
+    lines.push("");
+    lines.push("Operational Exception Closeout:");
+    lines.push(
+      `- status=${operationalExceptionCloseout.status || "-"}`
+      + ` | canClose=${operationalExceptionCloseout.canClose === true}`
+      + ` | reviewRequired=${operationalExceptionCloseout.reviewRequired === true}`
+      + ` | reasons=${operationalExceptionCloseout.blockingReasonCount ?? 0}`
+    );
+    lines.push(
+      `- next=${operationalExceptionCloseout.nextOperation || "-"}`
+      + ` | action=${operationalExceptionCloseout.nextActionKey || "-"}`
+      + ` | download=${operationalExceptionCloseout.downloadKey || "-"}`
     );
   }
 

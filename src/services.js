@@ -21829,10 +21829,13 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     "RockSolid Developer Ops Launch Mainline Handoff Routes",
     `Generated At: ${payload.generatedAt || ""}`,
     `Project Filter: ${scope.productCode || "-"}`,
-    `Channel: ${scope.channel || latestLaunchReceipt.channel || "stable"}`,
+    `Channel: ${scope.channel || latestLaunchReceipt.channel || "stable"}`
+  ];
+  appendLaunchReceiptAuditBackfillStatusText(lines, payload);
+  lines.push(
     "",
     "Launch Mainline Direct Downloads:"
-  ];
+  );
   for (const [key, download] of downloads) {
     lines.push(`- ${key}: ${formatLaunchHandoffDownloadText(download, { fileSeparator: " | " })}`);
   }

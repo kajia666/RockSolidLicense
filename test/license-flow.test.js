@@ -14484,6 +14484,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(opsLaunchMainlineRouteMapDownload.contentType, "text/plain; charset=utf-8");
     assert.match(opsLaunchMainlineRouteMapDownload.contentDisposition || "", /developer-ops-launch-mainline-handoff-routes\.txt/);
     assert.match(opsLaunchMainlineRouteMapDownload.body, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
+    assert.match(opsLaunchMainlineRouteMapDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
+    assert.match(opsLaunchMainlineRouteMapDownload.body, /Launch Receipt Audit Backfill Status: USED/);
+    assert.match(opsLaunchMainlineRouteMapDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
+    assert.match(opsLaunchMainlineRouteMapDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(
       opsLaunchMainlineRouteMapDownload.body,
       /launch-mainline-handoff-download-routes.*\/api\/developer\/launch-mainline\/download\?.*format=handoff-download-routes/

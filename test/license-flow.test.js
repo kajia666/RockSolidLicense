@@ -14568,6 +14568,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.operationalReadinessStatus, launchOpsAction.receipt.mainlineOperationalReadiness.status);
     assert.equal(latestLaunchReceipt.operationalReadinessLabel, "Still Needs Evidence");
     assert.equal(latestLaunchReceipt.operationalReadinessReady, false);
+    assert.equal(latestLaunchReceipt.operationalReadinessNextActionKey, "launch_mainline_record_launch_rehearsal_run");
     assert.equal(latestLaunchReceipt.operationalReadinessNextOperation, "record_launch_rehearsal_run");
     assert.equal(latestLaunchReceipt.operationalReadinessPrimaryDownloadKey, "launch_mainline_rehearsal_guide");
     assert.equal(latestLaunchReceipt.initialLaunchOperatorDecision, "no_go");
@@ -14613,6 +14614,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptEvidenceFollowUp.operationalReadinessStatus, "still_needs_evidence");
     assert.equal(launchReceiptEvidenceFollowUp.operationalReadinessNextOperation, "record_launch_rehearsal_run");
     assert.match(launchReceiptEvidenceFollowUp.summary, /production evidence checks remain/i);
+    const launchReceiptReadinessFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
+      item.stage === "operational_readiness"
+    );
+    assert.ok(launchReceiptReadinessFollowUp);
+    assert.equal(launchReceiptReadinessFollowUp.title, "Continue operational readiness");
+    assert.equal(launchReceiptReadinessFollowUp.actionKey, latestLaunchReceipt.operationalReadinessNextActionKey);
+    assert.equal(launchReceiptReadinessFollowUp.operationToRecord, latestLaunchReceipt.operationalReadinessNextOperation);
+    assert.equal(launchReceiptReadinessFollowUp.downloadKey, latestLaunchReceipt.operationalReadinessPrimaryDownloadKey);
+    assert.equal(launchReceiptReadinessFollowUp.operationalReadinessStatus, "still_needs_evidence");
+    assert.match(launchReceiptReadinessFollowUp.summary, /Operational readiness still needs evidence/i);
     const launchReceiptLifecycleFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.operation === "record_post_launch_ops_sweep" && item.stage === "post_launch_lifecycle"
     );
@@ -15027,7 +15038,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       )
     );
     assert.match(launchReceiptSnapshot.summaryText, /postLaunchIndex=post-launch-handoff-index/);
-    assert.match(launchReceiptSnapshot.summaryText, /Receipt Follow-up Count: 2/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      new RegExp(`Receipt Follow-up Count: ${launchReceiptSnapshot.summary.launchReceiptFollowUps}`)
+    );
     assert.match(
       launchReceiptSnapshot.summaryText,
       new RegExp(
@@ -19812,6 +19826,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Operational Readiness/);
     assert.match(html, /renderLaunchReceiptOperatorSummary/);
     assert.match(html, /operationalReadinessNextOperation/);
+    assert.match(html, /operationalReadinessNextActionKey/);
+    assert.match(html, /data-operational-readiness-action-key/);
+    assert.match(html, /data-launch-receipt-operator-action="open-readiness-mainline"/);
+    assert.match(html, /Open Readiness Action/);
     assert.match(html, /initialLaunchOperatorNextOperation/);
     assert.match(html, /initialLaunchOperatorNextDownloadFileName/);
     assert.match(html, /Initial Operator Next/);

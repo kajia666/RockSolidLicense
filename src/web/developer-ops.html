@@ -2641,6 +2641,7 @@
           `download=${esc(item.initialLaunchOperatorNextDownloadFileName || item.initialLaunchOperatorNextDownloadKey || "-")}`,
           `workspace=${esc(item.initialLaunchOperatorWorkspaceKey || "-")}@${esc(item.initialLaunchOperatorWorkspaceAutofocus || "-")}`,
           `readiness=${esc(item.operationalReadinessStatus || "-")}`,
+          `readinessAction=${esc(item.operationalReadinessNextActionKey || "-")}`,
           `readinessNext=${esc(item.operationalReadinessNextOperation || "-")}`,
           `readinessDownload=${esc(item.operationalReadinessPrimaryDownloadKey || "-")}`
         ].join(" | ");
@@ -2655,6 +2656,7 @@
           operatorDownloadHref ? `data-operator-download-href="${esc(operatorDownloadHref)}"` : "",
           item.initialLaunchOperatorWorkspaceAutofocus ? `data-operator-workspace-autofocus="${esc(item.initialLaunchOperatorWorkspaceAutofocus)}"` : "",
           item.operationalReadinessStatus ? `data-operational-readiness-status="${esc(item.operationalReadinessStatus)}"` : "",
+          item.operationalReadinessNextActionKey ? `data-operational-readiness-action-key="${esc(item.operationalReadinessNextActionKey)}"` : "",
           item.operationalReadinessNextOperation ? `data-operational-readiness-next-operation="${esc(item.operationalReadinessNextOperation)}"` : "",
           item.operationalReadinessPrimaryDownloadKey ? `data-operational-readiness-download-key="${esc(item.operationalReadinessPrimaryDownloadKey)}"` : ""
         ].filter(Boolean).join(" ");
@@ -2665,6 +2667,7 @@
             <div>${details}</div>
             <div class="snapshot-recap-actions" style="margin-top:8px;">
               <button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="open-mainline" ${actionAttrs}>Open Operator Mainline</button>
+              ${item.operationalReadinessNextOperation ? `<button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="open-readiness-mainline" ${actionAttrs}>Open Readiness Action</button>` : ""}
               <button type="button" class="snapshot-inline-button" data-launch-receipt-operator-action="download-handoff" ${actionAttrs} ${(token && operatorDownloadHref) ? "" : "disabled"}>Download Operator Handoff</button>
             </div>
           </div>
@@ -2988,6 +2991,9 @@
         const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
         const channel = String(data.channel || requestedChannel || "stable").trim() || "stable";
         const operation = String(data.operatorOperation || "").trim();
+        const readinessOperation = String(data.operationalReadinessNextOperation || "").trim();
+        const readinessActionKey = String(data.operationalReadinessActionKey || "").trim();
+        const readinessDownloadKey = String(data.operationalReadinessDownloadKey || "").trim();
         if (!productCode) {
           throw { code: "MISSING_PROJECT", message: "Select or route a project before continuing the initial operator action." };
         }
@@ -3006,6 +3012,27 @@
             ...(operation ? { operation } : {}),
             ...(data.operatorActionKey ? { actionKey: data.operatorActionKey } : {}),
             ...(data.operatorDownloadKey ? { downloadKey: data.operatorDownloadKey } : {})
+          });
+          return;
+        }
+        if (normalizedAction === "open-readiness-mainline") {
+          if (!readinessOperation && !readinessActionKey && !readinessDownloadKey) {
+            throw { code: "MISSING_READINESS_ACTION", message: "No operational readiness action is available for this launch receipt." };
+          }
+          lastOperatorActionResult = buildLaunchReceiptOperatorActionResult(normalizedAction, data, {
+            status: "routed",
+            message: "Opening Launch Mainline for the operational readiness action."
+          });
+          renderSnapshotOverview();
+          window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
+            productCode,
+            channel,
+            autofocus: data.operatorWorkspaceAutofocus || "summary",
+            routeTitle: "Operational Readiness Next",
+            routeReason: readinessOperation || readinessActionKey || "Continue operational readiness",
+            ...(readinessOperation ? { operation: readinessOperation } : {}),
+            ...(readinessActionKey ? { actionKey: readinessActionKey } : {}),
+            ...(readinessDownloadKey ? { downloadKey: readinessDownloadKey } : {})
           });
           return;
         }
@@ -4186,9 +4213,11 @@
         const normalizedAction = String(action || "").trim().toLowerCase();
         const label = normalizedAction === "open-mainline"
           ? "Open Operator Mainline"
-          : normalizedAction === "download-handoff"
-            ? "Download Operator Handoff"
-            : "Operator Action";
+          : normalizedAction === "open-readiness-mainline"
+            ? "Open Readiness Action"
+            : normalizedAction === "download-handoff"
+              ? "Download Operator Handoff"
+              : "Operator Action";
         return {
           action: normalizedAction,
           label,
@@ -4199,6 +4228,9 @@
           operation: String(data.operatorOperation || "").trim(),
           actionKey: String(data.operatorActionKey || "").trim(),
           downloadKey: String(data.operatorDownloadKey || "").trim(),
+          readinessOperation: String(data.operationalReadinessNextOperation || "").trim(),
+          readinessActionKey: String(data.operationalReadinessActionKey || "").trim(),
+          readinessDownloadKey: String(data.operationalReadinessDownloadKey || "").trim(),
           downloadFileName: String(extra.fileName || data.operatorDownloadFileName || "").trim(),
           workspaceAutofocus: String(data.operatorWorkspaceAutofocus || "summary").trim() || "summary",
           timestamp: new Date().toISOString()
@@ -4218,6 +4250,9 @@
           item.operation ? `operation=${item.operation}` : "",
           item.actionKey ? `action=${item.actionKey}` : "",
           item.downloadFileName || item.downloadKey ? `download=${item.downloadFileName || item.downloadKey}` : "",
+          item.readinessOperation ? `readinessOperation=${item.readinessOperation}` : "",
+          item.readinessActionKey ? `readinessAction=${item.readinessActionKey}` : "",
+          item.readinessDownloadKey ? `readinessDownload=${item.readinessDownloadKey}` : "",
           item.workspaceAutofocus ? `workspace=${item.workspaceAutofocus}` : ""
         ].filter(Boolean).join(" | ");
         return `

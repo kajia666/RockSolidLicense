@@ -14074,12 +14074,36 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.ok(readinessFirstWaveConfirmation);
     assert.equal(readinessFirstWaveConfirmation.auditLogId, handoffConfirmation.auditLogId);
     assert.equal(readinessFirstWaveConfirmation.sourceRecommendation.latestLaunchReceiptOperation, "first_batch_setup");
+    const firstWaveConfirmationChain = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveConfirmationChain;
+    assert.ok(firstWaveConfirmationChain);
+    assert.equal(firstWaveConfirmationChain.status, "confirmed");
+    assert.equal(firstWaveConfirmationChain.allSegmentsConfirmed, true);
+    assert.equal(firstWaveConfirmationChain.segmentCount, 3);
+    assert.equal(firstWaveConfirmationChain.auditLogId, handoffConfirmation.auditLogId);
+    assert.equal(firstWaveConfirmationChain.latestLaunchReceiptOperation, "first_batch_setup");
+    assert.deepEqual(
+      firstWaveConfirmationChain.segments.map((item) => [item.key, item.status, item.confirmed]),
+      [
+        ["first_batch_inventory", "ready", true],
+        ["first_cards", "ready", true],
+        ["first_round_ops", "review", true]
+      ]
+    );
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveHandoffConfirmation.auditLogId,
       handoffConfirmation.auditLogId
     );
+    assert.equal(
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveConfirmationChain.auditLogId,
+      handoffConfirmation.auditLogId
+    );
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Confirmation Chain:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /segments=3\/3/);
+    assert.match(confirmedOpsSnapshot.summaryText, /inventory=ready/);
+    assert.match(confirmedOpsSnapshot.summaryText, /firstCards=ready/);
+    assert.match(confirmedOpsSnapshot.summaryText, /firstRoundOps=review/);
     assert.ok(confirmedOpsSnapshot.overview.highlights.some((item) => item.includes("Latest first-wave handoff confirmation")));
 
     const firstWaveHandoffIndex = await getText(
@@ -14088,6 +14112,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       operatorSession.token
     );
     assert.match(firstWaveHandoffIndex.body, /First-Wave Handoff Confirmation:/);
+    assert.match(firstWaveHandoffIndex.body, /First-Wave Confirmation Chain:/);
+    assert.match(firstWaveHandoffIndex.body, /segments=3\/3/);
     assert.match(firstWaveHandoffIndex.body, /developer-ops-first-wave-recommendations-firstwave-stable\.txt/);
 
     const recommendationAudit = await getJson(
@@ -19886,6 +19912,9 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /latestFirstWaveHandoffConfirmations/);
     assert.match(html, /renderFirstWaveHandoffConfirmation/);
     assert.match(html, /First-Wave Snapshot Confirmation/);
+    assert.match(html, /firstWaveConfirmationChain/);
+    assert.match(html, /First-Wave Confirmation Chain/);
+    assert.match(html, /data-first-wave-confirmation-chain/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);
   } finally {
     await app.close();

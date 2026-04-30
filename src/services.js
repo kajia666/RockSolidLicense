@@ -19030,6 +19030,12 @@ function buildFirstWaveHandoffConfirmationPayload(item = null) {
     confirmedBy,
     note: item.note || metadata.note || "",
     sourceRecommendation,
+    firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload({
+      ...item,
+      metadata,
+      confirmedBy,
+      sourceRecommendation
+    }),
     downloads: item.downloads || metadata.downloads || null,
     createdAt: item.createdAt || null
   };
@@ -19769,6 +19775,7 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
       : null,
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
+    firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation),
     opsFiles: {
       handoffIndex: "handoff-index.txt",
       initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
@@ -20188,6 +20195,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     const channelMatches = !targetChannel || item.channel === targetChannel;
     return productMatches && channelMatches;
   }) || firstWaveHandoffConfirmations[0] || null;
+  const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation);
   const operatorActionReceipts = buildDeveloperOpsInitialLaunchOperatorActionReceipts(overview.latestLaunchReceipts, 5);
   const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction
     || mainlineHandoff?.workspaceAction
@@ -20419,6 +20427,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     latestOperatorActionReceipt: operatorActionReceipts[0] || null,
     stabilizationHandoff,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
+    firstWaveConfirmationChain,
     traceability,
     nextSteps
   };
@@ -20861,6 +20870,70 @@ function normalizeDeveloperOpsConfirmationFileName(value, fallback) {
     .replace(/[\\/:"*?<>|\r\n]/g, "_")
     .slice(0, 160);
   return normalized || fallback;
+}
+
+function buildFirstWaveConfirmationChainPayload(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const sourceRecommendation = item.sourceRecommendation && typeof item.sourceRecommendation === "object"
+    ? item.sourceRecommendation
+    : {
+        inventoryStatus: metadata.inventoryStatus || null,
+        firstCardStatus: metadata.firstCardStatus || null,
+        firstRoundOpsStatus: metadata.firstRoundOpsStatus || null,
+        latestLaunchReceiptOperation: metadata.latestLaunchReceiptOperation || null,
+        recommendedCardCount: metadata.recommendedCardCount ?? null,
+        issuedFreshCardCount: metadata.issuedFreshCardCount ?? null
+      };
+  const buildSegment = (key, label, status) => {
+    const normalizedStatus = normalizeDeveloperOpsConfirmationToken(status, "unknown");
+    return {
+      key,
+      label,
+      status: normalizedStatus,
+      confirmed: normalizedStatus !== "unknown" && normalizedStatus !== "missing",
+      ready: normalizedStatus === "ready"
+    };
+  };
+  const segments = [
+    buildSegment("first_batch_inventory", "First Batch Inventory", sourceRecommendation.inventoryStatus),
+    buildSegment("first_cards", "First Cards", sourceRecommendation.firstCardStatus),
+    buildSegment("first_round_ops", "First Round Ops", sourceRecommendation.firstRoundOpsStatus)
+  ];
+  const confirmedSegmentCount = segments.filter((segment) => segment.confirmed).length;
+  const confirmedBy = item.confirmedBy && typeof item.confirmedBy === "object"
+    ? item.confirmedBy
+    : {
+        actorType: item.actorType || null,
+        actorScope: metadata.actorType || null,
+        actorId: item.actorId || null,
+        username: metadata.actorUsername || null,
+        role: metadata.actorRole || null
+      };
+  return {
+    version: "developer-ops-first-wave-confirmation-chain/v1",
+    status: item.status || metadata.status || "confirmed",
+    decision: item.decision || metadata.decision || "confirmed",
+    auditLogId: item.auditLogId || item.id || null,
+    productCode: item.productCode || metadata.productCode || null,
+    channel: item.channel || metadata.channel || "stable",
+    handoffFileName: item.handoffFileName || metadata.handoffFileName || "developer-ops-first-wave-recommendations.txt",
+    confirmedAt: item.confirmedAt || metadata.confirmedAt || item.createdAt || null,
+    confirmedBy,
+    latestLaunchReceiptOperation: sourceRecommendation.latestLaunchReceiptOperation || null,
+    inventoryStatus: segments[0].status,
+    firstCardStatus: segments[1].status,
+    firstRoundOpsStatus: segments[2].status,
+    recommendedCardCount: sourceRecommendation.recommendedCardCount ?? null,
+    issuedFreshCardCount: sourceRecommendation.issuedFreshCardCount ?? null,
+    segmentCount: segments.length,
+    confirmedSegmentCount,
+    allSegmentsConfirmed: confirmedSegmentCount === segments.length,
+    segments,
+    summary: `first-wave confirmation segments=${confirmedSegmentCount}/${segments.length} | inventory=${segments[0].status} | firstCards=${segments[1].status} | firstRoundOps=${segments[2].status}`
+  };
 }
 
 function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) {
@@ -22827,6 +22900,26 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | latestReceipt=${firstWaveHandoffConfirmation.sourceRecommendation?.latestLaunchReceiptOperation || "-"}`
       );
     }
+    const firstWaveConfirmationChain = initialLaunchOpsReadiness.firstWaveConfirmationChain
+      || initialLaunchOpsReadiness.traceability?.firstWaveConfirmationChain
+      || firstWaveHandoffConfirmation?.firstWaveConfirmationChain
+      || null;
+    if (firstWaveConfirmationChain) {
+      lines.push("");
+      lines.push("First-Wave Confirmation Chain:");
+      lines.push(
+        `- status=${firstWaveConfirmationChain.status || "-"}`
+        + ` | segments=${firstWaveConfirmationChain.confirmedSegmentCount ?? 0}/${firstWaveConfirmationChain.segmentCount ?? 0}`
+        + ` | allConfirmed=${firstWaveConfirmationChain.allSegmentsConfirmed === true}`
+        + ` | audit=${firstWaveConfirmationChain.auditLogId || "-"}`
+      );
+      lines.push(
+        `- inventory=${firstWaveConfirmationChain.inventoryStatus || "-"}`
+        + ` | firstCards=${firstWaveConfirmationChain.firstCardStatus || "-"}`
+        + ` | firstRoundOps=${firstWaveConfirmationChain.firstRoundOpsStatus || "-"}`
+        + ` | latestReceipt=${firstWaveConfirmationChain.latestLaunchReceiptOperation || "-"}`
+      );
+    }
     const stabilizationHandoff = initialLaunchOpsReadiness.stabilizationHandoff || null;
     if (stabilizationHandoff) {
       lines.push("");
@@ -23642,6 +23735,27 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | inventory=${firstWaveHandoffConfirmation.sourceRecommendation?.inventoryStatus || "-"}`
       + ` | cards=${firstWaveHandoffConfirmation.sourceRecommendation?.firstCardStatus || "-"}`
       + ` | ops=${firstWaveHandoffConfirmation.sourceRecommendation?.firstRoundOpsStatus || "-"}`
+    );
+  }
+
+  const firstWaveConfirmationChain = readiness.firstWaveConfirmationChain
+    || readiness.traceability?.firstWaveConfirmationChain
+    || firstWaveHandoffConfirmation?.firstWaveConfirmationChain
+    || null;
+  if (firstWaveConfirmationChain) {
+    lines.push("");
+    lines.push("First-Wave Confirmation Chain:");
+    lines.push(
+      `- status=${firstWaveConfirmationChain.status || "-"}`
+      + ` | segments=${firstWaveConfirmationChain.confirmedSegmentCount ?? 0}/${firstWaveConfirmationChain.segmentCount ?? 0}`
+      + ` | allConfirmed=${firstWaveConfirmationChain.allSegmentsConfirmed === true}`
+      + ` | audit=${firstWaveConfirmationChain.auditLogId || "-"}`
+    );
+    lines.push(
+      `- inventory=${firstWaveConfirmationChain.inventoryStatus || "-"}`
+      + ` | firstCards=${firstWaveConfirmationChain.firstCardStatus || "-"}`
+      + ` | firstRoundOps=${firstWaveConfirmationChain.firstRoundOpsStatus || "-"}`
+      + ` | latestReceipt=${firstWaveConfirmationChain.latestLaunchReceiptOperation || "-"}`
     );
   }
 
@@ -37178,6 +37292,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         handoffFileName,
         handoffFormat: "first-wave-recommendations",
         sourceRecommendation,
+        firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload({
+          auditLogId,
+          productCode: product.code,
+          channel,
+          status: "confirmed",
+          decision,
+          confirmedAt,
+          confirmedBy,
+          handoffFileName,
+          sourceRecommendation
+        }),
         traceability,
         auditLogId,
         message: `First-wave handoff confirmed for ${product.code} (${channel}).`

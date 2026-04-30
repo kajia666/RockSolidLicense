@@ -4387,6 +4387,18 @@
           `cards=${esc(source.firstCardStatus || "-")}`,
           `ops=${esc(source.firstRoundOpsStatus || "-")}`
         ].join(" | ");
+        const firstWaveConfirmationChain = item.firstWaveConfirmationChain || item.confirmationChain || null;
+        const chainSegments = Array.isArray(firstWaveConfirmationChain?.segments)
+          ? firstWaveConfirmationChain.segments
+          : [];
+        const chainDetails = firstWaveConfirmationChain
+          ? [
+              `segments=${esc(firstWaveConfirmationChain.confirmedSegmentCount ?? 0)}/${esc(firstWaveConfirmationChain.segmentCount ?? chainSegments.length)}`,
+              `inventory=${esc(firstWaveConfirmationChain.inventoryStatus || "-")}`,
+              `firstCards=${esc(firstWaveConfirmationChain.firstCardStatus || "-")}`,
+              `firstRoundOps=${esc(firstWaveConfirmationChain.firstRoundOpsStatus || "-")}`
+            ].join(" | ")
+          : "";
         return `
           <div class="snapshot-recap first-wave-handoff-confirmation" data-first-wave-handoff-confirmation="latest">
             <div class="snapshot-recap-head">
@@ -4394,6 +4406,12 @@
               <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
             </div>
             <div class="hint">${details}</div>
+            ${firstWaveConfirmationChain ? `
+            <div class="snapshot-recap" data-first-wave-confirmation-chain="${esc(firstWaveConfirmationChain.status || "-")}">
+              <strong>First-Wave Confirmation Chain</strong>
+              <div class="hint">${chainDetails}</div>
+              <ul class="snapshot-list">${chainSegments.length ? chainSegments.map((segment) => `<li><strong>${esc(segment.label || segment.key || "-")}</strong> ${esc(segment.status || "-")} | confirmed=${segment.confirmed === true ? "yes" : "no"}</li>`).join("") : "<li>No first-wave confirmation segments are available.</li>"}</ul>
+            </div>` : ""}
           </div>
         `;
       }

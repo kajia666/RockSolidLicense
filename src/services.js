@@ -17850,8 +17850,10 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
     closeoutTemplate: file("staging-closeout-template.json"),
     runRecordIndex: file("staging-run-record-index.json"),
     artifactManifest: file("staging-artifact-manifest.json"),
+    backupRestorePacket: file("staging-backup-restore-drill-packet.json"),
     closeoutReloadPacket: file("staging-closeout-reload-packet.json"),
     readinessReviewPacket: file("staging-readiness-review-packet.json"),
+    productionSignoffPacket: file("staging-production-signoff-packet.json"),
     launchDutyArchiveIndex: file("staging-launch-duty-archive-index.json"),
     filledCloseoutInput: file("filled-closeout-input.json"),
     filledCloseoutDraft: file("filled-closeout-input.draft.json")
@@ -17859,8 +17861,10 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const packetFiles = [
     ["run_record_index", files.runRecordIndex],
     ["artifact_manifest", files.artifactManifest],
+    ["backup_restore_packet", files.backupRestorePacket],
     ["closeout_reload_packet", files.closeoutReloadPacket],
-    ["readiness_review_packet", files.readinessReviewPacket]
+    ["readiness_review_packet", files.readinessReviewPacket],
+    ["production_signoff_packet", files.productionSignoffPacket]
   ].map(([key, path]) => ({ key, path }));
   const profileDrivenArgs = [
     "--profile-file", profileFile,
@@ -17870,8 +17874,10 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
     "--closeout-file", files.closeoutTemplate,
     "--run-record-file", files.runRecordIndex,
     "--artifact-manifest-file", files.artifactManifest,
+    "--backup-restore-packet-file", files.backupRestorePacket,
     "--closeout-reload-packet-file", files.closeoutReloadPacket,
     "--readiness-review-packet-file", files.readinessReviewPacket,
+    "--production-signoff-packet-file", files.productionSignoffPacket,
     "--launch-duty-archive-index-file", files.launchDutyArchiveIndex,
     "--filled-closeout-draft-file", files.filledCloseoutDraft
   ];

@@ -13871,19 +13871,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(stagingLaunchDutyArchive.mode, "developer-ops-staging-launch-duty-archive");
     assert.equal(stagingLaunchDutyArchive.status, "awaiting_staging_archive_index");
     assert.equal(stagingLaunchDutyArchive.archiveRoot, "artifacts/staging/EXPORT_ALPHA/stable");
+    assert.equal(stagingLaunchDutyArchive.files.backupRestorePacket, "artifacts/staging/EXPORT_ALPHA/stable/staging-backup-restore-drill-packet.json");
+    assert.equal(stagingLaunchDutyArchive.files.productionSignoffPacket, "artifacts/staging/EXPORT_ALPHA/stable/staging-production-signoff-packet.json");
     assert.equal(stagingLaunchDutyArchive.files.launchDutyArchiveIndex, "artifacts/staging/EXPORT_ALPHA/stable/staging-launch-duty-archive-index.json");
     assert.deepEqual(
       stagingLaunchDutyArchive.packetFiles.map((item) => [item.key, item.path]),
       [
         ["run_record_index", "artifacts/staging/EXPORT_ALPHA/stable/staging-run-record-index.json"],
         ["artifact_manifest", "artifacts/staging/EXPORT_ALPHA/stable/staging-artifact-manifest.json"],
+        ["backup_restore_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-backup-restore-drill-packet.json"],
         ["closeout_reload_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-closeout-reload-packet.json"],
-        ["readiness_review_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-readiness-review-packet.json"]
+        ["readiness_review_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-readiness-review-packet.json"],
+        ["production_signoff_packet", "artifacts/staging/EXPORT_ALPHA/stable/staging-production-signoff-packet.json"]
       ]
     );
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /npm\.cmd run staging:rehearsal/);
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--product-code EXPORT_ALPHA/);
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--channel stable/);
+    assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--backup-restore-packet-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json/);
+    assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--production-signoff-packet-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(stagingLaunchDutyArchive.commands.profileDrivenDryRun, /--launch-duty-archive-index-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.equal(stagingLaunchDutyArchive.commands.fullTestWindow, "npm.cmd test");
     const launchDutyActionOrder = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.launchDutyActionOrder;
@@ -14318,7 +14324,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /Status: awaiting_staging_archive_index/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Archive Root: artifacts\/staging\/EXPORT_ALPHA\/stable/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /backup_restore_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /production_signoff_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(initialLaunchOpsReadinessDownload.body, /profileDrivenDryRun: npm\.cmd run staging:rehearsal/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /--backup-restore-packet-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /--production-signoff-packet-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(initialLaunchOpsReadinessDownload.body, /--launch-duty-archive-index-file artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Launch Duty Action Order:/);
     assert.match(initialLaunchOpsReadinessDownload.body, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
@@ -14340,7 +14350,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(stagingLaunchDutyArchiveDownload.body, /Archive Root: artifacts\/staging\/EXPORT_ALPHA\/stable/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Duty Archive Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /run_record_index: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /backup_restore_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /readiness_review_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-readiness-review-packet\.json/);
+    assert.match(stagingLaunchDutyArchiveDownload.body, /production_signoff_packet: artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /profileDrivenDryRun: npm\.cmd run staging:rehearsal/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /fullTestWindow: npm\.cmd test/);
     assert.match(stagingLaunchDutyArchiveDownload.body, /Launch Duty Action Order:/);
@@ -15005,6 +15017,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /launch-receipt-backfill-status\.txt/);
     assert.match(zipText, /staging-launch-duty-archive\.txt/);
     assert.match(zipText, /staging-launch-duty-archive-index\.json/);
+    assert.match(zipText, /staging-backup-restore-drill-packet\.json/);
+    assert.match(zipText, /staging-production-signoff-packet\.json/);
     assert.match(zipText, /launch-mainline-handoff-routes\.txt/);
     assert.match(zipText, /route-review\/developer-ops-primary-session-summary\.txt/);
     assert.match(zipText, /route-review\/developer-ops-next-audit-summary\.txt/);

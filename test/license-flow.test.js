@@ -6328,6 +6328,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
       assert.match(launchReview.summaryText, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
       assert.match(launchReview.summaryText, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
+      assert.match(launchReview.summaryText, /Staging Archive Packet Completeness: complete \(6\/6\)/);
       assert.match(launchReview.summaryText, /Launch Review Route Focus:/);
       assert.match(launchReview.summaryText, /Continue launch review sweep/);
       assert.match(launchReview.summaryText, /operation=record_post_launch_ops_sweep/);
@@ -6360,6 +6361,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /Ops Snapshot Summary:/);
       assert.match(launchReviewSummaryDownload.body, /Launch Review Launch Duty Action Order:/);
       assert.match(launchReviewSummaryDownload.body, /Staging archive -> Launch readiness -> Next follow-up/);
+      assert.match(launchReviewSummaryDownload.body, /Staging Archive Packet Completeness: complete \(6\/6\)/);
       assert.match(launchReviewSummaryDownload.body, /Launch Review Route Focus:/);
       assert.match(launchReviewSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff/);
@@ -9060,6 +9062,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(smokeKit.summaryText || "", /Launch Smoke Launch Duty Action Order:/);
     assert.match(smokeKit.summaryText || "", /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
     assert.match(smokeKit.summaryText || "", /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
+    assert.match(smokeKit.summaryText || "", /Staging Archive Packet Completeness: complete \(6\/6\)/);
     assert.match(smokeKit.summaryText || "", /Launch Smoke Route Focus:/);
     assert.match(smokeKit.summaryText || "", /Continue launch smoke sweep/);
     assert.match(smokeKit.summaryText || "", /operation=record_post_launch_ops_sweep/);
@@ -9083,6 +9086,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Paths:/);
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Launch Duty Action Order:/);
     assert.match(smokeKitSummaryDownload.body, /Staging archive -> Launch readiness -> Next follow-up/);
+    assert.match(smokeKitSummaryDownload.body, /Staging Archive Packet Completeness: complete \(6\/6\)/);
     assert.match(smokeKitSummaryDownload.body, /Launch Smoke Route Focus:/);
     assert.match(smokeKitSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
     assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary/);
@@ -14554,6 +14558,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineHandoffRoutesDownload.body, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Packet Completeness: complete \(6\/6\)/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
@@ -14570,6 +14575,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /1\. Download Staging Archive.*format=staging-launch-duty-archive/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /2\. Review Launch Readiness.*format=initial-launch-ops-readiness/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /3\. Record Next Follow-up.*format=launch-receipt-next-follow-up/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Staging Archive Packet Completeness: complete \(6\/6\)/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Traceability:/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Latest Launch Receipt: record_post_launch_ops_sweep/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);

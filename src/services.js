@@ -17986,6 +17986,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
       label: "Download Staging Archive",
       status: stagingLaunchDutyArchive?.status || "awaiting_staging_archive_index",
       summary: "Pull the staging archive bridge before the real rehearsal so packet paths and full-test-window commands are visible.",
+      packetCompleteness: stagingLaunchDutyArchive?.packetCompleteness || null,
       download: copyDownload(stagingLaunchDutyArchiveDownload)
     },
     {
@@ -18010,6 +18011,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
     mode: "developer-ops-launch-duty-action-order",
     status: normalizedStatus,
     operatorSummary: "Staging archive -> Launch readiness -> Next follow-up",
+    stagingArchivePacketCompleteness: stagingLaunchDutyArchive?.packetCompleteness || null,
     primaryStepKey: steps[0].key,
     finalStepKey: steps[steps.length - 1].key,
     stepCount: steps.length,
@@ -18027,6 +18029,23 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
   lines.push(title);
   lines.push(`- Summary: ${actionOrder.operatorSummary || "-"}`);
   lines.push(`- Status: ${actionOrder.status || "-"}`);
+  const stagingArchivePacketCompleteness = actionOrder.stagingArchivePacketCompleteness
+    || steps.find((item) => item?.key === "staging_archive")?.packetCompleteness
+    || null;
+  if (stagingArchivePacketCompleteness && typeof stagingArchivePacketCompleteness === "object") {
+    const expectedCount = Number.isFinite(Number(stagingArchivePacketCompleteness.expectedCount))
+      ? Number(stagingArchivePacketCompleteness.expectedCount)
+      : 0;
+    const listedCount = Number.isFinite(Number(stagingArchivePacketCompleteness.listedCount))
+      ? Number(stagingArchivePacketCompleteness.listedCount)
+      : 0;
+    const missingKeys = Array.isArray(stagingArchivePacketCompleteness.missingKeys) && stagingArchivePacketCompleteness.missingKeys.length
+      ? stagingArchivePacketCompleteness.missingKeys.join(", ")
+      : "-";
+    lines.push(`- Staging Archive Packet Completeness: ${stagingArchivePacketCompleteness.status || "-"} (${listedCount}/${expectedCount})`);
+    lines.push(`- Staging Archive Missing Packet Keys: ${missingKeys}`);
+    lines.push(`- Staging Archive Next Packet Action: ${stagingArchivePacketCompleteness.nextAction || "-"}`);
+  }
   lines.push("- Steps:");
   if (!steps.length) {
     lines.push("  - none");

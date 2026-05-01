@@ -4864,6 +4864,9 @@
         const executionPlans = actions
           .map((item) => ({ action: item, executionPlan: item?.executionPlan || null }))
           .filter((item) => item.executionPlan);
+        const receiptPlans = executionPlans
+          .map((item) => ({ action: item.action, receiptPlan: item.executionPlan?.receiptPlan || null }))
+          .filter((item) => item.receiptPlan);
         const supportingDownloads = Array.isArray(launchOperationsShiftActionPlan.supportingDownloads)
           ? launchOperationsShiftActionPlan.supportingDownloads
           : [];
@@ -4887,6 +4890,7 @@
             <div class="snapshot-focus-meta">download=${esc(download.fileName || "-")} | format=${esc(download.format || "-")} | href=${esc(download.href || "-")}</div>
             ${actions.length ? `<ul class="snapshot-list">${actions.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.priority || "-")} | ${esc(item.status || "-")} | file=${esc(item.fileName || "-")} | href=${esc(item.href || "-")}</li>`).join("")}</ul>` : ""}
             ${executionPlans.length ? `<div class="snapshot-focus-meta"><strong>Execution Plans</strong></div><ul class="snapshot-list">${executionPlans.map((entry) => `<li><strong>${esc(entry.action.key || "-")}</strong> mode=${esc(entry.executionPlan.mode || "-")} | status=${esc(entry.executionPlan.status || "-")} | method=${esc(entry.executionPlan.method || "-")} | hint=${esc(entry.executionPlan.operatorHint || "-")}</li>`).join("")}</ul>` : ""}
+            ${receiptPlans.length ? `<div class="snapshot-focus-meta"><strong>Receipt Plans</strong></div><ul class="snapshot-list">${receiptPlans.map((entry) => `<li><strong>${esc(entry.action.key || "-")}</strong> route=${esc(entry.receiptPlan.route || "-")} | method=${esc(entry.receiptPlan.method || "-")} | action=${esc(entry.receiptPlan.payload?.action || "-")} | note=${esc(entry.receiptPlan.payload?.note || "-")}</li>`).join("")}</ul>` : ""}
             ${supportingDownloads.length ? `<div class="audit-meta">${supportingDownloads.slice(0, 5).map((item) => renderTag(item.fileName || item.key || "-")).join("")}</div>` : ""}
           </div>
         `;

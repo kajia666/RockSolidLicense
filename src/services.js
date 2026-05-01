@@ -22232,6 +22232,29 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         ? "open_workspace"
         : "review";
     const hasHref = Boolean(String(href || "").trim());
+    const receiptAction = mode === "download"
+      ? "download"
+      : mode === "open_workspace"
+        ? "open"
+        : "review";
+    const receiptIntent = mode === "download"
+      ? "download_asset"
+      : mode;
+    const receiptPayload = {
+      productCode,
+      channel,
+      action: receiptAction,
+      intent: receiptIntent,
+      planKind: kind,
+      planMode: mode,
+      targetType: source || kind,
+      href: href || "",
+      fileName: fileName || "",
+      format: format || "",
+      focusKind: source || kind,
+      focusReason: summary || label || key || "",
+      note: `launch_operations_shift_action:${key || "shift_action"}`
+    };
     return {
       status: hasHref || mode === "review" ? "ready" : "pending",
       mode,
@@ -22250,7 +22273,16 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       }),
       confirmationLabel: label || key || "Confirm shift action",
       operatorHint: confirmation || summary || "Complete this shift action and record the result in the operator note.",
-      receiptHint: `Record ${key || "shift_action"} in the launch operations shift note before handoff.`
+      receiptHint: `Record ${key || "shift_action"} in the launch operations shift note before handoff.`,
+      receiptPlan: {
+        status: productCode ? "ready" : "pending",
+        method: "POST",
+        route: "/api/developer/ops/steady-state-duty-plan/receipt",
+        eventType: "developer.ops.steady-state-duty-plan.receipt",
+        entityType: "developer_ops_steady_state_duty_plan",
+        payload: receiptPayload,
+        operatorHint: "Post this receipt payload after the shift action is completed so Developer Ops can attach audit evidence."
+      }
     };
   };
   const pushOperatorAction = ({
@@ -27748,6 +27780,25 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | href=${plan.href || "-"}`
       );
       lines.push(`  - confirmation=${plan.confirmationLabel || "-"} | hint=${plan.operatorHint || "-"}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Receipt Plans:");
+  if (actions.some((item) => item.executionPlan?.receiptPlan)) {
+    for (const item of actions.filter((entry) => entry.executionPlan?.receiptPlan)) {
+      const receiptPlan = item.executionPlan.receiptPlan || {};
+      const payload = receiptPlan.payload || {};
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | status=${receiptPlan.status || "-"}`
+        + ` | method=${receiptPlan.method || "-"}`
+        + ` | route=${receiptPlan.route || "-"}`
+        + ` | action=${payload.action || "-"}`
+        + ` | intent=${payload.intent || "-"}`
+      );
+      lines.push(`  - note=${payload.note || "-"} | hint=${receiptPlan.operatorHint || "-"}`);
     }
   } else {
     lines.push("- none");

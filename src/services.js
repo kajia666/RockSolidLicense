@@ -19797,6 +19797,36 @@ function buildDeveloperOpsLaunchDayWatchReceiptPayload({
   };
 }
 
+function isDeveloperOpsCloseoutReadinessFollowUp(item = null, {
+  launchDayWatchStatus = null,
+  stabilizationStatus = null
+} = {}) {
+  if (!item || typeof item !== "object") {
+    return false;
+  }
+  const stage = String(item.stage || "").trim().toLowerCase();
+  const operation = String(item.operationToRecord || item.operation || item.nextOperation || "").trim().toLowerCase();
+  if (operation === "record_launch_closeout_review" || operation === "record_launch_stabilization_review") {
+    return true;
+  }
+  return stage === "operational_readiness"
+    && operation === "record_post_launch_ops_sweep"
+    && launchDayWatchStatus === "checked_in"
+    && stabilizationStatus === "ready_for_steady_state";
+}
+
+function filterDeveloperOpsCurrentReceiptFollowUps(followUps = [], latestReceipt = null) {
+  const items = Array.isArray(followUps) ? followUps : [];
+  const latestHandoffFileName = String(latestReceipt?.handoffFileName || "").trim();
+  if (!latestHandoffFileName) {
+    return items;
+  }
+  return items.filter((item) => {
+    const handoffFileName = String(item?.handoffFileName || "").trim();
+    return !handoffFileName || handoffFileName === latestHandoffFileName;
+  });
+}
+
 function buildDeveloperOpsStabilizationStatusReceiptPayload({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
@@ -19810,7 +19840,15 @@ function buildDeveloperOpsStabilizationStatusReceiptPayload({
   }
   const confirmation = buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation);
   const handoffConfirmed = confirmation?.status === "confirmed";
-  const followUpCount = Array.isArray(followUpQueue) ? followUpQueue.length : 0;
+  const followUps = Array.isArray(followUpQueue) ? followUpQueue : [];
+  const currentReceiptFollowUps = filterDeveloperOpsCurrentReceiptFollowUps(followUps, latestReceipt);
+  const liveStabilizationStatus = handoffConfirmed ? "ready_for_steady_state" : null;
+  const blockingFollowUps = currentReceiptFollowUps.filter((item) => !isDeveloperOpsCloseoutReadinessFollowUp(item, {
+    launchDayWatchStatus: launchDayWatchReceipt?.status || latestReceipt?.operationalReadinessWatchCheckInStatus || null,
+    stabilizationStatus: liveStabilizationStatus
+  }));
+  const followUpCount = blockingFollowUps.length;
+  const closeoutFollowUpCount = currentReceiptFollowUps.length - blockingFollowUps.length;
   const nextAction = stabilizationHandoff?.nextAction && typeof stabilizationHandoff.nextAction === "object"
     ? stabilizationHandoff.nextAction
     : {};
@@ -19848,6 +19886,8 @@ function buildDeveloperOpsStabilizationStatusReceiptPayload({
     postLaunchLifecycleStatus: latestReceipt?.postLaunchLifecycleStatus || stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleStatus || null,
     stabilizationNextOperation: latestReceipt?.postLaunchLifecycleNextOperation || stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleNextOperation || null,
     followUpCount,
+    closeoutFollowUpCount,
+    totalFollowUpCount: currentReceiptFollowUps.length,
     nextActionKey,
     nextOperation,
     downloadKey,
@@ -19887,6 +19927,16 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
   followUpQueue = []
 } = {}) {
   const followUps = Array.isArray(followUpQueue) ? followUpQueue : [];
+  const currentReceiptFollowUps = filterDeveloperOpsCurrentReceiptFollowUps(followUps, latestReceipt);
+  const followUpContext = {
+    launchDayWatchStatus: launchDayWatchReceipt?.status || latestReceipt?.operationalReadinessWatchCheckInStatus || null,
+    stabilizationStatus: stabilizationStatusReceipt?.status || null
+  };
+  const blockingFollowUps = currentReceiptFollowUps.filter((item) => !isDeveloperOpsCloseoutReadinessFollowUp(item, followUpContext));
+  const launchReceiptNextFollowUpIsCloseout = isDeveloperOpsCloseoutReadinessFollowUp(
+    launchReceiptNextFollowUp,
+    followUpContext
+  );
   const operation = launchReceiptNextFollowUp?.operationToRecord
     || launchReceiptNextFollowUp?.operation
     || stabilizationStatusReceipt?.nextOperation
@@ -19903,13 +19953,13 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
     || latestReceipt?.operationalReadinessPrimaryDownloadKey
     || null;
   const reasons = [];
-  if (followUps.length || launchReceiptNextFollowUp) {
+  if (blockingFollowUps.length || (launchReceiptNextFollowUp && !launchReceiptNextFollowUpIsCloseout)) {
     reasons.push({
       key: "launch_receipt_followups",
-      status: followUps.length ? "open" : "queued",
-      count: followUps.length,
-      summary: followUps.length
-        ? `${followUps.length} launch receipt follow-up${followUps.length === 1 ? "" : "s"} remain.`
+      status: blockingFollowUps.length ? "open" : "queued",
+      count: blockingFollowUps.length,
+      summary: blockingFollowUps.length
+        ? `${blockingFollowUps.length} launch receipt follow-up${blockingFollowUps.length === 1 ? "" : "s"} remain.`
         : "The next launch receipt follow-up is queued."
     });
   }
@@ -20079,7 +20129,7 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
     recommendedDownload: cloneDownload(operationalExceptionEntry.download)
   };
   const closeoutOperation = "record_launch_closeout_review";
-  const closeoutActionKey = "operational_exception_closeout_review";
+  const closeoutActionKey = canClose ? "operational_closeout_review" : "operational_exception_closeout_review";
   const closeoutDownloadKey = "launch_mainline_closeout_handoff";
   const closeoutParams = {
     productCode,
@@ -20093,7 +20143,7 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
       : "Review closeout criteria before recording launch closeout."
   };
   const closeoutReviewAction = {
-    key: "operational_exception_closeout_review",
+    key: closeoutActionKey,
     label: "Record Closeout Review",
     summary: canClose
       ? "Record the Launch Mainline closeout review after reviewer sign-off."

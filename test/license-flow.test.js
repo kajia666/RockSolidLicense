@@ -16155,6 +16155,94 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Operator Action Manifest:/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Manifest: initial-launch-operator-actions\/v1 \| primary=launch_mainline_follow_up \| actions=1/);
 
+    await postJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        code: "EXPORT_CLOSEOUT_READY",
+        name: "Export Closeout Ready",
+        ownerDeveloperId: owner.id
+      },
+      adminSession.token
+    );
+
+    await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        operation: "record_launch_rehearsal_run"
+      },
+      ownerSession.token
+    );
+    await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        operation: "record_launch_day_readiness_review"
+      },
+      ownerSession.token
+    );
+    const finalSweepAction = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        operation: "record_post_launch_ops_sweep"
+      },
+      ownerSession.token
+    );
+    assert.equal(finalSweepAction.operation, "record_post_launch_ops_sweep");
+    assert.equal(finalSweepAction.receipt?.operation, "record_post_launch_ops_sweep");
+
+    const finalStabilizationConfirmation = await postJson(
+      baseUrl,
+      "/api/developer/ops/stabilization-handoff/confirm",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        decision: "confirmed",
+        note: "final closeout readiness reviewed by ops"
+      },
+      ownerSession.token
+    );
+    assert.equal(finalStabilizationConfirmation.status, "confirmed");
+
+    const closeoutReadySnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=20",
+      ownerSession.token
+    );
+    const closeoutReadySummary = closeoutReadySnapshot.summary.initialLaunchOpsReadiness.closeoutReadinessSummary;
+    assert.ok(closeoutReadySummary);
+    assert.equal(closeoutReadySummary.version, "developer-ops-closeout-readiness-summary/v1");
+    assert.equal(closeoutReadySummary.status, "ready_to_close");
+    assert.equal(closeoutReadySummary.canClose, true);
+    assert.equal(closeoutReadySummary.closeoutReviewReady, true);
+    assert.equal(closeoutReadySummary.blockingCount, 0);
+    assert.deepEqual(closeoutReadySummary.blockerKeys, []);
+    assert.equal(closeoutReadySummary.launchDayWatchStatus, "checked_in");
+    assert.equal(closeoutReadySummary.stabilizationStatus, "ready_for_steady_state");
+    assert.equal(closeoutReadySummary.nextAction.key, "operational_closeout_review");
+    assert.equal(closeoutReadySummary.nextAction.endpoint, "/api/developer/launch-mainline/action");
+    assert.equal(closeoutReadySummary.nextAction.method, "POST");
+    assert.equal(closeoutReadySummary.nextAction.enabled, true);
+    assert.equal(closeoutReadySummary.nextAction.operation, "record_launch_closeout_review");
+    assert.equal(closeoutReadySummary.nextAction.actionKey, "operational_closeout_review");
+    assert.equal(closeoutReadySummary.nextAction.body.operation, "record_launch_closeout_review");
+    assert.equal(closeoutReadySummary.nextAction.body.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.match(closeoutReadySummary.nextAction.workspaceAction.href, /operation=record_launch_closeout_review/);
+    assert.match(closeoutReadySummary.nextAction.recommendedDownload.href, /format=closeout-handoff/);
+    assert.match(closeoutReadySnapshot.summaryText, /Closeout Readiness Summary:/);
+    assert.match(closeoutReadySnapshot.summaryText, /status=ready_to_close/);
+    assert.match(closeoutReadySnapshot.summaryText, /closeoutReady=true/);
+    assert.match(closeoutReadySnapshot.summaryText, /closeoutReviewReady=true/);
+    assert.match(closeoutReadySnapshot.summaryText, /nextAction=operational_closeout_review/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

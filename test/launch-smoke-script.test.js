@@ -97,6 +97,8 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.equal(output.summary.firstWave.latestLaunchReceiptOperation, "first_batch_setup");
   assert.equal(output.summary.ops.firstWaveConfirmationStatus, "confirmed");
   assert.ok(output.summary.ops.handoffIndexFileName.endsWith("developer-ops-handoff-index.txt"));
+  assert.equal(output.summary.ops.launchOperationsOverviewStatus, "review");
+  assert.equal(output.summary.ops.launchOperationsOverviewFileName, "developer-ops-launch-operations-overview-status.txt");
   assert.equal(output.handoff.status, "ready_for_launch_review");
   assert.equal(output.handoff.nextWorkspace.key, "launch-review");
   assert.equal(output.handoff.nextWorkspace.route, "/developer/launch-review?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave");
@@ -106,6 +108,7 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.equal(output.handoff.downloads.firstWaveSummary.route, "/api/developer/ops/first-wave/recommendations/download?productCode=SMOKE_ALPHA&channel=stable&limit=20&format=summary");
   assert.equal(output.handoff.downloads.firstWaveChecksums.route, "/api/developer/ops/first-wave/recommendations/download?productCode=SMOKE_ALPHA&channel=stable&limit=20&format=checksums");
   assert.equal(output.handoff.downloads.opsHandoffIndex.route, "/api/developer/ops/export/download?productCode=SMOKE_ALPHA&format=handoff-index&limit=20");
+  assert.equal(output.handoff.downloads.launchOpsOverviewStatus.route, "/api/developer/ops/export/download?productCode=SMOKE_ALPHA&format=launch-operations-overview-status&limit=20");
   assert.equal(output.handoff.downloads.launchReviewSummary.route, "/api/developer/launch-review/download?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary");
   assert.equal(output.handoff.downloads.launchSmokeSummary.route, "/api/developer/launch-smoke-kit/download?productCode=SMOKE_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary");
   assert.deepEqual(
@@ -114,6 +117,7 @@ test("launch smoke script runs the first-wave operations preflight", () => {
       "open_launch_review",
       "verify_launch_review_receipt_visibility",
       "verify_launch_smoke_receipt_visibility",
+      "verify_launch_ops_overview_status",
       "verify_first_wave_confirmation",
       "download_ops_handoff_index",
       "continue_developer_ops_watch",
@@ -135,7 +139,8 @@ test("launch smoke script runs the first-wave operations preflight", () => {
     "first-wave.download.checksums",
     "first-wave.confirm",
     "ops.export",
-    "ops.handoff-index"
+    "ops.handoff-index",
+    "ops.launch-operations-overview-status"
   ]);
   assert.ok(output.checks.every((item) => item.status === "pass"));
 });
@@ -254,15 +259,18 @@ test("launch smoke script can run the first-wave preflight against an existing A
     assert.equal(output.summary.firstWave.inventoryStatus, "ready");
     assert.equal(output.summary.firstWave.confirmationStatus, "confirmed");
     assert.equal(output.summary.ops.firstWaveConfirmationStatus, "confirmed");
+    assert.equal(output.summary.ops.launchOperationsOverviewStatus, "review");
     assert.equal(output.handoff.status, "ready_for_launch_review");
     assert.equal(output.handoff.nextWorkspace.href, `${baseUrl}/developer/launch-review?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave`);
     assert.equal(output.handoff.reviewWorkspaces.developerOps.href, `${baseUrl}/developer/ops?productCode=LIVE_SMOKE_ALPHA&source=launch-smoke&handoff=first-wave`);
     assert.equal(output.handoff.reviewWorkspaces.launchMainline.href, `${baseUrl}/developer/launch-mainline?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave`);
     assert.equal(output.handoff.downloads.opsHandoffIndex.href, `${baseUrl}/api/developer/ops/export/download?productCode=LIVE_SMOKE_ALPHA&format=handoff-index&limit=20`);
+    assert.equal(output.handoff.downloads.launchOpsOverviewStatus.href, `${baseUrl}/api/developer/ops/export/download?productCode=LIVE_SMOKE_ALPHA&format=launch-operations-overview-status&limit=20`);
     assert.equal(output.handoff.downloads.launchReviewSummary.href, `${baseUrl}/api/developer/launch-review/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`);
     assert.equal(output.handoff.downloads.launchSmokeSummary.href, `${baseUrl}/api/developer/launch-smoke-kit/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`);
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_review_receipt_visibility"));
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_smoke_receipt_visibility"));
+    assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_ops_overview_status"));
     assert.ok(output.checks.every((item) => item.status === "pass"));
   } finally {
     await app.close();

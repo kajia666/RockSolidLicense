@@ -228,6 +228,7 @@ function buildLaunchDutyHandoff({
   summaryDownload,
   checksumDownload,
   handoffIndex,
+  launchOperationsOverviewStatusDownload,
   opsSnapshot
 }) {
   const sharedWorkspaceParams = {
@@ -275,6 +276,14 @@ function buildLaunchDutyHandoff({
     buildRoute("/api/developer/ops/export/download", {
       productCode: options.productCode,
       format: "handoff-index",
+      limit: options.limit
+    })
+  );
+  const launchOpsOverviewStatus = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/ops/export/download", {
+      productCode: options.productCode,
+      format: "launch-operations-overview-status",
       limit: options.limit
     })
   );
@@ -349,6 +358,12 @@ function buildLaunchDutyHandoff({
         fileName: handoffIndex.fileName || "developer-ops-handoff-index.txt",
         ...opsHandoffIndex
       },
+      launchOpsOverviewStatus: {
+        key: "launch-ops-overview-status",
+        label: "Launch Ops overview status",
+        fileName: launchOperationsOverviewStatusDownload.fileName || "developer-ops-launch-operations-overview-status.txt",
+        ...launchOpsOverviewStatus
+      },
       launchReviewSummary: {
         key: "launch-review-summary",
         label: "Launch Review receipt visibility summary",
@@ -394,6 +409,14 @@ function buildLaunchDutyHandoff({
         route: launchSmokeSummary.route,
         href: launchSmokeSummary.href,
         fileName: "launch-smoke-kit.txt"
+      },
+      {
+        key: "verify_launch_ops_overview_status",
+        label: "Download Launch Ops Overview Status and verify the one-screen launch watch state before handoff.",
+        status: opsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOverviewStatus.status,
+        route: launchOpsOverviewStatus.route,
+        href: launchOpsOverviewStatus.href,
+        fileName: launchOperationsOverviewStatusDownload.fileName || "developer-ops-launch-operations-overview-status.txt"
       },
       {
         key: "verify_first_wave_confirmation",
@@ -741,12 +764,16 @@ async function runLaunchSmoke(options) {
       );
       const latestConfirmation = opsSnapshot.overview?.latestFirstWaveHandoffConfirmations?.[0];
       const readinessConfirmation = opsSnapshot.summary?.initialLaunchOpsReadiness?.firstWaveHandoffConfirmation;
+      const launchOperationsOverviewStatus = opsSnapshot.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus;
       ensure(latestConfirmation?.auditLogId === handoffConfirmation.auditLogId, "Ops export did not surface the latest first-wave confirmation.", opsSnapshot.overview);
       ensure(readinessConfirmation?.status === "confirmed", "Initial launch ops readiness did not include confirmed first-wave handoff.", opsSnapshot.summary?.initialLaunchOpsReadiness);
+      ensure(launchOperationsOverviewStatus?.overviewDownload?.format === "launch-operations-overview-status", "Initial launch ops readiness did not include the Launch Ops overview status download.", opsSnapshot.summary?.initialLaunchOpsReadiness);
       ensure(opsSnapshot.summaryText?.includes("First-Wave Handoff Confirmation:"), "Ops export summary text missed first-wave confirmation evidence.");
+      ensure(opsSnapshot.summaryText?.includes("Launch Operations Overview Status:"), "Ops export summary text missed Launch Ops overview status.");
       return {
         firstWaveConfirmationStatus: readinessConfirmation.status,
-        firstWaveConfirmationAuditLogId: readinessConfirmation.auditLogId
+        firstWaveConfirmationAuditLogId: readinessConfirmation.auditLogId,
+        launchOperationsOverviewStatus: launchOperationsOverviewStatus.status
       };
     });
 
@@ -764,6 +791,21 @@ async function runLaunchSmoke(options) {
         fileName: parseAttachmentFileName(download.contentDisposition)
       };
     });
+    const launchOperationsOverviewStatusDownload = await step("ops.launch-operations-overview-status", async () => {
+      const download = await requestText(
+        baseUrl,
+        `/api/developer/ops/export/download?${buildQuery({ productCode: options.productCode, format: "launch-operations-overview-status", limit: options.limit })}`,
+        developerToken
+      );
+      ensure(download.contentType === "text/plain; charset=utf-8", "Launch Ops overview status should be text/plain.", download);
+      ensure(/developer-ops-launch-operations-overview-status\.txt/i.test(download.contentDisposition), "Launch Ops overview status should expose its file name.", download);
+      ensure(download.body.includes("RockSolid Developer Ops Launch Operations Overview Status"), "Launch Ops overview status missed its title.");
+      ensure(download.body.includes("Overview Status:"), "Launch Ops overview status missed overview status details.");
+      ensure(download.body.includes("Receipt Recovery:"), "Launch Ops overview status missed receipt recovery details.");
+      return {
+        fileName: parseAttachmentFileName(download.contentDisposition)
+      };
+    });
     const handoff = buildLaunchDutyHandoff({
       options,
       handoffBaseUrl: options.baseUrl,
@@ -772,6 +814,7 @@ async function runLaunchSmoke(options) {
       summaryDownload,
       checksumDownload,
       handoffIndex,
+      launchOperationsOverviewStatusDownload,
       opsSnapshot
     });
 
@@ -795,7 +838,9 @@ async function runLaunchSmoke(options) {
         ops: {
           firstWaveConfirmationStatus: opsSnapshot.summary.initialLaunchOpsReadiness.firstWaveHandoffConfirmation.status,
           firstWaveConfirmationAuditLogId: handoffConfirmation.auditLogId,
-          handoffIndexFileName: handoffIndex.fileName || "developer-ops-handoff-index.txt"
+          handoffIndexFileName: handoffIndex.fileName || "developer-ops-handoff-index.txt",
+          launchOperationsOverviewStatus: opsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOverviewStatus.status,
+          launchOperationsOverviewFileName: launchOperationsOverviewStatusDownload.fileName || "developer-ops-launch-operations-overview-status.txt"
         }
       },
       handoff,
@@ -827,11 +872,13 @@ function writeResult(result, json) {
     }
     console.log(`First-wave handoff: ${result.summary.firstWave.confirmationStatus}`);
     console.log(`Ops handoff index: ${result.summary.ops.handoffIndexFileName}`);
+    console.log(`Launch Ops overview: ${result.summary.ops.launchOperationsOverviewStatus}`);
     if (result.handoff) {
       console.log("Next launch-duty handoff:");
       console.log(`- Open Launch Review: ${result.handoff.nextWorkspace.href || result.handoff.nextWorkspace.route}`);
       console.log(`- Verify Launch Review receipt visibility: ${result.handoff.downloads.launchReviewSummary.href || result.handoff.downloads.launchReviewSummary.route}`);
       console.log(`- Verify Launch Smoke receipt visibility: ${result.handoff.downloads.launchSmokeSummary.href || result.handoff.downloads.launchSmokeSummary.route}`);
+      console.log(`- Verify Launch Ops overview: ${result.handoff.downloads.launchOpsOverviewStatus.href || result.handoff.downloads.launchOpsOverviewStatus.route}`);
       console.log(`- Download Ops handoff index: ${result.handoff.downloads.opsHandoffIndex.href || result.handoff.downloads.opsHandoffIndex.route}`);
       console.log(`- Continue Developer Ops watch: ${result.handoff.reviewWorkspaces.developerOps.href || result.handoff.reviewWorkspaces.developerOps.route}`);
       console.log(`- Open Launch Mainline evidence: ${result.handoff.reviewWorkspaces.launchMainline.href || result.handoff.reviewWorkspaces.launchMainline.route}`);

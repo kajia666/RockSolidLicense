@@ -16513,6 +16513,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateDutyPlanReceipt.planMode, "download");
     assert.equal(steadyStateDutyPlanReceipt.format, "steady-state-duty-board");
     assert.ok(steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.status, "visible");
+    assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.snapshotRoute, "/api/developer/ops/export");
+    assert.ok(steadyStateDutyPlanReceipt.receiptVisibility.visibleIn.includes("launch_operations_handoff_summary"));
+    assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.method, "POST");
+    assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.route, "/api/developer/ops/steady-state-duty-plan/receipt");
+    assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.payload.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.handoffEvidence.stageKey, "steady_state_duty_plan_receipt");
 
     const steadyStateDutyReceiptSnapshot = await getJson(
       baseUrl,
@@ -16528,6 +16536,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestSteadyStateDutyPlanReceipt.planKind, "download");
     assert.equal(latestSteadyStateDutyPlanReceipt.planMode, "download");
     assert.equal(latestSteadyStateDutyPlanReceipt.format, "steady-state-duty-board");
+    assert.equal(latestSteadyStateDutyPlanReceipt.receiptVisibility.status, "visible");
+    assert.equal(latestSteadyStateDutyPlanReceipt.receiptVisibility.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.payload.action, "download");
     assert.equal(
       steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.latestSteadyStateDutyPlanReceipt.auditLogId,
       steadyStateDutyPlanReceipt.auditLogId
@@ -16554,6 +16565,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchOperationsEvidenceChain.nextReviewAction);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`audit=${steadyStateDutyPlanReceipt.auditLogId}`));
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /receiptVisibility=visible/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /steady_state_duty_plan_receipt=recorded/);
     const launchOperationsHandoffSummary = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsHandoffSummary;
@@ -20639,6 +20652,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /lastSteadyStateDutyPlanResult/);
     assert.match(html, /buildSteadyStateDutyPlanResult/);
     assert.match(html, /renderLastSteadyStateDutyPlanResult/);
+    assert.match(html, /receiptVisibility/);
+    assert.match(html, /Receipt Visibility/);
     assert.match(html, /Last Steady-State Duty Plan/);
     assert.match(html, /steady-state-duty-plan-confirmation/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);

@@ -19103,29 +19103,127 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
           role: metadata.actorRole || null
         };
   const recordedAt = item.recordedAt || metadata.recordedAt || item.createdAt || item.created_at || null;
+  const status = normalizeDeveloperOpsConfirmationToken(item.status || metadata.status, "recorded");
+  const productCode = item.productCode || metadata.productCode || null;
+  const productId = item.productId || metadata.productId || item.entityId || item.entity_id || null;
+  const channel = normalizeChannel(item.channel || metadata.channel, "stable");
+  const action = normalizeDeveloperOpsConfirmationToken(item.action || metadata.action, "unknown");
+  const intent = normalizeDeveloperOpsConfirmationToken(item.intent || metadata.intent, "");
+  const planKind = normalizeDeveloperOpsConfirmationToken(item.planKind || metadata.planKind, "");
+  const planMode = normalizeDeveloperOpsConfirmationToken(item.planMode || metadata.planMode, "");
+  const targetType = normalizeDeveloperOpsConfirmationToken(item.targetType || metadata.targetType, "");
+  const href = String(item.href ?? metadata.href ?? "").trim();
+  const fileName = String(item.fileName ?? metadata.fileName ?? "").trim();
+  const format = normalizeDeveloperOpsConfirmationToken(item.format || metadata.format, "");
+  const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
+  const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
+  const note = String(item.note ?? metadata.note ?? "").trim();
+  const auditLogId = item.auditLogId || item.id || null;
+  const eventType = item.eventType || item.event_type || metadata.eventType || "developer.ops.steady-state-duty-plan.receipt";
+  const entityType = item.entityType || item.entity_type || metadata.entityType || "developer_ops_steady_state_duty_plan";
   return {
     version: "developer-ops-steady-state-duty-plan-receipt/v1",
-    status: normalizeDeveloperOpsConfirmationToken(item.status || metadata.status, "recorded"),
-    productCode: item.productCode || metadata.productCode || null,
-    productId: item.productId || metadata.productId || item.entityId || item.entity_id || null,
-    channel: normalizeChannel(item.channel || metadata.channel, "stable"),
-    action: normalizeDeveloperOpsConfirmationToken(item.action || metadata.action, "unknown"),
-    intent: normalizeDeveloperOpsConfirmationToken(item.intent || metadata.intent, ""),
-    planKind: normalizeDeveloperOpsConfirmationToken(item.planKind || metadata.planKind, ""),
-    planMode: normalizeDeveloperOpsConfirmationToken(item.planMode || metadata.planMode, ""),
-    targetType: normalizeDeveloperOpsConfirmationToken(item.targetType || metadata.targetType, ""),
-    href: String(item.href ?? metadata.href ?? "").trim(),
-    fileName: String(item.fileName ?? metadata.fileName ?? "").trim(),
-    format: normalizeDeveloperOpsConfirmationToken(item.format || metadata.format, ""),
-    focusKind: normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, ""),
-    focusReason: String(item.focusReason ?? metadata.focusReason ?? "").trim(),
-    note: String(item.note ?? metadata.note ?? "").trim(),
+    status,
+    productCode,
+    productId,
+    channel,
+    action,
+    intent,
+    planKind,
+    planMode,
+    targetType,
+    href,
+    fileName,
+    format,
+    focusKind,
+    focusReason,
+    note,
     recordedAt,
     recordedBy,
-    auditLogId: item.auditLogId || item.id || null,
-    eventType: item.eventType || item.event_type || metadata.eventType || "developer.ops.steady-state-duty-plan.receipt",
-    entityType: item.entityType || item.entity_type || metadata.entityType || "developer_ops_steady_state_duty_plan",
-    createdAt: item.createdAt || item.created_at || recordedAt
+    auditLogId,
+    eventType,
+    entityType,
+    createdAt: item.createdAt || item.created_at || recordedAt,
+    receiptVisibility: buildSteadyStateDutyPlanReceiptVisibility({
+      status,
+      productCode,
+      productId,
+      channel,
+      action,
+      intent,
+      planKind,
+      planMode,
+      targetType,
+      href,
+      fileName,
+      format,
+      focusKind,
+      focusReason,
+      note,
+      recordedAt,
+      auditLogId,
+      eventType,
+      entityType
+    })
+  };
+}
+
+function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
+  const productCode = receipt.productCode || null;
+  const channel = normalizeChannel(receipt.channel, "stable");
+  const action = normalizeDeveloperOpsConfirmationToken(receipt.action, "recorded");
+  const payload = {
+    productCode,
+    channel,
+    action,
+    intent: normalizeDeveloperOpsConfirmationToken(receipt.intent, ""),
+    planKind: normalizeDeveloperOpsConfirmationToken(receipt.planKind, ""),
+    planMode: normalizeDeveloperOpsConfirmationToken(receipt.planMode, ""),
+    targetType: normalizeDeveloperOpsConfirmationToken(receipt.targetType, ""),
+    href: String(receipt.href || "").trim(),
+    fileName: String(receipt.fileName || "").trim(),
+    format: normalizeDeveloperOpsConfirmationToken(receipt.format, ""),
+    focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
+    focusReason: String(receipt.focusReason || "").trim(),
+    note: String(receipt.note || "").trim()
+  };
+  return {
+    version: "developer-ops-steady-state-duty-plan-receipt-visibility/v1",
+    status: receipt.auditLogId ? "visible" : "pending",
+    auditLogId: receipt.auditLogId || null,
+    productCode,
+    channel,
+    snapshotRoute: "/api/developer/ops/export",
+    snapshotQuery: {
+      productCode,
+      channel,
+      limit: "80"
+    },
+    exportDownloadRoute: "/api/developer/ops/export/download",
+    visibleIn: [
+      "receipt_response",
+      "developer_ops_snapshot",
+      "initial_launch_ops_readiness",
+      "launch_operations_evidence_chain",
+      "launch_operations_handoff_summary"
+    ],
+    handoffEvidence: {
+      stageKey: "steady_state_duty_plan_receipt",
+      status: receipt.status || "recorded",
+      auditLogId: receipt.auditLogId || null,
+      action,
+      intent: payload.intent || null,
+      fileName: payload.fileName || payload.format || null,
+      recordedAt: receipt.recordedAt || null
+    },
+    failureRecovery: {
+      key: "retry_steady_state_duty_plan_receipt",
+      label: "Retry steady-state duty plan receipt",
+      method: "POST",
+      route: "/api/developer/ops/steady-state-duty-plan/receipt",
+      payload,
+      operatorHint: "If the receipt is not visible after refreshing Developer Ops, retry this POST payload and attach the returned audit id to the shift handoff."
+    }
   };
 }
 
@@ -26330,6 +26428,13 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
         + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
       );
+      if (latestSteadyStateDutyPlanReceipt.receiptVisibility) {
+        lines.push(
+          `- receiptVisibility=${latestSteadyStateDutyPlanReceipt.receiptVisibility.status || "-"}`
+          + ` | visibleIn=${Array.isArray(latestSteadyStateDutyPlanReceipt.receiptVisibility.visibleIn) ? latestSteadyStateDutyPlanReceipt.receiptVisibility.visibleIn.length : 0}`
+          + ` | recovery=${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.method || "-"} ${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.route || "-"}`
+        );
+      }
     }
     const launchOperationsEvidenceChain = initialLaunchOpsReadiness.launchOperationsEvidenceChain || null;
     if (launchOperationsEvidenceChain) {
@@ -26874,6 +26979,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
       + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
     );
+    if (latestSteadyStateDutyPlanReceipt.receiptVisibility) {
+      lines.push(
+        `- receiptVisibility=${latestSteadyStateDutyPlanReceipt.receiptVisibility.status || "-"}`
+        + ` | visibleIn=${Array.isArray(latestSteadyStateDutyPlanReceipt.receiptVisibility.visibleIn) ? latestSteadyStateDutyPlanReceipt.receiptVisibility.visibleIn.length : 0}`
+        + ` | recovery=${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.method || "-"} ${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.route || "-"}`
+      );
+    }
     lines.push("");
   }
   const launchOperationsEvidenceChain = readiness.launchOperationsEvidenceChain || null;

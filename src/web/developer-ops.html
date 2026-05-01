@@ -3264,6 +3264,7 @@
             message: "Opening the steady-state duty workspace.",
             auditLogId: receipt.auditLogId,
             recordedAt: receipt.recordedAt,
+            receiptVisibility: receipt.receiptVisibility,
             ...prefill
           });
           renderSnapshotOverview();
@@ -3285,6 +3286,7 @@
             status: "downloaded",
             auditLogId: receipt.auditLogId,
             recordedAt: receipt.recordedAt,
+            receiptVisibility: receipt.receiptVisibility,
             fileName: result.fileName,
             message: `Downloaded ${result.fileName}.`
           });
@@ -3306,6 +3308,7 @@
             message: "Quick controls and scoped filters were prefilled from the steady-state duty plan.",
             auditLogId: receipt.auditLogId,
             recordedAt: receipt.recordedAt,
+            receiptVisibility: receipt.receiptVisibility,
             ...prefill
           });
           renderSnapshotOverview();
@@ -4686,6 +4689,7 @@
           focusReason: String(extra.focusReason || data.dutyPlanFocusReason || "").trim(),
           auditLogId: String(extra.auditLogId || "").trim(),
           recordedAt: String(extra.recordedAt || "").trim(),
+          receiptVisibility: extra.receiptVisibility || null,
           timestamp: new Date().toISOString()
         };
       }
@@ -4705,10 +4709,12 @@
           item.targetType ? `target=${item.targetType}` : "",
           item.fileName || item.format ? `download=${item.fileName || item.format}` : "",
           item.auditLogId ? `audit=${item.auditLogId}` : "",
+          item.receiptVisibility?.status ? `receiptVisibility=${item.receiptVisibility.status}` : "",
           item.recordedAt ? `recorded=${formatTime(item.recordedAt)}` : "",
           item.focusKind ? `focus=${item.focusKind}` : "",
           item.href ? `href=${item.href}` : ""
         ].filter(Boolean).join(" | ");
+        const receiptVisibility = item.receiptVisibility || null;
         return `
           <div class="snapshot-recap steady-state-duty-plan-confirmation" data-steady-state-duty-plan-confirmation="latest">
             <div class="snapshot-recap-head">
@@ -4719,6 +4725,7 @@
             <div>${esc(item.label || "Steady-State Duty Plan")}</div>
             ${item.message ? `<div class="hint">${esc(item.message)}</div>` : ""}
             ${item.focusReason ? `<div class="hint">${esc(item.focusReason)}</div>` : ""}
+            ${receiptVisibility ? `<div class="hint"><strong>Receipt Visibility</strong> ${esc(receiptVisibility.status || "-")} | recovery=${esc(receiptVisibility.failureRecovery?.method || "-")} ${esc(receiptVisibility.failureRecovery?.route || "-")}</div>` : ""}
             <div class="hint">${esc(details || "Steady-state duty plan action captured for this Ops session.")}</div>
           </div>
         `;

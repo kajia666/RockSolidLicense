@@ -21203,6 +21203,82 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     }
     return "open_control";
   };
+  const extractHrefParams = (href = "") => {
+    const text = String(href || "").trim();
+    const queryIndex = text.indexOf("?");
+    if (queryIndex < 0) {
+      return {};
+    }
+    const params = new URLSearchParams(text.slice(queryIndex + 1));
+    const result = {};
+    for (const [key, value] of params.entries()) {
+      if (String(value || "").trim() !== "") {
+        result[key] = value;
+      }
+    }
+    return result;
+  };
+  const buildExecutionPlan = (item = {}, type = "", intent = "") => {
+    const hrefParams = extractHrefParams(item.href);
+    const basePrefill = compactRouteParams({
+      productCode,
+      channel,
+      ...hrefParams
+    });
+    if (intent === "download_asset") {
+      return {
+        status: item.href ? "ready" : "pending",
+        kind: "download",
+        mode: "download",
+        method: "GET",
+        href: item.href || null,
+        fileName: item.fileName || null,
+        format: item.format || hrefParams.format || null,
+        prefill: basePrefill,
+        confirmationLabel: "Download duty asset",
+        operatorHint: "Download and attach this handoff asset before transferring or closing the duty window."
+      };
+    }
+    if (intent === "open_workspace") {
+      return {
+        status: item.href ? "ready" : "pending",
+        kind: "workspace",
+        mode: "navigate",
+        method: "GET",
+        href: item.href || null,
+        fileName: null,
+        format: null,
+        prefill: basePrefill,
+        confirmationLabel: "Open duty workspace",
+        operatorHint: "Open the scoped Developer Ops workspace and keep the filters prefilled for this duty lane."
+      };
+    }
+    const targetType = intent.includes("session")
+      ? "session"
+      : intent.includes("device")
+        ? "device"
+        : intent.includes("entitlement")
+          ? "entitlement"
+          : intent.includes("account")
+            ? "account"
+            : type || "control";
+    return {
+      status: item.href || Object.keys(basePrefill).length ? "ready" : "pending",
+      kind: "quick_control",
+      mode: "prefill",
+      method: "GET",
+      href: item.href || null,
+      fileName: null,
+      format: null,
+      prefill: {
+        ...basePrefill,
+        focusKind: basePrefill.focusKind || targetType,
+        focusReason: basePrefill.focusReason || item.summary || item.label || item.key || ""
+      },
+      confirmationLabel: `Prepare ${targetType} control`,
+      operatorHint: "Use the prefilled quick control fields, review the scoped snapshot row, then run the matching Developer Ops action."
+    };
+  };
   const buildControlIntent = (item = {}, type = "", index = 0) => {
     const intent = inferControlIntent(item, type);
     return {
@@ -21216,6 +21292,7 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       href: item.href || null,
       fileName: item.fileName || null,
       format: item.format || null,
+      executionPlan: buildExecutionPlan(item, type, intent),
       requiresConfirmation: intent !== "open_workspace" && intent !== "download_asset",
       summary: item.summary || ""
     };
@@ -21241,6 +21318,7 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     controlLinkCount: controlLinks.length,
     downloadLinkCount: downloadLinks.length,
     controlIntentCount: controlIntents.length,
+    executionPlanCount: controlIntents.filter((item) => item.executionPlan?.status === "ready").length,
     workspaceLinks,
     controlLinks,
     downloadLinks,
@@ -24813,6 +24891,7 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
     + ` | control=${actionLinks.controlLinkCount ?? 0}`
     + ` | download=${actionLinks.downloadLinkCount ?? 0}`
     + ` | controlIntents=${actionLinks.controlIntentCount ?? 0}`
+    + ` | executionPlans=${actionLinks.executionPlanCount ?? 0}`
   );
   lines.push(
     `- actionLinksDownload=${actionLinks.actionLinksDownload?.fileName || "-"}`
@@ -24854,9 +24933,30 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
         + ` | target=${item.targetType || "-"}`
         + ` | method=${item.method || "-"}`
         + ` | confirm=${item.requiresConfirmation === true}`
+        + ` | plan=${item.executionPlan?.kind || "-"}:${item.executionPlan?.mode || "-"}`
         + ` | href=${item.href || "-"}`
         + (item.fileName ? ` | file=${item.fileName}` : "")
         + (item.format ? ` | format=${item.format}` : "")
+      );
+    }
+  };
+  const appendExecutionPlans = (label, items = []) => {
+    const plans = Array.isArray(items)
+      ? items.map((item) => item.executionPlan).filter(Boolean)
+      : [];
+    if (!plans.length) {
+      return;
+    }
+    lines.push(`- ${label}:`);
+    for (const plan of plans) {
+      lines.push(
+        `  - kind=${plan.kind || "-"}`
+        + ` | mode=${plan.mode || "-"}`
+        + ` | status=${plan.status || "-"}`
+        + ` | method=${plan.method || "-"}`
+        + ` | href=${plan.href || "-"}`
+        + (plan.fileName ? ` | file=${plan.fileName}` : "")
+        + (plan.format ? ` | format=${plan.format}` : "")
       );
     }
   };
@@ -24864,6 +24964,7 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
   appendLinks("controlLinks", actionLinks.controlLinks);
   appendLinks("downloadLinks", actionLinks.downloadLinks);
   appendIntents("controlIntents", actionLinks.controlIntents);
+  appendExecutionPlans("executionPlans", actionLinks.controlIntents);
 }
 
 function buildDeveloperOpsSummaryText(payload = {}) {
@@ -26059,9 +26160,33 @@ function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
           + ` | target=${item.targetType || "-"}`
           + ` | method=${item.method || "-"}`
           + ` | confirm=${item.requiresConfirmation === true ? "yes" : "no"}`
+          + ` | plan=${item.executionPlan?.kind || "-"}:${item.executionPlan?.mode || "-"}`
           + ` | href=${item.href || "-"}`
           + (item.fileName ? ` | file=${item.fileName}` : "")
           + (item.format ? ` | format=${item.format}` : "")
+        );
+      }
+    } else {
+      lines.push("- none");
+    }
+  };
+  const appendExecutionPlanSection = (title, items = []) => {
+    lines.push("");
+    lines.push(`${title}:`);
+    const plans = Array.isArray(items)
+      ? items.map((item) => item.executionPlan).filter(Boolean)
+      : [];
+    if (plans.length) {
+      for (const plan of plans) {
+        lines.push(
+          `- kind=${plan.kind || "-"}`
+          + ` | mode=${plan.mode || "-"}`
+          + ` | status=${plan.status || "-"}`
+          + ` | method=${plan.method || "-"}`
+          + ` | href=${plan.href || "-"}`
+          + (plan.fileName ? ` | file=${plan.fileName}` : "")
+          + (plan.format ? ` | format=${plan.format}` : "")
+          + (plan.confirmationLabel ? ` | confirm=${plan.confirmationLabel}` : "")
         );
       }
     } else {
@@ -26072,6 +26197,7 @@ function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
   appendSection("Download Links", actionLinks.downloadLinks);
   appendSection("Control Links", actionLinks.controlLinks);
   appendIntentSection("Control Intents", actionLinks.controlIntents);
+  appendExecutionPlanSection("Execution Plans", actionLinks.controlIntents);
   return lines.join("\n");
 }
 

@@ -16443,9 +16443,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(steadyStateDutyActionLinks.controlIntents.length >= 1);
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "open_workspace"));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "download_asset"));
+    assert.ok(steadyStateDutyActionLinks.controlIntents.every((item) => item.executionPlan?.status === "ready"));
+    assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
+      item.intent === "open_workspace"
+      && item.executionPlan?.kind === "workspace"
+      && item.executionPlan?.mode === "navigate"
+      && /\/developer\/ops/.test(item.executionPlan?.href || "")
+    )));
+    assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
+      item.intent === "download_asset"
+      && item.executionPlan?.kind === "download"
+      && item.executionPlan?.mode === "download"
+      && item.executionPlan?.format === "steady-state-duty-board"
+    )));
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Action Links:/);
     assert.match(steadyStateSnapshot.summaryText, /actionCount=\d+/);
     assert.match(steadyStateSnapshot.summaryText, /controlIntents=\d+/);
+    assert.match(steadyStateSnapshot.summaryText, /executionPlans=\d+/);
 
     const steadyStateDutyActionLinksDownload = await getText(
       baseUrl,
@@ -16462,6 +16476,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /Control Links:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Control Intents:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /intent=open_workspace/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /Execution Plans:/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /kind=workspace/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /mode=download/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

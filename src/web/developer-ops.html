@@ -234,6 +234,7 @@
       let lastFirstWaveRecommendations = null;
       let lastOperatorActionResult = null;
       let lastStabilizationHandoffResult = null;
+      let lastOperationalExceptionActionResult = null;
       let preparedFocus = null;
       let lastMutation = null;
       let routeReviewDisplayMode = "all";
@@ -2996,12 +2997,22 @@
         if (normalizedAction === "open-resolution" || normalizedAction === "open-closeout-review") {
           const href = String(data.operationalExceptionWorkspaceHref || "").trim();
           if (href) {
+            lastOperationalExceptionActionResult = buildOperationalExceptionActionResult(normalizedAction, data, {
+              status: "routed",
+              message: "Opening the operational exception workspace."
+            });
+            renderSnapshotOverview();
             window.location.href = href;
             return;
           }
           if (!productCode) {
             throw { code: "MISSING_PROJECT", message: "Select or route a project before opening this operational exception workspace." };
           }
+          lastOperationalExceptionActionResult = buildOperationalExceptionActionResult(normalizedAction, data, {
+            status: "routed",
+            message: "Opening Launch Mainline for operational exception handling."
+          });
+          renderSnapshotOverview();
           window.location.href = buildWorkspaceUrl("/developer/launch-mainline", {
             productCode,
             channel,
@@ -3024,6 +3035,11 @@
             data.operationalExceptionDownloadFileName || "operational-exception-handoff.txt"
           );
           lastExportDownload = result;
+          lastOperationalExceptionActionResult = buildOperationalExceptionActionResult(normalizedAction, data, {
+            status: "downloaded",
+            fileName: result.fileName,
+            message: `Downloaded ${result.fileName}.`
+          });
           renderSnapshotOverview();
           setStatus(`Operational exception handoff downloaded: ${result.fileName}`);
           return;
@@ -3045,6 +3061,14 @@
               ...(actionKey ? { actionKey } : {}),
               ...(downloadKey ? { downloadKey } : {})
             }
+          });
+          lastOperationalExceptionActionResult = buildOperationalExceptionActionResult(normalizedAction, data, {
+            status: result?.receipt?.operation ? "recorded" : "ready",
+            message: result?.message || "Operational exception closeout review recorded.",
+            receiptOperation: result?.receipt?.operation || result?.operation || "",
+            receiptSummary: result?.receipt?.summary || "",
+            recordedEvidenceKey: result?.result?.recordedEvidence?.key || "",
+            recordedAt: result?.result?.recordedEvidence?.createdAt || ""
           });
           setOutput(result);
           await refreshOps(false);
@@ -4397,6 +4421,74 @@
         `;
       }
 
+      function buildOperationalExceptionActionResult(action = "", data = {}, extra = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const label = normalizedAction === "open-resolution"
+          ? "Open Exception Workspace"
+          : normalizedAction === "download-resolution"
+            ? "Download Exception Handoff"
+            : normalizedAction === "open-closeout-review"
+              ? "Open Closeout Review"
+              : normalizedAction === "download-closeout-handoff"
+                ? "Download Closeout Handoff"
+                : normalizedAction === "record-closeout-review"
+                  ? "Record Closeout Review"
+                  : "Operational Exception Action";
+        return {
+          action: normalizedAction,
+          label,
+          status: String(extra.status || "ready").trim().toLowerCase() || "ready",
+          message: String(extra.message || "").trim(),
+          productCode: String(data.productCode || el("filter-product-code")?.value || requestedProductCode || "").trim(),
+          channel: String(data.channel || requestedChannel || "stable").trim() || "stable",
+          operation: String(data.operationalExceptionOperation || "").trim(),
+          actionKey: String(data.operationalExceptionActionKey || "").trim(),
+          downloadKey: String(data.operationalExceptionDownloadKey || "").trim(),
+          endpoint: String(data.operationalExceptionEndpoint || "").trim(),
+          workspaceHref: String(data.operationalExceptionWorkspaceHref || "").trim(),
+          downloadFileName: String(extra.fileName || data.operationalExceptionDownloadFileName || "").trim(),
+          receiptOperation: String(extra.receiptOperation || "").trim(),
+          receiptSummary: String(extra.receiptSummary || "").trim(),
+          recordedEvidenceKey: String(extra.recordedEvidenceKey || "").trim(),
+          recordedAt: String(extra.recordedAt || "").trim(),
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      function renderLastOperationalExceptionActionResult() {
+        if (!lastOperationalExceptionActionResult) {
+          return "";
+        }
+        const item = lastOperationalExceptionActionResult;
+        const status = String(item.status || "ready").toLowerCase();
+        const statusClass = status === "downloaded" || status === "routed" || status === "recorded" ? "ok" : "warning";
+        const details = [
+          item.productCode ? `project=${item.productCode}` : "",
+          item.channel ? `channel=${item.channel}` : "",
+          item.operation ? `operation=${item.operation}` : "",
+          item.actionKey ? `action=${item.actionKey}` : "",
+          item.downloadFileName || item.downloadKey ? `download=${item.downloadFileName || item.downloadKey}` : "",
+          item.endpoint ? `endpoint=${item.endpoint}` : "",
+          item.workspaceHref ? `workspace=${item.workspaceHref}` : "",
+          item.receiptOperation ? `receipt=${item.receiptOperation}` : "",
+          item.recordedEvidenceKey ? `evidence=${item.recordedEvidenceKey}` : "",
+          item.recordedAt ? `recordedAt=${formatTime(item.recordedAt)}` : ""
+        ].filter(Boolean).join(" | ");
+        return `
+          <div class="snapshot-recap operational-exception-action-confirmation" data-operational-exception-action-confirmation="latest">
+            <div class="snapshot-recap-head">
+              <strong>Last Operational Exception Action</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+              <span class="tag">${esc(formatTime(item.timestamp))}</span>
+            </div>
+            <div>${esc(item.label || "Operational Exception Action")}</div>
+            ${item.message ? `<div class="hint">${esc(item.message)}</div>` : ""}
+            ${item.receiptSummary ? `<div class="hint">${esc(item.receiptSummary)}</div>` : ""}
+            <div class="hint">${esc(details || "Operational exception action captured for this Ops session.")}</div>
+          </div>
+        `;
+      }
+
       function renderOperatorActionReceipts(initialLaunchOpsReadiness = {}) {
         const entries = Array.isArray(initialLaunchOpsReadiness?.operatorActionReceipts)
           ? initialLaunchOpsReadiness.operatorActionReceipts.slice(0, 5)
@@ -5273,6 +5365,7 @@
           ${renderLaunchReceiptNextFollowUpActions(launchReceiptNextFollowUp)}
           ${renderLastOperatorActionResult()}
           ${renderLastStabilizationHandoffResult()}
+          ${renderLastOperationalExceptionActionResult()}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
@@ -5932,6 +6025,7 @@
         lastFirstWaveRecommendations = null;
         lastOperatorActionResult = null;
         lastStabilizationHandoffResult = null;
+        lastOperationalExceptionActionResult = null;
         preparedFocus = null;
         lastMutation = null;
         routeReviewDisplayMode = (requestedReviewMode === "matched" || currentRequestedRouteReviewAction()) ? "matched" : "all";

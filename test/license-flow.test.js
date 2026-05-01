@@ -20055,6 +20055,12 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Operational Exception Closeout/);
     assert.match(html, /data-operational-exception-closeout/);
     assert.match(html, /handleOperationalExceptionAction/);
+    assert.match(html, /lastOperationalExceptionActionResult/);
+    assert.match(html, /buildOperationalExceptionActionResult/);
+    assert.match(html, /renderLastOperationalExceptionActionResult/);
+    assert.match(html, /Last Operational Exception Action/);
+    assert.match(html, /operational-exception-action-confirmation/);
+    assert.match(html, /Operational exception action captured/);
     assert.match(html, /data-operational-exception-action/);
     assert.match(html, /Open Exception Workspace/);
     assert.match(html, /Download Exception Handoff/);

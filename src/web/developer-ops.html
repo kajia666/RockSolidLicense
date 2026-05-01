@@ -151,6 +151,7 @@
             <button class="secondary" id="download-export-exception-digest-btn">Download Exception Digest</button>
             <button class="secondary" id="download-export-handoff-brief-btn">Download Handoff Brief</button>
             <button class="secondary" id="download-export-duty-board-btn">Download Duty Board</button>
+            <button class="secondary" id="download-export-duty-action-links-btn">Download Action Links</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
@@ -4959,6 +4960,51 @@
         `;
       }
 
+      function renderSteadyStateDutyActionLinks(initialLaunchOpsReadiness = {}) {
+        const actionLinks = initialLaunchOpsReadiness?.steadyStateDutyActionLinks || null;
+        if (!actionLinks || typeof actionLinks !== "object") {
+          return "";
+        }
+        const status = String(actionLinks.status || "unknown").toLowerCase();
+        const statusClass = actionLinks.readyForDuty === true ? "ok" : "warning";
+        const details = [
+          `ready=${actionLinks.readyForDuty === true ? "yes" : "no"}`,
+          `actions=${esc(actionLinks.actionCount ?? 0)}`,
+          `workspace=${esc(actionLinks.workspaceLinkCount ?? 0)}`,
+          `control=${esc(actionLinks.controlLinkCount ?? 0)}`,
+          `download=${esc(actionLinks.downloadLinkCount ?? 0)}`
+        ].join(" | ");
+        const renderLinks = (items = [], emptyText = "No links are attached.") => {
+          return `<ul class="snapshot-list">${Array.isArray(items) && items.length ? items.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.priority || "-")} | source=${esc(item.source || "-")} | href=${esc(item.href || "-")}${item.fileName ? ` | file=${esc(item.fileName)}` : ""}${item.format ? ` | format=${esc(item.format)}` : ""}</li>`).join("") : `<li>${esc(emptyText)}</li>`}</ul>`;
+        };
+        return `
+          <div class="snapshot-recap steady-state-duty-action-links" data-steady-state-duty-action-links="${esc(status)}">
+            <div class="snapshot-recap-head">
+              <strong>Steady-State Duty Action Links</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(actionLinks.summary || "Workspace, control, and download links for steady-state duty actions.")}</div>
+            <div class="hint">${details}</div>
+            <div class="snapshot-recap">
+              <strong>Action Links Download</strong>
+              <div class="hint">file=${esc(actionLinks.actionLinksDownload?.fileName || "-")} | format=${esc(actionLinks.actionLinksDownload?.format || "-")} | href=${esc(actionLinks.actionLinksDownload?.href || "-")}</div>
+            </div>
+            <div class="snapshot-recap">
+              <strong>Workspace Links</strong>
+              ${renderLinks(actionLinks.workspaceLinks, "No workspace links are attached.")}
+            </div>
+            <div class="snapshot-recap">
+              <strong>Download Links</strong>
+              ${renderLinks(actionLinks.downloadLinks, "No download links are attached.")}
+            </div>
+            <div class="snapshot-recap">
+              <strong>Control Links</strong>
+              ${renderLinks(actionLinks.controlLinks, "No control links are attached.")}
+            </div>
+          </div>
+        `;
+      }
+
       function renderOperationalExceptionSignals(initialLaunchOpsReadiness = {}) {
         const traceability = initialLaunchOpsReadiness?.traceability || {};
         const operationalExceptionEntry = initialLaunchOpsReadiness?.operationalExceptionEntry
@@ -5754,6 +5800,7 @@
           ${renderSteadyStateExceptionDigest(initialLaunchOpsReadiness)}
           ${renderSteadyStateHandoffBrief(initialLaunchOpsReadiness)}
           ${renderSteadyStateDutyBoard(initialLaunchOpsReadiness)}
+          ${renderSteadyStateDutyActionLinks(initialLaunchOpsReadiness)}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
@@ -6531,6 +6578,7 @@
       el("download-export-exception-digest-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-exception-digest", "developer-ops-steady-state-exception-digest.txt", "Steady-state exception digest"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-handoff-brief-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-handoff-brief", "developer-ops-steady-state-handoff-brief.txt", "Steady-state handoff brief"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-duty-board-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-duty-board", "developer-ops-steady-state-duty-board.txt", "Steady-state duty board"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-duty-action-links-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-duty-action-links", "developer-ops-steady-state-duty-action-links.txt", "Steady-state duty action links"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

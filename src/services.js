@@ -3617,6 +3617,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("steady_state_exception_digest") || normalized.includes("steady-state-exception-digest")) return "steady-state-exception-digest";
   if (normalized.includes("steady_state_handoff_brief") || normalized.includes("steady-state-handoff-brief")) return "steady-state-handoff-brief";
   if (normalized.includes("steady_state_duty_board") || normalized.includes("steady-state-duty-board")) return "steady-state-duty-board";
+  if (normalized.includes("steady_state_duty_action_links") || normalized.includes("steady-state-duty-action-links")) return "steady-state-duty-action-links";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -19423,6 +19424,19 @@ function buildDeveloperOpsSteadyStateDutyBoardDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsSteadyStateDutyActionLinksDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_steady_state_duty_action_links",
+    "developer-ops-steady-state-duty-action-links.txt",
+    "Developer Ops steady-state duty action links",
+    {
+      source: "developer-ops",
+      format: "steady-state-duty-action-links",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
@@ -21096,6 +21110,95 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
   };
 }
 
+function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
+  scope = {},
+  steadyStateDutyBoard = null
+} = {}) {
+  if (!steadyStateDutyBoard || typeof steadyStateDutyBoard !== "object") {
+    return null;
+  }
+  const productCode = scope.productCode || steadyStateDutyBoard.projectCode || null;
+  const channel = steadyStateDutyBoard.channel || scope.channel || "stable";
+  const linkScope = {
+    ...scope,
+    productCode: productCode || scope.productCode || "",
+    channel
+  };
+  const actionLinksDownload = productCode ? buildDeveloperOpsSteadyStateDutyActionLinksDownload(linkScope) : null;
+  const quickActions = Array.isArray(steadyStateDutyBoard.quickActions)
+    ? steadyStateDutyBoard.quickActions
+    : [];
+  const buildActionLink = (item = {}, type = "") => ({
+    key: item.key || item.label || type || null,
+    type,
+    label: item.label || item.key || type || null,
+    priority: item.priority || "secondary",
+    href: item.href || null,
+    source: item.source || null,
+    summary: item.summary || ""
+  });
+  const workspaceLinks = quickActions
+    .filter((item) => item?.source === "workspace" || /\/developer\/ops/.test(String(item?.href || "")))
+    .map((item) => buildActionLink(item, "workspace"));
+  const controlLinks = quickActions
+    .filter((item) => item?.source && item.source !== "workspace" && item.source !== "download")
+    .map((item) => buildActionLink(item, "control"));
+  const downloadLinks = [];
+  const seenDownloads = new Set();
+  const appendDownloadLink = (item = {}, source = "download") => {
+    const key = item?.key || item?.href || item?.fileName || item?.label || "";
+    if (!key || seenDownloads.has(key)) {
+      return;
+    }
+    seenDownloads.add(key);
+    downloadLinks.push({
+      key: item.key || key,
+      type: "download",
+      label: item.label || item.title || item.key || item.fileName || "Download",
+      priority: item.priority || "secondary",
+      href: item.href || null,
+      source,
+      fileName: item.fileName || null,
+      format: item.format || null,
+      summary: item.summary || ""
+    });
+  };
+  for (const item of quickActions.filter((entry) => entry?.source === "download")) {
+    appendDownloadLink(item, "quick_action");
+  }
+  for (const item of Array.isArray(steadyStateDutyBoard.handoffAssets) ? steadyStateDutyBoard.handoffAssets : []) {
+    appendDownloadLink(item, "handoff_asset");
+  }
+  if (actionLinksDownload) {
+    appendDownloadLink(actionLinksDownload, "action_links");
+  }
+  const actionLinks = [
+    ...workspaceLinks,
+    ...controlLinks,
+    ...downloadLinks
+  ];
+  return {
+    version: "developer-ops-steady-state-duty-action-links/v1",
+    projectCode: productCode,
+    channel,
+    status: steadyStateDutyBoard.status || "pending",
+    readyForDuty: steadyStateDutyBoard.readyForDuty === true,
+    actionCount: quickActions.length,
+    workspaceLinkCount: workspaceLinks.length,
+    controlLinkCount: controlLinks.length,
+    downloadLinkCount: downloadLinks.length,
+    workspaceLinks,
+    controlLinks,
+    downloadLinks,
+    primaryAction: workspaceLinks[0] || controlLinks[0] || downloadLinks[0] || null,
+    actionLinks,
+    actionLinksDownload,
+    summary: quickActions.length
+      ? "Steady-state duty actions are mapped to workspace, control, and download links."
+      : "No steady-state duty actions are currently mapped."
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   scope = {},
   latestReceipt = null,
@@ -21814,6 +21917,10 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateHandoffBrief,
     closeoutReadinessSummary
   });
+  const steadyStateDutyActionLinks = buildDeveloperOpsSteadyStateDutyActionLinksPayload({
+    scope,
+    steadyStateDutyBoard
+  });
   if (steadyStateOperationalReview?.reviewDownload) {
     const dedupeKey = steadyStateOperationalReview.reviewDownload.key
       || steadyStateOperationalReview.reviewDownload.href
@@ -21878,6 +21985,22 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       });
     }
   }
+  if (steadyStateDutyActionLinks?.actionLinksDownload) {
+    const dedupeKey = steadyStateDutyActionLinks.actionLinksDownload.key
+      || steadyStateDutyActionLinks.actionLinksDownload.href
+      || steadyStateDutyActionLinks.actionLinksDownload.fileName;
+    if (dedupeKey && !seenRecommendedDownloads.has(dedupeKey)) {
+      seenRecommendedDownloads.add(dedupeKey);
+      recommendedDownloads.push({
+        key: steadyStateDutyActionLinks.actionLinksDownload.key || null,
+        label: steadyStateDutyActionLinks.actionLinksDownload.label || steadyStateDutyActionLinks.actionLinksDownload.title || steadyStateDutyActionLinks.actionLinksDownload.key || null,
+        fileName: steadyStateDutyActionLinks.actionLinksDownload.fileName || null,
+        format: steadyStateDutyActionLinks.actionLinksDownload.format || null,
+        href: steadyStateDutyActionLinks.actionLinksDownload.href || null,
+        source: steadyStateDutyActionLinks.actionLinksDownload.source || null
+      });
+    }
+  }
   if (
     steadyStateOperationalReview?.monitoringReady === true
     && steadyStateOperationalReview.reviewDownload?.fileName
@@ -21901,6 +22024,12 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     && steadyStateDutyBoard.boardDownload?.fileName
   ) {
     nextSteps.push(`Open steady-state duty board: ${steadyStateDutyBoard.boardDownload.fileName}.`);
+  }
+  if (
+    steadyStateDutyActionLinks?.readyForDuty === true
+    && steadyStateDutyActionLinks.actionLinksDownload?.fileName
+  ) {
+    nextSteps.push(`Open duty action links: ${steadyStateDutyActionLinks.actionLinksDownload.fileName}.`);
   }
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
@@ -21987,6 +22116,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateExceptionDigest,
     steadyStateHandoffBrief,
     steadyStateDutyBoard,
+    steadyStateDutyActionLinks,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -24612,6 +24742,54 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
   }
 }
 
+function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = null, {
+  title = "Steady-State Duty Action Links:"
+} = {}) {
+  if (!actionLinks || typeof actionLinks !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${actionLinks.status || "-"}`
+    + ` | readyForDuty=${actionLinks.readyForDuty === true}`
+    + ` | actionCount=${actionLinks.actionCount ?? 0}`
+    + ` | workspace=${actionLinks.workspaceLinkCount ?? 0}`
+    + ` | control=${actionLinks.controlLinkCount ?? 0}`
+    + ` | download=${actionLinks.downloadLinkCount ?? 0}`
+  );
+  lines.push(
+    `- actionLinksDownload=${actionLinks.actionLinksDownload?.fileName || "-"}`
+    + ` | format=${actionLinks.actionLinksDownload?.format || "-"}`
+    + ` | href=${actionLinks.actionLinksDownload?.href || "-"}`
+  );
+  if (actionLinks.primaryAction) {
+    lines.push(
+      `- primaryAction=${actionLinks.primaryAction.label || actionLinks.primaryAction.key || "-"}`
+      + ` | type=${actionLinks.primaryAction.type || "-"}`
+      + ` | href=${actionLinks.primaryAction.href || "-"}`
+    );
+  }
+  const appendLinks = (label, items = []) => {
+    if (!Array.isArray(items) || !items.length) {
+      return;
+    }
+    lines.push(`- ${label}:`);
+    for (const item of items) {
+      lines.push(
+        `  - ${item.label || item.key || "-"}`
+        + ` | priority=${item.priority || "-"}`
+        + ` | source=${item.source || "-"}`
+        + ` | href=${item.href || "-"}`
+        + (item.fileName ? ` | file=${item.fileName}` : "")
+        + (item.format ? ` | format=${item.format}` : "")
+      );
+    }
+  };
+  appendLinks("workspaceLinks", actionLinks.workspaceLinks);
+  appendLinks("controlLinks", actionLinks.controlLinks);
+  appendLinks("downloadLinks", actionLinks.downloadLinks);
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -24930,6 +25108,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (steadyStateDutyBoard) {
       lines.push("");
       appendDeveloperOpsSteadyStateDutyBoardLines(lines, steadyStateDutyBoard);
+    }
+    const steadyStateDutyActionLinks = initialLaunchOpsReadiness.steadyStateDutyActionLinks || null;
+    if (steadyStateDutyActionLinks) {
+      lines.push("");
+      appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, steadyStateDutyActionLinks);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -25438,6 +25621,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     appendDeveloperOpsSteadyStateDutyBoardLines(lines, steadyStateDutyBoard);
     lines.push("");
   }
+  const steadyStateDutyActionLinks = readiness.steadyStateDutyActionLinks || null;
+  if (steadyStateDutyActionLinks) {
+    appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, steadyStateDutyActionLinks);
+    lines.push("");
+  }
   const formatGateDownloadText = (item = {}) => {
     const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
       ? item.recommendedDownload
@@ -25741,6 +25929,55 @@ function buildDeveloperOpsSteadyStateDutyBoardText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const actionLinks = readiness.steadyStateDutyActionLinks || buildDeveloperOpsSteadyStateDutyActionLinksPayload({
+    scope,
+    steadyStateDutyBoard: readiness.steadyStateDutyBoard || null
+  });
+  const lines = [
+    "RockSolid Developer Ops Steady-State Duty Action Links",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${actionLinks?.projectCode || scope.productCode || "-"}`,
+    `Channel: ${actionLinks?.channel || scope.channel || "stable"}`,
+    `Status: ${String(actionLinks?.status || "unknown").toUpperCase()}`,
+    `Ready For Duty: ${actionLinks?.readyForDuty === true ? "yes" : "no"}`,
+    `Summary: ${actionLinks?.summary || "-"}`,
+    ""
+  ];
+  if (!actionLinks) {
+    lines.push("No steady-state duty action links are available for this scoped Ops snapshot yet.");
+    return lines.join("\n");
+  }
+  appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks, {
+    title: "Action Link Summary:"
+  });
+  const appendSection = (title, items = []) => {
+    lines.push("");
+    lines.push(`${title}:`);
+    if (Array.isArray(items) && items.length) {
+      for (const item of items) {
+        lines.push(`- ${item.label || item.key || "-"} | priority=${item.priority || "-"} | source=${item.source || "-"} | href=${item.href || "-"}${item.fileName ? ` | file=${item.fileName}` : ""}${item.format ? ` | format=${item.format}` : ""}`);
+      }
+    } else {
+      lines.push("- none");
+    }
+  };
+  appendSection("Workspace Links", actionLinks.workspaceLinks);
+  appendSection("Download Links", actionLinks.downloadLinks);
+  appendSection("Control Links", actionLinks.controlLinks);
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -25935,6 +26172,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "steady-state-exception-digest.txt",
     "steady-state-handoff-brief.txt",
     "steady-state-duty-board.txt",
+    "steady-state-duty-action-links.txt",
     "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
     "csv/accounts.csv",
@@ -25964,6 +26202,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Steady-State Exception Digest: ${String(readiness.steadyStateExceptionDigest?.status || "-").toUpperCase()} | queue=${readiness.steadyStateExceptionDigest?.queueSummary?.total ?? 0} | file=${readiness.steadyStateExceptionDigest?.digestDownload?.fileName || "-"}`,
     `Steady-State Handoff Brief: ${String(readiness.steadyStateHandoffBrief?.status || "-").toUpperCase()} | ready=${readiness.steadyStateHandoffBrief?.handoffReady === true ? "yes" : "no"} | file=${readiness.steadyStateHandoffBrief?.handoffDownload?.fileName || "-"}`,
     `Steady-State Duty Board: ${String(readiness.steadyStateDutyBoard?.status || "-").toUpperCase()} | ready=${readiness.steadyStateDutyBoard?.readyForDuty === true ? "yes" : "no"} | file=${readiness.steadyStateDutyBoard?.boardDownload?.fileName || "-"}`,
+    `Steady-State Duty Action Links: ${String(readiness.steadyStateDutyActionLinks?.status || "-").toUpperCase()} | actions=${readiness.steadyStateDutyActionLinks?.actionCount ?? 0} | file=${readiness.steadyStateDutyActionLinks?.actionLinksDownload?.fileName || "-"}`,
     ""
   ];
 
@@ -26155,6 +26394,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use steady-state-exception-digest.txt for the current exception queue, focus users, focus devices, and next operator controls.");
   lines.push("- Use steady-state-handoff-brief.txt as the single operator-facing handoff cover sheet.");
   lines.push("- Use steady-state-duty-board.txt as the active duty board with quick actions and handoff assets.");
+  lines.push("- Use steady-state-duty-action-links.txt to jump from duty board actions to workspace, control, and download links.");
   lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
@@ -26413,6 +26653,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "steady-state-duty-board.txt",
       body: buildDeveloperOpsSteadyStateDutyBoardText(payload)
+    },
+    {
+      path: "steady-state-duty-action-links.txt",
+      body: buildDeveloperOpsSteadyStateDutyActionLinksText(payload)
     },
     {
       path: "launch-mainline-handoff-routes.txt",
@@ -27136,7 +27380,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -27251,6 +27495,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-steady-state-duty-board.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsSteadyStateDutyBoardText(payload)
+    };
+  }
+
+  if (normalizedFormat === "steady-state-duty-action-links") {
+    return {
+      fileName: "developer-ops-steady-state-duty-action-links.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsSteadyStateDutyActionLinksText(payload)
     };
   }
 

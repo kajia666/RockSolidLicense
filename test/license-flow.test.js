@@ -16430,6 +16430,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:/);
 
+    const steadyStateDutyActionLinks = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateDutyActionLinks;
+    assert.ok(steadyStateDutyActionLinks);
+    assert.equal(steadyStateDutyActionLinks.status, "active");
+    assert.equal(steadyStateDutyActionLinks.readyForDuty, true);
+    assert.equal(steadyStateDutyActionLinks.projectCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(steadyStateDutyActionLinks.actionCount, steadyStateDutyBoard.quickActions.length);
+    assert.match(steadyStateDutyActionLinks.actionLinksDownload.href, /format=steady-state-duty-action-links/);
+    assert.ok(steadyStateDutyActionLinks.workspaceLinks.some((item) => /\/developer\/ops/.test(item.href || "")));
+    assert.ok(steadyStateDutyActionLinks.downloadLinks.some((item) => item.format === "steady-state-duty-board"));
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Action Links:/);
+    assert.match(steadyStateSnapshot.summaryText, /actionCount=\d+/);
+
+    const steadyStateDutyActionLinksDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=steady-state-duty-action-links",
+      ownerSession.token
+    );
+    assert.equal(steadyStateDutyActionLinksDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(steadyStateDutyActionLinksDownload.contentDisposition || "", /developer-ops-steady-state-duty-action-links\.txt/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /RockSolid Developer Ops Steady-State Duty Action Links/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /Ready For Duty: yes/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /Workspace Links:/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /Download Links:/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /Control Links:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

@@ -16634,9 +16634,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsShiftActionPlan.actionCount, launchOperationsShiftActionPlan.operatorActions.length);
     assert.ok(launchOperationsShiftActionPlan.actionCount >= 4);
     assert.equal(launchOperationsShiftActionPlan.primaryAction.key, "download_launch_operations_daily_brief");
+    assert.equal(launchOperationsShiftActionPlan.executionPlanCount, launchOperationsShiftActionPlan.operatorActions.length);
+    assert.ok(launchOperationsShiftActionPlan.readyExecutionPlanCount >= 3);
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.status, "ready");
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.mode, "download");
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.method, "GET");
+    assert.match(launchOperationsShiftActionPlan.primaryAction.executionPlan.href, /format=launch-operations-daily-brief/);
     assert.match(launchOperationsShiftActionPlan.actionPlanDownload.href, /format=launch-operations-shift-action-plan/);
     assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_board"));
     assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_action_links"));
+    assert.ok(launchOperationsShiftActionPlan.operatorActions.every((item) => item.executionPlan?.operatorHint));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:/);
     assert.match(
       steadyStateDutyReceiptSnapshot.summaryText,
@@ -16653,6 +16660,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /RockSolid Developer Ops Launch Operations Shift Action Plan/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Primary Action:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Actions:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Execution Plans:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /mode=download/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:/);
 
     const forbiddenExport = await getJsonExpectError(
@@ -20614,6 +20623,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Launch Operations Shift Action Plan/);
     assert.match(html, /download-export-launch-operations-shift-action-plan-btn/);
     assert.match(html, /launch-operations-shift-action-plan/);
+    assert.match(html, /executionPlan/);
+    assert.match(html, /Execution Plans/);
     assert.match(html, /lastSteadyStateDutyPlanResult/);
     assert.match(html, /buildSteadyStateDutyPlanResult/);
     assert.match(html, /renderLastSteadyStateDutyPlanResult/);

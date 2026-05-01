@@ -22214,6 +22214,45 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
   const attentionCount = Number(dailyBrief.attentionCount ?? steadyStateExceptionDigest?.attentionCount ?? steadyStateDutyBoard?.attentionCount ?? 0);
   const followUpCount = Number(dailyBrief.followUpCount ?? (Array.isArray(followUpQueue) ? followUpQueue.length : 0));
   const operatorActions = [];
+  const buildShiftExecutionPlan = ({
+    key = "",
+    label = "",
+    kind = "review",
+    status = "ready",
+    href = "",
+    fileName = "",
+    format = "",
+    source = "",
+    summary = "",
+    confirmation = ""
+  } = {}) => {
+    const mode = kind === "download"
+      ? "download"
+      : kind === "workspace"
+        ? "open_workspace"
+        : "review";
+    const hasHref = Boolean(String(href || "").trim());
+    return {
+      status: hasHref || mode === "review" ? "ready" : "pending",
+      mode,
+      method: hasHref ? "GET" : null,
+      href: href || null,
+      fileName: fileName || null,
+      format: format || null,
+      source: source || null,
+      prefill: compactRouteParams({
+        productCode,
+        channel,
+        actionKey: key,
+        actionLabel: label,
+        actionSource: source,
+        actionStatus: status
+      }),
+      confirmationLabel: label || key || "Confirm shift action",
+      operatorHint: confirmation || summary || "Complete this shift action and record the result in the operator note.",
+      receiptHint: `Record ${key || "shift_action"} in the launch operations shift note before handoff.`
+    };
+  };
   const pushOperatorAction = ({
     key = "",
     label = "",
@@ -22225,12 +22264,27 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     format = "",
     source = "",
     summary = "",
-    confirmation = ""
+    confirmation = "",
+    executionPlan = null
   } = {}) => {
     const resolvedKey = String(key || label || "").trim();
     if (!resolvedKey || operatorActions.some((item) => item.key === resolvedKey)) {
       return;
     }
+    const resolvedExecutionPlan = executionPlan && typeof executionPlan === "object"
+      ? executionPlan
+      : buildShiftExecutionPlan({
+          key: resolvedKey,
+          label: label || resolvedKey,
+          kind,
+          status,
+          href,
+          fileName,
+          format,
+          source,
+          summary,
+          confirmation
+        });
     operatorActions.push({
       key: resolvedKey,
       label: label || resolvedKey,
@@ -22242,7 +22296,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       format: format || null,
       source: source || null,
       summary: summary || "",
-      confirmation: confirmation || ""
+      confirmation: confirmation || "",
+      executionPlan: resolvedExecutionPlan
     });
   };
   pushOperatorAction({
@@ -22370,6 +22425,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     nextReviewAction: dailyBrief.nextReviewAction || null,
     primaryAction: operatorActions[0] || null,
     actionCount: operatorActions.length,
+    executionPlanCount: operatorActions.filter((item) => item.executionPlan).length,
+    readyExecutionPlanCount: operatorActions.filter((item) => item.executionPlan?.status === "ready").length,
     operatorActions,
     actionPlanDownload,
     supportingDownloads,
@@ -25879,6 +25936,7 @@ function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = nu
     + ` | status=${plan.status || "-"}`
     + ` | primary=${plan.primaryAction?.key || "-"}`
     + ` | actions=${plan.actionCount ?? 0}`
+    + ` | executionPlans=${plan.executionPlanCount ?? 0}`
     + ` | queue=${plan.queueTotal ?? 0}`
     + ` | attention=${plan.attentionCount ?? 0}`
   );
@@ -27653,6 +27711,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     `- dutyBoard=${actionPlan?.dutyBoardStatus || "-"}`
     + ` | dutyActionLinks=${actionPlan?.dutyActionLinksStatus || "-"}`
     + ` | actions=${actionPlan?.actionCount ?? 0}`
+    + ` | executionPlans=${actionPlan?.executionPlanCount ?? 0}`
     + ` | followUps=${actionPlan?.followUpCount ?? 0}`
   );
   lines.push("");
@@ -27671,6 +27730,24 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
       if (item.summary || item.confirmation) {
         lines.push(`  - summary=${item.summary || "-"} | confirmation=${item.confirmation || "-"}`);
       }
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Execution Plans:");
+  if (actions.some((item) => item.executionPlan)) {
+    for (const item of actions.filter((entry) => entry.executionPlan)) {
+      const plan = item.executionPlan || {};
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | mode=${plan.mode || "-"}`
+        + ` | status=${plan.status || "-"}`
+        + ` | method=${plan.method || "-"}`
+        + ` | file=${plan.fileName || "-"}`
+        + ` | href=${plan.href || "-"}`
+      );
+      lines.push(`  - confirmation=${plan.confirmationLabel || "-"} | hint=${plan.operatorHint || "-"}`);
     }
   } else {
     lines.push("- none");

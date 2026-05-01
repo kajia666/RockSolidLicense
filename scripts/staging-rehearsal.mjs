@@ -1505,6 +1505,11 @@ function buildReceiptVisibilitySummaryDownloads(options) {
       operation: "record_post_launch_ops_sweep",
       downloadKey: "launch_smoke_summary",
       format: "summary"
+    }),
+    launchOpsOverviewStatus: buildRoute(options.baseUrl, "/api/developer/ops/export/download", {
+      productCode: options.productCode,
+      format: "launch-operations-overview-status",
+      limit: "20"
     })
   };
 }
@@ -1659,7 +1664,7 @@ function buildStagingOperatorChecklist(result) {
       label: "Verify receipt visibility",
       status: "operator_review",
       downloads: result.nextCommands?.receiptVisibilitySummaries || null,
-      summary: "Verify Launch Review and Launch Smoke receipt-visibility summaries after evidence is recorded."
+      summary: "Verify Launch Review, Launch Smoke, and Launch Ops overview receipt-visibility summaries after evidence is recorded."
     }
   ];
 }
@@ -2485,7 +2490,7 @@ function buildStagingExecutionRunbook(result) {
       downloads: result.nextCommands?.receiptVisibilitySummaries || null,
       closeoutKey: "receipt_visibility_review",
       artifactPath: ledgerRowsByKey.get("receipt_visibility_review")?.artifactPath || null,
-      summary: "Verify Launch Mainline, Launch Review, Launch Smoke, and Developer Ops receipt visibility."
+      summary: "Verify Launch Mainline, Launch Review, Launch Smoke, Developer Ops receipt visibility, and the Launch Ops overview status."
     },
     {
       key: "backfill_filled_closeout_input",
@@ -3844,7 +3849,8 @@ function renderReceiptVisibilitySummaries(downloads) {
   }
   return [
     `- Launch Review summary: \`${downloads.launchReviewSummary}\``,
-    `- Launch Smoke Kit summary: \`${downloads.launchSmokeSummary}\``
+    `- Launch Smoke Kit summary: \`${downloads.launchSmokeSummary}\``,
+    `- Launch Ops Overview Status: \`${downloads.launchOpsOverviewStatus}\``
   ].join("\n");
 }
 
@@ -4105,6 +4111,7 @@ function renderStagingResultBackfillSummary(summary) {
     `- Evidence endpoint: ${summary.evidenceEndpoint || "-"}`,
     `- Launch Review visibility: ${summary.receiptVisibilityDownloads?.launchReviewSummary || "-"}`,
     `- Launch Smoke visibility: ${summary.receiptVisibilityDownloads?.launchSmokeSummary || "-"}`,
+    `- Launch Ops overview status: ${summary.receiptVisibilityDownloads?.launchOpsOverviewStatus || "-"}`,
     `- Operator note: ${summary.operatorNote || "-"}`
   ].join("\n");
 }
@@ -4124,6 +4131,7 @@ function renderStagingAcceptanceCloseout(closeout) {
     `- Evidence endpoint: ${closeout.destinations?.evidenceEndpoint || "-"}`,
     `- Launch Review visibility: ${closeout.destinations?.receiptVisibilityDownloads?.launchReviewSummary || "-"}`,
     `- Launch Smoke visibility: ${closeout.destinations?.receiptVisibilityDownloads?.launchSmokeSummary || "-"}`,
+    `- Launch Ops overview status: ${closeout.destinations?.receiptVisibilityDownloads?.launchOpsOverviewStatus || "-"}`,
     `- Next action: ${closeout.nextAction || "-"}`,
     `- Operator note: ${closeout.operatorNote || "-"}`
   ];
@@ -4147,6 +4155,7 @@ function renderStagingAcceptanceCloseout(closeout) {
       if (check.downloads) {
         lines.push(`    - launchReviewVisibility: ${check.downloads.launchReviewSummary || "-"}`);
         lines.push(`    - launchSmokeVisibility: ${check.downloads.launchSmokeSummary || "-"}`);
+        lines.push(`    - launchOpsOverviewStatus: ${check.downloads.launchOpsOverviewStatus || "-"}`);
       }
       lines.push(`    - expectedEvidence: ${check.expectedEvidence || "-"}`);
     }
@@ -5198,6 +5207,7 @@ function writeResult(result, json) {
     console.log(result.environmentReadiness?.nextAction || "");
     console.log(result.nextCommands.receiptVisibilitySummaries?.launchReviewSummary || "");
     console.log(result.nextCommands.receiptVisibilitySummaries?.launchSmokeSummary || "");
+    console.log(result.nextCommands.receiptVisibilitySummaries?.launchOpsOverviewStatus || "");
     return;
   }
 

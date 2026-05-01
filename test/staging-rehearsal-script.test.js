@@ -90,7 +90,8 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.match(output.nextCommands.launchMainline, /\/developer\/launch-mainline\?productCode=PILOT_ALPHA&channel=stable/);
   assert.deepEqual(output.nextCommands.receiptVisibilitySummaries, {
     launchReviewSummary: "https://staging.example.com/api/developer/launch-review/download?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary",
-    launchSmokeSummary: "https://staging.example.com/api/developer/launch-smoke-kit/download?productCode=PILOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary"
+    launchSmokeSummary: "https://staging.example.com/api/developer/launch-smoke-kit/download?productCode=PILOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary",
+    launchOpsOverviewStatus: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&format=launch-operations-overview-status&limit=20"
   });
   assert.deepEqual(output.evidenceOrder.slice(0, 3), [
     "Record Launch Rehearsal Run",
@@ -207,6 +208,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "record_recovery_drill",
     "record_backup_verification"
   ]);
+  assert.equal(
+    output.operatorChecklist[8].downloads.launchOpsOverviewStatus,
+    "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&format=launch-operations-overview-status&limit=20"
+  );
   assert.doesNotMatch(JSON.stringify(output.operatorChecklist), /StrongAdmin123!|StrongDeveloper123!/);
   assert.equal(output.operatorExecutionPlan.status, "ready_for_staging_execution");
   assert.equal(output.operatorExecutionPlan.willModifyData, false);
@@ -967,6 +972,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.stagingAcceptanceCloseout.destinations.developerOps, output.resultBackfillSummary.destinations.developerOps);
   assert.equal(output.stagingAcceptanceCloseout.destinations.evidenceEndpoint, output.evidenceActionPlan.endpoint);
   assert.deepEqual(output.stagingAcceptanceCloseout.destinations.receiptVisibilityDownloads, output.nextCommands.receiptVisibilitySummaries);
+  assert.equal(
+    output.stagingAcceptanceCloseout.acceptanceChecks.find((item) => item.key === "receipt_visibility_review").downloads.launchOpsOverviewStatus,
+    output.nextCommands.receiptVisibilitySummaries.launchOpsOverviewStatus
+  );
   assert.deepEqual(
     output.stagingAcceptanceCloseout.evidenceOperations.slice(0, 3),
     [
@@ -1458,6 +1467,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Receipt Visibility Summary Downloads/);
     assert.match(handoff, /Launch Review summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`/);
     assert.match(handoff, /Launch Smoke Kit summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-smoke-kit\/download\?productCode=PILOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`/);
+    assert.match(handoff, /Launch Ops Overview Status: `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=launch-operations-overview-status&limit=20`/);
     assert.match(handoff, /\/api\/developer\/launch-mainline\/action/);
     assert.match(handoff, /record_launch_rehearsal_run/);
     assert.match(handoff, /Record Launch Stabilization Review/);

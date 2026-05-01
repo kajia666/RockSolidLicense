@@ -16591,6 +16591,39 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /steady_state_duty_plan_receipt/);
     assert.match(launchOperationsHandoffDownload.body, /Next Review:/);
 
+    const launchOperationsDailyBrief = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsDailyBrief;
+    assert.ok(launchOperationsDailyBrief);
+    assert.equal(launchOperationsDailyBrief.version, "developer-ops-launch-operations-daily-brief/v1");
+    assert.equal(launchOperationsDailyBrief.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(launchOperationsDailyBrief.channel, "stable");
+    assert.equal(launchOperationsDailyBrief.status, launchOperationsHandoffSummary.status);
+    assert.equal(launchOperationsDailyBrief.handoffSummaryStatus, launchOperationsHandoffSummary.status);
+    assert.equal(launchOperationsDailyBrief.evidenceChainStatus, launchOperationsEvidenceChain.status);
+    assert.equal(launchOperationsDailyBrief.evidenceCompletedStageCount, launchOperationsEvidenceChain.completedStageCount);
+    assert.equal(launchOperationsDailyBrief.evidenceRequiredStageCount, launchOperationsEvidenceChain.requiredStageCount);
+    assert.equal(launchOperationsDailyBrief.nextReviewAction.key, launchOperationsHandoffSummary.nextReviewAction.key);
+    assert.ok(Array.isArray(launchOperationsDailyBrief.dailyChecklist));
+    assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => item.key === "launch_operations_handoff_summary"));
+    assert.match(launchOperationsDailyBrief.briefDownload.href, /format=launch-operations-daily-brief/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:/);
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      new RegExp(`dailyBrief=.*nextReview=${launchOperationsDailyBrief.nextReviewAction.key}`)
+    );
+
+    const launchOperationsDailyBriefDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=launch-operations-daily-brief",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsDailyBriefDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchOperationsDailyBriefDownload.contentDisposition || "", /developer-ops-launch-operations-daily-brief\.txt/);
+    assert.match(launchOperationsDailyBriefDownload.body, /RockSolid Developer Ops Launch Operations Daily Brief/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Next Review:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Daily Checklist:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -20540,6 +20573,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Launch Operations Handoff Summary/);
     assert.match(html, /download-export-launch-operations-handoff-btn/);
     assert.match(html, /launch-operations-handoff-summary/);
+    assert.match(html, /launchOperationsDailyBrief/);
+    assert.match(html, /renderLaunchOperationsDailyBrief/);
+    assert.match(html, /Launch Operations Daily Brief/);
+    assert.match(html, /download-export-launch-operations-daily-brief-btn/);
+    assert.match(html, /launch-operations-daily-brief/);
     assert.match(html, /lastSteadyStateDutyPlanResult/);
     assert.match(html, /buildSteadyStateDutyPlanResult/);
     assert.match(html, /renderLastSteadyStateDutyPlanResult/);

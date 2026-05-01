@@ -21794,6 +21794,117 @@ function buildDeveloperOpsInitialLaunchOperatorActionReceipts(latestLaunchReceip
     .slice(0, Math.max(1, Number(limit || 5)));
 }
 
+function buildDeveloperOpsLaunchOperationsEvidenceChain({
+  scope = {},
+  latestReceipt = null,
+  firstWaveHandoffConfirmation = null,
+  stabilizationHandoffConfirmation = null,
+  latestSteadyStateDutyPlanReceipt = null
+} = {}) {
+  const productCode = scope.productCode
+    || latestSteadyStateDutyPlanReceipt?.productCode
+    || latestReceipt?.productCode
+    || stabilizationHandoffConfirmation?.productCode
+    || firstWaveHandoffConfirmation?.productCode
+    || null;
+  const channel = latestSteadyStateDutyPlanReceipt?.channel
+    || latestReceipt?.channel
+    || stabilizationHandoffConfirmation?.channel
+    || firstWaveHandoffConfirmation?.channel
+    || scope.channel
+    || "stable";
+  const stageSource = (status, item = null) => ({
+    status,
+    auditLogId: item?.auditLogId || null,
+    eventType: item?.eventType || null,
+    productCode: item?.productCode || productCode,
+    channel: item?.channel || channel,
+    recordedAt: item?.recordedAt || item?.confirmedAt || item?.createdAt || item?.handoffGeneratedAt || null
+  });
+  const stages = [
+    {
+      key: "launch_mainline_receipt",
+      label: "Launch Mainline Receipt",
+      required: true,
+      ...stageSource(latestReceipt?.auditLogId ? "recorded" : "missing", latestReceipt),
+      operation: latestReceipt?.operation || null,
+      action: latestReceipt?.operation || null,
+      fileName: latestReceipt?.handoffFileName || null
+    },
+    {
+      key: "first_wave_handoff_confirmation",
+      label: "First-Wave Handoff Confirmation",
+      required: true,
+      ...stageSource(firstWaveHandoffConfirmation?.auditLogId ? (firstWaveHandoffConfirmation.status || "confirmed") : "missing", firstWaveHandoffConfirmation),
+      action: firstWaveHandoffConfirmation?.decision || null,
+      fileName: firstWaveHandoffConfirmation?.handoffFileName || null
+    },
+    {
+      key: "stabilization_handoff_confirmation",
+      label: "Stabilization Handoff Confirmation",
+      required: true,
+      ...stageSource(stabilizationHandoffConfirmation?.auditLogId ? (stabilizationHandoffConfirmation.status || "confirmed") : "missing", stabilizationHandoffConfirmation),
+      action: stabilizationHandoffConfirmation?.decision || null,
+      fileName: stabilizationHandoffConfirmation?.handoffFileName || null
+    },
+    {
+      key: "steady_state_duty_plan_receipt",
+      label: "Steady-State Duty Plan Receipt",
+      required: true,
+      ...stageSource(latestSteadyStateDutyPlanReceipt?.auditLogId ? (latestSteadyStateDutyPlanReceipt.status || "recorded") : "missing", latestSteadyStateDutyPlanReceipt),
+      action: latestSteadyStateDutyPlanReceipt?.action || null,
+      intent: latestSteadyStateDutyPlanReceipt?.intent || null,
+      planKind: latestSteadyStateDutyPlanReceipt?.planKind || null,
+      planMode: latestSteadyStateDutyPlanReceipt?.planMode || null,
+      fileName: latestSteadyStateDutyPlanReceipt?.fileName || null,
+      format: latestSteadyStateDutyPlanReceipt?.format || null
+    }
+  ];
+  const completedStages = stages.filter((item) => item.auditLogId && item.status !== "missing");
+  const missingStages = stages.filter((item) => item.required && (!item.auditLogId || item.status === "missing"));
+  const latestStage = completedStages
+    .slice()
+    .sort((left, right) => snapshotDateMs(right.recordedAt) - snapshotDateMs(left.recordedAt))[0] || null;
+  const nextMissingStage = missingStages[0] || null;
+  return {
+    version: "developer-ops-launch-operations-evidence-chain/v1",
+    status: missingStages.length ? "partial" : "complete",
+    productCode,
+    channel,
+    requiredStageCount: stages.length,
+    completedStageCount: completedStages.length,
+    missingStageCount: missingStages.length,
+    complete: missingStages.length === 0,
+    stages,
+    completedStages: completedStages.map((item) => item.key),
+    missingStages: missingStages.map((item) => item.key),
+    latestStage: latestStage
+      ? {
+          key: latestStage.key,
+          label: latestStage.label,
+          status: latestStage.status,
+          auditLogId: latestStage.auditLogId,
+          recordedAt: latestStage.recordedAt
+        }
+      : null,
+    nextReviewAction: nextMissingStage
+      ? {
+          key: `review_${nextMissingStage.key}`,
+          stageKey: nextMissingStage.key,
+          label: `Review ${nextMissingStage.label}`,
+          status: "review",
+          summary: `${nextMissingStage.label} evidence is not recorded in the current Ops snapshot.`
+        }
+      : {
+          key: "monitor_steady_state_evidence",
+          stageKey: latestStage?.key || null,
+          label: "Monitor steady-state evidence",
+          status: "ready",
+          summary: "All tracked launch operations evidence stages are recorded."
+        }
+  };
+}
+
 function buildDeveloperOpsInitialLaunchStabilizationHandoff({
   status = "not_started",
   latestReceipt = null,
@@ -22155,6 +22266,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     scope,
     steadyStateDutyBoard
   });
+  const launchOperationsEvidenceChain = buildDeveloperOpsLaunchOperationsEvidenceChain({
+    scope,
+    latestReceipt,
+    firstWaveHandoffConfirmation,
+    stabilizationHandoffConfirmation,
+    latestSteadyStateDutyPlanReceipt
+  });
   if (steadyStateOperationalReview?.reviewDownload) {
     const dedupeKey = steadyStateOperationalReview.reviewDownload.key
       || steadyStateOperationalReview.reviewDownload.href
@@ -22352,6 +22470,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateDutyBoard,
     steadyStateDutyActionLinks,
     latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    launchOperationsEvidenceChain,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -25074,6 +25193,37 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
   appendExecutionPlans("executionPlans", actionLinks.controlIntents);
 }
 
+function appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, chain = null, {
+  title = "Launch Operations Evidence Chain:"
+} = {}) {
+  if (!chain || typeof chain !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${chain.status || "-"}`
+    + ` | complete=${chain.complete === true}`
+    + ` | completed=${chain.completedStageCount ?? 0}/${chain.requiredStageCount ?? 0}`
+    + ` | latest=${chain.latestStage?.key || "-"}`
+  );
+  const stages = Array.isArray(chain.stages) ? chain.stages : [];
+  for (const item of stages) {
+    lines.push(
+      `- ${item.key || "-"}=${item.status || "-"}`
+      + ` | audit=${item.auditLogId || "-"}`
+      + ` | action=${item.action || item.operation || "-"}`
+      + ` | file=${item.fileName || item.format || "-"}`
+    );
+  }
+  if (chain.nextReviewAction) {
+    lines.push(
+      `- nextReview=${chain.nextReviewAction.key || "-"}`
+      + ` | stage=${chain.nextReviewAction.stageKey || "-"}`
+      + ` | summary=${chain.nextReviewAction.summary || "-"}`
+    );
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -25410,6 +25560,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
         + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
       );
+    }
+    const launchOperationsEvidenceChain = initialLaunchOpsReadiness.launchOperationsEvidenceChain || null;
+    if (launchOperationsEvidenceChain) {
+      lines.push("");
+      appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, launchOperationsEvidenceChain);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -25934,6 +26089,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
       + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
     );
+    lines.push("");
+  }
+  const launchOperationsEvidenceChain = readiness.launchOperationsEvidenceChain || null;
+  if (launchOperationsEvidenceChain) {
+    appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, launchOperationsEvidenceChain);
     lines.push("");
   }
   const formatGateDownloadText = (item = {}) => {

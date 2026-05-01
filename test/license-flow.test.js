@@ -16532,8 +16532,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.latestSteadyStateDutyPlanReceipt.auditLogId,
       steadyStateDutyPlanReceipt.auditLogId
     );
+    const launchOperationsEvidenceChain = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsEvidenceChain;
+    assert.ok(launchOperationsEvidenceChain);
+    assert.equal(launchOperationsEvidenceChain.version, "developer-ops-launch-operations-evidence-chain/v1");
+    assert.equal(launchOperationsEvidenceChain.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(launchOperationsEvidenceChain.channel, "stable");
+    assert.equal(launchOperationsEvidenceChain.requiredStageCount, 4);
+    assert.ok(launchOperationsEvidenceChain.completedStageCount >= 3);
+    assert.ok(Array.isArray(launchOperationsEvidenceChain.stages));
+    const evidenceStageByKey = Object.fromEntries(
+      launchOperationsEvidenceChain.stages.map((item) => [item.key, item])
+    );
+    assert.equal(evidenceStageByKey.launch_mainline_receipt.status, "recorded");
+    assert.ok(evidenceStageByKey.launch_mainline_receipt.auditLogId);
+    assert.ok(evidenceStageByKey.first_wave_handoff_confirmation);
+    assert.equal(evidenceStageByKey.stabilization_handoff_confirmation.status, "confirmed");
+    assert.equal(evidenceStageByKey.steady_state_duty_plan_receipt.status, "recorded");
+    assert.equal(evidenceStageByKey.steady_state_duty_plan_receipt.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(evidenceStageByKey.steady_state_duty_plan_receipt.action, "download");
+    assert.equal(launchOperationsEvidenceChain.latestStage.key, "steady_state_duty_plan_receipt");
+    assert.ok(launchOperationsEvidenceChain.nextReviewAction);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`audit=${steadyStateDutyPlanReceipt.auditLogId}`));
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /steady_state_duty_plan_receipt=recorded/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
@@ -20475,6 +20497,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-duty-plan-index/);
     assert.match(html, /handleSteadyStateDutyPlanAction/);
     assert.match(html, /recordSteadyStateDutyPlanReceipt/);
+    assert.match(html, /launchOperationsEvidenceChain/);
+    assert.match(html, /renderLaunchOperationsEvidenceChain/);
+    assert.match(html, /Launch Operations Evidence Chain/);
+    assert.match(html, /data-launch-operations-evidence-chain/);
     assert.match(html, /lastSteadyStateDutyPlanResult/);
     assert.match(html, /buildSteadyStateDutyPlanResult/);
     assert.match(html, /renderLastSteadyStateDutyPlanResult/);

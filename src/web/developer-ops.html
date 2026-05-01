@@ -149,6 +149,7 @@
             <button class="secondary" id="download-export-stabilization-handoff-btn">Download Stabilization Handoff</button>
             <button class="secondary" id="download-export-steady-state-review-btn">Download Steady-State Review</button>
             <button class="secondary" id="download-export-exception-digest-btn">Download Exception Digest</button>
+            <button class="secondary" id="download-export-handoff-brief-btn">Download Handoff Brief</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
@@ -4843,6 +4844,65 @@
         `;
       }
 
+      function renderSteadyStateHandoffBrief(initialLaunchOpsReadiness = {}) {
+        const brief = initialLaunchOpsReadiness?.steadyStateHandoffBrief || null;
+        if (!brief || typeof brief !== "object") {
+          return "";
+        }
+        const status = String(brief.status || "unknown").toLowerCase();
+        const statusClass = brief.handoffReady === true ? "ok" : "warning";
+        const details = [
+          `handoffReady=${brief.handoffReady === true ? "yes" : "no"}`,
+          `monitoring=${brief.monitoringReady === true ? "yes" : "no"}`,
+          `exceptions=${brief.exceptionMonitoringReady === true ? "yes" : "no"}`,
+          `queue=${esc(brief.queueStatus || "-")}`,
+          `queueTotal=${esc(brief.queueTotal ?? 0)}`,
+          `attention=${esc(brief.attentionCount ?? 0)}`,
+          `closeout=${esc(brief.closeoutStatus || "-")}`
+        ].join(" | ");
+        const downloadSet = Array.isArray(brief.downloadSet) ? brief.downloadSet : [];
+        const operatorActions = Array.isArray(brief.operatorActions) ? brief.operatorActions : [];
+        const latestReceipt = brief.latestReceipt && typeof brief.latestReceipt === "object"
+          ? brief.latestReceipt
+          : null;
+        const receiptDetails = latestReceipt
+          ? [
+              `operation=${esc(latestReceipt.operationLabel || latestReceipt.operation || "-")}`,
+              `handoff=${esc(latestReceipt.handoffFileName || "-")}`,
+              `audit=${esc(latestReceipt.auditLogId || "-")}`,
+              `at=${esc(formatTime(latestReceipt.createdAt))}`
+            ].join(" | ")
+          : "";
+        return `
+          <div class="snapshot-recap steady-state-handoff-brief" data-steady-state-handoff-brief="${esc(status)}">
+            <div class="snapshot-recap-head">
+              <strong>Steady-State Handoff Brief</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(brief.summary || "Operator-facing steady-state handoff cover sheet.")}</div>
+            <div class="hint">${details}</div>
+            <div class="snapshot-recap">
+              <strong>Handoff Download</strong>
+              <div class="hint">file=${esc(brief.handoffDownload?.fileName || "-")} | format=${esc(brief.handoffDownload?.format || "-")} | href=${esc(brief.handoffDownload?.href || "-")}</div>
+            </div>
+            ${receiptDetails ? `
+              <div class="snapshot-recap">
+                <strong>Latest Receipt</strong>
+                <div class="hint">${receiptDetails}</div>
+              </div>
+            ` : ""}
+            <div class="snapshot-recap">
+              <strong>Download Set</strong>
+              <ul class="snapshot-list">${downloadSet.length ? downloadSet.map((item) => `<li><strong>${esc(item.role || item.key || "-")}</strong> ${esc(item.fileName || "-")} | ${esc(item.format || "-")} | ${esc(item.href || "-")}</li>`).join("") : "<li>No handoff downloads are attached.</li>"}</ul>
+            </div>
+            <div class="snapshot-recap">
+              <strong>Operator Handoff</strong>
+              <ul class="snapshot-list">${operatorActions.length ? operatorActions.map((item) => `<li>${esc(item)}</li>`).join("") : "<li>Open Developer Ops and attach the current review and exception digest.</li>"}</ul>
+            </div>
+          </div>
+        `;
+      }
+
       function renderOperationalExceptionSignals(initialLaunchOpsReadiness = {}) {
         const traceability = initialLaunchOpsReadiness?.traceability || {};
         const operationalExceptionEntry = initialLaunchOpsReadiness?.operationalExceptionEntry
@@ -5636,6 +5696,7 @@
           ${renderCloseoutReadinessSummary(initialLaunchOpsReadiness)}
           ${renderSteadyStateOperationalReview(initialLaunchOpsReadiness)}
           ${renderSteadyStateExceptionDigest(initialLaunchOpsReadiness)}
+          ${renderSteadyStateHandoffBrief(initialLaunchOpsReadiness)}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
@@ -6411,6 +6472,7 @@
       el("download-export-stabilization-handoff-btn").addEventListener("click", async () => { try { await handleExportDownload("stabilization-handoff", "developer-ops-stabilization-handoff.txt", "Stabilization handoff"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-steady-state-review-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-operational-review", "developer-ops-steady-state-operational-review.txt", "Steady-state operational review"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-exception-digest-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-exception-digest", "developer-ops-steady-state-exception-digest.txt", "Steady-state exception digest"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-handoff-brief-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-handoff-brief", "developer-ops-steady-state-handoff-brief.txt", "Steady-state handoff brief"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

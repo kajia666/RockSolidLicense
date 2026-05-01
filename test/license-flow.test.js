@@ -16380,6 +16380,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateExceptionDigestDownload.body, /Monitoring Ready: yes/);
     assert.match(steadyStateExceptionDigestDownload.body, /Exception Queue:/);
 
+    const steadyStateHandoffBrief = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateHandoffBrief;
+    assert.ok(steadyStateHandoffBrief);
+    assert.equal(steadyStateHandoffBrief.status, "ready_for_handoff");
+    assert.equal(steadyStateHandoffBrief.handoffReady, true);
+    assert.equal(steadyStateHandoffBrief.projectCode, "EXPORT_CLOSEOUT_READY");
+    assert.match(steadyStateHandoffBrief.handoffDownload.href, /format=steady-state-handoff-brief/);
+    assert.match(steadyStateHandoffBrief.reviewDownload.href, /format=steady-state-operational-review/);
+    assert.match(steadyStateHandoffBrief.exceptionDigestDownload.href, /format=steady-state-exception-digest/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Handoff Brief:/);
+    assert.match(steadyStateSnapshot.summaryText, /handoffReady=true/);
+
+    const steadyStateHandoffBriefDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=steady-state-handoff-brief",
+      ownerSession.token
+    );
+    assert.equal(steadyStateHandoffBriefDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(steadyStateHandoffBriefDownload.contentDisposition || "", /developer-ops-steady-state-handoff-brief\.txt/);
+    assert.match(steadyStateHandoffBriefDownload.body, /RockSolid Developer Ops Steady-State Handoff Brief/);
+    assert.match(steadyStateHandoffBriefDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
+    assert.match(steadyStateHandoffBriefDownload.body, /Handoff Ready: yes/);
+    assert.match(steadyStateHandoffBriefDownload.body, /Download Set:/);
+    assert.match(steadyStateHandoffBriefDownload.body, /Operator Handoff:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

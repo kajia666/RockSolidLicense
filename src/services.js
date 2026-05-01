@@ -20156,6 +20156,87 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
   };
 }
 
+function buildDeveloperOpsCloseoutReadinessSummaryPayload({
+  operationalExceptionCloseout = null,
+  launchDayWatchReceipt = null,
+  stabilizationStatusReceipt = null,
+  firstWaveConfirmationChain = null
+} = {}) {
+  if (
+    !operationalExceptionCloseout
+    && !launchDayWatchReceipt
+    && !stabilizationStatusReceipt
+    && !firstWaveConfirmationChain
+  ) {
+    return null;
+  }
+  const blockers = [];
+  const operationalExceptionStatus = operationalExceptionCloseout?.status || null;
+  const launchDayWatchStatus = launchDayWatchReceipt?.status || null;
+  const stabilizationStatus = stabilizationStatusReceipt?.status || null;
+  const firstWaveConfirmationStatus = firstWaveConfirmationChain?.status || null;
+  if (operationalExceptionCloseout && operationalExceptionCloseout.canClose !== true) {
+    blockers.push({
+      key: "operational_exception",
+      status: operationalExceptionStatus || "awaiting_resolution",
+      count: operationalExceptionCloseout.blockingReasonCount ?? 0,
+      summary: operationalExceptionCloseout.operatorHint
+        || "Operational exception criteria must be resolved before closeout."
+    });
+  }
+  if (launchDayWatchReceipt && launchDayWatchReceipt.status !== "checked_in") {
+    blockers.push({
+      key: "launch_day_watch",
+      status: launchDayWatchStatus || "unknown",
+      summary: launchDayWatchReceipt.summary || "Launch-day watch is not fully checked in."
+    });
+  }
+  if (stabilizationStatusReceipt && stabilizationStatusReceipt.status !== "ready_for_steady_state") {
+    blockers.push({
+      key: "stabilization_status",
+      status: stabilizationStatus || "unknown",
+      count: stabilizationStatusReceipt.followUpCount ?? 0,
+      summary: stabilizationStatusReceipt.summary || "Stabilization is not ready for steady-state monitoring yet."
+    });
+  }
+  if (firstWaveConfirmationChain && firstWaveConfirmationChain.allSegmentsConfirmed !== true) {
+    blockers.push({
+      key: "first_wave_confirmation_chain",
+      status: firstWaveConfirmationStatus || "unknown",
+      count: firstWaveConfirmationChain.segmentCount - firstWaveConfirmationChain.confirmedSegmentCount,
+      summary: firstWaveConfirmationChain.summary || "First-wave confirmation segments are not fully confirmed."
+    });
+  }
+  const closeoutReviewAction = operationalExceptionCloseout?.closeoutReviewAction || null;
+  const resolutionAction = operationalExceptionCloseout?.resolutionAction || null;
+  const closeoutReviewReady = closeoutReviewAction?.enabled === true;
+  const canClose = blockers.length === 0 && (!operationalExceptionCloseout || operationalExceptionCloseout.canClose === true);
+  const nextAction = closeoutReviewReady ? closeoutReviewAction : (resolutionAction || closeoutReviewAction || null);
+  return {
+    version: "developer-ops-closeout-readiness-summary/v1",
+    status: canClose ? "ready_to_close" : "awaiting_resolution",
+    canClose,
+    closeoutReviewReady,
+    blockingCount: blockers.length,
+    blockers,
+    blockerKeys: blockers.map((item) => item.key),
+    operationalExceptionStatus,
+    launchDayWatchStatus,
+    stabilizationStatus,
+    firstWaveConfirmationStatus,
+    nextAction,
+    nextActionKey: nextAction?.key || null,
+    nextOperation: nextAction?.operation || null,
+    nextDownloadKey: nextAction?.downloadKey || null,
+    headline: canClose
+      ? "Closeout readiness is ready for reviewer sign-off"
+      : "Closeout readiness still has blockers to resolve",
+    operatorHint: canClose
+      ? "Record closeout review after reviewer sign-off."
+      : "Follow the next action before recording closeout review."
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
@@ -20177,6 +20258,13 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
   });
   const operationalExceptionCloseout = buildDeveloperOpsOperationalExceptionCloseoutPayload({
     operationalExceptionEntry
+  });
+  const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation);
+  const closeoutReadinessSummary = buildDeveloperOpsCloseoutReadinessSummaryPayload({
+    operationalExceptionCloseout,
+    launchDayWatchReceipt,
+    stabilizationStatusReceipt,
+    firstWaveConfirmationChain
   });
   return {
     latestLaunchReceipt: latestReceipt
@@ -20217,11 +20305,12 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
       : null,
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
-    firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation),
+    firstWaveConfirmationChain,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
     operationalExceptionEntry,
     operationalExceptionCloseout,
+    closeoutReadinessSummary,
     opsFiles: {
       handoffIndex: "handoff-index.txt",
       initialLaunchOpsReadiness: "initial-launch-ops-readiness.txt",
@@ -20821,6 +20910,12 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const operationalExceptionCloseout = buildDeveloperOpsOperationalExceptionCloseoutPayload({
     operationalExceptionEntry
   });
+  const closeoutReadinessSummary = buildDeveloperOpsCloseoutReadinessSummaryPayload({
+    operationalExceptionCloseout,
+    launchDayWatchReceipt,
+    stabilizationStatusReceipt,
+    firstWaveConfirmationChain
+  });
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
     stagingLaunchDutyArchive,
@@ -20901,6 +20996,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationStatusReceipt,
     operationalExceptionEntry,
     operationalExceptionCloseout,
+    closeoutReadinessSummary,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -23239,6 +23335,43 @@ function buildLaunchDutyReceiptVisibilitySummaryDownloads({
   };
 }
 
+function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary = null, {
+  title = "Closeout Readiness Summary:"
+} = {}) {
+  if (!closeoutReadinessSummary || typeof closeoutReadinessSummary !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${closeoutReadinessSummary.status || "-"}`
+    + ` | closeoutReady=${closeoutReadinessSummary.canClose === true}`
+    + ` | closeoutReviewReady=${closeoutReadinessSummary.closeoutReviewReady === true}`
+    + ` | blockers=${closeoutReadinessSummary.blockingCount ?? 0}`
+  );
+  lines.push(
+    `- operationalException=${closeoutReadinessSummary.operationalExceptionStatus || "-"}`
+    + ` | launchDayWatch=${closeoutReadinessSummary.launchDayWatchStatus || "-"}`
+    + ` | stabilization=${closeoutReadinessSummary.stabilizationStatus || "-"}`
+    + ` | firstWave=${closeoutReadinessSummary.firstWaveConfirmationStatus || "-"}`
+  );
+  lines.push(
+    `- nextAction=${closeoutReadinessSummary.nextActionKey || closeoutReadinessSummary.nextAction?.key || "-"}`
+    + ` | operation=${closeoutReadinessSummary.nextOperation || closeoutReadinessSummary.nextAction?.operation || "-"}`
+    + ` | download=${closeoutReadinessSummary.nextDownloadKey || closeoutReadinessSummary.nextAction?.downloadKey || "-"}`
+  );
+  if (Array.isArray(closeoutReadinessSummary.blockers) && closeoutReadinessSummary.blockers.length) {
+    lines.push("- blockers:");
+    for (const item of closeoutReadinessSummary.blockers) {
+      lines.push(
+        `  - ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | count=${item.count ?? "-"}`
+        + ` | ${item.summary || "-"}`
+      );
+    }
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -23530,6 +23663,13 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"}`
         + ` | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`
       );
+    }
+    const closeoutReadinessSummary = initialLaunchOpsReadiness.closeoutReadinessSummary
+      || initialLaunchOpsReadiness.traceability?.closeoutReadinessSummary
+      || null;
+    if (closeoutReadinessSummary) {
+      lines.push("");
+      appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -24011,6 +24151,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     }
     lines.push("");
   }
+  const closeoutReadinessSummary = readiness.closeoutReadinessSummary
+    || readiness.traceability?.closeoutReadinessSummary
+    || null;
+  if (closeoutReadinessSummary) {
+    appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary);
+    lines.push("");
+  }
   const formatGateDownloadText = (item = {}) => {
     const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
       ? item.recommendedDownload
@@ -24419,6 +24566,14 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"}`
       + ` | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`
     );
+  }
+
+  const closeoutReadinessSummary = readiness.closeoutReadinessSummary
+    || readiness.traceability?.closeoutReadinessSummary
+    || null;
+  if (closeoutReadinessSummary) {
+    lines.push("");
+    appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary);
   }
 
   const stagingArchive = readiness.stagingLaunchDutyArchive || null;

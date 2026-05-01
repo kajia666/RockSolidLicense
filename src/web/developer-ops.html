@@ -4576,6 +4576,91 @@
         `;
       }
 
+      function renderCloseoutReadinessSummary(initialLaunchOpsReadiness = {}) {
+        const traceability = initialLaunchOpsReadiness?.traceability || {};
+        const closeoutReadinessSummary = initialLaunchOpsReadiness?.closeoutReadinessSummary
+          || traceability.closeoutReadinessSummary
+          || null;
+        if (!closeoutReadinessSummary || typeof closeoutReadinessSummary !== "object") {
+          return "";
+        }
+        const blockers = Array.isArray(closeoutReadinessSummary.blockers)
+          ? closeoutReadinessSummary.blockers
+          : [];
+        const nextAction = closeoutReadinessSummary.nextAction && typeof closeoutReadinessSummary.nextAction === "object"
+          ? closeoutReadinessSummary.nextAction
+          : null;
+        const status = String(closeoutReadinessSummary.status || "unknown").toLowerCase();
+        const statusClass = closeoutReadinessSummary.canClose === true ? "ok" : "warning";
+        const summaryDetails = [
+          `closeoutReady=${closeoutReadinessSummary.canClose === true ? "yes" : "no"}`,
+          `reviewReady=${closeoutReadinessSummary.closeoutReviewReady === true ? "yes" : "no"}`,
+          `blockers=${esc(closeoutReadinessSummary.blockingCount ?? blockers.length)}`,
+          `exception=${esc(closeoutReadinessSummary.operationalExceptionStatus || "-")}`,
+          `watch=${esc(closeoutReadinessSummary.launchDayWatchStatus || "-")}`,
+          `stabilization=${esc(closeoutReadinessSummary.stabilizationStatus || "-")}`,
+          `firstWave=${esc(closeoutReadinessSummary.firstWaveConfirmationStatus || "-")}`
+        ].join(" | ");
+        const nextDetails = nextAction
+          ? [
+              `action=${esc(nextAction.key || closeoutReadinessSummary.nextActionKey || "-")}`,
+              `operation=${esc(nextAction.operation || closeoutReadinessSummary.nextOperation || "-")}`,
+              `download=${esc(nextAction.recommendedDownload?.fileName || nextAction.downloadKey || closeoutReadinessSummary.nextDownloadKey || "-")}`,
+              `endpoint=${esc(nextAction.endpoint || "-")}`
+            ].join(" | ")
+          : "No closeout next action is available.";
+        const buildCloseoutActionAttrs = (action = null, actionName = "") => {
+          if (!action || typeof action !== "object") {
+            return "";
+          }
+          const workspace = action.workspaceAction || {};
+          const download = action.recommendedDownload || {};
+          return [
+            `data-operational-exception-action="${esc(actionName)}"`,
+            action.productCode ? `data-product-code="${esc(action.productCode)}"` : "",
+            action.channel ? `data-channel="${esc(action.channel)}"` : "",
+            action.operation ? `data-operational-exception-operation="${esc(action.operation)}"` : "",
+            action.actionKey ? `data-operational-exception-action-key="${esc(action.actionKey)}"` : "",
+            action.downloadKey ? `data-operational-exception-download-key="${esc(action.downloadKey)}"` : "",
+            action.endpoint ? `data-operational-exception-endpoint="${esc(action.endpoint)}"` : "",
+            `data-operational-exception-enabled="${action.enabled === true ? "true" : "false"}"`,
+            workspace.href ? `data-operational-exception-workspace-href="${esc(workspace.href)}"` : "",
+            download.href ? `data-operational-exception-download-href="${esc(download.href)}"` : "",
+            download.fileName ? `data-operational-exception-download-file-name="${esc(download.fileName)}"` : ""
+          ].filter(Boolean).join(" ");
+        };
+        const isCloseoutReviewAction = nextAction?.key === "operational_exception_closeout_review"
+          || nextAction?.operation === "record_launch_closeout_review";
+        const openActionName = isCloseoutReviewAction ? "open-closeout-review" : "open-resolution";
+        const downloadActionName = isCloseoutReviewAction ? "download-closeout-handoff" : "download-resolution";
+        const blockerList = blockers.length
+          ? blockers.map((item) => `<li><strong>${esc(item.key || "-")}</strong> ${esc(item.status || "-")} | count=${esc(item.count ?? "-")} | ${esc(item.summary || "-")}</li>`).join("")
+          : "<li>No closeout blockers are open.</li>";
+        return `
+          <div class="snapshot-recap closeout-readiness-summary" data-closeout-readiness-summary="${esc(status)}">
+            <div class="snapshot-recap-head">
+              <strong>Closeout Readiness Summary</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(closeoutReadinessSummary.headline || "Initial launch closeout readiness summary.")}</div>
+            <div class="hint">${summaryDetails}</div>
+            <div class="snapshot-recap">
+              <strong>Closeout Next Action</strong>
+              <div class="hint">${nextDetails}</div>
+              ${nextAction ? `
+                <div class="snapshot-recap-actions">
+                  <button type="button" class="snapshot-inline-button" ${buildCloseoutActionAttrs(nextAction, openActionName)} ${nextAction.workspaceAction?.href ? "" : "disabled"}>Open Closeout Next Action</button>
+                  <button type="button" class="snapshot-inline-button" ${buildCloseoutActionAttrs(nextAction, downloadActionName)} ${(token && nextAction.recommendedDownload?.href) ? "" : "disabled"}>Download Closeout Next Handoff</button>
+                  ${isCloseoutReviewAction ? `<button type="button" class="snapshot-inline-button" ${buildCloseoutActionAttrs(nextAction, "record-closeout-review")} ${(token && nextAction.enabled === true) ? "" : "disabled"}>Record Closeout Review</button>` : ""}
+                </div>
+              ` : ""}
+            </div>
+            <ul class="snapshot-list">${blockerList}</ul>
+            ${closeoutReadinessSummary.operatorHint ? `<div class="hint">${esc(closeoutReadinessSummary.operatorHint)}</div>` : ""}
+          </div>
+        `;
+      }
+
       function renderOperationalExceptionSignals(initialLaunchOpsReadiness = {}) {
         const traceability = initialLaunchOpsReadiness?.traceability || {};
         const operationalExceptionEntry = initialLaunchOpsReadiness?.operationalExceptionEntry
@@ -5366,6 +5451,7 @@
           ${renderLastOperatorActionResult()}
           ${renderLastStabilizationHandoffResult()}
           ${renderLastOperationalExceptionActionResult()}
+          ${renderCloseoutReadinessSummary(initialLaunchOpsReadiness)}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}

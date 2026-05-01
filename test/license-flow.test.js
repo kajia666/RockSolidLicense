@@ -15492,6 +15492,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(operationalExceptionCloseout.closeoutReviewAction.body.productCode, "EXPORT_ALPHA");
     assert.match(operationalExceptionCloseout.closeoutReviewAction.workspaceAction.href, /operation=record_launch_closeout_review/);
     assert.match(operationalExceptionCloseout.closeoutReviewAction.recommendedDownload.href, /format=closeout-handoff/);
+    const closeoutReadinessSummary = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.closeoutReadinessSummary;
+    assert.ok(closeoutReadinessSummary);
+    assert.equal(closeoutReadinessSummary.version, "developer-ops-closeout-readiness-summary/v1");
+    assert.equal(closeoutReadinessSummary.status, "awaiting_resolution");
+    assert.equal(closeoutReadinessSummary.canClose, false);
+    assert.equal(closeoutReadinessSummary.operationalExceptionStatus, operationalExceptionCloseout.status);
+    assert.equal(
+      closeoutReadinessSummary.launchDayWatchStatus,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.status
+    );
+    assert.equal(closeoutReadinessSummary.stabilizationStatus, stabilizationStatusReceipt.status);
+    assert.equal(closeoutReadinessSummary.closeoutReviewReady, false);
+    assert.equal(closeoutReadinessSummary.nextAction.key, operationalExceptionCloseout.resolutionAction.key);
+    assert.ok(closeoutReadinessSummary.blockingCount >= 1);
+    assert.ok(closeoutReadinessSummary.blockers.some((item) => item.key === "operational_exception"));
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.operationalExceptionCloseout.status,
       "awaiting_resolution"
@@ -15509,6 +15524,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(confirmedOpsSnapshot.summaryText, /canClose=false/);
     assert.match(confirmedOpsSnapshot.summaryText, /resolutionAction=record_launch_rehearsal_run/);
     assert.match(confirmedOpsSnapshot.summaryText, /closeoutReview=record_launch_closeout_review/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Closeout Readiness Summary:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /closeoutReady=false/);
+    assert.match(confirmedOpsSnapshot.summaryText, /nextAction=operational_exception_resolution/);
 
     const handoffIndexDownload = await getText(
       baseUrl,
@@ -20054,6 +20072,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /operationalExceptionCloseout/);
     assert.match(html, /Operational Exception Closeout/);
     assert.match(html, /data-operational-exception-closeout/);
+    assert.match(html, /closeoutReadinessSummary/);
+    assert.match(html, /renderCloseoutReadinessSummary/);
+    assert.match(html, /Closeout Readiness Summary/);
+    assert.match(html, /data-closeout-readiness-summary/);
+    assert.match(html, /Closeout Next Action/);
     assert.match(html, /handleOperationalExceptionAction/);
     assert.match(html, /lastOperationalExceptionActionResult/);
     assert.match(html, /buildOperationalExceptionActionResult/);

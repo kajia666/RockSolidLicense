@@ -240,6 +240,7 @@
       let lastOperatorActionResult = null;
       let lastStabilizationHandoffResult = null;
       let lastOperationalExceptionActionResult = null;
+      let lastSteadyStateDutyPlanResult = null;
       let preparedFocus = null;
       let lastMutation = null;
       let routeReviewDisplayMode = "all";
@@ -3155,6 +3156,116 @@
         throw { code: "UNSUPPORTED_OPERATOR_ACTION", message: `Unsupported initial operator action: ${normalizedAction || "-"}` };
       }
 
+      function steadyStateDutyPlanParams(data = {}) {
+        const params = new URLSearchParams();
+        const href = String(data.dutyPlanHref || "").trim();
+        if (href) {
+          try {
+            const parsed = new URL(href, window.location.origin);
+            parsed.searchParams.forEach((value, key) => params.set(key, value));
+          } catch {
+            const queryIndex = href.indexOf("?");
+            if (queryIndex >= 0) {
+              const fallback = new URLSearchParams(href.slice(queryIndex + 1));
+              fallback.forEach((value, key) => params.set(key, value));
+            }
+          }
+        }
+        [
+          ["productCode", data.dutyPlanProductCode],
+          ["channel", data.dutyPlanChannel],
+          ["focusKind", data.dutyPlanFocusKind],
+          ["focusReason", data.dutyPlanFocusReason || data.dutyPlanRouteReason]
+        ].forEach(([key, value]) => {
+          if (String(value || "").trim() && !params.get(key)) {
+            params.set(key, String(value).trim());
+          }
+        });
+        return params;
+      }
+
+      function setDutyPlanInput(id, value, overwrite = true) {
+        const node = el(id);
+        const text = String(value || "").trim();
+        if (!node || !text) {
+          return;
+        }
+        if (!overwrite && String(node.value || "").trim()) {
+          return;
+        }
+        node.value = text;
+      }
+
+      function applySteadyStateDutyPlanPrefill(data = {}) {
+        const params = steadyStateDutyPlanParams(data);
+        const focusKind = String(params.get("focusKind") || data.dutyPlanTargetType || "").trim().toLowerCase();
+        const focusReason = String(params.get("focusReason") || params.get("routeReason") || data.dutyPlanLabel || "").trim();
+        setDutyPlanInput("filter-product-code", params.get("productCode"));
+        setDutyPlanInput("filter-username", params.get("username"));
+        setDutyPlanInput("filter-search", params.get("search"));
+        setDutyPlanInput("filter-event-type", params.get("eventType"));
+        setDutyPlanInput("filter-actor-type", params.get("actorType"));
+        setDutyPlanInput("filter-entity-type", params.get("entityType"));
+        setDutyPlanInput("account-id", params.get("focusAccountId"));
+        setDutyPlanInput("entitlement-id", params.get("focusEntitlementId"));
+        setDutyPlanInput("session-id", params.get("focusSessionId"));
+        setDutyPlanInput("binding-id", params.get("focusBindingId"));
+        setDutyPlanInput("block-id", params.get("focusBlockId"));
+        setDutyPlanInput("block-fingerprint", params.get("focusFingerprint"));
+        setDutyPlanInput("block-product-code", params.get("focusProductCode") || params.get("productCode"));
+        setDutyPlanInput("reason", focusReason);
+        return { focusKind, focusReason };
+      }
+
+      async function handleSteadyStateDutyPlanAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const href = String(data.dutyPlanHref || "").trim();
+        if (normalizedAction === "open") {
+          if (!href) {
+            throw { code: "MISSING_DUTY_PLAN_HREF", message: "This steady-state duty plan has no workspace link." };
+          }
+          const prefill = applySteadyStateDutyPlanPrefill(data);
+          lastSteadyStateDutyPlanResult = buildSteadyStateDutyPlanResult(normalizedAction, data, {
+            status: "routed",
+            message: "Opening the steady-state duty workspace.",
+            ...prefill
+          });
+          renderSnapshotOverview();
+          window.location.href = href;
+          return;
+        }
+        if (normalizedAction === "download") {
+          if (!href) {
+            throw { code: "MISSING_DUTY_PLAN_DOWNLOAD", message: "This steady-state duty plan has no download link." };
+          }
+          const result = await downloadApiFile(href, data.dutyPlanFileName || "developer-ops-duty-plan.txt");
+          lastExportDownload = result;
+          lastSteadyStateDutyPlanResult = buildSteadyStateDutyPlanResult(normalizedAction, data, {
+            status: "downloaded",
+            fileName: result.fileName,
+            message: `Downloaded ${result.fileName}.`
+          });
+          renderSnapshotOverview();
+          setStatus(`Steady-state duty asset downloaded: ${result.fileName}`);
+          setOutput(result);
+          return;
+        }
+        if (normalizedAction === "prefill") {
+          const prefill = applySteadyStateDutyPlanPrefill(data);
+          lastSteadyStateDutyPlanResult = buildSteadyStateDutyPlanResult(normalizedAction, data, {
+            status: "prefilled",
+            message: "Quick controls and scoped filters were prefilled from the steady-state duty plan.",
+            ...prefill
+          });
+          renderSnapshotOverview();
+          el("quick-controls-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          setStatus("Steady-state duty quick control prefilled.");
+          setOutput(lastSteadyStateDutyPlanResult);
+          return;
+        }
+        throw { code: "UNSUPPORTED_DUTY_PLAN_ACTION", message: `Unsupported steady-state duty plan action: ${normalizedAction || "-"}` };
+      }
+
       function applyRecommendedControl(control = {}) {
         const type = String(control?.type || "").trim();
         if (!type) {
@@ -4496,6 +4607,67 @@
         `;
       }
 
+      function buildSteadyStateDutyPlanResult(action = "", data = {}, extra = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        const label = normalizedAction === "open"
+          ? "Open Steady-State Duty Plan"
+          : normalizedAction === "download"
+            ? "Download Duty Plan Asset"
+            : normalizedAction === "prefill"
+              ? "Prefill Duty Quick Control"
+              : "Steady-State Duty Plan";
+        return {
+          action: normalizedAction,
+          label,
+          status: String(extra.status || "ready").trim().toLowerCase() || "ready",
+          message: String(extra.message || "").trim(),
+          productCode: String(data.dutyPlanProductCode || el("filter-product-code")?.value || requestedProductCode || "").trim(),
+          channel: String(data.dutyPlanChannel || requestedChannel || "stable").trim() || "stable",
+          intent: String(data.dutyPlanIntent || "").trim(),
+          kind: String(data.dutyPlanKind || "").trim(),
+          mode: String(data.dutyPlanMode || "").trim(),
+          targetType: String(data.dutyPlanTargetType || "").trim(),
+          href: String(data.dutyPlanHref || "").trim(),
+          fileName: String(extra.fileName || data.dutyPlanFileName || "").trim(),
+          format: String(data.dutyPlanFormat || "").trim(),
+          focusKind: String(extra.focusKind || data.dutyPlanFocusKind || "").trim(),
+          focusReason: String(extra.focusReason || data.dutyPlanFocusReason || "").trim(),
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      function renderLastSteadyStateDutyPlanResult() {
+        if (!lastSteadyStateDutyPlanResult) {
+          return "";
+        }
+        const item = lastSteadyStateDutyPlanResult;
+        const status = String(item.status || "ready").toLowerCase();
+        const statusClass = status === "downloaded" || status === "routed" || status === "prefilled" ? "ok" : "warning";
+        const details = [
+          item.productCode ? `project=${item.productCode}` : "",
+          item.channel ? `channel=${item.channel}` : "",
+          item.intent ? `intent=${item.intent}` : "",
+          item.kind || item.mode ? `plan=${item.kind || "-"}:${item.mode || "-"}` : "",
+          item.targetType ? `target=${item.targetType}` : "",
+          item.fileName || item.format ? `download=${item.fileName || item.format}` : "",
+          item.focusKind ? `focus=${item.focusKind}` : "",
+          item.href ? `href=${item.href}` : ""
+        ].filter(Boolean).join(" | ");
+        return `
+          <div class="snapshot-recap steady-state-duty-plan-confirmation" data-steady-state-duty-plan-confirmation="latest">
+            <div class="snapshot-recap-head">
+              <strong>Last Steady-State Duty Plan</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+              <span class="tag">${esc(formatTime(item.timestamp))}</span>
+            </div>
+            <div>${esc(item.label || "Steady-State Duty Plan")}</div>
+            ${item.message ? `<div class="hint">${esc(item.message)}</div>` : ""}
+            ${item.focusReason ? `<div class="hint">${esc(item.focusReason)}</div>` : ""}
+            <div class="hint">${esc(details || "Steady-state duty plan action captured for this Ops session.")}</div>
+          </div>
+        `;
+      }
+
       function renderOperatorActionReceipts(initialLaunchOpsReadiness = {}) {
         const entries = Array.isArray(initialLaunchOpsReadiness?.operatorActionReceipts)
           ? initialLaunchOpsReadiness.operatorActionReceipts.slice(0, 5)
@@ -4982,9 +5154,38 @@
         const renderIntents = (items = [], emptyText = "No control intents are attached.") => {
           return `<ul class="snapshot-list">${Array.isArray(items) && items.length ? items.map((item) => `<li><strong>${esc(item.intent || "-")}</strong> ${esc(item.label || item.key || "-")} | target=${esc(item.targetType || "-")} | method=${esc(item.method || "-")} | confirm=${item.requiresConfirmation === true ? "yes" : "no"} | plan=${esc(item.executionPlan?.kind || "-")}:${esc(item.executionPlan?.mode || "-")} | href=${esc(item.href || "-")}${item.fileName ? ` | file=${esc(item.fileName)}` : ""}${item.format ? ` | format=${esc(item.format)}` : ""}</li>`).join("") : `<li>${esc(emptyText)}</li>`}</ul>`;
         };
+        const buildPlanActionAttrs = (item = {}, plan = {}, index = 0) => {
+          const action = plan.mode === "download"
+            ? "download"
+            : plan.mode === "navigate"
+              ? "open"
+              : "prefill";
+          const prefill = plan.prefill && typeof plan.prefill === "object" ? plan.prefill : {};
+          return [
+            `data-steady-state-duty-plan-action="${esc(action)}"`,
+            `data-duty-plan-index="${esc(index)}"`,
+            `data-duty-plan-intent="${esc(item.intent || "")}"`,
+            `data-duty-plan-kind="${esc(plan.kind || "")}"`,
+            `data-duty-plan-mode="${esc(plan.mode || "")}"`,
+            `data-duty-plan-target-type="${esc(item.targetType || "")}"`,
+            `data-duty-plan-label="${esc(item.label || item.key || plan.confirmationLabel || "")}"`,
+            plan.href ? `data-duty-plan-href="${esc(plan.href)}"` : "",
+            plan.fileName ? `data-duty-plan-file-name="${esc(plan.fileName)}"` : "",
+            plan.format ? `data-duty-plan-format="${esc(plan.format)}"` : "",
+            prefill.productCode ? `data-duty-plan-product-code="${esc(prefill.productCode)}"` : "",
+            prefill.channel ? `data-duty-plan-channel="${esc(prefill.channel)}"` : "",
+            prefill.focusKind ? `data-duty-plan-focus-kind="${esc(prefill.focusKind)}"` : "",
+            prefill.focusReason ? `data-duty-plan-focus-reason="${esc(prefill.focusReason)}"` : "",
+            prefill.routeReason ? `data-duty-plan-route-reason="${esc(prefill.routeReason)}"` : ""
+          ].filter(Boolean).join(" ");
+        };
         const renderExecutionPlans = (items = [], emptyText = "No execution plans are attached.") => {
           const plans = Array.isArray(items) ? items.map((item) => item.executionPlan).filter(Boolean) : [];
-          return `<ul class="snapshot-list">${plans.length ? plans.map((plan) => `<li><strong>${esc(plan.kind || "-")}</strong> ${esc(plan.mode || "-")} | status=${esc(plan.status || "-")} | method=${esc(plan.method || "-")} | href=${esc(plan.href || "-")}${plan.fileName ? ` | file=${esc(plan.fileName)}` : ""}${plan.format ? ` | format=${esc(plan.format)}` : ""}${plan.confirmationLabel ? ` | confirm=${esc(plan.confirmationLabel)}` : ""}</li>`).join("") : `<li>${esc(emptyText)}</li>`}</ul>`;
+          return `<ul class="snapshot-list">${plans.length ? items.map((item, index) => {
+            const plan = item.executionPlan || {};
+            const actionLabel = plan.mode === "download" ? "Download Plan Asset" : plan.mode === "navigate" ? "Open Plan" : "Prefill Quick Control";
+            return `<li><strong>${esc(plan.kind || "-")}</strong> ${esc(plan.mode || "-")} | status=${esc(plan.status || "-")} | method=${esc(plan.method || "-")} | href=${esc(plan.href || "-")}${plan.fileName ? ` | file=${esc(plan.fileName)}` : ""}${plan.format ? ` | format=${esc(plan.format)}` : ""}${plan.confirmationLabel ? ` | confirm=${esc(plan.confirmationLabel)}` : ""}<div class="snapshot-recap-actions"><button type="button" class="snapshot-inline-button" ${buildPlanActionAttrs(item, plan, index)} ${plan.status === "ready" ? "" : "disabled"}>${esc(actionLabel)}</button></div></li>`;
+          }).join("") : `<li>${esc(emptyText)}</li>`}</ul>`;
         };
         return `
           <div class="snapshot-recap steady-state-duty-action-links" data-steady-state-duty-action-links="${esc(status)}">
@@ -5812,6 +6013,7 @@
           ${renderLastOperatorActionResult()}
           ${renderLastStabilizationHandoffResult()}
           ${renderLastOperationalExceptionActionResult()}
+          ${renderLastSteadyStateDutyPlanResult()}
           ${renderCloseoutReadinessSummary(initialLaunchOpsReadiness)}
           ${renderSteadyStateOperationalReview(initialLaunchOpsReadiness)}
           ${renderSteadyStateExceptionDigest(initialLaunchOpsReadiness)}
@@ -6007,6 +6209,14 @@
         bindRows("#snapshot-overview [data-launch-receipt-operator-action]", async (data) => {
           try {
             await handleLaunchReceiptOperatorAction(data.launchReceiptOperatorAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-steady-state-duty-plan-action]", async (data) => {
+          try {
+            await handleSteadyStateDutyPlanAction(data.steadyStateDutyPlanAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
@@ -6478,6 +6688,7 @@
         lastOperatorActionResult = null;
         lastStabilizationHandoffResult = null;
         lastOperationalExceptionActionResult = null;
+        lastSteadyStateDutyPlanResult = null;
         preparedFocus = null;
         lastMutation = null;
         routeReviewDisplayMode = (requestedReviewMode === "matched" || currentRequestedRouteReviewAction()) ? "matched" : "all";

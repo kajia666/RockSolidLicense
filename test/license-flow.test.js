@@ -20413,6 +20413,16 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Open Exception Workspace/);
     assert.match(html, /Download Exception Handoff/);
     assert.match(html, /Record Closeout Review/);
+    assert.match(html, /Steady-State Duty Action Links/);
+    assert.match(html, /Execution Plans/);
+    assert.match(html, /data-steady-state-duty-plan-action/);
+    assert.match(html, /data-duty-plan-index/);
+    assert.match(html, /handleSteadyStateDutyPlanAction/);
+    assert.match(html, /lastSteadyStateDutyPlanResult/);
+    assert.match(html, /buildSteadyStateDutyPlanResult/);
+    assert.match(html, /renderLastSteadyStateDutyPlanResult/);
+    assert.match(html, /Last Steady-State Duty Plan/);
+    assert.match(html, /steady-state-duty-plan-confirmation/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/download/);
   } finally {
     await app.close();

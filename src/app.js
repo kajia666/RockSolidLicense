@@ -1945,6 +1945,15 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/developer/ops/steady-state-duty-plan/receipt") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerRecordSteadyStateDutyPlanReceipt(getBearerToken(req), body)
+        });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/developer/ops/export/download") {
         const data = await services.developerExportOpsSnapshot(getBearerToken(req), {
           productCode: url.searchParams.get("productCode"),

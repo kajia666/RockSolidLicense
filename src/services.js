@@ -19083,6 +19083,93 @@ function buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs = [], limit 
     .slice(0, Math.max(1, Number(limit || 5)));
 }
 
+function buildSteadyStateDutyPlanReceiptPayload(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const recordedBy = item.recordedBy && typeof item.recordedBy === "object"
+    ? item.recordedBy
+    : metadata.recordedBy && typeof metadata.recordedBy === "object"
+      ? metadata.recordedBy
+      : {
+          actorType: item.actorType || item.actor_type || metadata.actorType || null,
+          actorScope: metadata.actorScope || metadata.actorType || null,
+          actorId: item.actorId || item.actor_id || metadata.actorId || null,
+          username: metadata.actorUsername || null,
+          role: metadata.actorRole || null
+        };
+  const recordedAt = item.recordedAt || metadata.recordedAt || item.createdAt || item.created_at || null;
+  return {
+    version: "developer-ops-steady-state-duty-plan-receipt/v1",
+    status: normalizeDeveloperOpsConfirmationToken(item.status || metadata.status, "recorded"),
+    productCode: item.productCode || metadata.productCode || null,
+    productId: item.productId || metadata.productId || item.entityId || item.entity_id || null,
+    channel: normalizeChannel(item.channel || metadata.channel, "stable"),
+    action: normalizeDeveloperOpsConfirmationToken(item.action || metadata.action, "unknown"),
+    intent: normalizeDeveloperOpsConfirmationToken(item.intent || metadata.intent, ""),
+    planKind: normalizeDeveloperOpsConfirmationToken(item.planKind || metadata.planKind, ""),
+    planMode: normalizeDeveloperOpsConfirmationToken(item.planMode || metadata.planMode, ""),
+    targetType: normalizeDeveloperOpsConfirmationToken(item.targetType || metadata.targetType, ""),
+    href: String(item.href ?? metadata.href ?? "").trim(),
+    fileName: String(item.fileName ?? metadata.fileName ?? "").trim(),
+    format: normalizeDeveloperOpsConfirmationToken(item.format || metadata.format, ""),
+    focusKind: normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, ""),
+    focusReason: String(item.focusReason ?? metadata.focusReason ?? "").trim(),
+    note: String(item.note ?? metadata.note ?? "").trim(),
+    recordedAt,
+    recordedBy,
+    auditLogId: item.auditLogId || item.id || null,
+    eventType: item.eventType || item.event_type || metadata.eventType || "developer.ops.steady-state-duty-plan.receipt",
+    entityType: item.entityType || item.entity_type || metadata.entityType || "developer_ops_steady_state_duty_plan",
+    createdAt: item.createdAt || item.created_at || recordedAt
+  };
+}
+
+function buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs = [], limit = 5) {
+  return auditLogs
+    .map((item) => {
+      const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+      const eventType = item?.eventType || item?.event_type || "";
+      const entityType = item?.entityType || item?.entity_type || "";
+      if (
+        eventType !== "developer.ops.steady-state-duty-plan.receipt"
+        && entityType !== "developer_ops_steady_state_duty_plan"
+      ) {
+        return null;
+      }
+      return buildSteadyStateDutyPlanReceiptPayload({
+        id: item.id || null,
+        eventType,
+        actorType: item.actorType || item.actor_type || null,
+        actorId: item.actorId || item.actor_id || null,
+        entityType,
+        entityId: item.entityId || item.entity_id || null,
+        metadata,
+        productCode: metadata.productCode || null,
+        productId: metadata.productId || item.entityId || item.entity_id || null,
+        channel: metadata.channel || "stable",
+        status: metadata.status || "recorded",
+        action: metadata.action || "recorded",
+        intent: metadata.intent || "",
+        planKind: metadata.planKind || "",
+        planMode: metadata.planMode || "",
+        targetType: metadata.targetType || "",
+        href: metadata.href || "",
+        fileName: metadata.fileName || "",
+        format: metadata.format || "",
+        focusKind: metadata.focusKind || "",
+        focusReason: metadata.focusReason || "",
+        note: metadata.note || "",
+        recordedAt: metadata.recordedAt || item.createdAt || item.created_at || null,
+        createdAt: item.createdAt || item.created_at || null
+      });
+    })
+    .filter(Boolean)
+    .sort((left, right) => snapshotDateMs(right.recordedAt || right.createdAt) - snapshotDateMs(left.recordedAt || left.createdAt))
+    .slice(0, Math.max(1, Number(limit || 5)));
+}
+
 function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 6) {
   const followUps = [];
   const pushFollowUp = (receipt = {}, stage = "", payload = {}) => {
@@ -21811,6 +21898,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const firstWaveHandoffConfirmations = Array.isArray(overview.latestFirstWaveHandoffConfirmations)
     ? overview.latestFirstWaveHandoffConfirmations
     : [];
+  const steadyStateDutyPlanReceipts = Array.isArray(overview.latestSteadyStateDutyPlanReceipts)
+    ? overview.latestSteadyStateDutyPlanReceipts
+    : [];
   const stabilizationHandoffConfirmation = stabilizationHandoffConfirmations.find((item) => {
     if (!item || typeof item !== "object") {
       return false;
@@ -21829,6 +21919,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     const channelMatches = !targetChannel || item.channel === targetChannel;
     return productMatches && channelMatches;
   }) || firstWaveHandoffConfirmations[0] || null;
+  const latestSteadyStateDutyPlanReceipt = steadyStateDutyPlanReceipts.find((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    const targetProductCode = latestReceipt?.productCode || scope.productCode || "";
+    const targetChannel = latestReceipt?.channel || scope.channel || item.channel || "stable";
+    const productMatches = !targetProductCode || item.productCode === targetProductCode;
+    const channelMatches = !targetChannel || item.channel === targetChannel;
+    return productMatches && channelMatches;
+  }) || steadyStateDutyPlanReceipts[0] || null;
   const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation);
   const operatorActionReceipts = buildDeveloperOpsInitialLaunchOperatorActionReceipts(overview.latestLaunchReceipts, 5);
   const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction
@@ -22251,6 +22351,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateHandoffBrief,
     steadyStateDutyBoard,
     steadyStateDutyActionLinks,
+    latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -24304,6 +24405,7 @@ function buildSnapshotOverview({
   const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5, scope.channel || null);
   const latestStabilizationHandoffConfirmations = buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs, 5);
   const latestFirstWaveHandoffConfirmations = buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs, 5);
+  const latestSteadyStateDutyPlanReceipts = buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs, 5);
   const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6);
   const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
   const queueSummary = buildSnapshotQueueSummary(recommendedQueue);
@@ -24365,6 +24467,10 @@ function buildSnapshotOverview({
     const latest = latestFirstWaveHandoffConfirmations[0];
     highlights.push(`Latest first-wave handoff confirmation: ${latest.status || "confirmed"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
   }
+  if (latestSteadyStateDutyPlanReceipts.length) {
+    const latest = latestSteadyStateDutyPlanReceipts[0];
+    highlights.push(`Latest steady-state duty plan receipt: ${latest.action || "recorded"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
+  }
   if (launchReceiptFollowUps.length) {
     highlights.push(`Launch receipt follow-ups: ${launchReceiptFollowUps.slice(0, 3).map((item) => `${item.title} for ${item.productCode || "-"}`).join(", ")}.`);
   }
@@ -24401,6 +24507,7 @@ function buildSnapshotOverview({
     latestLaunchReceipts,
     latestStabilizationHandoffConfirmations,
     latestFirstWaveHandoffConfirmations,
+    latestSteadyStateDutyPlanReceipts,
     launchReceiptFollowUps,
     queueSummary,
     recommendedQueue,
@@ -25291,6 +25398,19 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("");
       appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, steadyStateDutyActionLinks);
     }
+    const latestSteadyStateDutyPlanReceipt = initialLaunchOpsReadiness.latestSteadyStateDutyPlanReceipt || null;
+    if (latestSteadyStateDutyPlanReceipt) {
+      lines.push("");
+      lines.push("Steady-State Duty Plan Receipts:");
+      lines.push(
+        `- status=${latestSteadyStateDutyPlanReceipt.status || "-"}`
+        + ` | audit=${latestSteadyStateDutyPlanReceipt.auditLogId || "-"}`
+        + ` | action=${latestSteadyStateDutyPlanReceipt.action || "-"}`
+        + ` | intent=${latestSteadyStateDutyPlanReceipt.intent || "-"}`
+        + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
+        + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
+      );
+    }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
       for (const item of initialLaunchOpsReadiness.nextSteps) {
@@ -25801,6 +25921,19 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const steadyStateDutyActionLinks = readiness.steadyStateDutyActionLinks || null;
   if (steadyStateDutyActionLinks) {
     appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, steadyStateDutyActionLinks);
+    lines.push("");
+  }
+  const latestSteadyStateDutyPlanReceipt = readiness.latestSteadyStateDutyPlanReceipt || null;
+  if (latestSteadyStateDutyPlanReceipt) {
+    lines.push("Steady-State Duty Plan Receipts:");
+    lines.push(
+      `- status=${latestSteadyStateDutyPlanReceipt.status || "-"}`
+      + ` | audit=${latestSteadyStateDutyPlanReceipt.auditLogId || "-"}`
+      + ` | action=${latestSteadyStateDutyPlanReceipt.action || "-"}`
+      + ` | intent=${latestSteadyStateDutyPlanReceipt.intent || "-"}`
+      + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
+      + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
+    );
     lines.push("");
   }
   const formatGateDownloadText = (item = {}) => {
@@ -40213,6 +40346,110 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         traceability,
         auditLogId,
         message: `First-wave handoff confirmed for ${product.code} (${channel}).`
+      };
+    },
+
+    async developerRecordSteadyStateDutyPlanReceipt(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only record steady-state duty plan receipts for your assigned projects."
+      );
+      requireField(body, "productCode");
+
+      const productCode = readProductCodeInput(body);
+      const product = await requireDeveloperOwnedProductByCode(
+        db,
+        store,
+        session,
+        productCode,
+        "ops.write"
+      );
+      const channel = normalizeChannel(body.channel, "stable");
+      const action = normalizeDeveloperOpsConfirmationToken(body.action || body.dutyPlanAction, "recorded");
+      const intent = normalizeDeveloperOpsConfirmationToken(body.intent || body.dutyPlanIntent, "");
+      const planKind = normalizeDeveloperOpsConfirmationToken(body.planKind || body.kind || body.dutyPlanKind, "");
+      const planMode = normalizeDeveloperOpsConfirmationToken(body.planMode || body.mode || body.dutyPlanMode, "");
+      const targetType = normalizeDeveloperOpsConfirmationToken(body.targetType || body.dutyPlanTargetType, "");
+      const format = normalizeDeveloperOpsConfirmationToken(body.format || body.dutyPlanFormat, "");
+      const href = String(body.href ?? body.dutyPlanHref ?? "").trim().slice(0, 1000);
+      const rawFileName = String(body.fileName ?? body.dutyPlanFileName ?? "").trim();
+      const fileName = rawFileName
+        ? normalizeDeveloperOpsConfirmationFileName(rawFileName, rawFileName)
+        : "";
+      const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
+      const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
+      const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
+      const recordedAt = nowIso();
+      const recordedBy = {
+        actorType: session.actor_scope === "member" ? "developer_member" : "developer",
+        actorScope: session.actor_scope,
+        actorId: session.actor_id,
+        username: session.username,
+        role: session.member_role ?? "owner"
+      };
+      const traceability = {
+        eventType: "developer.ops.steady-state-duty-plan.receipt",
+        entityType: "developer_ops_steady_state_duty_plan",
+        route: "/api/developer/ops/export",
+        receiptRoute: "/api/developer/ops/steady-state-duty-plan/receipt",
+        downloadRoute: "/api/developer/ops/export/download"
+      };
+      const auditLogId = auditDeveloperSession(
+        db,
+        session,
+        traceability.eventType,
+        traceability.entityType,
+        product.id,
+        {
+          productCode: product.code,
+          productId: product.id,
+          channel,
+          status: "recorded",
+          action,
+          intent,
+          planKind,
+          planMode,
+          targetType,
+          href,
+          fileName,
+          format,
+          focusKind,
+          focusReason,
+          note,
+          recordedAt,
+          recordedBy,
+          receiptRoute: traceability.receiptRoute,
+          route: traceability.route,
+          downloadRoute: traceability.downloadRoute
+        }
+      );
+
+      return {
+        ...buildSteadyStateDutyPlanReceiptPayload({
+          auditLogId,
+          productCode: product.code,
+          productId: product.id,
+          channel,
+          status: "recorded",
+          action,
+          intent,
+          planKind,
+          planMode,
+          targetType,
+          href,
+          fileName,
+          format,
+          focusKind,
+          focusReason,
+          note,
+          recordedAt,
+          recordedBy
+        }),
+        traceability,
+        message: `Steady-state duty plan ${action || "action"} recorded for ${product.code} (${channel}).`
       };
     },
 

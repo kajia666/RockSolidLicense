@@ -16480,6 +16480,61 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /kind=workspace/);
     assert.match(steadyStateDutyActionLinksDownload.body, /mode=download/);
 
+    const steadyStateDutyDownloadIntent = steadyStateDutyActionLinks.controlIntents.find((item) => (
+      item.intent === "download_asset"
+      && item.executionPlan?.format === "steady-state-duty-board"
+    ));
+    assert.ok(steadyStateDutyDownloadIntent);
+    const steadyStateDutyPlanReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "download",
+        intent: steadyStateDutyDownloadIntent.intent,
+        planKind: steadyStateDutyDownloadIntent.executionPlan.kind,
+        planMode: steadyStateDutyDownloadIntent.executionPlan.mode,
+        targetType: steadyStateDutyDownloadIntent.targetType,
+        href: steadyStateDutyDownloadIntent.executionPlan.href,
+        fileName: steadyStateDutyDownloadIntent.executionPlan.fileName,
+        format: steadyStateDutyDownloadIntent.executionPlan.format,
+        note: "steady-state duty board downloaded during launch duty"
+      },
+      ownerSession.token
+    );
+    assert.equal(steadyStateDutyPlanReceipt.version, "developer-ops-steady-state-duty-plan-receipt/v1");
+    assert.equal(steadyStateDutyPlanReceipt.status, "recorded");
+    assert.equal(steadyStateDutyPlanReceipt.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(steadyStateDutyPlanReceipt.channel, "stable");
+    assert.equal(steadyStateDutyPlanReceipt.action, "download");
+    assert.equal(steadyStateDutyPlanReceipt.intent, "download_asset");
+    assert.equal(steadyStateDutyPlanReceipt.planKind, "download");
+    assert.equal(steadyStateDutyPlanReceipt.planMode, "download");
+    assert.equal(steadyStateDutyPlanReceipt.format, "steady-state-duty-board");
+    assert.ok(steadyStateDutyPlanReceipt.auditLogId);
+
+    const steadyStateDutyReceiptSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const latestSteadyStateDutyPlanReceipt = steadyStateDutyReceiptSnapshot.overview.latestSteadyStateDutyPlanReceipts?.[0];
+    assert.ok(latestSteadyStateDutyPlanReceipt);
+    assert.equal(latestSteadyStateDutyPlanReceipt.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(latestSteadyStateDutyPlanReceipt.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(latestSteadyStateDutyPlanReceipt.action, "download");
+    assert.equal(latestSteadyStateDutyPlanReceipt.intent, "download_asset");
+    assert.equal(latestSteadyStateDutyPlanReceipt.planKind, "download");
+    assert.equal(latestSteadyStateDutyPlanReceipt.planMode, "download");
+    assert.equal(latestSteadyStateDutyPlanReceipt.format, "steady-state-duty-board");
+    assert.equal(
+      steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.latestSteadyStateDutyPlanReceipt.auditLogId,
+      steadyStateDutyPlanReceipt.auditLogId
+    );
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`audit=${steadyStateDutyPlanReceipt.auditLogId}`));
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -20145,6 +20200,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations/);
     assert.match(html, /api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(html, /api\/developer\/ops\/stabilization-handoff\/confirm/);
+    assert.match(html, /api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(html, /Preview First-Wave Recommendations/);
     assert.match(html, /Download First-Wave Handoff/);
     assert.match(html, /Confirm First-Wave Handoff/);
@@ -20418,6 +20474,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-steady-state-duty-plan-action/);
     assert.match(html, /data-duty-plan-index/);
     assert.match(html, /handleSteadyStateDutyPlanAction/);
+    assert.match(html, /recordSteadyStateDutyPlanReceipt/);
     assert.match(html, /lastSteadyStateDutyPlanResult/);
     assert.match(html, /buildSteadyStateDutyPlanResult/);
     assert.match(html, /renderLastSteadyStateDutyPlanResult/);

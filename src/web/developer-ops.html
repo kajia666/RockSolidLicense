@@ -3217,6 +3217,32 @@
         return { focusKind, focusReason };
       }
 
+      async function recordSteadyStateDutyPlanReceipt(action = "", data = {}, extra = {}) {
+        const productCode = String(data.dutyPlanProductCode || el("filter-product-code")?.value || requestedProductCode || "").trim();
+        if (!productCode) {
+          throw { code: "MISSING_DUTY_PLAN_PROJECT", message: "Select or route a project before recording the steady-state duty plan receipt." };
+        }
+        const channel = String(data.dutyPlanChannel || requestedChannel || "stable").trim() || "stable";
+        return api("/api/developer/ops/steady-state-duty-plan/receipt", {
+          method: "POST",
+          body: {
+            productCode,
+            channel,
+            action,
+            intent: String(data.dutyPlanIntent || "").trim(),
+            planKind: String(data.dutyPlanKind || "").trim(),
+            planMode: String(data.dutyPlanMode || "").trim(),
+            targetType: String(data.dutyPlanTargetType || "").trim(),
+            href: String(extra.href || data.dutyPlanHref || "").trim(),
+            fileName: String(extra.fileName || data.dutyPlanFileName || "").trim(),
+            format: String(extra.format || data.dutyPlanFormat || "").trim(),
+            focusKind: String(extra.focusKind || data.dutyPlanFocusKind || "").trim(),
+            focusReason: String(extra.focusReason || data.dutyPlanFocusReason || data.dutyPlanLabel || "").trim(),
+            note: String(extra.note || `developer_ops_steady_state_duty_plan_${action || "recorded"}`).trim()
+          }
+        });
+      }
+
       async function handleSteadyStateDutyPlanAction(action = "", data = {}) {
         const normalizedAction = String(action || "").trim().toLowerCase();
         const href = String(data.dutyPlanHref || "").trim();
@@ -3225,9 +3251,16 @@
             throw { code: "MISSING_DUTY_PLAN_HREF", message: "This steady-state duty plan has no workspace link." };
           }
           const prefill = applySteadyStateDutyPlanPrefill(data);
+          const receipt = await recordSteadyStateDutyPlanReceipt(normalizedAction, data, {
+            ...prefill,
+            href,
+            note: "developer_ops_steady_state_duty_plan_opened"
+          });
           lastSteadyStateDutyPlanResult = buildSteadyStateDutyPlanResult(normalizedAction, data, {
             status: "routed",
             message: "Opening the steady-state duty workspace.",
+            auditLogId: receipt.auditLogId,
+            recordedAt: receipt.recordedAt,
             ...prefill
           });
           renderSnapshotOverview();
@@ -3240,27 +3273,43 @@
           }
           const result = await downloadApiFile(href, data.dutyPlanFileName || "developer-ops-duty-plan.txt");
           lastExportDownload = result;
+          const receipt = await recordSteadyStateDutyPlanReceipt(normalizedAction, data, {
+            href,
+            fileName: result.fileName,
+            note: "developer_ops_steady_state_duty_plan_downloaded"
+          });
           lastSteadyStateDutyPlanResult = buildSteadyStateDutyPlanResult(normalizedAction, data, {
             status: "downloaded",
+            auditLogId: receipt.auditLogId,
+            recordedAt: receipt.recordedAt,
             fileName: result.fileName,
             message: `Downloaded ${result.fileName}.`
           });
           renderSnapshotOverview();
           setStatus(`Steady-state duty asset downloaded: ${result.fileName}`);
-          setOutput(result);
+          setOutput({ download: result, receipt });
+          await refreshOps(false);
           return;
         }
         if (normalizedAction === "prefill") {
           const prefill = applySteadyStateDutyPlanPrefill(data);
+          const receipt = await recordSteadyStateDutyPlanReceipt(normalizedAction, data, {
+            ...prefill,
+            href,
+            note: "developer_ops_steady_state_duty_plan_prefilled"
+          });
           lastSteadyStateDutyPlanResult = buildSteadyStateDutyPlanResult(normalizedAction, data, {
             status: "prefilled",
             message: "Quick controls and scoped filters were prefilled from the steady-state duty plan.",
+            auditLogId: receipt.auditLogId,
+            recordedAt: receipt.recordedAt,
             ...prefill
           });
           renderSnapshotOverview();
           el("quick-controls-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          setStatus("Steady-state duty quick control prefilled.");
-          setOutput(lastSteadyStateDutyPlanResult);
+          setStatus(`Steady-state duty quick control prefilled: audit ${receipt.auditLogId || "-"}`);
+          setOutput({ ...lastSteadyStateDutyPlanResult, receipt });
+          await refreshOps(false);
           return;
         }
         throw { code: "UNSUPPORTED_DUTY_PLAN_ACTION", message: `Unsupported steady-state duty plan action: ${normalizedAction || "-"}` };
@@ -4632,6 +4681,8 @@
           format: String(data.dutyPlanFormat || "").trim(),
           focusKind: String(extra.focusKind || data.dutyPlanFocusKind || "").trim(),
           focusReason: String(extra.focusReason || data.dutyPlanFocusReason || "").trim(),
+          auditLogId: String(extra.auditLogId || "").trim(),
+          recordedAt: String(extra.recordedAt || "").trim(),
           timestamp: new Date().toISOString()
         };
       }
@@ -4642,7 +4693,7 @@
         }
         const item = lastSteadyStateDutyPlanResult;
         const status = String(item.status || "ready").toLowerCase();
-        const statusClass = status === "downloaded" || status === "routed" || status === "prefilled" ? "ok" : "warning";
+        const statusClass = status === "downloaded" || status === "routed" || status === "prefilled" || status === "recorded" ? "ok" : "warning";
         const details = [
           item.productCode ? `project=${item.productCode}` : "",
           item.channel ? `channel=${item.channel}` : "",
@@ -4650,6 +4701,8 @@
           item.kind || item.mode ? `plan=${item.kind || "-"}:${item.mode || "-"}` : "",
           item.targetType ? `target=${item.targetType}` : "",
           item.fileName || item.format ? `download=${item.fileName || item.format}` : "",
+          item.auditLogId ? `audit=${item.auditLogId}` : "",
+          item.recordedAt ? `recorded=${formatTime(item.recordedAt)}` : "",
           item.focusKind ? `focus=${item.focusKind}` : "",
           item.href ? `href=${item.href}` : ""
         ].filter(Boolean).join(" | ");

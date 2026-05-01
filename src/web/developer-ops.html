@@ -4432,7 +4432,9 @@
               : normalizedAction === "download-closeout-handoff"
                 ? "Download Closeout Handoff"
                 : normalizedAction === "record-closeout-review"
-                  ? "Record Closeout Review"
+                  ? String(data.operationalExceptionOperation || "").trim() === "record_launch_stabilization_review"
+                    ? "Record Stabilization Review"
+                    : "Record Closeout Review"
                   : "Operational Exception Action";
         return {
           action: normalizedAction,
@@ -4590,11 +4592,18 @@
         const nextAction = closeoutReadinessSummary.nextAction && typeof closeoutReadinessSummary.nextAction === "object"
           ? closeoutReadinessSummary.nextAction
           : null;
+        const recordedAction = closeoutReadinessSummary.recordedAction && typeof closeoutReadinessSummary.recordedAction === "object"
+          ? closeoutReadinessSummary.recordedAction
+          : null;
         const status = String(closeoutReadinessSummary.status || "unknown").toLowerCase();
         const statusClass = closeoutReadinessSummary.canClose === true ? "ok" : "warning";
         const summaryDetails = [
           `closeoutReady=${closeoutReadinessSummary.canClose === true ? "yes" : "no"}`,
           `reviewReady=${closeoutReadinessSummary.closeoutReviewReady === true ? "yes" : "no"}`,
+          `closeoutRecorded=${closeoutReadinessSummary.closeoutRecorded === true ? "yes" : "no"}`,
+          `stabilizationReady=${closeoutReadinessSummary.stabilizationReviewReady === true ? "yes" : "no"}`,
+          `stabilizationRecorded=${closeoutReadinessSummary.stabilizationReviewRecorded === true ? "yes" : "no"}`,
+          `steadyState=${closeoutReadinessSummary.steadyStateReady === true ? "ready" : "pending"}`,
           `blockers=${esc(closeoutReadinessSummary.blockingCount ?? blockers.length)}`,
           `exception=${esc(closeoutReadinessSummary.operationalExceptionStatus || "-")}`,
           `watch=${esc(closeoutReadinessSummary.launchDayWatchStatus || "-")}`,
@@ -4609,6 +4618,15 @@
               `endpoint=${esc(nextAction.endpoint || "-")}`
             ].join(" | ")
           : "No closeout next action is available.";
+        const recordedDetails = recordedAction
+          ? [
+              `operation=${esc(recordedAction.operation || "-")}`,
+              `evidence=${esc(recordedAction.evidenceKey || recordedAction.key || "-")}`,
+              `audit=${esc(recordedAction.auditLogId || "-")}`,
+              `at=${esc(formatTime(recordedAction.recordedAt))}`,
+              `handoff=${esc(recordedAction.handoffFileName || "-")}`
+            ].join(" | ")
+          : "";
         const buildCloseoutActionAttrs = (action = null, actionName = "") => {
           if (!action || typeof action !== "object") {
             return "";
@@ -4631,6 +4649,12 @@
         };
         const isCloseoutReviewAction = nextAction?.key === "operational_exception_closeout_review"
           || nextAction?.operation === "record_launch_closeout_review";
+        const isLaunchMainlineRecordAction = nextAction?.endpoint === "/api/developer/launch-mainline/action"
+          && String(nextAction?.method || "POST").toUpperCase() === "POST"
+          && Boolean(nextAction?.operation);
+        const recordActionLabel = nextAction?.operation === "record_launch_stabilization_review"
+          ? "Record Stabilization Review"
+          : "Record Closeout Review";
         const openActionName = isCloseoutReviewAction ? "open-closeout-review" : "open-resolution";
         const downloadActionName = isCloseoutReviewAction ? "download-closeout-handoff" : "download-resolution";
         const blockerList = blockers.length
@@ -4644,6 +4668,12 @@
             </div>
             <div class="hint">${esc(closeoutReadinessSummary.headline || "Initial launch closeout readiness summary.")}</div>
             <div class="hint">${summaryDetails}</div>
+            ${recordedAction ? `
+              <div class="snapshot-recap">
+                <strong>Recorded Closeout Evidence</strong>
+                <div class="hint">${recordedDetails}</div>
+              </div>
+            ` : ""}
             <div class="snapshot-recap">
               <strong>Closeout Next Action</strong>
               <div class="hint">${nextDetails}</div>
@@ -4651,7 +4681,7 @@
                 <div class="snapshot-recap-actions">
                   <button type="button" class="snapshot-inline-button" ${buildCloseoutActionAttrs(nextAction, openActionName)} ${nextAction.workspaceAction?.href ? "" : "disabled"}>Open Closeout Next Action</button>
                   <button type="button" class="snapshot-inline-button" ${buildCloseoutActionAttrs(nextAction, downloadActionName)} ${(token && nextAction.recommendedDownload?.href) ? "" : "disabled"}>Download Closeout Next Handoff</button>
-                  ${isCloseoutReviewAction ? `<button type="button" class="snapshot-inline-button" ${buildCloseoutActionAttrs(nextAction, "record-closeout-review")} ${(token && nextAction.enabled === true) ? "" : "disabled"}>Record Closeout Review</button>` : ""}
+                  ${isLaunchMainlineRecordAction ? `<button type="button" class="snapshot-inline-button" ${buildCloseoutActionAttrs(nextAction, "record-closeout-review")} ${(token && nextAction.enabled === true) ? "" : "disabled"}>${esc(recordActionLabel)}</button>` : ""}
                 </div>
               ` : ""}
             </div>

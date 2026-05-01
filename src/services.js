@@ -19809,6 +19809,13 @@ function isDeveloperOpsCloseoutReadinessFollowUp(item = null, {
   if (operation === "record_launch_closeout_review" || operation === "record_launch_stabilization_review") {
     return true;
   }
+  if (
+    stage === "first_launch_handoff"
+    && launchDayWatchStatus === "checked_in"
+    && stabilizationStatus === "ready_for_steady_state"
+  ) {
+    return true;
+  }
   return stage === "operational_readiness"
     && operation === "record_post_launch_ops_sweep"
     && launchDayWatchStatus === "checked_in"
@@ -20207,13 +20214,16 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
 }
 
 function buildDeveloperOpsCloseoutReadinessSummaryPayload({
+  scope = {},
+  latestReceipt = null,
   operationalExceptionCloseout = null,
   launchDayWatchReceipt = null,
   stabilizationStatusReceipt = null,
   firstWaveConfirmationChain = null
 } = {}) {
   if (
-    !operationalExceptionCloseout
+    !latestReceipt
+    && !operationalExceptionCloseout
     && !launchDayWatchReceipt
     && !stabilizationStatusReceipt
     && !firstWaveConfirmationChain
@@ -20225,7 +20235,13 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
   const launchDayWatchStatus = launchDayWatchReceipt?.status || null;
   const stabilizationStatus = stabilizationStatusReceipt?.status || null;
   const firstWaveConfirmationStatus = firstWaveConfirmationChain?.status || null;
-  if (operationalExceptionCloseout && operationalExceptionCloseout.canClose !== true) {
+  const latestOperation = String(latestReceipt?.operation || "").trim().toLowerCase();
+  const closeoutReviewRecorded = latestOperation === "record_launch_closeout_review"
+    || latestOperation === "record_launch_stabilization_review";
+  const stabilizationReviewRecorded = latestOperation === "record_launch_stabilization_review";
+  const closeoutRecorded = closeoutReviewRecorded;
+  const steadyStateReady = stabilizationReviewRecorded;
+  if (operationalExceptionCloseout && operationalExceptionCloseout.canClose !== true && !stabilizationReviewRecorded) {
     blockers.push({
       key: "operational_exception",
       status: operationalExceptionStatus || "awaiting_resolution",
@@ -20241,7 +20257,7 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
       summary: launchDayWatchReceipt.summary || "Launch-day watch is not fully checked in."
     });
   }
-  if (stabilizationStatusReceipt && stabilizationStatusReceipt.status !== "ready_for_steady_state") {
+  if (stabilizationStatusReceipt && stabilizationStatusReceipt.status !== "ready_for_steady_state" && !stabilizationReviewRecorded) {
     blockers.push({
       key: "stabilization_status",
       status: stabilizationStatus || "unknown",
@@ -20259,14 +20275,167 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
   }
   const closeoutReviewAction = operationalExceptionCloseout?.closeoutReviewAction || null;
   const resolutionAction = operationalExceptionCloseout?.resolutionAction || null;
-  const closeoutReviewReady = closeoutReviewAction?.enabled === true;
-  const canClose = blockers.length === 0 && (!operationalExceptionCloseout || operationalExceptionCloseout.canClose === true);
-  const nextAction = closeoutReviewReady ? closeoutReviewAction : (resolutionAction || closeoutReviewAction || null);
+  const productCode = operationalExceptionCloseout?.closeoutReviewAction?.productCode
+    || operationalExceptionCloseout?.resolutionAction?.productCode
+    || latestReceipt?.productCode
+    || scope.productCode
+    || null;
+  const channel = operationalExceptionCloseout?.closeoutReviewAction?.channel
+    || operationalExceptionCloseout?.resolutionAction?.channel
+    || latestReceipt?.channel
+    || scope.channel
+    || "stable";
+  const closeoutReviewReady = closeoutReviewAction?.enabled === true && !closeoutRecorded;
+  const operationalCloseoutSatisfied = !operationalExceptionCloseout
+    || operationalExceptionCloseout.canClose === true
+    || stabilizationReviewRecorded;
+  const canClose = blockers.length === 0 && operationalCloseoutSatisfied;
+  const buildLaunchEvidenceAction = ({
+    key = "",
+    label = "",
+    summary = "",
+    operation = "",
+    downloadKey = "",
+    fileName = "",
+    format = "summary",
+    routeTitle = "",
+    routeReason = ""
+  } = {}) => {
+    const params = {
+      productCode,
+      channel,
+      operation,
+      actionKey: key,
+      downloadKey,
+      routeTitle,
+      routeReason
+    };
+    return {
+      key,
+      label,
+      summary,
+      status: canClose ? "ready" : "blocked",
+      endpoint: "/api/developer/launch-mainline/action",
+      method: "POST",
+      enabled: Boolean(canClose && productCode),
+      productCode,
+      channel,
+      operation,
+      actionKey: key,
+      downloadKey,
+      body: {
+        productCode,
+        channel,
+        operation,
+        actionKey: key,
+        downloadKey
+      },
+      workspaceAction: productCode
+        ? createLaunchWorkflowWorkspaceShortcut(
+            "launch-mainline",
+            "summary",
+            label,
+            params
+          )
+        : null,
+      recommendedDownload: productCode
+        ? createLaunchMainlineDownloadShortcut(
+            label,
+            fileName,
+            format,
+            params
+          )
+        : null
+    };
+  };
+  const stabilizationReviewAction = buildLaunchEvidenceAction({
+    key: "operational_stabilization_review",
+    label: "Record Stabilization Review",
+    summary: "Record the Launch Mainline stabilization review after closeout is recorded.",
+    operation: "record_launch_stabilization_review",
+    downloadKey: "launch_mainline_stabilization_handoff",
+    fileName: "launch-mainline-stabilization-handoff.txt",
+    format: "stabilization-handoff",
+    routeTitle: "Record Stabilization Review",
+    routeReason: "Closeout review is recorded; complete stabilization review before steady-state handoff."
+  });
+  const steadyStateParams = compactRouteParams({
+    ...buildDeveloperOpsRouteReviewBaseDownloadParams(scope),
+    productCode: productCode || "",
+    channel,
+    routeTitle: "Monitor Steady-State Ops",
+    routeReason: "Closeout and stabilization reviews are recorded."
+  });
+  const steadyStateAction = {
+    key: "steady_state_monitoring",
+    label: "Monitor Steady-State Ops",
+    summary: "Closeout and stabilization reviews are recorded; continue monitoring the steady-state operations lane.",
+    status: "ready",
+    endpoint: "/api/developer/ops/export",
+    method: "GET",
+    enabled: Boolean(productCode),
+    productCode,
+    channel,
+    operation: "monitor_steady_state_ops",
+    actionKey: "steady_state_monitoring",
+    downloadKey: "ops_stabilization_handoff",
+    workspaceAction: productCode
+      ? createLaunchWorkflowWorkspaceShortcut(
+          "ops",
+          "snapshot",
+          "Open Steady-State Ops",
+          steadyStateParams
+        )
+      : null,
+    recommendedDownload: productCode
+      ? createLaunchWorkflowDownloadShortcut(
+          "ops_stabilization_handoff",
+          "developer-ops-stabilization-handoff.txt",
+          "Developer Ops stabilization handoff",
+          {
+            source: "developer-ops",
+            format: "stabilization-handoff",
+            params: steadyStateParams
+          }
+        )
+      : null
+  };
+  const recordedAction = closeoutRecorded
+    ? {
+        key: stabilizationReviewRecorded ? "launch_stabilization_review" : "launch_closeout_review",
+        operation: latestOperation,
+        evidenceKey: stabilizationReviewRecorded ? "launch_stabilization_review" : "launch_closeout_review",
+        auditLogId: latestReceipt?.auditLogId || null,
+        productCode,
+        channel,
+        handoffFileName: latestReceipt?.handoffFileName || null,
+        recordedAt: latestReceipt?.createdAt || latestReceipt?.handoffGeneratedAt || null
+      }
+    : null;
+  const nextAction = steadyStateReady && canClose
+    ? steadyStateAction
+    : closeoutRecorded && canClose
+      ? stabilizationReviewAction
+      : closeoutReviewReady
+        ? closeoutReviewAction
+        : (resolutionAction || closeoutReviewAction || null);
+  const status = steadyStateReady && canClose
+    ? "steady_state_ready"
+    : closeoutRecorded && canClose
+      ? "closeout_recorded"
+      : canClose
+        ? "ready_to_close"
+        : "awaiting_resolution";
   return {
     version: "developer-ops-closeout-readiness-summary/v1",
-    status: canClose ? "ready_to_close" : "awaiting_resolution",
+    status,
     canClose,
+    closeoutRecorded,
+    closeoutReviewRecorded,
     closeoutReviewReady,
+    stabilizationReviewReady: Boolean(closeoutRecorded && !stabilizationReviewRecorded && canClose),
+    stabilizationReviewRecorded,
+    steadyStateReady,
     blockingCount: blockers.length,
     blockers,
     blockerKeys: blockers.map((item) => item.key),
@@ -20274,20 +20443,30 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
     launchDayWatchStatus,
     stabilizationStatus,
     firstWaveConfirmationStatus,
+    recordedAction,
     nextAction,
     nextActionKey: nextAction?.key || null,
     nextOperation: nextAction?.operation || null,
     nextDownloadKey: nextAction?.downloadKey || null,
-    headline: canClose
+    headline: steadyStateReady && canClose
+      ? "Closeout and stabilization reviews are recorded"
+      : closeoutRecorded && canClose
+        ? "Closeout review is recorded; stabilization review is ready"
+        : canClose
       ? "Closeout readiness is ready for reviewer sign-off"
       : "Closeout readiness still has blockers to resolve",
-    operatorHint: canClose
+    operatorHint: steadyStateReady && canClose
+      ? "Keep Developer Ops in steady-state monitoring and hand off stabilization materials to the operator lane."
+      : closeoutRecorded && canClose
+        ? "Record the stabilization review to complete the first-wave closeout handoff."
+        : canClose
       ? "Record closeout review after reviewer sign-off."
       : "Follow the next action before recording closeout review."
   };
 }
 
 function buildDeveloperOpsInitialLaunchOpsTraceability({
+  scope = {},
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
   stabilizationHandoffConfirmation = null,
@@ -20311,6 +20490,8 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
   });
   const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation);
   const closeoutReadinessSummary = buildDeveloperOpsCloseoutReadinessSummaryPayload({
+    scope,
+    latestReceipt,
     operationalExceptionCloseout,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
@@ -20885,6 +21066,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     gate
   });
   const traceability = buildDeveloperOpsInitialLaunchOpsTraceability({
+    scope,
     latestReceipt,
     launchReceiptNextFollowUp,
     stabilizationHandoffConfirmation,
@@ -20961,6 +21143,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operationalExceptionEntry
   });
   const closeoutReadinessSummary = buildDeveloperOpsCloseoutReadinessSummaryPayload({
+    scope,
+    latestReceipt,
     operationalExceptionCloseout,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
@@ -23396,6 +23580,8 @@ function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadines
     `- status=${closeoutReadinessSummary.status || "-"}`
     + ` | closeoutReady=${closeoutReadinessSummary.canClose === true}`
     + ` | closeoutReviewReady=${closeoutReadinessSummary.closeoutReviewReady === true}`
+    + ` | closeoutRecorded=${closeoutReadinessSummary.closeoutRecorded === true}`
+    + ` | stabilizationReviewRecorded=${closeoutReadinessSummary.stabilizationReviewRecorded === true}`
     + ` | blockers=${closeoutReadinessSummary.blockingCount ?? 0}`
   );
   lines.push(
@@ -23404,6 +23590,18 @@ function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadines
     + ` | stabilization=${closeoutReadinessSummary.stabilizationStatus || "-"}`
     + ` | firstWave=${closeoutReadinessSummary.firstWaveConfirmationStatus || "-"}`
   );
+  const recordedAction = closeoutReadinessSummary.recordedAction && typeof closeoutReadinessSummary.recordedAction === "object"
+    ? closeoutReadinessSummary.recordedAction
+    : null;
+  if (recordedAction) {
+    lines.push(
+      `- recordedAction=${recordedAction.operation || "-"}`
+      + ` | evidence=${recordedAction.evidenceKey || recordedAction.key || "-"}`
+      + ` | audit=${recordedAction.auditLogId || "-"}`
+      + ` | at=${recordedAction.recordedAt || "-"}`
+      + ` | handoff=${recordedAction.handoffFileName || "-"}`
+    );
+  }
   lines.push(
     `- nextAction=${closeoutReadinessSummary.nextActionKey || closeoutReadinessSummary.nextAction?.key || "-"}`
     + ` | operation=${closeoutReadinessSummary.nextOperation || closeoutReadinessSummary.nextAction?.operation || "-"}`

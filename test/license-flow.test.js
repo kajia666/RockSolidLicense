@@ -16243,6 +16243,98 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(closeoutReadySnapshot.summaryText, /closeoutReviewReady=true/);
     assert.match(closeoutReadySnapshot.summaryText, /nextAction=operational_closeout_review/);
 
+    const closeoutReviewAction = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        operation: "record_launch_closeout_review",
+        actionKey: closeoutReadySummary.nextAction.actionKey,
+        downloadKey: closeoutReadySummary.nextAction.downloadKey
+      },
+      ownerSession.token
+    );
+    assert.equal(closeoutReviewAction.operation, "record_launch_closeout_review");
+    assert.equal(closeoutReviewAction.result?.recordedEvidence?.key, "launch_closeout_review");
+    assert.equal(closeoutReviewAction.receipt?.operation, "record_launch_closeout_review");
+
+    const closeoutRecordedSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=20",
+      ownerSession.token
+    );
+    const closeoutRecordedSummary = closeoutRecordedSnapshot.summary.initialLaunchOpsReadiness.closeoutReadinessSummary;
+    assert.ok(closeoutRecordedSummary);
+    assert.equal(closeoutRecordedSummary.status, "closeout_recorded");
+    assert.equal(closeoutRecordedSummary.canClose, true);
+    assert.equal(closeoutRecordedSummary.closeoutRecorded, true);
+    assert.equal(closeoutRecordedSummary.closeoutReviewRecorded, true);
+    assert.equal(closeoutRecordedSummary.closeoutReviewReady, false);
+    assert.equal(closeoutRecordedSummary.stabilizationReviewReady, true);
+    assert.equal(closeoutRecordedSummary.stabilizationReviewRecorded, false);
+    assert.equal(closeoutRecordedSummary.blockingCount, 0);
+    assert.equal(closeoutRecordedSummary.recordedAction.operation, "record_launch_closeout_review");
+    assert.equal(closeoutRecordedSummary.recordedAction.evidenceKey, "launch_closeout_review");
+    assert.ok(closeoutRecordedSummary.recordedAction.recordedAt);
+    assert.equal(closeoutRecordedSummary.nextAction.key, "operational_stabilization_review");
+    assert.equal(closeoutRecordedSummary.nextAction.endpoint, "/api/developer/launch-mainline/action");
+    assert.equal(closeoutRecordedSummary.nextAction.method, "POST");
+    assert.equal(closeoutRecordedSummary.nextAction.enabled, true);
+    assert.equal(closeoutRecordedSummary.nextAction.operation, "record_launch_stabilization_review");
+    assert.equal(closeoutRecordedSummary.nextAction.body.operation, "record_launch_stabilization_review");
+    assert.equal(closeoutRecordedSummary.nextAction.body.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.match(closeoutRecordedSummary.nextAction.workspaceAction.href, /operation=record_launch_stabilization_review/);
+    assert.match(closeoutRecordedSummary.nextAction.recommendedDownload.href, /format=stabilization-handoff/);
+    assert.match(closeoutRecordedSnapshot.summaryText, /status=closeout_recorded/);
+    assert.match(closeoutRecordedSnapshot.summaryText, /closeoutRecorded=true/);
+    assert.match(closeoutRecordedSnapshot.summaryText, /recordedAction=record_launch_closeout_review/);
+    assert.match(closeoutRecordedSnapshot.summaryText, /nextAction=operational_stabilization_review/);
+
+    const stabilizationReviewAction = await postJson(
+      baseUrl,
+      "/api/developer/launch-mainline/action",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        operation: "record_launch_stabilization_review",
+        actionKey: closeoutRecordedSummary.nextAction.actionKey,
+        downloadKey: closeoutRecordedSummary.nextAction.downloadKey
+      },
+      ownerSession.token
+    );
+    assert.equal(stabilizationReviewAction.operation, "record_launch_stabilization_review");
+    assert.equal(stabilizationReviewAction.result?.recordedEvidence?.key, "launch_stabilization_review");
+    assert.equal(stabilizationReviewAction.receipt?.operation, "record_launch_stabilization_review");
+
+    const steadyStateSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=20",
+      ownerSession.token
+    );
+    const steadyStateSummary = steadyStateSnapshot.summary.initialLaunchOpsReadiness.closeoutReadinessSummary;
+    assert.ok(steadyStateSummary);
+    assert.equal(steadyStateSummary.status, "steady_state_ready");
+    assert.equal(steadyStateSummary.canClose, true);
+    assert.equal(steadyStateSummary.closeoutRecorded, true);
+    assert.equal(steadyStateSummary.closeoutReviewRecorded, true);
+    assert.equal(steadyStateSummary.stabilizationReviewRecorded, true);
+    assert.equal(steadyStateSummary.steadyStateReady, true);
+    assert.equal(steadyStateSummary.blockingCount, 0);
+    assert.equal(steadyStateSummary.recordedAction.operation, "record_launch_stabilization_review");
+    assert.equal(steadyStateSummary.recordedAction.evidenceKey, "launch_stabilization_review");
+    assert.equal(steadyStateSummary.nextAction.key, "steady_state_monitoring");
+    assert.equal(steadyStateSummary.nextAction.endpoint, "/api/developer/ops/export");
+    assert.equal(steadyStateSummary.nextAction.method, "GET");
+    assert.equal(steadyStateSummary.nextAction.enabled, true);
+    assert.equal(steadyStateSummary.nextAction.operation, "monitor_steady_state_ops");
+    assert.match(steadyStateSummary.nextAction.workspaceAction.href, /\/developer\/ops/);
+    assert.match(steadyStateSummary.nextAction.recommendedDownload.href, /format=stabilization-handoff/);
+    assert.match(steadyStateSnapshot.summaryText, /status=steady_state_ready/);
+    assert.match(steadyStateSnapshot.summaryText, /stabilizationReviewRecorded=true/);
+    assert.match(steadyStateSnapshot.summaryText, /recordedAction=record_launch_stabilization_review/);
+    assert.match(steadyStateSnapshot.summaryText, /nextAction=steady_state_monitoring/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

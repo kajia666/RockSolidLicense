@@ -3613,6 +3613,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("post_launch_sweep_handoff")) return "post-launch-sweep-handoff";
   if (normalized.includes("closeout_handoff")) return "closeout-handoff";
   if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
+  if (normalized.includes("steady_state_operational_review") || normalized.includes("steady-state-operational-review")) return "steady-state-operational-review";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -19367,6 +19368,19 @@ function buildDeveloperOpsInitialLaunchReadinessDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsSteadyStateOperationalReviewDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_steady_state_operational_review",
+    "developer-ops-steady-state-operational-review.txt",
+    "Developer Ops steady-state operational review",
+    {
+      source: "developer-ops",
+      format: "steady-state-operational-review",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
@@ -20465,6 +20479,160 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
   };
 }
 
+function buildDeveloperOpsSteadyStateOperationalReviewPayload({
+  scope = {},
+  latestReceipt = null,
+  closeoutReadinessSummary = null,
+  launchDayWatchReceipt = null,
+  stabilizationStatusReceipt = null,
+  firstWaveConfirmationChain = null,
+  followUpQueue = [],
+  stabilizationHandoff = null
+} = {}) {
+  if (
+    !latestReceipt
+    && !closeoutReadinessSummary
+    && !launchDayWatchReceipt
+    && !stabilizationStatusReceipt
+    && !firstWaveConfirmationChain
+  ) {
+    return null;
+  }
+  const productCode = scope.productCode
+    || latestReceipt?.productCode
+    || closeoutReadinessSummary?.nextAction?.productCode
+    || null;
+  const channel = latestReceipt?.channel
+    || scope.channel
+    || closeoutReadinessSummary?.nextAction?.channel
+    || "stable";
+  const followUps = Array.isArray(followUpQueue) ? followUpQueue : [];
+  const monitoringReady = closeoutReadinessSummary?.steadyStateReady === true
+    && closeoutReadinessSummary?.canClose === true;
+  const remainingFollowUpCount = monitoringReady ? 0 : followUps.length;
+  const reviewScope = {
+    ...scope,
+    productCode: productCode || scope.productCode || "",
+    channel
+  };
+  const steadyStateWorkspaceParams = compactRouteParams({
+    ...buildDeveloperOpsRouteReviewBaseDownloadParams(reviewScope),
+    productCode: productCode || "",
+    channel,
+    routeTitle: "Steady-State Operational Review",
+    routeReason: monitoringReady
+      ? "Review first-round steady-state operations."
+      : "Review the remaining closeout and stabilization blockers."
+  });
+  const reviewDownload = productCode
+    ? buildDeveloperOpsSteadyStateOperationalReviewDownload(reviewScope)
+    : null;
+  const supportingDownloads = [];
+  const seenSupportingDownloads = new Set();
+  for (const download of [
+    closeoutReadinessSummary?.nextAction?.recommendedDownload || null,
+    productCode ? buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(reviewScope) : null,
+    remainingFollowUpCount > 0 ? buildDeveloperOpsLaunchReceiptNextFollowUpDownload(reviewScope, followUps[0]) : null,
+    productCode ? buildDeveloperOpsInitialLaunchReadinessDownload(reviewScope) : null
+  ]) {
+    if (!download || typeof download !== "object") {
+      continue;
+    }
+    const dedupeKey = download.key || download.href || download.fileName;
+    if (!dedupeKey || seenSupportingDownloads.has(dedupeKey)) {
+      continue;
+    }
+    seenSupportingDownloads.add(dedupeKey);
+    supportingDownloads.push({
+      key: download.key || null,
+      label: download.label || download.title || download.key || null,
+      fileName: download.fileName || null,
+      format: download.format || null,
+      href: download.href || null,
+      source: download.source || null
+    });
+  }
+  const checklist = monitoringReady
+    ? [
+        "Keep the stabilization handoff and this steady-state review together for the first operator handover after launch.",
+        "Re-open the scoped Developer Ops snapshot before widening traffic or handing the lane to a different operator.",
+        "Escalate only if account, entitlement, session, device, or audit signals drift from the launch-day baseline."
+      ]
+    : closeoutReadinessSummary?.canClose === true
+      ? closeoutReadinessSummary?.closeoutRecorded === true
+        ? [
+            "Record the stabilization review to complete the steady-state handoff.",
+            "Keep closeout evidence and the stabilization handoff attached while the review is pending.",
+            "Do not widen first-wave operations until the stabilization review is recorded."
+          ]
+        : [
+            "Record the closeout review after reviewer sign-off.",
+            "Keep launch-day watch and first-wave confirmation evidence attached to the closeout package.",
+            "Re-check the scoped Developer Ops snapshot before recording the next launch-mainline review."
+          ]
+      : [
+          "Resolve open closeout blockers before treating the lane as steady-state ready.",
+          "Use the recommended supporting download to hand the blocker context to the next reviewer.",
+          "Keep monitoring the scoped Developer Ops snapshot while the closeout chain remains open."
+        ];
+  const latestReceiptPayload = latestReceipt
+    ? {
+        operation: latestReceipt.operation || null,
+        operationLabel: latestReceipt.operationLabel || null,
+        handoffFileName: latestReceipt.handoffFileName || null,
+        auditLogId: latestReceipt.auditLogId || null,
+        createdAt: latestReceipt.createdAt || latestReceipt.handoffGeneratedAt || null,
+        postLaunchLifecycleStatus: latestReceipt.postLaunchLifecycleStatus || null
+      }
+    : null;
+  return {
+    version: "developer-ops-steady-state-operational-review/v1",
+    projectCode: productCode,
+    channel,
+    status: closeoutReadinessSummary?.status || (latestReceipt ? "review" : "not_started"),
+    monitoringReady,
+    headline: monitoringReady
+      ? "Steady-state monitoring is ready for the first-round operational review."
+      : closeoutReadinessSummary?.closeoutRecorded === true
+        ? "Stabilization review still needs to be recorded before steady-state monitoring is fully ready."
+        : closeoutReadinessSummary?.canClose === true
+          ? "Closeout review still needs to be recorded before the first-round operational review can be handed over."
+          : "Steady-state operational review is still blocked by closeout readiness gaps.",
+    summary: monitoringReady
+      ? "First-wave closeout, stabilization review, and runtime monitoring signals are aligned for ongoing operations."
+      : closeoutReadinessSummary?.operatorHint
+        || "Review the closeout summary before handing the lane into steady-state operations.",
+    closeoutStatus: closeoutReadinessSummary?.status || null,
+    launchDayWatchStatus: launchDayWatchReceipt?.status || null,
+    stabilizationStatus: stabilizationStatusReceipt?.status || null,
+    firstWaveStatus: firstWaveConfirmationChain?.status || null,
+    followUpCount: remainingFollowUpCount,
+    blockers: Array.isArray(closeoutReadinessSummary?.blockers)
+      ? closeoutReadinessSummary.blockers
+      : [],
+    latestReceipt: latestReceiptPayload,
+    recordedAction: closeoutReadinessSummary?.recordedAction || null,
+    workspaceAction: closeoutReadinessSummary?.nextAction?.workspaceAction
+      || stabilizationHandoff?.nextAction?.workspaceAction
+      || (productCode
+        ? createLaunchWorkflowWorkspaceShortcut(
+            "ops",
+            "snapshot",
+            "Open Steady-State Ops Workspace",
+            steadyStateWorkspaceParams
+          )
+        : null),
+    reviewDownload,
+    supportingDownloads,
+    handoffFiles: {
+      readiness: stabilizationHandoff?.files?.readiness || "initial-launch-ops-readiness.txt",
+      stabilizationHandoff: closeoutReadinessSummary?.nextAction?.recommendedDownload?.fileName || "developer-ops-stabilization-handoff.txt",
+      routeMap: supportingDownloads.find((item) => item.format === "launch-mainline-handoff-routes")?.fileName || "developer-ops-launch-mainline-handoff-routes.txt"
+    },
+    checklist
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   scope = {},
   latestReceipt = null,
@@ -21150,6 +21318,38 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationStatusReceipt,
     firstWaveConfirmationChain
   });
+  const steadyStateOperationalReview = buildDeveloperOpsSteadyStateOperationalReviewPayload({
+    scope,
+    latestReceipt,
+    closeoutReadinessSummary,
+    launchDayWatchReceipt,
+    stabilizationStatusReceipt,
+    firstWaveConfirmationChain,
+    followUpQueue,
+    stabilizationHandoff
+  });
+  if (steadyStateOperationalReview?.reviewDownload) {
+    const dedupeKey = steadyStateOperationalReview.reviewDownload.key
+      || steadyStateOperationalReview.reviewDownload.href
+      || steadyStateOperationalReview.reviewDownload.fileName;
+    if (dedupeKey && !seenRecommendedDownloads.has(dedupeKey)) {
+      seenRecommendedDownloads.add(dedupeKey);
+      recommendedDownloads.push({
+        key: steadyStateOperationalReview.reviewDownload.key || null,
+        label: steadyStateOperationalReview.reviewDownload.label || steadyStateOperationalReview.reviewDownload.title || steadyStateOperationalReview.reviewDownload.key || null,
+        fileName: steadyStateOperationalReview.reviewDownload.fileName || null,
+        format: steadyStateOperationalReview.reviewDownload.format || null,
+        href: steadyStateOperationalReview.reviewDownload.href || null,
+        source: steadyStateOperationalReview.reviewDownload.source || null
+      });
+    }
+  }
+  if (
+    steadyStateOperationalReview?.monitoringReady === true
+    && steadyStateOperationalReview.reviewDownload?.fileName
+  ) {
+    nextSteps.push(`Export steady-state review: ${steadyStateOperationalReview.reviewDownload.fileName}.`);
+  }
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
     stagingLaunchDutyArchive,
@@ -21231,6 +21431,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operationalExceptionEntry,
     operationalExceptionCloseout,
     closeoutReadinessSummary,
+    steadyStateOperationalReview,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -23620,6 +23821,78 @@ function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadines
   }
 }
 
+function appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateOperationalReview = null, {
+  title = "Steady-State Operational Review:"
+} = {}) {
+  if (!steadyStateOperationalReview || typeof steadyStateOperationalReview !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${steadyStateOperationalReview.status || "-"}`
+    + ` | monitoringReady=${steadyStateOperationalReview.monitoringReady === true}`
+    + ` | closeout=${steadyStateOperationalReview.closeoutStatus || "-"}`
+    + ` | launchDayWatch=${steadyStateOperationalReview.launchDayWatchStatus || "-"}`
+    + ` | stabilization=${steadyStateOperationalReview.stabilizationStatus || "-"}`
+    + ` | firstWave=${steadyStateOperationalReview.firstWaveStatus || "-"}`
+    + ` | followUps=${steadyStateOperationalReview.followUpCount ?? 0}`
+  );
+  lines.push(`- headline=${steadyStateOperationalReview.headline || "-"} | summary=${steadyStateOperationalReview.summary || "-"}`);
+  const latestReceipt = steadyStateOperationalReview.latestReceipt && typeof steadyStateOperationalReview.latestReceipt === "object"
+    ? steadyStateOperationalReview.latestReceipt
+    : null;
+  if (latestReceipt) {
+    lines.push(
+      `- latestReceipt=${latestReceipt.operation || latestReceipt.operationLabel || "-"}`
+      + ` | handoff=${latestReceipt.handoffFileName || "-"}`
+      + ` | audit=${latestReceipt.auditLogId || "-"}`
+      + ` | recordedAt=${latestReceipt.createdAt || "-"}`
+      + ` | postLaunch=${latestReceipt.postLaunchLifecycleStatus || "-"}`
+    );
+  }
+  const recordedAction = steadyStateOperationalReview.recordedAction && typeof steadyStateOperationalReview.recordedAction === "object"
+    ? steadyStateOperationalReview.recordedAction
+    : null;
+  if (recordedAction) {
+    lines.push(
+      `- recordedAction=${recordedAction.operation || "-"}`
+      + ` | evidence=${recordedAction.evidenceKey || recordedAction.key || "-"}`
+      + ` | audit=${recordedAction.auditLogId || "-"}`
+      + ` | at=${recordedAction.recordedAt || "-"}`
+      + ` | handoff=${recordedAction.handoffFileName || "-"}`
+    );
+  }
+  lines.push(
+    `- workspace=${steadyStateOperationalReview.workspaceAction?.label || "-"}`
+    + ` | href=${steadyStateOperationalReview.workspaceAction?.href || "-"}`
+  );
+  lines.push(
+    `- reviewDownload=${steadyStateOperationalReview.reviewDownload?.fileName || "-"}`
+    + ` | format=${steadyStateOperationalReview.reviewDownload?.format || "-"}`
+    + ` | href=${steadyStateOperationalReview.reviewDownload?.href || "-"}`
+  );
+  const supportingDownloads = Array.isArray(steadyStateOperationalReview.supportingDownloads)
+    ? steadyStateOperationalReview.supportingDownloads
+    : [];
+  if (supportingDownloads.length) {
+    lines.push("- supportingDownloads:");
+    for (const item of supportingDownloads) {
+      lines.push(
+        `  - ${item.label || item.key || "-"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | format=${item.format || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+  }
+  if (Array.isArray(steadyStateOperationalReview.checklist) && steadyStateOperationalReview.checklist.length) {
+    lines.push("- checklist:");
+    for (const item of steadyStateOperationalReview.checklist) {
+      lines.push(`  - ${item}`);
+    }
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -23918,6 +24191,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (closeoutReadinessSummary) {
       lines.push("");
       appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary);
+    }
+    const steadyStateOperationalReview = initialLaunchOpsReadiness.steadyStateOperationalReview || null;
+    if (steadyStateOperationalReview) {
+      lines.push("");
+      appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateOperationalReview);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -24406,6 +24684,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary);
     lines.push("");
   }
+  const steadyStateOperationalReview = readiness.steadyStateOperationalReview || null;
+  if (steadyStateOperationalReview) {
+    appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateOperationalReview);
+    lines.push("");
+  }
   const formatGateDownloadText = (item = {}) => {
     const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
       ? item.recommendedDownload
@@ -24476,6 +24759,53 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   } else {
     lines.push("- Continue monitoring the scoped Developer Ops snapshot.");
   }
+  return lines.join("\n");
+}
+
+function buildDeveloperOpsSteadyStateOperationalReviewText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const review = readiness.steadyStateOperationalReview || buildDeveloperOpsSteadyStateOperationalReviewPayload({
+    scope,
+    latestReceipt: readiness.latestReceipt || payload.overview?.latestLaunchReceipts?.[0] || null,
+    closeoutReadinessSummary: readiness.closeoutReadinessSummary || null,
+    launchDayWatchReceipt: readiness.launchDayWatchReceipt || null,
+    stabilizationStatusReceipt: readiness.stabilizationStatusReceipt || null,
+    firstWaveConfirmationChain: readiness.firstWaveConfirmationChain || null,
+    followUpQueue: readiness.followUpQueue || [],
+    stabilizationHandoff: readiness.stabilizationHandoff || null
+  });
+  const lines = [
+    "RockSolid Developer Ops Steady-State Operational Review",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${review?.projectCode || scope.productCode || "-"}`,
+    `Channel: ${review?.channel || scope.channel || "stable"}`,
+    `Status: ${String(review?.status || readiness.closeoutReadinessSummary?.status || readiness.status || "unknown").toUpperCase()}`,
+    `Monitoring Ready: ${review?.monitoringReady === true ? "yes" : "no"}`,
+    `Headline: ${review?.headline || "-"}`,
+    `Summary: ${review?.summary || "-"}`,
+    ""
+  ];
+  if (!review) {
+    lines.push("No steady-state operational review is available for this scoped Ops snapshot yet.");
+    return lines.join("\n");
+  }
+  appendDeveloperOpsSteadyStateOperationalReviewLines(lines, review, {
+    title: "Review Signals:"
+  });
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push("- Download this file when handing the first stable operating lane to the next operator.");
+  lines.push("- Keep stabilization-handoff.txt and initial-launch-ops-readiness.txt attached beside this recap.");
+  lines.push("- Re-open the scoped Developer Ops snapshot before widening rollout or changing operator ownership.");
   return lines.join("\n");
 }
 
@@ -24669,6 +24999,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "initial-launch-ops-readiness.txt",
     "staging-launch-duty-archive.txt",
     "stabilization-handoff.txt",
+    "steady-state-operational-review.txt",
     "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
     "csv/accounts.csv",
@@ -24694,6 +25025,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Next Follow-up: ${formatLaunchReceiptNextFollowUp(readiness.nextFollowUp || summary.launchReceiptNextFollowUp || null)}`,
     `Primary Workspace: ${readiness.primaryWorkspaceAction?.label || "-"} | href=${readiness.primaryWorkspaceAction?.href || "-"}`,
     `Primary Download: ${readiness.primaryDownload?.fileName || "-"} | format=${readiness.primaryDownload?.format || "-"} | href=${readiness.primaryDownload?.href || "-"}`,
+    `Steady-State Review: ${String(readiness.steadyStateOperationalReview?.status || "-").toUpperCase()} | ready=${readiness.steadyStateOperationalReview?.monitoringReady === true ? "yes" : "no"} | file=${readiness.steadyStateOperationalReview?.reviewDownload?.fileName || "-"}`,
     ""
   ];
 
@@ -24881,6 +25213,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use initial-launch-ops-readiness.txt for the current gate and launch duty decision.");
   lines.push("- Use launch-receipt-next-follow-up.txt for the next recorded Launch Mainline operation.");
   lines.push("- Use stabilization-handoff.txt when handing first-wave stabilization duty to the next operator.");
+  lines.push("- Use steady-state-operational-review.txt for the first-round operations recap once closeout and stabilization reviews are both recorded.");
   lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
@@ -25123,6 +25456,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "stabilization-handoff.txt",
       body: buildDeveloperOpsStabilizationHandoffText(payload)
+    },
+    {
+      path: "steady-state-operational-review.txt",
+      body: buildDeveloperOpsSteadyStateOperationalReviewText(payload)
     },
     {
       path: "launch-mainline-handoff-routes.txt",
@@ -25846,7 +26183,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -25929,6 +26266,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-stabilization-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsStabilizationHandoffText(payload)
+    };
+  }
+
+  if (normalizedFormat === "steady-state-operational-review") {
+    return {
+      fileName: "developer-ops-steady-state-operational-review.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsSteadyStateOperationalReviewText(payload)
     };
   }
 

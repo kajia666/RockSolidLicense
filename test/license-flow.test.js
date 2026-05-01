@@ -16330,10 +16330,33 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateSummary.nextAction.operation, "monitor_steady_state_ops");
     assert.match(steadyStateSummary.nextAction.workspaceAction.href, /\/developer\/ops/);
     assert.match(steadyStateSummary.nextAction.recommendedDownload.href, /format=stabilization-handoff/);
+    const steadyStateOperationalReview = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateOperationalReview;
+    assert.ok(steadyStateOperationalReview);
+    assert.equal(steadyStateOperationalReview.status, "steady_state_ready");
+    assert.equal(steadyStateOperationalReview.monitoringReady, true);
+    assert.equal(steadyStateOperationalReview.closeoutStatus, "steady_state_ready");
+    assert.equal(steadyStateOperationalReview.followUpCount, 0);
+    assert.equal(steadyStateOperationalReview.recordedAction.operation, "record_launch_stabilization_review");
+    assert.equal(steadyStateOperationalReview.recordedAction.evidenceKey, "launch_stabilization_review");
+    assert.match(steadyStateOperationalReview.reviewDownload.href, /format=steady-state-operational-review/);
     assert.match(steadyStateSnapshot.summaryText, /status=steady_state_ready/);
     assert.match(steadyStateSnapshot.summaryText, /stabilizationReviewRecorded=true/);
     assert.match(steadyStateSnapshot.summaryText, /recordedAction=record_launch_stabilization_review/);
     assert.match(steadyStateSnapshot.summaryText, /nextAction=steady_state_monitoring/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Operational Review:/);
+    assert.match(steadyStateSnapshot.summaryText, /monitoringReady=true/);
+
+    const steadyStateOperationalReviewDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=steady-state-operational-review",
+      ownerSession.token
+    );
+    assert.equal(steadyStateOperationalReviewDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(steadyStateOperationalReviewDownload.contentDisposition || "", /developer-ops-steady-state-operational-review\.txt/);
+    assert.match(steadyStateOperationalReviewDownload.body, /RockSolid Developer Ops Steady-State Operational Review/);
+    assert.match(steadyStateOperationalReviewDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
+    assert.match(steadyStateOperationalReviewDownload.body, /Status: STEADY_STATE_READY/);
+    assert.match(steadyStateOperationalReviewDownload.body, /Monitoring Ready: yes/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

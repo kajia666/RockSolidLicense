@@ -147,6 +147,7 @@
             <button class="secondary" id="download-export-initial-launch-readiness-btn">Download Launch Readiness</button>
             <button class="secondary" id="download-export-staging-archive-btn">Download Staging Archive</button>
             <button class="secondary" id="download-export-stabilization-handoff-btn">Download Stabilization Handoff</button>
+            <button class="secondary" id="download-export-steady-state-review-btn">Download Steady-State Review</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
@@ -4691,6 +4692,92 @@
         `;
       }
 
+      function renderSteadyStateOperationalReview(initialLaunchOpsReadiness = {}) {
+        const review = initialLaunchOpsReadiness?.steadyStateOperationalReview || null;
+        if (!review || typeof review !== "object") {
+          return "";
+        }
+        const status = String(review.status || "unknown").toLowerCase();
+        const statusClass = review.monitoringReady === true ? "ok" : "warning";
+        const details = [
+          `monitoringReady=${review.monitoringReady === true ? "yes" : "no"}`,
+          `closeout=${esc(review.closeoutStatus || "-")}`,
+          `watch=${esc(review.launchDayWatchStatus || "-")}`,
+          `stabilization=${esc(review.stabilizationStatus || "-")}`,
+          `firstWave=${esc(review.firstWaveStatus || "-")}`,
+          `followUps=${esc(review.followUpCount ?? 0)}`
+        ].join(" | ");
+        const latestReceipt = review.latestReceipt && typeof review.latestReceipt === "object"
+          ? review.latestReceipt
+          : null;
+        const latestReceiptDetails = latestReceipt
+          ? [
+              `operation=${esc(latestReceipt.operationLabel || latestReceipt.operation || "-")}`,
+              `handoff=${esc(latestReceipt.handoffFileName || "-")}`,
+              `audit=${esc(latestReceipt.auditLogId || "-")}`,
+              `at=${esc(formatTime(latestReceipt.createdAt))}`,
+              `postLaunch=${esc(latestReceipt.postLaunchLifecycleStatus || "-")}`
+            ].join(" | ")
+          : "";
+        const recordedAction = review.recordedAction && typeof review.recordedAction === "object"
+          ? review.recordedAction
+          : null;
+        const recordedDetails = recordedAction
+          ? [
+              `operation=${esc(recordedAction.operation || "-")}`,
+              `evidence=${esc(recordedAction.evidenceKey || recordedAction.key || "-")}`,
+              `audit=${esc(recordedAction.auditLogId || "-")}`,
+              `at=${esc(formatTime(recordedAction.recordedAt))}`,
+              `handoff=${esc(recordedAction.handoffFileName || "-")}`
+            ].join(" | ")
+          : "";
+        const reviewDownloadDetails = [
+          `file=${esc(review.reviewDownload?.fileName || "-")}`,
+          `format=${esc(review.reviewDownload?.format || "-")}`,
+          `href=${esc(review.reviewDownload?.href || "-")}`
+        ].join(" | ");
+        const supportingDownloads = Array.isArray(review.supportingDownloads)
+          ? review.supportingDownloads
+          : [];
+        const checklist = Array.isArray(review.checklist)
+          ? review.checklist
+          : [];
+        return `
+          <div class="snapshot-recap steady-state-operational-review" data-steady-state-operational-review="${esc(status)}">
+            <div class="snapshot-recap-head">
+              <strong>Steady-State Operational Review</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(review.headline || "Steady-state operational review for the first-round operating lane.")}</div>
+            <div class="hint">${details}</div>
+            <div class="snapshot-recap">
+              <strong>Review Download</strong>
+              <div class="hint">${reviewDownloadDetails}</div>
+            </div>
+            ${latestReceiptDetails ? `
+              <div class="snapshot-recap">
+                <strong>Latest Receipt Context</strong>
+                <div class="hint">${latestReceiptDetails}</div>
+              </div>
+            ` : ""}
+            ${recordedDetails ? `
+              <div class="snapshot-recap">
+                <strong>Recorded Review Evidence</strong>
+                <div class="hint">${recordedDetails}</div>
+              </div>
+            ` : ""}
+            <div class="snapshot-recap">
+              <strong>Supporting Downloads</strong>
+              <ul class="snapshot-list">${supportingDownloads.length ? supportingDownloads.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.fileName || "-")} | ${esc(item.format || "-")} | ${esc(item.href || "-")}</li>`).join("") : "<li>No supporting downloads are attached.</li>"}</ul>
+            </div>
+            <div class="snapshot-recap">
+              <strong>Operator Checklist</strong>
+              <ul class="snapshot-list">${checklist.length ? checklist.map((item) => `<li>${esc(item)}</li>`).join("") : "<li>No operator checklist is available.</li>"}</ul>
+            </div>
+          </div>
+        `;
+      }
+
       function renderOperationalExceptionSignals(initialLaunchOpsReadiness = {}) {
         const traceability = initialLaunchOpsReadiness?.traceability || {};
         const operationalExceptionEntry = initialLaunchOpsReadiness?.operationalExceptionEntry
@@ -5482,6 +5569,7 @@
           ${renderLastStabilizationHandoffResult()}
           ${renderLastOperationalExceptionActionResult()}
           ${renderCloseoutReadinessSummary(initialLaunchOpsReadiness)}
+          ${renderSteadyStateOperationalReview(initialLaunchOpsReadiness)}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
@@ -6255,6 +6343,7 @@
       el("download-export-initial-launch-readiness-btn").addEventListener("click", async () => { try { await handleExportDownload("initial-launch-ops-readiness", "developer-ops-initial-launch-readiness.txt", "Initial launch ops readiness"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-staging-archive-btn").addEventListener("click", async () => { try { await handleExportDownload("staging-launch-duty-archive", "developer-ops-staging-launch-duty-archive.txt", "Staging launch-duty archive"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-stabilization-handoff-btn").addEventListener("click", async () => { try { await handleExportDownload("stabilization-handoff", "developer-ops-stabilization-handoff.txt", "Stabilization handoff"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-steady-state-review-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-operational-review", "developer-ops-steady-state-operational-review.txt", "Steady-state operational review"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

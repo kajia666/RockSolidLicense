@@ -16556,6 +16556,40 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`audit=${steadyStateDutyPlanReceipt.auditLogId}`));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /steady_state_duty_plan_receipt=recorded/);
+    const launchOperationsHandoffSummary = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsHandoffSummary;
+    assert.ok(launchOperationsHandoffSummary);
+    assert.equal(launchOperationsHandoffSummary.version, "developer-ops-launch-operations-handoff-summary/v1");
+    assert.equal(launchOperationsHandoffSummary.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(launchOperationsHandoffSummary.channel, "stable");
+    assert.equal(launchOperationsHandoffSummary.status, launchOperationsEvidenceChain.complete ? "ready" : "review");
+    assert.equal(launchOperationsHandoffSummary.evidenceChainStatus, launchOperationsEvidenceChain.status);
+    assert.equal(launchOperationsHandoffSummary.evidenceCompletedStageCount, launchOperationsEvidenceChain.completedStageCount);
+    assert.equal(launchOperationsHandoffSummary.evidenceRequiredStageCount, launchOperationsEvidenceChain.requiredStageCount);
+    assert.equal(launchOperationsHandoffSummary.nextReviewAction.key, launchOperationsEvidenceChain.nextReviewAction.key);
+    assert.equal(launchOperationsHandoffSummary.latestEvidenceStage.key, "steady_state_duty_plan_receipt");
+    assert.ok(Array.isArray(launchOperationsHandoffSummary.handoffChecklist));
+    assert.ok(launchOperationsHandoffSummary.handoffChecklist.some((item) => (
+      item.key === "steady_state_duty_plan_receipt"
+      && item.auditLogId === steadyStateDutyPlanReceipt.auditLogId
+    )));
+    assert.match(launchOperationsHandoffSummary.handoffDownload.href, /format=launch-operations-handoff-summary/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:/);
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      new RegExp(`nextReview=${launchOperationsEvidenceChain.nextReviewAction.key}`)
+    );
+
+    const launchOperationsHandoffDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=launch-operations-handoff-summary",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsHandoffDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchOperationsHandoffDownload.contentDisposition || "", /developer-ops-launch-operations-handoff-summary\.txt/);
+    assert.match(launchOperationsHandoffDownload.body, /RockSolid Developer Ops Launch Operations Handoff Summary/);
+    assert.match(launchOperationsHandoffDownload.body, /Evidence Chain:/);
+    assert.match(launchOperationsHandoffDownload.body, /steady_state_duty_plan_receipt/);
+    assert.match(launchOperationsHandoffDownload.body, /Next Review:/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
@@ -20501,6 +20535,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /renderLaunchOperationsEvidenceChain/);
     assert.match(html, /Launch Operations Evidence Chain/);
     assert.match(html, /data-launch-operations-evidence-chain/);
+    assert.match(html, /launchOperationsHandoffSummary/);
+    assert.match(html, /renderLaunchOperationsHandoffSummary/);
+    assert.match(html, /Launch Operations Handoff Summary/);
+    assert.match(html, /download-export-launch-operations-handoff-btn/);
+    assert.match(html, /launch-operations-handoff-summary/);
     assert.match(html, /lastSteadyStateDutyPlanResult/);
     assert.match(html, /buildSteadyStateDutyPlanResult/);
     assert.match(html, /renderLastSteadyStateDutyPlanResult/);

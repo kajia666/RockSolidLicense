@@ -3618,6 +3618,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("steady_state_handoff_brief") || normalized.includes("steady-state-handoff-brief")) return "steady-state-handoff-brief";
   if (normalized.includes("steady_state_duty_board") || normalized.includes("steady-state-duty-board")) return "steady-state-duty-board";
   if (normalized.includes("steady_state_duty_action_links") || normalized.includes("steady-state-duty-action-links")) return "steady-state-duty-action-links";
+  if (normalized.includes("launch_operations_handoff_summary") || normalized.includes("launch-operations-handoff-summary")) return "launch-operations-handoff-summary";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -19524,6 +19525,19 @@ function buildDeveloperOpsSteadyStateDutyActionLinksDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsLaunchOperationsHandoffSummaryDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_launch_operations_handoff_summary",
+    "developer-ops-launch-operations-handoff-summary.txt",
+    "Developer Ops launch operations handoff summary",
+    {
+      source: "developer-ops",
+      format: "launch-operations-handoff-summary",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
@@ -21901,7 +21915,75 @@ function buildDeveloperOpsLaunchOperationsEvidenceChain({
           label: "Monitor steady-state evidence",
           status: "ready",
           summary: "All tracked launch operations evidence stages are recorded."
-        }
+      }
+  };
+}
+
+function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
+  scope = {},
+  launchOperationsEvidenceChain = null,
+  steadyStateOperationalReview = null,
+  steadyStateExceptionDigest = null,
+  steadyStateHandoffBrief = null,
+  steadyStateDutyBoard = null,
+  steadyStateDutyActionLinks = null,
+  latestSteadyStateDutyPlanReceipt = null
+} = {}) {
+  const chain = launchOperationsEvidenceChain && typeof launchOperationsEvidenceChain === "object"
+    ? launchOperationsEvidenceChain
+    : null;
+  if (!chain) {
+    return null;
+  }
+  const productCode = chain.productCode || scope.productCode || latestSteadyStateDutyPlanReceipt?.productCode || null;
+  const channel = chain.channel || scope.channel || latestSteadyStateDutyPlanReceipt?.channel || "stable";
+  const handoffScope = {
+    ...scope,
+    productCode,
+    channel
+  };
+  const handoffDownload = productCode ? buildDeveloperOpsLaunchOperationsHandoffSummaryDownload(handoffScope) : null;
+  const stages = Array.isArray(chain.stages) ? chain.stages : [];
+  const handoffChecklist = stages.map((item) => ({
+    key: item.key || null,
+    label: item.label || item.key || null,
+    status: item.status || "missing",
+    ready: Boolean(item.auditLogId) && item.status !== "missing",
+    auditLogId: item.auditLogId || null,
+    action: item.action || item.operation || null,
+    fileName: item.fileName || item.format || null,
+    recordedAt: item.recordedAt || null
+  }));
+  const supportingDownloads = [
+    handoffDownload,
+    steadyStateHandoffBrief?.handoffDownload || null,
+    steadyStateDutyBoard?.boardDownload || null,
+    steadyStateDutyActionLinks?.actionLinksDownload || null,
+    steadyStateOperationalReview?.reviewDownload || null,
+    steadyStateExceptionDigest?.digestDownload || null
+  ].filter(Boolean);
+  return {
+    version: "developer-ops-launch-operations-handoff-summary/v1",
+    status: chain.complete === true ? "ready" : "review",
+    productCode,
+    channel,
+    evidenceChainStatus: chain.status || "unknown",
+    evidenceCompletedStageCount: chain.completedStageCount ?? 0,
+    evidenceRequiredStageCount: chain.requiredStageCount ?? stages.length,
+    evidenceMissingStageCount: chain.missingStageCount ?? 0,
+    latestEvidenceStage: chain.latestStage || null,
+    nextReviewAction: chain.nextReviewAction || null,
+    handoffChecklist,
+    handoffDownload,
+    supportingDownloads,
+    steadyStateStatus: steadyStateOperationalReview?.status || null,
+    exceptionDigestStatus: steadyStateExceptionDigest?.status || null,
+    dutyBoardStatus: steadyStateDutyBoard?.status || null,
+    dutyActionLinksStatus: steadyStateDutyActionLinks?.status || null,
+    latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    operatorSummary: chain.complete === true
+      ? "Launch operations evidence is ready for steady-state handoff."
+      : "Launch operations evidence still needs review before steady-state handoff."
   };
 }
 
@@ -22273,6 +22355,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationHandoffConfirmation,
     latestSteadyStateDutyPlanReceipt
   });
+  const launchOperationsHandoffSummary = buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
+    scope,
+    launchOperationsEvidenceChain,
+    steadyStateOperationalReview,
+    steadyStateExceptionDigest,
+    steadyStateHandoffBrief,
+    steadyStateDutyBoard,
+    steadyStateDutyActionLinks,
+    latestSteadyStateDutyPlanReceipt
+  });
   if (steadyStateOperationalReview?.reviewDownload) {
     const dedupeKey = steadyStateOperationalReview.reviewDownload.key
       || steadyStateOperationalReview.reviewDownload.href
@@ -22353,6 +22445,22 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       });
     }
   }
+  if (launchOperationsHandoffSummary?.handoffDownload) {
+    const dedupeKey = launchOperationsHandoffSummary.handoffDownload.key
+      || launchOperationsHandoffSummary.handoffDownload.href
+      || launchOperationsHandoffSummary.handoffDownload.fileName;
+    if (dedupeKey && !seenRecommendedDownloads.has(dedupeKey)) {
+      seenRecommendedDownloads.add(dedupeKey);
+      recommendedDownloads.push({
+        key: launchOperationsHandoffSummary.handoffDownload.key || null,
+        label: launchOperationsHandoffSummary.handoffDownload.label || launchOperationsHandoffSummary.handoffDownload.title || launchOperationsHandoffSummary.handoffDownload.key || null,
+        fileName: launchOperationsHandoffSummary.handoffDownload.fileName || null,
+        format: launchOperationsHandoffSummary.handoffDownload.format || null,
+        href: launchOperationsHandoffSummary.handoffDownload.href || null,
+        source: launchOperationsHandoffSummary.handoffDownload.source || null
+      });
+    }
+  }
   if (
     steadyStateOperationalReview?.monitoringReady === true
     && steadyStateOperationalReview.reviewDownload?.fileName
@@ -22382,6 +22490,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     && steadyStateDutyActionLinks.actionLinksDownload?.fileName
   ) {
     nextSteps.push(`Open duty action links: ${steadyStateDutyActionLinks.actionLinksDownload.fileName}.`);
+  }
+  if (launchOperationsHandoffSummary?.handoffDownload?.fileName) {
+    nextSteps.push(`Export launch operations handoff summary: ${launchOperationsHandoffSummary.handoffDownload.fileName}.`);
   }
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
@@ -22471,6 +22582,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateDutyActionLinks,
     latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
     launchOperationsEvidenceChain,
+    launchOperationsHandoffSummary,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -25224,6 +25336,45 @@ function appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, chain = nul
   }
 }
 
+function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = null, {
+  title = "Launch Operations Handoff Summary:"
+} = {}) {
+  if (!summary || typeof summary !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${summary.status || "-"}`
+    + ` | evidence=${summary.evidenceChainStatus || "-"}`
+    + ` | completed=${summary.evidenceCompletedStageCount ?? 0}/${summary.evidenceRequiredStageCount ?? 0}`
+    + ` | latest=${summary.latestEvidenceStage?.key || "-"}`
+  );
+  lines.push(
+    `- nextReview=${summary.nextReviewAction?.key || "-"}`
+    + ` | stage=${summary.nextReviewAction?.stageKey || "-"}`
+    + ` | summary=${summary.nextReviewAction?.summary || "-"}`
+  );
+  lines.push(
+    `- handoffDownload=${summary.handoffDownload?.fileName || "-"}`
+    + ` | format=${summary.handoffDownload?.format || "-"}`
+    + ` | href=${summary.handoffDownload?.href || "-"}`
+  );
+  const checklist = Array.isArray(summary.handoffChecklist) ? summary.handoffChecklist : [];
+  if (checklist.length) {
+    lines.push("- checklist:");
+    for (const item of checklist) {
+      lines.push(
+        `  - ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | ready=${item.ready === true}`
+        + ` | audit=${item.auditLogId || "-"}`
+        + ` | action=${item.action || "-"}`
+        + ` | file=${item.fileName || "-"}`
+      );
+    }
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -25565,6 +25716,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (launchOperationsEvidenceChain) {
       lines.push("");
       appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, launchOperationsEvidenceChain);
+    }
+    const launchOperationsHandoffSummary = initialLaunchOpsReadiness.launchOperationsHandoffSummary || null;
+    if (launchOperationsHandoffSummary) {
+      lines.push("");
+      appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, launchOperationsHandoffSummary);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -26094,6 +26250,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const launchOperationsEvidenceChain = readiness.launchOperationsEvidenceChain || null;
   if (launchOperationsEvidenceChain) {
     appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, launchOperationsEvidenceChain);
+    lines.push("");
+  }
+  const launchOperationsHandoffSummary = readiness.launchOperationsHandoffSummary || null;
+  if (launchOperationsHandoffSummary) {
+    appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, launchOperationsHandoffSummary);
     lines.push("");
   }
   const formatGateDownloadText = (item = {}) => {
@@ -26654,6 +26815,109 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const handoffSummary = readiness.launchOperationsHandoffSummary || buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
+    scope,
+    launchOperationsEvidenceChain: readiness.launchOperationsEvidenceChain || null,
+    steadyStateOperationalReview: readiness.steadyStateOperationalReview || null,
+    steadyStateExceptionDigest: readiness.steadyStateExceptionDigest || null,
+    steadyStateHandoffBrief: readiness.steadyStateHandoffBrief || null,
+    steadyStateDutyBoard: readiness.steadyStateDutyBoard || null,
+    steadyStateDutyActionLinks: readiness.steadyStateDutyActionLinks || null,
+    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null
+  });
+  const chain = readiness.launchOperationsEvidenceChain || null;
+  const checklist = Array.isArray(handoffSummary?.handoffChecklist)
+    ? handoffSummary.handoffChecklist
+    : [];
+  const supportingDownloads = Array.isArray(handoffSummary?.supportingDownloads)
+    ? handoffSummary.supportingDownloads
+    : [];
+  const lines = [
+    "RockSolid Developer Ops Launch Operations Handoff Summary",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${handoffSummary?.productCode || scope.productCode || "-"}`,
+    `Channel: ${handoffSummary?.channel || scope.channel || "stable"}`,
+    `Status: ${String(handoffSummary?.status || "unknown").toUpperCase()}`,
+    `Operator Summary: ${handoffSummary?.operatorSummary || "-"}`,
+    ""
+  ];
+  if (chain) {
+    lines.push("Evidence Chain:");
+    lines.push(
+      `- status=${chain.status || "-"}`
+      + ` | complete=${chain.complete === true}`
+      + ` | completed=${chain.completedStageCount ?? 0}/${chain.requiredStageCount ?? 0}`
+      + ` | latest=${chain.latestStage?.key || "-"}`
+    );
+    for (const item of Array.isArray(chain.stages) ? chain.stages : []) {
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | audit=${item.auditLogId || "-"}`
+        + ` | action=${item.action || item.operation || "-"}`
+        + ` | file=${item.fileName || item.format || "-"}`
+      );
+    }
+    lines.push("");
+  }
+  lines.push("Next Review:");
+  lines.push(
+    `- key=${handoffSummary?.nextReviewAction?.key || "-"}`
+    + ` | stage=${handoffSummary?.nextReviewAction?.stageKey || "-"}`
+    + ` | status=${handoffSummary?.nextReviewAction?.status || "-"}`
+    + ` | summary=${handoffSummary?.nextReviewAction?.summary || "-"}`
+  );
+  lines.push("");
+  lines.push("Handoff Download:");
+  lines.push(
+    `- file=${handoffSummary?.handoffDownload?.fileName || "-"}`
+    + ` | format=${handoffSummary?.handoffDownload?.format || "-"}`
+    + ` | href=${handoffSummary?.handoffDownload?.href || "-"}`
+  );
+  lines.push("");
+  lines.push("Handoff Checklist:");
+  if (checklist.length) {
+    for (const item of checklist) {
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | ready=${item.ready === true ? "yes" : "no"}`
+        + ` | audit=${item.auditLogId || "-"}`
+        + ` | action=${item.action || "-"}`
+        + ` | file=${item.fileName || "-"}`
+      );
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Supporting Downloads:");
+  if (supportingDownloads.length) {
+    for (const item of supportingDownloads) {
+      lines.push(
+        `- ${item.label || item.key || "-"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | format=${item.format || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+  } else {
+    lines.push("- none");
+  }
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -26689,6 +26953,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "steady-state-handoff-brief.txt",
     "steady-state-duty-board.txt",
     "steady-state-duty-action-links.txt",
+    "launch-operations-handoff-summary.txt",
     "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
     "csv/accounts.csv",
@@ -26719,6 +26984,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Steady-State Handoff Brief: ${String(readiness.steadyStateHandoffBrief?.status || "-").toUpperCase()} | ready=${readiness.steadyStateHandoffBrief?.handoffReady === true ? "yes" : "no"} | file=${readiness.steadyStateHandoffBrief?.handoffDownload?.fileName || "-"}`,
     `Steady-State Duty Board: ${String(readiness.steadyStateDutyBoard?.status || "-").toUpperCase()} | ready=${readiness.steadyStateDutyBoard?.readyForDuty === true ? "yes" : "no"} | file=${readiness.steadyStateDutyBoard?.boardDownload?.fileName || "-"}`,
     `Steady-State Duty Action Links: ${String(readiness.steadyStateDutyActionLinks?.status || "-").toUpperCase()} | actions=${readiness.steadyStateDutyActionLinks?.actionCount ?? 0} | file=${readiness.steadyStateDutyActionLinks?.actionLinksDownload?.fileName || "-"}`,
+    `Launch Operations Handoff Summary: ${String(readiness.launchOperationsHandoffSummary?.status || "-").toUpperCase()} | evidence=${readiness.launchOperationsHandoffSummary?.evidenceChainStatus || "-"} | file=${readiness.launchOperationsHandoffSummary?.handoffDownload?.fileName || "-"}`,
     ""
   ];
 
@@ -26911,6 +27177,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use steady-state-handoff-brief.txt as the single operator-facing handoff cover sheet.");
   lines.push("- Use steady-state-duty-board.txt as the active duty board with quick actions and handoff assets.");
   lines.push("- Use steady-state-duty-action-links.txt to jump from duty board actions to workspace, control, and download links.");
+  lines.push("- Use launch-operations-handoff-summary.txt as the latest launch operations evidence summary for shift handoff.");
   lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
@@ -27173,6 +27440,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "steady-state-duty-action-links.txt",
       body: buildDeveloperOpsSteadyStateDutyActionLinksText(payload)
+    },
+    {
+      path: "launch-operations-handoff-summary.txt",
+      body: buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload)
     },
     {
       path: "launch-mainline-handoff-routes.txt",
@@ -27896,7 +28167,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -28019,6 +28290,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-steady-state-duty-action-links.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsSteadyStateDutyActionLinksText(payload)
+    };
+  }
+
+  if (normalizedFormat === "launch-operations-handoff-summary") {
+    return {
+      fileName: "developer-ops-launch-operations-handoff-summary.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload)
     };
   }
 

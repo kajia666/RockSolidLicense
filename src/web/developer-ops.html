@@ -4800,11 +4800,13 @@
         const supportingDownloads = Array.isArray(launchOperationsHandoffSummary.supportingDownloads)
           ? launchOperationsHandoffSummary.supportingDownloads
           : [];
+        const receiptVisibilitySummary = launchOperationsHandoffSummary.receiptVisibilitySummary || null;
         const details = [
           `evidence=${esc(launchOperationsHandoffSummary.evidenceChainStatus || "-")}`,
           `completed=${esc(launchOperationsHandoffSummary.evidenceCompletedStageCount ?? 0)}/${esc(launchOperationsHandoffSummary.evidenceRequiredStageCount ?? 0)}`,
           `latest=${esc(launchOperationsHandoffSummary.latestEvidenceStage?.key || "-")}`,
-          `next=${esc(launchOperationsHandoffSummary.nextReviewAction?.key || "-")}`
+          `next=${esc(launchOperationsHandoffSummary.nextReviewAction?.key || "-")}`,
+          `receiptVisibilitySummary=${esc(receiptVisibilitySummary?.status || "-")}`
         ].join(" | ");
         const download = launchOperationsHandoffSummary.handoffDownload || {};
         return `
@@ -4816,6 +4818,7 @@
             <div class="hint">${esc(launchOperationsHandoffSummary.operatorSummary || "Launch operations handoff summary is available.")}</div>
             <div class="snapshot-focus-meta">${details}</div>
             <div class="snapshot-focus-meta">download=${esc(download.fileName || "-")} | format=${esc(download.format || "-")} | href=${esc(download.href || "-")}</div>
+            ${receiptVisibilitySummary ? `<div class="snapshot-focus-meta"><strong>Receipt Visibility Summary</strong> ${esc(receiptVisibilitySummary.status || "-")} | audit=${esc(receiptVisibilitySummary.auditLogId || "-")} | stage=${esc(receiptVisibilitySummary.stageKey || "-")} | visibleIn=${esc(receiptVisibilitySummary.visibleInCount ?? 0)} | recovery=${esc(receiptVisibilitySummary.failureRecovery?.method || "-")} ${esc(receiptVisibilitySummary.failureRecovery?.route || "-")}</div>` : ""}
             ${checklist.length ? `<ul class="snapshot-list">${checklist.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.status || "-")} | audit=${esc(item.auditLogId || "-")} | action=${esc(item.action || "-")} | file=${esc(item.fileName || "-")}</li>`).join("")}</ul>` : ""}
             ${supportingDownloads.length ? `<div class="audit-meta">${supportingDownloads.slice(0, 5).map((item) => renderTag(item.fileName || item.key || "-")).join("")}</div>` : ""}
           </div>
@@ -4835,12 +4838,14 @@
         const supportingDownloads = Array.isArray(launchOperationsDailyBrief.supportingDownloads)
           ? launchOperationsDailyBrief.supportingDownloads
           : [];
+        const receiptVisibilitySummary = launchOperationsDailyBrief.receiptVisibilitySummary || null;
         const details = [
           `handoff=${esc(launchOperationsDailyBrief.handoffSummaryStatus || "-")}`,
           `evidence=${esc(launchOperationsDailyBrief.evidenceChainStatus || "-")}`,
           `next=${esc(launchOperationsDailyBrief.nextReviewAction?.key || "-")}`,
           `queue=${esc(launchOperationsDailyBrief.queueTotal ?? 0)}`,
-          `attention=${esc(launchOperationsDailyBrief.attentionCount ?? 0)}`
+          `attention=${esc(launchOperationsDailyBrief.attentionCount ?? 0)}`,
+          `receiptVisibilitySummary=${esc(receiptVisibilitySummary?.status || "-")}`
         ].join(" | ");
         const download = launchOperationsDailyBrief.briefDownload || {};
         return `
@@ -4852,6 +4857,7 @@
             <div class="hint">${esc(launchOperationsDailyBrief.operatorSummary || "Launch operations daily brief is available for shift handoff.")}</div>
             <div class="snapshot-focus-meta">${details}</div>
             <div class="snapshot-focus-meta">download=${esc(download.fileName || "-")} | format=${esc(download.format || "-")} | href=${esc(download.href || "-")}</div>
+            ${receiptVisibilitySummary ? `<div class="snapshot-focus-meta"><strong>Receipt Visibility Summary</strong> ${esc(receiptVisibilitySummary.status || "-")} | audit=${esc(receiptVisibilitySummary.auditLogId || "-")} | recovery=${esc(receiptVisibilitySummary.failureRecovery?.method || "-")} ${esc(receiptVisibilitySummary.failureRecovery?.route || "-")}</div>` : ""}
             ${checklist.length ? `<ul class="snapshot-list">${checklist.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.status || "-")} | ready=${item.ready === true ? "yes" : "no"} | file=${esc(item.fileName || "-")}</li>`).join("")}</ul>` : ""}
             ${supportingDownloads.length ? `<div class="audit-meta">${supportingDownloads.slice(0, 5).map((item) => renderTag(item.fileName || item.key || "-")).join("")}</div>` : ""}
           </div>
@@ -4877,13 +4883,15 @@
         const supportingDownloads = Array.isArray(launchOperationsShiftActionPlan.supportingDownloads)
           ? launchOperationsShiftActionPlan.supportingDownloads
           : [];
+        const receiptVisibilitySummary = launchOperationsShiftActionPlan.receiptVisibilitySummary || null;
         const details = [
           `primary=${esc(launchOperationsShiftActionPlan.primaryAction?.key || "-")}`,
           `actions=${esc(launchOperationsShiftActionPlan.actionCount ?? actions.length)}`,
           `executionPlans=${esc(launchOperationsShiftActionPlan.executionPlanCount ?? executionPlans.length)}`,
           `queue=${esc(launchOperationsShiftActionPlan.queueTotal ?? 0)}`,
           `attention=${esc(launchOperationsShiftActionPlan.attentionCount ?? 0)}`,
-          `next=${esc(launchOperationsShiftActionPlan.nextReviewAction?.key || "-")}`
+          `next=${esc(launchOperationsShiftActionPlan.nextReviewAction?.key || "-")}`,
+          `receiptVisibilitySummary=${esc(receiptVisibilitySummary?.status || "-")}`
         ].join(" | ");
         const download = launchOperationsShiftActionPlan.actionPlanDownload || {};
         return `
@@ -4895,6 +4903,7 @@
             <div class="hint">${esc(launchOperationsShiftActionPlan.operatorSummary || "Launch operations shift action plan is ready for ordered operator execution.")}</div>
             <div class="snapshot-focus-meta">${details}</div>
             <div class="snapshot-focus-meta">download=${esc(download.fileName || "-")} | format=${esc(download.format || "-")} | href=${esc(download.href || "-")}</div>
+            ${receiptVisibilitySummary ? `<div class="snapshot-focus-meta"><strong>Receipt Visibility Summary</strong> ${esc(receiptVisibilitySummary.status || "-")} | stage=${esc(receiptVisibilitySummary.handoffEvidence?.stageKey || receiptVisibilitySummary.stageKey || "-")} | visibleIn=${esc(receiptVisibilitySummary.visibleInCount ?? 0)} | recovery=${esc(receiptVisibilitySummary.failureRecovery?.method || "-")} ${esc(receiptVisibilitySummary.failureRecovery?.route || "-")}</div>` : ""}
             ${actions.length ? `<ul class="snapshot-list">${actions.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.priority || "-")} | ${esc(item.status || "-")} | file=${esc(item.fileName || "-")} | href=${esc(item.href || "-")}</li>`).join("")}</ul>` : ""}
             ${executionPlans.length ? `<div class="snapshot-focus-meta"><strong>Execution Plans</strong></div><ul class="snapshot-list">${executionPlans.map((entry) => `<li><strong>${esc(entry.action.key || "-")}</strong> mode=${esc(entry.executionPlan.mode || "-")} | status=${esc(entry.executionPlan.status || "-")} | method=${esc(entry.executionPlan.method || "-")} | hint=${esc(entry.executionPlan.operatorHint || "-")}</li>`).join("")}</ul>` : ""}
             ${receiptPlans.length ? `<div class="snapshot-focus-meta"><strong>Receipt Plans</strong></div><ul class="snapshot-list">${receiptPlans.map((entry) => `<li><strong>${esc(entry.action.key || "-")}</strong> route=${esc(entry.receiptPlan.route || "-")} | method=${esc(entry.receiptPlan.method || "-")} | action=${esc(entry.receiptPlan.payload?.action || "-")} | note=${esc(entry.receiptPlan.payload?.note || "-")}</li>`).join("")}</ul>` : ""}

@@ -16580,6 +16580,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsHandoffSummary.evidenceRequiredStageCount, launchOperationsEvidenceChain.requiredStageCount);
     assert.equal(launchOperationsHandoffSummary.nextReviewAction.key, launchOperationsEvidenceChain.nextReviewAction.key);
     assert.equal(launchOperationsHandoffSummary.latestEvidenceStage.key, "steady_state_duty_plan_receipt");
+    assert.equal(launchOperationsHandoffSummary.receiptVisibilitySummary.status, "visible");
+    assert.equal(launchOperationsHandoffSummary.receiptVisibilitySummary.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(launchOperationsHandoffSummary.receiptVisibilitySummary.stageKey, "steady_state_duty_plan_receipt");
+    assert.equal(launchOperationsHandoffSummary.receiptVisibilitySummary.failureRecovery.route, "/api/developer/ops/steady-state-duty-plan/receipt");
+    assert.ok(launchOperationsHandoffSummary.receiptVisibilitySummary.visibleInCount >= 5);
     assert.ok(Array.isArray(launchOperationsHandoffSummary.handoffChecklist));
     assert.ok(launchOperationsHandoffSummary.handoffChecklist.some((item) => (
       item.key === "steady_state_duty_plan_receipt"
@@ -16602,6 +16607,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /RockSolid Developer Ops Launch Operations Handoff Summary/);
     assert.match(launchOperationsHandoffDownload.body, /Evidence Chain:/);
     assert.match(launchOperationsHandoffDownload.body, /steady_state_duty_plan_receipt/);
+    assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:/);
+    assert.match(launchOperationsHandoffDownload.body, /receiptVisibilitySummary=visible/);
     assert.match(launchOperationsHandoffDownload.body, /Next Review:/);
 
     const launchOperationsDailyBrief = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsDailyBrief;
@@ -16615,6 +16622,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsDailyBrief.evidenceCompletedStageCount, launchOperationsEvidenceChain.completedStageCount);
     assert.equal(launchOperationsDailyBrief.evidenceRequiredStageCount, launchOperationsEvidenceChain.requiredStageCount);
     assert.equal(launchOperationsDailyBrief.nextReviewAction.key, launchOperationsHandoffSummary.nextReviewAction.key);
+    assert.equal(launchOperationsDailyBrief.receiptVisibilitySummary.status, "visible");
+    assert.equal(launchOperationsDailyBrief.receiptVisibilitySummary.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(launchOperationsDailyBrief.receiptVisibilitySummary.failureRecovery.method, "POST");
     assert.ok(Array.isArray(launchOperationsDailyBrief.dailyChecklist));
     assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => item.key === "launch_operations_handoff_summary"));
     assert.match(launchOperationsDailyBrief.briefDownload.href, /format=launch-operations-daily-brief/);
@@ -16633,6 +16643,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsDailyBriefDownload.contentDisposition || "", /developer-ops-launch-operations-daily-brief\.txt/);
     assert.match(launchOperationsDailyBriefDownload.body, /RockSolid Developer Ops Launch Operations Daily Brief/);
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsDailyBriefDownload.body, /Next Review:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Checklist:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:/);
@@ -16647,6 +16659,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsShiftActionPlan.actionCount, launchOperationsShiftActionPlan.operatorActions.length);
     assert.ok(launchOperationsShiftActionPlan.actionCount >= 4);
     assert.equal(launchOperationsShiftActionPlan.primaryAction.key, "download_launch_operations_daily_brief");
+    assert.equal(launchOperationsShiftActionPlan.receiptVisibilitySummary.status, "visible");
+    assert.equal(launchOperationsShiftActionPlan.receiptVisibilitySummary.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(launchOperationsShiftActionPlan.receiptVisibilitySummary.handoffEvidence.stageKey, "steady_state_duty_plan_receipt");
     assert.equal(launchOperationsShiftActionPlan.executionPlanCount, launchOperationsShiftActionPlan.operatorActions.length);
     assert.ok(launchOperationsShiftActionPlan.readyExecutionPlanCount >= 3);
     assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.status, "ready");
@@ -16679,6 +16694,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.contentDisposition || "", /developer-ops-launch-operations-shift-action-plan\.txt/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /RockSolid Developer Ops Launch Operations Shift Action Plan/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Primary Action:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /visibleIn=\d+/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Actions:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Execution Plans:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /mode=download/);
@@ -20645,6 +20662,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Launch Operations Shift Action Plan/);
     assert.match(html, /download-export-launch-operations-shift-action-plan-btn/);
     assert.match(html, /launch-operations-shift-action-plan/);
+    assert.match(html, /receiptVisibilitySummary/);
+    assert.match(html, /Receipt Visibility Summary/);
     assert.match(html, /executionPlan/);
     assert.match(html, /Execution Plans/);
     assert.match(html, /receiptPlan/);

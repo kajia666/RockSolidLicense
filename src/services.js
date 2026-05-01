@@ -19227,6 +19227,39 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
   };
 }
 
+function buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceipt = null) {
+  const receipt = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
+  const visibility = receipt?.receiptVisibility && typeof receipt.receiptVisibility === "object"
+    ? receipt.receiptVisibility
+    : null;
+  if (!visibility) {
+    return null;
+  }
+  const visibleIn = Array.isArray(visibility.visibleIn) ? visibility.visibleIn : [];
+  const failureRecovery = visibility.failureRecovery && typeof visibility.failureRecovery === "object"
+    ? visibility.failureRecovery
+    : null;
+  const handoffEvidence = visibility.handoffEvidence && typeof visibility.handoffEvidence === "object"
+    ? visibility.handoffEvidence
+    : null;
+  return {
+    version: "developer-ops-receipt-visibility-summary/v1",
+    status: visibility.status || "pending",
+    auditLogId: visibility.auditLogId || receipt.auditLogId || null,
+    productCode: visibility.productCode || receipt.productCode || null,
+    channel: visibility.channel || receipt.channel || "stable",
+    stageKey: handoffEvidence?.stageKey || "steady_state_duty_plan_receipt",
+    visibleIn,
+    visibleInCount: visibleIn.length,
+    snapshotRoute: visibility.snapshotRoute || "/api/developer/ops/export",
+    snapshotQuery: visibility.snapshotQuery || null,
+    exportDownloadRoute: visibility.exportDownloadRoute || "/api/developer/ops/export/download",
+    failureRecovery,
+    handoffEvidence,
+    operatorHint: failureRecovery?.operatorHint || "Confirm the latest receipt is visible before handing launch operations to the next owner."
+  };
+}
+
 function buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs = [], limit = 5) {
   return auditLogs
     .map((item) => {
@@ -22080,6 +22113,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     fileName: item.fileName || item.format || null,
     recordedAt: item.recordedAt || null
   }));
+  const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
+  const receiptVisibilitySummary = buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceiptPayload);
   const supportingDownloads = [
     handoffDownload,
     steadyStateHandoffBrief?.handoffDownload || null,
@@ -22106,7 +22141,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     exceptionDigestStatus: steadyStateExceptionDigest?.status || null,
     dutyBoardStatus: steadyStateDutyBoard?.status || null,
     dutyActionLinksStatus: steadyStateDutyActionLinks?.status || null,
-    latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    latestSteadyStateDutyPlanReceipt: latestSteadyStateDutyPlanReceiptPayload,
+    receiptVisibilitySummary,
     operatorSummary: chain.complete === true
       ? "Launch operations evidence is ready for steady-state handoff."
       : "Launch operations evidence still needs review before steady-state handoff."
@@ -22162,6 +22198,9 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
   );
   const followUpCount = Array.isArray(followUpQueue) ? followUpQueue.length : 0;
   const status = handoffSummary.status || (chain?.complete === true ? "ready" : "review");
+  const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
+  const receiptVisibilitySummary = handoffSummary.receiptVisibilitySummary
+    || buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceiptPayload);
   const dailyChecklist = [
     {
       key: "launch_operations_evidence_chain",
@@ -22265,7 +22304,8 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     briefDownload,
     supportingDownloads,
     dailyChecklist,
-    latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    latestSteadyStateDutyPlanReceipt: latestSteadyStateDutyPlanReceiptPayload,
+    receiptVisibilitySummary,
     headline: status === "ready"
       ? "Launch operations daily brief is ready for operator shift handoff."
       : "Launch operations daily brief is ready for review before shift handoff.",
@@ -22311,6 +22351,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
   const queueTotal = Number(dailyBrief.queueTotal ?? steadyStateExceptionDigest?.queueSummary?.total ?? steadyStateDutyBoard?.queueTotal ?? 0);
   const attentionCount = Number(dailyBrief.attentionCount ?? steadyStateExceptionDigest?.attentionCount ?? steadyStateDutyBoard?.attentionCount ?? 0);
   const followUpCount = Number(dailyBrief.followUpCount ?? (Array.isArray(followUpQueue) ? followUpQueue.length : 0));
+  const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
+  const receiptVisibilitySummary = dailyBrief.receiptVisibilitySummary
+    || launchOperationsHandoffSummary?.receiptVisibilitySummary
+    || buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceiptPayload);
   const operatorActions = [];
   const buildShiftExecutionPlan = ({
     key = "",
@@ -22560,7 +22604,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     operatorActions,
     actionPlanDownload,
     supportingDownloads,
-    latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    latestSteadyStateDutyPlanReceipt: latestSteadyStateDutyPlanReceiptPayload,
+    receiptVisibilitySummary,
     headline: dailyBrief.status === "ready"
       ? "Launch operations shift action plan is ready for the operator."
       : "Launch operations shift action plan needs review before handoff.",
@@ -25979,6 +26024,26 @@ function appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, chain = nul
   }
 }
 
+function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, {
+  title = "Receipt Visibility Summary:"
+} = {}) {
+  if (!summary || typeof summary !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- receiptVisibilitySummary=${summary.status || "-"}`
+    + ` | audit=${summary.auditLogId || "-"}`
+    + ` | stage=${summary.stageKey || "-"}`
+    + ` | visibleIn=${summary.visibleInCount ?? 0}`
+  );
+  lines.push(
+    `- recovery=${summary.failureRecovery?.method || "-"} ${summary.failureRecovery?.route || "-"}`
+    + ` | action=${summary.failureRecovery?.payload?.action || "-"}`
+    + ` | intent=${summary.failureRecovery?.payload?.intent || "-"}`
+  );
+}
+
 function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = null, {
   title = "Launch Operations Handoff Summary:"
 } = {}) {
@@ -26002,6 +26067,7 @@ function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = 
     + ` | format=${summary.handoffDownload?.format || "-"}`
     + ` | href=${summary.handoffDownload?.href || "-"}`
   );
+  appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary.receiptVisibilitySummary);
   const checklist = Array.isArray(summary.handoffChecklist) ? summary.handoffChecklist : [];
   if (checklist.length) {
     lines.push("- checklist:");
@@ -26039,6 +26105,7 @@ function appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, brief = null, 
     + ` | dutyActionLinks=${brief.dutyActionLinksStatus || "-"}`
     + ` | actions=${brief.dutyActionCount ?? 0}`
   );
+  appendDeveloperOpsReceiptVisibilitySummaryLines(lines, brief.receiptVisibilitySummary);
   const checklist = Array.isArray(brief.dailyChecklist) ? brief.dailyChecklist : [];
   if (checklist.length) {
     lines.push("- dailyChecklist:");
@@ -26076,6 +26143,7 @@ function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = nu
     + ` | dutyActionLinks=${plan.dutyActionLinksStatus || "-"}`
     + ` | nextReview=${plan.nextReviewAction?.key || "-"}`
   );
+  appendDeveloperOpsReceiptVisibilitySummaryLines(lines, plan.receiptVisibilitySummary);
   const actions = Array.isArray(plan.operatorActions) ? plan.operatorActions : [];
   if (actions.length) {
     lines.push("- operatorActions:");
@@ -27637,6 +27705,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
     + ` | href=${handoffSummary?.handoffDownload?.href || "-"}`
   );
   lines.push("");
+  appendDeveloperOpsReceiptVisibilitySummaryLines(lines, handoffSummary?.receiptVisibilitySummary);
+  lines.push("");
   lines.push("Handoff Checklist:");
   if (checklist.length) {
     for (const item of checklist) {
@@ -27731,6 +27801,8 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
     + ` | actions=${dailyBrief?.dutyActionCount ?? 0}`
     + ` | followUps=${dailyBrief?.followUpCount ?? 0}`
   );
+  lines.push("");
+  appendDeveloperOpsReceiptVisibilitySummaryLines(lines, dailyBrief?.receiptVisibilitySummary);
   lines.push("");
   lines.push("Next Review:");
   lines.push(
@@ -27858,6 +27930,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     + ` | executionPlans=${actionPlan?.executionPlanCount ?? 0}`
     + ` | followUps=${actionPlan?.followUpCount ?? 0}`
   );
+  lines.push("");
+  appendDeveloperOpsReceiptVisibilitySummaryLines(lines, actionPlan?.receiptVisibilitySummary);
   lines.push("");
   lines.push("Shift Actions:");
   if (actions.length) {

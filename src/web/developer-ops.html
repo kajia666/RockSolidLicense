@@ -150,6 +150,7 @@
             <button class="secondary" id="download-export-steady-state-review-btn">Download Steady-State Review</button>
             <button class="secondary" id="download-export-exception-digest-btn">Download Exception Digest</button>
             <button class="secondary" id="download-export-handoff-brief-btn">Download Handoff Brief</button>
+            <button class="secondary" id="download-export-duty-board-btn">Download Duty Board</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
@@ -4903,6 +4904,61 @@
         `;
       }
 
+      function renderSteadyStateDutyBoard(initialLaunchOpsReadiness = {}) {
+        const board = initialLaunchOpsReadiness?.steadyStateDutyBoard || null;
+        if (!board || typeof board !== "object") {
+          return "";
+        }
+        const status = String(board.status || "unknown").toLowerCase();
+        const statusClass = board.readyForDuty === true ? "ok" : "warning";
+        const details = [
+          `ready=${board.readyForDuty === true ? "yes" : "no"}`,
+          `queue=${esc(board.queueStatus || "-")}`,
+          `queueTotal=${esc(board.queueTotal ?? 0)}`,
+          `attention=${esc(board.attentionCount ?? 0)}`,
+          `closeout=${esc(board.closeoutStatus || "-")}`
+        ].join(" | ");
+        const quickActions = Array.isArray(board.quickActions) ? board.quickActions : [];
+        const handoffAssets = Array.isArray(board.handoffAssets) ? board.handoffAssets : [];
+        const latestReceipt = board.latestReceipt && typeof board.latestReceipt === "object" ? board.latestReceipt : null;
+        const receiptDetails = latestReceipt
+          ? [
+              `operation=${esc(latestReceipt.operationLabel || latestReceipt.operation || "-")}`,
+              `handoff=${esc(latestReceipt.handoffFileName || "-")}`,
+              `audit=${esc(latestReceipt.auditLogId || "-")}`,
+              `at=${esc(formatTime(latestReceipt.createdAt))}`
+            ].join(" | ")
+          : "";
+        return `
+          <div class="snapshot-recap steady-state-duty-board" data-steady-state-duty-board="${esc(status)}">
+            <div class="snapshot-recap-head">
+              <strong>Steady-State Duty Board</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(board.summary || "Active steady-state duty board for the first operating lane.")}</div>
+            <div class="hint">${details}</div>
+            <div class="snapshot-recap">
+              <strong>Board Download</strong>
+              <div class="hint">file=${esc(board.boardDownload?.fileName || "-")} | format=${esc(board.boardDownload?.format || "-")} | href=${esc(board.boardDownload?.href || "-")}</div>
+            </div>
+            ${receiptDetails ? `
+              <div class="snapshot-recap">
+                <strong>Latest Receipt</strong>
+                <div class="hint">${receiptDetails}</div>
+              </div>
+            ` : ""}
+            <div class="snapshot-recap">
+              <strong>Quick Actions</strong>
+              <ul class="snapshot-list">${quickActions.length ? quickActions.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.priority || "-")} | source=${esc(item.source || "-")} | href=${esc(item.href || "-")}</li>`).join("") : "<li>No quick actions are attached.</li>"}</ul>
+            </div>
+            <div class="snapshot-recap">
+              <strong>Handoff Assets</strong>
+              <ul class="snapshot-list">${handoffAssets.length ? handoffAssets.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.fileName || "-")} | ${esc(item.format || "-")} | ${esc(item.href || "-")}</li>`).join("") : "<li>No handoff assets are attached.</li>"}</ul>
+            </div>
+          </div>
+        `;
+      }
+
       function renderOperationalExceptionSignals(initialLaunchOpsReadiness = {}) {
         const traceability = initialLaunchOpsReadiness?.traceability || {};
         const operationalExceptionEntry = initialLaunchOpsReadiness?.operationalExceptionEntry
@@ -5697,6 +5753,7 @@
           ${renderSteadyStateOperationalReview(initialLaunchOpsReadiness)}
           ${renderSteadyStateExceptionDigest(initialLaunchOpsReadiness)}
           ${renderSteadyStateHandoffBrief(initialLaunchOpsReadiness)}
+          ${renderSteadyStateDutyBoard(initialLaunchOpsReadiness)}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
@@ -6473,6 +6530,7 @@
       el("download-export-steady-state-review-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-operational-review", "developer-ops-steady-state-operational-review.txt", "Steady-state operational review"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-exception-digest-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-exception-digest", "developer-ops-steady-state-exception-digest.txt", "Steady-state exception digest"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-handoff-brief-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-handoff-brief", "developer-ops-steady-state-handoff-brief.txt", "Steady-state handoff brief"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-duty-board-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-duty-board", "developer-ops-steady-state-duty-board.txt", "Steady-state duty board"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

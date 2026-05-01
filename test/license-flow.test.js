@@ -16404,6 +16404,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateHandoffBriefDownload.body, /Download Set:/);
     assert.match(steadyStateHandoffBriefDownload.body, /Operator Handoff:/);
 
+    const steadyStateDutyBoard = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateDutyBoard;
+    assert.ok(steadyStateDutyBoard);
+    assert.equal(steadyStateDutyBoard.status, "active");
+    assert.equal(steadyStateDutyBoard.readyForDuty, true);
+    assert.equal(steadyStateDutyBoard.projectCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(steadyStateDutyBoard.queueTotal, steadyStateExceptionDigest.queueSummary.total);
+    assert.match(steadyStateDutyBoard.boardDownload.href, /format=steady-state-duty-board/);
+    assert.match(steadyStateDutyBoard.handoffBriefDownload.href, /format=steady-state-handoff-brief/);
+    assert.ok(Array.isArray(steadyStateDutyBoard.quickActions));
+    assert.ok(steadyStateDutyBoard.quickActions.length >= 1);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:/);
+    assert.match(steadyStateSnapshot.summaryText, /readyForDuty=true/);
+
+    const steadyStateDutyBoardDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=steady-state-duty-board",
+      ownerSession.token
+    );
+    assert.equal(steadyStateDutyBoardDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(steadyStateDutyBoardDownload.contentDisposition || "", /developer-ops-steady-state-duty-board\.txt/);
+    assert.match(steadyStateDutyBoardDownload.body, /RockSolid Developer Ops Steady-State Duty Board/);
+    assert.match(steadyStateDutyBoardDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
+    assert.match(steadyStateDutyBoardDownload.body, /Ready For Duty: yes/);
+    assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:/);
+    assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

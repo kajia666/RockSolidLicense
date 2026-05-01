@@ -6352,6 +6352,29 @@ test("developer release package export bundles integration, versions, and notice
         launchReview.summaryText,
         /control=Prepare (account re-enable|account control|entitlement resume|entitlement control|7-day extension|point top-up|session review|session control|device unblock review|device control)/i
       );
+      assert.equal(
+        launchReview.reviewSummary.launchOperationsOverviewStatus?.status,
+        launchReview.opsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOverviewStatus.status
+      );
+      assert.equal(
+        launchReview.reviewSummary.launchOperationsOverviewStatus?.overviewDownload?.format,
+        "launch-operations-overview-status"
+      );
+      assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
+        item.key === "launch_review_launch_ops_overview"
+        && item.recommendedDownload?.format === "launch-operations-overview-status"
+      ));
+      assert.ok(launchReview.reviewSummary.recommendedDownloads.some((item) =>
+        item.key === "ops_launch_operations_overview_status"
+        && item.source === "developer-ops"
+      ));
+      assert.ok(launchReview.reviewSummary.routeFocus?.controls?.some((item) =>
+        item.label === "Download Launch Ops Overview"
+        && item.recommendedDownload?.format === "launch-operations-overview-status"
+      ));
+      assert.match(launchReview.summaryText, /Launch Review Launch Ops Overview:/);
+      assert.match(launchReview.summaryText, /overviewStatus=.*receipt=/);
+      assert.match(launchReview.summaryText, /format=launch-operations-overview-status/);
       assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(
@@ -6504,6 +6527,26 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.format, "initial-launch-ops-readiness");
       assert.match(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.href || "", /\/api\/developer\/launch-mainline\/download\?/);
       assert.match(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.href || "", /format=initial-launch-ops-readiness/);
+      assert.equal(
+        launchMainline.mainlineSummary.initialLaunchOpsOverviewStatus?.status,
+        launchMainline.opsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOverviewStatus.status
+      );
+      assert.equal(
+        launchMainline.mainlineSummary.initialLaunchOpsOverviewStatusDownload?.format,
+        "launch-operations-overview-status"
+      );
+      assert.ok(launchMainline.mainlineSummary.initialLaunchOpsMainlineGate?.actionPlan?.some((item) =>
+        item.key === "initial_launch_ops_overview_status"
+        && item.recommendedDownload?.format === "launch-operations-overview-status"
+      ));
+      assert.ok(launchMainline.mainlineSummary.initialLaunchOpsMainlineGate?.recommendedDownloads?.some((item) =>
+        item.key === "ops_launch_operations_overview_status"
+        && item.source === "developer-ops"
+      ));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) =>
+        item.key === "ops_launch_operations_overview_status"
+        && item.source === "developer-ops"
+      ));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) =>
         item.key === "launch_mainline_initial_launch_ops_readiness"
         && item.source === "developer-launch-mainline"
@@ -6937,6 +6980,9 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /RockSolid Developer Launch Mainline/);
       assert.match(launchMainline.summaryText, /Launch Mainline Gate:/);
       assert.match(launchMainline.summaryText, /Initial Launch Ops Gate:/);
+      assert.match(launchMainline.summaryText, /Launch Mainline Launch Ops Overview:/);
+      assert.match(launchMainline.summaryText, /overviewStatus=.*receipt=/);
+      assert.match(launchMainline.summaryText, /format=launch-operations-overview-status/);
       assert.match(launchMainline.summaryText, /- decision: HOLD/);
       assert.match(launchMainline.summaryText, /- canEnterInitialLaunch: false/);
       assert.match(

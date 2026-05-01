@@ -11110,6 +11110,9 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
   const launchDutyActionOrder = reviewSummary.launchDutyActionOrder
     || opsSnapshot.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder
     || null;
+  const launchOperationsOverviewStatus = reviewSummary.launchOperationsOverviewStatus
+    || opsSnapshot.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus
+    || null;
   const lines = [
     "RockSolid Developer Launch Review",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -11159,6 +11162,12 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     opsOverview.latestLaunchReceipts,
     "Launch Review Receipt Visibility:"
   );
+  if (launchOperationsOverviewStatus) {
+    lines.push("");
+    appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, launchOperationsOverviewStatus, {
+      title: "Launch Review Launch Ops Overview:"
+    });
+  }
   if (launchDutyActionOrder) {
     lines.push("");
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
@@ -11389,6 +11398,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const workflowChecklist = launchWorkflow?.workflowChecklist || {};
   const opsOverview = opsSnapshot?.overview || {};
   const launchDutyActionOrder = opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
+  const launchOperationsOverviewStatusBase = opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
   const reviewMode = String(filters.reviewMode || "matched").trim().toLowerCase() || "matched";
   const routeProductCode = launchWorkflow?.manifest?.project?.code || filters.productCode || null;
   const routeChannel = launchWorkflow?.manifest?.channel || filters.channel || "stable";
@@ -11420,6 +11430,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
     ...(filters.entityType ? { entityType: filters.entityType } : {}),
     ...routedParams
   };
+  const launchOperationsOverviewDownload = ensureLaunchWorkflowDownloadHref(
+    launchOperationsOverviewStatusBase?.overviewDownload || null,
+    scopedOpsParams
+  );
+  const launchOperationsOverviewStatus = launchOperationsOverviewStatusBase
+    ? {
+        ...launchOperationsOverviewStatusBase,
+        overviewDownload: launchOperationsOverviewDownload || launchOperationsOverviewStatusBase.overviewDownload || null
+      }
+    : null;
   const stayAction = createLaunchWorkflowWorkspaceShortcut(
     "launch-review",
     "summary",
@@ -11907,6 +11927,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
     recommendedDownload: mainlineRehearsalGuideDownload
   }));
+  if (launchOperationsOverviewStatus) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_launch_ops_overview",
+      title: "Review Launch Ops Overview Status",
+      summary: launchOperationsOverviewStatus.operatorSummary
+        || "Use the one-screen Launch Ops overview before leaving Launch Review.",
+      status: launchOperationsOverviewStatus.readyForOperations === true ? "pass" : "review",
+      priority: "secondary",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: launchOperationsOverviewDownload
+    }));
+  }
 
   for (const item of (Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : []).slice(0, 3)) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
@@ -12034,6 +12066,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(workflowSummaryDownload);
   pushRecommendedDownload(workflowChecklistDownload);
   pushRecommendedDownload(opsSummaryDownload);
+  pushRecommendedDownload(launchOperationsOverviewDownload);
   if (handoffDownload) {
     pushRecommendedDownload(handoffDownload);
   }
@@ -12107,6 +12140,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
         label: "Download Review Summary",
         recommendedDownload: reviewDownload
       },
+      launchOperationsOverviewDownload
+        ? {
+            kind: "download",
+            label: "Download Launch Ops Overview",
+            recommendedDownload: launchOperationsOverviewDownload
+          }
+        : null,
       routeFocusDownload
         ? {
             kind: "download",
@@ -12163,6 +12203,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     launchDutyActionOrder,
+    launchOperationsOverviewStatus,
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
@@ -13672,6 +13713,19 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     "initial-launch-ops-readiness",
     params
   );
+  const initialLaunchOpsOverviewStatusBase = initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
+  const initialLaunchOpsOverviewStatusDownload = ensureLaunchWorkflowDownloadHref(
+    initialLaunchOpsOverviewStatusBase?.overviewDownload || null,
+    params
+  );
+  const initialLaunchOpsOverviewStatus = initialLaunchOpsOverviewStatusBase
+    ? {
+        ...initialLaunchOpsOverviewStatusBase,
+        overviewDownload: initialLaunchOpsOverviewStatusDownload
+          || initialLaunchOpsOverviewStatusBase.overviewDownload
+          || null
+      }
+    : null;
   const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
     || (Array.isArray(launchDutyActionOrder?.steps)
@@ -14182,9 +14236,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             priority: "primary",
             workspaceAction: initialLaunchOpsWorkspaceAction,
             recommendedDownload: initialLaunchOpsReadinessDownload
-          })
-        ],
-        recommendedDownloads: [initialLaunchOpsReadinessDownload].filter(Boolean)
+          }),
+          initialLaunchOpsOverviewStatus ? createLaunchWorkflowActionPlanStep({
+            key: "initial_launch_ops_overview_status",
+            title: "Review Launch Ops Overview Status",
+            summary: initialLaunchOpsOverviewStatus.operatorSummary
+              || "Open the one-screen Launch Ops overview before launch-day watch.",
+            status: initialLaunchOpsOverviewStatus.readyForOperations === true ? "pass" : "review",
+            priority: "secondary",
+            workspaceAction: initialLaunchOpsWorkspaceAction,
+            recommendedDownload: initialLaunchOpsOverviewStatusDownload
+          }) : null
+        ].filter(Boolean),
+        recommendedDownloads: [
+          initialLaunchOpsReadinessDownload,
+          initialLaunchOpsOverviewStatusDownload
+        ].filter(Boolean)
       })
     : null;
   const productionGate = buildLaunchMainlineProductionGatePayload({
@@ -14837,6 +14904,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(productionHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(initialLaunchOpsOverviewStatusDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stabilizationHandoffDownload, params));
@@ -15746,9 +15814,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     smokeGate,
     opsGate,
     initialLaunchOpsReadiness,
+    initialLaunchOpsOverviewStatus,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
+    initialLaunchOpsOverviewStatusDownload,
     launchRunway,
     operationalReadiness,
     launchDayWatchPanel: ensuredLaunchDayWatchPanel,
@@ -16261,6 +16331,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     mainlineSummary.initialLaunchOpsReadiness,
     mainlineSummary.initialLaunchOpsReadinessDownload
   );
+  if (mainlineSummary.initialLaunchOpsOverviewStatus) {
+    lines.push("");
+    appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, mainlineSummary.initialLaunchOpsOverviewStatus, {
+      title: "Launch Mainline Launch Ops Overview:"
+    });
+  }
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
   lines.push(`Mainline Recommended Download: ${formatLaunchHandoffDownloadText(mainlineSummary.recommendedDownload, { fileSeparator: " | " })}`);
   if (mainlineSummary.continuation) {

@@ -16624,6 +16624,37 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Checklist:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:/);
 
+    const launchOperationsShiftActionPlan = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsShiftActionPlan;
+    assert.ok(launchOperationsShiftActionPlan);
+    assert.equal(launchOperationsShiftActionPlan.version, "developer-ops-launch-operations-shift-action-plan/v1");
+    assert.equal(launchOperationsShiftActionPlan.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(launchOperationsShiftActionPlan.channel, "stable");
+    assert.equal(launchOperationsShiftActionPlan.status, launchOperationsDailyBrief.status);
+    assert.equal(launchOperationsShiftActionPlan.dailyBriefStatus, launchOperationsDailyBrief.status);
+    assert.equal(launchOperationsShiftActionPlan.actionCount, launchOperationsShiftActionPlan.operatorActions.length);
+    assert.ok(launchOperationsShiftActionPlan.actionCount >= 4);
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.key, "download_launch_operations_daily_brief");
+    assert.match(launchOperationsShiftActionPlan.actionPlanDownload.href, /format=launch-operations-shift-action-plan/);
+    assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_board"));
+    assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_action_links"));
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:/);
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      new RegExp(`shiftPlan=.*primary=${launchOperationsShiftActionPlan.primaryAction.key}`)
+    );
+
+    const launchOperationsShiftActionPlanDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=launch-operations-shift-action-plan",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsShiftActionPlanDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchOperationsShiftActionPlanDownload.contentDisposition || "", /developer-ops-launch-operations-shift-action-plan\.txt/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /RockSolid Developer Ops Launch Operations Shift Action Plan/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Primary Action:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Actions:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -20578,6 +20609,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Launch Operations Daily Brief/);
     assert.match(html, /download-export-launch-operations-daily-brief-btn/);
     assert.match(html, /launch-operations-daily-brief/);
+    assert.match(html, /launchOperationsShiftActionPlan/);
+    assert.match(html, /renderLaunchOperationsShiftActionPlan/);
+    assert.match(html, /Launch Operations Shift Action Plan/);
+    assert.match(html, /download-export-launch-operations-shift-action-plan-btn/);
+    assert.match(html, /launch-operations-shift-action-plan/);
     assert.match(html, /lastSteadyStateDutyPlanResult/);
     assert.match(html, /buildSteadyStateDutyPlanResult/);
     assert.match(html, /renderLastSteadyStateDutyPlanResult/);

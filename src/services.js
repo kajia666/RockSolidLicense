@@ -3620,6 +3620,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("steady_state_duty_action_links") || normalized.includes("steady-state-duty-action-links")) return "steady-state-duty-action-links";
   if (normalized.includes("launch_operations_handoff_summary") || normalized.includes("launch-operations-handoff-summary")) return "launch-operations-handoff-summary";
   if (normalized.includes("launch_operations_daily_brief") || normalized.includes("launch-operations-daily-brief")) return "launch-operations-daily-brief";
+  if (normalized.includes("launch_operations_shift_action_plan") || normalized.includes("launch-operations-shift-action-plan")) return "launch-operations-shift-action-plan";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -19552,6 +19553,19 @@ function buildDeveloperOpsLaunchOperationsDailyBriefDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsLaunchOperationsShiftActionPlanDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_launch_operations_shift_action_plan",
+    "developer-ops-launch-operations-shift-action-plan.txt",
+    "Developer Ops launch operations shift action plan",
+    {
+      source: "developer-ops",
+      format: "launch-operations-shift-action-plan",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
@@ -22163,6 +22177,210 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
   };
 }
 
+function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
+  scope = {},
+  launchOperationsDailyBrief = null,
+  launchOperationsHandoffSummary = null,
+  steadyStateOperationalReview = null,
+  steadyStateExceptionDigest = null,
+  steadyStateDutyBoard = null,
+  steadyStateDutyActionLinks = null,
+  latestSteadyStateDutyPlanReceipt = null,
+  followUpQueue = []
+} = {}) {
+  const dailyBrief = launchOperationsDailyBrief && typeof launchOperationsDailyBrief === "object"
+    ? launchOperationsDailyBrief
+    : null;
+  if (!dailyBrief) {
+    return null;
+  }
+  const productCode = dailyBrief.productCode
+    || launchOperationsHandoffSummary?.productCode
+    || scope.productCode
+    || latestSteadyStateDutyPlanReceipt?.productCode
+    || null;
+  const channel = dailyBrief.channel
+    || launchOperationsHandoffSummary?.channel
+    || latestSteadyStateDutyPlanReceipt?.channel
+    || scope.channel
+    || "stable";
+  const planScope = {
+    ...scope,
+    productCode,
+    channel
+  };
+  const actionPlanDownload = productCode ? buildDeveloperOpsLaunchOperationsShiftActionPlanDownload(planScope) : null;
+  const queueTotal = Number(dailyBrief.queueTotal ?? steadyStateExceptionDigest?.queueSummary?.total ?? steadyStateDutyBoard?.queueTotal ?? 0);
+  const attentionCount = Number(dailyBrief.attentionCount ?? steadyStateExceptionDigest?.attentionCount ?? steadyStateDutyBoard?.attentionCount ?? 0);
+  const followUpCount = Number(dailyBrief.followUpCount ?? (Array.isArray(followUpQueue) ? followUpQueue.length : 0));
+  const operatorActions = [];
+  const pushOperatorAction = ({
+    key = "",
+    label = "",
+    priority = "secondary",
+    kind = "review",
+    status = "ready",
+    href = "",
+    fileName = "",
+    format = "",
+    source = "",
+    summary = "",
+    confirmation = ""
+  } = {}) => {
+    const resolvedKey = String(key || label || "").trim();
+    if (!resolvedKey || operatorActions.some((item) => item.key === resolvedKey)) {
+      return;
+    }
+    operatorActions.push({
+      key: resolvedKey,
+      label: label || resolvedKey,
+      priority,
+      kind,
+      status,
+      href: href || null,
+      fileName: fileName || null,
+      format: format || null,
+      source: source || null,
+      summary: summary || "",
+      confirmation: confirmation || ""
+    });
+  };
+  pushOperatorAction({
+    key: "download_launch_operations_daily_brief",
+    label: "Download Launch Operations Daily Brief",
+    priority: "primary",
+    kind: "download",
+    status: dailyBrief.briefDownload?.href ? "ready" : "pending",
+    href: dailyBrief.briefDownload?.href || "",
+    fileName: dailyBrief.briefDownload?.fileName || "",
+    format: dailyBrief.briefDownload?.format || "",
+    source: "daily_brief",
+    summary: "Start the shift from the single operator-facing launch operations daily brief.",
+    confirmation: "Attach the daily brief to the shift note before starting live watch."
+  });
+  pushOperatorAction({
+    key: "open_steady_state_duty_board",
+    label: "Open Steady-State Duty Board",
+    priority: steadyStateDutyBoard?.readyForDuty === true ? "primary" : "review",
+    kind: "workspace",
+    status: steadyStateDutyBoard?.readyForDuty === true ? "ready" : "review",
+    href: steadyStateDutyBoard?.workspaceAction?.href || steadyStateDutyBoard?.boardDownload?.href || "",
+    fileName: steadyStateDutyBoard?.boardDownload?.fileName || "",
+    format: steadyStateDutyBoard?.boardDownload?.format || "",
+    source: "duty_board",
+    summary: steadyStateDutyBoard?.summary || "Keep the duty board open while monitoring the first stable operating lane.",
+    confirmation: "Confirm the board status before transferring or widening launch duty."
+  });
+  pushOperatorAction({
+    key: "open_steady_state_duty_action_links",
+    label: "Open Steady-State Duty Action Links",
+    priority: steadyStateDutyActionLinks?.readyForDuty === true ? "primary" : "review",
+    kind: "download",
+    status: steadyStateDutyActionLinks?.readyForDuty === true ? "ready" : "review",
+    href: steadyStateDutyActionLinks?.actionLinksDownload?.href || "",
+    fileName: steadyStateDutyActionLinks?.actionLinksDownload?.fileName || "",
+    format: steadyStateDutyActionLinks?.actionLinksDownload?.format || "",
+    source: "duty_action_links",
+    summary: `${steadyStateDutyActionLinks?.actionCount ?? 0} mapped duty action link${Number(steadyStateDutyActionLinks?.actionCount ?? 0) === 1 ? "" : "s"} are available for operator follow-through.`,
+    confirmation: "Use the mapped links instead of manually reconstructing API routes during launch watch."
+  });
+  pushOperatorAction({
+    key: queueTotal > 0 || attentionCount > 0 ? "review_steady_state_exception_queue" : "monitor_steady_state_exception_queue",
+    label: queueTotal > 0 || attentionCount > 0 ? "Review Steady-State Exception Queue" : "Monitor Steady-State Exception Queue",
+    priority: queueTotal > 0 || attentionCount > 0 ? "review" : "secondary",
+    kind: "review",
+    status: queueTotal > 0 || attentionCount > 0 ? "attention" : "ready",
+    href: steadyStateExceptionDigest?.workspaceAction?.href || steadyStateExceptionDigest?.digestDownload?.href || "",
+    fileName: steadyStateExceptionDigest?.digestDownload?.fileName || "",
+    format: steadyStateExceptionDigest?.digestDownload?.format || "",
+    source: "exception_digest",
+    summary: `${queueTotal} queue item${queueTotal === 1 ? "" : "s"} and ${attentionCount} attention signal${attentionCount === 1 ? "" : "s"} are visible for this shift.`,
+    confirmation: "Record any exception remediation before ending the shift."
+  });
+  pushOperatorAction({
+    key: "confirm_next_review_action",
+    label: "Confirm Next Review Action",
+    priority: dailyBrief.nextReviewAction?.status === "ready" ? "secondary" : "review",
+    kind: "review",
+    status: dailyBrief.nextReviewAction?.status || "review",
+    href: dailyBrief.briefDownload?.href || "",
+    fileName: dailyBrief.briefDownload?.fileName || "",
+    format: dailyBrief.briefDownload?.format || "",
+    source: "next_review",
+    summary: dailyBrief.nextReviewAction?.summary || "Confirm the next launch operations review action before handing off.",
+    confirmation: `Next review key: ${dailyBrief.nextReviewAction?.key || "-"}`
+  });
+  if (actionPlanDownload) {
+    pushOperatorAction({
+      key: "download_shift_action_plan",
+      label: "Download Shift Action Plan",
+      priority: "secondary",
+      kind: "download",
+      status: "ready",
+      href: actionPlanDownload.href || "",
+      fileName: actionPlanDownload.fileName || "",
+      format: actionPlanDownload.format || "",
+      source: "shift_action_plan",
+      summary: "Attach this action plan to the operator shift handoff packet.",
+      confirmation: "Keep this file beside the daily brief and handoff summary."
+    });
+  }
+  const supportingDownloads = [];
+  const seenDownloads = new Set();
+  for (const item of [
+    actionPlanDownload,
+    dailyBrief.briefDownload || null,
+    launchOperationsHandoffSummary?.handoffDownload || null,
+    steadyStateDutyBoard?.boardDownload || null,
+    steadyStateDutyActionLinks?.actionLinksDownload || null,
+    steadyStateExceptionDigest?.digestDownload || null,
+    steadyStateOperationalReview?.reviewDownload || null
+  ]) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const key = item.key || item.href || item.fileName;
+    if (!key || seenDownloads.has(key)) {
+      continue;
+    }
+    seenDownloads.add(key);
+    supportingDownloads.push({
+      key: item.key || null,
+      label: item.label || item.title || item.key || null,
+      fileName: item.fileName || null,
+      format: item.format || null,
+      href: item.href || null,
+      source: item.source || null
+    });
+  }
+  return {
+    version: "developer-ops-launch-operations-shift-action-plan/v1",
+    status: dailyBrief.status || "review",
+    productCode,
+    channel,
+    dailyBriefStatus: dailyBrief.status || "unknown",
+    handoffSummaryStatus: launchOperationsHandoffSummary?.status || dailyBrief.handoffSummaryStatus || null,
+    evidenceChainStatus: dailyBrief.evidenceChainStatus || null,
+    queueTotal,
+    attentionCount,
+    followUpCount,
+    dutyBoardStatus: steadyStateDutyBoard?.status || dailyBrief.dutyBoardStatus || null,
+    dutyActionLinksStatus: steadyStateDutyActionLinks?.status || dailyBrief.dutyActionLinksStatus || null,
+    dutyActionCount: steadyStateDutyActionLinks?.actionCount ?? dailyBrief.dutyActionCount ?? 0,
+    nextReviewAction: dailyBrief.nextReviewAction || null,
+    primaryAction: operatorActions[0] || null,
+    actionCount: operatorActions.length,
+    operatorActions,
+    actionPlanDownload,
+    supportingDownloads,
+    latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    headline: dailyBrief.status === "ready"
+      ? "Launch operations shift action plan is ready for the operator."
+      : "Launch operations shift action plan needs review before handoff.",
+    operatorSummary: `Run ${operatorActions.length} shift action${operatorActions.length === 1 ? "" : "s"} in order; primary=${operatorActions[0]?.key || "-"}.`
+  };
+}
+
 function buildDeveloperOpsInitialLaunchStabilizationHandoff({
   status = "not_started",
   latestReceipt = null,
@@ -22552,6 +22770,17 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     latestSteadyStateDutyPlanReceipt,
     followUpQueue
   });
+  const launchOperationsShiftActionPlan = buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
+    scope,
+    launchOperationsDailyBrief,
+    launchOperationsHandoffSummary,
+    steadyStateOperationalReview,
+    steadyStateExceptionDigest,
+    steadyStateDutyBoard,
+    steadyStateDutyActionLinks,
+    latestSteadyStateDutyPlanReceipt,
+    followUpQueue
+  });
   if (steadyStateOperationalReview?.reviewDownload) {
     const dedupeKey = steadyStateOperationalReview.reviewDownload.key
       || steadyStateOperationalReview.reviewDownload.href
@@ -22664,6 +22893,22 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       });
     }
   }
+  if (launchOperationsShiftActionPlan?.actionPlanDownload) {
+    const dedupeKey = launchOperationsShiftActionPlan.actionPlanDownload.key
+      || launchOperationsShiftActionPlan.actionPlanDownload.href
+      || launchOperationsShiftActionPlan.actionPlanDownload.fileName;
+    if (dedupeKey && !seenRecommendedDownloads.has(dedupeKey)) {
+      seenRecommendedDownloads.add(dedupeKey);
+      recommendedDownloads.push({
+        key: launchOperationsShiftActionPlan.actionPlanDownload.key || null,
+        label: launchOperationsShiftActionPlan.actionPlanDownload.label || launchOperationsShiftActionPlan.actionPlanDownload.title || launchOperationsShiftActionPlan.actionPlanDownload.key || null,
+        fileName: launchOperationsShiftActionPlan.actionPlanDownload.fileName || null,
+        format: launchOperationsShiftActionPlan.actionPlanDownload.format || null,
+        href: launchOperationsShiftActionPlan.actionPlanDownload.href || null,
+        source: launchOperationsShiftActionPlan.actionPlanDownload.source || null
+      });
+    }
+  }
   if (
     steadyStateOperationalReview?.monitoringReady === true
     && steadyStateOperationalReview.reviewDownload?.fileName
@@ -22699,6 +22944,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   }
   if (launchOperationsDailyBrief?.briefDownload?.fileName) {
     nextSteps.push(`Export launch operations daily brief: ${launchOperationsDailyBrief.briefDownload.fileName}.`);
+  }
+  if (launchOperationsShiftActionPlan?.actionPlanDownload?.fileName) {
+    nextSteps.push(`Run launch operations shift action plan: ${launchOperationsShiftActionPlan.actionPlanDownload.fileName}.`);
   }
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
@@ -22790,6 +23038,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsEvidenceChain,
     launchOperationsHandoffSummary,
     launchOperationsDailyBrief,
+    launchOperationsShiftActionPlan,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -25618,6 +25867,43 @@ function appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, brief = null, 
   }
 }
 
+function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = null, {
+  title = "Launch Operations Shift Action Plan:"
+} = {}) {
+  if (!plan || typeof plan !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- shiftPlan=${plan.actionPlanDownload?.fileName || "-"}`
+    + ` | status=${plan.status || "-"}`
+    + ` | primary=${plan.primaryAction?.key || "-"}`
+    + ` | actions=${plan.actionCount ?? 0}`
+    + ` | queue=${plan.queueTotal ?? 0}`
+    + ` | attention=${plan.attentionCount ?? 0}`
+  );
+  lines.push(
+    `- dailyBrief=${plan.dailyBriefStatus || "-"}`
+    + ` | dutyBoard=${plan.dutyBoardStatus || "-"}`
+    + ` | dutyActionLinks=${plan.dutyActionLinksStatus || "-"}`
+    + ` | nextReview=${plan.nextReviewAction?.key || "-"}`
+  );
+  const actions = Array.isArray(plan.operatorActions) ? plan.operatorActions : [];
+  if (actions.length) {
+    lines.push("- operatorActions:");
+    for (const item of actions) {
+      lines.push(
+        `  - ${item.key || "-"}`
+        + ` | priority=${item.priority || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | kind=${item.kind || "-"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -25969,6 +26255,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (launchOperationsDailyBrief) {
       lines.push("");
       appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, launchOperationsDailyBrief);
+    }
+    const launchOperationsShiftActionPlan = initialLaunchOpsReadiness.launchOperationsShiftActionPlan || null;
+    if (launchOperationsShiftActionPlan) {
+      lines.push("");
+      appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, launchOperationsShiftActionPlan);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -26508,6 +26799,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const launchOperationsDailyBrief = readiness.launchOperationsDailyBrief || null;
   if (launchOperationsDailyBrief) {
     appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, launchOperationsDailyBrief);
+    lines.push("");
+  }
+  const launchOperationsShiftActionPlan = readiness.launchOperationsShiftActionPlan || null;
+  if (launchOperationsShiftActionPlan) {
+    appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, launchOperationsShiftActionPlan);
     lines.push("");
   }
   const formatGateDownloadText = (item = {}) => {
@@ -27281,6 +27577,121 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const handoffSummary = readiness.launchOperationsHandoffSummary || buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
+    scope,
+    launchOperationsEvidenceChain: readiness.launchOperationsEvidenceChain || null,
+    steadyStateOperationalReview: readiness.steadyStateOperationalReview || null,
+    steadyStateExceptionDigest: readiness.steadyStateExceptionDigest || null,
+    steadyStateHandoffBrief: readiness.steadyStateHandoffBrief || null,
+    steadyStateDutyBoard: readiness.steadyStateDutyBoard || null,
+    steadyStateDutyActionLinks: readiness.steadyStateDutyActionLinks || null,
+    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null
+  });
+  const dailyBrief = readiness.launchOperationsDailyBrief || buildDeveloperOpsLaunchOperationsDailyBriefPayload({
+    scope,
+    launchOperationsHandoffSummary: handoffSummary,
+    launchOperationsEvidenceChain: readiness.launchOperationsEvidenceChain || null,
+    steadyStateOperationalReview: readiness.steadyStateOperationalReview || null,
+    steadyStateExceptionDigest: readiness.steadyStateExceptionDigest || null,
+    steadyStateDutyBoard: readiness.steadyStateDutyBoard || null,
+    steadyStateDutyActionLinks: readiness.steadyStateDutyActionLinks || null,
+    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null,
+    followUpQueue: readiness.followUpQueue || []
+  });
+  const actionPlan = readiness.launchOperationsShiftActionPlan || buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
+    scope,
+    launchOperationsDailyBrief: dailyBrief,
+    launchOperationsHandoffSummary: handoffSummary,
+    steadyStateOperationalReview: readiness.steadyStateOperationalReview || null,
+    steadyStateExceptionDigest: readiness.steadyStateExceptionDigest || null,
+    steadyStateDutyBoard: readiness.steadyStateDutyBoard || null,
+    steadyStateDutyActionLinks: readiness.steadyStateDutyActionLinks || null,
+    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null,
+    followUpQueue: readiness.followUpQueue || []
+  });
+  const actions = Array.isArray(actionPlan?.operatorActions) ? actionPlan.operatorActions : [];
+  const supportingDownloads = Array.isArray(actionPlan?.supportingDownloads) ? actionPlan.supportingDownloads : [];
+  const lines = [
+    "RockSolid Developer Ops Launch Operations Shift Action Plan",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${actionPlan?.productCode || scope.productCode || "-"}`,
+    `Channel: ${actionPlan?.channel || scope.channel || "stable"}`,
+    `Status: ${String(actionPlan?.status || "unknown").toUpperCase()}`,
+    `Headline: ${actionPlan?.headline || "-"}`,
+    `Operator Summary: ${actionPlan?.operatorSummary || "-"}`,
+    ""
+  ];
+  lines.push("Primary Action:");
+  lines.push(
+    `- key=${actionPlan?.primaryAction?.key || "-"}`
+    + ` | priority=${actionPlan?.primaryAction?.priority || "-"}`
+    + ` | status=${actionPlan?.primaryAction?.status || "-"}`
+    + ` | file=${actionPlan?.primaryAction?.fileName || "-"}`
+    + ` | href=${actionPlan?.primaryAction?.href || "-"}`
+  );
+  lines.push("");
+  lines.push("Shift Summary:");
+  lines.push(
+    `- dailyBrief=${actionPlan?.dailyBriefStatus || "-"}`
+    + ` | handoff=${actionPlan?.handoffSummaryStatus || "-"}`
+    + ` | evidence=${actionPlan?.evidenceChainStatus || "-"}`
+    + ` | queue=${actionPlan?.queueTotal ?? 0}`
+    + ` | attention=${actionPlan?.attentionCount ?? 0}`
+  );
+  lines.push(
+    `- dutyBoard=${actionPlan?.dutyBoardStatus || "-"}`
+    + ` | dutyActionLinks=${actionPlan?.dutyActionLinksStatus || "-"}`
+    + ` | actions=${actionPlan?.actionCount ?? 0}`
+    + ` | followUps=${actionPlan?.followUpCount ?? 0}`
+  );
+  lines.push("");
+  lines.push("Shift Actions:");
+  if (actions.length) {
+    for (const item of actions) {
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | ${item.label || "-"}`
+        + ` | priority=${item.priority || "-"}`
+        + ` | kind=${item.kind || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+      if (item.summary || item.confirmation) {
+        lines.push(`  - summary=${item.summary || "-"} | confirmation=${item.confirmation || "-"}`);
+      }
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Supporting Downloads:");
+  if (supportingDownloads.length) {
+    for (const item of supportingDownloads) {
+      lines.push(
+        `- ${item.label || item.key || "-"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | format=${item.format || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+  } else {
+    lines.push("- none");
+  }
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -27318,6 +27729,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "steady-state-duty-action-links.txt",
     "launch-operations-handoff-summary.txt",
     "launch-operations-daily-brief.txt",
+    "launch-operations-shift-action-plan.txt",
     "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
     "csv/accounts.csv",
@@ -27350,6 +27762,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Steady-State Duty Action Links: ${String(readiness.steadyStateDutyActionLinks?.status || "-").toUpperCase()} | actions=${readiness.steadyStateDutyActionLinks?.actionCount ?? 0} | file=${readiness.steadyStateDutyActionLinks?.actionLinksDownload?.fileName || "-"}`,
     `Launch Operations Handoff Summary: ${String(readiness.launchOperationsHandoffSummary?.status || "-").toUpperCase()} | evidence=${readiness.launchOperationsHandoffSummary?.evidenceChainStatus || "-"} | file=${readiness.launchOperationsHandoffSummary?.handoffDownload?.fileName || "-"}`,
     `Launch Operations Daily Brief: ${String(readiness.launchOperationsDailyBrief?.status || "-").toUpperCase()} | nextReview=${readiness.launchOperationsDailyBrief?.nextReviewAction?.key || "-"} | file=${readiness.launchOperationsDailyBrief?.briefDownload?.fileName || "-"}`,
+    `Launch Operations Shift Action Plan: ${String(readiness.launchOperationsShiftActionPlan?.status || "-").toUpperCase()} | primary=${readiness.launchOperationsShiftActionPlan?.primaryAction?.key || "-"} | file=${readiness.launchOperationsShiftActionPlan?.actionPlanDownload?.fileName || "-"}`,
     ""
   ];
 
@@ -27544,6 +27957,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use steady-state-duty-action-links.txt to jump from duty board actions to workspace, control, and download links.");
   lines.push("- Use launch-operations-handoff-summary.txt as the latest launch operations evidence summary for shift handoff.");
   lines.push("- Use launch-operations-daily-brief.txt as the shift-start daily brief for launch-day watch and stable-lane handoff.");
+  lines.push("- Use launch-operations-shift-action-plan.txt as the ordered operator checklist for the active launch watch shift.");
   lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
@@ -27814,6 +28228,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "launch-operations-daily-brief.txt",
       body: buildDeveloperOpsLaunchOperationsDailyBriefText(payload)
+    },
+    {
+      path: "launch-operations-shift-action-plan.txt",
+      body: buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload)
     },
     {
       path: "launch-mainline-handoff-routes.txt",
@@ -28537,7 +28955,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -28676,6 +29094,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-launch-operations-daily-brief.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsLaunchOperationsDailyBriefText(payload)
+    };
+  }
+
+  if (normalizedFormat === "launch-operations-shift-action-plan") {
+    return {
+      fileName: "developer-ops-launch-operations-shift-action-plan.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload)
     };
   }
 

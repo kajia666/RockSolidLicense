@@ -154,6 +154,7 @@
             <button class="secondary" id="download-export-duty-action-links-btn">Download Action Links</button>
             <button class="secondary" id="download-export-launch-operations-handoff-btn">Download Launch Ops Handoff</button>
             <button class="secondary" id="download-export-launch-operations-daily-brief-btn">Download Daily Brief</button>
+            <button class="secondary" id="download-export-launch-operations-shift-action-plan-btn">Download Shift Action Plan</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
@@ -4850,6 +4851,42 @@
         `;
       }
 
+      function renderLaunchOperationsShiftActionPlan(initialLaunchOpsReadiness = {}) {
+        const launchOperationsShiftActionPlan = initialLaunchOpsReadiness?.launchOperationsShiftActionPlan || null;
+        if (!launchOperationsShiftActionPlan || typeof launchOperationsShiftActionPlan !== "object") {
+          return "";
+        }
+        const status = String(launchOperationsShiftActionPlan.status || "unknown").toLowerCase();
+        const statusClass = status === "ready" ? "ok" : "warning";
+        const actions = Array.isArray(launchOperationsShiftActionPlan.operatorActions)
+          ? launchOperationsShiftActionPlan.operatorActions
+          : [];
+        const supportingDownloads = Array.isArray(launchOperationsShiftActionPlan.supportingDownloads)
+          ? launchOperationsShiftActionPlan.supportingDownloads
+          : [];
+        const details = [
+          `primary=${esc(launchOperationsShiftActionPlan.primaryAction?.key || "-")}`,
+          `actions=${esc(launchOperationsShiftActionPlan.actionCount ?? actions.length)}`,
+          `queue=${esc(launchOperationsShiftActionPlan.queueTotal ?? 0)}`,
+          `attention=${esc(launchOperationsShiftActionPlan.attentionCount ?? 0)}`,
+          `next=${esc(launchOperationsShiftActionPlan.nextReviewAction?.key || "-")}`
+        ].join(" | ");
+        const download = launchOperationsShiftActionPlan.actionPlanDownload || {};
+        return `
+          <div class="snapshot-recap launch-operations-shift-action-plan" data-launch-operations-shift-action-plan="latest">
+            <div class="snapshot-recap-head">
+              <strong>Launch Operations Shift Action Plan</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(launchOperationsShiftActionPlan.operatorSummary || "Launch operations shift action plan is ready for ordered operator execution.")}</div>
+            <div class="snapshot-focus-meta">${details}</div>
+            <div class="snapshot-focus-meta">download=${esc(download.fileName || "-")} | format=${esc(download.format || "-")} | href=${esc(download.href || "-")}</div>
+            ${actions.length ? `<ul class="snapshot-list">${actions.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.priority || "-")} | ${esc(item.status || "-")} | file=${esc(item.fileName || "-")} | href=${esc(item.href || "-")}</li>`).join("")}</ul>` : ""}
+            ${supportingDownloads.length ? `<div class="audit-meta">${supportingDownloads.slice(0, 5).map((item) => renderTag(item.fileName || item.key || "-")).join("")}</div>` : ""}
+          </div>
+        `;
+      }
+
       function renderOperatorActionReceipts(initialLaunchOpsReadiness = {}) {
         const entries = Array.isArray(initialLaunchOpsReadiness?.operatorActionReceipts)
           ? initialLaunchOpsReadiness.operatorActionReceipts.slice(0, 5)
@@ -6092,6 +6129,7 @@
         const launchOperationsEvidenceChain = initialLaunchOpsReadiness.launchOperationsEvidenceChain || null;
         const launchOperationsHandoffSummary = initialLaunchOpsReadiness.launchOperationsHandoffSummary || null;
         const launchOperationsDailyBrief = initialLaunchOpsReadiness.launchOperationsDailyBrief || null;
+        const launchOperationsShiftActionPlan = initialLaunchOpsReadiness.launchOperationsShiftActionPlan || null;
         const normalizeLaunchReceiptPriority = (priority) => {
           const value = String(priority || "secondary").toLowerCase();
           return ["primary", "review", "secondary"].includes(value) ? value : "other";
@@ -6206,6 +6244,10 @@
             label: "Launch Daily Brief",
             value: launchOperationsDailyBrief?.status || "-"
           },
+          {
+            label: "Shift Action Plan",
+            value: launchOperationsShiftActionPlan?.primaryAction?.key || "-"
+          },
           { label: "Latest Audit", value: formatTime(overview.latestAuditAt || payload.generatedAt) }
         ];
 
@@ -6227,6 +6269,7 @@
           ${renderLaunchOperationsEvidenceChain(initialLaunchOpsReadiness)}
           ${renderLaunchOperationsHandoffSummary(initialLaunchOpsReadiness)}
           ${renderLaunchOperationsDailyBrief(initialLaunchOpsReadiness)}
+          ${renderLaunchOperationsShiftActionPlan(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
           ${renderLaunchDutyActionOrder(initialLaunchOpsReadiness)}
@@ -7015,6 +7058,7 @@
       el("download-export-duty-action-links-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-duty-action-links", "developer-ops-steady-state-duty-action-links.txt", "Steady-state duty action links"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-launch-operations-handoff-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-operations-handoff-summary", "developer-ops-launch-operations-handoff-summary.txt", "Launch operations handoff summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-launch-operations-daily-brief-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-operations-daily-brief", "developer-ops-launch-operations-daily-brief.txt", "Launch operations daily brief"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-launch-operations-shift-action-plan-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-operations-shift-action-plan", "developer-ops-launch-operations-shift-action-plan.txt", "Launch operations shift action plan"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

@@ -16439,8 +16439,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinks.actionLinksDownload.href, /format=steady-state-duty-action-links/);
     assert.ok(steadyStateDutyActionLinks.workspaceLinks.some((item) => /\/developer\/ops/.test(item.href || "")));
     assert.ok(steadyStateDutyActionLinks.downloadLinks.some((item) => item.format === "steady-state-duty-board"));
+    assert.ok(Array.isArray(steadyStateDutyActionLinks.controlIntents));
+    assert.ok(steadyStateDutyActionLinks.controlIntents.length >= 1);
+    assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "open_workspace"));
+    assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "download_asset"));
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Action Links:/);
     assert.match(steadyStateSnapshot.summaryText, /actionCount=\d+/);
+    assert.match(steadyStateSnapshot.summaryText, /controlIntents=\d+/);
 
     const steadyStateDutyActionLinksDownload = await getText(
       baseUrl,
@@ -16455,6 +16460,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /Workspace Links:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Download Links:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Control Links:/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /Control Intents:/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /intent=open_workspace/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

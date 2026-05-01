@@ -21172,6 +21172,59 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
   if (actionLinksDownload) {
     appendDownloadLink(actionLinksDownload, "action_links");
   }
+  const inferControlIntent = (item = {}, type = "") => {
+    const signal = [
+      type,
+      item.key,
+      item.label,
+      item.source,
+      item.href,
+      item.fileName,
+      item.format,
+      item.summary
+    ].map((value) => String(value || "").toLowerCase()).join(" ");
+    if (type === "download" || /download|format=|\.txt|\.csv|\.zip/.test(signal)) {
+      return "download_asset";
+    }
+    if (type === "workspace" || /workspace|developer\/ops/.test(signal)) {
+      return "open_workspace";
+    }
+    if (/session|revoke/.test(signal)) {
+      return "open_session_control";
+    }
+    if (/device|fingerprint|binding|block|unblock/.test(signal)) {
+      return "open_device_control";
+    }
+    if (/entitlement|license|policy|points|extend/.test(signal)) {
+      return "open_entitlement_control";
+    }
+    if (/account|user/.test(signal)) {
+      return "open_account_control";
+    }
+    return "open_control";
+  };
+  const buildControlIntent = (item = {}, type = "", index = 0) => {
+    const intent = inferControlIntent(item, type);
+    return {
+      key: item.key || item.label || `${type || "action"}-${index + 1}`,
+      intent,
+      targetType: type === "download" ? "asset" : type || "control",
+      label: item.label || item.key || intent,
+      priority: item.priority || "secondary",
+      source: item.source || type || null,
+      method: item.href ? "GET" : null,
+      href: item.href || null,
+      fileName: item.fileName || null,
+      format: item.format || null,
+      requiresConfirmation: intent !== "open_workspace" && intent !== "download_asset",
+      summary: item.summary || ""
+    };
+  };
+  const controlIntents = [
+    ...workspaceLinks.map((item, index) => buildControlIntent(item, "workspace", index)),
+    ...controlLinks.map((item, index) => buildControlIntent(item, "control", index)),
+    ...downloadLinks.map((item, index) => buildControlIntent(item, "download", index))
+  ];
   const actionLinks = [
     ...workspaceLinks,
     ...controlLinks,
@@ -21187,9 +21240,12 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     workspaceLinkCount: workspaceLinks.length,
     controlLinkCount: controlLinks.length,
     downloadLinkCount: downloadLinks.length,
+    controlIntentCount: controlIntents.length,
     workspaceLinks,
     controlLinks,
     downloadLinks,
+    controlIntents,
+    primaryIntent: controlIntents[0] || null,
     primaryAction: workspaceLinks[0] || controlLinks[0] || downloadLinks[0] || null,
     actionLinks,
     actionLinksDownload,
@@ -24756,6 +24812,7 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
     + ` | workspace=${actionLinks.workspaceLinkCount ?? 0}`
     + ` | control=${actionLinks.controlLinkCount ?? 0}`
     + ` | download=${actionLinks.downloadLinkCount ?? 0}`
+    + ` | controlIntents=${actionLinks.controlIntentCount ?? 0}`
   );
   lines.push(
     `- actionLinksDownload=${actionLinks.actionLinksDownload?.fileName || "-"}`
@@ -24785,9 +24842,28 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
       );
     }
   };
+  const appendIntents = (label, items = []) => {
+    if (!Array.isArray(items) || !items.length) {
+      return;
+    }
+    lines.push(`- ${label}:`);
+    for (const item of items) {
+      lines.push(
+        `  - intent=${item.intent || "-"}`
+        + ` | label=${item.label || item.key || "-"}`
+        + ` | target=${item.targetType || "-"}`
+        + ` | method=${item.method || "-"}`
+        + ` | confirm=${item.requiresConfirmation === true}`
+        + ` | href=${item.href || "-"}`
+        + (item.fileName ? ` | file=${item.fileName}` : "")
+        + (item.format ? ` | format=${item.format}` : "")
+      );
+    }
+  };
   appendLinks("workspaceLinks", actionLinks.workspaceLinks);
   appendLinks("controlLinks", actionLinks.controlLinks);
   appendLinks("downloadLinks", actionLinks.downloadLinks);
+  appendIntents("controlIntents", actionLinks.controlIntents);
 }
 
 function buildDeveloperOpsSummaryText(payload = {}) {
@@ -25972,9 +26048,30 @@ function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
       lines.push("- none");
     }
   };
+  const appendIntentSection = (title, items = []) => {
+    lines.push("");
+    lines.push(`${title}:`);
+    if (Array.isArray(items) && items.length) {
+      for (const item of items) {
+        lines.push(
+          `- intent=${item.intent || "-"}`
+          + ` | label=${item.label || item.key || "-"}`
+          + ` | target=${item.targetType || "-"}`
+          + ` | method=${item.method || "-"}`
+          + ` | confirm=${item.requiresConfirmation === true ? "yes" : "no"}`
+          + ` | href=${item.href || "-"}`
+          + (item.fileName ? ` | file=${item.fileName}` : "")
+          + (item.format ? ` | format=${item.format}` : "")
+        );
+      }
+    } else {
+      lines.push("- none");
+    }
+  };
   appendSection("Workspace Links", actionLinks.workspaceLinks);
   appendSection("Download Links", actionLinks.downloadLinks);
   appendSection("Control Links", actionLinks.controlLinks);
+  appendIntentSection("Control Intents", actionLinks.controlIntents);
   return lines.join("\n");
 }
 

@@ -4972,10 +4972,14 @@
           `actions=${esc(actionLinks.actionCount ?? 0)}`,
           `workspace=${esc(actionLinks.workspaceLinkCount ?? 0)}`,
           `control=${esc(actionLinks.controlLinkCount ?? 0)}`,
-          `download=${esc(actionLinks.downloadLinkCount ?? 0)}`
+          `download=${esc(actionLinks.downloadLinkCount ?? 0)}`,
+          `intents=${esc(actionLinks.controlIntentCount ?? 0)}`
         ].join(" | ");
         const renderLinks = (items = [], emptyText = "No links are attached.") => {
           return `<ul class="snapshot-list">${Array.isArray(items) && items.length ? items.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.priority || "-")} | source=${esc(item.source || "-")} | href=${esc(item.href || "-")}${item.fileName ? ` | file=${esc(item.fileName)}` : ""}${item.format ? ` | format=${esc(item.format)}` : ""}</li>`).join("") : `<li>${esc(emptyText)}</li>`}</ul>`;
+        };
+        const renderIntents = (items = [], emptyText = "No control intents are attached.") => {
+          return `<ul class="snapshot-list">${Array.isArray(items) && items.length ? items.map((item) => `<li><strong>${esc(item.intent || "-")}</strong> ${esc(item.label || item.key || "-")} | target=${esc(item.targetType || "-")} | method=${esc(item.method || "-")} | confirm=${item.requiresConfirmation === true ? "yes" : "no"} | href=${esc(item.href || "-")}${item.fileName ? ` | file=${esc(item.fileName)}` : ""}${item.format ? ` | format=${esc(item.format)}` : ""}</li>`).join("") : `<li>${esc(emptyText)}</li>`}</ul>`;
         };
         return `
           <div class="snapshot-recap steady-state-duty-action-links" data-steady-state-duty-action-links="${esc(status)}">
@@ -5000,6 +5004,10 @@
             <div class="snapshot-recap">
               <strong>Control Links</strong>
               ${renderLinks(actionLinks.controlLinks, "No control links are attached.")}
+            </div>
+            <div class="snapshot-recap">
+              <strong>Control Intents</strong>
+              ${renderIntents(actionLinks.controlIntents)}
             </div>
           </div>
         `;

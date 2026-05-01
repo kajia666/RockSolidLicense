@@ -16703,6 +16703,33 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /\/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:/);
 
+    const launchOperationsOverviewStatus = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOverviewStatus;
+    assert.ok(launchOperationsOverviewStatus);
+    assert.equal(launchOperationsOverviewStatus.version, "developer-ops-launch-operations-overview-status/v1");
+    assert.equal(launchOperationsOverviewStatus.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(launchOperationsOverviewStatus.channel, "stable");
+    assert.equal(launchOperationsOverviewStatus.status, launchOperationsShiftActionPlan.status);
+    assert.equal(launchOperationsOverviewStatus.receiptVisibilityStatus, "visible");
+    assert.equal(launchOperationsOverviewStatus.canRecoverReceipt, true);
+    assert.equal(launchOperationsOverviewStatus.recoveryRoute, "/api/developer/ops/steady-state-duty-plan/receipt");
+    assert.equal(launchOperationsOverviewStatus.nextAction.key, launchOperationsShiftActionPlan.primaryAction.key);
+    assert.ok(launchOperationsOverviewStatus.panels.some((item) => item.key === "launch_operations_shift_action_plan"));
+    assert.match(launchOperationsOverviewStatus.overviewDownload.href, /format=launch-operations-overview-status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /overviewStatus=.*receipt=visible/);
+
+    const launchOperationsOverviewStatusDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=launch-operations-overview-status",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsOverviewStatusDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchOperationsOverviewStatusDownload.contentDisposition || "", /developer-ops-launch-operations-overview-status\.txt/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /RockSolid Developer Ops Launch Operations Overview Status/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",
@@ -20662,6 +20689,11 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Launch Operations Shift Action Plan/);
     assert.match(html, /download-export-launch-operations-shift-action-plan-btn/);
     assert.match(html, /launch-operations-shift-action-plan/);
+    assert.match(html, /launchOperationsOverviewStatus/);
+    assert.match(html, /renderLaunchOperationsOverviewStatus/);
+    assert.match(html, /Launch Operations Overview Status/);
+    assert.match(html, /download-export-launch-operations-overview-status-btn/);
+    assert.match(html, /launch-operations-overview-status/);
     assert.match(html, /receiptVisibilitySummary/);
     assert.match(html, /Receipt Visibility Summary/);
     assert.match(html, /executionPlan/);

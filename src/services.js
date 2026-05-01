@@ -3621,6 +3621,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("launch_operations_handoff_summary") || normalized.includes("launch-operations-handoff-summary")) return "launch-operations-handoff-summary";
   if (normalized.includes("launch_operations_daily_brief") || normalized.includes("launch-operations-daily-brief")) return "launch-operations-daily-brief";
   if (normalized.includes("launch_operations_shift_action_plan") || normalized.includes("launch-operations-shift-action-plan")) return "launch-operations-shift-action-plan";
+  if (normalized.includes("launch_operations_overview_status") || normalized.includes("launch-operations-overview-status")) return "launch-operations-overview-status";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -19697,6 +19698,19 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsLaunchOperationsOverviewStatusDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_launch_operations_overview_status",
+    "developer-ops-launch-operations-overview-status.txt",
+    "Developer Ops launch operations overview status",
+    {
+      source: "developer-ops",
+      format: "launch-operations-overview-status",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
@@ -22613,6 +22627,128 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
+  scope = {},
+  launchOperationsEvidenceChain = null,
+  launchOperationsHandoffSummary = null,
+  launchOperationsDailyBrief = null,
+  launchOperationsShiftActionPlan = null,
+  latestSteadyStateDutyPlanReceipt = null
+} = {}) {
+  const shiftPlan = launchOperationsShiftActionPlan && typeof launchOperationsShiftActionPlan === "object"
+    ? launchOperationsShiftActionPlan
+    : null;
+  const dailyBrief = launchOperationsDailyBrief && typeof launchOperationsDailyBrief === "object"
+    ? launchOperationsDailyBrief
+    : null;
+  const handoffSummary = launchOperationsHandoffSummary && typeof launchOperationsHandoffSummary === "object"
+    ? launchOperationsHandoffSummary
+    : null;
+  const chain = launchOperationsEvidenceChain && typeof launchOperationsEvidenceChain === "object"
+    ? launchOperationsEvidenceChain
+    : null;
+  if (!shiftPlan && !dailyBrief && !handoffSummary && !chain) {
+    return null;
+  }
+  const productCode = shiftPlan?.productCode
+    || dailyBrief?.productCode
+    || handoffSummary?.productCode
+    || chain?.productCode
+    || latestSteadyStateDutyPlanReceipt?.productCode
+    || scope.productCode
+    || null;
+  const channel = shiftPlan?.channel
+    || dailyBrief?.channel
+    || handoffSummary?.channel
+    || chain?.channel
+    || latestSteadyStateDutyPlanReceipt?.channel
+    || scope.channel
+    || "stable";
+  const overviewScope = {
+    ...scope,
+    productCode,
+    channel
+  };
+  const receiptVisibilitySummary = shiftPlan?.receiptVisibilitySummary
+    || dailyBrief?.receiptVisibilitySummary
+    || handoffSummary?.receiptVisibilitySummary
+    || buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceipt);
+  const overviewDownload = productCode ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(overviewScope) : null;
+  const panels = [
+    {
+      key: "launch_operations_evidence_chain",
+      label: "Launch Operations Evidence Chain",
+      status: chain?.status || "missing",
+      ready: chain?.complete === true,
+      href: null,
+      fileName: "initial-launch-ops-readiness.txt"
+    },
+    {
+      key: "launch_operations_handoff_summary",
+      label: "Launch Operations Handoff Summary",
+      status: handoffSummary?.status || "missing",
+      ready: handoffSummary?.status === "ready",
+      href: handoffSummary?.handoffDownload?.href || null,
+      fileName: handoffSummary?.handoffDownload?.fileName || null
+    },
+    {
+      key: "launch_operations_daily_brief",
+      label: "Launch Operations Daily Brief",
+      status: dailyBrief?.status || "missing",
+      ready: dailyBrief?.status === "ready",
+      href: dailyBrief?.briefDownload?.href || null,
+      fileName: dailyBrief?.briefDownload?.fileName || null
+    },
+    {
+      key: "launch_operations_shift_action_plan",
+      label: "Launch Operations Shift Action Plan",
+      status: shiftPlan?.status || "missing",
+      ready: Boolean(shiftPlan?.primaryAction?.executionPlan),
+      href: shiftPlan?.actionPlanDownload?.href || null,
+      fileName: shiftPlan?.actionPlanDownload?.fileName || null
+    }
+  ];
+  const receiptVisible = receiptVisibilitySummary?.status === "visible";
+  const status = shiftPlan?.status || dailyBrief?.status || handoffSummary?.status || (chain?.complete === true ? "ready" : "review");
+  const nextAction = shiftPlan?.primaryAction
+    ? {
+        key: shiftPlan.primaryAction.key || null,
+        label: shiftPlan.primaryAction.label || shiftPlan.primaryAction.key || null,
+        status: shiftPlan.primaryAction.status || null,
+        priority: shiftPlan.primaryAction.priority || null,
+        href: shiftPlan.primaryAction.href || null,
+        fileName: shiftPlan.primaryAction.fileName || null,
+        executionPlanStatus: shiftPlan.primaryAction.executionPlan?.status || null,
+        receiptPlanRoute: shiftPlan.primaryAction.executionPlan?.receiptPlan?.route || null
+      }
+    : dailyBrief?.nextReviewAction || handoffSummary?.nextReviewAction || chain?.nextReviewAction || null;
+  const readyPanelCount = panels.filter((item) => item.ready).length;
+  return {
+    version: "developer-ops-launch-operations-overview-status/v1",
+    status,
+    productCode,
+    channel,
+    readyForOperations: status === "ready" && receiptVisible,
+    evidenceChainStatus: chain?.status || null,
+    evidenceComplete: chain?.complete === true,
+    evidenceCompletedStageCount: chain?.completedStageCount ?? 0,
+    evidenceRequiredStageCount: chain?.requiredStageCount ?? 0,
+    handoffSummaryStatus: handoffSummary?.status || null,
+    dailyBriefStatus: dailyBrief?.status || null,
+    shiftActionPlanStatus: shiftPlan?.status || null,
+    receiptVisibilityStatus: receiptVisibilitySummary?.status || "pending",
+    receiptVisibilitySummary,
+    canRecoverReceipt: Boolean(receiptVisibilitySummary?.failureRecovery?.route),
+    recoveryRoute: receiptVisibilitySummary?.failureRecovery?.route || null,
+    nextAction,
+    overviewDownload,
+    panels,
+    readyPanelCount,
+    panelCount: panels.length,
+    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, next=${nextAction?.key || "-"}.`
+  };
+}
+
 function buildDeveloperOpsInitialLaunchStabilizationHandoff({
   status = "not_started",
   latestReceipt = null,
@@ -23013,6 +23149,14 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     latestSteadyStateDutyPlanReceipt,
     followUpQueue
   });
+  const launchOperationsOverviewStatus = buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
+    scope,
+    launchOperationsEvidenceChain,
+    launchOperationsHandoffSummary,
+    launchOperationsDailyBrief,
+    launchOperationsShiftActionPlan,
+    latestSteadyStateDutyPlanReceipt
+  });
   if (steadyStateOperationalReview?.reviewDownload) {
     const dedupeKey = steadyStateOperationalReview.reviewDownload.key
       || steadyStateOperationalReview.reviewDownload.href
@@ -23141,6 +23285,22 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       });
     }
   }
+  if (launchOperationsOverviewStatus?.overviewDownload) {
+    const dedupeKey = launchOperationsOverviewStatus.overviewDownload.key
+      || launchOperationsOverviewStatus.overviewDownload.href
+      || launchOperationsOverviewStatus.overviewDownload.fileName;
+    if (dedupeKey && !seenRecommendedDownloads.has(dedupeKey)) {
+      seenRecommendedDownloads.add(dedupeKey);
+      recommendedDownloads.push({
+        key: launchOperationsOverviewStatus.overviewDownload.key || null,
+        label: launchOperationsOverviewStatus.overviewDownload.label || launchOperationsOverviewStatus.overviewDownload.title || launchOperationsOverviewStatus.overviewDownload.key || null,
+        fileName: launchOperationsOverviewStatus.overviewDownload.fileName || null,
+        format: launchOperationsOverviewStatus.overviewDownload.format || null,
+        href: launchOperationsOverviewStatus.overviewDownload.href || null,
+        source: launchOperationsOverviewStatus.overviewDownload.source || null
+      });
+    }
+  }
   if (
     steadyStateOperationalReview?.monitoringReady === true
     && steadyStateOperationalReview.reviewDownload?.fileName
@@ -23179,6 +23339,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   }
   if (launchOperationsShiftActionPlan?.actionPlanDownload?.fileName) {
     nextSteps.push(`Run launch operations shift action plan: ${launchOperationsShiftActionPlan.actionPlanDownload.fileName}.`);
+  }
+  if (launchOperationsOverviewStatus?.overviewDownload?.fileName) {
+    nextSteps.push(`Open launch operations overview status: ${launchOperationsOverviewStatus.overviewDownload.fileName}.`);
   }
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
@@ -23271,6 +23434,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsHandoffSummary,
     launchOperationsDailyBrief,
     launchOperationsShiftActionPlan,
+    launchOperationsOverviewStatus,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -26160,6 +26324,38 @@ function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = nu
   }
 }
 
+function appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, overview = null, {
+  title = "Launch Operations Overview Status:"
+} = {}) {
+  if (!overview || typeof overview !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- overviewStatus=${overview.status || "-"}`
+    + ` | receipt=${overview.receiptVisibilityStatus || "-"}`
+    + ` | panels=${overview.readyPanelCount ?? 0}/${overview.panelCount ?? 0}`
+    + ` | ready=${overview.readyForOperations === true}`
+  );
+  lines.push(
+    `- next=${overview.nextAction?.key || "-"}`
+    + ` | recovery=${overview.canRecoverReceipt === true ? overview.recoveryRoute || "-" : "-"}`
+    + ` | download=${overview.overviewDownload?.fileName || "-"}`
+  );
+  const panels = Array.isArray(overview.panels) ? overview.panels : [];
+  if (panels.length) {
+    lines.push("- panels:");
+    for (const item of panels) {
+      lines.push(
+        `  - ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | ready=${item.ready === true}`
+        + ` | file=${item.fileName || "-"}`
+      );
+    }
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -26523,6 +26719,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (launchOperationsShiftActionPlan) {
       lines.push("");
       appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, launchOperationsShiftActionPlan);
+    }
+    const launchOperationsOverviewStatus = initialLaunchOpsReadiness.launchOperationsOverviewStatus || null;
+    if (launchOperationsOverviewStatus) {
+      lines.push("");
+      appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, launchOperationsOverviewStatus);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -27074,6 +27275,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const launchOperationsShiftActionPlan = readiness.launchOperationsShiftActionPlan || null;
   if (launchOperationsShiftActionPlan) {
     appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, launchOperationsShiftActionPlan);
+    lines.push("");
+  }
+  const launchOperationsOverviewStatus = readiness.launchOperationsOverviewStatus || null;
+  if (launchOperationsOverviewStatus) {
+    appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, launchOperationsOverviewStatus);
     lines.push("");
   }
   const formatGateDownloadText = (item = {}) => {
@@ -28006,6 +28212,82 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const overview = readiness.launchOperationsOverviewStatus || buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
+    scope,
+    launchOperationsEvidenceChain: readiness.launchOperationsEvidenceChain || null,
+    launchOperationsHandoffSummary: readiness.launchOperationsHandoffSummary || null,
+    launchOperationsDailyBrief: readiness.launchOperationsDailyBrief || null,
+    launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
+    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null
+  });
+  const panels = Array.isArray(overview?.panels) ? overview.panels : [];
+  const lines = [
+    "RockSolid Developer Ops Launch Operations Overview Status",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${overview?.productCode || scope.productCode || "-"}`,
+    `Channel: ${overview?.channel || scope.channel || "stable"}`,
+    `Status: ${String(overview?.status || "unknown").toUpperCase()}`,
+    `Operator Summary: ${overview?.operatorSummary || "-"}`,
+    ""
+  ];
+  lines.push("Overview Status:");
+  lines.push(
+    `- status=${overview?.status || "-"}`
+    + ` | readyForOperations=${overview?.readyForOperations === true}`
+    + ` | evidence=${overview?.evidenceChainStatus || "-"}`
+    + ` | receipt=${overview?.receiptVisibilityStatus || "-"}`
+    + ` | panels=${overview?.readyPanelCount ?? 0}/${overview?.panelCount ?? 0}`
+  );
+  lines.push(
+    `- handoff=${overview?.handoffSummaryStatus || "-"}`
+    + ` | dailyBrief=${overview?.dailyBriefStatus || "-"}`
+    + ` | shiftPlan=${overview?.shiftActionPlanStatus || "-"}`
+    + ` | next=${overview?.nextAction?.key || "-"}`
+  );
+  lines.push("");
+  lines.push("Receipt Recovery:");
+  lines.push(
+    `- canRecover=${overview?.canRecoverReceipt === true}`
+    + ` | route=${overview?.recoveryRoute || "-"}`
+    + ` | action=${overview?.receiptVisibilitySummary?.failureRecovery?.payload?.action || "-"}`
+    + ` | intent=${overview?.receiptVisibilitySummary?.failureRecovery?.payload?.intent || "-"}`
+  );
+  lines.push("");
+  lines.push("Overview Download:");
+  lines.push(
+    `- file=${overview?.overviewDownload?.fileName || "-"}`
+    + ` | format=${overview?.overviewDownload?.format || "-"}`
+    + ` | href=${overview?.overviewDownload?.href || "-"}`
+  );
+  lines.push("");
+  lines.push("Panels:");
+  if (panels.length) {
+    for (const item of panels) {
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | ready=${item.ready === true ? "yes" : "no"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+  } else {
+    lines.push("- none");
+  }
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -28044,6 +28326,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "launch-operations-handoff-summary.txt",
     "launch-operations-daily-brief.txt",
     "launch-operations-shift-action-plan.txt",
+    "launch-operations-overview-status.txt",
     "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
     "csv/accounts.csv",
@@ -28272,6 +28555,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use launch-operations-handoff-summary.txt as the latest launch operations evidence summary for shift handoff.");
   lines.push("- Use launch-operations-daily-brief.txt as the shift-start daily brief for launch-day watch and stable-lane handoff.");
   lines.push("- Use launch-operations-shift-action-plan.txt as the ordered operator checklist for the active launch watch shift.");
+  lines.push("- Use launch-operations-overview-status.txt as the one-screen launch operations status before and during cutover.");
   lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
@@ -28546,6 +28830,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "launch-operations-shift-action-plan.txt",
       body: buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload)
+    },
+    {
+      path: "launch-operations-overview-status.txt",
+      body: buildDeveloperOpsLaunchOperationsOverviewStatusText(payload)
     },
     {
       path: "launch-mainline-handoff-routes.txt",
@@ -29269,7 +29557,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -29416,6 +29704,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-launch-operations-shift-action-plan.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload)
+    };
+  }
+
+  if (normalizedFormat === "launch-operations-overview-status") {
+    return {
+      fileName: "developer-ops-launch-operations-overview-status.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsLaunchOperationsOverviewStatusText(payload)
     };
   }
 

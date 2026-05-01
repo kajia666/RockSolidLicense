@@ -16358,6 +16358,28 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateOperationalReviewDownload.body, /Status: STEADY_STATE_READY/);
     assert.match(steadyStateOperationalReviewDownload.body, /Monitoring Ready: yes/);
 
+    const steadyStateExceptionDigest = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateExceptionDigest;
+    assert.ok(steadyStateExceptionDigest);
+    assert.equal(steadyStateExceptionDigest.status, "monitoring_ready");
+    assert.equal(steadyStateExceptionDigest.monitoringReady, true);
+    assert.equal(steadyStateExceptionDigest.projectCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(steadyStateExceptionDigest.queueSummary.total, steadyStateSnapshot.overview.queueSummary.total);
+    assert.match(steadyStateExceptionDigest.digestDownload.href, /format=steady-state-exception-digest/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Exception Digest:/);
+    assert.match(steadyStateSnapshot.summaryText, /queueTotal=\d+/);
+
+    const steadyStateExceptionDigestDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=steady-state-exception-digest",
+      ownerSession.token
+    );
+    assert.equal(steadyStateExceptionDigestDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(steadyStateExceptionDigestDownload.contentDisposition || "", /developer-ops-steady-state-exception-digest\.txt/);
+    assert.match(steadyStateExceptionDigestDownload.body, /RockSolid Developer Ops Steady-State Exception Digest/);
+    assert.match(steadyStateExceptionDigestDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
+    assert.match(steadyStateExceptionDigestDownload.body, /Monitoring Ready: yes/);
+    assert.match(steadyStateExceptionDigestDownload.body, /Exception Queue:/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

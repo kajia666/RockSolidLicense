@@ -148,6 +148,7 @@
             <button class="secondary" id="download-export-staging-archive-btn">Download Staging Archive</button>
             <button class="secondary" id="download-export-stabilization-handoff-btn">Download Stabilization Handoff</button>
             <button class="secondary" id="download-export-steady-state-review-btn">Download Steady-State Review</button>
+            <button class="secondary" id="download-export-exception-digest-btn">Download Exception Digest</button>
             <button class="secondary" id="download-export-follow-ups-btn">Download Follow-up CSV</button>
             <button class="secondary" id="download-export-checksums-btn">Download Checksums</button>
             <button class="secondary" id="download-export-zip-btn">Download Zip</button>
@@ -4778,6 +4779,70 @@
         `;
       }
 
+      function renderSteadyStateExceptionDigest(initialLaunchOpsReadiness = {}) {
+        const digest = initialLaunchOpsReadiness?.steadyStateExceptionDigest || null;
+        if (!digest || typeof digest !== "object") {
+          return "";
+        }
+        const status = String(digest.status || "unknown").toLowerCase();
+        const statusClass = digest.monitoringReady === true && digest.queueStatus !== "attention" ? "ok" : "warning";
+        const queueSummary = digest.queueSummary && typeof digest.queueSummary === "object" ? digest.queueSummary : {};
+        const metrics = digest.metrics && typeof digest.metrics === "object" ? digest.metrics : {};
+        const details = [
+          `monitoringReady=${digest.monitoringReady === true ? "yes" : "no"}`,
+          `queue=${esc(digest.queueStatus || "-")}`,
+          `total=${esc(queueSummary.total ?? 0)}`,
+          `critical=${esc(queueSummary.critical ?? 0)}`,
+          `high=${esc(queueSummary.high ?? 0)}`,
+          `medium=${esc(queueSummary.medium ?? 0)}`,
+          `low=${esc(queueSummary.low ?? 0)}`
+        ].join(" | ");
+        const metricDetails = [
+          `attention=${esc(digest.attentionCount ?? 0)}`,
+          `blocks=${esc(metrics.activeBlocks ?? 0)}`,
+          `disabled=${esc(metrics.disabledAccounts ?? 0)}`,
+          `frozen=${esc(metrics.frozenEntitlements ?? 0)}`,
+          `expired=${esc(metrics.expiredEntitlements ?? 0)}`,
+          `sessions=${esc(metrics.expiredSessions ?? 0)}`
+        ].join(" | ");
+        const signals = Array.isArray(digest.signals) ? digest.signals : [];
+        const auditSignals = Array.isArray(digest.auditSignals) ? digest.auditSignals : [];
+        const focusUsers = Array.isArray(digest.focusUsers) ? digest.focusUsers : [];
+        const focusDevices = Array.isArray(digest.focusDevices) ? digest.focusDevices : [];
+        const operatorActions = Array.isArray(digest.operatorActions) ? digest.operatorActions : [];
+        return `
+          <div class="snapshot-recap steady-state-exception-digest" data-steady-state-exception-digest="${esc(status)}">
+            <div class="snapshot-recap-head">
+              <strong>Steady-State Exception Digest</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(digest.summary || "Current steady-state exception queue and operator controls.")}</div>
+            <div class="hint">${details}</div>
+            <div class="hint">${metricDetails}</div>
+            <div class="snapshot-recap">
+              <strong>Digest Download</strong>
+              <div class="hint">file=${esc(digest.digestDownload?.fileName || "-")} | format=${esc(digest.digestDownload?.format || "-")} | href=${esc(digest.digestDownload?.href || "-")}</div>
+            </div>
+            <div class="snapshot-recap">
+              <strong>Exception Queue</strong>
+              <ul class="snapshot-list">${signals.length ? signals.map((item) => `<li><strong>${esc(String(item.severity || "-").toUpperCase())}</strong> ${esc(item.title || "-")} | ${esc(item.sourceType || "-")} | control=${esc(item.controlLabel || "-")}</li>`).join("") : "<li>No active exception queue items are open.</li>"}</ul>
+            </div>
+            <div class="snapshot-recap">
+              <strong>Focus Signals</strong>
+              <ul class="snapshot-list">
+                ${auditSignals.length ? auditSignals.map((item) => `<li>audit=${esc(item.eventType || "-")} x${esc(item.count ?? 0)}</li>`).join("") : "<li>audit=none</li>"}
+                ${focusUsers.length ? focusUsers.map((item) => `<li>user=${esc(item.username || "-")} x${esc(item.count ?? 0)}</li>`).join("") : "<li>user=none</li>"}
+                ${focusDevices.length ? focusDevices.map((item) => `<li>device=${esc(item.fingerprint || "-")} x${esc(item.count ?? 0)}</li>`).join("") : "<li>device=none</li>"}
+              </ul>
+            </div>
+            <div class="snapshot-recap">
+              <strong>Operator Actions</strong>
+              <ul class="snapshot-list">${operatorActions.length ? operatorActions.map((item) => `<li>${esc(item)}</li>`).join("") : "<li>Continue monitoring the scoped Developer Ops snapshot.</li>"}</ul>
+            </div>
+          </div>
+        `;
+      }
+
       function renderOperationalExceptionSignals(initialLaunchOpsReadiness = {}) {
         const traceability = initialLaunchOpsReadiness?.traceability || {};
         const operationalExceptionEntry = initialLaunchOpsReadiness?.operationalExceptionEntry
@@ -5570,6 +5635,7 @@
           ${renderLastOperationalExceptionActionResult()}
           ${renderCloseoutReadinessSummary(initialLaunchOpsReadiness)}
           ${renderSteadyStateOperationalReview(initialLaunchOpsReadiness)}
+          ${renderSteadyStateExceptionDigest(initialLaunchOpsReadiness)}
           ${renderOperatorActionReceipts(initialLaunchOpsReadiness)}
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
@@ -6344,6 +6410,7 @@
       el("download-export-staging-archive-btn").addEventListener("click", async () => { try { await handleExportDownload("staging-launch-duty-archive", "developer-ops-staging-launch-duty-archive.txt", "Staging launch-duty archive"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-stabilization-handoff-btn").addEventListener("click", async () => { try { await handleExportDownload("stabilization-handoff", "developer-ops-stabilization-handoff.txt", "Stabilization handoff"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-steady-state-review-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-operational-review", "developer-ops-steady-state-operational-review.txt", "Steady-state operational review"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-export-exception-digest-btn").addEventListener("click", async () => { try { await handleExportDownload("steady-state-exception-digest", "developer-ops-steady-state-exception-digest.txt", "Steady-state exception digest"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-follow-ups-btn").addEventListener("click", async () => { try { await handleExportDownload("launch-receipt-follow-ups", "developer-ops-launch-receipt-follow-ups.csv", "Launch receipt follow-up CSV"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-checksums-btn").addEventListener("click", async () => { try { await handleExportDownload("checksums", "developer-ops-sha256.txt", "Ops snapshot checksums"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-zip-btn").addEventListener("click", async () => { try { await handleExportDownload("zip", "developer-ops.zip", "Ops snapshot zip"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

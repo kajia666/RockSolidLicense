@@ -3614,6 +3614,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("closeout_handoff")) return "closeout-handoff";
   if (normalized.includes("stabilization_handoff")) return "stabilization-handoff";
   if (normalized.includes("steady_state_operational_review") || normalized.includes("steady-state-operational-review")) return "steady-state-operational-review";
+  if (normalized.includes("steady_state_exception_digest") || normalized.includes("steady-state-exception-digest")) return "steady-state-exception-digest";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -19381,6 +19382,19 @@ function buildDeveloperOpsSteadyStateOperationalReviewDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsSteadyStateExceptionDigestDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_steady_state_exception_digest",
+    "developer-ops-steady-state-exception-digest.txt",
+    "Developer Ops steady-state exception digest",
+    {
+      source: "developer-ops",
+      format: "steady-state-exception-digest",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
@@ -20633,6 +20647,134 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
   };
 }
 
+function buildDeveloperOpsSteadyStateExceptionDigestPayload({
+  scope = {},
+  overview = {},
+  latestReceipt = null,
+  closeoutReadinessSummary = null,
+  steadyStateOperationalReview = null
+} = {}) {
+  if (!overview || typeof overview !== "object") {
+    return null;
+  }
+  const metrics = overview.metrics && typeof overview.metrics === "object" ? overview.metrics : {};
+  const queueSummary = overview.queueSummary && typeof overview.queueSummary === "object"
+    ? overview.queueSummary
+    : {};
+  const recommendedQueue = Array.isArray(overview.recommendedQueue) ? overview.recommendedQueue : [];
+  const productCode = scope.productCode
+    || steadyStateOperationalReview?.projectCode
+    || latestReceipt?.productCode
+    || null;
+  const channel = latestReceipt?.channel
+    || steadyStateOperationalReview?.channel
+    || scope.channel
+    || "stable";
+  const reviewScope = {
+    ...scope,
+    productCode: productCode || scope.productCode || "",
+    channel
+  };
+  const monitoringReady = steadyStateOperationalReview?.monitoringReady === true
+    || (closeoutReadinessSummary?.steadyStateReady === true && closeoutReadinessSummary?.canClose === true);
+  const attentionMetrics = {
+    disabledAccounts: Number(metrics.disabledAccounts || 0),
+    frozenEntitlements: Number(metrics.frozenEntitlements || 0),
+    expiredEntitlements: Number(metrics.expiredEntitlements || 0),
+    pointExhaustedEntitlements: Number(metrics.pointExhaustedEntitlements || 0),
+    expiredSessions: Number(metrics.expiredSessions || 0),
+    activeBlocks: Number(metrics.activeBlocks || 0),
+    releasedBindings: Number(metrics.releasedBindings || 0)
+  };
+  const attentionCount = Object.values(attentionMetrics).reduce((sum, value) => sum + Number(value || 0), 0);
+  const normalizedQueueSummary = {
+    critical: Number(queueSummary.critical || 0),
+    high: Number(queueSummary.high || 0),
+    medium: Number(queueSummary.medium || 0),
+    low: Number(queueSummary.low || 0),
+    total: Number(queueSummary.total || recommendedQueue.length || 0)
+  };
+  const queueStatus = normalizedQueueSummary.total > 0 || attentionCount > 0 ? "attention" : "clear";
+  const digestDownload = productCode ? buildDeveloperOpsSteadyStateExceptionDigestDownload(reviewScope) : null;
+  const workspaceAction = productCode
+    ? createLaunchWorkflowWorkspaceShortcut(
+        "ops",
+        "snapshot",
+        "Open Steady-State Exception Monitor",
+        compactRouteParams({
+          ...buildDeveloperOpsRouteReviewBaseDownloadParams(reviewScope),
+          productCode,
+          channel,
+          routeTitle: "Steady-State Exception Digest",
+          routeReason: queueStatus === "attention"
+            ? "Review current steady-state exception signals."
+            : "Monitor steady-state exception signals."
+        })
+      )
+    : null;
+  const signals = recommendedQueue.slice(0, 6).map((item) => ({
+    severity: item?.severity || null,
+    sourceType: item?.sourceType || null,
+    title: item?.title || "",
+    summary: item?.summary || "",
+    nextAction: item?.nextAction || null,
+    controlLabel: item?.recommendedControl?.label || null
+  }));
+  const auditSignals = Array.isArray(overview.topAuditEvents)
+    ? overview.topAuditEvents.slice(0, 5).map((item) => ({
+        eventType: item?.eventType || null,
+        count: Number(item?.count || 0)
+      }))
+    : [];
+  const focusUsers = Array.isArray(overview.focusUsernames)
+    ? overview.focusUsernames.slice(0, 5)
+    : [];
+  const focusDevices = Array.isArray(overview.focusFingerprints)
+    ? overview.focusFingerprints.slice(0, 5)
+    : [];
+  const operatorActions = queueStatus === "attention"
+    ? [
+        "Open the scoped Developer Ops snapshot and work the recommended queue from highest severity to lowest.",
+        "Use the listed control labels to jump directly into account, session, entitlement, or device remediation.",
+        "Download this digest with the steady-state review before handing the lane to the next operator."
+      ]
+    : [
+        "Keep the scoped Developer Ops snapshot open during the first stable operating window.",
+        "Download this digest with the steady-state review for the first operator handover.",
+        "Escalate only when the queue, active blocks, disabled accounts, or failed session signals move away from this baseline."
+      ];
+  return {
+    version: "developer-ops-steady-state-exception-digest/v1",
+    projectCode: productCode,
+    channel,
+    status: monitoringReady ? "monitoring_ready" : "pending_steady_state",
+    queueStatus,
+    monitoringReady,
+    attentionCount,
+    queueSummary: normalizedQueueSummary,
+    metrics: attentionMetrics,
+    latestReceipt: latestReceipt
+      ? {
+          operation: latestReceipt.operation || null,
+          operationLabel: latestReceipt.operationLabel || null,
+          handoffFileName: latestReceipt.handoffFileName || null,
+          auditLogId: latestReceipt.auditLogId || null,
+          createdAt: latestReceipt.createdAt || latestReceipt.handoffGeneratedAt || null
+        }
+      : null,
+    signals,
+    auditSignals,
+    focusUsers,
+    focusDevices,
+    workspaceAction,
+    digestDownload,
+    operatorActions,
+    summary: queueStatus === "attention"
+      ? "Steady-state monitoring is ready, but current authorization signals still need operator attention."
+      : "Steady-state monitoring is ready and no current exception queue is open in this scoped snapshot."
+  };
+}
+
 function buildDeveloperOpsInitialLaunchOpsTraceability({
   scope = {},
   latestReceipt = null,
@@ -21328,6 +21470,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     followUpQueue,
     stabilizationHandoff
   });
+  const steadyStateExceptionDigest = buildDeveloperOpsSteadyStateExceptionDigestPayload({
+    scope,
+    overview,
+    latestReceipt,
+    closeoutReadinessSummary,
+    steadyStateOperationalReview
+  });
   if (steadyStateOperationalReview?.reviewDownload) {
     const dedupeKey = steadyStateOperationalReview.reviewDownload.key
       || steadyStateOperationalReview.reviewDownload.href
@@ -21344,11 +21493,33 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       });
     }
   }
+  if (steadyStateExceptionDigest?.digestDownload) {
+    const dedupeKey = steadyStateExceptionDigest.digestDownload.key
+      || steadyStateExceptionDigest.digestDownload.href
+      || steadyStateExceptionDigest.digestDownload.fileName;
+    if (dedupeKey && !seenRecommendedDownloads.has(dedupeKey)) {
+      seenRecommendedDownloads.add(dedupeKey);
+      recommendedDownloads.push({
+        key: steadyStateExceptionDigest.digestDownload.key || null,
+        label: steadyStateExceptionDigest.digestDownload.label || steadyStateExceptionDigest.digestDownload.title || steadyStateExceptionDigest.digestDownload.key || null,
+        fileName: steadyStateExceptionDigest.digestDownload.fileName || null,
+        format: steadyStateExceptionDigest.digestDownload.format || null,
+        href: steadyStateExceptionDigest.digestDownload.href || null,
+        source: steadyStateExceptionDigest.digestDownload.source || null
+      });
+    }
+  }
   if (
     steadyStateOperationalReview?.monitoringReady === true
     && steadyStateOperationalReview.reviewDownload?.fileName
   ) {
     nextSteps.push(`Export steady-state review: ${steadyStateOperationalReview.reviewDownload.fileName}.`);
+  }
+  if (
+    steadyStateExceptionDigest?.monitoringReady === true
+    && steadyStateExceptionDigest.digestDownload?.fileName
+  ) {
+    nextSteps.push(`Export exception digest: ${steadyStateExceptionDigest.digestDownload.fileName}.`);
   }
   const launchDutyActionOrder = buildDeveloperOpsLaunchDutyActionOrder({
     status,
@@ -21432,6 +21603,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operationalExceptionCloseout,
     closeoutReadinessSummary,
     steadyStateOperationalReview,
+    steadyStateExceptionDigest,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -23893,6 +24065,63 @@ function appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateO
   }
 }
 
+function appendDeveloperOpsSteadyStateExceptionDigestLines(lines, digest = null, {
+  title = "Steady-State Exception Digest:"
+} = {}) {
+  if (!digest || typeof digest !== "object") {
+    return;
+  }
+  const queueSummary = digest.queueSummary && typeof digest.queueSummary === "object"
+    ? digest.queueSummary
+    : {};
+  const metrics = digest.metrics && typeof digest.metrics === "object" ? digest.metrics : {};
+  lines.push(title);
+  lines.push(
+    `- status=${digest.status || "-"}`
+    + ` | monitoringReady=${digest.monitoringReady === true}`
+    + ` | queueStatus=${digest.queueStatus || "-"}`
+    + ` | queueTotal=${queueSummary.total ?? 0}`
+    + ` | critical=${queueSummary.critical ?? 0}`
+    + ` | high=${queueSummary.high ?? 0}`
+    + ` | medium=${queueSummary.medium ?? 0}`
+    + ` | low=${queueSummary.low ?? 0}`
+  );
+  lines.push(
+    `- attentionCount=${digest.attentionCount ?? 0}`
+    + ` | activeBlocks=${metrics.activeBlocks ?? 0}`
+    + ` | disabledAccounts=${metrics.disabledAccounts ?? 0}`
+    + ` | frozenEntitlements=${metrics.frozenEntitlements ?? 0}`
+    + ` | expiredEntitlements=${metrics.expiredEntitlements ?? 0}`
+    + ` | expiredSessions=${metrics.expiredSessions ?? 0}`
+  );
+  lines.push(
+    `- workspace=${digest.workspaceAction?.label || "-"}`
+    + ` | href=${digest.workspaceAction?.href || "-"}`
+  );
+  lines.push(
+    `- digestDownload=${digest.digestDownload?.fileName || "-"}`
+    + ` | format=${digest.digestDownload?.format || "-"}`
+    + ` | href=${digest.digestDownload?.href || "-"}`
+  );
+  if (Array.isArray(digest.signals) && digest.signals.length) {
+    lines.push("- exceptionQueue:");
+    for (const item of digest.signals) {
+      lines.push(
+        `  - [${String(item.severity || "-").toUpperCase()}][${item.sourceType || "-"}] ${item.title || "-"}`
+        + ` | next=${item.nextAction || "-"}`
+        + ` | control=${item.controlLabel || "-"}`
+        + ` | ${item.summary || "-"}`
+      );
+    }
+  }
+  if (Array.isArray(digest.operatorActions) && digest.operatorActions.length) {
+    lines.push("- operatorActions:");
+    for (const item of digest.operatorActions) {
+      lines.push(`  - ${item}`);
+    }
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -24196,6 +24425,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (steadyStateOperationalReview) {
       lines.push("");
       appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateOperationalReview);
+    }
+    const steadyStateExceptionDigest = initialLaunchOpsReadiness.steadyStateExceptionDigest || null;
+    if (steadyStateExceptionDigest) {
+      lines.push("");
+      appendDeveloperOpsSteadyStateExceptionDigestLines(lines, steadyStateExceptionDigest);
     }
     if (Array.isArray(initialLaunchOpsReadiness.nextSteps) && initialLaunchOpsReadiness.nextSteps.length) {
       lines.push("- nextSteps:");
@@ -24689,6 +24923,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateOperationalReview);
     lines.push("");
   }
+  const steadyStateExceptionDigest = readiness.steadyStateExceptionDigest || null;
+  if (steadyStateExceptionDigest) {
+    appendDeveloperOpsSteadyStateExceptionDigestLines(lines, steadyStateExceptionDigest);
+    lines.push("");
+  }
   const formatGateDownloadText = (item = {}) => {
     const recommendedDownload = item.recommendedDownload && typeof item.recommendedDownload === "object"
       ? item.recommendedDownload
@@ -24806,6 +25045,72 @@ function buildDeveloperOpsSteadyStateOperationalReviewText(payload = {}) {
   lines.push("- Download this file when handing the first stable operating lane to the next operator.");
   lines.push("- Keep stabilization-handoff.txt and initial-launch-ops-readiness.txt attached beside this recap.");
   lines.push("- Re-open the scoped Developer Ops snapshot before widening rollout or changing operator ownership.");
+  return lines.join("\n");
+}
+
+function buildDeveloperOpsSteadyStateExceptionDigestText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const digest = readiness.steadyStateExceptionDigest || buildDeveloperOpsSteadyStateExceptionDigestPayload({
+    scope,
+    overview: payload.overview || {},
+    latestReceipt: readiness.latestReceipt || payload.overview?.latestLaunchReceipts?.[0] || null,
+    closeoutReadinessSummary: readiness.closeoutReadinessSummary || null,
+    steadyStateOperationalReview: readiness.steadyStateOperationalReview || null
+  });
+  const lines = [
+    "RockSolid Developer Ops Steady-State Exception Digest",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${digest?.projectCode || scope.productCode || "-"}`,
+    `Channel: ${digest?.channel || scope.channel || "stable"}`,
+    `Status: ${String(digest?.status || "unknown").toUpperCase()}`,
+    `Monitoring Ready: ${digest?.monitoringReady === true ? "yes" : "no"}`,
+    `Queue Status: ${String(digest?.queueStatus || "unknown").toUpperCase()}`,
+    `Summary: ${digest?.summary || "-"}`,
+    ""
+  ];
+  if (!digest) {
+    lines.push("No steady-state exception digest is available for this scoped Ops snapshot yet.");
+    return lines.join("\n");
+  }
+  appendDeveloperOpsSteadyStateExceptionDigestLines(lines, digest, {
+    title: "Exception Queue:"
+  });
+  lines.push("");
+  lines.push("Top Audit Signals:");
+  if (Array.isArray(digest.auditSignals) && digest.auditSignals.length) {
+    for (const item of digest.auditSignals) {
+      lines.push(`- ${item.eventType || "-"} x${item.count ?? 0}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Focus Users:");
+  if (Array.isArray(digest.focusUsers) && digest.focusUsers.length) {
+    for (const item of digest.focusUsers) {
+      lines.push(`- ${item.username || "-"} x${item.count ?? 0}`);
+    }
+  } else {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Focus Devices:");
+  if (Array.isArray(digest.focusDevices) && digest.focusDevices.length) {
+    for (const item of digest.focusDevices) {
+      lines.push(`- ${item.fingerprint || "-"} x${item.count ?? 0}`);
+    }
+  } else {
+    lines.push("- none");
+  }
   return lines.join("\n");
 }
 
@@ -25000,6 +25305,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "staging-launch-duty-archive.txt",
     "stabilization-handoff.txt",
     "steady-state-operational-review.txt",
+    "steady-state-exception-digest.txt",
     "launch-mainline-handoff-routes.txt",
     "csv/projects.csv",
     "csv/accounts.csv",
@@ -25026,6 +25332,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Primary Workspace: ${readiness.primaryWorkspaceAction?.label || "-"} | href=${readiness.primaryWorkspaceAction?.href || "-"}`,
     `Primary Download: ${readiness.primaryDownload?.fileName || "-"} | format=${readiness.primaryDownload?.format || "-"} | href=${readiness.primaryDownload?.href || "-"}`,
     `Steady-State Review: ${String(readiness.steadyStateOperationalReview?.status || "-").toUpperCase()} | ready=${readiness.steadyStateOperationalReview?.monitoringReady === true ? "yes" : "no"} | file=${readiness.steadyStateOperationalReview?.reviewDownload?.fileName || "-"}`,
+    `Steady-State Exception Digest: ${String(readiness.steadyStateExceptionDigest?.status || "-").toUpperCase()} | queue=${readiness.steadyStateExceptionDigest?.queueSummary?.total ?? 0} | file=${readiness.steadyStateExceptionDigest?.digestDownload?.fileName || "-"}`,
     ""
   ];
 
@@ -25214,6 +25521,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use launch-receipt-next-follow-up.txt for the next recorded Launch Mainline operation.");
   lines.push("- Use stabilization-handoff.txt when handing first-wave stabilization duty to the next operator.");
   lines.push("- Use steady-state-operational-review.txt for the first-round operations recap once closeout and stabilization reviews are both recorded.");
+  lines.push("- Use steady-state-exception-digest.txt for the current exception queue, focus users, focus devices, and next operator controls.");
   lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
@@ -25460,6 +25768,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "steady-state-operational-review.txt",
       body: buildDeveloperOpsSteadyStateOperationalReviewText(payload)
+    },
+    {
+      path: "steady-state-exception-digest.txt",
+      body: buildDeveloperOpsSteadyStateExceptionDigestText(payload)
     },
     {
       path: "launch-mainline-handoff-routes.txt",
@@ -26183,7 +26495,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -26274,6 +26586,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-steady-state-operational-review.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsSteadyStateOperationalReviewText(payload)
+    };
+  }
+
+  if (normalizedFormat === "steady-state-exception-digest") {
+    return {
+      fileName: "developer-ops-steady-state-exception-digest.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsSteadyStateExceptionDigestText(payload)
     };
   }
 

@@ -10451,6 +10451,85 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceOpsSnapshot.summaryText, /Review first-user runtime evidence/);
     assert.doesNotMatch(runtimeEvidenceOpsSnapshot.summaryText, /Run first-user validation/);
 
+    const runtimeEvidenceLaunchMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchMainline.mainlineSummary?.firstWaveRuntimeEvidence
+        ? {
+            key: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.key,
+            status: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.status,
+            ready: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.ready,
+            productCode: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.productCode,
+            activeSessionCount: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.activeSessionCount,
+            loginAuditCount: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.loginAuditCount,
+            cardRedemptionAuditCount: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.cardRedemptionAuditCount,
+            heartbeatSeenCount: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.heartbeatSeenCount,
+            latestAuthMode: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.latestAuthMode,
+            latestDeviceFingerprint: runtimeEvidenceLaunchMainline.mainlineSummary.firstWaveRuntimeEvidence.latestDeviceFingerprint
+          }
+        : null,
+      {
+        key: "first_wave_runtime_evidence",
+        status: "evidence_recorded",
+        ready: true,
+        productCode: "FIRSTBATCH",
+        activeSessionCount: 1,
+        loginAuditCount: 1,
+        cardRedemptionAuditCount: 1,
+        heartbeatSeenCount: 1,
+        latestAuthMode: "card",
+        latestDeviceFingerprint: "first-wave-runtime-device-001"
+      }
+    );
+    assert.ok(
+      runtimeEvidenceLaunchMainline.mainlineSummary.overviewCards.some((item) =>
+        item.key === "first_wave_runtime_evidence"
+          && item.controls.some((control) => control.workspaceAction?.key === "ops")
+      )
+    );
+    assert.match(runtimeEvidenceLaunchMainline.summaryText, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceLaunchMainline.summaryText, /session\.login=1/);
+
+    const runtimeEvidenceLaunchReview = await getJson(
+      baseUrl,
+      "/api/developer/launch-review?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary?.firstWaveRuntimeEvidence
+        ? {
+            key: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.key,
+            status: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.status,
+            ready: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.ready,
+            productCode: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.productCode,
+            activeSessionCount: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.activeSessionCount,
+            loginAuditCount: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.loginAuditCount,
+            cardRedemptionAuditCount: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.cardRedemptionAuditCount,
+            heartbeatSeenCount: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.heartbeatSeenCount,
+            latestAuthMode: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.latestAuthMode,
+            latestDeviceFingerprint: runtimeEvidenceLaunchReview.reviewSummary.firstWaveRuntimeEvidence.latestDeviceFingerprint
+          }
+        : null,
+      {
+        key: "first_wave_runtime_evidence",
+        status: "evidence_recorded",
+        ready: true,
+        productCode: "FIRSTBATCH",
+        activeSessionCount: 1,
+        loginAuditCount: 1,
+        cardRedemptionAuditCount: 1,
+        heartbeatSeenCount: 1,
+        latestAuthMode: "card",
+        latestDeviceFingerprint: "first-wave-runtime-device-001"
+      }
+    );
+    assert.ok(runtimeEvidenceLaunchReview.reviewSummary.actionPlan.some((item) => item.key === "launch_review_first_wave_runtime_evidence"));
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /session\.login=1/);
+
     const repeatSetup = await postJsonExpectError(
       baseUrl,
       "/api/developer/license-quickstart/first-batches",

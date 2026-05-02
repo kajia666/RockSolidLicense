@@ -11341,6 +11341,12 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       title: "Launch Review Launch Ops Overview:"
     });
   }
+  if (reviewSummary.firstWaveRuntimeEvidence) {
+    lines.push("");
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: reviewSummary.firstWaveRuntimeEvidence
+    });
+  }
   if (launchDutyActionOrder) {
     lines.push("");
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
@@ -11661,6 +11667,21 @@ function buildDeveloperLaunchReviewSummaryPayload({
       params: { ...scopedOpsParams }
     }
   );
+  const firstWaveRuntimeEvidence = opsOverview.firstWaveRuntimeEvidence?.ready === true
+    && typeof opsOverview.firstWaveRuntimeEvidence === "object"
+    ? { ...opsOverview.firstWaveRuntimeEvidence }
+    : null;
+  const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidence
+    ? createLaunchWorkflowWorkspaceShortcut(
+        "ops",
+        "sessions",
+        "Review First-Wave Runtime Evidence",
+        {
+          ...scopedOpsParams,
+          reviewMode: "matched"
+        }
+      )
+    : null;
   const mainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline summary",
     "launch-mainline-summary.txt",
@@ -12112,6 +12133,20 @@ function buildDeveloperLaunchReviewSummaryPayload({
       recommendedDownload: launchOperationsOverviewDownload
     }));
   }
+  if (firstWaveRuntimeEvidence) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_first_wave_runtime_evidence",
+      title: firstWaveRuntimeEvidence.ready === true
+        ? "Review recorded first-wave runtime evidence"
+        : "Review first-wave runtime evidence status",
+      summary: firstWaveRuntimeEvidence.summary
+        || `First-wave runtime evidence status: ${firstWaveRuntimeEvidence.status || "unknown"}.`,
+      status: firstWaveRuntimeEvidence.ready === true ? "pass" : "review",
+      priority: firstWaveRuntimeEvidence.ready === true ? "secondary" : "primary",
+      workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction || opsWorkspaceAction,
+      recommendedDownload: opsSummaryDownload
+    }));
+  }
 
   for (const item of (Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : []).slice(0, 3)) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
@@ -12377,6 +12412,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     reviewTargets: visibleReviewTargets,
     launchDutyActionOrder,
     launchOperationsOverviewStatus,
+    firstWaveRuntimeEvidence,
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
@@ -13870,6 +13906,24 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       params
     }
   );
+  const firstWaveRuntimeEvidence = opsOverview.firstWaveRuntimeEvidence?.ready === true
+    && typeof opsOverview.firstWaveRuntimeEvidence === "object"
+    ? { ...opsOverview.firstWaveRuntimeEvidence }
+    : null;
+  const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidence
+    ? createLaunchWorkflowWorkspaceShortcut(
+        "ops",
+        "sessions",
+        "Review First-Wave Runtime Evidence",
+        {
+          ...params,
+          reviewMode: "matched"
+        }
+      )
+    : null;
+  const firstWaveRuntimeEvidenceDownload = firstWaveRuntimeEvidence
+    ? opsSummaryDownload
+    : null;
   const opsPrimaryDownload = createOpsMainlineDownload(opsRouteReview.downloads?.primary || null);
   const opsRemainingDownload = createOpsMainlineDownload(opsRouteReview.downloads?.remaining || null);
   const initialLaunchOpsReadiness = opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
@@ -14998,9 +15052,26 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
+  const firstWaveRuntimeEvidenceHeroControls = firstWaveRuntimeEvidence
+    ? [
+        firstWaveRuntimeEvidenceWorkspaceAction ? {
+          kind: "workspace",
+          label: firstWaveRuntimeEvidence.ready === true
+            ? "Review Recorded Runtime Evidence"
+            : "Review Runtime Evidence Status",
+          workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction
+        } : null,
+        firstWaveRuntimeEvidenceDownload ? {
+          kind: "download",
+          label: "Download Runtime Evidence Summary",
+          recommendedDownload: firstWaveRuntimeEvidenceDownload
+        } : null
+      ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+    : [];
   const heroControls = [
     ...confirmedFirstWaveHeroControls,
     ...firstWaveHeroControls,
+    ...firstWaveRuntimeEvidenceHeroControls,
     ...launchRunwayHeroControls,
     ...workspaceActions.map((item) => ({
       kind: "workspace",
@@ -15237,6 +15308,58 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
+  const firstWaveRuntimeEvidenceCard = firstWaveRuntimeEvidence
+    ? {
+        key: "first_wave_runtime_evidence",
+        title: "First-Wave Runtime Evidence",
+        summary: firstWaveRuntimeEvidence.summary
+          || `Runtime evidence status is ${firstWaveRuntimeEvidence.status || "unknown"}.`,
+        tags: [
+          {
+            label: "status",
+            value: firstWaveRuntimeEvidence.status || "unknown",
+            strong: true
+          },
+          {
+            label: "ready",
+            value: firstWaveRuntimeEvidence.ready === true,
+            strong: true
+          },
+          {
+            label: "sessions",
+            value: firstWaveRuntimeEvidence.activeSessionCount ?? 0,
+            strong: false
+          },
+          {
+            label: "logins",
+            value: firstWaveRuntimeEvidence.loginAuditCount ?? 0,
+            strong: false
+          },
+          {
+            label: "cardRedemptions",
+            value: firstWaveRuntimeEvidence.cardRedemptionAuditCount ?? 0,
+            strong: false
+          },
+          {
+            label: "heartbeatSeen",
+            value: firstWaveRuntimeEvidence.heartbeatSeenCount ?? 0,
+            strong: false
+          }
+        ],
+        controls: [
+          firstWaveRuntimeEvidenceWorkspaceAction ? ensureLaunchMainlineControlHrefs({
+            kind: "workspace",
+            label: firstWaveRuntimeEvidenceWorkspaceAction.label || "Review First-Wave Runtime Evidence",
+            workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction
+          }, params) : null,
+          firstWaveRuntimeEvidenceDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Download Runtime Evidence Summary",
+            recommendedDownload: firstWaveRuntimeEvidenceDownload
+          }, params) : null
+        ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -15321,6 +15444,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     },
     firstWaveReadinessBridgeCard,
     firstWaveHandoffConfirmationCard,
+    firstWaveRuntimeEvidenceCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -15835,6 +15959,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: overviewCards.filter((item) => item?.key === "workspace_path")
     },
     {
+      key: "first_wave_runtime_evidence",
+      title: "First-Wave Runtime Evidence",
+      emptyState: "Run the first real card-login path to expose runtime evidence here.",
+      cards: overviewCards.filter((item) => item?.key === "first_wave_runtime_evidence")
+    },
+    {
       key: "action_plan",
       title: "Mainline Action Plan",
       emptyState: "Generate a launch mainline package to inspect the server-side action plan here.",
@@ -16132,6 +16262,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveReadinessBridge,
     firstWaveHandoffConfirmation,
     firstWaveConfirmationChain,
+    firstWaveRuntimeEvidence,
     initialLaunchOpsOverviewStatus,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
@@ -16727,6 +16858,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendFirstWaveConfirmationChainTextLines(lines, mainlineSummary.firstWaveConfirmationChain, {
       title: "Launch Mainline First-Wave Confirmation Chain:"
+    });
+  }
+  if (mainlineSummary.firstWaveRuntimeEvidence) {
+    lines.push("");
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: mainlineSummary.firstWaveRuntimeEvidence
     });
   }
   if (mainlineSummary.initialLaunchOpsOverviewStatus) {

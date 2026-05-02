@@ -20597,6 +20597,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
     if (!receipt || typeof receipt !== "object") {
       continue;
     }
+    const receiptRuntimeEvidenceReady = runtimeEvidenceMatchesReceipt(receipt);
     if (receipt.firstLaunchDutyDeliveryExportCsvDownloadKey) {
       const cardCount = Number(receipt.firstLaunchDutyDeliveryExportCardCount || 0);
       pushFollowUp(receipt, "first_launch_delivery", {
@@ -20614,7 +20615,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
     }
     if (receipt.firstLaunchDutyHandoffDownloadKey) {
       pushFollowUp(receipt, "first_launch_handoff", {
-        priority: index === 0 ? "primary" : "secondary",
+        priority: index === 0 && !receiptRuntimeEvidenceReady ? "primary" : "secondary",
         title: "Download first-launch handoff",
         summary: `Use this first-wave handoff after ${receipt.operationLabel || receipt.operation || "the latest launch action"} so launch duty can continue without rebuilding receipt context.`,
         actionKey: receipt.firstLaunchDutyPrimaryWorkspaceKey || null,
@@ -20624,7 +20625,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
     if (receipt.firstLaunchDutyFirstUserValidationNextActionKey) {
       const actionCount = Number(receipt.firstLaunchDutyFirstUserValidationActionCount || 0);
       const remainingCount = Number(receipt.firstLaunchDutyFirstUserValidationRemainingCount ?? actionCount);
-      const runtimeEvidenceReady = runtimeEvidenceMatchesReceipt(receipt);
+      const runtimeEvidenceReady = receiptRuntimeEvidenceReady;
       if (runtimeEvidenceReady) {
         const runtimeEvidenceDownload = buildDeveloperOpsFirstWaveRuntimeEvidenceDownload({
           productCode: firstWaveRuntimeEvidence.productCode || receipt.productCode || "",
@@ -20632,7 +20633,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
           auditLimit: 60
         });
         pushFollowUp(receipt, "first_user_validation", {
-          priority: "secondary",
+          priority: "primary",
           title: "Review first-user runtime evidence",
           summary: `First-user runtime evidence recorded: activeSessions=${firstWaveRuntimeEvidence.activeSessionCount ?? 0}, logins=${firstWaveRuntimeEvidence.loginAuditCount ?? 0}, cardRedemptions=${firstWaveRuntimeEvidence.cardRedemptionAuditCount ?? 0}, heartbeatSeen=${firstWaveRuntimeEvidence.heartbeatSeenCount ?? 0}.`,
           actionKey: "runtime_evidence_review",
@@ -30346,7 +30347,7 @@ function buildDeveloperOpsSnapshotPayload({
     ? {
         ...launchReceiptNextFollowUpBase,
         recommendedAction: buildDeveloperOpsLaunchReceiptNextFollowUpAction(launchReceiptNextFollowUpBase),
-        recommendedDownload: buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, launchReceiptNextFollowUpBase)
+        recommendedDownload: buildDeveloperOpsLaunchReceiptFollowUpDownload(launchReceiptNextFollowUpBase, scope)
       }
     : null;
   const initialLaunchOpsReadiness = buildDeveloperOpsInitialLaunchOpsReadinessPayload({

@@ -6683,6 +6683,18 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
   const duty = receipt.firstLaunchDutySummary && typeof receipt.firstLaunchDutySummary === "object"
     ? receipt.firstLaunchDutySummary
     : null;
+  const deliveryExports = duty?.deliveryExports && typeof duty.deliveryExports === "object"
+    ? duty.deliveryExports
+    : null;
+  const deliveryExportDownloads = Array.isArray(deliveryExports?.downloads)
+    ? deliveryExports.downloads
+    : [];
+  const findDeliveryExportDownload = (format = "") => deliveryExportDownloads.find((item) =>
+    String(item?.format || "").trim().toLowerCase() === format
+  ) || null;
+  const deliveryExportCsvDownload = findDeliveryExportDownload("csv");
+  const deliveryExportZipDownload = findDeliveryExportDownload("zip");
+  const deliveryExportChecksumDownload = findDeliveryExportDownload("checksums");
   const lifecycle = receipt.postLaunchLifecycleSummary && typeof receipt.postLaunchLifecycleSummary === "object"
     ? receipt.postLaunchLifecycleSummary
     : null;
@@ -6754,7 +6766,18 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           stageCount: Array.isArray(opsQueue?.stageGroups) ? opsQueue.stageGroups.length : 0,
           handoffDownloadKey: duty?.handoffDownload?.key || receipt.firstLaunchHandoffDownload?.key || null,
           primaryWorkspaceKey: duty?.primaryWorkspaceAction?.key || opsQueue?.nextAction?.workspaceAction?.key || null,
-          primaryDownloadKey: duty?.primaryRecommendedDownload?.key || opsQueue?.nextAction?.recommendedDownload?.key || null
+          primaryDownloadKey: duty?.primaryRecommendedDownload?.key || opsQueue?.nextAction?.recommendedDownload?.key || null,
+          deliveryExportStatus: deliveryExports?.status || null,
+          deliveryExportProductCode: deliveryExports?.productCode || null,
+          deliveryExportUsageStatus: deliveryExports?.usageStatus || null,
+          deliveryExportCardCount: Number(deliveryExports?.cardCount || 0),
+          deliveryExportBatchCount: Number(deliveryExports?.batchCount || 0),
+          deliveryExportCsvDownloadKey: deliveryExportCsvDownload?.key || null,
+          deliveryExportCsvHref: deliveryExportCsvDownload?.href || null,
+          deliveryExportZipDownloadKey: deliveryExportZipDownload?.key || null,
+          deliveryExportZipHref: deliveryExportZipDownload?.href || null,
+          deliveryExportChecksumDownloadKey: deliveryExportChecksumDownload?.key || null,
+          deliveryExportChecksumHref: deliveryExportChecksumDownload?.href || null
         }
       : null,
     postLaunchLifecycle: lifecycle
@@ -19439,6 +19462,13 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         firstLaunchDutyPrimaryWorkspaceKey: receipt.firstLaunchDuty?.primaryWorkspaceKey || null,
         firstLaunchDutyPrimaryDownloadKey: receipt.firstLaunchDuty?.primaryDownloadKey || null,
         firstLaunchDutyActionCount: receipt.firstLaunchDuty?.actionCount ?? null,
+        firstLaunchDutyDeliveryExportStatus: receipt.firstLaunchDuty?.deliveryExportStatus || null,
+        firstLaunchDutyDeliveryExportCardCount: receipt.firstLaunchDuty?.deliveryExportCardCount ?? null,
+        firstLaunchDutyDeliveryExportUsageStatus: receipt.firstLaunchDuty?.deliveryExportUsageStatus || null,
+        firstLaunchDutyDeliveryExportCsvDownloadKey: receipt.firstLaunchDuty?.deliveryExportCsvDownloadKey || null,
+        firstLaunchDutyDeliveryExportCsvHref: receipt.firstLaunchDuty?.deliveryExportCsvHref || null,
+        firstLaunchDutyDeliveryExportZipDownloadKey: receipt.firstLaunchDuty?.deliveryExportZipDownloadKey || null,
+        firstLaunchDutyDeliveryExportChecksumDownloadKey: receipt.firstLaunchDuty?.deliveryExportChecksumDownloadKey || null,
         postLaunchLifecycleStatus: receipt.postLaunchLifecycle?.status || null,
         postLaunchLifecyclePhaseCount: receipt.postLaunchLifecycle?.phaseCount ?? null,
         postLaunchLifecycleReadyCount: receipt.postLaunchLifecycle?.readyCount ?? null,

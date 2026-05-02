@@ -10232,6 +10232,27 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(setupAuditEntry.metadata?.launchReceipt?.handoffText, undefined);
     assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchInventory?.createdBatchCount, setup.createdBatches.length);
     assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.handoffDownloadKey, "launch_mainline_first_launch_handoff");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportStatus, "ready");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportCardCount, 150);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportUsageStatus, "unused");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportCsvDownloadKey, "developer_cards_first_launch_csv");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportZipDownloadKey, "developer_cards_first_launch_zip");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportChecksumDownloadKey, "developer_cards_first_launch_checksums");
+    assert.match(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportCsvHref || "", /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+
+    const deliveryAuditOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTBATCH&limit=20",
+      ownerSession.token
+    );
+    const deliveryAuditLaunchReceipt = deliveryAuditOpsSnapshot.overview?.latestLaunchReceipts?.find((item) =>
+      item.operation === "first_batch_setup"
+    );
+    assert.ok(deliveryAuditLaunchReceipt);
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportStatus, "ready");
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCardCount, 150);
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCsvDownloadKey, "developer_cards_first_launch_csv");
+    assert.match(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCsvHref || "", /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
 
     const cards = await getJson(
       baseUrl,

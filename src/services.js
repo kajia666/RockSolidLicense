@@ -18430,6 +18430,23 @@ function buildDeveloperOpsLaunchReceiptBackfillStatusText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload = {}) {
+  const scope = payload.scope || {};
+  const lines = [
+    "RockSolid Developer Ops First-Wave Audit Backfill Status",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || "-"}`,
+    `Channel: ${scope.channel || "-"}`
+  ];
+  appendFirstWaveAuditBackfillStatusText(lines, payload);
+  lines.push("");
+  lines.push("Operator Note:");
+  lines.push("- Use this file as the direct diagnostic anchor for first-wave confirmation-chain protection.");
+  lines.push("- USED means recent First-Wave handoff confirmations and readiness bridges were added to preserve the chain.");
+  lines.push("- NOT_USED means the current snapshot or explicit audit filter did not require First-Wave audit backfill.");
+  return lines.join("\n");
+}
+
 function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
   const mainlineSummary = payload.mainlineSummary || {};
@@ -20109,6 +20126,19 @@ function buildDeveloperOpsLaunchReceiptBackfillStatusDownload(scope = {}) {
     {
       source: "developer-ops",
       format: "launch-receipt-backfill-status",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
+function buildDeveloperOpsFirstWaveAuditBackfillStatusDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_first_wave_audit_backfill_status",
+    "first-wave-audit-backfill-status.txt",
+    "First-Wave audit backfill status",
+    {
+      source: "developer-ops",
+      format: "first-wave-audit-backfill-status",
       params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
     }
   );
@@ -23485,6 +23515,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const primaryDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
   const nextFollowUpDownload = primaryDownload || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, launchReceiptNextFollowUp);
   const backfillStatusDownload = buildDeveloperOpsLaunchReceiptBackfillStatusDownload(scope);
+  const firstWaveBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload(scope);
   const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
   const stagingLaunchDutyArchiveDownload = buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope);
   const initialLaunchReadinessDownload = buildDeveloperOpsInitialLaunchReadinessDownload(scope);
@@ -23523,6 +23554,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   for (const download of [
     primaryDownload,
     backfillStatusDownload,
+    firstWaveBackfillStatusDownload,
     firstLaunchHandoffDownload,
     launchMainlineHandoffRoutesDownload,
     stagingLaunchDutyArchiveDownload,
@@ -29617,6 +29649,10 @@ function buildDeveloperOpsExportFiles(payload) {
       body: buildDeveloperOpsLaunchReceiptBackfillStatusText(payload)
     },
     {
+      path: "first-wave-audit-backfill-status.txt",
+      body: buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload)
+    },
+    {
       path: "initial-launch-ops-readiness.txt",
       body: buildDeveloperOpsInitialLaunchOpsReadinessText(payload)
     },
@@ -30386,7 +30422,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -30445,6 +30481,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "launch-receipt-backfill-status.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsLaunchReceiptBackfillStatusText(payload)
+    };
+  }
+
+  if (normalizedFormat === "first-wave-audit-backfill-status") {
+    return {
+      fileName: "first-wave-audit-backfill-status.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload)
     };
   }
 

@@ -14337,6 +14337,11 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.ok(Number(confirmedOpsSnapshot.auditLogs.filters.firstWaveReadinessBackfill || 0) > 0);
     assert.equal(confirmedOpsSnapshot.summary.firstWaveAuditBackfillStatus?.used, true);
     assert.equal(confirmedOpsSnapshot.summary.firstWaveAuditBackfillStatus?.source, "first-wave-audit-backfill");
+    assert.ok(confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
+      item.key === "ops_first_wave_audit_backfill_status"
+      && item.format === "first-wave-audit-backfill-status"
+      && /format=first-wave-audit-backfill-status/.test(item.href || "")
+    ));
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Confirmation Chain:/);
@@ -14482,6 +14487,26 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(firstWaveHandoffIndex.body, /First-Wave Confirmation Chain:/);
     assert.match(firstWaveHandoffIndex.body, /segments=3\/3/);
     assert.match(firstWaveHandoffIndex.body, /developer-ops-first-wave-recommendations-firstwave-stable\.txt/);
+    assert.match(firstWaveHandoffIndex.body, /first-wave-audit-backfill-status\.txt.*format=first-wave-audit-backfill-status/);
+
+    const firstWaveAuditBackfillStatusDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=first-wave-audit-backfill-status&limit=80",
+      operatorSession.token
+    );
+    assert.equal(firstWaveAuditBackfillStatusDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(firstWaveAuditBackfillStatusDownload.contentDisposition || "", /first-wave-audit-backfill-status\.txt/);
+    assert.match(firstWaveAuditBackfillStatusDownload.body, /RockSolid Developer Ops First-Wave Audit Backfill Status/);
+    assert.match(firstWaveAuditBackfillStatusDownload.body, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
+    assert.match(firstWaveAuditBackfillStatusDownload.body, /First-Wave Audit Backfill Status: USED/);
+    assert.match(firstWaveAuditBackfillStatusDownload.body, /First-Wave Audit Backfill Source: first-wave-audit-backfill/);
+
+    const firstWaveOpsChecksums = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=checksums&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveOpsChecksums.body, /first-wave-audit-backfill-status\.txt/);
 
     const recommendationAudit = await getJson(
       baseUrl,

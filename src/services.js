@@ -23740,6 +23740,56 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         recommendedDownload: null,
         handoffFileName: null
       };
+  const firstCardsStatus = inventoryStatus === "not_applicable"
+    ? "not_applicable"
+    : inventoryStatus === "missing"
+      ? "pending"
+      : inventoryStatus;
+  const primaryFirstRoundAction = firstRoundActions[0] || fallbackFirstRoundAction;
+  const firstRoundOpsPayload = {
+    status: firstRoundStatus,
+    actionCount: firstRoundActions.length,
+    primaryAction: primaryFirstRoundAction,
+    actions: firstRoundActions.length ? firstRoundActions : [fallbackFirstRoundAction],
+    readiness: {
+      status: readiness.status || null,
+      headline: readiness.headline || null,
+      followUpCount: readiness.followUpCount ?? firstRoundActions.length,
+      gateDecision: readiness.gate?.decision || null,
+      canEnterInitialLaunch: readiness.gate?.canEnterInitialLaunch === true,
+      nextFollowUp: readiness.nextFollowUp || null
+    }
+  };
+  const traceabilityPayload = {
+    opsSnapshotFileName: opsSnapshot?.fileName || null,
+    opsSummaryFileName: opsSnapshot?.summaryFileName || null,
+    latestLaunchReceipt: latestLaunchReceipt
+      ? {
+          auditLogId: latestLaunchReceipt.auditLogId || null,
+          operation: latestLaunchReceipt.operation || null,
+          operationLabel: latestLaunchReceipt.operationLabel || null,
+          channel: latestLaunchReceipt.channel || null,
+          handoffFileName: latestLaunchReceipt.handoffFileName || null,
+          firstLaunchInventoryCreatedBatchCount: latestLaunchReceipt.firstLaunchInventoryCreatedBatchCount ?? null,
+          firstLaunchInventoryCreatedCardCount: latestLaunchReceipt.firstLaunchInventoryCreatedCardCount ?? null,
+          firstLaunchDutyHandoffDownloadKey: latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey || null,
+          postLaunchLifecycleStatus: latestLaunchReceipt.postLaunchLifecycleStatus || null,
+          postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null
+        }
+      : null,
+    initialLaunchOpsReadinessStatus: readiness.status || null,
+    firstLaunchHandoffDownload: readiness.firstLaunchHandoffDownload || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff || null
+  };
+  const launchReadinessBridge = buildDeveloperOpsFirstWaveReadinessBridgePayload({
+    productCode,
+    channel,
+    inventoryStatus,
+    firstCardsStatus,
+    firstRoundOpsStatus: firstRoundStatus,
+    inventoryAction,
+    firstRoundAction: primaryFirstRoundAction,
+    latestLaunchReceipt: traceabilityPayload.latestLaunchReceipt
+  });
 
   return {
     version: "developer-ops-first-wave-recommendations/v1",
@@ -23762,11 +23812,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
       states
     },
     firstCards: {
-      status: inventoryStatus === "not_applicable"
-        ? "not_applicable"
-        : inventoryStatus === "missing"
-          ? "pending"
-          : inventoryStatus,
+      status: firstCardsStatus,
       recommendedBatchCount: states.length,
       recommendedCardCount: targetCardCount,
       issuedBatchCount: issuedBatchCodes.size,
@@ -23782,45 +23828,123 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         status: item.status
       }))
     },
-    firstRoundOps: {
-      status: firstRoundStatus,
-      actionCount: firstRoundActions.length,
-      primaryAction: firstRoundActions[0] || fallbackFirstRoundAction,
-      actions: firstRoundActions.length ? firstRoundActions : [fallbackFirstRoundAction],
-      readiness: {
-        status: readiness.status || null,
-        headline: readiness.headline || null,
-        followUpCount: readiness.followUpCount ?? firstRoundActions.length,
-        gateDecision: readiness.gate?.decision || null,
-        canEnterInitialLaunch: readiness.gate?.canEnterInitialLaunch === true,
-        nextFollowUp: readiness.nextFollowUp || null
-      }
-    },
-    traceability: {
-      opsSnapshotFileName: opsSnapshot?.fileName || null,
-      opsSummaryFileName: opsSnapshot?.summaryFileName || null,
-      latestLaunchReceipt: latestLaunchReceipt
-        ? {
-            auditLogId: latestLaunchReceipt.auditLogId || null,
-            operation: latestLaunchReceipt.operation || null,
-            operationLabel: latestLaunchReceipt.operationLabel || null,
-            channel: latestLaunchReceipt.channel || null,
-            handoffFileName: latestLaunchReceipt.handoffFileName || null,
-            firstLaunchInventoryCreatedBatchCount: latestLaunchReceipt.firstLaunchInventoryCreatedBatchCount ?? null,
-            firstLaunchInventoryCreatedCardCount: latestLaunchReceipt.firstLaunchInventoryCreatedCardCount ?? null,
-            firstLaunchDutyHandoffDownloadKey: latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey || null,
-            postLaunchLifecycleStatus: latestLaunchReceipt.postLaunchLifecycleStatus || null,
-            postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null
-          }
-        : null,
-      initialLaunchOpsReadinessStatus: readiness.status || null,
-      firstLaunchHandoffDownload: readiness.firstLaunchHandoffDownload || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff || null
-    },
+    firstRoundOps: firstRoundOpsPayload,
+    launchReadinessBridge,
+    traceability: traceabilityPayload,
     message: inventoryStatus === "missing"
       ? `First-wave setup still needs ${missingStates.length} starter launch batch${missingStates.length === 1 ? "" : "es"} for ${productCode}.`
       : inventoryStatus === "low"
         ? `First-wave inventory is low for ${productCode}; refill before widening rollout.`
         : `First-wave inventory is ready for ${productCode}; continue launch-day ops monitoring.`
+  };
+}
+
+function buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode = "", channel = "stable", format = "summary") {
+  const normalizedFormat = String(format || "summary").trim().toLowerCase() || "summary";
+  const fileSuffix = normalizedFormat === "checksums"
+    ? "sha256.txt"
+    : normalizedFormat === "json"
+      ? "json"
+      : "txt";
+  return {
+    key: `first_wave_recommendations_${normalizedFormat}`,
+    label: `First-wave recommendations ${normalizedFormat}`,
+    source: "developer-ops-first-wave-recommendations",
+    format: normalizedFormat,
+    fileName: `first-wave-recommendations.${fileSuffix}`,
+    href: `/api/developer/ops/first-wave/recommendations/download${buildLaunchWorkflowActionQuery({
+      productCode,
+      channel,
+      format: normalizedFormat
+    })}`
+  };
+}
+
+function buildDeveloperOpsFirstWaveReadinessBridgePayload({
+  productCode = "",
+  channel = "stable",
+  inventoryStatus = "unknown",
+  firstCardsStatus = "unknown",
+  firstRoundOpsStatus = "unknown",
+  inventoryAction = null,
+  firstRoundAction = null,
+  latestLaunchReceipt = null
+} = {}) {
+  const buildSegment = (key, label, status) => {
+    const normalizedStatus = normalizeDeveloperOpsConfirmationToken(status, "unknown");
+    return {
+      key,
+      label,
+      status: normalizedStatus,
+      ready: normalizedStatus === "ready",
+      confirmed: normalizedStatus !== "unknown" && normalizedStatus !== "missing" && normalizedStatus !== "pending" && normalizedStatus !== "not_started"
+    };
+  };
+  const normalizeNextAction = (action = null, fallbackKey = "") => {
+    if (!action || typeof action !== "object") {
+      return null;
+    }
+    const stableKey = action.stage || fallbackKey || action.operation || action.key || null;
+    return {
+      ...action,
+      key: stableKey,
+      ...(action.key && action.key !== stableKey ? { sourceActionKey: action.key } : {})
+    };
+  };
+  const segments = [
+    buildSegment("first_batch_inventory", "First Batch Inventory", inventoryStatus),
+    buildSegment("first_cards", "First Cards", firstCardsStatus),
+    buildSegment("first_round_ops", "First Round Ops", firstRoundOpsStatus)
+  ];
+  const firstOpenSegment = segments.find((item) => item.ready !== true) || null;
+  const readySegmentCount = segments.filter((item) => item.ready === true).length;
+  const currentGate = firstOpenSegment?.key || "ready";
+  const nextAction = currentGate === "first_round_ops"
+    ? normalizeNextAction(firstRoundAction, "first_round_ops")
+    : currentGate === "ready"
+      ? null
+      : normalizeNextAction(inventoryAction, currentGate);
+  const downloads = {
+    summary: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "summary"),
+    json: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "json"),
+    checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums")
+  };
+  return {
+    version: "developer-ops-first-wave-readiness-bridge/v1",
+    status: currentGate === "ready"
+      ? "ready"
+      : currentGate === "first_round_ops" && segments[0]?.ready === true && segments[1]?.ready === true
+        ? "ready_for_first_wave_handoff"
+        : "blocked",
+    productCode,
+    channel,
+    currentGate,
+    segmentCount: segments.length,
+    readySegmentCount,
+    pendingSegmentCount: segments.length - readySegmentCount,
+    segments,
+    nextAction: nextAction || null,
+    confirmation: {
+      endpoint: "/api/developer/ops/first-wave/recommendations/confirm",
+      method: "POST",
+      requiredFields: [
+        "productCode",
+        "channel",
+        "decision",
+        "inventoryStatus",
+        "firstCardStatus",
+        "firstRoundOpsStatus"
+      ]
+    },
+    downloads,
+    latestLaunchReceipt: latestLaunchReceipt
+      ? {
+          auditLogId: latestLaunchReceipt.auditLogId || null,
+          operation: latestLaunchReceipt.operation || null,
+          channel: latestLaunchReceipt.channel || null,
+          handoffFileName: latestLaunchReceipt.handoffFileName || null
+        }
+      : null
   };
 }
 
@@ -23834,6 +23958,7 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   const inventory = payload.inventory || {};
   const firstCards = payload.firstCards || {};
   const firstRoundOps = payload.firstRoundOps || {};
+  const launchReadinessBridge = payload.launchReadinessBridge || {};
   const traceability = payload.traceability || {};
   const latestReceipt = traceability.latestLaunchReceipt || {};
   const lines = [
@@ -23881,6 +24006,20 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
     if (action.summary) {
       lines.push(`  summary=${action.summary}`);
     }
+  }
+
+  const bridgeSegments = Array.isArray(launchReadinessBridge.segments)
+    ? launchReadinessBridge.segments
+    : [];
+  lines.push(
+    "",
+    "Launch Readiness Bridge:",
+    `- status=${launchReadinessBridge.status || "-"} | gate=${launchReadinessBridge.currentGate || "-"} | ready=${launchReadinessBridge.readySegmentCount ?? 0}/${launchReadinessBridge.segmentCount ?? bridgeSegments.length}`,
+    `- nextAction=${launchReadinessBridge.nextAction?.operation || launchReadinessBridge.nextAction?.key || "-"} | confirm=${launchReadinessBridge.confirmation?.method || "POST"} ${launchReadinessBridge.confirmation?.endpoint || "-"}`,
+    `- downloads=${launchReadinessBridge.downloads?.summary?.href || "-"} | ${launchReadinessBridge.downloads?.json?.href || "-"} | ${launchReadinessBridge.downloads?.checksums?.href || "-"}`
+  );
+  for (const segment of bridgeSegments) {
+    lines.push(`  - ${segment.key || "-"} | status=${segment.status || "-"} | ready=${segment.ready ? "yes" : "no"}`);
   }
 
   lines.push(
@@ -42153,7 +42292,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           freshCardCount: payload.inventory.freshCardCount,
           recommendedCardCount: payload.firstCards.recommendedCardCount,
           latestLaunchReceiptOperation: payload.traceability.latestLaunchReceipt?.operation || null,
-          opsSnapshotFileName: payload.traceability.opsSnapshotFileName || null
+          opsSnapshotFileName: payload.traceability.opsSnapshotFileName || null,
+          launchReadinessBridgeStatus: payload.launchReadinessBridge?.status || null,
+          launchReadinessBridgeCurrentGate: payload.launchReadinessBridge?.currentGate || null,
+          launchReadinessBridgeNextActionKey: payload.launchReadinessBridge?.nextAction?.key || null,
+          launchReadinessBridgeReadySegmentCount: payload.launchReadinessBridge?.readySegmentCount ?? null,
+          launchReadinessBridgeSegmentCount: payload.launchReadinessBridge?.segmentCount ?? null
         }
       );
 

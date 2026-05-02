@@ -13989,6 +13989,36 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(beforeSetup.firstCards.recommendedCardCount, 150);
     assert.equal(beforeSetup.firstRoundOps.status, "not_started");
     assert.equal(beforeSetup.firstRoundOps.primaryAction.operation, "first_batch_setup");
+    assert.deepEqual(
+      {
+        version: beforeSetup.launchReadinessBridge?.version,
+        status: beforeSetup.launchReadinessBridge?.status,
+        currentGate: beforeSetup.launchReadinessBridge?.currentGate,
+        readySegmentCount: beforeSetup.launchReadinessBridge?.readySegmentCount,
+        segmentCount: beforeSetup.launchReadinessBridge?.segmentCount,
+        nextActionOperation: beforeSetup.launchReadinessBridge?.nextAction?.operation,
+        confirmEndpoint: beforeSetup.launchReadinessBridge?.confirmation?.endpoint,
+        summaryDownload: beforeSetup.launchReadinessBridge?.downloads?.summary?.href
+      },
+      {
+        version: "developer-ops-first-wave-readiness-bridge/v1",
+        status: "blocked",
+        currentGate: "first_batch_inventory",
+        readySegmentCount: 0,
+        segmentCount: 3,
+        nextActionOperation: "first_batch_setup",
+        confirmEndpoint: "/api/developer/ops/first-wave/recommendations/confirm",
+        summaryDownload: "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=summary"
+      }
+    );
+    assert.deepEqual(
+      beforeSetup.launchReadinessBridge.segments.map((item) => [item.key, item.status, item.ready]),
+      [
+        ["first_batch_inventory", "missing", false],
+        ["first_cards", "pending", false],
+        ["first_round_ops", "not_started", false]
+      ]
+    );
     assert.ok(beforeSetup.auditLogId);
 
     const setup = await postJson(
@@ -14013,6 +14043,38 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(afterSetup.firstCards.status, "ready");
     assert.equal(afterSetup.firstCards.issuedBatchCount, 2);
     assert.equal(afterSetup.firstRoundOps.status, "review");
+    assert.deepEqual(
+      {
+        status: afterSetup.launchReadinessBridge?.status,
+        currentGate: afterSetup.launchReadinessBridge?.currentGate,
+        readySegmentCount: afterSetup.launchReadinessBridge?.readySegmentCount,
+        segmentCount: afterSetup.launchReadinessBridge?.segmentCount,
+        nextActionKey: afterSetup.launchReadinessBridge?.nextAction?.key,
+        nextActionOperation: afterSetup.launchReadinessBridge?.nextAction?.operation,
+        nextActionDownload: afterSetup.launchReadinessBridge?.nextAction?.recommendedDownload?.href,
+        jsonDownload: afterSetup.launchReadinessBridge?.downloads?.json?.href,
+        checksumsDownload: afterSetup.launchReadinessBridge?.downloads?.checksums?.href
+      },
+      {
+        status: "ready_for_first_wave_handoff",
+        currentGate: "first_round_ops",
+        readySegmentCount: 2,
+        segmentCount: 3,
+        nextActionKey: "first_launch_handoff",
+        nextActionOperation: "first_batch_setup",
+        nextActionDownload: afterSetup.firstRoundOps.primaryAction.recommendedDownload.href,
+        jsonDownload: "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=json",
+        checksumsDownload: "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=checksums"
+      }
+    );
+    assert.deepEqual(
+      afterSetup.launchReadinessBridge.segments.map((item) => [item.key, item.status, item.ready]),
+      [
+        ["first_batch_inventory", "ready", true],
+        ["first_cards", "ready", true],
+        ["first_round_ops", "review", false]
+      ]
+    );
     assert.ok(Array.isArray(afterSetup.firstRoundOps.actions));
     assert.ok(afterSetup.firstRoundOps.actions.length >= 1);
     assert.ok(afterSetup.firstRoundOps.actions.some((item) => item.stage === "first_launch_handoff"));
@@ -14041,6 +14103,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(handoffDownload.body, /Inventory Recommendation:/);
     assert.match(handoffDownload.body, /First Card Issuance:/);
     assert.match(handoffDownload.body, /First Round Ops Actions:/);
+    assert.match(handoffDownload.body, /Launch Readiness Bridge:/);
+    assert.match(handoffDownload.body, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
+    assert.match(handoffDownload.body, /downloads=.*format=json.*format=checksums/);
     assert.match(handoffDownload.body, /Traceability:/);
     assert.match(handoffDownload.body, /latestReceipt=first_batch_setup/);
     assert.match(handoffDownload.body, /href=.*format=first-launch-handoff/);
@@ -14172,6 +14237,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && item.metadata?.productCode === "FIRSTWAVE"
       && item.metadata?.inventoryStatus === "ready"
       && item.metadata?.firstRoundOpsStatus === "review"
+      && item.metadata?.launchReadinessBridgeStatus === "ready_for_first_wave_handoff"
+      && item.metadata?.launchReadinessBridgeCurrentGate === "first_round_ops"
+      && item.metadata?.launchReadinessBridgeNextActionKey === "first_launch_handoff"
     ));
 
     const betaLaunchReceipt = await postJson(

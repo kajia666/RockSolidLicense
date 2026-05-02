@@ -10419,6 +10419,37 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceOpsSnapshot.summaryText, /session\.login/);
     assert.match(runtimeEvidenceOpsSnapshot.summaryText, /card\.direct_redeem/);
 
+    const runtimeEvidenceOpsDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&limit=40&format=first-wave-runtime-evidence",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceOpsDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceOpsDownload.contentDisposition || "", /first-wave-runtime-evidence\.txt"/);
+    assert.match(runtimeEvidenceOpsDownload.body, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceOpsDownload.body, /ready=true/);
+    assert.match(runtimeEvidenceOpsDownload.body, /session\.login=1/);
+    assert.match(runtimeEvidenceOpsDownload.body, /card\.redemption=1/);
+    assert.match(runtimeEvidenceOpsDownload.body, /device=first-wave-runtime-device-001/);
+    assert.doesNotMatch(runtimeEvidenceOpsDownload.body, new RegExp(firstLaunchDirectCard.cardKey));
+    assert.doesNotMatch(runtimeEvidenceOpsDownload.body, new RegExp(firstWaveRuntimeLogin.sessionToken));
+
+    const runtimeEvidenceOpsChecksums = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&limit=40&format=checksums",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceOpsChecksums.body, /first-wave-runtime-evidence\.txt/);
+
+    const runtimeEvidenceOpsZip = await getBinary(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&limit=40&format=zip",
+      ownerSession.token
+    );
+    const runtimeEvidenceOpsZipText = runtimeEvidenceOpsZip.body.toString("latin1");
+    assert.match(runtimeEvidenceOpsZipText, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceOpsZipText, /First-Wave Runtime Evidence:/);
+
     const runtimeEvidenceValidationFollowUp = runtimeEvidenceOpsSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.stage === "first_user_validation"
     );

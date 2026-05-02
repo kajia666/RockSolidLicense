@@ -18992,6 +18992,38 @@ function buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload = {}) {
+  const scope = payload.scope || {};
+  const project = Array.isArray(payload.projects) && payload.projects.length ? payload.projects[0] : {};
+  const evidence = payload.overview?.firstWaveRuntimeEvidence
+    && typeof payload.overview.firstWaveRuntimeEvidence === "object"
+    ? payload.overview.firstWaveRuntimeEvidence
+    : null;
+  const lines = [
+    "RockSolid Developer Ops First-Wave Runtime Evidence",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || evidence?.productCode || project.code || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${scope.channel || evidence?.channel || "-"}`,
+    ""
+  ];
+  if (evidence) {
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: evidence
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file as the Developer Ops source-of-truth runtime evidence handoff.");
+    lines.push("- Counts come from scoped active sessions plus session.login and card redemption audit rows.");
+    lines.push("- Raw card keys and session tokens are intentionally excluded from this handoff.");
+  } else {
+    lines.push("First-Wave Runtime Evidence:");
+    lines.push("- status=not_recorded | ready=false");
+    lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
   const mainlineSummary = payload.mainlineSummary || {};
@@ -29968,6 +30000,8 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "handoff-index.txt",
     "launch-receipt-next-follow-up.txt",
     "launch-receipt-backfill-status.txt",
+    "first-wave-audit-backfill-status.txt",
+    "first-wave-runtime-evidence.txt",
     "initial-launch-ops-readiness.txt",
     "staging-launch-duty-archive.txt",
     "stabilization-handoff.txt",
@@ -30452,6 +30486,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "first-wave-audit-backfill-status.txt",
       body: buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload)
+    },
+    {
+      path: "first-wave-runtime-evidence.txt",
+      body: buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload)
     },
     {
       path: "initial-launch-ops-readiness.txt",
@@ -31223,7 +31261,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -31290,6 +31328,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "first-wave-audit-backfill-status.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload)
+    };
+  }
+
+  if (normalizedFormat === "first-wave-runtime-evidence") {
+    return {
+      fileName: "first-wave-runtime-evidence.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload)
     };
   }
 

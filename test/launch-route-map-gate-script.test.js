@@ -25,6 +25,7 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
   assert.equal(output.mode, "launch-route-map-gate");
   assert.equal(output.dryRun, true);
   assert.equal(output.summary.willRunFullSuite, false);
+  assert.match(output.summary.scope, /first-batch runtime evidence/i);
   assert.deepEqual(
     output.commands.map((command) => command.key),
     [
@@ -42,6 +43,7 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     (command) => command.key === "developer_ops_export_and_mainline_action"
   );
   assert.ok(licenseFlowCommand);
+  assert.match(licenseFlowCommand.label, /first-batch runtime evidence/i);
   assert.ok(licenseFlowCommand.args.includes("--test-name-pattern"));
   assert.match(
     licenseFlowCommand.args[licenseFlowCommand.args.indexOf("--test-name-pattern") + 1],

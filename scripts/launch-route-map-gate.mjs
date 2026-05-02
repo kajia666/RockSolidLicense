@@ -39,7 +39,7 @@ const commands = [
   },
   {
     key: "developer_ops_export_and_mainline_action",
-    label: "Developer Ops export and Launch Mainline first-wave action",
+    label: "Developer Ops export, Launch Mainline action, and first-batch runtime evidence",
     command: "node",
     executable: process.execPath,
     args: [
@@ -134,7 +134,7 @@ function payload(status = "pass") {
     summary: {
       commandCount: commands.length,
       willRunFullSuite: false,
-      scope: "Launch Mainline / Launch Smoke / Developer Ops route-map visibility plus launch download surface targeted gate"
+      scope: "Launch Mainline / Launch Smoke / Developer Ops route-map visibility, first-batch runtime evidence, and launch download surface targeted gate"
     },
     commands: commands.map(publicCommand)
   };

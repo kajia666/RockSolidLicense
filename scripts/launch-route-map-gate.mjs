@@ -12,7 +12,8 @@ const help = rawArgs.includes("--help") || rawArgs.includes("-h");
 
 const launchMainlinePattern = [
   "developer ops export bundles scoped data and downloadable assets",
-  "developer launch mainline action can record a first-wave ops sweep and refresh post-launch evidence"
+  "developer launch mainline action can record a first-wave ops sweep and refresh post-launch evidence",
+  "developer license quickstart first-batch setup can create recommended launch card batches"
 ].join("|");
 
 const launchDownloadSurfacePattern = [

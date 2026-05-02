@@ -51,6 +51,10 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     licenseFlowCommand.args[licenseFlowCommand.args.indexOf("--test-name-pattern") + 1],
     /developer launch mainline action can record a first-wave ops sweep/
   );
+  assert.match(
+    licenseFlowCommand.args[licenseFlowCommand.args.indexOf("--test-name-pattern") + 1],
+    /developer license quickstart first-batch setup can create recommended launch card batches/
+  );
 
   const downloadAuditCommand = output.commands.find(
     (command) => command.key === "launch_download_surface_audit"

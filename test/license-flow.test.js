@@ -10497,6 +10497,12 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(runtimeEvidenceNextFollowUpDownload?.fileName, "first-wave-runtime-evidence.txt");
     assert.equal(runtimeEvidenceNextFollowUpDownload?.format, "first-wave-runtime-evidence");
     assert.match(runtimeEvidenceNextFollowUpDownload?.href || "", /format=first-wave-runtime-evidence/);
+    const runtimeEvidenceNextFollowUpAction = runtimeEvidenceOpsSnapshot.summary?.launchReceiptNextFollowUp?.recommendedAction;
+    assert.equal(runtimeEvidenceNextFollowUpAction?.key, "runtime_evidence_review");
+    assert.equal(runtimeEvidenceNextFollowUpAction?.workspaceAction?.key, "ops");
+    assert.equal(runtimeEvidenceNextFollowUpAction?.workspaceAction?.autofocus, "sessions");
+    assert.match(runtimeEvidenceNextFollowUpAction?.workspaceAction?.href || "", /\/developer\/ops/);
+    assert.match(runtimeEvidenceNextFollowUpAction?.workspaceAction?.href || "", /autofocus=sessions/);
 
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,

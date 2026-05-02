@@ -25480,6 +25480,25 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) 
   if (!item || typeof item !== "object") {
     return null;
   }
+  if (item.actionKey === "runtime_evidence_review" || item.downloadKey === "ops_first_wave_runtime_evidence") {
+    return createLaunchWorkflowWorkspaceShortcut(
+      "ops",
+      "sessions",
+      "Review Runtime Evidence in Ops",
+      {
+        productCode: item.productCode || "",
+        channel: item.channel || "stable",
+        reviewMode: "matched",
+        focusKind: "session",
+        actionKey: item.actionKey || "",
+        downloadKey: item.downloadKey || "",
+        runtimeEvidenceStatus: item.firstUserValidationRuntimeEvidenceStatus || "",
+        runtimeEvidenceReady: item.firstUserValidationRuntimeEvidenceReady === true,
+        routeTitle: item.title || "Review first-user runtime evidence",
+        routeReason: item.summary || "Review recorded first-user runtime evidence in Developer Ops."
+      }
+    );
+  }
   return createLaunchWorkflowWorkspaceShortcut(
     "launch-mainline",
     "summary",

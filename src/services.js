@@ -5358,13 +5358,14 @@ function buildLaunchMainlineActionReceipt({
           }))
         : [],
       controls: Array.isArray(item?.controls)
-        ? item.controls.map((control) => ({
+          ? item.controls.map((control) => ({
             kind: control?.kind || null,
             label: control?.label || control?.workspaceAction?.label || control?.recommendedDownload?.label || control?.bootstrapAction?.label || control?.setupAction?.label || control?.kind || "Action",
             workspaceAction: control?.workspaceAction || null,
             recommendedDownload: control?.recommendedDownload || null,
             bootstrapAction: control?.bootstrapAction || null,
-            setupAction: control?.setupAction || null
+            setupAction: control?.setupAction || null,
+            confirmation: control?.confirmation || null
           }))
         : []
     }))
@@ -5417,7 +5418,8 @@ function buildLaunchMainlineActionReceipt({
       workspaceAction: item?.workspaceAction || null,
       recommendedDownload: item?.recommendedDownload || null,
       bootstrapAction: item?.bootstrapAction || null,
-      setupAction: item?.setupAction || null
+      setupAction: item?.setupAction || null,
+      confirmation: item?.confirmation || null
     }))
     .filter((item) =>
       item?.workspaceAction?.key
@@ -5425,6 +5427,7 @@ function buildLaunchMainlineActionReceipt({
       || item?.bootstrapAction?.key
       || item?.setupAction?.key
       || item?.setupAction?.operation
+      || item?.confirmation?.endpoint
     );
   const mainlineOperationalReadiness = launchMainline?.mainlineSummary?.operationalReadiness && typeof launchMainline.mainlineSummary.operationalReadiness === "object"
     ? {
@@ -5653,7 +5656,8 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
       workspaceAction: item?.workspaceAction || null,
       recommendedDownload: item?.recommendedDownload || null,
       bootstrapAction: item?.bootstrapAction || null,
-      setupAction: item?.setupAction || null
+      setupAction: item?.setupAction || null,
+      confirmation: item?.confirmation || null
     }))
   ].filter((item) =>
     item?.workspaceAction?.key
@@ -5661,6 +5665,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     || item?.bootstrapAction?.key
     || item?.setupAction?.key
     || item?.setupAction?.operation
+    || item?.confirmation?.endpoint
   );
   const productionFollowUpChecks = [];
   const pushProductionFollowUpCheck = (item = null) => {
@@ -14780,7 +14785,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           }
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key))
     : [];
+  const firstWaveHeroControls = firstWaveReadinessBridge?.status === "ready_for_first_wave_handoff"
+    ? [
+        firstWaveReadinessBridge.downloads?.summary ? {
+          kind: "download",
+          label: "Download First-Wave Recommendations",
+          recommendedDownload: firstWaveReadinessBridge.downloads.summary
+        } : null,
+        firstWaveReadinessBridge.confirmation?.endpoint ? {
+          kind: "confirm",
+          label: "Confirm First-Wave Handoff",
+          confirmation: firstWaveReadinessBridge.confirmation
+        } : null
+      ].filter(Boolean)
+    : [];
   const heroControls = [
+    ...firstWaveHeroControls,
     ...launchRunwayHeroControls,
     ...workspaceActions.map((item) => ({
       kind: "workspace",
@@ -14798,6 +14818,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     || item?.bootstrapAction?.key
     || item?.setupAction?.key
     || item?.setupAction?.operation
+    || item?.confirmation?.endpoint
   );
   const gateRank = (status = "unknown") => {
     const normalized = normalizeLaunchMainlineGateStatus(status);
@@ -16070,6 +16091,21 @@ function appendOperationalReadinessTextLines(lines = [], operationalReadiness = 
   return true;
 }
 
+function formatDeveloperOpsConfirmationDraftText(confirmation = null) {
+  const payloadTemplate = confirmation?.payloadTemplate && typeof confirmation.payloadTemplate === "object"
+    ? confirmation.payloadTemplate
+    : null;
+  if (!payloadTemplate) {
+    return null;
+  }
+  return [
+    payloadTemplate.decision || "-",
+    payloadTemplate.inventoryStatus || "-",
+    payloadTemplate.firstCardStatus || "-",
+    payloadTemplate.firstRoundOpsStatus || "-"
+  ].join("/");
+}
+
 function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = null, formatWorkspaceActionText = (value) => value || "-") {
   if (!Array.isArray(lines) || !launchDayWatchPanel || typeof launchDayWatchPanel !== "object") {
     return false;
@@ -16414,10 +16450,14 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
       if (Array.isArray(item?.controls) && item.controls.length) {
         for (const control of item.controls) {
+          const confirmationDraft = formatDeveloperOpsConfirmationDraftText(control?.confirmation);
           lines.push(
             `  control: ${control?.label || control?.kind || "Action"}`
             + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
             + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
+            + `${control?.confirmation ? ` | confirm=${control.confirmation.method || "POST"} ${control.confirmation.endpoint || "-"}` : ""}`
+            + `${confirmationDraft ? ` | draft=${confirmationDraft}` : ""}`
+            + `${control?.confirmation?.payloadTemplate?.handoffFileName ? ` | file=${control.confirmation.payloadTemplate.handoffFileName}` : ""}`
           );
         }
       }
@@ -16426,12 +16466,16 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   if (Array.isArray(mainlineSummary.heroControls) && mainlineSummary.heroControls.length) {
     lines.push("Mainline Hero Controls:");
     for (const item of mainlineSummary.heroControls) {
+      const confirmationDraft = formatDeveloperOpsConfirmationDraftText(item?.confirmation);
       lines.push(
         `- ${item?.label || item?.workspaceAction?.label || item?.recommendedDownload?.label || item?.kind || "Action"}`
         + `${item?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
         + `${item?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
         + `${item?.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}:${item.bootstrapAction.operation || "bootstrap"}` : ""}`
         + `${item?.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
+        + `${item?.confirmation ? ` | confirm=${item.confirmation.method || "POST"} ${item.confirmation.endpoint || "-"}` : ""}`
+        + `${confirmationDraft ? ` | draft=${confirmationDraft}` : ""}`
+        + `${item?.confirmation?.payloadTemplate?.handoffFileName ? ` | file=${item.confirmation.payloadTemplate.handoffFileName}` : ""}`
       );
     }
   }
@@ -19256,6 +19300,18 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
       : segments.filter((segment) => segment.ready === true).length
   );
   const nextActionKey = metadata.launchReadinessBridgeNextActionKey || null;
+  const confirmationPayloadTemplate = {
+    productCode,
+    channel,
+    decision: "confirmed",
+    handoffFileName: `${buildDeveloperOpsFirstWaveRecommendationsBaseName({ productCode, channel })}.txt`,
+    inventoryStatus,
+    firstCardStatus,
+    firstRoundOpsStatus,
+    latestLaunchReceiptOperation: metadata.latestLaunchReceiptOperation || null,
+    recommendedCardCount: Number(metadata.recommendedCardCount ?? 0),
+    issuedFreshCardCount: Number(metadata.issuedFreshCardCount ?? 0)
+  };
   return {
     version: "developer-ops-first-wave-readiness-bridge/v1",
     auditLogId: item.auditLogId || item.id || null,
@@ -19278,7 +19334,17 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
       : null,
     confirmation: {
       endpoint: "/api/developer/ops/first-wave/recommendations/confirm",
-      method: "POST"
+      method: "POST",
+      requiredFields: [
+        "productCode",
+        "channel",
+        "decision",
+        "inventoryStatus",
+        "firstCardStatus",
+        "firstRoundOpsStatus"
+      ],
+      payloadTemplate: confirmationPayloadTemplate,
+      operatorHint: "Reuse this draft when confirming the reviewed first-wave handoff."
     },
     downloads: {
       summary: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "summary"),
@@ -23984,6 +24050,8 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     firstRoundOpsStatus: firstRoundStatus,
     inventoryAction,
     firstRoundAction: primaryFirstRoundAction,
+    recommendedCardCount: targetCardCount,
+    issuedFreshCardCount: freshCardCount,
     latestLaunchReceipt: traceabilityPayload.latestLaunchReceipt
   });
 
@@ -24064,6 +24132,8 @@ function buildDeveloperOpsFirstWaveReadinessBridgePayload({
   firstRoundOpsStatus = "unknown",
   inventoryAction = null,
   firstRoundAction = null,
+  recommendedCardCount = 0,
+  issuedFreshCardCount = 0,
   latestLaunchReceipt = null
 } = {}) {
   const buildSegment = (key, label, status) => {
@@ -24105,6 +24175,18 @@ function buildDeveloperOpsFirstWaveReadinessBridgePayload({
     json: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "json"),
     checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums")
   };
+  const confirmationPayloadTemplate = {
+    productCode,
+    channel,
+    decision: "confirmed",
+    handoffFileName: `${buildDeveloperOpsFirstWaveRecommendationsBaseName({ productCode, channel })}.txt`,
+    inventoryStatus,
+    firstCardStatus: firstCardsStatus,
+    firstRoundOpsStatus,
+    latestLaunchReceiptOperation: latestLaunchReceipt?.operation || null,
+    recommendedCardCount: Number(recommendedCardCount || 0),
+    issuedFreshCardCount: Number(issuedFreshCardCount || 0)
+  };
   return {
     version: "developer-ops-first-wave-readiness-bridge/v1",
     status: currentGate === "ready"
@@ -24130,7 +24212,9 @@ function buildDeveloperOpsFirstWaveReadinessBridgePayload({
         "inventoryStatus",
         "firstCardStatus",
         "firstRoundOpsStatus"
-      ]
+      ],
+      payloadTemplate: confirmationPayloadTemplate,
+      operatorHint: "Reuse this draft when confirming the reviewed first-wave handoff."
     },
     downloads,
     latestLaunchReceipt: latestLaunchReceipt
@@ -24214,6 +24298,17 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
     `- nextAction=${launchReadinessBridge.nextAction?.operation || launchReadinessBridge.nextAction?.key || "-"} | confirm=${launchReadinessBridge.confirmation?.method || "POST"} ${launchReadinessBridge.confirmation?.endpoint || "-"}`,
     `- downloads=${launchReadinessBridge.downloads?.summary?.href || "-"} | ${launchReadinessBridge.downloads?.json?.href || "-"} | ${launchReadinessBridge.downloads?.checksums?.href || "-"}`
   );
+  if (launchReadinessBridge.confirmation?.payloadTemplate) {
+    const payloadTemplate = launchReadinessBridge.confirmation.payloadTemplate;
+    lines.push(
+      `- confirmationDraft=${payloadTemplate.decision || "-"}`
+      + ` | file=${payloadTemplate.handoffFileName || "-"}`
+      + ` | inventory=${payloadTemplate.inventoryStatus || "-"}`
+      + ` | firstCards=${payloadTemplate.firstCardStatus || "-"}`
+      + ` | firstRoundOps=${payloadTemplate.firstRoundOpsStatus || "-"}`
+      + ` | receipt=${payloadTemplate.latestLaunchReceiptOperation || "-"}`
+    );
+  }
   for (const segment of bridgeSegments) {
     lines.push(`  - ${segment.key || "-"} | status=${segment.status || "-"} | ready=${segment.ready ? "yes" : "no"}`);
   }
@@ -26792,6 +26887,17 @@ function appendDeveloperOpsFirstWaveReadinessBridgeLines(lines = [], bridge = nu
     + ` | operation=${bridge.nextAction?.operation || "-"}`
     + ` | confirm=${bridge.confirmation?.method || "POST"} ${bridge.confirmation?.endpoint || "-"}`
   );
+  if (bridge.confirmation?.payloadTemplate) {
+    const payloadTemplate = bridge.confirmation.payloadTemplate;
+    lines.push(
+      `- confirmationDraft=${payloadTemplate.decision || "-"}`
+      + ` | file=${payloadTemplate.handoffFileName || "-"}`
+      + ` | inventory=${payloadTemplate.inventoryStatus || "-"}`
+      + ` | firstCards=${payloadTemplate.firstCardStatus || "-"}`
+      + ` | firstRoundOps=${payloadTemplate.firstRoundOpsStatus || "-"}`
+      + ` | receipt=${payloadTemplate.latestLaunchReceiptOperation || "-"}`
+    );
+  }
   lines.push(
     `- download=${bridge.downloads?.summary?.href || "-"}`
     + ` | json=${bridge.downloads?.json?.href || "-"}`
@@ -42530,6 +42636,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           readyCount: payload.inventory.readyCount,
           freshCardCount: payload.inventory.freshCardCount,
           recommendedCardCount: payload.firstCards.recommendedCardCount,
+          issuedFreshCardCount: payload.firstCards.issuedFreshCardCount,
           latestLaunchReceiptOperation: payload.traceability.latestLaunchReceipt?.operation || null,
           opsSnapshotFileName: payload.traceability.opsSnapshotFileName || null,
           launchReadinessBridgeStatus: payload.launchReadinessBridge?.status || null,

@@ -10615,6 +10615,80 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewZipText, /first-wave-runtime-evidence\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
 
+    const runtimeEvidenceLaunchSmoke = await getJson(
+      baseUrl,
+      "/api/developer/launch-smoke-kit?productCode=FIRSTBATCH&channel=stable",
+      ownerSession.token
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchSmoke.smokeSummary?.firstWaveRuntimeEvidence
+        ? {
+            key: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.key,
+            status: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.status,
+            ready: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.ready,
+            productCode: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.productCode,
+            activeSessionCount: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.activeSessionCount,
+            loginAuditCount: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.loginAuditCount,
+            cardRedemptionAuditCount: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.cardRedemptionAuditCount,
+            heartbeatSeenCount: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.heartbeatSeenCount,
+            latestAuthMode: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.latestAuthMode,
+            latestDeviceFingerprint: runtimeEvidenceLaunchSmoke.smokeSummary.firstWaveRuntimeEvidence.latestDeviceFingerprint
+          }
+        : null,
+      {
+        key: "first_wave_runtime_evidence",
+        status: "evidence_recorded",
+        ready: true,
+        productCode: "FIRSTBATCH",
+        activeSessionCount: 1,
+        loginAuditCount: 1,
+        cardRedemptionAuditCount: 1,
+        heartbeatSeenCount: 1,
+        latestAuthMode: "card",
+        latestDeviceFingerprint: "first-wave-runtime-device-001"
+      }
+    );
+    const runtimeEvidenceLaunchSmokeAction = runtimeEvidenceLaunchSmoke.smokeSummary.actionPlan.find((item) =>
+      item.key === "launch_smoke_first_wave_runtime_evidence"
+    );
+    assert.ok(runtimeEvidenceLaunchSmokeAction);
+    assert.equal(runtimeEvidenceLaunchSmokeAction.recommendedDownload?.key, "launch_smoke_first_wave_runtime_evidence");
+    assert.equal(runtimeEvidenceLaunchSmokeAction.recommendedDownload?.format, "first-wave-runtime-evidence");
+    assert.match(runtimeEvidenceLaunchSmokeAction.recommendedDownload?.href || "", /format=first-wave-runtime-evidence/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /session\.login=1/);
+
+    const runtimeEvidenceSmokeDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=first-wave-runtime-evidence",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceSmokeDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceSmokeDownload.contentDisposition || "", /first-wave-runtime-evidence\.txt"/);
+    assert.match(runtimeEvidenceSmokeDownload.body, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceSmokeDownload.body, /ready=true/);
+    assert.match(runtimeEvidenceSmokeDownload.body, /session\.login=1/);
+    assert.match(runtimeEvidenceSmokeDownload.body, /card\.redemption=1/);
+    assert.match(runtimeEvidenceSmokeDownload.body, /device=first-wave-runtime-device-001/);
+    assert.doesNotMatch(runtimeEvidenceSmokeDownload.body, new RegExp(firstLaunchDirectCard.cardKey));
+    assert.doesNotMatch(runtimeEvidenceSmokeDownload.body, new RegExp(firstWaveRuntimeLogin.sessionToken));
+
+    const runtimeEvidenceSmokeChecksums = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=checksums",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceSmokeChecksums.body, /first-wave-runtime-evidence\.txt/);
+
+    const runtimeEvidenceSmokeZip = await getBinary(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=zip",
+      ownerSession.token
+    );
+    const runtimeEvidenceSmokeZipText = runtimeEvidenceSmokeZip.body.toString("latin1");
+    assert.match(runtimeEvidenceSmokeZipText, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceSmokeZipText, /First-Wave Runtime Evidence:/);
+
     const repeatSetup = await postJsonExpectError(
       baseUrl,
       "/api/developer/license-quickstart/first-batches",

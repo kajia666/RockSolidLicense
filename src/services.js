@@ -12793,6 +12793,30 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     reviewMode: "matched",
     ...routedParams
   });
+  const firstWaveRuntimeEvidence = opsSnapshot?.overview?.firstWaveRuntimeEvidence?.ready === true
+    && typeof opsSnapshot.overview.firstWaveRuntimeEvidence === "object"
+    ? { ...opsSnapshot.overview.firstWaveRuntimeEvidence }
+    : null;
+  const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidence
+    ? createLaunchWorkflowWorkspaceShortcut(
+        "ops",
+        "sessions",
+        "Review First-Wave Runtime Evidence",
+        smokeRouteParams
+      )
+    : null;
+  const firstWaveRuntimeEvidenceDownload = firstWaveRuntimeEvidence
+    ? createLaunchWorkflowDownloadShortcut(
+        "launch_smoke_first_wave_runtime_evidence",
+        "first-wave-runtime-evidence.txt",
+        "First-wave runtime evidence",
+        {
+          source: "developer-launch-smoke-kit",
+          format: "first-wave-runtime-evidence",
+          params: smokeRouteParams
+        }
+      )
+    : null;
 
   const accountLoginReady = accountLoginEnabled && (registerEnabled || accountCandidates.length > 0);
   const directCardReady = cardLoginEnabled && directCardCandidates.length > 0;
@@ -12926,11 +12950,12 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   );
   const recommendedDownloads = [
     launchSmokeKitSummaryDownload,
+    firstWaveRuntimeEvidenceDownload,
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineChecksumsDownload,
     launchMainlineZipDownload
-  ];
+  ].filter(Boolean);
   const bootstrapAction = authReadiness.bootstrapAction || null;
   const setupAction = authReadiness.firstBatchSetupAction || null;
   const compactSmokeFocusParams = (params = {}) => Object.fromEntries(
@@ -13303,6 +13328,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", smokeRouteParams)
     } : null,
+    firstWaveRuntimeEvidence ? {
+      key: "launch_smoke_first_wave_runtime_evidence",
+      title: "Review recorded first-wave runtime evidence",
+      priority: "secondary",
+      status: "pass",
+      summary: firstWaveRuntimeEvidence.summary || "First-wave runtime evidence is recorded for this smoke lane.",
+      workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction,
+      recommendedDownload: firstWaveRuntimeEvidenceDownload
+    } : null,
     {
       key: "launch_mainline_overview",
       title: "Review the unified launch mainline handoff",
@@ -13478,6 +13512,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     recommendedWorkspace,
     workspaceActions,
     launchDutyActionOrder,
+    firstWaveRuntimeEvidence,
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     actionPlan,
@@ -13531,6 +13566,12 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     lines.push("");
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Smoke Launch Duty Action Order:"
+    });
+  }
+  if (smokeSummary.firstWaveRuntimeEvidence) {
+    lines.push("");
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: smokeSummary.firstWaveRuntimeEvidence
     });
   }
 
@@ -13646,10 +13687,12 @@ function buildDeveloperLaunchSmokeKitPayload({
   const scopeTag = sanitizeExportNameSegment(project.code || filters.productCode || "launch-smoke-kit", "launch-smoke-kit");
   const fileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
+  const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
+    firstWaveRuntimeEvidenceFileName,
     manifest: {
       generatedAt,
       channel,
@@ -13687,6 +13730,39 @@ function buildDeveloperLaunchSmokeKitPayload({
   return payload;
 }
 
+function buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const evidence = payload.smokeSummary?.firstWaveRuntimeEvidence
+    && typeof payload.smokeSummary.firstWaveRuntimeEvidence === "object"
+    ? payload.smokeSummary.firstWaveRuntimeEvidence
+    : null;
+  const lines = [
+    "RockSolid Developer Launch Smoke Kit First-Wave Runtime Evidence",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (evidence) {
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: evidence
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file while reviewing Launch Smoke without reopening Developer Ops.");
+    lines.push("- Counts come from scoped active sessions plus session.login and card redemption audit rows.");
+    lines.push("- Raw card keys and session tokens are intentionally excluded from this handoff.");
+  } else {
+    lines.push("First-Wave Runtime Evidence:");
+    lines.push("- status=not_recorded | ready=false");
+    lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
   const files = [
     {
@@ -13713,6 +13789,13 @@ function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
     `integration/${payload.launchWorkflow?.integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env"}`,
     payload.launchWorkflow?.integrationPackage?.snippets?.hostConfigEnv || ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.firstWaveRuntimeEvidenceFileName || "developer-launch-smoke-kit-first-wave-runtime-evidence.txt",
+    payload.smokeSummary?.firstWaveRuntimeEvidence
+      ? buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload)
+      : ""
+  );
   return files;
 }
 
@@ -13724,7 +13807,7 @@ function buildDeveloperLaunchSmokeKitZipEntries(payload = {}) {
 function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "checksums", "zip"],
+    ["json", "summary", "first-wave-runtime-evidence", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_SMOKE_KIT_FORMAT",
     "Developer launch smoke kit format"
@@ -13749,6 +13832,13 @@ function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-launch-smoke-kit-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "first-wave-runtime-evidence") {
+    return {
+      fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-smoke-kit-first-wave-runtime-evidence.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload)
     };
   }
 
@@ -44027,6 +44117,30 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             productCodes: scopedProductCodes
           })
         : { items: [] };
+      const firstWaveRuntimeLoginAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "session.login",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
+      const firstWaveRuntimeCardRedeemAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "card.redeem",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
+      const firstWaveRuntimeDirectCardRedeemAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "card.direct_redeem",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
       let mergedAuditLogItems = auditLogs.items || [];
       if (launchReceiptAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, launchReceiptAuditLogs.items);
@@ -44037,9 +44151,21 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       if (firstWaveReadinessAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveReadinessAuditLogs.items);
       }
+      if (firstWaveRuntimeLoginAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveRuntimeLoginAuditLogs.items);
+      }
+      if (firstWaveRuntimeCardRedeemAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveRuntimeCardRedeemAuditLogs.items);
+      }
+      if (firstWaveRuntimeDirectCardRedeemAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveRuntimeDirectCardRedeemAuditLogs.items);
+      }
       const usedProtectiveAuditBackfill = launchReceiptAuditLogs.items?.length
         || firstWaveHandoffAuditLogs.items?.length
-        || firstWaveReadinessAuditLogs.items?.length;
+        || firstWaveReadinessAuditLogs.items?.length
+        || firstWaveRuntimeLoginAuditLogs.items?.length
+        || firstWaveRuntimeCardRedeemAuditLogs.items?.length
+        || firstWaveRuntimeDirectCardRedeemAuditLogs.items?.length;
       const effectiveAuditLogs = usedProtectiveAuditBackfill
         ? {
             ...auditLogs,
@@ -44049,7 +44175,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
               ...(auditLogs.filters || {}),
               launchReceiptBackfill: launchReceiptAuditLogs.items?.length || 0,
               firstWaveHandoffBackfill: firstWaveHandoffAuditLogs.items?.length || 0,
-              firstWaveReadinessBackfill: firstWaveReadinessAuditLogs.items?.length || 0
+              firstWaveReadinessBackfill: firstWaveReadinessAuditLogs.items?.length || 0,
+              firstWaveRuntimeBackfill: (firstWaveRuntimeLoginAuditLogs.items?.length || 0)
+                + (firstWaveRuntimeCardRedeemAuditLogs.items?.length || 0)
+                + (firstWaveRuntimeDirectCardRedeemAuditLogs.items?.length || 0)
             }
           }
         : auditLogs;

@@ -17350,6 +17350,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/first-wave-audit-backfill-status.txt",
+    payload.opsSnapshot ? buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/initial-launch-ops-readiness.txt",
     payload.opsSnapshot ? buildDeveloperOpsInitialLaunchOpsReadinessText(payload.opsSnapshot) : ""
   );

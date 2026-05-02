@@ -14425,6 +14425,22 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineConfirmedPostLaunchIndex.body, /segments=3\/3/);
     assert.match(mainlineConfirmedPostLaunchIndex.body, /first-wave-audit-backfill-status\.txt.*format=first-wave-audit-backfill-status/);
 
+    const mainlineConfirmedChecksums = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedChecksums.body, /ops\/first-wave-audit-backfill-status\.txt/);
+
+    const mainlineConfirmedZip = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const mainlineConfirmedZipText = mainlineConfirmedZip.body.toString("latin1");
+    assert.match(mainlineConfirmedZipText, /ops\/first-wave-audit-backfill-status\.txt/);
+    assert.match(mainlineConfirmedZipText, /RockSolid Developer Ops First-Wave Audit Backfill Status/);
+
     const mainlineConfirmedFirstLaunchHandoff = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=first-launch-handoff",
@@ -14540,7 +14556,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
 
     const stableAfterBetaReceipt = await getJson(
       baseUrl,
-      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=120",
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=160",
       operatorSession.token
     );
     assert.equal(stableAfterBetaReceipt.channel, "stable");
@@ -14551,7 +14567,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
 
     const betaAfterBetaReceipt = await getJson(
       baseUrl,
-      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=beta&limit=120",
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=beta&limit=160",
       operatorSession.token
     );
     assert.equal(betaAfterBetaReceipt.channel, "beta");

@@ -14929,6 +14929,52 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   });
   const recommendedWorkspace = ensureLaunchWorkflowWorkspaceHref(overallGate.recommendedWorkspace || preferredStage?.gate?.recommendedWorkspace || null, params);
   const primaryAction = overallGate.primaryAction || preferredStage?.gate?.primaryAction || null;
+  const firstWaveReadinessBridgeCard = firstWaveReadinessBridge
+    ? {
+        key: "first_wave_readiness_bridge",
+        title: "First-Wave Readiness Bridge",
+        summary: `First-wave handoff is ${firstWaveReadinessBridge.status || "unknown"} at ${firstWaveReadinessBridge.currentGate || "unknown"}.`,
+        tags: [
+          {
+            label: "status",
+            value: firstWaveReadinessBridge.status || "unknown",
+            strong: true
+          },
+          {
+            label: "gate",
+            value: firstWaveReadinessBridge.currentGate || "unknown",
+            strong: true
+          },
+          {
+            label: "ready",
+            value: `${firstWaveReadinessBridge.readySegmentCount ?? 0}/${firstWaveReadinessBridge.segmentCount ?? 0}`,
+            strong: false
+          }
+        ],
+        controls: [
+          firstWaveReadinessBridge.downloads?.summary ? {
+            kind: "download",
+            label: "Download First-Wave Recommendations",
+            recommendedDownload: firstWaveReadinessBridge.downloads.summary
+          } : null,
+          firstWaveReadinessBridge.downloads?.json ? {
+            kind: "download",
+            label: "Download First-Wave JSON",
+            recommendedDownload: firstWaveReadinessBridge.downloads.json
+          } : null,
+          firstWaveReadinessBridge.downloads?.checksums ? {
+            kind: "download",
+            label: "Download First-Wave Checksums",
+            recommendedDownload: firstWaveReadinessBridge.downloads.checksums
+          } : null,
+          firstWaveReadinessBridge.confirmation?.endpoint ? {
+            kind: "confirm",
+            label: "Confirm First-Wave Handoff",
+            confirmation: firstWaveReadinessBridge.confirmation
+          } : null
+        ].filter(Boolean)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -15011,6 +15057,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           ]
         : []
     },
+    firstWaveReadinessBridgeCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -15032,7 +15079,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         }, params)
       }))
     }
-  ];
+  ].filter(Boolean);
   const routeFocusDownload = routedDownloadKey
     ? createLaunchWorkflowDownloadShortcut(
         routedDownloadKey,

@@ -14162,9 +14162,40 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(mainlineAfterRecommendation.mainlineSummary.firstWaveReadinessBridge?.status, "ready_for_first_wave_handoff");
     assert.equal(mainlineAfterRecommendation.mainlineSummary.firstWaveReadinessBridge?.currentGate, "first_round_ops");
     assert.equal(mainlineAfterRecommendation.mainlineSummary.firstWaveReadinessBridge?.nextAction?.key, "first_launch_handoff");
+    const mainlineFirstWaveBridgeCard = mainlineAfterRecommendation.mainlineSummary.overviewCards
+      .find((item) => item?.key === "first_wave_readiness_bridge");
+    assert.ok(mainlineFirstWaveBridgeCard);
+    assert.equal(mainlineFirstWaveBridgeCard.title, "First-Wave Readiness Bridge");
+    assert.ok(mainlineFirstWaveBridgeCard.tags.some((item) => item.label === "status" && item.value === "ready_for_first_wave_handoff"));
+    assert.ok(mainlineFirstWaveBridgeCard.tags.some((item) => item.label === "gate" && item.value === "first_round_ops"));
+    assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Wave Recommendations"
+      && item.recommendedDownload?.format === "summary"
+      && /format=summary/.test(item.recommendedDownload?.href || "")
+    ));
+    assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Wave JSON"
+      && item.recommendedDownload?.format === "json"
+      && /format=json/.test(item.recommendedDownload?.href || "")
+    ));
+    assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Wave Checksums"
+      && item.recommendedDownload?.format === "checksums"
+      && /format=checksums/.test(item.recommendedDownload?.href || "")
+    ));
+    assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
+      item.kind === "confirm"
+      && item.label === "Confirm First-Wave Handoff"
+      && item.confirmation?.endpoint === "/api/developer/ops/first-wave/recommendations/confirm"
+    ));
     assert.match(mainlineAfterRecommendation.summaryText, /Launch Mainline First-Wave Readiness Bridge:/);
     assert.match(mainlineAfterRecommendation.summaryText, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
     assert.match(mainlineAfterRecommendation.summaryText, /confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(mainlineAfterRecommendation.summaryText, /First-Wave Readiness Bridge \| First-wave handoff is ready_for_first_wave_handoff at first_round_ops/);
+    assert.match(mainlineAfterRecommendation.summaryText, /control: Download First-Wave JSON \| download=.*format=json/);
 
     const mainlineSummaryAfterRecommendation = await getText(
       baseUrl,
@@ -14174,6 +14205,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineSummaryAfterRecommendation.body, /Launch Mainline First-Wave Readiness Bridge:/);
     assert.match(mainlineSummaryAfterRecommendation.body, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
     assert.match(mainlineSummaryAfterRecommendation.body, /download=.*format=summary/);
+    assert.match(mainlineSummaryAfterRecommendation.body, /First-Wave Readiness Bridge \| First-wave handoff is ready_for_first_wave_handoff at first_round_ops/);
+    assert.match(mainlineSummaryAfterRecommendation.body, /control: Download First-Wave Checksums \| download=.*format=checksums/);
 
     const handoffConfirmation = await postJson(
       baseUrl,

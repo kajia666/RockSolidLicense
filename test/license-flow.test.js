@@ -10253,6 +10253,17 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCardCount, 150);
     assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCsvDownloadKey, "developer_cards_first_launch_csv");
     assert.match(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCsvHref || "", /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+    const deliveryAuditFollowUp = deliveryAuditOpsSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
+      item.stage === "first_launch_delivery"
+    );
+    assert.ok(deliveryAuditFollowUp);
+    assert.equal(deliveryAuditFollowUp.priority, "secondary");
+    assert.equal(deliveryAuditFollowUp.title, "Deliver first-launch card export");
+    assert.equal(deliveryAuditFollowUp.productCode, "FIRSTBATCH");
+    assert.equal(deliveryAuditFollowUp.downloadKey, "developer_cards_first_launch_csv");
+    assert.equal(deliveryAuditFollowUp.deliveryExportCardCount, 150);
+    assert.equal(deliveryAuditFollowUp.deliveryExportUsageStatus, "unused");
+    assert.match(deliveryAuditFollowUp.downloadHref || "", /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
 
     const cards = await getJson(
       baseUrl,

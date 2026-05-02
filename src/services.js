@@ -20077,7 +20077,13 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       actionKey,
       operationToRecord: payload.operationToRecord || null,
       downloadKey,
+      downloadFileName: payload.downloadFileName || null,
+      downloadFormat: payload.downloadFormat || null,
+      downloadHref: payload.downloadHref || null,
+      downloadSource: payload.downloadSource || null,
       handoffFileName: receipt.handoffFileName || null,
+      deliveryExportCardCount: payload.deliveryExportCardCount ?? null,
+      deliveryExportUsageStatus: payload.deliveryExportUsageStatus || null,
       mainlineGateStatus: receipt.mainlineGateStatus || null,
       evidenceRemainingCount: receipt.productionEvidenceRemainingCount ?? null,
       postLaunchLifecycleStatus: receipt.postLaunchLifecycleStatus || null,
@@ -20094,6 +20100,21 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
   for (const [index, receipt] of latestLaunchReceipts.entries()) {
     if (!receipt || typeof receipt !== "object") {
       continue;
+    }
+    if (receipt.firstLaunchDutyDeliveryExportCsvDownloadKey) {
+      const cardCount = Number(receipt.firstLaunchDutyDeliveryExportCardCount || 0);
+      pushFollowUp(receipt, "first_launch_delivery", {
+        priority: "secondary",
+        title: "Deliver first-launch card export",
+        summary: `Hand off ${cardCount} unused first-launch card${cardCount === 1 ? "" : "s"} from the scoped CSV export before first-wave users receive inventory.`,
+        downloadKey: receipt.firstLaunchDutyDeliveryExportCsvDownloadKey,
+        downloadFileName: "developer-cards-first-launch-unused.csv",
+        downloadFormat: "csv",
+        downloadSource: "developer-cards",
+        downloadHref: receipt.firstLaunchDutyDeliveryExportCsvHref || null,
+        deliveryExportCardCount: cardCount,
+        deliveryExportUsageStatus: receipt.firstLaunchDutyDeliveryExportUsageStatus || null
+      });
     }
     if (receipt.firstLaunchDutyHandoffDownloadKey) {
       pushFollowUp(receipt, "first_launch_handoff", {
@@ -20198,7 +20219,13 @@ function buildLaunchReceiptNextFollowUp(items = []) {
     operationToRecord: selected.operationToRecord || null,
     actionKey: selected.actionKey || null,
     downloadKey: selected.downloadKey || null,
+    downloadFileName: selected.downloadFileName || null,
+    downloadFormat: selected.downloadFormat || null,
+    downloadHref: selected.downloadHref || null,
+    downloadSource: selected.downloadSource || null,
     handoffFileName: selected.handoffFileName || null,
+    deliveryExportCardCount: selected.deliveryExportCardCount ?? null,
+    deliveryExportUsageStatus: selected.deliveryExportUsageStatus || null,
     mainlineGateStatus: selected.mainlineGateStatus || null,
     operationalReadinessStatus: selected.operationalReadinessStatus || null,
     operationalReadinessLabel: selected.operationalReadinessLabel || null,
@@ -20297,7 +20324,7 @@ function buildDeveloperOpsLaunchReceiptFollowUpDownload(item = null, scope = {})
   if (!downloadKey) {
     return buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, item);
   }
-  const format = inferRouteDownloadFormat(downloadKey);
+  const format = item?.downloadFormat || inferRouteDownloadFormat(downloadKey);
   const fileExtension = format === "zip" ? "zip" : "txt";
   const fileName = item?.downloadFileName
     || `${sanitizeExportNameSegment(downloadKey, "launch-receipt-follow-up")}.${fileExtension}`;
@@ -20306,8 +20333,9 @@ function buildDeveloperOpsLaunchReceiptFollowUpDownload(item = null, scope = {})
     fileName,
     item?.title ? `${item.title} handoff` : "Launch receipt follow-up handoff",
     {
-      source: inferLaunchWorkflowDownloadSource(downloadKey),
+      source: item?.downloadSource || inferLaunchWorkflowDownloadSource(downloadKey),
       format,
+      href: item?.downloadHref || null,
       params: buildDeveloperOpsLaunchReceiptDownloadParams(scope, item)
     }
   );
@@ -24446,7 +24474,8 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     : inventoryStatus === "missing"
       ? "pending"
       : inventoryStatus;
-  const primaryFirstRoundAction = firstRoundActions[0] || fallbackFirstRoundAction;
+  const primaryFirstRoundAction = firstRoundActions.find((item) => item.stage !== "first_launch_delivery")
+    || fallbackFirstRoundAction;
   const firstRoundOpsPayload = {
     status: firstRoundStatus,
     actionCount: firstRoundActions.length,

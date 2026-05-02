@@ -4086,6 +4086,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_handoff_download_routes"
         : normalizedFormat === "first-launch-handoff"
           ? "launch_mainline_first_launch_handoff"
+        : normalizedFormat === "first-wave-runtime-evidence"
+          ? "launch_mainline_first_wave_runtime_evidence"
         : normalizedFormat === "initial-launch-ops-readiness"
           ? "launch_mainline_initial_launch_ops_readiness"
         : "launch_mainline_summary",
@@ -13922,7 +13924,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       )
     : null;
   const firstWaveRuntimeEvidenceDownload = firstWaveRuntimeEvidence
-    ? opsSummaryDownload
+    ? createLaunchMainlineDownloadShortcut(
+        "First-wave runtime evidence",
+        "first-wave-runtime-evidence.txt",
+        "first-wave-runtime-evidence",
+        params
+      )
     : null;
   const opsPrimaryDownload = createOpsMainlineDownload(opsRouteReview.downloads?.primary || null);
   const opsRemainingDownload = createOpsMainlineDownload(opsRouteReview.downloads?.remaining || null);
@@ -17141,6 +17148,39 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const evidence = payload.mainlineSummary?.firstWaveRuntimeEvidence
+    && typeof payload.mainlineSummary.firstWaveRuntimeEvidence === "object"
+    ? payload.mainlineSummary.firstWaveRuntimeEvidence
+    : null;
+  const lines = [
+    "RockSolid Developer Launch Mainline First-Wave Runtime Evidence",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (evidence) {
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: evidence
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file to review first real-user runtime evidence without reopening Developer Ops.");
+    lines.push("- Counts come from scoped active sessions plus session.login and card redemption audit rows.");
+    lines.push("- Raw card keys and session tokens are intentionally excluded from this handoff.");
+  } else {
+    lines.push("First-Wave Runtime Evidence:");
+    lines.push("- status=not_recorded | ready=false");
+    lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlinePayload({
   generatedAt = nowIso(),
   releasePackage = null,
@@ -17191,6 +17231,7 @@ function buildDeveloperLaunchMainlinePayload({
   const stabilizationHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-stabilization-handoff.txt`;
   const postLaunchHandoffIndexFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-handoff-index.txt`;
   const firstLaunchHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-launch-handoff.txt`;
+  const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const rehearsalGuideFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-rehearsal-guide.txt`;
   const initialLaunchOpsReadinessFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-initial-launch-ops-readiness.txt`;
   const payload = {
@@ -17206,6 +17247,7 @@ function buildDeveloperLaunchMainlinePayload({
     stabilizationHandoffFileName,
     postLaunchHandoffIndexFileName,
     firstLaunchHandoffFileName,
+    firstWaveRuntimeEvidenceFileName,
     rehearsalGuideFileName,
     initialLaunchOpsReadinessFileName,
     manifest: {
@@ -17448,6 +17490,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "zip",
     mainlineRouteParams
   );
+  const firstWaveRuntimeEvidenceDownload = mainlineSummary.firstWaveRuntimeEvidence
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline first-wave runtime evidence",
+        payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
+        "first-wave-runtime-evidence",
+        mainlineRouteParams
+      )
+    : null;
   const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
     productCode: project.code || payload.filters?.productCode || "",
     channel: manifest.channel || payload.filters?.channel || "stable"
@@ -17533,6 +17583,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     mainlineZipDownload.fileName || "developer-launch-mainline.zip",
     mainlineZipDownload || {}
   );
+  if (firstWaveRuntimeEvidenceDownload) {
+    pushRoute(
+      "launch-mainline-first-wave-runtime-evidence",
+      "Launch Mainline first-wave runtime evidence",
+      payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
+      firstWaveRuntimeEvidenceDownload
+    );
+  }
   pushRoute(
     "launch-receipt-next-follow-up",
     nextFollowUp.title || "Launch receipt next follow-up",
@@ -17715,6 +17773,13 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
+    payload.mainlineSummary?.firstWaveRuntimeEvidence
+      ? buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
     payload.firstLaunchHandoffText || ""
   );
@@ -17734,7 +17799,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "first-launch-handoff", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "first-launch-handoff", "first-wave-runtime-evidence", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -17836,6 +17901,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.firstLaunchHandoffText || ""
+    };
+  }
+  if (normalizedFormat === "first-wave-runtime-evidence") {
+    return {
+      fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload)
     };
   }
   if (normalizedFormat === "rehearsal-guide") {

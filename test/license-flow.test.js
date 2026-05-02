@@ -10490,8 +10490,56 @@ test("developer license quickstart first-batch setup can create recommended laun
           && item.controls.some((control) => control.workspaceAction?.key === "ops")
       )
     );
+    const runtimeEvidenceMainlineCard = runtimeEvidenceLaunchMainline.mainlineSummary.overviewCards.find((item) =>
+      item.key === "first_wave_runtime_evidence"
+    );
+    const runtimeEvidenceMainlineCardDownload = runtimeEvidenceMainlineCard?.controls.find((control) =>
+      control.recommendedDownload?.key === "launch_mainline_first_wave_runtime_evidence"
+    )?.recommendedDownload;
+    assert.ok(runtimeEvidenceMainlineCardDownload);
+    assert.equal(runtimeEvidenceMainlineCardDownload.format, "first-wave-runtime-evidence");
+    assert.match(runtimeEvidenceMainlineCardDownload.href || "", /format=first-wave-runtime-evidence/);
     assert.match(runtimeEvidenceLaunchMainline.summaryText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceLaunchMainline.summaryText, /session\.login=1/);
+
+    const runtimeEvidenceMainlineDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=first-wave-runtime-evidence",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceMainlineDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceMainlineDownload.contentDisposition || "", /first-wave-runtime-evidence\.txt"/);
+    assert.match(runtimeEvidenceMainlineDownload.body, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceMainlineDownload.body, /ready=true/);
+    assert.match(runtimeEvidenceMainlineDownload.body, /session\.login=1/);
+    assert.match(runtimeEvidenceMainlineDownload.body, /card\.redemption=1/);
+    assert.match(runtimeEvidenceMainlineDownload.body, /device=first-wave-runtime-device-001/);
+    assert.doesNotMatch(runtimeEvidenceMainlineDownload.body, new RegExp(firstLaunchDirectCard.cardKey));
+    assert.doesNotMatch(runtimeEvidenceMainlineDownload.body, new RegExp(firstWaveRuntimeLogin.sessionToken));
+
+    const runtimeEvidenceMainlineChecksums = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceMainlineChecksums.body, /first-wave-runtime-evidence\.txt/);
+
+    const runtimeEvidenceMainlineRoutes = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceMainlineRoutes.body, /launch-mainline-first-wave-runtime-evidence/);
+    assert.match(runtimeEvidenceMainlineRoutes.body, /format=first-wave-runtime-evidence/);
+
+    const runtimeEvidenceMainlineZip = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const runtimeEvidenceMainlineZipText = runtimeEvidenceMainlineZip.body.toString("latin1");
+    assert.match(runtimeEvidenceMainlineZipText, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceMainlineZipText, /First-Wave Runtime Evidence:/);
 
     const runtimeEvidenceLaunchReview = await getJson(
       baseUrl,

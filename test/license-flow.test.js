@@ -10055,7 +10055,7 @@ test("developer license quickstart first-batch setup can create recommended laun
       adminSession.token
     );
 
-    await postJson(
+    const firstBatchProduct = await postJson(
       baseUrl,
       "/api/admin/products",
       {
@@ -10343,6 +10343,81 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(cards.items.filter((item) => ["fresh", "unused"].includes(String(item.usageStatus || item.displayStatus || "").toLowerCase())).length, 150);
     assert.ok(cards.items.some((item) => /^FIRSTBATCHDL/i.test(item.cardKey)));
     assert.ok(cards.items.some((item) => /^FIRSTBATCHRC/i.test(item.cardKey)));
+
+    const firstLaunchDirectCard = cards.items.find((item) => /^FIRSTBATCHDL/i.test(item.cardKey));
+    assert.ok(firstLaunchDirectCard?.cardKey);
+    const firstWaveRuntimeLogin = await signedClientPost(
+      baseUrl,
+      "/api/client/card-login",
+      firstBatchProduct.sdkAppId,
+      firstBatchProduct.sdkAppSecret,
+      {
+        productCode: "FIRSTBATCH",
+        cardKey: firstLaunchDirectCard.cardKey,
+        deviceFingerprint: "first-wave-runtime-device-001",
+        deviceName: "First Wave Runtime Device",
+        clientVersion: "1.0.0",
+        channel: "stable"
+      }
+    );
+    assert.equal(firstWaveRuntimeLogin.authMode, "card");
+    assert.ok(firstWaveRuntimeLogin.sessionToken);
+
+    const firstWaveRuntimeHeartbeat = await signedClientPost(
+      baseUrl,
+      "/api/client/heartbeat",
+      firstBatchProduct.sdkAppId,
+      firstBatchProduct.sdkAppSecret,
+      {
+        productCode: "FIRSTBATCH",
+        sessionToken: firstWaveRuntimeLogin.sessionToken,
+        deviceFingerprint: "first-wave-runtime-device-001",
+        clientVersion: "1.0.0",
+        channel: "stable"
+      }
+    );
+    assert.equal(firstWaveRuntimeHeartbeat.status, "active");
+
+    const runtimeEvidenceOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTBATCH&limit=40",
+      ownerSession.token
+    );
+    const firstWaveRuntimeEvidence = runtimeEvidenceOpsSnapshot.overview?.firstWaveRuntimeEvidence;
+    assert.deepEqual(
+      firstWaveRuntimeEvidence
+        ? {
+            key: firstWaveRuntimeEvidence.key,
+            status: firstWaveRuntimeEvidence.status,
+            ready: firstWaveRuntimeEvidence.ready,
+            productCode: firstWaveRuntimeEvidence.productCode,
+            activeSessionCount: firstWaveRuntimeEvidence.activeSessionCount,
+            loginAuditCount: firstWaveRuntimeEvidence.loginAuditCount,
+            cardRedemptionAuditCount: firstWaveRuntimeEvidence.cardRedemptionAuditCount,
+            heartbeatSeenCount: firstWaveRuntimeEvidence.heartbeatSeenCount,
+            latestAuthMode: firstWaveRuntimeEvidence.latestAuthMode,
+            latestDeviceFingerprint: firstWaveRuntimeEvidence.latestDeviceFingerprint
+          }
+        : null,
+      {
+        key: "first_wave_runtime_evidence",
+        status: "evidence_recorded",
+        ready: true,
+        productCode: "FIRSTBATCH",
+        activeSessionCount: 1,
+        loginAuditCount: 1,
+        cardRedemptionAuditCount: 1,
+        heartbeatSeenCount: 1,
+        latestAuthMode: "card",
+        latestDeviceFingerprint: "first-wave-runtime-device-001"
+      }
+    );
+    assert.ok(firstWaveRuntimeEvidence.eventTypes.includes("session.login"));
+    assert.ok(firstWaveRuntimeEvidence.eventTypes.includes("card.direct_redeem"));
+    assert.match(firstWaveRuntimeEvidence.summary, /first-wave runtime evidence/i);
+    assert.match(runtimeEvidenceOpsSnapshot.summaryText, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceOpsSnapshot.summaryText, /session\.login/);
+    assert.match(runtimeEvidenceOpsSnapshot.summaryText, /card\.direct_redeem/);
 
     const repeatSetup = await postJsonExpectError(
       baseUrl,

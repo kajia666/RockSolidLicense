@@ -26426,6 +26426,87 @@ function buildSnapshotFocusDevices(bindings = [], blocks = [], sessions = [], li
     });
 }
 
+function latestSnapshotItem(items = [], timestampSelector = (item) => item?.createdAt) {
+  return [...items].sort((left, right) => {
+    const rightMs = snapshotDateMs(timestampSelector(right));
+    const leftMs = snapshotDateMs(timestampSelector(left));
+    if (rightMs !== leftMs) {
+      return rightMs - leftMs;
+    }
+    return String(right?.id ?? "").localeCompare(String(left?.id ?? ""));
+  })[0] || null;
+}
+
+function buildSnapshotFirstWaveRuntimeEvidence({ sessions = [], auditLogs = [], scope = {} } = {}) {
+  const runtimeEventTypes = new Set(["session.login", "card.redeem", "card.direct_redeem"]);
+  const loginEvents = auditLogs.filter((item) => String(item?.eventType || "") === "session.login");
+  const cardRedemptionEvents = auditLogs.filter((item) => {
+    const eventType = String(item?.eventType || "");
+    return eventType === "card.redeem" || eventType === "card.direct_redeem";
+  });
+  const runtimeEvents = auditLogs.filter((item) => runtimeEventTypes.has(String(item?.eventType || "")));
+  const activeSessions = sessions.filter((item) => normalizeSnapshotStatus(item?.status || "active") === "active");
+  const sessionsWithHeartbeat = activeSessions.filter((item) => item?.lastHeartbeatAt);
+  const latestSession = latestSnapshotItem(
+    activeSessions,
+    (item) => item?.lastHeartbeatAt || item?.issuedAt || item?.expiresAt
+  );
+  const latestLoginEvent = latestSnapshotItem(loginEvents);
+  const latestCardRedemptionEvent = latestSnapshotItem(cardRedemptionEvents);
+  const latestLoginMetadata = latestLoginEvent?.metadata && typeof latestLoginEvent.metadata === "object"
+    ? latestLoginEvent.metadata
+    : {};
+  const latestRedemptionMetadata = latestCardRedemptionEvent?.metadata && typeof latestCardRedemptionEvent.metadata === "object"
+    ? latestCardRedemptionEvent.metadata
+    : {};
+  const productCode = String(
+    scope.productCode
+    || latestSession?.productCode
+    || latestLoginMetadata.productCode
+    || latestRedemptionMetadata.productCode
+    || latestRedemptionMetadata.projectCode
+    || latestRedemptionMetadata.softwareCode
+    || ""
+  ).trim() || null;
+  const latestAuthMode = latestLoginMetadata.authMode
+    || latestRedemptionMetadata.authMode
+    || (cardRedemptionEvents.length ? "card" : null);
+  let status = "pending_runtime";
+  if (activeSessions.length && loginEvents.length && (cardRedemptionEvents.length || latestAuthMode === "card")) {
+    status = "evidence_recorded";
+  } else if (activeSessions.length || loginEvents.length || cardRedemptionEvents.length) {
+    status = "session_seen";
+  }
+  const eventTypes = Array.from(new Set(runtimeEvents.map((item) => item?.eventType).filter(Boolean)));
+  const latestHeartbeatAt = latestSnapshotTimestamp(activeSessions.map((item) => item?.lastHeartbeatAt));
+  const summaryStatus = status === "evidence_recorded"
+    ? "recorded"
+    : status === "session_seen"
+      ? "partially visible"
+      : "pending";
+
+  return {
+    key: "first_wave_runtime_evidence",
+    status,
+    ready: status === "evidence_recorded",
+    productCode,
+    channel: scope.channel || "stable",
+    activeSessionCount: activeSessions.length,
+    loginAuditCount: loginEvents.length,
+    cardRedemptionAuditCount: cardRedemptionEvents.length,
+    heartbeatSeenCount: sessionsWithHeartbeat.length,
+    latestSessionId: latestSession?.id || null,
+    latestSessionUsername: latestSession?.username || latestLoginMetadata.username || latestRedemptionMetadata.username || null,
+    latestDeviceFingerprint: latestSession?.fingerprint || latestLoginMetadata.deviceFingerprint || latestLoginMetadata.fingerprint || null,
+    latestAuthMode,
+    latestLoginAt: latestLoginEvent?.createdAt || null,
+    latestCardRedemptionAt: latestCardRedemptionEvent?.createdAt || null,
+    latestHeartbeatAt,
+    eventTypes,
+    summary: `First-wave runtime evidence ${summaryStatus}: activeSessions=${activeSessions.length}, logins=${loginEvents.length}, cardRedemptions=${cardRedemptionEvents.length}, heartbeatSeen=${sessionsWithHeartbeat.length}.`
+  };
+}
+
 function buildSnapshotOverview({
   generatedAt = nowIso(),
   projects = [],
@@ -26555,6 +26636,7 @@ function buildSnapshotOverview({
   const latestFirstWaveReadinessBridges = buildSnapshotLatestFirstWaveReadinessBridges(auditLogs, 5, scope.channel || null);
   const latestSteadyStateDutyPlanReceipts = buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs, 5);
   const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6);
+  const firstWaveRuntimeEvidence = buildSnapshotFirstWaveRuntimeEvidence({ sessions, auditLogs, scope });
   const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
   const queueSummary = buildSnapshotQueueSummary(recommendedQueue);
 
@@ -26626,6 +26708,9 @@ function buildSnapshotOverview({
   if (launchReceiptFollowUps.length) {
     highlights.push(`Launch receipt follow-ups: ${launchReceiptFollowUps.slice(0, 3).map((item) => `${item.title} for ${item.productCode || "-"}`).join(", ")}.`);
   }
+  if (firstWaveRuntimeEvidence.ready) {
+    highlights.push(`First-wave runtime evidence recorded for ${firstWaveRuntimeEvidence.productCode || "-"}: ${firstWaveRuntimeEvidence.activeSessionCount} active session(s), ${firstWaveRuntimeEvidence.loginAuditCount} login audit(s), ${firstWaveRuntimeEvidence.cardRedemptionAuditCount} card redemption audit(s).`);
+  }
   if (topReasons.length) {
     highlights.push(`Common reasons: ${topReasons.slice(0, 3).map((item) => `${item.reason} x${item.count}`).join(", ")}.`);
   }
@@ -26662,6 +26747,7 @@ function buildSnapshotOverview({
     latestFirstWaveReadinessBridges,
     latestSteadyStateDutyPlanReceipts,
     launchReceiptFollowUps,
+    firstWaveRuntimeEvidence,
     queueSummary,
     recommendedQueue,
     focusAccounts,
@@ -26680,6 +26766,40 @@ function appendSnapshotQueueSummaryLines(lines = [], overview = {}) {
       lines.push(`- [${String(item.severity || "-").toUpperCase()}][${item.sourceType || "-"}] ${item.title || "-"} | ${item.summary || "-"} | control=${item.recommendedControl?.label || "-"} | next=${item.nextAction || "-"}`);
     }
   }
+}
+
+function appendFirstWaveRuntimeEvidenceLines(lines = [], overview = {}) {
+  const evidence = overview?.firstWaveRuntimeEvidence && typeof overview.firstWaveRuntimeEvidence === "object"
+    ? overview.firstWaveRuntimeEvidence
+    : null;
+  if (!evidence) {
+    return;
+  }
+  lines.push("First-Wave Runtime Evidence:");
+  lines.push(
+    `- status=${evidence.status || "-"}`
+    + ` | ready=${evidence.ready === true}`
+    + ` | project=${evidence.productCode || "-"}`
+    + ` | channel=${evidence.channel || "-"}`
+  );
+  lines.push(
+    `- sessions=${evidence.activeSessionCount ?? 0}`
+    + ` | session.login=${evidence.loginAuditCount ?? 0}`
+    + ` | card.redemption=${evidence.cardRedemptionAuditCount ?? 0}`
+    + ` | heartbeatSeen=${evidence.heartbeatSeenCount ?? 0}`
+  );
+  lines.push(
+    `- latestSession=${evidence.latestSessionId || "-"}`
+    + ` | username=${evidence.latestSessionUsername || "-"}`
+    + ` | auth=${evidence.latestAuthMode || "-"}`
+    + ` | device=${evidence.latestDeviceFingerprint || "-"}`
+    + ` | loginAt=${evidence.latestLoginAt || "-"}`
+    + ` | heartbeatAt=${evidence.latestHeartbeatAt || "-"}`
+  );
+  if (Array.isArray(evidence.eventTypes) && evidence.eventTypes.length) {
+    lines.push(`- events=${evidence.eventTypes.join(",")}`);
+  }
+  lines.push(`- summary=${evidence.summary || "-"}`);
 }
 
 function buildSnapshotQueueImpactBits(item = {}) {
@@ -27904,6 +28024,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     lines.push(`Overview Status: ${overview.status || "-"}`);
     lines.push(`Overview Headline: ${overview.headline || "-"}`);
     lines.push(`Latest Audit At: ${overview.latestAuditAt || "-"}`);
+    appendFirstWaveRuntimeEvidenceLines(lines, overview);
     if (Array.isArray(overview.highlights) && overview.highlights.length) {
       lines.push("Highlights:");
       for (const item of overview.highlights) {
@@ -30932,6 +31053,7 @@ function buildAdminOpsSummaryText(payload = {}) {
     lines.push(`Overview Status: ${overview.status || "-"}`);
     lines.push(`Overview Headline: ${overview.headline || "-"}`);
     lines.push(`Latest Audit At: ${overview.latestAuditAt || "-"}`);
+    appendFirstWaveRuntimeEvidenceLines(lines, overview);
     if (Array.isArray(overview.highlights) && overview.highlights.length) {
       lines.push("Highlights:");
       for (const item of overview.highlights) {
@@ -33837,6 +33959,9 @@ function formatResellerListRow(row) {
 
 function auditActivatedCardEntitlement(db, product, account, card, activation, eventType = "card.redeem", metadata = {}) {
   audit(db, "account", account.id, eventType, "license_key", card.id, {
+    productCode: product.code,
+    productId: product.id,
+    username: account.username,
     cardKey: activation.cardKey ?? card.card_key ?? card.cardKey ?? null,
     cardKeyMasked: maskCardKey(activation.cardKey ?? card.card_key ?? card.cardKey),
     policyName: activation.policyName ?? card.policy_name ?? card.policyName ?? null,

@@ -11684,6 +11684,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
         }
       )
     : null;
+  const firstWaveRuntimeEvidenceDownload = firstWaveRuntimeEvidence
+    ? createLaunchWorkflowDownloadShortcut(
+        "launch_review_first_wave_runtime_evidence",
+        "first-wave-runtime-evidence.txt",
+        "First-wave runtime evidence",
+        {
+          source: "developer-launch-review",
+          format: "first-wave-runtime-evidence",
+          params: { ...scopedOpsParams }
+        }
+      )
+    : null;
   const mainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline summary",
     "launch-mainline-summary.txt",
@@ -12146,7 +12158,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       status: firstWaveRuntimeEvidence.ready === true ? "pass" : "review",
       priority: firstWaveRuntimeEvidence.ready === true ? "secondary" : "primary",
       workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction || opsWorkspaceAction,
-      recommendedDownload: opsSummaryDownload
+      recommendedDownload: firstWaveRuntimeEvidenceDownload || opsSummaryDownload
     }));
   }
 
@@ -12434,10 +12446,12 @@ function buildDeveloperLaunchReviewPayload({
   const scopeTag = sanitizeExportNameSegment(project.code || filters.productCode || "launch-review", "launch-review");
   const fileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
+  const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
+    firstWaveRuntimeEvidenceFileName,
     manifest: {
       generatedAt,
       channel,
@@ -12480,6 +12494,39 @@ function buildDeveloperLaunchReviewPayload({
     return payload;
   }
 
+function buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const evidence = payload.reviewSummary?.firstWaveRuntimeEvidence
+    && typeof payload.reviewSummary.firstWaveRuntimeEvidence === "object"
+    ? payload.reviewSummary.firstWaveRuntimeEvidence
+    : null;
+  const lines = [
+    "RockSolid Developer Launch Review First-Wave Runtime Evidence",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (evidence) {
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: evidence
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file while reviewing Launch Review without reopening Developer Ops.");
+    lines.push("- Counts come from scoped active sessions plus session.login and card redemption audit rows.");
+    lines.push("- Raw card keys and session tokens are intentionally excluded from this handoff.");
+  } else {
+    lines.push("First-Wave Runtime Evidence:");
+    lines.push("- status=not_recorded | ready=false");
+    lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchReviewFiles(payload = {}) {
   const files = [
     {
@@ -12511,6 +12558,13 @@ function buildDeveloperLaunchReviewFiles(payload = {}) {
     `ops/${payload.opsSnapshot?.fileName || "developer-ops.json"}`,
     payload.opsSnapshot ? JSON.stringify(payload.opsSnapshot, null, 2) : ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.firstWaveRuntimeEvidenceFileName || "developer-launch-review-first-wave-runtime-evidence.txt",
+    payload.reviewSummary?.firstWaveRuntimeEvidence
+      ? buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload)
+      : ""
+  );
   return files;
 }
 
@@ -12522,7 +12576,7 @@ function buildDeveloperLaunchReviewZipEntries(payload = {}) {
 function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "checksums", "zip"],
+    ["json", "summary", "first-wave-runtime-evidence", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_REVIEW_FORMAT",
     "Developer launch review format"
@@ -12547,6 +12601,13 @@ function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-launch-review-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "first-wave-runtime-evidence") {
+    return {
+      fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-review-first-wave-runtime-evidence.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload)
     };
   }
 

@@ -10574,9 +10574,46 @@ test("developer license quickstart first-batch setup can create recommended laun
         latestDeviceFingerprint: "first-wave-runtime-device-001"
       }
     );
-    assert.ok(runtimeEvidenceLaunchReview.reviewSummary.actionPlan.some((item) => item.key === "launch_review_first_wave_runtime_evidence"));
+    const runtimeEvidenceLaunchReviewAction = runtimeEvidenceLaunchReview.reviewSummary.actionPlan.find((item) =>
+      item.key === "launch_review_first_wave_runtime_evidence"
+    );
+    assert.ok(runtimeEvidenceLaunchReviewAction);
+    assert.equal(runtimeEvidenceLaunchReviewAction.recommendedDownload?.key, "launch_review_first_wave_runtime_evidence");
+    assert.equal(runtimeEvidenceLaunchReviewAction.recommendedDownload?.format, "first-wave-runtime-evidence");
+    assert.match(runtimeEvidenceLaunchReviewAction.recommendedDownload?.href || "", /format=first-wave-runtime-evidence/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /session\.login=1/);
+
+    const runtimeEvidenceReviewDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=first-wave-runtime-evidence",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceReviewDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceReviewDownload.contentDisposition || "", /first-wave-runtime-evidence\.txt"/);
+    assert.match(runtimeEvidenceReviewDownload.body, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceReviewDownload.body, /ready=true/);
+    assert.match(runtimeEvidenceReviewDownload.body, /session\.login=1/);
+    assert.match(runtimeEvidenceReviewDownload.body, /card\.redemption=1/);
+    assert.match(runtimeEvidenceReviewDownload.body, /device=first-wave-runtime-device-001/);
+    assert.doesNotMatch(runtimeEvidenceReviewDownload.body, new RegExp(firstLaunchDirectCard.cardKey));
+    assert.doesNotMatch(runtimeEvidenceReviewDownload.body, new RegExp(firstWaveRuntimeLogin.sessionToken));
+
+    const runtimeEvidenceReviewChecksums = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceReviewChecksums.body, /first-wave-runtime-evidence\.txt/);
+
+    const runtimeEvidenceReviewZip = await getBinary(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const runtimeEvidenceReviewZipText = runtimeEvidenceReviewZip.body.toString("latin1");
+    assert.match(runtimeEvidenceReviewZipText, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
 
     const repeatSetup = await postJsonExpectError(
       baseUrl,

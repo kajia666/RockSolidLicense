@@ -14294,7 +14294,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
 
     const confirmedOpsSnapshot = await getJson(
       baseUrl,
-      "/api/developer/ops/export?productCode=FIRSTWAVE&limit=20",
+      "/api/developer/ops/export?productCode=FIRSTWAVE&limit=80",
       operatorSession.token
     );
     const latestFirstWaveConfirmation = confirmedOpsSnapshot.overview.latestFirstWaveHandoffConfirmations[0];
@@ -14384,9 +14384,31 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineAfterConfirmation.summaryText, /segments=3\/3/);
     assert.match(mainlineAfterConfirmation.summaryText, /First-Wave Handoff Confirmation \| First-wave handoff is confirmed/);
 
+    const mainlineConfirmedRouteMap = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedRouteMap.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(mainlineConfirmedRouteMap.body, /First-Wave Handoff Confirmation:/);
+    assert.match(mainlineConfirmedRouteMap.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedRouteMap.body, /First-Wave Confirmation Chain:/);
+    assert.match(mainlineConfirmedRouteMap.body, /segments=3\/3/);
+
+    const mainlineConfirmedPostLaunchIndex = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedPostLaunchIndex.body, /RockSolid Developer Launch Mainline Post-Launch Handoff Index/);
+    assert.match(mainlineConfirmedPostLaunchIndex.body, /First-Wave Handoff Confirmation:/);
+    assert.match(mainlineConfirmedPostLaunchIndex.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedPostLaunchIndex.body, /First-Wave Confirmation Chain:/);
+    assert.match(mainlineConfirmedPostLaunchIndex.body, /segments=3\/3/);
+
     const firstWaveHandoffIndex = await getText(
       baseUrl,
-      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=handoff-index&limit=20",
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=handoff-index&limit=80",
       operatorSession.token
     );
     assert.match(firstWaveHandoffIndex.body, /First-Wave Handoff Confirmation:/);

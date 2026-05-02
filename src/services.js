@@ -17051,6 +17051,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     ? nextFollowUp.recommendedDownload
     : {};
   const mainlineSummary = payload.mainlineSummary || {};
+  const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
+  const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const postLaunchLifecycle = traceability.postLaunchLifecycle || {};
   const lifecyclePrimaryRecommendedDownload = mainlineSummary.productionGate?.postLaunchLifecycle?.primaryRecommendedDownload
     && typeof mainlineSummary.productionGate.postLaunchLifecycle.primaryRecommendedDownload === "object"
@@ -17153,6 +17155,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
     });
+    lines.push("");
+  }
+  if (firstWaveHandoffConfirmation) {
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
+    lines.push("");
+  }
+  if (firstWaveConfirmationChain) {
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
     lines.push("");
   }
   lines.push("Critical Handoff Routes:");
@@ -18430,6 +18440,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const project = manifest.project || {};
   const filters = payload.filters || {};
   const mainlineSummary = payload.mainlineSummary || {};
+  const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
+  const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
   const phases = Array.isArray(lifecycle.phases) ? lifecycle.phases : [];
   const recommendedDownloads = Array.isArray(lifecycle.recommendedDownloads) ? lifecycle.recommendedDownloads : [];
@@ -18524,6 +18536,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | opsHref=${stabilizationConfirmation.opsDownloads?.stabilizationHandoff?.href || "-"}`
       + ` | mainlineHref=${stabilizationConfirmation.launchMainlineDownloads?.stabilizationHandoff?.href || "-"}`
     );
+  }
+  if (firstWaveHandoffConfirmation) {
+    lines.push("");
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
+  }
+  if (firstWaveConfirmationChain) {
+    lines.push("");
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
   }
   appendInitialLaunchContractTraceabilityTextLines(lines, traceability.initialLaunchOpsContract || null, opsFiles);
   appendInitialLaunchOperatorHeadlineTextLines(lines, traceability.initialLaunchOperatorHeadline || null);

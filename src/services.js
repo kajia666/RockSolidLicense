@@ -18149,6 +18149,8 @@ function buildDeveloperLaunchMainlineOperationsHandoffText({
   mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
+  const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
+  const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const operationsDocs = [
     "docs/production-operations-runbook.md",
     "docs/daily-operations-checklist.md",
@@ -18177,6 +18179,14 @@ function buildDeveloperLaunchMainlineOperationsHandoffText({
     `Primary Signals: ${operationsSignals.join(" | ")}`,
     "Focus Areas: launch health | login failures | heartbeat failures | backup freshness | alert routing | shift handover"
   ];
+  if (firstWaveHandoffConfirmation) {
+    lines.push("");
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
+  }
+  if (firstWaveConfirmationChain) {
+    lines.push("");
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
+  }
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
@@ -18590,6 +18600,8 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
   publicBaseUrl = ""
 } = {}) {
   const project = manifest.project || {};
+  const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
+  const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const workflowSummary = launchWorkflow?.workflowSummary || launchWorkflow?.manifest?.workflowSummary || {};
   const authorizationRecommendations = workflowSummary.authorizationLaunchRecommendations || {};
   const firstBatchCardRecommendations = Array.isArray(authorizationRecommendations.firstBatchCardRecommendations)
@@ -18714,6 +18726,14 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     `- Duty Chain: ${dutyActionLabels.join(" -> ")}`
   ];
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
+  if (firstWaveHandoffConfirmation) {
+    lines.push("");
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
+  }
+  if (firstWaveConfirmationChain) {
+    lines.push("");
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
+  }
   lines.push("");
   lines.push("First Batch Card Suggestions:");
 

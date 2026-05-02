@@ -14406,6 +14406,28 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineConfirmedPostLaunchIndex.body, /First-Wave Confirmation Chain:/);
     assert.match(mainlineConfirmedPostLaunchIndex.body, /segments=3\/3/);
 
+    const mainlineConfirmedFirstLaunchHandoff = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=first-launch-handoff",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedFirstLaunchHandoff.body, /RockSolid Developer Launch Mainline First Launch Handoff/);
+    assert.match(mainlineConfirmedFirstLaunchHandoff.body, /First-Wave Handoff Confirmation:/);
+    assert.match(mainlineConfirmedFirstLaunchHandoff.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedFirstLaunchHandoff.body, /First-Wave Confirmation Chain:/);
+    assert.match(mainlineConfirmedFirstLaunchHandoff.body, /segments=3\/3/);
+
+    const mainlineConfirmedOperationsHandoff = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=operations-handoff",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedOperationsHandoff.body, /RockSolid Developer Launch Mainline Operations Handoff/);
+    assert.match(mainlineConfirmedOperationsHandoff.body, /First-Wave Handoff Confirmation:/);
+    assert.match(mainlineConfirmedOperationsHandoff.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedOperationsHandoff.body, /First-Wave Confirmation Chain:/);
+    assert.match(mainlineConfirmedOperationsHandoff.body, /segments=3\/3/);
+
     const firstWaveHandoffIndex = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=handoff-index&limit=80",
@@ -14446,7 +14468,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
 
     const stableAfterBetaReceipt = await getJson(
       baseUrl,
-      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=80",
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=120",
       operatorSession.token
     );
     assert.equal(stableAfterBetaReceipt.channel, "stable");
@@ -14457,7 +14479,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
 
     const betaAfterBetaReceipt = await getJson(
       baseUrl,
-      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=beta&limit=80",
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=beta&limit=120",
       operatorSession.token
     );
     assert.equal(betaAfterBetaReceipt.channel, "beta");

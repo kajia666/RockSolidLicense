@@ -101,7 +101,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     dryRunCommand: "npm.cmd run launch:route-map-gate -- --dry-run --json",
     willModifyData: false,
     willRunFullSuite: false,
-    purpose: "Re-run the Launch Mainline / Launch Smoke / Developer Ops route-map visibility and low-frequency download surface targeted gate before live-write staging smoke."
+    purpose: "Re-run the Launch Mainline / Launch Smoke / Developer Ops route-map visibility, first-batch runtime evidence, and low-frequency download surface targeted gate before live-write staging smoke."
   });
   assert.match(output.nextCommands.launchMainline, /\/developer\/launch-mainline\?productCode=PILOT_ALPHA&channel=stable/);
   assert.deepEqual(output.nextCommands.receiptVisibilitySummaries, {
@@ -197,6 +197,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "healthcheck"
   ]);
   assert.equal(readinessChecks.route_map_gate.status, "operator_execute");
+  assert.equal(readinessChecks.route_map_gate.label, "Route-map, first-batch runtime evidence, and download-surface gate");
   assert.equal(readinessChecks.route_map_gate.command, "npm.cmd run launch:route-map-gate");
   assert.equal(readinessChecks.live_write_approval.status, "operator_confirm");
   assert.match(readinessChecks.live_write_approval.evidence, /--allow-live-writes/);
@@ -216,6 +217,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ]
   );
   assert.equal(output.operatorChecklist[0].status, "operator_review");
+  assert.match(output.operatorChecklist[1].label, /first-batch runtime evidence/);
   assert.match(output.operatorChecklist[1].command, /launch:route-map-gate/);
   assert.match(output.operatorChecklist[4].command, /launch:smoke:staging/);
   assert.equal(output.operatorChecklist[7].endpoint, "https://staging.example.com/api/developer/launch-mainline/action");
@@ -263,6 +265,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ]
   );
   assert.equal(output.operatorExecutionPlan.orderedSteps[1].command, "npm.cmd run launch:route-map-gate");
+  assert.match(output.operatorExecutionPlan.orderedSteps[1].summary, /first-batch runtime evidence/);
   assert.equal(output.operatorExecutionPlan.orderedSteps[5].endpoint, output.evidenceActionPlan.endpoint);
   assert.deepEqual(
     output.operatorExecutionPlan.requiredCloseoutKeys,
@@ -737,6 +740,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(runbookSteps.generate_rehearsal_outputs.command, output.stagingEnvironmentBinding.dryRunCommand);
   assert.deepEqual(runbookSteps.generate_rehearsal_outputs.outputs, ["handoff_file", "closeout_file"]);
   assert.equal(runbookSteps.run_route_map_gate.command, "npm.cmd run launch:route-map-gate");
+  assert.match(runbookSteps.run_route_map_gate.summary, /first-batch runtime evidence/);
   assert.deepEqual(runbookSteps.run_backup_restore_drill.commandKeys, [
     "appBackup",
     "postgresBackup",
@@ -982,6 +986,7 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ]
   );
   assert.equal(output.stagingAcceptanceCloseout.acceptanceChecks[0].command, "npm.cmd run launch:route-map-gate");
+  assert.match(output.stagingAcceptanceCloseout.acceptanceChecks[0].label, /first-batch runtime evidence/);
   assert.equal(output.stagingAcceptanceCloseout.destinations.launchMainline, output.nextCommands.launchMainline);
   assert.equal(output.stagingAcceptanceCloseout.destinations.developerOps, output.resultBackfillSummary.destinations.developerOps);
   assert.equal(output.stagingAcceptanceCloseout.destinations.evidenceEndpoint, output.evidenceActionPlan.endpoint);
@@ -1479,6 +1484,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Launch Route Map Targeted Gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate -- --dry-run --json/);
+    assert.match(handoff, /first-batch runtime evidence/);
     assert.match(handoff, /## Receipt Visibility Summary Downloads/);
     assert.match(handoff, /Launch Review summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`/);
     assert.match(handoff, /Launch Smoke Kit summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-smoke-kit\/download\?productCode=PILOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`/);
@@ -1498,7 +1504,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /route_map_gate: operator_execute/);
     assert.match(handoff, /## Staging Operator Checklist/);
     assert.match(handoff, /1\. Review environment readiness/);
-    assert.match(handoff, /2\. Run route-map and download-surface gate/);
+    assert.match(handoff, /2\. Run route-map, first-batch runtime evidence, and download-surface gate/);
     assert.match(handoff, /5\. Run live-write staging smoke/);
     assert.match(handoff, /8\. Record Launch Mainline evidence/);
     assert.match(handoff, /## Staging Result Backfill Summary/);

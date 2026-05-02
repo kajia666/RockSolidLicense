@@ -1522,7 +1522,7 @@ function buildLaunchRouteMapGateCommand() {
     dryRunCommand: "npm.cmd run launch:route-map-gate -- --dry-run --json",
     willModifyData: false,
     willRunFullSuite: false,
-    purpose: "Re-run the Launch Mainline / Launch Smoke / Developer Ops route-map visibility and low-frequency download surface targeted gate before live-write staging smoke."
+    purpose: "Re-run the Launch Mainline / Launch Smoke / Developer Ops route-map visibility, first-batch runtime evidence, and low-frequency download surface targeted gate before live-write staging smoke."
   };
 }
 
@@ -1571,7 +1571,7 @@ function buildStagingEnvironmentReadiness(options, { recovery = null, launchRout
       },
       {
         key: "route_map_gate",
-        label: "Route-map and download-surface gate",
+        label: "Route-map, first-batch runtime evidence, and download-surface gate",
         status: "operator_execute",
         evidence: launchRouteMapGate?.dryRunCommand || "Run the route-map gate dry run first.",
         command: launchRouteMapGate?.command || null,
@@ -1600,17 +1600,17 @@ function buildStagingOperatorChecklist(result) {
       order: 1,
       label: "Review environment readiness",
       status: "operator_review",
-      summary: "Confirm HTTPS, non-default secrets, storage, recovery, route-map gate, and live-write approval readiness.",
+      summary: "Confirm HTTPS, non-default secrets, storage, recovery, route-map/runtime-evidence gate, and live-write approval readiness.",
       readinessStatus: result.environmentReadiness?.status || "not_available"
     },
     {
       key: "run_route_map_gate",
       order: 2,
-      label: "Run route-map and download-surface gate",
+      label: "Run route-map, first-batch runtime evidence, and download-surface gate",
       status: "operator_execute",
       command: result.nextCommands?.launchRouteMapGate?.command || null,
       dryRunCommand: result.nextCommands?.launchRouteMapGate?.dryRunCommand || null,
-      summary: "Run the targeted pre-staging gate before any live-write smoke command."
+      summary: "Run the targeted route-map, first-batch runtime evidence, and download-surface gate before any live-write smoke command."
     },
     {
       key: "run_backup_restore_drill",
@@ -2443,7 +2443,7 @@ function buildStagingExecutionRunbook(result) {
       command: result.nextCommands?.launchRouteMapGate?.command || null,
       closeoutKey: "route_map_gate_result",
       artifactPath: ledgerRowsByKey.get("route_map_gate_result")?.artifactPath || null,
-      summary: "Run targeted route/download visibility tests before staging writes."
+      summary: "Run targeted route, first-batch runtime evidence, and download visibility tests before staging writes."
     },
     {
       key: "run_backup_restore_drill",
@@ -2795,7 +2795,7 @@ function buildFinalRehearsalPacket(result) {
       key: "run_route_map_gate",
       status: "operator_execute",
       command: result.nextCommands?.launchRouteMapGate?.command || null,
-      summary: "Run the targeted Launch Mainline / Launch Smoke / Developer Ops route-map gate before live writes."
+      summary: "Run the targeted Launch Mainline / Launch Smoke / Developer Ops route-map and first-batch runtime evidence gate before live writes."
     },
     {
       key: "run_backup_restore_drill",
@@ -3223,7 +3223,7 @@ function buildStagingOperatorExecutionPlan(result) {
         command: result.nextCommands?.launchRouteMapGate?.command || null,
         dryRunCommand: result.nextCommands?.launchRouteMapGate?.dryRunCommand || null,
         closeoutKey: "route_map_gate_result",
-        summary: "Run the repeatable Launch Mainline / Launch Smoke / Developer Ops route-map gate."
+        summary: "Run the repeatable Launch Mainline / Launch Smoke / Developer Ops route-map and first-batch runtime evidence gate."
       },
       {
         key: "run_backup_restore_drill",
@@ -3487,7 +3487,7 @@ function buildStagingAcceptanceCloseout(result) {
   const acceptanceChecks = [
     {
       key: "route_map_gate_result",
-      label: "Route-map and download-surface targeted gate",
+      label: "Route-map, first-batch runtime evidence, and download-surface targeted gate",
       required: true,
       command: result.nextCommands?.launchRouteMapGate?.command || null,
       expectedEvidence: "Record the targeted gate exit status, pass count, and redacted output artifact path."

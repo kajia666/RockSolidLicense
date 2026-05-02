@@ -16535,6 +16535,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     ""
   ];
+  appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
+  lines.push("");
   appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
   appendInitialLaunchOpsReadinessTextLines(
     lines,
@@ -17151,6 +17153,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     ""
   ];
+  appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
+  lines.push("");
   if (launchDutyActionOrder) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
@@ -18344,6 +18348,54 @@ function buildLaunchReceiptAuditBackfillStatus(count = 0) {
   };
 }
 
+function buildFirstWaveAuditBackfillStatus({
+  handoffCount = 0,
+  readinessCount = 0
+} = {}) {
+  const normalizedHandoffCount = Math.max(Number(handoffCount || 0), 0);
+  const normalizedReadinessCount = Math.max(Number(readinessCount || 0), 0);
+  const total = normalizedHandoffCount + normalizedReadinessCount;
+  const used = total > 0;
+  return {
+    used,
+    handoffCount: normalizedHandoffCount,
+    readinessCount: normalizedReadinessCount,
+    total,
+    source: used ? "first-wave-audit-backfill" : "snapshot-audit-filter",
+    operatorHint: used
+      ? "Recent First-Wave handoff confirmations and readiness bridges were added to protect the confirmation chain."
+      : "No First-Wave confirmation or readiness bridge audit backfill was needed for this snapshot."
+  };
+}
+
+function readFirstWaveAuditBackfillStatus(payload = {}) {
+  const summary = payload.summary || {};
+  const handoffCount = Number(
+    summary.firstWaveHandoffBackfill
+    ?? payload.auditLogs?.filters?.firstWaveHandoffBackfill
+    ?? 0
+  );
+  const readinessCount = Number(
+    summary.firstWaveReadinessBackfill
+    ?? payload.auditLogs?.filters?.firstWaveReadinessBackfill
+    ?? 0
+  );
+  return summary.firstWaveAuditBackfillStatus
+    || buildFirstWaveAuditBackfillStatus({ handoffCount, readinessCount });
+}
+
+function appendFirstWaveAuditBackfillStatusText(lines, payload = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const status = readFirstWaveAuditBackfillStatus(payload);
+  lines.push(`First-Wave Audit Backfill: handoff=${status.handoffCount ?? 0} | readiness=${status.readinessCount ?? 0} | total=${status.total ?? 0}`);
+  lines.push(`First-Wave Audit Backfill Status: ${status.used ? "USED" : "NOT_USED"}`);
+  lines.push(`First-Wave Audit Backfill Source: ${status.source || "-"}`);
+  lines.push(`First-Wave Audit Backfill Operator Hint: ${status.operatorHint || "-"}`);
+  return true;
+}
+
 function appendLaunchReceiptAuditBackfillStatusText(lines, payload = {}) {
   const summary = payload.summary || {};
   const launchReceiptAuditBackfill = Number(
@@ -18357,6 +18409,7 @@ function appendLaunchReceiptAuditBackfillStatusText(lines, payload = {}) {
   lines.push(`Launch Receipt Audit Backfill Status: ${launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED"}`);
   lines.push(`Launch Receipt Audit Backfill Source: ${launchReceiptAuditBackfillStatus.source || "-"}`);
   lines.push(`Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`);
+  appendFirstWaveAuditBackfillStatusText(lines, payload);
 }
 
 function buildDeveloperOpsLaunchReceiptBackfillStatusText(payload = {}) {
@@ -18372,6 +18425,7 @@ function buildDeveloperOpsLaunchReceiptBackfillStatusText(payload = {}) {
   lines.push("Operator Note:");
   lines.push("- Use this file as the offline backfill diagnostic anchor before reviewing Launch Mainline receipt follow-ups.");
   lines.push("- USED means recent Launch Mainline action receipts were added to preserve first-wave traceability.");
+  lines.push("- First-Wave USED means recent handoff confirmation and readiness bridge audits were added to preserve the first-wave confirmation chain.");
   lines.push("- NOT_USED means the current snapshot or explicit audit filter did not require protective receipt backfill.");
   return lines.join("\n");
 }
@@ -18525,6 +18579,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     `Primary Lifecycle Download: ${formatLaunchHandoffDownloadText(lifecycle.primaryRecommendedDownload, { fileSeparator: " | " })}`,
     ""
   ];
+  appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
+  lines.push("");
 
   if (launchDutyActionOrder) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
@@ -27159,6 +27215,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Next Follow-up Workspace: ${launchReceiptNextFollowUpWorkspace?.label || "-"}@${launchReceiptNextFollowUpWorkspace?.autofocus || "-"}`,
     `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"}) | href=${launchReceiptNextFollowUpDownload?.href || "-"}`
   ];
+  appendFirstWaveAuditBackfillStatusText(lines, payload);
 
   if (initialLaunchOpsReadiness) {
     const gate = initialLaunchOpsReadiness.gate || {};
@@ -29416,6 +29473,12 @@ function buildDeveloperOpsSnapshotPayload({
     : launchReceiptFollowUps;
   const launchReceiptAuditBackfill = Number(auditLogs.filters?.launchReceiptBackfill || 0);
   const launchReceiptAuditBackfillStatus = buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
+  const firstWaveHandoffBackfill = Number(auditLogs.filters?.firstWaveHandoffBackfill || 0);
+  const firstWaveReadinessBackfill = Number(auditLogs.filters?.firstWaveReadinessBackfill || 0);
+  const firstWaveAuditBackfillStatus = buildFirstWaveAuditBackfillStatus({
+    handoffCount: firstWaveHandoffBackfill,
+    readinessCount: firstWaveReadinessBackfill
+  });
 
   const payload = {
     generatedAt,
@@ -29434,6 +29497,9 @@ function buildDeveloperOpsSnapshotPayload({
       auditLogs: normalizedAuditLogs.length,
       launchReceiptAuditBackfill,
       launchReceiptAuditBackfillStatus,
+      firstWaveHandoffBackfill,
+      firstWaveReadinessBackfill,
+      firstWaveAuditBackfillStatus,
       launchReceiptFollowUps: launchReceiptFollowUps.length,
       launchReceiptFollowUpPriorities,
       launchReceiptNextFollowUp,

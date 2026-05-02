@@ -14333,10 +14333,18 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveConfirmationChain.auditLogId,
       handoffConfirmation.auditLogId
     );
+    assert.ok(Number(confirmedOpsSnapshot.auditLogs.filters.firstWaveHandoffBackfill || 0) > 0);
+    assert.ok(Number(confirmedOpsSnapshot.auditLogs.filters.firstWaveReadinessBackfill || 0) > 0);
+    assert.equal(confirmedOpsSnapshot.summary.firstWaveAuditBackfillStatus?.used, true);
+    assert.equal(confirmedOpsSnapshot.summary.firstWaveAuditBackfillStatus?.source, "first-wave-audit-backfill");
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Confirmation Chain:/);
     assert.match(confirmedOpsSnapshot.summaryText, /segments=3\/3/);
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Status: USED/);
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Source: first-wave-audit-backfill/);
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Operator Hint: .*First-Wave handoff confirmations/i);
     assert.match(confirmedOpsSnapshot.summaryText, /inventory=ready/);
     assert.match(confirmedOpsSnapshot.summaryText, /firstCards=ready/);
     assert.match(confirmedOpsSnapshot.summaryText, /firstRoundOps=review/);
@@ -14382,6 +14390,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineAfterConfirmation.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
     assert.match(mainlineAfterConfirmation.summaryText, /Launch Mainline First-Wave Confirmation Chain:/);
     assert.match(mainlineAfterConfirmation.summaryText, /segments=3\/3/);
+    assert.match(mainlineAfterConfirmation.summaryText, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
+    assert.match(mainlineAfterConfirmation.summaryText, /First-Wave Audit Backfill Status: USED/);
     assert.match(mainlineAfterConfirmation.summaryText, /First-Wave Handoff Confirmation \| First-wave handoff is confirmed/);
 
     const mainlineConfirmedRouteMap = await getText(
@@ -14394,6 +14404,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineConfirmedRouteMap.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
     assert.match(mainlineConfirmedRouteMap.body, /First-Wave Confirmation Chain:/);
     assert.match(mainlineConfirmedRouteMap.body, /segments=3\/3/);
+    assert.match(mainlineConfirmedRouteMap.body, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
+    assert.match(mainlineConfirmedRouteMap.body, /First-Wave Audit Backfill Source: first-wave-audit-backfill/);
 
     const mainlineConfirmedPostLaunchIndex = await getText(
       baseUrl,

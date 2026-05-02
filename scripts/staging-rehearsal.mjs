@@ -44,7 +44,8 @@ const RECEIPT_VISIBILITY_KEYS = [
   "launchMainline",
   "launchReview",
   "launchSmoke",
-  "developerOps"
+  "developerOps",
+  "launchOpsOverviewStatus"
 ];
 
 const PROFILE_ALLOWED_FIELDS = [
@@ -1197,7 +1198,8 @@ function buildStagingProductionSignoffPacket(result) {
       launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
       developerOps: launchDayWatch.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
       launchReviewSummary: launchDayWatch.routes?.launchReviewSummary || result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
-      launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null
+      launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
+      launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
     commands: {
       closeoutReload,
@@ -1950,14 +1952,15 @@ function buildLaunchDayWatchPlan(result) {
       launchMainline: result.nextCommands?.launchMainline || null,
       developerOps: result.resultBackfillSummary?.destinations?.developerOps || null,
       launchReviewSummary: result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
-      launchSmokeSummary: result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null
+      launchSmokeSummary: result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
+      launchOpsOverviewStatus: result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
     watchWindows: [
       {
         key: "cutover_watch",
         status: canStartCutoverWatch ? "operator_watch" : "blocked_until_production_signoff",
         window: "T-30m through T+2h",
-        summary: "Keep Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility open during cutover."
+        summary: "Keep Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility open during cutover."
       },
       {
         key: "first_wave_stabilization",
@@ -1974,7 +1977,7 @@ function buildLaunchDayWatchPlan(result) {
       "backup_restore_or_rollback_unclear"
     ],
     nextAction: canStartCutoverWatch
-      ? "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility open."
+      ? "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility open."
       : "Do not start launch-day watch until production sign-off readiness is ready."
   };
 }
@@ -2000,7 +2003,8 @@ function buildStabilizationHandoffPlan(result) {
       launchMainline: watchPlan?.routes?.launchMainline || result.nextCommands?.launchMainline || null,
       developerOps: watchPlan?.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
       launchReviewSummary: watchPlan?.routes?.launchReviewSummary || result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
-      launchSmokeSummary: watchPlan?.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null
+      launchSmokeSummary: watchPlan?.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
+      launchOpsOverviewStatus: watchPlan?.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
     handoffWindows: [
       {
@@ -2075,7 +2079,7 @@ function buildStagingRunRecordTemplate(result) {
       artifactKey: "receipt_visibility_snapshot",
       artifactPath: path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt"),
       receiptOperations: ["record_post_launch_ops_sweep"],
-      operatorNote: "Save Launch Mainline, Developer Ops, Launch Review, and Launch Smoke receipt visibility snapshots."
+      operatorNote: "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."
     },
     {
       key: "rollback_signal_review",
@@ -2839,7 +2843,7 @@ function buildFinalRehearsalPacket(result) {
     {
       key: "launch_day_watch",
       status: "operator_watch",
-      summary: "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, and Launch Smoke routes open."
+      summary: "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status routes open."
     },
     {
       key: "stabilization_handoff",
@@ -3093,7 +3097,7 @@ function buildOperatorReadinessGaps(result, { closeout = {}, outputFiles = [] } 
       severity: "blocker",
       stepKey: "verify_receipt_visibility",
       missingReceiptVisibilityKeys: closeoutInput.missingReceiptVisibilityKeys || [],
-      summary: "Production sign-off needs Launch Mainline, Launch Review, Launch Smoke, and Developer Ops receipt visibility confirmed.",
+      summary: "Production sign-off needs Launch Mainline, Launch Review, Launch Smoke, Developer Ops, and Launch Ops Overview Status receipt visibility confirmed.",
       nextAction: "Backfill receiptVisibility with visible statuses for every required lane before production sign-off review."
     });
   }
@@ -3262,7 +3266,7 @@ function buildStagingOperatorExecutionPlan(result) {
         status: "operator_review",
         downloads: result.nextCommands?.receiptVisibilitySummaries || null,
         closeoutKey: "receipt_visibility_review",
-        summary: "Verify Launch Review and Launch Smoke visibility summaries show the recorded receipts."
+        summary: "Verify Launch Review, Launch Smoke, and Launch Ops Overview Status show the recorded receipts."
       },
       {
         key: "backfill_closeout_template",
@@ -3379,7 +3383,7 @@ function buildStagingArtifactReceiptLedger(result) {
         artifactKey: "receipt_visibility_review",
         fileName: "receipt-visibility-review.txt",
         receiptOperations: ["record_post_launch_ops_sweep"],
-        operatorNote: "Record the Launch Review and Launch Smoke visibility summary review result."
+        operatorNote: "Record the Launch Review, Launch Smoke, and Launch Ops Overview Status visibility review result."
       }),
       row({
         checkKey: "operator_go_no_go",
@@ -3450,6 +3454,11 @@ function buildProductionSignoffConditions(result) {
         evidence: "Confirm Launch Mainline, Launch Review, Launch Smoke, and Developer Ops show the latest receipts."
       },
       {
+        key: "launch_ops_overview_status_visible",
+        status: "required",
+        evidence: "Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover."
+      },
+      {
         key: "backup_restore_drill_passed",
         status: "required",
         evidence: "Confirm the backup and restore drill passed on the intended staging storage profile."
@@ -3516,7 +3525,7 @@ function buildStagingAcceptanceCloseout(result) {
       label: "Receipt visibility review",
       required: true,
       downloads: result.nextCommands?.receiptVisibilitySummaries || null,
-      expectedEvidence: "Verify Launch Review and Launch Smoke receipt-visibility summaries show the recorded first-wave receipt."
+      expectedEvidence: "Verify Launch Review, Launch Smoke, and Launch Ops Overview Status receipt-visibility summaries show the recorded first-wave receipt."
     },
     {
       key: "operator_go_no_go",
@@ -4327,6 +4336,7 @@ function renderStagingProductionSignoffPacket(packet) {
     return "- Not available";
   }
   const decision = packet.decision || {};
+  const routes = packet.routes || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -4339,6 +4349,11 @@ function renderStagingProductionSignoffPacket(packet) {
     `- Full test window ready: ${decision.readyForFullTestWindow ? "yes" : "no"}`,
     `- Missing sign-off keys: ${(packet.missingSignoffKeys || []).join(", ") || "-"}`,
     `- Missing receipt visibility keys: ${(packet.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
+    `- Launch Mainline: ${routes.launchMainline || "-"}`,
+    `- Developer Ops: ${routes.developerOps || "-"}`,
+    `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
+    `- Launch Smoke summary: ${routes.launchSmokeSummary || "-"}`,
+    `- Launch Ops overview status: ${routes.launchOpsOverviewStatus || "-"}`,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
@@ -4371,6 +4386,7 @@ function renderLaunchDayWatchPlan(plan) {
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
     `- Launch Smoke summary: ${routes.launchSmokeSummary || "-"}`,
+    `- Launch Ops overview status: ${routes.launchOpsOverviewStatus || "-"}`,
     `- Watch windows: ${watchWindows.map((item) => item.key).filter(Boolean).join(", ") || "-"}`,
     `- Escalation triggers: ${(plan.escalationTriggers || []).join(", ") || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
@@ -4399,6 +4415,7 @@ function renderStabilizationHandoffPlan(plan) {
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
     `- Launch Smoke summary: ${routes.launchSmokeSummary || "-"}`,
+    `- Launch Ops overview status: ${routes.launchOpsOverviewStatus || "-"}`,
     `- Handoff windows: ${handoffWindows.map((item) => item.label || item.key).filter(Boolean).join(", ") || "-"}`,
     `- Escalation triggers: ${(plan.escalationTriggers || []).join(", ") || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`

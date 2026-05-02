@@ -13700,6 +13700,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const opsPrimaryDownload = createOpsMainlineDownload(opsRouteReview.downloads?.primary || null);
   const opsRemainingDownload = createOpsMainlineDownload(opsRouteReview.downloads?.remaining || null);
   const initialLaunchOpsReadiness = opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const firstWaveReadinessBridge = initialLaunchOpsReadiness?.firstWaveReadinessBridge
+    || (Array.isArray(opsOverview.latestFirstWaveReadinessBridges)
+      ? opsOverview.latestFirstWaveReadinessBridges[0]
+      : null)
+    || null;
   const initialLaunchOpsGate = initialLaunchOpsReadiness?.gate || null;
   const initialLaunchOpsWorkspaceAction = createLaunchWorkflowWorkspaceShortcut(
     "ops",
@@ -15814,6 +15819,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     smokeGate,
     opsGate,
     initialLaunchOpsReadiness,
+    firstWaveReadinessBridge,
     initialLaunchOpsOverviewStatus,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
@@ -16331,6 +16337,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     mainlineSummary.initialLaunchOpsReadiness,
     mainlineSummary.initialLaunchOpsReadinessDownload
   );
+  if (mainlineSummary.firstWaveReadinessBridge) {
+    lines.push("");
+    appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, mainlineSummary.firstWaveReadinessBridge, {
+      title: "Launch Mainline First-Wave Readiness Bridge:"
+    });
+  }
   if (mainlineSummary.initialLaunchOpsOverviewStatus) {
     lines.push("");
     appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, mainlineSummary.initialLaunchOpsOverviewStatus, {

@@ -14153,6 +14153,28 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(firstWaveChecksums.body, /first-wave-recommendations\.json/);
     assert.match(firstWaveChecksums.body, /first-wave-recommendations\.txt/);
 
+    const mainlineAfterRecommendation = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=FIRSTWAVE&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.ok(mainlineAfterRecommendation.mainlineSummary.firstWaveReadinessBridge?.auditLogId);
+    assert.equal(mainlineAfterRecommendation.mainlineSummary.firstWaveReadinessBridge?.status, "ready_for_first_wave_handoff");
+    assert.equal(mainlineAfterRecommendation.mainlineSummary.firstWaveReadinessBridge?.currentGate, "first_round_ops");
+    assert.equal(mainlineAfterRecommendation.mainlineSummary.firstWaveReadinessBridge?.nextAction?.key, "first_launch_handoff");
+    assert.match(mainlineAfterRecommendation.summaryText, /Launch Mainline First-Wave Readiness Bridge:/);
+    assert.match(mainlineAfterRecommendation.summaryText, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
+    assert.match(mainlineAfterRecommendation.summaryText, /confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+
+    const mainlineSummaryAfterRecommendation = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(mainlineSummaryAfterRecommendation.body, /Launch Mainline First-Wave Readiness Bridge:/);
+    assert.match(mainlineSummaryAfterRecommendation.body, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
+    assert.match(mainlineSummaryAfterRecommendation.body, /download=.*format=summary/);
+
     const handoffConfirmation = await postJson(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations/confirm",
@@ -14291,7 +14313,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
 
     const stableAfterBetaReceipt = await getJson(
       baseUrl,
-      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=20",
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=stable&limit=80",
       operatorSession.token
     );
     assert.equal(stableAfterBetaReceipt.channel, "stable");
@@ -14302,7 +14324,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
 
     const betaAfterBetaReceipt = await getJson(
       baseUrl,
-      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=beta&limit=20",
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE&channel=beta&limit=80",
       operatorSession.token
     );
     assert.equal(betaAfterBetaReceipt.channel, "beta");

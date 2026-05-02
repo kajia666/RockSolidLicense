@@ -19163,6 +19163,126 @@ function buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs = [], limit 
     .slice(0, Math.max(1, Number(limit || 5)));
 }
 
+function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const productCode = item.productCode || metadata.productCode || null;
+  const channel = normalizeChannel(item.channel || metadata.channel, "stable");
+  const inventoryStatus = normalizeDeveloperOpsConfirmationToken(metadata.inventoryStatus, "unknown");
+  const firstCardStatus = normalizeDeveloperOpsConfirmationToken(metadata.firstCardStatus, "unknown");
+  const firstRoundOpsStatus = normalizeDeveloperOpsConfirmationToken(metadata.firstRoundOpsStatus, "unknown");
+  const buildSegment = (key, label, status) => {
+    const normalizedStatus = normalizeDeveloperOpsConfirmationToken(status, "unknown");
+    return {
+      key,
+      label,
+      status: normalizedStatus,
+      ready: normalizedStatus === "ready",
+      confirmed: normalizedStatus !== "unknown" && normalizedStatus !== "missing" && normalizedStatus !== "pending" && normalizedStatus !== "not_started"
+    };
+  };
+  const segments = [
+    buildSegment("first_batch_inventory", "First Batch Inventory", inventoryStatus),
+    buildSegment("first_cards", "First Cards", firstCardStatus),
+    buildSegment("first_round_ops", "First Round Ops", firstRoundOpsStatus)
+  ];
+  const rawSegmentCount = Number(metadata.launchReadinessBridgeSegmentCount || 0);
+  const segmentCount = Math.max(segments.length, Number.isFinite(rawSegmentCount) ? rawSegmentCount : 0);
+  const readySegmentCount = Math.max(
+    0,
+    Number.isFinite(Number(metadata.launchReadinessBridgeReadySegmentCount))
+      ? Number(metadata.launchReadinessBridgeReadySegmentCount)
+      : segments.filter((segment) => segment.ready === true).length
+  );
+  const nextActionKey = metadata.launchReadinessBridgeNextActionKey || null;
+  return {
+    version: "developer-ops-first-wave-readiness-bridge/v1",
+    auditLogId: item.auditLogId || item.id || null,
+    eventType: item.eventType || "developer.ops.first-wave.recommendations",
+    entityType: item.entityType || "developer_ops_first_wave_recommendations",
+    entityId: item.entityId || null,
+    productCode,
+    channel,
+    status: normalizeDeveloperOpsConfirmationToken(metadata.launchReadinessBridgeStatus, "unknown"),
+    currentGate: normalizeDeveloperOpsConfirmationToken(metadata.launchReadinessBridgeCurrentGate, "unknown"),
+    segmentCount,
+    readySegmentCount,
+    pendingSegmentCount: Math.max(0, segmentCount - readySegmentCount),
+    segments,
+    nextAction: nextActionKey
+      ? {
+          key: nextActionKey,
+          operation: metadata.latestLaunchReceiptOperation || null
+        }
+      : null,
+    confirmation: {
+      endpoint: "/api/developer/ops/first-wave/recommendations/confirm",
+      method: "POST"
+    },
+    downloads: {
+      summary: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "summary"),
+      json: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "json"),
+      checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums")
+    },
+    sourceRecommendation: {
+      inventoryStatus,
+      firstCardStatus,
+      firstRoundOpsStatus,
+      latestLaunchReceiptOperation: metadata.latestLaunchReceiptOperation || null,
+      recommendedCardCount: metadata.recommendedCardCount ?? null,
+      issuedFreshCardCount: metadata.issuedFreshCardCount ?? null
+    },
+    latestLaunchReceipt: metadata.latestLaunchReceiptOperation
+      ? {
+          operation: metadata.latestLaunchReceiptOperation,
+          channel
+        }
+      : null,
+    createdAt: item.createdAt || item.created_at || null
+  };
+}
+
+function buildSnapshotLatestFirstWaveReadinessBridges(auditLogs = [], limit = 5, channel = null) {
+  const normalizedChannel = channel ? normalizeChannel(channel, "stable") : null;
+  return auditLogs
+    .map((item) => {
+      const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+      const eventType = item?.eventType || item?.event_type || "";
+      const entityType = item?.entityType || item?.entity_type || "";
+      if (
+        eventType !== "developer.ops.first-wave.recommendations"
+        && entityType !== "developer_ops_first_wave_recommendations"
+      ) {
+        return null;
+      }
+      return buildFirstWaveReadinessBridgeAuditPayload({
+        id: item.id || null,
+        eventType,
+        actorType: item.actorType || item.actor_type || null,
+        actorId: item.actorId || item.actor_id || null,
+        entityType,
+        entityId: item.entityId || item.entity_id || null,
+        metadata,
+        productCode: metadata.productCode || null,
+        channel: metadata.channel || "stable",
+        createdAt: item.createdAt || item.created_at || null
+      });
+    })
+    .filter((item) => {
+      if (!item) {
+        return false;
+      }
+      if (!normalizedChannel) {
+        return true;
+      }
+      return normalizeChannel(item.channel, "stable") === normalizedChannel;
+    })
+    .sort((left, right) => snapshotDateMs(right.createdAt) - snapshotDateMs(left.createdAt))
+    .slice(0, Math.max(1, Number(limit || 5)));
+}
+
 function buildSteadyStateDutyPlanReceiptPayload(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -22929,6 +23049,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const firstWaveHandoffConfirmations = Array.isArray(overview.latestFirstWaveHandoffConfirmations)
     ? overview.latestFirstWaveHandoffConfirmations
     : [];
+  const firstWaveReadinessBridges = Array.isArray(overview.latestFirstWaveReadinessBridges)
+    ? overview.latestFirstWaveReadinessBridges
+    : [];
   const steadyStateDutyPlanReceipts = Array.isArray(overview.latestSteadyStateDutyPlanReceipts)
     ? overview.latestSteadyStateDutyPlanReceipts
     : [];
@@ -22950,6 +23073,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     const channelMatches = !targetChannel || item.channel === targetChannel;
     return productMatches && channelMatches;
   }) || firstWaveHandoffConfirmations[0] || null;
+  const firstWaveReadinessBridge = firstWaveReadinessBridges.find((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    const targetProductCode = latestReceipt?.productCode || scope.productCode || "";
+    const targetChannel = latestReceipt?.channel || scope.channel || item.channel || "stable";
+    const productMatches = !targetProductCode || item.productCode === targetProductCode;
+    const channelMatches = !targetChannel || normalizeChannel(item.channel, "stable") === normalizeChannel(targetChannel, "stable");
+    return productMatches && channelMatches;
+  }) || firstWaveReadinessBridges[0] || null;
   const latestSteadyStateDutyPlanReceipt = steadyStateDutyPlanReceipts.find((item) => {
     if (!item || typeof item !== "object") {
       return false;
@@ -23064,13 +23197,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     gate
   });
-  const traceability = buildDeveloperOpsInitialLaunchOpsTraceability({
-    scope,
-    latestReceipt,
-    launchReceiptNextFollowUp,
-    stabilizationHandoffConfirmation,
-    firstWaveHandoffConfirmation
-  });
+  const traceability = {
+    ...buildDeveloperOpsInitialLaunchOpsTraceability({
+      scope,
+      latestReceipt,
+      launchReceiptNextFollowUp,
+      stabilizationHandoffConfirmation,
+      firstWaveHandoffConfirmation
+    }),
+    firstWaveReadinessBridge
+  };
   const launchDayWatchReceipt = buildDeveloperOpsLaunchDayWatchReceiptPayload({
     latestReceipt,
     launchReceiptNextFollowUp,
@@ -23511,6 +23647,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsDailyBrief,
     launchOperationsShiftActionPlan,
     launchOperationsOverviewStatus,
+    firstWaveReadinessBridge,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -25703,6 +25840,7 @@ function buildSnapshotOverview({
   const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5, scope.channel || null);
   const latestStabilizationHandoffConfirmations = buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs, 5);
   const latestFirstWaveHandoffConfirmations = buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs, 5);
+  const latestFirstWaveReadinessBridges = buildSnapshotLatestFirstWaveReadinessBridges(auditLogs, 5, scope.channel || null);
   const latestSteadyStateDutyPlanReceipts = buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs, 5);
   const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6);
   const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
@@ -25765,6 +25903,10 @@ function buildSnapshotOverview({
     const latest = latestFirstWaveHandoffConfirmations[0];
     highlights.push(`Latest first-wave handoff confirmation: ${latest.status || "confirmed"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
   }
+  if (latestFirstWaveReadinessBridges.length) {
+    const latest = latestFirstWaveReadinessBridges[0];
+    highlights.push(`Latest first-wave readiness bridge: ${latest.status || "unknown"} at ${latest.currentGate || "-"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
+  }
   if (latestSteadyStateDutyPlanReceipts.length) {
     const latest = latestSteadyStateDutyPlanReceipts[0];
     highlights.push(`Latest steady-state duty plan receipt: ${latest.action || "recorded"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
@@ -25805,6 +25947,7 @@ function buildSnapshotOverview({
     latestLaunchReceipts,
     latestStabilizationHandoffConfirmations,
     latestFirstWaveHandoffConfirmations,
+    latestFirstWaveReadinessBridges,
     latestSteadyStateDutyPlanReceipts,
     launchReceiptFollowUps,
     queueSummary,
@@ -26571,6 +26714,35 @@ function appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, overview =
   }
 }
 
+function appendDeveloperOpsFirstWaveReadinessBridgeLines(lines = [], bridge = null, {
+  title = "First-Wave Readiness Bridge:"
+} = {}) {
+  if (!Array.isArray(lines) || !bridge || typeof bridge !== "object") {
+    return;
+  }
+  const segments = Array.isArray(bridge.segments) ? bridge.segments : [];
+  lines.push(title);
+  lines.push(
+    `- status=${bridge.status || "-"}`
+    + ` | gate=${bridge.currentGate || "-"}`
+    + ` | ready=${bridge.readySegmentCount ?? 0}/${bridge.segmentCount ?? segments.length}`
+    + ` | audit=${bridge.auditLogId || "-"}`
+  );
+  lines.push(
+    `- nextAction=${bridge.nextAction?.key || bridge.nextAction?.operation || "-"}`
+    + ` | operation=${bridge.nextAction?.operation || "-"}`
+    + ` | confirm=${bridge.confirmation?.method || "POST"} ${bridge.confirmation?.endpoint || "-"}`
+  );
+  lines.push(
+    `- download=${bridge.downloads?.summary?.href || "-"}`
+    + ` | json=${bridge.downloads?.json?.href || "-"}`
+    + ` | checksums=${bridge.downloads?.checksums?.href || "-"}`
+  );
+  for (const segment of segments) {
+    lines.push(`  - ${segment.key || "-"} | status=${segment.status || "-"} | ready=${segment.ready === true ? "yes" : "no"}`);
+  }
+}
+
 function buildDeveloperOpsSummaryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -26636,6 +26808,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     lines.push(`- workspace: ${initialLaunchOpsReadiness.primaryWorkspaceAction?.label || "-"}@${initialLaunchOpsReadiness.primaryWorkspaceAction?.autofocus || "-"}`);
     lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"}) | href=${initialLaunchOpsReadiness.primaryDownload?.href || "-"}`);
     lines.push(`- firstLaunchHandoff: ${initialLaunchOpsReadiness.firstLaunchHandoffDownload?.fileName || "-"}`);
+    if (initialLaunchOpsReadiness.firstWaveReadinessBridge) {
+      lines.push("");
+      appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, initialLaunchOpsReadiness.firstWaveReadinessBridge);
+    }
     if (initialLaunchOpsReadiness.launchDutyActionOrder) {
       lines.push("");
       appendDeveloperOpsLaunchDutyActionOrderLines(lines, initialLaunchOpsReadiness.launchDutyActionOrder);
@@ -27311,6 +27487,10 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     `First Launch Handoff: ${readiness.firstLaunchHandoffDownload?.fileName || "-"} | href=${readiness.firstLaunchHandoffDownload?.href || "-"}`,
     ""
   ];
+  if (readiness.firstWaveReadinessBridge) {
+    appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, readiness.firstWaveReadinessBridge);
+    lines.push("");
+  }
   if (readiness.launchDutyActionOrder) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, readiness.launchDutyActionOrder);
     lines.push("");

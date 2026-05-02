@@ -14091,6 +14091,40 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.ok(afterSetup.traceability.opsSnapshotFileName);
     assert.ok(afterSetup.auditLogId);
 
+    const preConfirmOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTWAVE&channel=stable&limit=20",
+      operatorSession.token
+    );
+    const latestReadinessBridge = preConfirmOpsSnapshot.overview.latestFirstWaveReadinessBridges[0];
+    assert.ok(latestReadinessBridge);
+    assert.equal(latestReadinessBridge.auditLogId, afterSetup.auditLogId);
+    assert.equal(latestReadinessBridge.status, "ready_for_first_wave_handoff");
+    assert.equal(latestReadinessBridge.currentGate, "first_round_ops");
+    assert.equal(latestReadinessBridge.nextAction.key, "first_launch_handoff");
+    assert.equal(latestReadinessBridge.downloads.summary.href, "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=summary");
+    assert.equal(
+      preConfirmOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveReadinessBridge.auditLogId,
+      afterSetup.auditLogId
+    );
+    assert.equal(
+      preConfirmOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveReadinessBridge.readySegmentCount,
+      2
+    );
+    assert.match(preConfirmOpsSnapshot.summaryText, /First-Wave Readiness Bridge:/);
+    assert.match(preConfirmOpsSnapshot.summaryText, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
+    assert.match(preConfirmOpsSnapshot.summaryText, /download=.*format=summary/);
+
+    const preConfirmInitialReadinessDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&channel=stable&format=initial-launch-ops-readiness&limit=20",
+      operatorSession.token
+    );
+    assert.match(preConfirmInitialReadinessDownload.body, /First-Wave Readiness Bridge:/);
+    assert.match(preConfirmInitialReadinessDownload.body, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
+    assert.match(preConfirmInitialReadinessDownload.body, /nextAction=first_launch_handoff/);
+    assert.match(preConfirmInitialReadinessDownload.body, /confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+
     const handoffDownload = await getText(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=summary&limit=20",

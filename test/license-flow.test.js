@@ -10156,6 +10156,31 @@ test("developer license quickstart first-batch setup can create recommended laun
         control?.kind === "download"
         && control?.recommendedDownload?.key === "launch_mainline_first_launch_handoff"
       ));
+      assert.equal(setup.receipt?.firstLaunchDutySummary?.deliveryExports?.status, "ready");
+      assert.equal(setup.receipt?.firstLaunchDutySummary?.deliveryExports?.cardCount, setup.createdBatches.reduce((sum, item) => sum + Number(item?.count || 0), 0));
+      assert.equal(setup.receipt?.firstLaunchDutySummary?.deliveryExports?.usageStatus, "unused");
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.deliveryExports?.downloads?.some((item) =>
+        item?.key === "developer_cards_first_launch_csv"
+        && item?.source === "developer-cards"
+        && item?.format === "csv"
+        && /\/api\/developer\/cards\/export\/download\?/.test(item?.href || "")
+        && /usageStatus=unused/.test(item?.href || "")
+      ));
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.deliveryExports?.downloads?.some((item) =>
+        item?.key === "developer_cards_first_launch_zip"
+        && item?.source === "developer-cards"
+        && item?.format === "zip"
+        && /\/api\/developer\/cards\/export\/download\?/.test(item?.href || "")
+      ));
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.deliveryExports?.downloads?.some((item) =>
+        item?.key === "developer_cards_first_launch_checksums"
+        && item?.source === "developer-cards"
+        && item?.format === "checksums"
+        && /\/api\/developer\/cards\/export\/download\?/.test(item?.href || "")
+      ));
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.recommendedDownloads?.some((item) =>
+        item?.key === "developer_cards_first_launch_csv"
+      ));
       assert.ok(setup.receipt?.firstLaunchOpsQueue?.handoffChecklist?.some((item) =>
         item?.ownerRole === "support"
         && item?.actions?.some((action) => action?.key === "card_redemption_watch")
@@ -10174,10 +10199,25 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.match(setup.receipt?.handoffText || "", /Mainline Gate:[\s\S]*recommendedDownload: .*href=.*\/api\/developer\/launch-mainline\/download\?/i);
       assert.match(setup.receipt?.handoffText || "", /First Launch Inventory:/);
       assert.match(setup.receipt?.handoffText || "", /First Launch Duty:/);
+      assert.match(setup.receipt?.handoffText || "", /First Launch Delivery Exports:/);
+      assert.match(setup.receipt?.handoffText || "", /developer_cards_first_launch_csv[\s\S]*href=.*\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+      assert.match(setup.receipt?.handoffText || "", /developer_cards_first_launch_zip[\s\S]*href=.*\/api\/developer\/cards\/export\/download\?.*format=zip/i);
       assert.match(setup.receipt?.handoffText || "", /First launch handoff/i);
       assert.match(setup.receipt?.handoffText || "", /Production Evidence:/);
       assert.match(setup.receipt?.handoffText || "", /Post Launch Lifecycle:/);
       assert.match(setup.receipt?.handoffText || "", /Post Launch Lifecycle:[\s\S]*recommendedDownload: .*href=.*\/api\/developer\/launch-mainline\/download\?/i);
+
+    const deliveryCsvDownload = setup.receipt.firstLaunchDutySummary.deliveryExports.downloads.find((item) =>
+      item.key === "developer_cards_first_launch_csv"
+    );
+    const deliveryCsvResponse = await fetch(new URL(deliveryCsvDownload.href, baseUrl), {
+      headers: { Authorization: `Bearer ${ownerSession.token}` }
+    });
+    const deliveryCsvText = await deliveryCsvResponse.text();
+    assert.equal(deliveryCsvResponse.ok, true);
+    assert.match(deliveryCsvText, /FIRSTBATCHDL/);
+    assert.match(deliveryCsvText, /FIRSTBATCHRC/);
+    assert.equal(deliveryCsvText.trim().split(/\r?\n/).length - 1, 150);
 
     const setupAudit = await getJson(
       baseUrl,

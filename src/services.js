@@ -3545,6 +3545,9 @@ function resolveLaunchWorkflowDownloadPath(source = "") {
   if (normalized === "developer-launch-workflow") {
     return "/api/developer/launch-workflow/download";
   }
+  if (normalized === "developer-cards") {
+    return "/api/developer/cards/export/download";
+  }
   if (normalized === "developer-ops") {
     return "/api/developer/ops/export/download";
   }
@@ -3571,6 +3574,9 @@ function inferLaunchWorkflowDownloadSource(key = "", source = "") {
   }
   if (normalizedKey.startsWith("release_")) {
     return "developer-release-package";
+  }
+  if (normalizedKey.startsWith("developer_cards_")) {
+    return "developer-cards";
   }
   if (normalizedKey.startsWith("ops_")) {
     return "developer-ops";
@@ -4746,6 +4752,22 @@ function buildLaunchMainlineActionReceiptHandoffText({
     }
   }
 
+  if (firstLaunchDutySummary?.deliveryExports && typeof firstLaunchDutySummary.deliveryExports === "object") {
+    const deliveryExports = firstLaunchDutySummary.deliveryExports;
+    lines.push("");
+    lines.push("First Launch Delivery Exports:");
+    lines.push(
+      `- status: ${String(deliveryExports.status || "unknown").toUpperCase()}`
+      + ` | product=${deliveryExports.productCode || "-"}`
+      + ` | cards=${deliveryExports.cardCount ?? 0}`
+      + ` | usageStatus=${deliveryExports.usageStatus || "-"}`
+    );
+    lines.push(`- summary: ${deliveryExports.summary || "-"}`);
+    for (const item of Array.isArray(deliveryExports.downloads) ? deliveryExports.downloads : []) {
+      lines.push(`- key=${item?.key || "-"} | ${formatLaunchHandoffDownloadText(item, { fileSeparator: " | ", includeSource: true })}`);
+    }
+  }
+
   if (transitions.length || created.length || skipped.length) {
     lines.push("");
     lines.push("Applied Changes:");
@@ -5197,6 +5219,58 @@ function buildLaunchMainlineActionReceipt({
         firstLaunchHandoffDownloadParams
       )
     : null;
+  const firstLaunchDeliveryExportParams = compactRouteParams({
+    productCode: result?.productCode || launchMainline?.manifest?.project?.code || mainlineSummary.form?.productCode || null,
+    usageStatus: "unused"
+  });
+  const firstLaunchDeliveryDownloads = firstLaunchInventoryQueue
+    ? [
+        createLaunchWorkflowDownloadShortcut(
+          "developer_cards_first_launch_csv",
+          "developer-cards-first-launch-unused.csv",
+          "First launch unused card CSV",
+          {
+            source: "developer-cards",
+            format: "csv",
+            params: firstLaunchDeliveryExportParams
+          }
+        ),
+        createLaunchWorkflowDownloadShortcut(
+          "developer_cards_first_launch_zip",
+          "developer-cards-first-launch-unused.zip",
+          "First launch unused card zip",
+          {
+            source: "developer-cards",
+            format: "zip",
+            params: firstLaunchDeliveryExportParams
+          }
+        ),
+        createLaunchWorkflowDownloadShortcut(
+          "developer_cards_first_launch_checksums",
+          "developer-cards-first-launch-unused-sha256.txt",
+          "First launch unused card checksums",
+          {
+            source: "developer-cards",
+            format: "checksums",
+            params: firstLaunchDeliveryExportParams
+          }
+        )
+      ].filter(Boolean)
+    : [];
+  const firstLaunchDeliveryExports = firstLaunchInventoryQueue
+    ? {
+        key: "first_launch_delivery_exports",
+        status: firstLaunchInventoryQueue.createdCardCount > 0 ? "ready" : "review",
+        productCode: firstLaunchDeliveryExportParams.productCode || null,
+        usageStatus: "unused",
+        cardCount: firstLaunchInventoryQueue.createdCardCount || 0,
+        batchCount: firstLaunchInventoryQueue.createdBatchCount || 0,
+        summary: firstLaunchInventoryQueue.createdCardCount > 0
+          ? `Export ${firstLaunchInventoryQueue.createdCardCount} unused first-launch cards before handing the initial stock to sales, support, or the software author.`
+          : "No new first-launch cards were staged; review card inventory before delivery.",
+        downloads: firstLaunchDeliveryDownloads
+      }
+    : null;
   const firstLaunchWorkspaceActions = dedupeLaunchMainlineWorkspaceActions([
     ...(Array.isArray(firstLaunchOpsQueue?.actions) ? firstLaunchOpsQueue.actions.map((item) => item?.workspaceAction || null) : []),
     mainlineEvidenceQueue?.nextAction?.workspaceAction || followUp?.nextProductionAction?.workspaceAction || null
@@ -5204,6 +5278,7 @@ function buildLaunchMainlineActionReceipt({
   const firstLaunchRecommendedDownloads = dedupeLaunchMainlineRecommendedDownloads([
     ...(Array.isArray(firstLaunchOpsQueue?.actions) ? firstLaunchOpsQueue.actions.map((item) => item?.recommendedDownload || null) : []),
     firstLaunchHandoffDownload,
+    ...firstLaunchDeliveryDownloads,
     mainlineEvidenceQueue?.nextAction?.recommendedDownload || followUp?.nextProductionAction?.recommendedDownload || null
   ]);
   const firstLaunchPrimaryWorkspaceAction = firstLaunchOpsQueue?.nextAction?.workspaceAction
@@ -5994,6 +6069,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         workspaceActions: firstLaunchWorkspaceActions,
         recommendedDownloads: firstLaunchRecommendedDownloads,
         nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,
+        deliveryExports: firstLaunchDeliveryExports,
         productionEvidence: firstLaunchProductionEvidence,
         productionNextAction: firstLaunchProductionEvidence?.nextAction || null,
         handoffDownload: firstLaunchHandoffDownload || null,
@@ -6055,6 +6131,9 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
             : "",
           firstLaunchWorkspaceActionsDetail,
           firstLaunchRecommendedDownloadsDetail,
+          firstLaunchDeliveryExports?.downloads?.length
+            ? `Delivery exports: ${firstLaunchDeliveryExports.downloads.map((item) => item.label || item.key).join(" | ")}`
+            : "",
           firstLaunchOpsQueue.ownerGroups.length
             ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
             : "",
@@ -6079,6 +6158,11 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
                 recommendedDownload: firstLaunchHandoffDownload
               }
             : null,
+          ...firstLaunchDeliveryDownloads.map((download) => ({
+            kind: "download",
+            label: download.label || "Download first launch delivery export",
+            recommendedDownload: download
+          })),
           ...firstLaunchInventoryQueueControlList(firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null),
           ...firstLaunchInventoryQueueControlList(mainlineEvidenceQueue?.nextAction || null)
         ].filter(Boolean))

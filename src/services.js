@@ -13710,6 +13710,18 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ? opsOverview.latestFirstWaveReadinessBridges[0]
       : null)
     || null;
+  const firstWaveHandoffConfirmation = initialLaunchOpsReadiness?.firstWaveHandoffConfirmation
+    || initialLaunchOpsReadiness?.traceability?.firstWaveHandoffConfirmation
+    || (Array.isArray(opsOverview.latestFirstWaveHandoffConfirmations)
+      ? opsOverview.latestFirstWaveHandoffConfirmations[0]
+      : null)
+    || null;
+  const firstWaveConfirmationChain = initialLaunchOpsReadiness?.firstWaveConfirmationChain
+    || initialLaunchOpsReadiness?.traceability?.firstWaveConfirmationChain
+    || firstWaveHandoffConfirmation?.firstWaveConfirmationChain
+    || null;
+  const firstWaveHandoffConfirmed = firstWaveHandoffConfirmation?.status === "confirmed"
+    || firstWaveConfirmationChain?.allSegmentsConfirmed === true;
   const initialLaunchOpsGate = initialLaunchOpsReadiness?.gate || null;
   const initialLaunchOpsWorkspaceAction = createLaunchWorkflowWorkspaceShortcut(
     "ops",
@@ -14785,7 +14797,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           }
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key))
     : [];
-  const firstWaveHeroControls = firstWaveReadinessBridge?.status === "ready_for_first_wave_handoff"
+  const firstWaveHeroControls = firstWaveReadinessBridge?.status === "ready_for_first_wave_handoff" && !firstWaveHandoffConfirmed
     ? [
         firstWaveReadinessBridge.downloads?.summary ? {
           kind: "download",
@@ -14799,7 +14811,27 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter(Boolean)
     : [];
+  const confirmedFirstWaveHeroControls = firstWaveHandoffConfirmed
+    ? [
+        {
+          kind: "workspace",
+          label: "Open Confirmed First-Wave Ops Snapshot",
+          workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+            "ops",
+            "snapshot",
+            "Open Confirmed First-Wave Ops Snapshot",
+            params
+          )
+        },
+        firstLaunchHandoffDownload ? {
+          kind: "download",
+          label: "Download First-Launch Handoff",
+          recommendedDownload: firstLaunchHandoffDownload
+        } : null
+      ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+    : [];
   const heroControls = [
+    ...confirmedFirstWaveHeroControls,
     ...firstWaveHeroControls,
     ...launchRunwayHeroControls,
     ...workspaceActions.map((item) => ({
@@ -14996,6 +15028,47 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter(Boolean)
       }
     : null;
+  const firstWaveHandoffConfirmationCard = firstWaveHandoffConfirmation
+    ? {
+        key: "first_wave_handoff_confirmation",
+        title: "First-Wave Handoff Confirmation",
+        summary: `First-wave handoff is ${firstWaveHandoffConfirmation.status || "confirmed"} for ${firstWaveHandoffConfirmation.productCode || params.productCode || "this lane"}.`,
+        tags: [
+          {
+            label: "status",
+            value: firstWaveHandoffConfirmation.status || "confirmed",
+            strong: true
+          },
+          firstWaveHandoffConfirmation.decision ? {
+            label: "decision",
+            value: firstWaveHandoffConfirmation.decision,
+            strong: true
+          } : null,
+          firstWaveConfirmationChain ? {
+            label: "segments",
+            value: `${firstWaveConfirmationChain.confirmedSegmentCount ?? 0}/${firstWaveConfirmationChain.segmentCount ?? 0}`,
+            strong: false
+          } : null
+        ].filter(Boolean),
+        controls: [
+          {
+            kind: "workspace",
+            label: "Open Confirmed First-Wave Ops Snapshot",
+            workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+              "ops",
+              "snapshot",
+              "Open Confirmed First-Wave Ops Snapshot",
+              params
+            )
+          },
+          firstLaunchHandoffDownload ? {
+            kind: "download",
+            label: "Download First-Launch Handoff",
+            recommendedDownload: firstLaunchHandoffDownload
+          } : null
+        ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -15079,6 +15152,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         : []
     },
     firstWaveReadinessBridgeCard,
+    firstWaveHandoffConfirmationCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -15888,6 +15962,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     opsGate,
     initialLaunchOpsReadiness,
     firstWaveReadinessBridge,
+    firstWaveHandoffConfirmation,
+    firstWaveConfirmationChain,
     initialLaunchOpsOverviewStatus,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
@@ -16104,6 +16180,51 @@ function formatDeveloperOpsConfirmationDraftText(confirmation = null) {
     payloadTemplate.firstCardStatus || "-",
     payloadTemplate.firstRoundOpsStatus || "-"
   ].join("/");
+}
+
+function appendFirstWaveHandoffConfirmationTextLines(lines = [], confirmation = null, {
+  title = "First-Wave Handoff Confirmation:"
+} = {}) {
+  if (!Array.isArray(lines) || !confirmation || typeof confirmation !== "object") {
+    return false;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${confirmation.status || "-"}`
+    + ` | audit=${confirmation.auditLogId || "-"}`
+    + ` | decision=${confirmation.decision || "-"}`
+    + ` | by=${confirmation.confirmedBy?.username || "-"}`
+    + ` | file=${confirmation.handoffFileName || "-"}`
+  );
+  lines.push(
+    `- inventory=${confirmation.sourceRecommendation?.inventoryStatus || "-"}`
+    + ` | cards=${confirmation.sourceRecommendation?.firstCardStatus || "-"}`
+    + ` | ops=${confirmation.sourceRecommendation?.firstRoundOpsStatus || "-"}`
+    + ` | latestReceipt=${confirmation.sourceRecommendation?.latestLaunchReceiptOperation || "-"}`
+  );
+  return true;
+}
+
+function appendFirstWaveConfirmationChainTextLines(lines = [], chain = null, {
+  title = "First-Wave Confirmation Chain:"
+} = {}) {
+  if (!Array.isArray(lines) || !chain || typeof chain !== "object") {
+    return false;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${chain.status || "-"}`
+    + ` | segments=${chain.confirmedSegmentCount ?? 0}/${chain.segmentCount ?? 0}`
+    + ` | allConfirmed=${chain.allSegmentsConfirmed === true}`
+    + ` | audit=${chain.auditLogId || "-"}`
+  );
+  lines.push(
+    `- inventory=${chain.inventoryStatus || "-"}`
+    + ` | firstCards=${chain.firstCardStatus || "-"}`
+    + ` | firstRoundOps=${chain.firstRoundOpsStatus || "-"}`
+    + ` | latestReceipt=${chain.latestLaunchReceiptOperation || "-"}`
+  );
+  return true;
 }
 
 function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = null, formatWorkspaceActionText = (value) => value || "-") {
@@ -16424,6 +16545,18 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, mainlineSummary.firstWaveReadinessBridge, {
       title: "Launch Mainline First-Wave Readiness Bridge:"
+    });
+  }
+  if (mainlineSummary.firstWaveHandoffConfirmation) {
+    lines.push("");
+    appendFirstWaveHandoffConfirmationTextLines(lines, mainlineSummary.firstWaveHandoffConfirmation, {
+      title: "Launch Mainline First-Wave Handoff Confirmation:"
+    });
+  }
+  if (mainlineSummary.firstWaveConfirmationChain) {
+    lines.push("");
+    appendFirstWaveConfirmationChainTextLines(lines, mainlineSummary.firstWaveConfirmationChain, {
+      title: "Launch Mainline First-Wave Confirmation Chain:"
     });
   }
   if (mainlineSummary.initialLaunchOpsOverviewStatus) {

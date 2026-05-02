@@ -14342,6 +14342,48 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(confirmedOpsSnapshot.summaryText, /firstRoundOps=review/);
     assert.ok(confirmedOpsSnapshot.overview.highlights.some((item) => item.includes("Latest first-wave handoff confirmation")));
 
+    const mainlineAfterConfirmation = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=FIRSTWAVE&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(mainlineAfterConfirmation.mainlineSummary.firstWaveHandoffConfirmation?.auditLogId, handoffConfirmation.auditLogId);
+    assert.equal(mainlineAfterConfirmation.mainlineSummary.firstWaveHandoffConfirmation?.decision, "confirmed");
+    assert.equal(mainlineAfterConfirmation.mainlineSummary.firstWaveHandoffConfirmation?.confirmedBy?.username, "first.wave.operator");
+    assert.equal(mainlineAfterConfirmation.mainlineSummary.firstWaveConfirmationChain?.auditLogId, handoffConfirmation.auditLogId);
+    assert.equal(mainlineAfterConfirmation.mainlineSummary.firstWaveConfirmationChain?.allSegmentsConfirmed, true);
+    assert.equal(mainlineAfterConfirmation.mainlineSummary.firstWaveConfirmationChain?.latestLaunchReceiptOperation, "first_batch_setup");
+    const mainlineFirstWaveConfirmationCard = mainlineAfterConfirmation.mainlineSummary.overviewCards
+      .find((item) => item?.key === "first_wave_handoff_confirmation");
+    assert.ok(mainlineFirstWaveConfirmationCard);
+    assert.equal(mainlineFirstWaveConfirmationCard.title, "First-Wave Handoff Confirmation");
+    assert.ok(mainlineFirstWaveConfirmationCard.tags.some((item) => item.label === "status" && item.value === "confirmed"));
+    assert.ok(mainlineFirstWaveConfirmationCard.tags.some((item) => item.label === "segments" && item.value === "3/3"));
+    assert.ok(mainlineFirstWaveConfirmationCard.controls.some((item) =>
+      item.kind === "workspace"
+      && item.label === "Open Confirmed First-Wave Ops Snapshot"
+      && item.workspaceAction?.key === "ops"
+    ));
+    assert.ok(mainlineAfterConfirmation.mainlineSummary.heroControls.some((item) =>
+      item.kind === "workspace"
+      && item.label === "Open Confirmed First-Wave Ops Snapshot"
+      && item.workspaceAction?.key === "ops"
+    ));
+    assert.ok(mainlineAfterConfirmation.mainlineSummary.heroControls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Launch Handoff"
+      && /format=first-launch-handoff/.test(item.recommendedDownload?.href || "")
+    ));
+    assert.equal(
+      mainlineAfterConfirmation.mainlineSummary.heroControls.some((item) => item?.label === "Confirm First-Wave Handoff"),
+      false
+    );
+    assert.match(mainlineAfterConfirmation.summaryText, /Launch Mainline First-Wave Handoff Confirmation:/);
+    assert.match(mainlineAfterConfirmation.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineAfterConfirmation.summaryText, /Launch Mainline First-Wave Confirmation Chain:/);
+    assert.match(mainlineAfterConfirmation.summaryText, /segments=3\/3/);
+    assert.match(mainlineAfterConfirmation.summaryText, /First-Wave Handoff Confirmation \| First-wave handoff is confirmed/);
+
     const firstWaveHandoffIndex = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=handoff-index&limit=20",

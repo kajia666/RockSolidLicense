@@ -10464,7 +10464,11 @@ test("developer license quickstart first-batch setup can create recommended laun
             firstUserValidationRuntimeEvidenceStatus: runtimeEvidenceValidationFollowUp.firstUserValidationRuntimeEvidenceStatus,
             firstUserValidationRuntimeEvidenceReady: runtimeEvidenceValidationFollowUp.firstUserValidationRuntimeEvidenceReady,
             runtimeEvidenceActiveSessionCount: runtimeEvidenceValidationFollowUp.runtimeEvidenceActiveSessionCount,
-            runtimeEvidenceHeartbeatSeenCount: runtimeEvidenceValidationFollowUp.runtimeEvidenceHeartbeatSeenCount
+            runtimeEvidenceHeartbeatSeenCount: runtimeEvidenceValidationFollowUp.runtimeEvidenceHeartbeatSeenCount,
+            downloadKey: runtimeEvidenceValidationFollowUp.downloadKey,
+            downloadFileName: runtimeEvidenceValidationFollowUp.downloadFileName,
+            downloadFormat: runtimeEvidenceValidationFollowUp.downloadFormat,
+            downloadSource: runtimeEvidenceValidationFollowUp.downloadSource
           }
         : null,
       {
@@ -10475,11 +10479,18 @@ test("developer license quickstart first-batch setup can create recommended laun
         firstUserValidationRuntimeEvidenceStatus: "evidence_recorded",
         firstUserValidationRuntimeEvidenceReady: true,
         runtimeEvidenceActiveSessionCount: 1,
-        runtimeEvidenceHeartbeatSeenCount: 1
+        runtimeEvidenceHeartbeatSeenCount: 1,
+        downloadKey: "ops_first_wave_runtime_evidence",
+        downloadFileName: "first-wave-runtime-evidence.txt",
+        downloadFormat: "first-wave-runtime-evidence",
+        downloadSource: "developer-ops"
       }
     );
+    assert.match(runtimeEvidenceValidationFollowUp.downloadHref || "", /\/api\/developer\/ops\/export\/download/);
+    assert.match(runtimeEvidenceValidationFollowUp.downloadHref || "", /format=first-wave-runtime-evidence/);
     assert.match(runtimeEvidenceValidationFollowUp.summary, /runtime evidence recorded/i);
     assert.match(runtimeEvidenceOpsSnapshot.summaryText, /Review first-user runtime evidence/);
+    assert.match(runtimeEvidenceOpsSnapshot.summaryText, /ops_first_wave_runtime_evidence/);
     assert.doesNotMatch(runtimeEvidenceOpsSnapshot.summaryText, /Run first-user validation/);
 
     const runtimeEvidenceLaunchMainline = await getJson(

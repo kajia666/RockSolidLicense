@@ -3628,6 +3628,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("launch_operations_daily_brief") || normalized.includes("launch-operations-daily-brief")) return "launch-operations-daily-brief";
   if (normalized.includes("launch_operations_shift_action_plan") || normalized.includes("launch-operations-shift-action-plan")) return "launch-operations-shift-action-plan";
   if (normalized.includes("launch_operations_overview_status") || normalized.includes("launch-operations-overview-status")) return "launch-operations-overview-status";
+  if (normalized.includes("first_wave_runtime_evidence") || normalized.includes("first-wave-runtime-evidence")) return "first-wave-runtime-evidence";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -20625,13 +20626,22 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       const remainingCount = Number(receipt.firstLaunchDutyFirstUserValidationRemainingCount ?? actionCount);
       const runtimeEvidenceReady = runtimeEvidenceMatchesReceipt(receipt);
       if (runtimeEvidenceReady) {
+        const runtimeEvidenceDownload = buildDeveloperOpsFirstWaveRuntimeEvidenceDownload({
+          productCode: firstWaveRuntimeEvidence.productCode || receipt.productCode || "",
+          channel: firstWaveRuntimeEvidence.channel || receipt.channel || "stable",
+          auditLimit: 60
+        });
         pushFollowUp(receipt, "first_user_validation", {
           priority: "secondary",
           title: "Review first-user runtime evidence",
           summary: `First-user runtime evidence recorded: activeSessions=${firstWaveRuntimeEvidence.activeSessionCount ?? 0}, logins=${firstWaveRuntimeEvidence.loginAuditCount ?? 0}, cardRedemptions=${firstWaveRuntimeEvidence.cardRedemptionAuditCount ?? 0}, heartbeatSeen=${firstWaveRuntimeEvidence.heartbeatSeenCount ?? 0}.`,
           actionKey: "runtime_evidence_review",
           operationToRecord: receipt.firstLaunchDutyFirstUserValidationProductionNextOperation || receipt.productionEvidenceNextOperation || null,
-          downloadKey: receipt.firstLaunchDutyHandoffDownloadKey || receipt.firstLaunchDutyPrimaryDownloadKey || null,
+          downloadKey: runtimeEvidenceDownload?.key || "ops_first_wave_runtime_evidence",
+          downloadFileName: runtimeEvidenceDownload?.fileName || "first-wave-runtime-evidence.txt",
+          downloadFormat: runtimeEvidenceDownload?.format || "first-wave-runtime-evidence",
+          downloadHref: runtimeEvidenceDownload?.href || null,
+          downloadSource: runtimeEvidenceDownload?.source || "developer-ops",
           firstUserValidationStatus: "evidence_recorded",
           firstUserValidationActionCount: actionCount,
           firstUserValidationRemainingCount: 0,
@@ -20847,6 +20857,19 @@ function buildDeveloperOpsFirstWaveAuditBackfillStatusDownload(scope = {}) {
     {
       source: "developer-ops",
       format: "first-wave-audit-backfill-status",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
+function buildDeveloperOpsFirstWaveRuntimeEvidenceDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_first_wave_runtime_evidence",
+    "first-wave-runtime-evidence.txt",
+    "First-wave runtime evidence",
+    {
+      source: "developer-ops",
+      format: "first-wave-runtime-evidence",
       params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
     }
   );

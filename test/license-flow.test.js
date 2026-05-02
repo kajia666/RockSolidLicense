@@ -14428,6 +14428,39 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineConfirmedOperationsHandoff.body, /First-Wave Confirmation Chain:/);
     assert.match(mainlineConfirmedOperationsHandoff.body, /segments=3\/3/);
 
+    const mainlineConfirmedPostLaunchSweepHandoff = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=post-launch-sweep-handoff",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedPostLaunchSweepHandoff.body, /RockSolid Developer Launch Mainline Post-Launch Sweep Handoff/);
+    assert.match(mainlineConfirmedPostLaunchSweepHandoff.body, /First-Wave Handoff Confirmation:/);
+    assert.match(mainlineConfirmedPostLaunchSweepHandoff.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedPostLaunchSweepHandoff.body, /First-Wave Confirmation Chain:/);
+    assert.match(mainlineConfirmedPostLaunchSweepHandoff.body, /segments=3\/3/);
+
+    const mainlineConfirmedCloseoutHandoff = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=closeout-handoff",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedCloseoutHandoff.body, /RockSolid Developer Launch Mainline Closeout Handoff/);
+    assert.match(mainlineConfirmedCloseoutHandoff.body, /First-Wave Handoff Confirmation:/);
+    assert.match(mainlineConfirmedCloseoutHandoff.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedCloseoutHandoff.body, /First-Wave Confirmation Chain:/);
+    assert.match(mainlineConfirmedCloseoutHandoff.body, /segments=3\/3/);
+
+    const mainlineConfirmedStabilizationHandoff = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=stabilization-handoff",
+      ownerSession.token
+    );
+    assert.match(mainlineConfirmedStabilizationHandoff.body, /RockSolid Developer Launch Mainline Stabilization Handoff/);
+    assert.match(mainlineConfirmedStabilizationHandoff.body, /First-Wave Handoff Confirmation:/);
+    assert.match(mainlineConfirmedStabilizationHandoff.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedStabilizationHandoff.body, /First-Wave Confirmation Chain:/);
+    assert.match(mainlineConfirmedStabilizationHandoff.body, /segments=3\/3/);
+
     const firstWaveHandoffIndex = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=handoff-index&limit=80",

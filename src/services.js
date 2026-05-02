@@ -18199,6 +18199,8 @@ function buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
   mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
+  const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
+  const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const sweepSignals = [
     "/developer/ops",
     "/developer/launch-mainline",
@@ -18219,6 +18221,14 @@ function buildDeveloperLaunchMainlinePostLaunchSweepHandoffText({
     "Secondary Follow-Up: Remaining routed review queue",
     "Sweep Flow: confirm cutover | continue routed review | hand off remaining queue | capture first-wave ops sweep evidence"
   ];
+  if (firstWaveHandoffConfirmation) {
+    lines.push("");
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
+  }
+  if (firstWaveConfirmationChain) {
+    lines.push("");
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
+  }
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
@@ -18231,6 +18241,8 @@ function buildDeveloperLaunchMainlineCloseoutHandoffText({
   mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
+  const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
+  const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const closeoutDocs = [
     "docs/launch-timeline-playbook.md",
     "docs/shift-handover-template.md",
@@ -18257,6 +18269,14 @@ function buildDeveloperLaunchMainlineCloseoutHandoffText({
     "Primary Follow-Up: Launch closeout review",
     "Closeout Flow: confirm launch day readiness evidence | confirm first-wave ops sweep | hand off remaining routed review queue | capture launch closeout review"
   ];
+  if (firstWaveHandoffConfirmation) {
+    lines.push("");
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
+  }
+  if (firstWaveConfirmationChain) {
+    lines.push("");
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
+  }
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
@@ -18269,6 +18289,8 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
   mainlineSummary = {}
 } = {}) {
   const project = manifest.project || {};
+  const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
+  const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const stabilizationDocs = [
     "docs/shift-handover-template.md",
     "docs/daily-operations-checklist.md",
@@ -18297,6 +18319,14 @@ function buildDeveloperLaunchMainlineStabilizationHandoffText({
     "Primary Follow-Up: Launch stabilization review",
     "Stabilization Flow: confirm launch closeout review | verify daily handover docs | confirm steady-state ops signals | capture launch stabilization review"
   ];
+  if (firstWaveHandoffConfirmation) {
+    lines.push("");
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
+  }
+  if (firstWaveConfirmationChain) {
+    lines.push("");
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
+  }
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
   return lines.join("\n");
 }
@@ -43147,7 +43177,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           productCodes: scopedProductCodes
         }))
       ]);
-      const launchReceiptAuditLogs = shouldBackfillLaunchReceiptAuditRows(normalizedFilters)
+      const shouldBackfillProtectiveAuditRows = shouldBackfillLaunchReceiptAuditRows(normalizedFilters);
+      const launchReceiptAuditLogs = shouldBackfillProtectiveAuditRows
         ? queryAuditLogRows(db, {
             eventType: "product.launch-mainline.action",
             limit: 10,
@@ -43155,17 +43186,45 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             productCodes: scopedProductCodes
           })
         : { items: [] };
-      const mergedAuditLogItems = launchReceiptAuditLogs.items?.length
-        ? mergeAuditLogRows(auditLogs.items || [], launchReceiptAuditLogs.items)
-        : null;
-      const effectiveAuditLogs = launchReceiptAuditLogs.items?.length
+      const firstWaveHandoffAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "developer.ops.first-wave.handoff.confirm",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
+      const firstWaveReadinessAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "developer.ops.first-wave.recommendations",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
+      let mergedAuditLogItems = auditLogs.items || [];
+      if (launchReceiptAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, launchReceiptAuditLogs.items);
+      }
+      if (firstWaveHandoffAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveHandoffAuditLogs.items);
+      }
+      if (firstWaveReadinessAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveReadinessAuditLogs.items);
+      }
+      const usedProtectiveAuditBackfill = launchReceiptAuditLogs.items?.length
+        || firstWaveHandoffAuditLogs.items?.length
+        || firstWaveReadinessAuditLogs.items?.length;
+      const effectiveAuditLogs = usedProtectiveAuditBackfill
         ? {
             ...auditLogs,
             items: mergedAuditLogItems,
             total: mergedAuditLogItems.length,
             filters: {
               ...(auditLogs.filters || {}),
-              launchReceiptBackfill: launchReceiptAuditLogs.items.length
+              launchReceiptBackfill: launchReceiptAuditLogs.items?.length || 0,
+              firstWaveHandoffBackfill: firstWaveHandoffAuditLogs.items?.length || 0,
+              firstWaveReadinessBackfill: firstWaveReadinessAuditLogs.items?.length || 0
             }
           }
         : auditLogs;

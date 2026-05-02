@@ -19421,6 +19421,10 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "operationalReadinessNextActionKey",
       "operationalReadinessNextOperation",
       "operationalReadinessPrimaryDownloadKey",
+      "firstUserValidationRuntimeEvidenceStatus",
+      "firstUserValidationRuntimeEvidenceReady",
+      "runtimeEvidenceActiveSessionCount",
+      "runtimeEvidenceHeartbeatSeenCount",
       "summary",
       "createdAt"
     ],
@@ -19448,6 +19452,10 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       item.operationalReadinessNextActionKey,
       item.operationalReadinessNextOperation,
       item.operationalReadinessPrimaryDownloadKey,
+      item.firstUserValidationRuntimeEvidenceStatus,
+      item.firstUserValidationRuntimeEvidenceReady,
+      item.runtimeEvidenceActiveSessionCount,
+      item.runtimeEvidenceHeartbeatSeenCount,
       item.summary,
       item.createdAt
     ])
@@ -20118,8 +20126,26 @@ function buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs = [], limit = 
     .slice(0, Math.max(1, Number(limit || 5)));
 }
 
-function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 6) {
+function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 6, options = {}) {
   const followUps = [];
+  const firstWaveRuntimeEvidence = options?.firstWaveRuntimeEvidence && typeof options.firstWaveRuntimeEvidence === "object"
+    ? options.firstWaveRuntimeEvidence
+    : null;
+  const runtimeEvidenceMatchesReceipt = (receipt = {}) => {
+    if (firstWaveRuntimeEvidence?.ready !== true) {
+      return false;
+    }
+    const evidenceProductCode = String(firstWaveRuntimeEvidence.productCode || "").trim().toUpperCase();
+    const receiptProductCode = String(receipt.productCode || "").trim().toUpperCase();
+    if (evidenceProductCode && receiptProductCode && evidenceProductCode !== receiptProductCode) {
+      return false;
+    }
+    const evidenceChannel = firstWaveRuntimeEvidence.channel
+      ? normalizeChannel(firstWaveRuntimeEvidence.channel, "stable")
+      : null;
+    const receiptChannel = receipt.channel ? normalizeChannel(receipt.channel, "stable") : null;
+    return !(evidenceChannel && receiptChannel && evidenceChannel !== receiptChannel);
+  };
   const pushFollowUp = (receipt = {}, stage = "", payload = {}) => {
     if (!stage || !payload.title) {
       return;
@@ -20157,6 +20183,10 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       firstUserValidationRemainingCount: payload.firstUserValidationRemainingCount ?? null,
       firstUserValidationNextStage: payload.firstUserValidationNextStage || null,
       firstUserValidationNextOwnerRole: payload.firstUserValidationNextOwnerRole || null,
+      firstUserValidationRuntimeEvidenceStatus: payload.firstUserValidationRuntimeEvidenceStatus || null,
+      firstUserValidationRuntimeEvidenceReady: payload.firstUserValidationRuntimeEvidenceReady === true,
+      runtimeEvidenceActiveSessionCount: payload.runtimeEvidenceActiveSessionCount ?? null,
+      runtimeEvidenceHeartbeatSeenCount: payload.runtimeEvidenceHeartbeatSeenCount ?? null,
       mainlineGateStatus: receipt.mainlineGateStatus || null,
       evidenceRemainingCount: receipt.productionEvidenceRemainingCount ?? null,
       postLaunchLifecycleStatus: receipt.postLaunchLifecycleStatus || null,
@@ -20201,6 +20231,27 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
     if (receipt.firstLaunchDutyFirstUserValidationNextActionKey) {
       const actionCount = Number(receipt.firstLaunchDutyFirstUserValidationActionCount || 0);
       const remainingCount = Number(receipt.firstLaunchDutyFirstUserValidationRemainingCount ?? actionCount);
+      const runtimeEvidenceReady = runtimeEvidenceMatchesReceipt(receipt);
+      if (runtimeEvidenceReady) {
+        pushFollowUp(receipt, "first_user_validation", {
+          priority: "secondary",
+          title: "Review first-user runtime evidence",
+          summary: `First-user runtime evidence recorded: activeSessions=${firstWaveRuntimeEvidence.activeSessionCount ?? 0}, logins=${firstWaveRuntimeEvidence.loginAuditCount ?? 0}, cardRedemptions=${firstWaveRuntimeEvidence.cardRedemptionAuditCount ?? 0}, heartbeatSeen=${firstWaveRuntimeEvidence.heartbeatSeenCount ?? 0}.`,
+          actionKey: "runtime_evidence_review",
+          operationToRecord: receipt.firstLaunchDutyFirstUserValidationProductionNextOperation || receipt.productionEvidenceNextOperation || null,
+          downloadKey: receipt.firstLaunchDutyHandoffDownloadKey || receipt.firstLaunchDutyPrimaryDownloadKey || null,
+          firstUserValidationStatus: "evidence_recorded",
+          firstUserValidationActionCount: actionCount,
+          firstUserValidationRemainingCount: 0,
+          firstUserValidationNextStage: "runtime_evidence_review",
+          firstUserValidationNextOwnerRole: "ops",
+          firstUserValidationRuntimeEvidenceStatus: firstWaveRuntimeEvidence.status || null,
+          firstUserValidationRuntimeEvidenceReady: firstWaveRuntimeEvidence.ready === true,
+          runtimeEvidenceActiveSessionCount: firstWaveRuntimeEvidence.activeSessionCount ?? null,
+          runtimeEvidenceHeartbeatSeenCount: firstWaveRuntimeEvidence.heartbeatSeenCount ?? null
+        });
+        continue;
+      }
       pushFollowUp(receipt, "first_user_validation", {
         priority: "secondary",
         title: "Run first-user validation",
@@ -26635,8 +26686,10 @@ function buildSnapshotOverview({
   const latestFirstWaveHandoffConfirmations = buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs, 5);
   const latestFirstWaveReadinessBridges = buildSnapshotLatestFirstWaveReadinessBridges(auditLogs, 5, scope.channel || null);
   const latestSteadyStateDutyPlanReceipts = buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs, 5);
-  const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6);
   const firstWaveRuntimeEvidence = buildSnapshotFirstWaveRuntimeEvidence({ sessions, auditLogs, scope });
+  const launchReceiptFollowUps = buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts, 6, {
+    firstWaveRuntimeEvidence
+  });
   const recommendedQueue = buildSnapshotActionQueue(focusAccounts, focusSessions, focusDevices, 8);
   const queueSummary = buildSnapshotQueueSummary(recommendedQueue);
 

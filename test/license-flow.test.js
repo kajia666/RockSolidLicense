@@ -10419,6 +10419,38 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceOpsSnapshot.summaryText, /session\.login/);
     assert.match(runtimeEvidenceOpsSnapshot.summaryText, /card\.direct_redeem/);
 
+    const runtimeEvidenceValidationFollowUp = runtimeEvidenceOpsSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
+      item.stage === "first_user_validation"
+    );
+    assert.ok(runtimeEvidenceValidationFollowUp);
+    assert.deepEqual(
+      runtimeEvidenceValidationFollowUp
+        ? {
+            title: runtimeEvidenceValidationFollowUp.title,
+            actionKey: runtimeEvidenceValidationFollowUp.actionKey,
+            firstUserValidationStatus: runtimeEvidenceValidationFollowUp.firstUserValidationStatus,
+            firstUserValidationRemainingCount: runtimeEvidenceValidationFollowUp.firstUserValidationRemainingCount,
+            firstUserValidationRuntimeEvidenceStatus: runtimeEvidenceValidationFollowUp.firstUserValidationRuntimeEvidenceStatus,
+            firstUserValidationRuntimeEvidenceReady: runtimeEvidenceValidationFollowUp.firstUserValidationRuntimeEvidenceReady,
+            runtimeEvidenceActiveSessionCount: runtimeEvidenceValidationFollowUp.runtimeEvidenceActiveSessionCount,
+            runtimeEvidenceHeartbeatSeenCount: runtimeEvidenceValidationFollowUp.runtimeEvidenceHeartbeatSeenCount
+          }
+        : null,
+      {
+        title: "Review first-user runtime evidence",
+        actionKey: "runtime_evidence_review",
+        firstUserValidationStatus: "evidence_recorded",
+        firstUserValidationRemainingCount: 0,
+        firstUserValidationRuntimeEvidenceStatus: "evidence_recorded",
+        firstUserValidationRuntimeEvidenceReady: true,
+        runtimeEvidenceActiveSessionCount: 1,
+        runtimeEvidenceHeartbeatSeenCount: 1
+      }
+    );
+    assert.match(runtimeEvidenceValidationFollowUp.summary, /runtime evidence recorded/i);
+    assert.match(runtimeEvidenceOpsSnapshot.summaryText, /Review first-user runtime evidence/);
+    assert.doesNotMatch(runtimeEvidenceOpsSnapshot.summaryText, /Run first-user validation/);
+
     const repeatSetup = await postJsonExpectError(
       baseUrl,
       "/api/developer/license-quickstart/first-batches",

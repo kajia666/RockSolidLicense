@@ -17092,6 +17092,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       })
     }
   );
+  const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
+    ...payload.filters,
+    ...opsScope,
+    productCode: opsScope.productCode || payload.filters?.productCode || project.code || "",
+    channel: opsScope.channel || payload.filters?.channel || manifest.channel || "stable"
+  });
   const mainlineRouteParams = compactRouteParams({
     productCode: payload.filters?.productCode || project.code || "",
     channel: payload.filters?.channel || manifest.channel || "stable",
@@ -17185,6 +17191,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "Developer Ops handoff index",
     opsFiles.handoffIndex || "ops/handoff-index.txt",
     opsHandoffIndexDownload || {}
+  );
+  pushRoute(
+    "first-wave-audit-backfill-status",
+    "First-Wave audit backfill status",
+    opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt",
+    opsFirstWaveAuditBackfillStatusDownload || {}
   );
   pushRoute(
     "launch-mainline-post-launch-handoff-index",
@@ -18534,6 +18546,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       handoffIndex: "ops/handoff-index.txt",
       initialLaunchOpsReadiness: "ops/initial-launch-ops-readiness.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
+      firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
       stabilizationHandoff: "ops/stabilization-handoff.txt"
     },
     packageFiles: {
@@ -18568,6 +18581,15 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     productCode: project.code || filters.productCode || "",
     channel: manifest.channel || filters.channel || "stable"
   });
+  const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
+    ? payload.opsSnapshot.scope
+    : {};
+  const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
+    ...filters,
+    ...opsScope,
+    productCode: opsScope.productCode || filters.productCode || project.code || "",
+    channel: opsScope.channel || filters.channel || manifest.channel || "stable"
+  });
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
@@ -18577,6 +18599,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
     ["Ops handoff index", opsFiles.handoffIndex || "ops/handoff-index.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
+    ["First-Wave audit backfill status", opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"],
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
   ];
@@ -18639,6 +18662,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "ops/handoff-index.txt"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
+  lines.push(
+    `- First-Wave Audit Backfill Status: ${opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"}`
+    + ` | file=${opsFirstWaveAuditBackfillStatusDownload.fileName || "-"}`
+    + ` | format=${opsFirstWaveAuditBackfillStatusDownload.format || "-"}`
+    + ` | href=${opsFirstWaveAuditBackfillStatusDownload.href || "-"}`
+  );
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"}`);
   if (stabilizationConfirmation) {
     lines.push(

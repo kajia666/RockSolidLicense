@@ -14411,6 +14411,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineConfirmedRouteMap.body, /segments=3\/3/);
     assert.match(mainlineConfirmedRouteMap.body, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
     assert.match(mainlineConfirmedRouteMap.body, /First-Wave Audit Backfill Source: first-wave-audit-backfill/);
+    assert.match(mainlineConfirmedRouteMap.body, /first-wave-audit-backfill-status\.txt.*format=first-wave-audit-backfill-status/);
 
     const mainlineConfirmedPostLaunchIndex = await getText(
       baseUrl,
@@ -14422,6 +14423,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineConfirmedPostLaunchIndex.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
     assert.match(mainlineConfirmedPostLaunchIndex.body, /First-Wave Confirmation Chain:/);
     assert.match(mainlineConfirmedPostLaunchIndex.body, /segments=3\/3/);
+    assert.match(mainlineConfirmedPostLaunchIndex.body, /first-wave-audit-backfill-status\.txt.*format=first-wave-audit-backfill-status/);
 
     const mainlineConfirmedFirstLaunchHandoff = await getText(
       baseUrl,

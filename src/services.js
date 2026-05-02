@@ -4768,6 +4768,24 @@ function buildLaunchMainlineActionReceiptHandoffText({
     }
   }
 
+  if (firstLaunchDutySummary?.firstUserValidation && typeof firstLaunchDutySummary.firstUserValidation === "object") {
+    const validation = firstLaunchDutySummary.firstUserValidation;
+    lines.push("");
+    lines.push("First User Validation:");
+    lines.push(
+      `- firstUserValidation: status=${validation.status || "unknown"}`
+      + ` | actions=${validation.actionCount ?? 0}`
+      + ` | next=${validation.nextAction?.label || validation.nextAction?.key || "-"}`
+    );
+    lines.push(`- summary: ${validation.summary || "-"}`);
+    if (validation.productionNextAction?.setupAction?.operation) {
+      lines.push(`- productionEvidenceOperation: ${validation.productionNextAction.setupAction.operation}`);
+    }
+    if (Array.isArray(validation.actionKeys) && validation.actionKeys.length) {
+      lines.push(`- actionKeys: ${validation.actionKeys.join(", ")}`);
+    }
+  }
+
   if (transitions.length || created.length || skipped.length) {
     lines.push("");
     lines.push("Applied Changes:");
@@ -5968,6 +5986,34 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         )
       }
     : null;
+  const firstUserValidationStageKeys = new Set(["first_sale_watch", "runtime_validation", "runtime_ops_watch"]);
+  const firstUserValidationActions = Array.isArray(firstLaunchOpsQueue?.actions)
+    ? firstLaunchOpsQueue.actions.filter((item) => firstUserValidationStageKeys.has(item?.stage))
+    : [];
+  const firstUserValidationNextAction = firstUserValidationActions[0] || null;
+  const firstLaunchFirstUserValidation = firstLaunchOpsQueue
+    ? {
+        key: "first_launch_first_user_validation",
+        title: "First User Validation",
+        status: firstUserValidationActions.length ? "pending_validation" : "review",
+        summary: firstUserValidationActions.length
+          ? `Run ${firstUserValidationActions.length} first-user validation action${firstUserValidationActions.length === 1 ? "" : "s"} before treating first-wave traffic as stable.`
+          : "No first-user validation actions are queued for this launch receipt.",
+        actionCount: firstUserValidationActions.length,
+        completedCount: 0,
+        remainingCount: firstUserValidationActions.length,
+        actionKeys: firstUserValidationActions.map((item) => item?.key || null).filter(Boolean),
+        nextAction: firstUserValidationNextAction
+          ? mapFirstLaunchActionSummary(firstUserValidationNextAction)
+          : null,
+        actions: firstUserValidationActions.map((item) => mapFirstLaunchActionSummary(item)),
+        productionNextAction: firstLaunchProductionEvidence?.nextAction || null,
+        controls: dedupeLaunchMainlineControls([
+          ...firstUserValidationActions.flatMap((item) => firstLaunchInventoryQueueControlList(item)),
+          ...firstLaunchInventoryQueueControlList(firstLaunchProductionEvidence?.nextAction || null)
+        ])
+      }
+    : null;
   const firstLaunchDutySummary = firstLaunchOpsQueue
     ? {
         key: "first_launch_duty_summary",
@@ -6070,6 +6116,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         recommendedDownloads: firstLaunchRecommendedDownloads,
         nextAction: firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null,
         deliveryExports: firstLaunchDeliveryExports,
+        firstUserValidation: firstLaunchFirstUserValidation,
         productionEvidence: firstLaunchProductionEvidence,
         productionNextAction: firstLaunchProductionEvidence?.nextAction || null,
         handoffDownload: firstLaunchHandoffDownload || null,
@@ -6134,6 +6181,9 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
           firstLaunchDeliveryExports?.downloads?.length
             ? `Delivery exports: ${firstLaunchDeliveryExports.downloads.map((item) => item.label || item.key).join(" | ")}`
             : "",
+          firstLaunchFirstUserValidation
+            ? `firstUserValidation: status=${firstLaunchFirstUserValidation.status} | actions=${firstLaunchFirstUserValidation.actionCount} | next=${firstLaunchFirstUserValidation.nextAction?.label || firstLaunchFirstUserValidation.nextAction?.key || "-"}`
+            : "",
           firstLaunchOpsQueue.ownerGroups.length
             ? `Owners: ${firstLaunchOpsQueue.ownerGroups.map((item) => `${item.label || item.key}:${item.actionCount}`).join(" | ")}`
             : "",
@@ -6163,6 +6213,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
             label: download.label || "Download first launch delivery export",
             recommendedDownload: download
           })),
+          ...(firstLaunchFirstUserValidation?.controls || []),
           ...firstLaunchInventoryQueueControlList(firstLaunchOpsQueue.nextAction || firstLaunchInventoryQueue?.nextAction || null),
           ...firstLaunchInventoryQueueControlList(mainlineEvidenceQueue?.nextAction || null)
         ].filter(Boolean))
@@ -6695,6 +6746,9 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
   const deliveryExportCsvDownload = findDeliveryExportDownload("csv");
   const deliveryExportZipDownload = findDeliveryExportDownload("zip");
   const deliveryExportChecksumDownload = findDeliveryExportDownload("checksums");
+  const firstUserValidation = duty?.firstUserValidation && typeof duty.firstUserValidation === "object"
+    ? duty.firstUserValidation
+    : null;
   const lifecycle = receipt.postLaunchLifecycleSummary && typeof receipt.postLaunchLifecycleSummary === "object"
     ? receipt.postLaunchLifecycleSummary
     : null;
@@ -6777,7 +6831,14 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           deliveryExportZipDownloadKey: deliveryExportZipDownload?.key || null,
           deliveryExportZipHref: deliveryExportZipDownload?.href || null,
           deliveryExportChecksumDownloadKey: deliveryExportChecksumDownload?.key || null,
-          deliveryExportChecksumHref: deliveryExportChecksumDownload?.href || null
+          deliveryExportChecksumHref: deliveryExportChecksumDownload?.href || null,
+          firstUserValidationStatus: firstUserValidation?.status || null,
+          firstUserValidationActionCount: firstUserValidation?.actionCount ?? null,
+          firstUserValidationRemainingCount: firstUserValidation?.remainingCount ?? null,
+          firstUserValidationNextActionKey: firstUserValidation?.nextAction?.key || null,
+          firstUserValidationNextStage: firstUserValidation?.nextAction?.stage || null,
+          firstUserValidationNextOwnerRole: firstUserValidation?.nextAction?.ownerRole || null,
+          firstUserValidationProductionNextOperation: firstUserValidation?.productionNextAction?.setupAction?.operation || null
         }
       : null,
     postLaunchLifecycle: lifecycle
@@ -19469,6 +19530,13 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         firstLaunchDutyDeliveryExportCsvHref: receipt.firstLaunchDuty?.deliveryExportCsvHref || null,
         firstLaunchDutyDeliveryExportZipDownloadKey: receipt.firstLaunchDuty?.deliveryExportZipDownloadKey || null,
         firstLaunchDutyDeliveryExportChecksumDownloadKey: receipt.firstLaunchDuty?.deliveryExportChecksumDownloadKey || null,
+        firstLaunchDutyFirstUserValidationStatus: receipt.firstLaunchDuty?.firstUserValidationStatus || null,
+        firstLaunchDutyFirstUserValidationActionCount: receipt.firstLaunchDuty?.firstUserValidationActionCount ?? null,
+        firstLaunchDutyFirstUserValidationRemainingCount: receipt.firstLaunchDuty?.firstUserValidationRemainingCount ?? null,
+        firstLaunchDutyFirstUserValidationNextActionKey: receipt.firstLaunchDuty?.firstUserValidationNextActionKey || null,
+        firstLaunchDutyFirstUserValidationNextStage: receipt.firstLaunchDuty?.firstUserValidationNextStage || null,
+        firstLaunchDutyFirstUserValidationNextOwnerRole: receipt.firstLaunchDuty?.firstUserValidationNextOwnerRole || null,
+        firstLaunchDutyFirstUserValidationProductionNextOperation: receipt.firstLaunchDuty?.firstUserValidationProductionNextOperation || null,
         postLaunchLifecycleStatus: receipt.postLaunchLifecycle?.status || null,
         postLaunchLifecyclePhaseCount: receipt.postLaunchLifecycle?.phaseCount ?? null,
         postLaunchLifecycleReadyCount: receipt.postLaunchLifecycle?.readyCount ?? null,
@@ -20084,6 +20152,11 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       handoffFileName: receipt.handoffFileName || null,
       deliveryExportCardCount: payload.deliveryExportCardCount ?? null,
       deliveryExportUsageStatus: payload.deliveryExportUsageStatus || null,
+      firstUserValidationStatus: payload.firstUserValidationStatus || null,
+      firstUserValidationActionCount: payload.firstUserValidationActionCount ?? null,
+      firstUserValidationRemainingCount: payload.firstUserValidationRemainingCount ?? null,
+      firstUserValidationNextStage: payload.firstUserValidationNextStage || null,
+      firstUserValidationNextOwnerRole: payload.firstUserValidationNextOwnerRole || null,
       mainlineGateStatus: receipt.mainlineGateStatus || null,
       evidenceRemainingCount: receipt.productionEvidenceRemainingCount ?? null,
       postLaunchLifecycleStatus: receipt.postLaunchLifecycleStatus || null,
@@ -20123,6 +20196,23 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
         summary: `Use this first-wave handoff after ${receipt.operationLabel || receipt.operation || "the latest launch action"} so launch duty can continue without rebuilding receipt context.`,
         actionKey: receipt.firstLaunchDutyPrimaryWorkspaceKey || null,
         downloadKey: receipt.firstLaunchDutyHandoffDownloadKey
+      });
+    }
+    if (receipt.firstLaunchDutyFirstUserValidationNextActionKey) {
+      const actionCount = Number(receipt.firstLaunchDutyFirstUserValidationActionCount || 0);
+      const remainingCount = Number(receipt.firstLaunchDutyFirstUserValidationRemainingCount ?? actionCount);
+      pushFollowUp(receipt, "first_user_validation", {
+        priority: "secondary",
+        title: "Run first-user validation",
+        summary: `${remainingCount} first-user validation action${remainingCount === 1 ? "" : "s"} remain; start with ${receipt.firstLaunchDutyFirstUserValidationNextActionKey}.`,
+        actionKey: receipt.firstLaunchDutyFirstUserValidationNextActionKey,
+        operationToRecord: receipt.firstLaunchDutyFirstUserValidationProductionNextOperation || receipt.productionEvidenceNextOperation || null,
+        downloadKey: receipt.firstLaunchDutyHandoffDownloadKey || receipt.firstLaunchDutyPrimaryDownloadKey || null,
+        firstUserValidationStatus: receipt.firstLaunchDutyFirstUserValidationStatus || null,
+        firstUserValidationActionCount: actionCount,
+        firstUserValidationRemainingCount: remainingCount,
+        firstUserValidationNextStage: receipt.firstLaunchDutyFirstUserValidationNextStage || null,
+        firstUserValidationNextOwnerRole: receipt.firstLaunchDutyFirstUserValidationNextOwnerRole || null
       });
     }
     if (Number(receipt.productionEvidenceRemainingCount || 0) > 0) {

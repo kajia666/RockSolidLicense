@@ -10191,6 +10191,40 @@ test("developer license quickstart first-batch setup can create recommended laun
         setup.receipt?.firstLaunchDutySummary?.productionEvidence?.nextAction?.key,
         setup.receipt?.mainlineEvidenceQueue?.nextAction?.key
       );
+      assert.deepEqual(
+        setup.receipt?.firstLaunchDutySummary?.firstUserValidation
+          ? {
+              status: setup.receipt.firstLaunchDutySummary.firstUserValidation.status || null,
+              actionCount: setup.receipt.firstLaunchDutySummary.firstUserValidation.actionCount ?? null,
+              remainingCount: setup.receipt.firstLaunchDutySummary.firstUserValidation.remainingCount ?? null,
+              nextActionKey: setup.receipt.firstLaunchDutySummary.firstUserValidation.nextAction?.key || null,
+              nextStage: setup.receipt.firstLaunchDutySummary.firstUserValidation.nextAction?.stage || null,
+              nextOwnerRole: setup.receipt.firstLaunchDutySummary.firstUserValidation.nextAction?.ownerRole || null,
+              productionNextOperation: setup.receipt.firstLaunchDutySummary.firstUserValidation.productionNextAction?.setupAction?.operation || null
+            }
+          : null,
+        {
+          status: "pending_validation",
+          actionCount: 4,
+          remainingCount: 4,
+          nextActionKey: "card_redemption_watch",
+          nextStage: "first_sale_watch",
+          nextOwnerRole: "support",
+          productionNextOperation: setup.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation || null
+        }
+      );
+      assert.deepEqual(
+        setup.receipt?.firstLaunchDutySummary?.firstUserValidation?.actionKeys || [],
+        ["card_redemption_watch", "runtime_smoke", "session_review", "startup_rule_watch"]
+      );
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.firstUserValidation?.controls?.some((control) =>
+        control?.kind === "workspace"
+        && control?.workspaceAction?.key === "ops"
+      ));
+      assert.ok(setup.receipt?.firstLaunchDutySummary?.firstUserValidation?.controls?.some((control) =>
+        control?.kind === "setup"
+        && control?.setupAction?.operation === setup.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation
+      ));
       assert.ok(setup.receipt?.postLaunchLifecycleSummary?.nextAction?.key);
       assert.ok(setup.receipt?.postLaunchLifecycleSummary?.primaryRecommendedDownload?.key);
       assert.match(setup.receipt?.handoffFileName || "", /FIRSTBATCH-stable-first_batch_setup.*\.txt/i);
@@ -10202,6 +10236,8 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.match(setup.receipt?.handoffText || "", /First Launch Delivery Exports:/);
       assert.match(setup.receipt?.handoffText || "", /developer_cards_first_launch_csv[\s\S]*href=.*\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
       assert.match(setup.receipt?.handoffText || "", /developer_cards_first_launch_zip[\s\S]*href=.*\/api\/developer\/cards\/export\/download\?.*format=zip/i);
+      assert.match(setup.receipt?.handoffText || "", /First User Validation:/);
+      assert.match(setup.receipt?.handoffText || "", /firstUserValidation: status=pending_validation \| actions=4 \| next=Watch first card redemptions/i);
       assert.match(setup.receipt?.handoffText || "", /First launch handoff/i);
       assert.match(setup.receipt?.handoffText || "", /Production Evidence:/);
       assert.match(setup.receipt?.handoffText || "", /Post Launch Lifecycle:/);
@@ -10239,6 +10275,16 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportZipDownloadKey, "developer_cards_first_launch_zip");
     assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportChecksumDownloadKey, "developer_cards_first_launch_checksums");
     assert.match(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.deliveryExportCsvHref || "", /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.firstUserValidationStatus, "pending_validation");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.firstUserValidationActionCount, 4);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.firstUserValidationRemainingCount, 4);
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.firstUserValidationNextActionKey, "card_redemption_watch");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.firstUserValidationNextStage, "first_sale_watch");
+    assert.equal(setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.firstUserValidationNextOwnerRole, "support");
+    assert.equal(
+      setupAuditEntry.metadata?.launchReceipt?.firstLaunchDuty?.firstUserValidationProductionNextOperation,
+      setup.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation || null
+    );
 
     const deliveryAuditOpsSnapshot = await getJson(
       baseUrl,
@@ -10253,6 +10299,16 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCardCount, 150);
     assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCsvDownloadKey, "developer_cards_first_launch_csv");
     assert.match(deliveryAuditLaunchReceipt.firstLaunchDutyDeliveryExportCsvHref || "", /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyFirstUserValidationStatus, "pending_validation");
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyFirstUserValidationActionCount, 4);
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyFirstUserValidationRemainingCount, 4);
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyFirstUserValidationNextActionKey, "card_redemption_watch");
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyFirstUserValidationNextStage, "first_sale_watch");
+    assert.equal(deliveryAuditLaunchReceipt.firstLaunchDutyFirstUserValidationNextOwnerRole, "support");
+    assert.equal(
+      deliveryAuditLaunchReceipt.firstLaunchDutyFirstUserValidationProductionNextOperation,
+      setup.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation || null
+    );
     const deliveryAuditFollowUp = deliveryAuditOpsSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.stage === "first_launch_delivery"
     );
@@ -10264,6 +10320,20 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(deliveryAuditFollowUp.deliveryExportCardCount, 150);
     assert.equal(deliveryAuditFollowUp.deliveryExportUsageStatus, "unused");
     assert.match(deliveryAuditFollowUp.downloadHref || "", /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+    const firstUserValidationFollowUp = deliveryAuditOpsSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
+      item.stage === "first_user_validation"
+    );
+    assert.ok(firstUserValidationFollowUp);
+    assert.equal(firstUserValidationFollowUp.priority, "secondary");
+    assert.equal(firstUserValidationFollowUp.title, "Run first-user validation");
+    assert.equal(firstUserValidationFollowUp.productCode, "FIRSTBATCH");
+    assert.equal(firstUserValidationFollowUp.actionKey, "card_redemption_watch");
+    assert.equal(firstUserValidationFollowUp.operationToRecord, setup.receipt.mainlineEvidenceQueue?.nextAction?.setupAction?.operation || null);
+    assert.equal(firstUserValidationFollowUp.downloadKey, "launch_mainline_first_launch_handoff");
+    assert.equal(firstUserValidationFollowUp.firstUserValidationActionCount, 4);
+    assert.equal(firstUserValidationFollowUp.firstUserValidationRemainingCount, 4);
+    assert.equal(firstUserValidationFollowUp.firstUserValidationNextStage, "first_sale_watch");
+    assert.equal(firstUserValidationFollowUp.firstUserValidationNextOwnerRole, "support");
 
     const cards = await getJson(
       baseUrl,
@@ -11369,6 +11439,17 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         : [],
       [
         { key: "result_status", controls: [] },
+        ...(actionResult.receipt?.mainlineOperationalReadiness
+          ? [{
+              key: "operational_readiness",
+              controls: Array.isArray(actionResult.receipt?.mainlineOperationalReadiness?.controls)
+                ? actionResult.receipt.mainlineOperationalReadiness.controls.map((item) => ({
+                    kind: item?.kind || null,
+                    key: item?.workspaceAction?.key || item?.recommendedDownload?.key || item?.bootstrapAction?.key || item?.setupAction?.key || null
+                  }))
+                : []
+            }]
+          : []),
         {
           key: "mainline_status",
           controls: Array.isArray(actionResult.receipt?.mainlineFollowUpActions)
@@ -12741,6 +12822,17 @@ test("developer launch mainline action can create first launch batches and retur
         : [],
       [
         { key: "result_status", controls: [] },
+        ...(actionResult.receipt?.mainlineOperationalReadiness
+          ? [{
+              key: "operational_readiness",
+              controls: Array.isArray(actionResult.receipt?.mainlineOperationalReadiness?.controls)
+                ? actionResult.receipt.mainlineOperationalReadiness.controls.map((item) => ({
+                    kind: item?.kind || null,
+                    key: item?.workspaceAction?.key || item?.recommendedDownload?.key || item?.bootstrapAction?.key || item?.setupAction?.key || null
+                  }))
+                : []
+            }]
+          : []),
         {
           key: "mainline_status",
           controls: Array.isArray(actionResult.receipt?.mainlineFollowUpActions)

@@ -1,6 +1,6 @@
 # Project Roadmap, Overall Plan, and Development Progress
 
-Updated: 2026-05-02
+Updated: 2026-05-03
 
 This document is the rolling project control sheet for RockSolidLicense. It answers three recurring questions:
 
@@ -26,6 +26,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - First-launch operations: launch bootstrap, first batch setup, inventory refill, first-launch handoff, launch receipt follow-ups, initial launch ops readiness.
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
+- Latest first-user validation slice: first-batch launch receipts now expose a `firstLaunchDutySummary.firstUserValidation` block that groups first-card redemption watch, runtime smoke, session review, and startup-rule watch into one launch-duty summary with action count, next action, owner/stage, production evidence operation, controls, handoff text, audit metadata, Developer Ops latest receipt fields, and a supporting `first_user_validation` follow-up. This makes the first real user validation chain visible from the same backend/API receipt path as first-batch delivery and first-launch handoff instead of leaving it scattered across the ops action queue.
 - Latest first-batch delivery follow-up slice: Developer Ops launch receipt follow-ups now generate a `first_launch_delivery` supporting follow-up when a first-batch receipt includes delivery exports, carrying the scoped unused-card CSV download key, href, card count, and usage status while leaving the first-launch handoff as the main First-Wave readiness next action. This turns the first-batch card export into an explicit launch-duty action instead of leaving operators to notice the delivery export block manually.
 - Latest first-batch delivery audit slice: the first-batch delivery export block is now preserved in launch receipt audit metadata and projected into Developer Ops `latestLaunchReceipts` with delivery export status, card count, usage status, CSV href, and CSV/zip/checksum download keys. This lets launch duty prove after the fact which first-launch card export was handed off without storing card keys in audit metadata or reopening the original receipt screen.
 - Latest first-batch delivery slice: first-batch setup receipts now expose a `firstLaunchDutySummary.deliveryExports` block with ready status, unused card count, product scope, and direct CSV/zip/checksum hrefs for `/api/developer/cards/export/download?usageStatus=unused`; the receipt handoff text prints the same delivery export keys, hrefs, formats, and source. The first-batch regression test now follows the CSV href and confirms the launch handoff can directly download the 150 freshly staged first-launch card keys, reducing the manual step between card generation and first-wave delivery to sales, support, or the software author.

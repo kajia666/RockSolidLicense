@@ -21606,6 +21606,8 @@ function buildDeveloperOpsLaunchDayWatchReceiptPayload({
     handoffFileName: latestReceipt.handoffFileName || null,
     recordedAt: latestReceipt.createdAt || latestReceipt.handoffGeneratedAt || null,
     watchReady: latestReceipt.operationalReadinessWatchReady === true,
+    watchRecordDraftStatus: latestReceipt.operationalReadinessWatchRecordDraftStatus || null,
+    watchRecordDraftRecordCount: latestReceipt.operationalReadinessWatchRecordDraftRecordCount ?? null,
     readinessStatus: latestReceipt.operationalReadinessStatus || null,
     readinessLabel: latestReceipt.operationalReadinessLabel || null,
     nextActionKey,
@@ -28463,6 +28465,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | recordedAt=${launchDayWatchReceipt.recordedAt || "-"}`
       );
       lines.push(
+        `- watchRecordDraft=${launchDayWatchReceipt.watchRecordDraftStatus || "-"}`
+        + ` | records=${launchDayWatchReceipt.watchRecordDraftRecordCount ?? "-"}`
+      );
+      lines.push(
         `- action=${launchDayWatchReceipt.nextActionKey || "-"}`
         + ` | next=${launchDayWatchReceipt.nextOperation || "-"}`
         + ` | download=${launchDayWatchReceipt.primaryDownloadKey || "-"}`
@@ -29047,6 +29053,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   if (launchDayWatchReceipt) {
     lines.push("Launch-Day Watch Receipt:");
     lines.push(`- Status: ${launchDayWatchReceipt.status || "-"} | receiptRecorded=${launchDayWatchReceipt.receiptRecorded === true}`);
+    lines.push(`- Watch Record Draft: ${launchDayWatchReceipt.watchRecordDraftStatus || "-"} | records=${launchDayWatchReceipt.watchRecordDraftRecordCount ?? "-"}`);
     lines.push(`- Latest Receipt: ${launchDayWatchReceipt.operation || "-"} | handoff=${launchDayWatchReceipt.handoffFileName || "-"} | recordedAt=${launchDayWatchReceipt.recordedAt || "-"}`);
     lines.push(`- Next: action=${launchDayWatchReceipt.nextActionKey || "-"} | operation=${launchDayWatchReceipt.nextOperation || "-"} | download=${launchDayWatchReceipt.primaryDownloadKey || "-"}`);
     lines.push(`- Stabilization: status=${launchDayWatchReceipt.stabilizationStatus || "-"} | next=${launchDayWatchReceipt.stabilizationNextOperation || "-"} | postLaunch=${launchDayWatchReceipt.postLaunchLifecycleStatus || "-"}`);

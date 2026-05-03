@@ -15780,6 +15780,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchDayWatchReceipt.productCode, "EXPORT_ALPHA");
     assert.equal(launchDayWatchReceipt.channel, "stable");
     assert.equal(launchDayWatchReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.equal(launchDayWatchReceipt.watchRecordDraftStatus, latestLaunchReceipt.operationalReadinessWatchRecordDraftStatus);
+    assert.equal(launchDayWatchReceipt.watchRecordDraftRecordCount, latestLaunchReceipt.operationalReadinessWatchRecordDraftRecordCount);
     assert.equal(launchDayWatchReceipt.nextActionKey, latestLaunchReceipt.operationalReadinessNextActionKey);
     assert.equal(launchDayWatchReceipt.nextOperation, latestLaunchReceipt.operationalReadinessNextOperation);
     assert.equal(launchDayWatchReceipt.primaryDownloadKey, latestLaunchReceipt.operationalReadinessPrimaryDownloadKey);
@@ -16114,6 +16116,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /postLaunchStatus=/);
     assert.match(launchReceiptSnapshot.summaryText, /Launch-Day Watch Receipt:/);
     assert.match(launchReceiptSnapshot.summaryText, /status=waiting_for_runway_evidence/);
+    assert.match(launchReceiptSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*watchRecordDraft=blocked_until_runway_evidence/);
     assert.match(launchReceiptSnapshot.summaryText, /receiptRecorded=true/);
     assert.match(launchReceiptSnapshot.summaryText, /next=record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:/);
@@ -16313,6 +16316,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialLaunchOpsReadinessDownload.body, /- Post-Launch: status=/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Launch-Day Watch Receipt:/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Status: waiting_for_runway_evidence \| receiptRecorded=true/);
+    assert.match(initialLaunchOpsReadinessDownload.body, /- Watch Record Draft: blocked_until_runway_evidence \| records=5/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Latest Receipt: record_post_launch_ops_sweep/);
     assert.match(initialLaunchOpsReadinessDownload.body, /- Next: action=launch_mainline_record_launch_rehearsal_run \| operation=record_launch_rehearsal_run/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Follow-up Queue:/);

@@ -1969,9 +1969,76 @@ function buildProductionSignoffReadiness(result) {
   };
 }
 
+function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, routes = {} } = {}) {
+  const archiveRoot = result.stagingAcceptanceCloseout?.artifactReceiptLedger?.archiveRoot || path.posix.join(
+    "artifacts",
+    "staging",
+    sanitizeArtifactPathSegment(result.summary?.productCode, "product"),
+    sanitizeArtifactPathSegment(result.summary?.channel || "stable", "stable")
+  );
+  const recordStatus = canStartCutoverWatch ? "pending_operator_entry" : "blocked_until_production_signoff";
+  const records = [
+    {
+      key: "launch_day_watch_summary",
+      artifactPath: path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
+      receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+      expectedEvidence: "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions."
+    },
+    {
+      key: "receipt_visibility_snapshot",
+      artifactPath: path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt"),
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      expectedEvidence: "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."
+    },
+    {
+      key: "first_wave_incident_log",
+      artifactPath: path.posix.join(archiveRoot, "first-wave-incident-log.md"),
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      expectedEvidence: "Record first-wave incidents, customer impact, mitigation, owner, and status."
+    },
+    {
+      key: "rollback_signal_review",
+      artifactPath: path.posix.join(archiveRoot, "rollback-signal-review.md"),
+      receiptOperations: ["record_rollback_walkthrough", "record_launch_stabilization_review"],
+      expectedEvidence: "Record whether rollback signals were observed, dismissed, or escalated."
+    },
+    {
+      key: "stabilization_owner_handoff",
+      artifactPath: path.posix.join(archiveRoot, "stabilization-owner-handoff.md"),
+      receiptOperations: ["record_launch_stabilization_review"],
+      expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
+    }
+  ].map((record, index) => ({
+    ...record,
+    order: index + 1,
+    status: recordStatus,
+    value: null,
+    operatorNote: "Backfill only redacted watch results, artifact paths, receipt IDs, incident summaries, and owner handoff notes."
+  }));
+  return {
+    mode: "launch-day-watch-record-draft",
+    status: canStartCutoverWatch ? "ready_for_operator_watch" : "blocked_until_production_signoff",
+    willModifyData: false,
+    archiveRoot,
+    closeoutInputPath: path.posix.join(archiveRoot, "filled-closeout-input.json"),
+    routes,
+    records,
+    nextAction: canStartCutoverWatch
+      ? "Record launch-day watch summary, receipt snapshots, incidents, rollback signal review, and stabilization owner handoff."
+      : "Complete production sign-off before filling launch-day watch records."
+  };
+}
+
 function buildLaunchDayWatchPlan(result) {
   const readiness = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
   const canStartCutoverWatch = readiness?.canSignoff === true;
+  const routes = {
+    launchMainline: result.nextCommands?.launchMainline || null,
+    developerOps: result.resultBackfillSummary?.destinations?.developerOps || null,
+    launchReviewSummary: result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
+    launchSmokeSummary: result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
+    launchOpsOverviewStatus: result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
+  };
   return {
     status: canStartCutoverWatch ? "ready" : "blocked",
     canStartCutoverWatch,
@@ -1982,13 +2049,8 @@ function buildLaunchDayWatchPlan(result) {
     closeoutInputStatus: readiness?.closeoutInputStatus || "missing",
     missingSignoffKeys: readiness?.missingSignoffKeys || [],
     missingReceiptVisibilityKeys: readiness?.missingReceiptVisibilityKeys || [],
-    routes: {
-      launchMainline: result.nextCommands?.launchMainline || null,
-      developerOps: result.resultBackfillSummary?.destinations?.developerOps || null,
-      launchReviewSummary: result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
-      launchSmokeSummary: result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
-      launchOpsOverviewStatus: result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
-    },
+    routes,
+    watchRecordDraft: buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch, routes }),
     watchWindows: [
       {
         key: "cutover_watch",
@@ -4431,6 +4493,7 @@ function renderLaunchDayWatchPlan(plan) {
   }
   const routes = plan.routes || {};
   const watchWindows = Array.isArray(plan.watchWindows) ? plan.watchWindows : [];
+  const watchRecordDraft = plan.watchRecordDraft || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Can start cutover watch: ${plan.canStartCutoverWatch ? "yes" : "no"}`,
@@ -4440,6 +4503,8 @@ function renderLaunchDayWatchPlan(plan) {
     `- Closeout input status: ${plan.closeoutInputStatus || "-"}`,
     `- Missing sign-off keys: ${(plan.missingSignoffKeys || []).join(", ") || "-"}`,
     `- Missing receipt visibility keys: ${(plan.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
+    `- Watch record draft: ${watchRecordDraft.status || "-"}`,
+    `- Watch draft records: ${(watchRecordDraft.records || []).map((item) => item.key).filter(Boolean).join(", ") || "-"}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,

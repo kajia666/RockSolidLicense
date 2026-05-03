@@ -400,6 +400,18 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.launchDayWatchPlan.productionDecision, null);
   assert.deepEqual(output.launchDayWatchPlan.missingSignoffKeys, output.productionSignoffReadiness.missingSignoffKeys);
   assert.deepEqual(output.launchDayWatchPlan.missingReceiptVisibilityKeys, expectedReceiptVisibilityKeys);
+  assert.equal(output.launchDayWatchPlan.watchRecordDraft.status, "blocked_until_production_signoff");
+  assert.equal(output.launchDayWatchPlan.watchRecordDraft.archiveRoot, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.deepEqual(
+    output.launchDayWatchPlan.watchRecordDraft.records.map((item) => [item.key, item.status]),
+    [
+      ["launch_day_watch_summary", "blocked_until_production_signoff"],
+      ["receipt_visibility_snapshot", "blocked_until_production_signoff"],
+      ["first_wave_incident_log", "blocked_until_production_signoff"],
+      ["rollback_signal_review", "blocked_until_production_signoff"],
+      ["stabilization_owner_handoff", "blocked_until_production_signoff"]
+    ]
+  );
   assert.deepEqual(
     output.launchDayWatchPlan.watchWindows.map((item) => item.key),
     ["cutover_watch", "first_wave_stabilization"]
@@ -1543,6 +1555,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Sign-off draft closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(handoff, /## Launch Day Watch Plan/);
     assert.match(handoff, /Can start cutover watch: no/);
+    assert.match(handoff, /Watch record draft: blocked_until_production_signoff/);
+    assert.match(handoff, /Watch draft records: launch_day_watch_summary, receipt_visibility_snapshot, first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
     assert.match(handoff, /Watch windows: cutover_watch, first_wave_stabilization/);
     assert.match(handoff, /Escalation triggers: production_signoff_missing, receipt_visibility_missing, launch_mainline_action_failure, developer_ops_receipt_mismatch, backup_restore_or_rollback_unclear/);
     assert.match(handoff, /## Stabilization Handoff Plan/);
@@ -2246,6 +2260,23 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(output.launchDayWatchPlan.canStartCutoverWatch, true);
     assert.deepEqual(output.launchDayWatchPlan.missingSignoffKeys, []);
     assert.deepEqual(output.launchDayWatchPlan.missingReceiptVisibilityKeys, []);
+    assert.equal(output.launchDayWatchPlan.watchRecordDraft.status, "ready_for_operator_watch");
+    assert.equal(output.launchDayWatchPlan.watchRecordDraft.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+    assert.equal(output.launchDayWatchPlan.watchRecordDraft.routes.launchMainline, output.nextCommands.launchMainline);
+    assert.deepEqual(
+      output.launchDayWatchPlan.watchRecordDraft.records.map((item) => [item.key, item.status, item.artifactPath]),
+      [
+        ["launch_day_watch_summary", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+        ["receipt_visibility_snapshot", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt"],
+        ["first_wave_incident_log", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md"],
+        ["rollback_signal_review", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+        ["stabilization_owner_handoff", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+      ]
+    );
+    assert.deepEqual(
+      output.launchDayWatchPlan.watchRecordDraft.records.find((item) => item.key === "launch_day_watch_summary").receiptOperations,
+      ["record_cutover_walkthrough", "record_launch_day_readiness_review"]
+    );
     assert.equal(output.launchDayWatchPlan.nextAction, "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility open.");
     assert.equal(output.stabilizationHandoffPlan.status, "ready");
     assert.equal(output.stabilizationHandoffPlan.canStartStabilizationHandoff, true);

@@ -23696,6 +23696,16 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
   }));
   const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
   const receiptVisibilitySummary = buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceiptPayload);
+  const watchRecordDraftStatus = steadyStateDutyActionLinks?.watchRecordDraftStatus
+    || steadyStateDutyBoard?.watchRecordDraftStatus
+    || steadyStateHandoffBrief?.watchRecordDraftStatus
+    || steadyStateOperationalReview?.watchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = steadyStateDutyActionLinks?.watchRecordDraftRecordCount
+    ?? steadyStateDutyBoard?.watchRecordDraftRecordCount
+    ?? steadyStateHandoffBrief?.watchRecordDraftRecordCount
+    ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
+    ?? null;
   const supportingDownloads = [
     handoffDownload,
     steadyStateHandoffBrief?.handoffDownload || null,
@@ -23722,6 +23732,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     exceptionDigestStatus: steadyStateExceptionDigest?.status || null,
     dutyBoardStatus: steadyStateDutyBoard?.status || null,
     dutyActionLinksStatus: steadyStateDutyActionLinks?.status || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     latestSteadyStateDutyPlanReceipt: latestSteadyStateDutyPlanReceiptPayload,
     receiptVisibilitySummary,
     operatorSummary: chain.complete === true
@@ -23782,6 +23794,16 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
   const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
   const receiptVisibilitySummary = handoffSummary.receiptVisibilitySummary
     || buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceiptPayload);
+  const watchRecordDraftStatus = handoffSummary.watchRecordDraftStatus
+    || steadyStateDutyActionLinks?.watchRecordDraftStatus
+    || steadyStateDutyBoard?.watchRecordDraftStatus
+    || steadyStateOperationalReview?.watchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = handoffSummary.watchRecordDraftRecordCount
+    ?? steadyStateDutyActionLinks?.watchRecordDraftRecordCount
+    ?? steadyStateDutyBoard?.watchRecordDraftRecordCount
+    ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
+    ?? null;
   const dailyChecklist = [
     {
       key: "launch_operations_evidence_chain",
@@ -23882,6 +23904,8 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     dutyBoardStatus: steadyStateDutyBoard?.status || null,
     dutyActionLinksStatus: steadyStateDutyActionLinks?.status || null,
     dutyActionCount: steadyStateDutyActionLinks?.actionCount ?? steadyStateDutyBoard?.quickActions?.length ?? 0,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     briefDownload,
     supportingDownloads,
     dailyChecklist,
@@ -23936,6 +23960,18 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
   const receiptVisibilitySummary = dailyBrief.receiptVisibilitySummary
     || launchOperationsHandoffSummary?.receiptVisibilitySummary
     || buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceiptPayload);
+  const watchRecordDraftStatus = dailyBrief.watchRecordDraftStatus
+    || launchOperationsHandoffSummary?.watchRecordDraftStatus
+    || steadyStateDutyActionLinks?.watchRecordDraftStatus
+    || steadyStateDutyBoard?.watchRecordDraftStatus
+    || steadyStateOperationalReview?.watchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = dailyBrief.watchRecordDraftRecordCount
+    ?? launchOperationsHandoffSummary?.watchRecordDraftRecordCount
+    ?? steadyStateDutyActionLinks?.watchRecordDraftRecordCount
+    ?? steadyStateDutyBoard?.watchRecordDraftRecordCount
+    ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
+    ?? null;
   const operatorActions = [];
   const buildShiftExecutionPlan = ({
     key = "",
@@ -23976,6 +24012,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       format: format || "",
       focusKind: source || kind,
       focusReason: summary || label || key || "",
+      watchRecordDraftStatus: watchRecordDraftStatus || "",
+      watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       note: `launch_operations_shift_action:${key || "shift_action"}`
     };
     return {
@@ -23992,7 +24030,9 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         actionKey: key,
         actionLabel: label,
         actionSource: source,
-        actionStatus: status
+        actionStatus: status,
+        watchRecordDraftStatus: watchRecordDraftStatus || "",
+        watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? ""
       }),
       confirmationLabel: label || key || "Confirm shift action",
       operatorHint: confirmation || summary || "Complete this shift action and record the result in the operator note.",
@@ -24177,6 +24217,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     dutyBoardStatus: steadyStateDutyBoard?.status || dailyBrief.dutyBoardStatus || null,
     dutyActionLinksStatus: steadyStateDutyActionLinks?.status || dailyBrief.dutyActionLinksStatus || null,
     dutyActionCount: steadyStateDutyActionLinks?.actionCount ?? dailyBrief.dutyActionCount ?? 0,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     nextReviewAction: dailyBrief.nextReviewAction || null,
     primaryAction: operatorActions[0] || null,
     actionCount: operatorActions.length,
@@ -28149,6 +28191,10 @@ function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = 
     + ` | summary=${summary.nextReviewAction?.summary || "-"}`
   );
   lines.push(
+    `- watchRecordDraft=${summary.watchRecordDraftStatus || "-"}`
+    + ` | records=${summary.watchRecordDraftRecordCount ?? "-"}`
+  );
+  lines.push(
     `- handoffDownload=${summary.handoffDownload?.fileName || "-"}`
     + ` | format=${summary.handoffDownload?.format || "-"}`
     + ` | href=${summary.handoffDownload?.href || "-"}`
@@ -28184,6 +28230,8 @@ function appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, brief = null, 
     + ` | evidence=${brief.evidenceChainStatus || "-"}`
     + ` | queue=${brief.queueTotal ?? 0}`
     + ` | attention=${brief.attentionCount ?? 0}`
+    + ` | watchRecordDraft=${brief.watchRecordDraftStatus || "-"}`
+    + ` | records=${brief.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push(
     `- handoff=${brief.handoffSummaryStatus || "-"}`
@@ -28222,6 +28270,8 @@ function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = nu
     + ` | executionPlans=${plan.executionPlanCount ?? 0}`
     + ` | queue=${plan.queueTotal ?? 0}`
     + ` | attention=${plan.attentionCount ?? 0}`
+    + ` | watchRecordDraft=${plan.watchRecordDraftStatus || "-"}`
+    + ` | records=${plan.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push(
     `- dailyBrief=${plan.dailyBriefStatus || "-"}`
@@ -29855,6 +29905,7 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
     `Channel: ${handoffSummary?.channel || scope.channel || "stable"}`,
     `Status: ${String(handoffSummary?.status || "unknown").toUpperCase()}`,
     `Operator Summary: ${handoffSummary?.operatorSummary || "-"}`,
+    `Watch Record Draft: watchRecordDraft=${handoffSummary?.watchRecordDraftStatus || "-"} | records=${handoffSummary?.watchRecordDraftRecordCount ?? "-"}`,
     ""
   ];
   if (chain) {
@@ -29987,6 +30038,10 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
     + ` | actions=${dailyBrief?.dutyActionCount ?? 0}`
     + ` | followUps=${dailyBrief?.followUpCount ?? 0}`
   );
+  lines.push(
+    `- watchRecordDraft=${dailyBrief?.watchRecordDraftStatus || "-"}`
+    + ` | records=${dailyBrief?.watchRecordDraftRecordCount ?? "-"}`
+  );
   lines.push("");
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, dailyBrief?.receiptVisibilitySummary);
   lines.push("");
@@ -30115,6 +30170,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     + ` | actions=${actionPlan?.actionCount ?? 0}`
     + ` | executionPlans=${actionPlan?.executionPlanCount ?? 0}`
     + ` | followUps=${actionPlan?.followUpCount ?? 0}`
+  );
+  lines.push(
+    `- watchRecordDraft=${actionPlan?.watchRecordDraftStatus || "-"}`
+    + ` | records=${actionPlan?.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push("");
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, actionPlan?.receiptVisibilitySummary);

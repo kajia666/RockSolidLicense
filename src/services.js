@@ -4274,7 +4274,8 @@ function createLaunchWorkflowActionPlanStep({
   workspaceAction = null,
   recommendedDownload = null,
   bootstrapAction = null,
-  setupAction = null
+  setupAction = null,
+  context = null
 } = {}) {
   if (!key) {
     return null;
@@ -4288,8 +4289,87 @@ function createLaunchWorkflowActionPlanStep({
     workspaceAction: workspaceAction || null,
     recommendedDownload: recommendedDownload || null,
     bootstrapAction: bootstrapAction || null,
-    setupAction: setupAction || null
+    setupAction: setupAction || null,
+    context: normalizeLaunchWorkflowActionContext(context)
   };
+}
+
+function normalizeLaunchWorkflowActionContext(context = null) {
+  if (!context || typeof context !== "object") {
+    return null;
+  }
+  return {
+    ...context,
+    overviewDownload: context.overviewDownload && typeof context.overviewDownload === "object"
+      ? { ...context.overviewDownload }
+      : null
+  };
+}
+
+function buildLaunchOpsOverviewActionContext({
+  overviewStatus = null,
+  overviewDownload = null,
+  operationalReadiness = null,
+  launchDayWatchPanel = null
+} = {}) {
+  const overview = overviewStatus && typeof overviewStatus === "object" ? overviewStatus : null;
+  const readiness = operationalReadiness && typeof operationalReadiness === "object" ? operationalReadiness : null;
+  const watchPanel = launchDayWatchPanel && typeof launchDayWatchPanel === "object" ? launchDayWatchPanel : null;
+  const watchDraft = watchPanel?.watchRecordDraft && typeof watchPanel.watchRecordDraft === "object"
+    ? watchPanel.watchRecordDraft
+    : null;
+  const watchRecords = Array.isArray(watchDraft?.records) ? watchDraft.records : [];
+  const download = overviewDownload && typeof overviewDownload === "object"
+    ? overviewDownload
+    : overview?.overviewDownload && typeof overview.overviewDownload === "object"
+      ? overview.overviewDownload
+      : null;
+  if (!overview && !readiness && !watchDraft && !download) {
+    return null;
+  }
+  const watchRecordDraftStatus = overview?.watchRecordDraftStatus
+    || readiness?.watchRecordDraftStatus
+    || watchDraft?.status
+    || null;
+  const watchRecordDraftRecordCount = overview?.watchRecordDraftRecordCount
+    ?? readiness?.watchRecordDraftRecordCount
+    ?? (watchDraft ? watchRecords.length : null);
+  return {
+    version: "launch-ops-overview-action-context/v1",
+    kind: "launch_ops_overview_status",
+    status: overview?.status || readiness?.status || null,
+    readyForOperations: overview?.readyForOperations === true || readiness?.readyToOperate === true,
+    receiptVisibilityStatus: overview?.receiptVisibilityStatus || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
+    nextActionKey: overview?.nextAction?.key || readiness?.nextActionKey || watchPanel?.nextActionKey || null,
+    nextActionOperation: readiness?.nextActionOperation || watchPanel?.nextActionOperation || null,
+    downloadKey: download?.key || null,
+    downloadFileName: download?.fileName || null,
+    downloadFormat: download?.format || null,
+    downloadHref: download?.href || null,
+    overviewDownload: download || null,
+    operatorSummary: overview?.operatorSummary || readiness?.summary || watchDraft?.summary || null
+  };
+}
+
+function formatLaunchWorkflowActionContextText(context = null) {
+  if (!context || typeof context !== "object") {
+    return "";
+  }
+  if (context.kind === "launch_ops_overview_status") {
+    return [
+      "context=launch_ops_overview_status",
+      `status=${context.status || "-"}`,
+      `receipt=${context.receiptVisibilityStatus || "-"}`,
+      `watchRecordDraft=${context.watchRecordDraftStatus || "-"}`,
+      `records=${context.watchRecordDraftRecordCount ?? "-"}`,
+      `ready=${context.readyForOperations === true}`,
+      `next=${context.nextActionKey || context.nextActionOperation || "-"}`,
+      `downloadFormat=${context.downloadFormat || context.overviewDownload?.format || "-"}`
+    ].join(" | ");
+  }
+  return `context=${context.kind || context.version || "action_context"}`;
 }
 
 function buildLaunchInventoryHealthFromStates(states = []) {
@@ -5485,6 +5565,7 @@ function buildLaunchMainlineActionReceipt({
                 }))
               : [],
             details: Array.isArray(card?.details) ? card.details.filter(Boolean) : [],
+            context: card?.context || null,
             controls: Array.isArray(card?.controls)
               ? card.controls.map((control) => ({
                   kind: control?.kind || null,
@@ -5706,6 +5787,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
       recommendedDownload: item?.recommendedDownload || null,
       bootstrapAction: item?.bootstrapAction || null,
       setupAction: item?.setupAction || null,
+      context: item?.context || null,
       controls: [
         item?.workspaceAction ? {
           kind: "workspace",
@@ -11394,6 +11476,10 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
         + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
       );
+      const contextText = formatLaunchWorkflowActionContextText(item.context);
+      if (contextText) {
+        lines.push(`  ${contextText}`);
+      }
     }
   }
   if (reviewSummary.primaryReviewTarget) {
@@ -12148,7 +12234,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
       status: launchOperationsOverviewStatus.readyForOperations === true ? "pass" : "review",
       priority: "secondary",
       workspaceAction: opsWorkspaceAction,
-      recommendedDownload: launchOperationsOverviewDownload
+      recommendedDownload: launchOperationsOverviewDownload,
+      context: buildLaunchOpsOverviewActionContext({
+        overviewStatus: launchOperationsOverviewStatus,
+        overviewDownload: launchOperationsOverviewDownload
+      })
     }));
   }
   if (firstWaveRuntimeEvidence) {
@@ -14651,7 +14741,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             status: initialLaunchOpsOverviewStatus.readyForOperations === true ? "pass" : "review",
             priority: "secondary",
             workspaceAction: initialLaunchOpsWorkspaceAction,
-            recommendedDownload: initialLaunchOpsOverviewStatusDownload
+            recommendedDownload: initialLaunchOpsOverviewStatusDownload,
+            context: buildLaunchOpsOverviewActionContext({
+              overviewStatus: initialLaunchOpsOverviewStatus,
+              overviewDownload: initialLaunchOpsOverviewStatusDownload
+            })
           }) : null
         ].filter(Boolean),
         recommendedDownloads: [
@@ -15780,7 +15874,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
       item?.status ? { label: "status", value: item.status, strong: false } : null
     ].filter(Boolean),
-    details: [],
+    details: [
+      formatLaunchWorkflowActionContextText(item?.context)
+    ].filter(Boolean),
+    context: item?.context || null,
     controls: Array.isArray(item?.controls) ? item.controls : []
   })).filter((item) => item.key || item.summary || item.controls.length);
   const buildProductionEvidenceQueueControls = (item = null) => [
@@ -16137,26 +16234,34 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       controls
     };
   }).filter((item) => item.key || item.summary || item.controls.length);
-  const stageCards = stages.map((item) => ({
-    key: item?.key || null,
-    title: item?.label || item?.key || "Stage",
-    summary: item?.gate?.headline || item?.gate?.summary || "-",
-    tags: [
-      {
-        label: "status",
-        value: String(item?.gate?.status || "unknown").toUpperCase(),
-        strong: true
-      },
-      Number(item?.gate?.blockingCount || 0)
-        ? { label: "block", value: Number(item.gate.blockingCount || 0), strong: true }
-        : null,
-      Number(item?.gate?.attentionCount || 0)
-        ? { label: "attention", value: Number(item.gate.attentionCount || 0), strong: false }
-        : null
-    ].filter(Boolean),
-    details: [],
-    controls: Array.isArray(item?.controls) ? item.controls : []
-  })).filter((item) => item.key || item.summary || item.controls.length);
+  const stageCards = stages.map((item) => {
+    const actionContext = (Array.isArray(item?.gate?.actionPlan) ? item.gate.actionPlan : [])
+      .find((step) => step?.context)?.context || null;
+    const actionContextText = formatLaunchWorkflowActionContextText(actionContext);
+    return {
+      key: item?.key || null,
+      title: item?.label || item?.key || "Stage",
+      summary: item?.gate?.headline || item?.gate?.summary || "-",
+      tags: [
+        {
+          label: "status",
+          value: String(item?.gate?.status || "unknown").toUpperCase(),
+          strong: true
+        },
+        Number(item?.gate?.blockingCount || 0)
+          ? { label: "block", value: Number(item.gate.blockingCount || 0), strong: true }
+          : null,
+        Number(item?.gate?.attentionCount || 0)
+          ? { label: "attention", value: Number(item.gate.attentionCount || 0), strong: false }
+          : null
+      ].filter(Boolean),
+      details: [
+        actionContextText
+      ].filter(Boolean),
+      context: actionContext,
+      controls: Array.isArray(item?.controls) ? item.controls : []
+    };
+  }).filter((item) => item.key || item.summary || item.controls.length);
   const sections = [
     {
       key: "overall_gate",
@@ -16491,6 +16596,38 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       controls
     };
   })();
+  const initialLaunchOpsOverviewAction = initialLaunchOpsMainlineGate?.actionPlan?.find((item) =>
+    item?.key === "initial_launch_ops_overview_status"
+  );
+  if (initialLaunchOpsOverviewAction) {
+    initialLaunchOpsOverviewAction.context = buildLaunchOpsOverviewActionContext({
+      overviewStatus: initialLaunchOpsOverviewStatus,
+      overviewDownload: initialLaunchOpsOverviewStatusDownload,
+      operationalReadiness,
+      launchDayWatchPanel: ensuredLaunchDayWatchPanel
+    }) || initialLaunchOpsOverviewAction.context || null;
+    const initialLaunchOpsOverviewContextText = formatLaunchWorkflowActionContextText(initialLaunchOpsOverviewAction.context);
+    const initialLaunchOpsMainlineAction = actionPlan.find((item) => item?.key === "initial_launch_ops_mainline");
+    if (initialLaunchOpsMainlineAction) {
+      initialLaunchOpsMainlineAction.context = initialLaunchOpsOverviewAction.context;
+    }
+    const initialLaunchOpsActionPlanCard = actionPlanCards.find((item) => item?.key === "initial_launch_ops_mainline");
+    if (initialLaunchOpsActionPlanCard) {
+      initialLaunchOpsActionPlanCard.context = initialLaunchOpsOverviewAction.context;
+      initialLaunchOpsActionPlanCard.details = Array.from(new Set([
+        ...(Array.isArray(initialLaunchOpsActionPlanCard.details) ? initialLaunchOpsActionPlanCard.details : []),
+        initialLaunchOpsOverviewContextText
+      ].filter(Boolean)));
+    }
+    const initialLaunchOpsStageCard = stageCards.find((item) => item?.key === "initial_launch_ops");
+    if (initialLaunchOpsStageCard) {
+      initialLaunchOpsStageCard.context = initialLaunchOpsOverviewAction.context;
+      initialLaunchOpsStageCard.details = Array.from(new Set([
+        ...(Array.isArray(initialLaunchOpsStageCard.details) ? initialLaunchOpsStageCard.details : []),
+        initialLaunchOpsOverviewContextText
+      ].filter(Boolean)));
+    }
+  }
   const mainlineView = {
     heroControls: screen.heroControls,
     form,
@@ -17427,6 +17564,10 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         + `${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}`
         + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}`
       );
+      const contextText = formatLaunchWorkflowActionContextText(item.context);
+      if (contextText) {
+        lines.push(`  ${contextText}`);
+      }
     }
   }
   if (Array.isArray(mainlineSummary.recommendedDownloads) && mainlineSummary.recommendedDownloads.length) {

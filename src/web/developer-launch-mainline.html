@@ -395,6 +395,33 @@
         return `<span class="tag ${strong ? "strong" : ""}">${esc(value)}</span>`;
       }
 
+      function formatActionContextMeta(context = null) {
+        if (!context || typeof context !== "object") {
+          return "";
+        }
+        if (context.kind === "launch_ops_overview_status") {
+          return [
+            "context=launch_ops_overview_status",
+            `status=${context.status || "-"}`,
+            `receipt=${context.receiptVisibilityStatus || "-"}`,
+            `watchRecordDraft=${context.watchRecordDraftStatus || "-"}`,
+            `records=${context.watchRecordDraftRecordCount ?? "-"}`,
+            `ready=${context.readyForOperations === true}`,
+            `downloadFormat=${context.downloadFormat || context.overviewDownload?.format || "-"}`
+          ].join(" | ");
+        }
+        return `context=${context.kind || context.version || "action_context"}`;
+      }
+
+      function renderActionContextMeta(context = null, attributeName = "", attributeValue = "") {
+        const text = formatActionContextMeta(context);
+        if (!text) {
+          return "";
+        }
+        const attribute = attributeName ? ` ${attributeName}="${esc(attributeValue)}"` : "";
+        return `<div class="hint"${attribute}>${esc(text)}</div>`;
+      }
+
       function setStatus(message, level = "") {
         const node = el("status-box");
         node.className = `status${level ? ` ${level}` : ""}`;
@@ -1007,6 +1034,7 @@
               <div class="audit-meta">${tags}</div>
             </div>
             <div class="hint">${esc(card.summary || "-")}</div>
+            ${renderActionContextMeta(card.context, "data-mainline-receipt-action-context", `${kind}:${card.key}`)}
             ${details.length ? details.map((item) => `<div class="hint">${esc(item)}</div>`).join("") : ""}
             ${controls.length ? `
               <div class="actions">
@@ -1079,6 +1107,7 @@
               <div class="audit-meta">${tags}</div>
             </div>
             <div class="hint">${esc(card.summary || "-")}</div>
+            ${renderActionContextMeta(card.context, "data-mainline-action-context", `${sectionKey}:${card.key}`)}
             ${details.length ? details.map((item) => `<div class="hint">${esc(item)}</div>`).join("") : ""}
             ${controls.length ? `
               <div class="actions">

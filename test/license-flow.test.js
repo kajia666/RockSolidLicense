@@ -6360,6 +6360,24 @@ test("developer release package export bundles integration, versions, and notice
         launchReview.reviewSummary.launchOperationsOverviewStatus?.overviewDownload?.format,
         "launch-operations-overview-status"
       );
+      const launchReviewOpsOverviewAction = launchReview.reviewSummary.actionPlan.find((item) =>
+        item.key === "launch_review_launch_ops_overview"
+      );
+      assert.ok(launchReviewOpsOverviewAction?.context);
+      assert.equal(launchReviewOpsOverviewAction.context.kind, "launch_ops_overview_status");
+      assert.equal(
+        launchReviewOpsOverviewAction.context.receiptVisibilityStatus,
+        launchReview.reviewSummary.launchOperationsOverviewStatus?.receiptVisibilityStatus || null
+      );
+      assert.equal(
+        launchReviewOpsOverviewAction.context.watchRecordDraftStatus,
+        launchReview.reviewSummary.launchOperationsOverviewStatus?.watchRecordDraftStatus || null
+      );
+      assert.equal(
+        launchReviewOpsOverviewAction.context.watchRecordDraftRecordCount,
+        launchReview.reviewSummary.launchOperationsOverviewStatus?.watchRecordDraftRecordCount ?? null
+      );
+      assert.equal(launchReviewOpsOverviewAction.context.downloadFormat, "launch-operations-overview-status");
       assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
         item.key === "launch_review_launch_ops_overview"
         && item.recommendedDownload?.format === "launch-operations-overview-status"
@@ -6375,6 +6393,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /Launch Review Launch Ops Overview:/);
       assert.match(launchReview.summaryText, /overviewStatus=.*receipt=/);
       assert.match(launchReview.summaryText, /format=launch-operations-overview-status/);
+      assert.match(launchReview.summaryText, /context=launch_ops_overview_status .*watchRecordDraft=/);
       assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(
@@ -6404,6 +6423,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff/);
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
       assert.match(launchReviewSummaryDownload.body, /control: Download Review Summary \| download=.*href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
+      assert.match(launchReviewSummaryDownload.body, /context=launch_ops_overview_status .*downloadFormat=launch-operations-overview-status/);
       assert.match(launchReviewSummaryDownload.body, /source=launch-smoke/);
       assert.match(launchReviewSummaryDownload.body, /handoff=first-wave/);
 
@@ -6934,6 +6954,29 @@ test("developer release package export bundles integration, versions, and notice
       ));
       const operationalReadiness = launchMainline.mainlineSummary.operationalReadiness;
       assert.ok(operationalReadiness);
+      const initialLaunchOpsOverviewAction = launchMainline.mainlineSummary.initialLaunchOpsMainlineGate?.actionPlan?.find((item) =>
+        item.key === "initial_launch_ops_overview_status"
+      );
+      assert.ok(initialLaunchOpsOverviewAction?.context);
+      assert.equal(initialLaunchOpsOverviewAction.context.kind, "launch_ops_overview_status");
+      assert.equal(initialLaunchOpsOverviewAction.context.watchRecordDraftStatus, operationalReadiness.watchRecordDraftStatus);
+      assert.equal(initialLaunchOpsOverviewAction.context.watchRecordDraftRecordCount, operationalReadiness.watchRecordDraftRecordCount);
+      assert.equal(initialLaunchOpsOverviewAction.context.downloadFormat, "launch-operations-overview-status");
+      const mainlinePageSections = Array.isArray(launchMainline.mainlineSummary.mainlinePage?.sections)
+        ? launchMainline.mainlineSummary.mainlinePage.sections
+        : [];
+      const mainlineActionPlanCard = mainlinePageSections
+        .find((item) => item?.key === "action_plan")
+        ?.cards?.find((item) => item?.key === "initial_launch_ops_mainline");
+      assert.ok(mainlineActionPlanCard?.context);
+      assert.equal(mainlineActionPlanCard.context.kind, "launch_ops_overview_status");
+      assert.match(mainlineActionPlanCard.details.join("\n"), /watchRecordDraft=/);
+      const mainlineInitialLaunchOpsStageCard = mainlinePageSections
+        .find((item) => item?.key === "stages")
+        ?.cards?.find((item) => item?.key === "initial_launch_ops");
+      assert.ok(mainlineInitialLaunchOpsStageCard?.context);
+      assert.equal(mainlineInitialLaunchOpsStageCard.context.downloadFormat, "launch-operations-overview-status");
+      assert.match(mainlineInitialLaunchOpsStageCard.details.join("\n"), /context=launch_ops_overview_status/);
       assert.deepEqual({
         status: operationalReadiness.status,
         label: operationalReadiness.label,
@@ -20583,6 +20626,9 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /Runway Evidence Recorded/);
     assert.match(html, /Launch-Day Watch/);
     assert.match(html, /Stabilization Handoff/);
+    assert.match(html, /renderActionContextMeta/);
+    assert.match(html, /data-mainline-action-context/);
+    assert.match(html, /watchRecordDraft/);
     assert.match(html, /currentMainlineSections/);
     assert.match(html, /mainlineScreen/);
     assert.match(html, /currentMainlineLastActionScreen/);
@@ -20665,6 +20711,9 @@ test("developer launch review page is served from the dedicated route", async ()
       assert.match(html, /currentReviewMainlineRehearsalDownload/);
       assert.match(html, /data-review-mainline-workspace/);
       assert.match(html, /data-review-mainline-rehearsal-download/);
+      assert.match(html, /renderActionContextMeta/);
+      assert.match(html, /data-review-action-context-index/);
+      assert.match(html, /watchRecordDraft/);
       assert.match(html, /data-review-target-workspace-index/);
       assert.match(html, /data-review-target-download-index/);
       assert.match(html, /data-review-action-bootstrap-index/);

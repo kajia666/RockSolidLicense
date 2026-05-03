@@ -342,6 +342,31 @@
       function renderTag(text, strong = false) {
         return `<span class="tag${strong ? " strong" : ""}">${esc(text)}</span>`;
       }
+      function formatActionContextMeta(context = null) {
+        if (!context || typeof context !== "object") {
+          return "";
+        }
+        if (context.kind === "launch_ops_overview_status") {
+          return [
+            "context=launch_ops_overview_status",
+            `status=${context.status || "-"}`,
+            `receipt=${context.receiptVisibilityStatus || "-"}`,
+            `watchRecordDraft=${context.watchRecordDraftStatus || "-"}`,
+            `records=${context.watchRecordDraftRecordCount ?? "-"}`,
+            `ready=${context.readyForOperations === true}`,
+            `downloadFormat=${context.downloadFormat || context.overviewDownload?.format || "-"}`
+          ].join(" | ");
+        }
+        return `context=${context.kind || context.version || "action_context"}`;
+      }
+      function renderActionContextMeta(context = null, attributeName = "", attributeValue = "") {
+        const text = formatActionContextMeta(context);
+        if (!text) {
+          return "";
+        }
+        const attribute = attributeName ? ` ${attributeName}="${esc(attributeValue)}"` : "";
+        return `<div class="hint"${attribute} style="margin-top: 8px;">${esc(text)}</div>`;
+      }
       function cloneAction(action = null) {
         if (!action || typeof action !== "object") {
           return null;
@@ -729,6 +754,7 @@
             ${actionPlan.map((item, index) => `
               <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.28);">
                 <div>${index + 1}. ${esc(`${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}`)}</div>
+                ${renderActionContextMeta(item.context, "data-review-action-context-index", index)}
                 ${(item.workspaceAction || item.recommendedDownload || item.bootstrapAction || item.setupAction) ? `
                   <div class="actions" style="margin-top: 8px;">
                     ${item.workspaceAction ? `<button type="button" class="secondary" data-review-action-workspace-index="${index}">${esc(item.workspaceAction.label || item.workspaceAction.key || "Open workspace")}</button>` : ""}

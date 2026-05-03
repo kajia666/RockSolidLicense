@@ -16101,6 +16101,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchStabilizationHandoff.nextAction.downloadFileName, "launch-mainline-stabilization-handoff.txt");
     assert.match(initialLaunchStabilizationHandoff.nextAction.downloadHref, /\/api\/developer\/launch-mainline\/download\?/);
     assert.match(initialLaunchStabilizationHandoff.nextAction.downloadHref, /format=stabilization-handoff/);
+    assert.equal(initialLaunchStabilizationHandoff.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(initialLaunchStabilizationHandoff.launchOpsOverviewContext?.watchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(initialLaunchStabilizationHandoff.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     assert.equal(initialLaunchStabilizationHandoff.files.postLaunchIndex, "post-launch-handoff-index");
     assert.ok(initialLaunchStabilizationHandoff.checklist.some((item) => /stabilization/i.test(item)));
     const initialLaunchOpsTraceability = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.traceability;
@@ -16194,6 +16197,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /version=initial-launch-stabilization-handoff\/v1/);
     assert.match(launchReceiptSnapshot.summaryText, /latestOperator=record_post_launch_ops_sweep/);
     assert.match(launchReceiptSnapshot.summaryText, /postLaunchStatus=/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Stabilization Handoff:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Stabilization Handoff:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(launchReceiptSnapshot.summaryText, /Launch-Day Watch Receipt:/);
     assert.match(launchReceiptSnapshot.summaryText, /status=waiting_for_runway_evidence/);
     assert.match(launchReceiptSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*watchRecordDraft=blocked_until_runway_evidence/);
@@ -16480,6 +16485,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(stabilizationHandoffDownload.body, new RegExp(`Next Action: ${latestLaunchReceipt.productionEvidenceNextOperation}`));
     assert.match(stabilizationHandoffDownload.body, /Download: launch-mainline-stabilization-handoff\.txt.*href=.*format=stabilization-handoff/);
     assert.match(stabilizationHandoffDownload.body, /Files: readiness=initial-launch-ops-readiness\.txt \| handoffIndex=handoff-index\.txt \| nextFollowUp=launch-receipt-next-follow-up\.txt/);
+    assert.match(stabilizationHandoffDownload.body, /Launch Ops Overview Context:/);
+    assert.match(stabilizationHandoffDownload.body, /context=launch_ops_overview_status.*watchRecordDraft=blocked_until_runway_evidence.*downloadFormat=launch-operations-overview-status/);
+    assert.match(stabilizationHandoffDownload.body, /download: .*format=launch-operations-overview-status/);
     assert.match(stabilizationHandoffDownload.body, /Checklist:/);
 
     const stabilizationConfirmation = await postJson(
@@ -16539,6 +16547,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/ops/export?productCode=EXPORT_ALPHA&limit=20",
       operatorSession.token
     );
+    const confirmedStabilizationHandoff = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.stabilizationHandoff;
+    assert.equal(confirmedStabilizationHandoff.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(confirmedStabilizationHandoff.launchOpsOverviewContext?.watchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(confirmedStabilizationHandoff.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     const stabilizationConfirmationEvidence = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.stabilizationHandoff.confirmation;
     assert.ok(stabilizationConfirmationEvidence);
     assert.equal(stabilizationConfirmationEvidence.auditLogId, stabilizationConfirmation.auditLogId);
@@ -16661,6 +16673,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftRecordCount
     );
     assert.equal(closeoutReadinessSummary.stabilizationStatus, stabilizationStatusReceipt.status);
+    assert.equal(closeoutReadinessSummary.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(
+      closeoutReadinessSummary.launchOpsOverviewContext?.watchRecordDraftStatus,
+      "blocked_until_runway_evidence"
+    );
+    assert.equal(
+      closeoutReadinessSummary.launchOpsOverviewContext?.downloadFormat,
+      "launch-operations-overview-status"
+    );
     assert.equal(closeoutReadinessSummary.closeoutReviewReady, false);
     assert.equal(closeoutReadinessSummary.nextAction.key, operationalExceptionCloseout.resolutionAction.key);
     assert.ok(closeoutReadinessSummary.blockingCount >= 1);
@@ -16692,6 +16713,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${stabilizationConfirmation.auditLogId}`));
+    assert.match(confirmedOpsSnapshot.summaryText, /Initial Launch Stabilization Handoff:[\s\S]*context=launch_ops_overview_status/);
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Status Receipt:/);
     assert.match(confirmedOpsSnapshot.summaryText, /status=confirmed_with_followups/);
     assert.match(confirmedOpsSnapshot.summaryText, /confirmed=true/);
@@ -16706,6 +16728,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(confirmedOpsSnapshot.summaryText, /resolutionAction=record_launch_rehearsal_run/);
     assert.match(confirmedOpsSnapshot.summaryText, /closeoutReview=record_launch_closeout_review/);
     assert.match(confirmedOpsSnapshot.summaryText, /Closeout Readiness Summary:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Closeout Readiness Summary:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Closeout Readiness Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(confirmedOpsSnapshot.summaryText, /closeoutReady=false/);
     assert.match(confirmedOpsSnapshot.summaryText, watchRecordDraftLifecyclePattern);
     assert.match(confirmedOpsSnapshot.summaryText, /nextAction=operational_exception_resolution/);
@@ -21849,6 +21873,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /data-stabilization-handoff-action="download-handoff"/);
     assert.match(html, /data-stabilization-workspace-href/);
     assert.match(html, /data-stabilization-download-href/);
+    assert.match(html, /data-stabilization-launch-ops-overview-context/);
     assert.match(html, /service-provided href/);
     assert.doesNotMatch(html, /launchReceiptOperatorDownloadFormat/);
     assert.doesNotMatch(html, /data-stabilization-download-format/);
@@ -21890,6 +21915,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /renderCloseoutReadinessSummary/);
     assert.match(html, /Closeout Readiness Summary/);
     assert.match(html, /data-closeout-readiness-summary/);
+    assert.match(html, /data-closeout-launch-ops-overview-context/);
     assert.match(html, /Closeout Next Action/);
     assert.match(html, /handleOperationalExceptionAction/);
     assert.match(html, /lastOperationalExceptionActionResult/);

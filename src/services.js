@@ -22368,6 +22368,13 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
     ?? null;
   const stabilizationStatus = stabilizationStatusReceipt?.status || null;
   const firstWaveConfirmationStatus = firstWaveConfirmationChain?.status || null;
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    latestReceipt?.launchOpsOverviewContext
+    || launchDayWatchReceipt?.launchOpsOverviewContext
+    || stabilizationStatusReceipt?.launchOpsOverviewContext
+    || operationalExceptionCloseout?.launchOpsOverviewContext
+    || firstWaveConfirmationChain?.launchOpsOverviewContext
+  );
   const latestOperation = String(latestReceipt?.operation || "").trim().toLowerCase();
   const closeoutReviewRecorded = latestOperation === "record_launch_closeout_review"
     || latestOperation === "record_launch_stabilization_review";
@@ -22578,6 +22585,7 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
     watchRecordDraftRecordCount,
     stabilizationStatus,
     firstWaveConfirmationStatus,
+    launchOpsOverviewContext,
     recordedAction,
     nextAction,
     nextActionKey: nextAction?.key || null,
@@ -24666,6 +24674,10 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
   };
   const postLaunchLifecycleStatus = latestReceipt?.postLaunchLifecycleStatus || null;
   const confirmation = buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation);
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    launchReceiptNextFollowUp?.launchOpsOverviewContext
+    || latestReceipt?.launchOpsOverviewContext
+  );
   const checklist = [
     `Confirm latest operator action receipt: ${latestOperatorActionReceipt?.operation || latestReceipt?.operation || "-"}.`,
     `Review post-launch lifecycle status before stabilization handoff: ${postLaunchLifecycleStatus || "unknown"}.`,
@@ -24707,6 +24719,7 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
       : null,
     confirmation,
     nextAction,
+    launchOpsOverviewContext,
     files: {
       readiness: opsFiles.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
       handoffIndex: opsFiles.handoffIndex || "handoff-index.txt",
@@ -28033,6 +28046,16 @@ function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadines
     + ` | stabilization=${closeoutReadinessSummary.stabilizationStatus || "-"}`
     + ` | firstWave=${closeoutReadinessSummary.firstWaveConfirmationStatus || "-"}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(closeoutReadinessSummary.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   const recordedAction = closeoutReadinessSummary.recordedAction && typeof closeoutReadinessSummary.recordedAction === "object"
     ? closeoutReadinessSummary.recordedAction
     : null;
@@ -28839,6 +28862,16 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | postLaunchIndex=${stabilizationHandoff.files?.postLaunchIndex || "-"}`
         + ` | routeMap=${stabilizationHandoff.files?.routeMap || "-"}`
       );
+      const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationHandoff.launchOpsOverviewContext);
+      if (launchOpsOverviewContext) {
+        lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+        lines.push(
+          `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+            buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+            { fileSeparator: " | " }
+          )}`
+        );
+      }
       const confirmation = stabilizationHandoff.confirmation || null;
       if (confirmation) {
         lines.push("");
@@ -29453,6 +29486,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Latest Operator: ${stabilizationHandoff.latestOperatorActionReceipt?.operation || "-"} | audit=${stabilizationHandoff.latestOperatorActionReceipt?.auditLogId || "-"} | next=${stabilizationHandoff.latestOperatorActionReceipt?.nextOperation || "-"}`);
     lines.push(`- Next Action: ${stabilizationHandoff.nextAction?.operation || "-"} | download=${stabilizationHandoff.nextAction?.downloadFileName || stabilizationHandoff.nextAction?.downloadKey || "-"} | href=${stabilizationHandoff.nextAction?.downloadHref || "-"} | workspace=${stabilizationHandoff.nextAction?.workspaceHref || "-"}`);
     lines.push(`- Files: readiness=${stabilizationHandoff.files?.readiness || "-"} | handoffIndex=${stabilizationHandoff.files?.handoffIndex || "-"} | nextFollowUp=${stabilizationHandoff.files?.nextFollowUp || "-"} | postLaunchIndex=${stabilizationHandoff.files?.postLaunchIndex || "-"}`);
+    const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationHandoff.launchOpsOverviewContext);
+    if (launchOpsOverviewContext) {
+      lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+      lines.push(`- download: ${formatLaunchHandoffDownloadText(buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext), { fileSeparator: " | " })}`);
+    }
     if (Array.isArray(stabilizationHandoff.checklist) && stabilizationHandoff.checklist.length) {
       lines.push("- Checklist:");
       for (const item of stabilizationHandoff.checklist) {
@@ -30049,6 +30087,13 @@ function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
   lines.push(`Download: ${nextAction.downloadFileName || nextAction.downloadKey || "-"} | key=${nextAction.downloadKey || "-"} | href=${nextAction.downloadHref || "-"}`);
   lines.push(`Workspace Href: ${nextAction.workspaceHref || "-"}`);
   lines.push(`Files: readiness=${files.readiness || "-"} | handoffIndex=${files.handoffIndex || "-"} | nextFollowUp=${files.nextFollowUp || "-"} | postLaunchIndex=${files.postLaunchIndex || "-"}`);
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(handoff.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push("");
+    lines.push("Launch Ops Overview Context:");
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(`- download: ${formatLaunchHandoffDownloadText(buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext), { fileSeparator: " | " })}`);
+  }
   const confirmation = handoff.confirmation || null;
   if (confirmation) {
     lines.push(`Confirmation: ${confirmation.status || "-"} | audit=${confirmation.auditLogId || "-"} | decision=${confirmation.decision || "-"} | by=${confirmation.confirmedBy?.username || "-"} | file=${confirmation.handoffFileName || "-"}`);

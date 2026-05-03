@@ -5086,6 +5086,9 @@
         const recordedAction = closeoutReadinessSummary.recordedAction && typeof closeoutReadinessSummary.recordedAction === "object"
           ? closeoutReadinessSummary.recordedAction
           : null;
+        const launchOpsOverviewContext = closeoutReadinessSummary.launchOpsOverviewContext && typeof closeoutReadinessSummary.launchOpsOverviewContext === "object"
+          ? closeoutReadinessSummary.launchOpsOverviewContext
+          : null;
         const status = String(closeoutReadinessSummary.status || "unknown").toLowerCase();
         const statusClass = closeoutReadinessSummary.canClose === true ? "ok" : "warning";
         const summaryDetails = [
@@ -5152,13 +5155,14 @@
           ? blockers.map((item) => `<li><strong>${esc(item.key || "-")}</strong> ${esc(item.status || "-")} | count=${esc(item.count ?? "-")} | ${esc(item.summary || "-")}</li>`).join("")
           : "<li>No closeout blockers are open.</li>";
         return `
-          <div class="snapshot-recap closeout-readiness-summary" data-closeout-readiness-summary="${esc(status)}">
+          <div class="snapshot-recap closeout-readiness-summary" data-closeout-readiness-summary="${esc(status)}" data-closeout-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
             <div class="snapshot-recap-head">
               <strong>Closeout Readiness Summary</strong>
               <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
             </div>
             <div class="hint">${esc(closeoutReadinessSummary.headline || "Initial launch closeout readiness summary.")}</div>
             <div class="hint">${summaryDetails}</div>
+            ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
             ${recordedAction ? `
               <div class="snapshot-recap">
                 <strong>Recorded Closeout Evidence</strong>
@@ -5776,6 +5780,7 @@
         const nextAction = item.nextAction || {};
         const files = item.files || {};
         const confirmation = stabilizationHandoff.confirmation || null;
+        const launchOpsOverviewContext = item.launchOpsOverviewContext || latestReceipt.launchOpsOverviewContext || null;
         const productCode = String(item.projectCode || latestOperator.productCode || latestReceipt.productCode || requestedProductCode || "").trim();
         const channel = String(item.channel || latestOperator.channel || latestReceipt.channel || requestedChannel || "stable").trim() || "stable";
         const nextOperation = nextAction.operation || latestOperator.nextOperation || latestReceipt.postLaunchLifecycleNextOperation || latestReceipt.productionEvidenceNextOperation || "";
@@ -5842,7 +5847,7 @@
           : "";
         const checklist = Array.isArray(item.checklist) ? item.checklist.slice(0, 5) : [];
         return `
-          <div class="snapshot-recap stabilization-handoff">
+          <div class="snapshot-recap stabilization-handoff" data-stabilization-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
             <div class="snapshot-recap-head">
               <strong>Initial Launch Stabilization Handoff</strong>
               <span class="tag ${status === "ready" ? "ok" : "warning"}">${esc(status.toUpperCase())}</span>
@@ -5853,6 +5858,7 @@
             <div class="snapshot-focus-meta">${operatorDetails}</div>
             <div class="snapshot-focus-meta">${nextDetails}</div>
             <div class="snapshot-focus-meta">${fileDetails}</div>
+            ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
             ${confirmationDetails ? `<div class="snapshot-focus-meta">${confirmationDetails}</div>` : ""}
             <div class="snapshot-recap-actions">
               <button type="button" class="snapshot-inline-button" data-stabilization-handoff-action="open-workspace" ${actionAttrs} ${workspaceHref ? "" : "disabled"}>Open Stabilization Workspace</button>

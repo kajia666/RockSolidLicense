@@ -22649,6 +22649,14 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
     ?? stabilizationStatusReceipt?.watchRecordDraftRecordCount
     ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
     ?? null;
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    closeoutReadinessSummary?.launchOpsOverviewContext
+    || stabilizationHandoff?.launchOpsOverviewContext
+    || latestReceipt?.launchOpsOverviewContext
+    || launchDayWatchReceipt?.launchOpsOverviewContext
+    || stabilizationStatusReceipt?.launchOpsOverviewContext
+    || firstWaveConfirmationChain?.launchOpsOverviewContext
+  );
   const reviewScope = {
     ...scope,
     productCode: productCode || scope.productCode || "",
@@ -22670,6 +22678,7 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
   const seenSupportingDownloads = new Set();
   for (const download of [
     closeoutReadinessSummary?.nextAction?.recommendedDownload || null,
+    launchOpsOverviewContext?.overviewDownload || null,
     productCode ? buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(reviewScope) : null,
     remainingFollowUpCount > 0 ? buildDeveloperOpsLaunchReceiptNextFollowUpDownload(reviewScope, followUps[0]) : null,
     productCode ? buildDeveloperOpsInitialLaunchReadinessDownload(reviewScope) : null
@@ -22748,6 +22757,7 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
     stabilizationStatus: stabilizationStatusReceipt?.status || null,
     firstWaveStatus: firstWaveConfirmationChain?.status || null,
     followUpCount: remainingFollowUpCount,
+    launchOpsOverviewContext,
     blockers: Array.isArray(closeoutReadinessSummary?.blockers)
       ? closeoutReadinessSummary.blockers
       : [],
@@ -22939,6 +22949,12 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
     ?? closeoutReadinessSummary?.watchRecordDraftRecordCount
     ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
     ?? null;
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    steadyStateOperationalReview?.launchOpsOverviewContext
+    || closeoutReadinessSummary?.launchOpsOverviewContext
+    || stabilizationHandoff?.launchOpsOverviewContext
+    || latestReceipt?.launchOpsOverviewContext
+  );
   const handoffDownload = productCode ? buildDeveloperOpsSteadyStateHandoffBriefDownload(briefScope) : null;
   const workspaceAction = steadyStateExceptionDigest?.workspaceAction
     || steadyStateOperationalReview?.workspaceAction
@@ -22984,6 +23000,7 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
   appendDownload(downloadSet, seenDownloads, steadyStateExceptionDigest?.digestDownload || null, "exception_digest");
   appendDownload(downloadSet, seenDownloads, closeoutReadinessSummary?.nextAction?.recommendedDownload || null, "stabilization_handoff");
   appendDownload(downloadSet, seenDownloads, stabilizationHandoff?.nextAction?.recommendedDownload || null, "stabilization_next_action");
+  appendDownload(downloadSet, seenDownloads, launchOpsOverviewContext?.overviewDownload || null, "launch_ops_overview_status");
   const operatorActions = [];
   const appendAction = (value = "") => {
     const text = String(value || "").trim();
@@ -23015,6 +23032,7 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
     closeoutStatus: closeoutReadinessSummary?.status || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    launchOpsOverviewContext,
     recordedAction: closeoutReadinessSummary?.recordedAction || null,
     latestReceipt: latestReceipt
       ? {
@@ -28104,6 +28122,16 @@ function appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateO
     + ` | followUps=${steadyStateOperationalReview.followUpCount ?? 0}`
   );
   lines.push(`- headline=${steadyStateOperationalReview.headline || "-"} | summary=${steadyStateOperationalReview.summary || "-"}`);
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(steadyStateOperationalReview.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   const latestReceipt = steadyStateOperationalReview.latestReceipt && typeof steadyStateOperationalReview.latestReceipt === "object"
     ? steadyStateOperationalReview.latestReceipt
     : null;
@@ -28244,6 +28272,16 @@ function appendDeveloperOpsSteadyStateHandoffBriefLines(lines, brief = null, {
     + ` | format=${brief.handoffDownload?.format || "-"}`
     + ` | href=${brief.handoffDownload?.href || "-"}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(brief.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   const latestReceipt = brief.latestReceipt && typeof brief.latestReceipt === "object"
     ? brief.latestReceipt
     : null;

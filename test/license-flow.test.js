@@ -16692,6 +16692,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const initialSteadyStateOperationalReview = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.steadyStateOperationalReview;
     assert.ok(initialSteadyStateOperationalReview);
+    assert.equal(initialSteadyStateOperationalReview.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(
+      initialSteadyStateOperationalReview.launchOpsOverviewContext?.watchRecordDraftStatus,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftStatus
+    );
+    assert.equal(
+      initialSteadyStateOperationalReview.launchOpsOverviewContext?.downloadFormat,
+      "launch-operations-overview-status"
+    );
+    assert.ok(
+      initialSteadyStateOperationalReview.supportingDownloads.some((item) => item.format === "launch-operations-overview-status")
+    );
     assert.equal(
       initialSteadyStateOperationalReview.watchRecordDraftStatus,
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftStatus
@@ -16734,6 +16746,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(confirmedOpsSnapshot.summaryText, watchRecordDraftLifecyclePattern);
     assert.match(confirmedOpsSnapshot.summaryText, /nextAction=operational_exception_resolution/);
     assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(confirmedOpsSnapshot.summaryText, watchRecordDraftLifecyclePattern);
 
     const handoffIndexDownload = await getText(
@@ -17551,6 +17565,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateOperationalReview.reviewDownload.href, /format=steady-state-operational-review/);
     assert.ok(steadyStateOperationalReview.watchRecordDraftStatus);
     assert.ok(Number(steadyStateOperationalReview.watchRecordDraftRecordCount) >= 1);
+    assert.equal(steadyStateOperationalReview.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(steadyStateOperationalReview.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
+    assert.ok(
+      steadyStateOperationalReview.supportingDownloads.some((item) => item.format === "launch-operations-overview-status")
+    );
     const steadyStateWatchRecordDraftStatus = steadyStateOperationalReview.watchRecordDraftStatus;
     const steadyStateWatchRecordDraftRecordCount = steadyStateOperationalReview.watchRecordDraftRecordCount;
     const steadyStateWatchRecordDraftPattern = new RegExp(
@@ -17561,6 +17580,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateSnapshot.summaryText, /recordedAction=record_launch_stabilization_review/);
     assert.match(steadyStateSnapshot.summaryText, /nextAction=steady_state_monitoring/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Operational Review:/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateSnapshot.summaryText, /monitoringReady=true/);
 
     const steadyStateOperationalReviewDownload = await getText(
@@ -17574,6 +17595,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateOperationalReviewDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
     assert.match(steadyStateOperationalReviewDownload.body, /Status: STEADY_STATE_READY/);
     assert.match(steadyStateOperationalReviewDownload.body, /Monitoring Ready: yes/);
+    assert.match(steadyStateOperationalReviewDownload.body, /Review Signals:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateOperationalReviewDownload.body, /Review Signals:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(steadyStateOperationalReviewDownload.body, /supportingDownloads:[\s\S]*format=launch-operations-overview-status/);
 
     const steadyStateExceptionDigest = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateExceptionDigest;
     assert.ok(steadyStateExceptionDigest);
@@ -17604,10 +17628,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateHandoffBrief.projectCode, "EXPORT_CLOSEOUT_READY");
     assert.equal(steadyStateHandoffBrief.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(steadyStateHandoffBrief.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(steadyStateHandoffBrief.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(steadyStateHandoffBrief.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
+    assert.ok(
+      steadyStateHandoffBrief.downloadSet.some((item) => item.format === "launch-operations-overview-status")
+    );
     assert.match(steadyStateHandoffBrief.handoffDownload.href, /format=steady-state-handoff-brief/);
     assert.match(steadyStateHandoffBrief.reviewDownload.href, /format=steady-state-operational-review/);
     assert.match(steadyStateHandoffBrief.exceptionDigestDownload.href, /format=steady-state-exception-digest/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Handoff Brief:/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Handoff Brief:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Handoff Brief:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateSnapshot.summaryText, /handoffReady=true/);
     assert.match(steadyStateSnapshot.summaryText, steadyStateWatchRecordDraftPattern);
 
@@ -17622,7 +17653,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateHandoffBriefDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
     assert.match(steadyStateHandoffBriefDownload.body, /Handoff Ready: yes/);
     assert.match(steadyStateHandoffBriefDownload.body, steadyStateWatchRecordDraftPattern);
+    assert.match(steadyStateHandoffBriefDownload.body, /Handoff Signals:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateHandoffBriefDownload.body, /Handoff Signals:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateHandoffBriefDownload.body, /Download Set:/);
+    assert.match(steadyStateHandoffBriefDownload.body, /Download Set:[\s\S]*format=launch-operations-overview-status/);
     assert.match(steadyStateHandoffBriefDownload.body, /Operator Handoff:/);
 
     const steadyStateDutyBoard = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateDutyBoard;
@@ -21928,6 +21962,15 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Open Exception Workspace/);
     assert.match(html, /Download Exception Handoff/);
     assert.match(html, /Record Closeout Review/);
+    assert.match(html, /steadyStateOperationalReview/);
+    assert.match(html, /renderSteadyStateOperationalReview/);
+    assert.match(html, /Steady-State Operational Review/);
+    assert.match(html, /data-steady-state-operational-review/);
+    assert.match(html, /data-steady-state-launch-ops-overview-context/);
+    assert.match(html, /renderSteadyStateHandoffBrief/);
+    assert.match(html, /Steady-State Handoff Brief/);
+    assert.match(html, /data-steady-state-handoff-brief/);
+    assert.match(html, /data-steady-state-handoff-launch-ops-overview-context/);
     assert.match(html, /Steady-State Duty Action Links/);
     assert.match(html, /Execution Plans/);
     assert.match(html, /data-steady-state-duty-plan-action/);

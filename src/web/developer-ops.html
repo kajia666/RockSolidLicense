@@ -5216,6 +5216,9 @@
         const recordedAction = review.recordedAction && typeof review.recordedAction === "object"
           ? review.recordedAction
           : null;
+        const launchOpsOverviewContext = review.launchOpsOverviewContext && typeof review.launchOpsOverviewContext === "object"
+          ? review.launchOpsOverviewContext
+          : null;
         const recordedDetails = recordedAction
           ? [
               `operation=${esc(recordedAction.operation || "-")}`,
@@ -5237,13 +5240,14 @@
           ? review.checklist
           : [];
         return `
-          <div class="snapshot-recap steady-state-operational-review" data-steady-state-operational-review="${esc(status)}">
+          <div class="snapshot-recap steady-state-operational-review" data-steady-state-operational-review="${esc(status)}" data-steady-state-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
             <div class="snapshot-recap-head">
               <strong>Steady-State Operational Review</strong>
               <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
             </div>
             <div class="hint">${esc(review.headline || "Steady-state operational review for the first-round operating lane.")}</div>
             <div class="hint">${details}</div>
+            ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
             <div class="snapshot-recap">
               <strong>Review Download</strong>
               <div class="hint">${reviewDownloadDetails}</div>
@@ -5354,6 +5358,9 @@
         ].join(" | ");
         const downloadSet = Array.isArray(brief.downloadSet) ? brief.downloadSet : [];
         const operatorActions = Array.isArray(brief.operatorActions) ? brief.operatorActions : [];
+        const launchOpsOverviewContext = brief.launchOpsOverviewContext && typeof brief.launchOpsOverviewContext === "object"
+          ? brief.launchOpsOverviewContext
+          : null;
         const latestReceipt = brief.latestReceipt && typeof brief.latestReceipt === "object"
           ? brief.latestReceipt
           : null;
@@ -5366,13 +5373,14 @@
             ].join(" | ")
           : "";
         return `
-          <div class="snapshot-recap steady-state-handoff-brief" data-steady-state-handoff-brief="${esc(status)}">
+          <div class="snapshot-recap steady-state-handoff-brief" data-steady-state-handoff-brief="${esc(status)}" data-steady-state-handoff-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
             <div class="snapshot-recap-head">
               <strong>Steady-State Handoff Brief</strong>
               <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
             </div>
             <div class="hint">${esc(brief.summary || "Operator-facing steady-state handoff cover sheet.")}</div>
             <div class="hint">${details}</div>
+            ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
             <div class="snapshot-recap">
               <strong>Handoff Download</strong>
               <div class="hint">file=${esc(brief.handoffDownload?.fileName || "-")} | format=${esc(brief.handoffDownload?.format || "-")} | href=${esc(brief.handoffDownload?.href || "-")}</div>

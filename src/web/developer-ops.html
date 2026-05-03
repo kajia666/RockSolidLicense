@@ -2539,6 +2539,40 @@
         }).join("")}</div>`;
       }
 
+      function renderLaunchOpsOverviewContext(context = null) {
+        if (!context || typeof context !== "object") {
+          return "";
+        }
+        const overviewDownload = context.overviewDownload && typeof context.overviewDownload === "object"
+          ? context.overviewDownload
+          : {};
+        const downloadFileName = context.downloadFileName || overviewDownload.fileName || "";
+        const downloadFormat = context.downloadFormat || overviewDownload.format || "";
+        const downloadHref = context.downloadHref || overviewDownload.href || "";
+        const bits = [
+          `context=${esc(context.kind || "launch_ops_overview_status")}`,
+          `status=${esc(context.status || "-")}`,
+          `receipt=${esc(context.receiptVisibilityStatus || "-")}`,
+          `watchRecordDraft=${esc(context.watchRecordDraftStatus || "-")}`,
+          `records=${esc(context.watchRecordDraftRecordCount ?? "-")}`,
+          `ready=${context.readyForOperations === true ? "true" : "false"}`,
+          `next=${esc(context.nextActionKey || context.nextActionOperation || "-")}`,
+          downloadFormat ? `downloadFormat=${esc(downloadFormat)}` : ""
+        ].filter(Boolean).join(" | ");
+        const downloadBits = [
+          downloadFileName ? `file=${esc(downloadFileName)}` : "",
+          downloadFormat ? `format=${esc(downloadFormat)}` : "",
+          downloadHref ? `href=${esc(downloadHref)}` : ""
+        ].filter(Boolean).join(" | ");
+        return `
+          <div class="hint" data-launch-ops-overview-context="${esc(context.kind || "launch_ops_overview_status")}">
+            <strong>Launch Ops Overview Context</strong>
+            <div>${bits}</div>
+            ${downloadBits ? `<div>overviewDownload=${downloadBits}</div>` : ""}
+          </div>
+        `;
+      }
+
       function renderLatestLaunchReceipts(items = []) {
         const entries = Array.isArray(items) ? items.slice(0, 5) : [];
         if (!entries.length) {
@@ -2570,6 +2604,7 @@
               <div class="audit-meta">${tags || renderTag("launch-receipt")}</div>
               <div class="hint">${details}</div>
               ${renderLaunchReceiptOperatorSummary(item)}
+              ${renderLaunchOpsOverviewContext(item.launchOpsOverviewContext)}
               ${item.summary ? `<div class="hint">${esc(item.summary)}</div>` : ""}
             </div>
           `;
@@ -2731,6 +2766,7 @@
               <div class="audit-meta">${tags || renderTag("launch-receipt-follow-up")}</div>
               <div class="hint">${details}</div>
               ${item.summary ? `<div class="hint">${esc(item.summary)}</div>` : ""}
+              ${renderLaunchOpsOverviewContext(item.launchOpsOverviewContext)}
               <div class="snapshot-recap-actions">
                 <button type="button" class="snapshot-inline-button" data-launch-receipt-follow-up-action="open" ${actionAttrs}>Open Mainline</button>
                 ${downloadHref ? `<button type="button" class="snapshot-inline-button" data-launch-receipt-follow-up-action="download" ${actionAttrs} ${token ? "" : "disabled"}>Download Handoff</button>` : ""}
@@ -2775,6 +2811,7 @@
             </div>
             <div class="hint">${esc(item.title || "Continue launch receipt follow-up")}</div>
             <div class="hint">${esc(bits.join(" | ") || "workspace handoff pending")}</div>
+            ${renderLaunchOpsOverviewContext(item.launchOpsOverviewContext)}
             <div class="snapshot-recap-actions">
               <button type="button" class="snapshot-inline-button" data-launch-receipt-next-follow-up-action="open-workspace" ${actionAttrs} ${workspaceAction?.href ? "" : "disabled"}>${esc(workspaceAction?.label || "Open Next Workspace")}</button>
               <button type="button" class="snapshot-inline-button" data-launch-receipt-next-follow-up-action="download-next-follow-up" ${actionAttrs} ${(token && recommendedDownload?.href) ? "" : "disabled"}>${esc(recommendedDownload?.label || "Download Next Follow-up")}</button>

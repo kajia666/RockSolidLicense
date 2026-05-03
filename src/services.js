@@ -4306,6 +4306,49 @@ function normalizeLaunchWorkflowActionContext(context = null) {
   };
 }
 
+function buildLaunchOpsOverviewContextDownload(context = null) {
+  if (!context || typeof context !== "object") {
+    return null;
+  }
+  if (context.overviewDownload && typeof context.overviewDownload === "object") {
+    return {
+      ...context.overviewDownload,
+      key: context.overviewDownload.key || context.downloadKey || null,
+      fileName: context.overviewDownload.fileName || context.downloadFileName || null,
+      format: context.overviewDownload.format || context.downloadFormat || null,
+      href: context.overviewDownload.href || context.downloadHref || null,
+      source: context.overviewDownload.source || "developer-ops"
+    };
+  }
+  if (!context.downloadKey && !context.downloadFileName && !context.downloadFormat && !context.downloadHref) {
+    return null;
+  }
+  return {
+    key: context.downloadKey || null,
+    label: "Launch Ops Overview Status",
+    fileName: context.downloadFileName || null,
+    format: context.downloadFormat || null,
+    href: context.downloadHref || null,
+    source: "developer-ops"
+  };
+}
+
+function normalizeLaunchOpsOverviewContext(context = null) {
+  const normalized = normalizeLaunchWorkflowActionContext(context);
+  if (!normalized) {
+    return null;
+  }
+  const overviewDownload = buildLaunchOpsOverviewContextDownload(normalized);
+  return {
+    ...normalized,
+    downloadKey: normalized.downloadKey || overviewDownload?.key || null,
+    downloadFileName: normalized.downloadFileName || overviewDownload?.fileName || null,
+    downloadFormat: normalized.downloadFormat || overviewDownload?.format || null,
+    downloadHref: normalized.downloadHref || overviewDownload?.href || null,
+    overviewDownload
+  };
+}
+
 function buildLaunchOpsOverviewActionContext({
   overviewStatus = null,
   overviewDownload = null,
@@ -4334,7 +4377,7 @@ function buildLaunchOpsOverviewActionContext({
   const watchRecordDraftRecordCount = overview?.watchRecordDraftRecordCount
     ?? readiness?.watchRecordDraftRecordCount
     ?? (watchDraft ? watchRecords.length : null);
-  return {
+  return normalizeLaunchOpsOverviewContext({
     version: "launch-ops-overview-action-context/v1",
     kind: "launch_ops_overview_status",
     status: overview?.status || readiness?.status || null,
@@ -4350,7 +4393,7 @@ function buildLaunchOpsOverviewActionContext({
     downloadHref: download?.href || null,
     overviewDownload: download || null,
     operatorSummary: overview?.operatorSummary || readiness?.summary || watchDraft?.summary || null
-  };
+  });
 }
 
 function formatLaunchWorkflowActionContextText(context = null) {
@@ -19434,6 +19477,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           downloadHref: launchReceiptNextFollowUp.downloadHref || launchReceiptNextFollowUp.recommendedDownload?.href || null,
           downloadFormat: launchReceiptNextFollowUp.downloadFormat || launchReceiptNextFollowUp.recommendedDownload?.format || null,
           downloadSource: launchReceiptNextFollowUp.downloadSource || launchReceiptNextFollowUp.recommendedDownload?.source || null,
+          launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(launchReceiptNextFollowUp.launchOpsOverviewContext),
           handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
         }
       : null,
@@ -20160,6 +20204,10 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "operationalReadinessPrimaryDownloadKey",
       "operationalReadinessWatchRecordDraftStatus",
       "operationalReadinessWatchRecordDraftRecordCount",
+      "launchOpsOverviewContext",
+      "launchOpsOverviewStatus",
+      "launchOpsOverviewWatchRecordDraftStatus",
+      "launchOpsOverviewDownloadFormat",
       "firstUserValidationRuntimeEvidenceStatus",
       "firstUserValidationRuntimeEvidenceReady",
       "runtimeEvidenceActiveSessionCount",
@@ -20167,39 +20215,46 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "summary",
       "createdAt"
     ],
-    (Array.isArray(items) ? items : []).map((item) => [
-      item.stage,
-      item.priority,
-      item.title,
-      item.productCode,
-      item.channel,
-      item.operation,
-      item.operationToRecord,
-      item.actionKey,
-      item.downloadKey,
-      item.downloadFileName || item.recommendedDownload?.fileName,
-      item.downloadFormat || item.recommendedDownload?.format,
-      item.downloadHref || item.recommendedDownload?.href,
-      item.downloadSource || item.recommendedDownload?.source,
-      item.handoffFileName,
-      item.mainlineGateStatus,
-      item.evidenceRemainingCount,
-      item.postLaunchLifecycleStatus,
-      item.operationalReadinessStatus,
-      item.operationalReadinessLabel,
-      item.operationalReadinessReady,
-      item.operationalReadinessNextActionKey,
-      item.operationalReadinessNextOperation,
-      item.operationalReadinessPrimaryDownloadKey,
-      item.operationalReadinessWatchRecordDraftStatus,
-      item.operationalReadinessWatchRecordDraftRecordCount,
-      item.firstUserValidationRuntimeEvidenceStatus,
-      item.firstUserValidationRuntimeEvidenceReady,
-      item.runtimeEvidenceActiveSessionCount,
-      item.runtimeEvidenceHeartbeatSeenCount,
-      item.summary,
-      item.createdAt
-    ])
+    (Array.isArray(items) ? items : []).map((item) => {
+      const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext);
+      return [
+        item.stage,
+        item.priority,
+        item.title,
+        item.productCode,
+        item.channel,
+        item.operation,
+        item.operationToRecord,
+        item.actionKey,
+        item.downloadKey,
+        item.downloadFileName || item.recommendedDownload?.fileName,
+        item.downloadFormat || item.recommendedDownload?.format,
+        item.downloadHref || item.recommendedDownload?.href,
+        item.downloadSource || item.recommendedDownload?.source,
+        item.handoffFileName,
+        item.mainlineGateStatus,
+        item.evidenceRemainingCount,
+        item.postLaunchLifecycleStatus,
+        item.operationalReadinessStatus,
+        item.operationalReadinessLabel,
+        item.operationalReadinessReady,
+        item.operationalReadinessNextActionKey,
+        item.operationalReadinessNextOperation,
+        item.operationalReadinessPrimaryDownloadKey,
+        item.operationalReadinessWatchRecordDraftStatus,
+        item.operationalReadinessWatchRecordDraftRecordCount,
+        launchOpsOverviewContext?.kind,
+        launchOpsOverviewContext?.status,
+        launchOpsOverviewContext?.watchRecordDraftStatus,
+        launchOpsOverviewContext?.downloadFormat,
+        item.firstUserValidationRuntimeEvidenceStatus,
+        item.firstUserValidationRuntimeEvidenceReady,
+        item.runtimeEvidenceActiveSessionCount,
+        item.runtimeEvidenceHeartbeatSeenCount,
+        item.summary,
+        item.createdAt
+      ];
+    })
   );
 }
 
@@ -20319,6 +20374,7 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         operationalReadinessPrimaryDownloadFormat: receipt.operationalReadiness?.primaryDownloadFormat || null,
         operationalReadinessPrimaryDownloadFileName: receipt.operationalReadiness?.primaryDownloadFileName || null,
         operationalReadinessPrimaryDownloadHref: receipt.operationalReadiness?.primaryDownloadHref || null,
+        launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(receipt.launchOpsOverviewContext),
         initialLaunchOperatorDecision: receipt.initialLaunchOperator?.decision || null,
         initialLaunchOperatorStatus: receipt.initialLaunchOperator?.status || null,
         initialLaunchOperatorPrimaryActionKey: receipt.initialLaunchOperator?.primaryActionKey || null,
@@ -20941,6 +20997,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       operationalReadinessPrimaryDownloadKey: receipt.operationalReadinessPrimaryDownloadKey || null,
       operationalReadinessWatchRecordDraftStatus: receipt.operationalReadinessWatchRecordDraftStatus || null,
       operationalReadinessWatchRecordDraftRecordCount: receipt.operationalReadinessWatchRecordDraftRecordCount ?? null,
+      launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(payload.launchOpsOverviewContext || receipt.launchOpsOverviewContext),
       createdAt: receipt.createdAt || receipt.handoffGeneratedAt || null
     });
   };
@@ -21133,6 +21190,7 @@ function buildLaunchReceiptNextFollowUp(items = []) {
     operationalReadinessPrimaryDownloadKey: selected.operationalReadinessPrimaryDownloadKey || null,
     operationalReadinessWatchRecordDraftStatus: selected.operationalReadinessWatchRecordDraftStatus || null,
     operationalReadinessWatchRecordDraftRecordCount: selected.operationalReadinessWatchRecordDraftRecordCount ?? null,
+    launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(selected.launchOpsOverviewContext),
     createdAt: selected.createdAt || null
   };
 }
@@ -21160,6 +21218,7 @@ function formatLaunchReceiptNextFollowUp(item = null) {
     item.operationalReadinessWatchRecordDraftStatus ? `watchRecordDraft=${item.operationalReadinessWatchRecordDraftStatus}` : "",
     item.operationalReadinessNextActionKey ? `readinessAction=${item.operationalReadinessNextActionKey}` : "",
     item.operationalReadinessNextOperation ? `readinessNext=${item.operationalReadinessNextOperation}` : "",
+    formatLaunchWorkflowActionContextText(item.launchOpsOverviewContext),
     `handoff=${item.handoffFileName || "-"}`
   ].filter(Boolean).join(" | ");
 }
@@ -24758,6 +24817,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         operationalReadinessPrimaryDownloadKey: item.operationalReadinessPrimaryDownloadKey || null,
         operationalReadinessWatchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || null,
         operationalReadinessWatchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? null,
+        launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext || latestReceipt?.launchOpsOverviewContext),
         handoffFileName: item.handoffFileName || latestReceipt?.handoffFileName || null
       };
       const recommendedDownload = buildDeveloperOpsLaunchReceiptFollowUpDownload(normalizedItem, scope);
@@ -25249,6 +25309,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
           downloadHref: launchReceiptNextFollowUp.recommendedDownload?.href || null,
           downloadFormat: launchReceiptNextFollowUp.recommendedDownload?.format || null,
           downloadSource: launchReceiptNextFollowUp.recommendedDownload?.source || null,
+          launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(launchReceiptNextFollowUp.launchOpsOverviewContext),
           handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
         }
       : null,
@@ -29174,6 +29235,8 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   const recommendedWorkspace = recommendedAction?.workspaceAction || null;
   const recommendedDownload = item?.recommendedDownload
     || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, item);
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(item?.launchOpsOverviewContext);
+  const launchOpsOverviewDownload = buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext);
   const launchReceiptAuditBackfill = Number(
     summary.launchReceiptAuditBackfill
     ?? payload.auditLogs?.filters?.launchReceiptBackfill
@@ -29238,6 +29301,12 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Download File: ${recommendedDownload?.fileName || "-"}`);
   lines.push(`Download Format: ${recommendedDownload?.format || "-"}`);
   lines.push(`Download Href: ${recommendedDownload?.href || "-"}`);
+  if (launchOpsOverviewContext) {
+    lines.push("");
+    lines.push("Launch Ops Overview Context:");
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(`- download: ${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`);
+  }
   if (receiptVisibilitySource) {
     lines.push("");
     appendDeveloperOpsReceiptVisibilityText(lines, receiptVisibilitySource);

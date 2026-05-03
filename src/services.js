@@ -24282,6 +24282,14 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     || dailyBrief?.receiptVisibilitySummary
     || handoffSummary?.receiptVisibilitySummary
     || buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceipt);
+  const watchRecordDraftStatus = shiftPlan?.watchRecordDraftStatus
+    || dailyBrief?.watchRecordDraftStatus
+    || handoffSummary?.watchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = shiftPlan?.watchRecordDraftRecordCount
+    ?? dailyBrief?.watchRecordDraftRecordCount
+    ?? handoffSummary?.watchRecordDraftRecordCount
+    ?? null;
   const overviewDownload = productCode ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(overviewScope) : null;
   const panels = [
     {
@@ -24345,6 +24353,8 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     handoffSummaryStatus: handoffSummary?.status || null,
     dailyBriefStatus: dailyBrief?.status || null,
     shiftActionPlanStatus: shiftPlan?.status || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     receiptVisibilityStatus: receiptVisibilitySummary?.status || "pending",
     receiptVisibilitySummary,
     canRecoverReceipt: Boolean(receiptVisibilitySummary?.failureRecovery?.route),
@@ -24354,7 +24364,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     panels,
     readyPanelCount,
     panelCount: panels.length,
-    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, next=${nextAction?.key || "-"}.`
+    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, next=${nextAction?.key || "-"}.`
   };
 }
 
@@ -28308,6 +28318,8 @@ function appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, overview =
     + ` | receipt=${overview.receiptVisibilityStatus || "-"}`
     + ` | panels=${overview.readyPanelCount ?? 0}/${overview.panelCount ?? 0}`
     + ` | ready=${overview.readyForOperations === true}`
+    + ` | watchRecordDraft=${overview.watchRecordDraftStatus || "-"}`
+    + ` | records=${overview.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push(
     `- next=${overview.nextAction?.key || "-"}`
@@ -30287,6 +30299,8 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     + ` | evidence=${overview?.evidenceChainStatus || "-"}`
     + ` | receipt=${overview?.receiptVisibilityStatus || "-"}`
     + ` | panels=${overview?.readyPanelCount ?? 0}/${overview?.panelCount ?? 0}`
+    + ` | watchRecordDraft=${overview?.watchRecordDraftStatus || "-"}`
+    + ` | records=${overview?.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push(
     `- handoff=${overview?.handoffSummaryStatus || "-"}`

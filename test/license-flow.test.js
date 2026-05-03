@@ -17847,6 +17847,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOverviewStatus.receiptVisibilityStatus, "visible");
     assert.equal(launchOperationsOverviewStatus.canRecoverReceipt, true);
     assert.equal(launchOperationsOverviewStatus.recoveryRoute, "/api/developer/ops/steady-state-duty-plan/receipt");
+    assert.equal(launchOperationsOverviewStatus.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
+    assert.equal(launchOperationsOverviewStatus.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
     assert.equal(launchOperationsOverviewStatus.nextAction.key, launchOperationsShiftActionPlan.primaryAction.key);
     assert.ok(launchOperationsOverviewStatus.panels.some((item) => item.key === "launch_operations_shift_action_plan"));
     assert.match(launchOperationsOverviewStatus.overviewDownload.href, /format=launch-operations-overview-status/);
@@ -17862,6 +17864,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.contentDisposition || "", /developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchOperationsOverviewStatusDownload.body, /RockSolid Developer Ops Launch Operations Overview Status/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:/);
+    assert.match(launchOperationsOverviewStatusDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);
 

@@ -4720,6 +4720,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
   mainlinePrimaryAction = null,
   mainlineRecommendedDownload = null,
   mainlineOperationalReadiness = null,
+  launchOpsOverviewContext = null,
   mainlineEvidenceQueue = null,
   firstLaunchInventoryQueue = null,
   firstLaunchOpsQueue = null,
@@ -4776,6 +4777,14 @@ function buildLaunchMainlineActionReceiptHandoffText({
     }
     lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(mainlineOperationalReadiness.primaryWorkspaceAction)}`);
     lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(mainlineOperationalReadiness.primaryDownload, { fileSeparator: " | " })}`);
+  }
+
+  const launchOpsContextText = formatLaunchWorkflowActionContextText(launchOpsOverviewContext);
+  if (launchOpsContextText) {
+    lines.push("");
+    lines.push("Launch Ops Overview Context:");
+    lines.push(`- ${launchOpsContextText}`);
+    lines.push(`- download: ${formatLaunchHandoffDownloadText(launchOpsOverviewContext.overviewDownload, { fileSeparator: " | " })}`);
   }
 
   if (mainlineEvidenceQueue) {
@@ -5691,6 +5700,18 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
           : []
       }
     : null;
+  const launchOpsOverviewContext = (() => {
+    const initialOpsOverviewAction = Array.isArray(mainlineSummary.initialLaunchOpsMainlineGate?.actionPlan)
+      ? mainlineSummary.initialLaunchOpsMainlineGate.actionPlan.find((item) => item?.key === "initial_launch_ops_overview_status")
+      : null;
+    return normalizeLaunchWorkflowActionContext(initialOpsOverviewAction?.context)
+      || buildLaunchOpsOverviewActionContext({
+        overviewStatus: mainlineSummary.initialLaunchOpsOverviewStatus,
+        overviewDownload: mainlineSummary.initialLaunchOpsOverviewStatusDownload,
+        operationalReadiness: mainlineOperationalReadiness,
+        launchDayWatchPanel: mainlineLaunchDayWatchPanel
+      });
+  })();
   const mainlineScreen = {
     heroControls: mainlineHeroControls,
     sections: mainlineSections
@@ -6490,6 +6511,28 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         ? mainlineOperationalReadiness.controls
         : []
     } : null,
+    launchOpsOverviewContext ? {
+      key: "launch_ops_overview_context",
+      title: "Launch Ops Overview Context",
+      summary: launchOpsOverviewContext.operatorSummary || "Review Launch Ops overview status after this action.",
+      tags: [
+        launchOpsOverviewContext.status ? { label: "status", value: String(launchOpsOverviewContext.status).toUpperCase(), strong: launchOpsOverviewContext.readyForOperations === true } : null,
+        launchOpsOverviewContext.receiptVisibilityStatus ? { label: "receipt", value: launchOpsOverviewContext.receiptVisibilityStatus, strong: launchOpsOverviewContext.receiptVisibilityStatus === "visible" } : null,
+        launchOpsOverviewContext.watchRecordDraftStatus ? { label: "watch", value: launchOpsOverviewContext.watchRecordDraftStatus, strong: false } : null
+      ].filter(Boolean),
+      details: [
+        formatLaunchWorkflowActionContextText(launchOpsOverviewContext),
+        launchOpsOverviewContext.downloadFileName ? `Download: ${launchOpsOverviewContext.downloadFileName}` : ""
+      ].filter(Boolean),
+      context: launchOpsOverviewContext,
+      controls: launchOpsOverviewContext.overviewDownload
+        ? [{
+            kind: "download",
+            label: launchOpsOverviewContext.overviewDownload.label || "Download Launch Ops Overview",
+            recommendedDownload: launchOpsOverviewContext.overviewDownload
+          }]
+        : []
+    } : null,
     {
       key: "mainline_status",
       title: mainlineOverallGate?.headline || "Unified launch mainline status",
@@ -6636,6 +6679,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     mainlinePrimaryAction,
     mainlineRecommendedDownload,
     mainlineOperationalReadiness,
+    launchOpsOverviewContext,
     mainlineEvidenceQueue,
     firstLaunchInventoryQueue,
     firstLaunchOpsQueue,
@@ -6666,6 +6710,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     mainlinePrimaryAction,
     mainlineRecommendedDownload,
     mainlineOperationalReadiness,
+    launchOpsOverviewContext,
     mainlineContinuation,
     mainlineNextActions,
     mainlineEvidenceQueue,
@@ -6841,6 +6886,9 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
   const operationalReadiness = receipt.mainlineOperationalReadiness && typeof receipt.mainlineOperationalReadiness === "object"
     ? receipt.mainlineOperationalReadiness
     : null;
+  const launchOpsOverviewContext = receipt.launchOpsOverviewContext && typeof receipt.launchOpsOverviewContext === "object"
+    ? receipt.launchOpsOverviewContext
+    : null;
   const lifecycleNextAction = lifecycle?.nextAction && typeof lifecycle.nextAction === "object"
     ? lifecycle.nextAction
     : null;
@@ -6966,6 +7014,22 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           primaryDownloadFormat: operationalReadiness.primaryDownload?.format || null,
           primaryDownloadFileName: operationalReadiness.primaryDownload?.fileName || null,
           primaryDownloadHref: operationalReadiness.primaryDownload?.href || null
+        }
+      : null,
+    launchOpsOverviewContext: launchOpsOverviewContext
+      ? {
+          kind: launchOpsOverviewContext.kind || null,
+          status: launchOpsOverviewContext.status || null,
+          readyForOperations: launchOpsOverviewContext.readyForOperations === true,
+          receiptVisibilityStatus: launchOpsOverviewContext.receiptVisibilityStatus || null,
+          watchRecordDraftStatus: launchOpsOverviewContext.watchRecordDraftStatus || null,
+          watchRecordDraftRecordCount: launchOpsOverviewContext.watchRecordDraftRecordCount ?? null,
+          nextActionKey: launchOpsOverviewContext.nextActionKey || null,
+          nextActionOperation: launchOpsOverviewContext.nextActionOperation || null,
+          downloadKey: launchOpsOverviewContext.downloadKey || null,
+          downloadFormat: launchOpsOverviewContext.downloadFormat || null,
+          downloadFileName: launchOpsOverviewContext.downloadFileName || null,
+          hasDownloadHref: Boolean(launchOpsOverviewContext.downloadHref)
         }
       : null,
     initialLaunchOperator: initialLaunchOperator

@@ -9199,6 +9199,28 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     assert.match(actionResult.receipt?.handoffText || "", /- status: still_needs_evidence \| label=Still Needs Evidence \| ready=false/);
     assert.match(actionResult.receipt?.handoffText || "", /watchRecordDraft=blocked_until_runway_evidence/);
     assert.match(actionResult.receipt?.handoffText || "", /- nextAction: .*operation=record_launch_day_readiness_review/);
+    const summaryLaunchOpsContext = actionResult.launchMainline?.mainlineSummary?.initialLaunchOpsMainlineGate?.actionPlan?.find((item) =>
+      item?.key === "initial_launch_ops_overview_status"
+    )?.context;
+    assert.ok(summaryLaunchOpsContext);
+    assert.ok(actionResult.receipt?.launchOpsOverviewContext);
+    assert.equal(actionResult.receipt.launchOpsOverviewContext.kind, "launch_ops_overview_status");
+    assert.equal(actionResult.receipt.launchOpsOverviewContext.watchRecordDraftStatus, actionResult.receipt.mainlineOperationalReadiness.watchRecordDraftStatus);
+    assert.equal(actionResult.receipt.launchOpsOverviewContext.watchRecordDraftRecordCount, actionResult.receipt.mainlineOperationalReadiness.watchRecordDraftRecordCount);
+    assert.equal(actionResult.receipt.launchOpsOverviewContext.downloadFormat, "launch-operations-overview-status");
+    assert.equal(actionResult.receipt.launchOpsOverviewContext.downloadHref, summaryLaunchOpsContext.downloadHref);
+    const receiptLaunchOpsContextCard = actionResult.receipt.mainlineRecapCards.find((item) =>
+      item?.key === "launch_ops_overview_context"
+    );
+    assert.ok(receiptLaunchOpsContextCard?.context);
+    assert.equal(receiptLaunchOpsContextCard.context.downloadHref, summaryLaunchOpsContext.downloadHref);
+    assert.match(receiptLaunchOpsContextCard.details.join("\n"), /context=launch_ops_overview_status/);
+    assert.ok(receiptLaunchOpsContextCard.controls.some((item) =>
+      item?.recommendedDownload?.format === "launch-operations-overview-status"
+    ));
+    assert.match(actionResult.receipt?.handoffText || "", /Launch Ops Overview Context:/);
+    assert.match(actionResult.receipt?.handoffText || "", /context=launch_ops_overview_status .*watchRecordDraft=blocked_until_runway_evidence/);
+    assert.match(actionResult.receipt?.handoffText || "", /downloadFormat=launch-operations-overview-status/);
     assert.ok(Array.isArray(actionResult.followUp.actions));
     assert.ok(actionResult.followUp.actions.some((item) =>
       item?.recommendedDownload?.key === "launch_mainline_rehearsal_guide"

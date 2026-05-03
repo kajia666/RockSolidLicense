@@ -14861,6 +14861,73 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           receiptDownload: watchReceiptDownload || null,
           primaryHandoffDownload: primaryDownload || null
         };
+        const watchRecordDraftStatus = launchDayWatchReady
+          ? "ready_for_operator_watch"
+          : "blocked_until_runway_evidence";
+        const watchRecordStatus = launchDayWatchReady
+          ? "pending_operator_entry"
+          : "blocked_until_runway_evidence";
+        const watchRecordDraft = {
+          mode: "launch-mainline-watch-record-draft",
+          status: watchRecordDraftStatus,
+          willModifyData: false,
+          summary: launchDayWatchReady
+            ? "Runway evidence is complete; use this draft to record the launch-day watch proof before stabilization handoff."
+            : "Complete runway evidence before opening these launch-day watch records.",
+          nextAction: launchDayWatchReady
+            ? "Record launch-day watch summary, receipt visibility, incident log, rollback signal review, and stabilization owner handoff."
+            : "Record the remaining runway evidence before writing launch-day watch records.",
+          records: [
+            {
+              key: "launch_day_watch_summary",
+              label: "Launch-Day Watch Summary",
+              status: watchRecordStatus,
+              receiptOperations: [
+                "record_cutover_walkthrough",
+                "record_launch_day_readiness_review"
+              ]
+            },
+            {
+              key: "receipt_visibility_snapshot",
+              label: "Receipt Visibility Snapshot",
+              status: watchRecordStatus,
+              receiptOperations: [
+                "record_post_launch_ops_sweep"
+              ]
+            },
+            {
+              key: "first_wave_incident_log",
+              label: "First-Wave Incident Log",
+              status: watchRecordStatus,
+              receiptOperations: [
+                "record_post_launch_ops_sweep"
+              ]
+            },
+            {
+              key: "rollback_signal_review",
+              label: "Rollback Signal Review",
+              status: watchRecordStatus,
+              receiptOperations: [
+                "record_rollback_walkthrough",
+                "record_launch_stabilization_review"
+              ]
+            },
+            {
+              key: "stabilization_owner_handoff",
+              label: "Stabilization Owner Handoff",
+              status: watchRecordStatus,
+              receiptOperations: [
+                "record_launch_stabilization_review"
+              ]
+            }
+          ],
+          downloads: {
+            watchHandoff: primaryDownload || null,
+            receiptFollowUp: watchReceiptDownload || null,
+            operationsHandoff: secondaryDownload || null,
+            supportingHandoff: supportingDownload || null
+          }
+        };
         const controls = launchDayWatchReady
           ? [
               {
@@ -14941,6 +15008,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           nextActionKey: launchDayWatchReady ? null : (launchRunwayNextEvidenceAction?.actionKey || launchRunwayNextEvidenceAction?.setupAction?.key || null),
           nextActionOperation: launchDayWatchReady ? null : (launchRunwayNextEvidenceAction?.operation || launchRunwayNextEvidenceAction?.setupAction?.operation || null),
           watchCheckIn,
+          watchRecordDraft,
           primaryWorkspaceAction,
           primaryDownload,
           secondaryDownload,
@@ -16156,6 +16224,25 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             primaryHandoffDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.watchCheckIn.primaryHandoffDownload, params)
           }
         : null,
+      watchRecordDraft: launchDayWatchPanel.watchRecordDraft && typeof launchDayWatchPanel.watchRecordDraft === "object"
+        ? {
+            ...launchDayWatchPanel.watchRecordDraft,
+            records: Array.isArray(launchDayWatchPanel.watchRecordDraft.records)
+              ? launchDayWatchPanel.watchRecordDraft.records.map((record) => ({
+                  ...record,
+                  receiptOperations: Array.isArray(record?.receiptOperations)
+                    ? record.receiptOperations.map((item) => String(item || "").trim()).filter(Boolean)
+                    : []
+                }))
+              : [],
+            downloads: launchDayWatchPanel.watchRecordDraft.downloads && typeof launchDayWatchPanel.watchRecordDraft.downloads === "object"
+              ? Object.fromEntries(Object.entries(launchDayWatchPanel.watchRecordDraft.downloads).map(([key, download]) => [
+                  key,
+                  ensureLaunchWorkflowDownloadHref(download, params)
+                ]))
+              : {}
+          }
+        : null,
       primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(launchDayWatchPanel.primaryWorkspaceAction, params),
       primaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.primaryDownload, params),
       secondaryDownload: ensureLaunchWorkflowDownloadHref(launchDayWatchPanel.secondaryDownload, params),
@@ -16729,6 +16816,36 @@ function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = nu
     }
     lines.push(`- watchReceiptDownload: ${formatLaunchHandoffDownloadText(watchCheckIn.receiptDownload, { fileSeparator: " | " })}`);
     lines.push(`- watchPrimaryHandoffDownload: ${formatLaunchHandoffDownloadText(watchCheckIn.primaryHandoffDownload, { fileSeparator: " | " })}`);
+  }
+  const watchRecordDraft = launchDayWatchPanel.watchRecordDraft && typeof launchDayWatchPanel.watchRecordDraft === "object"
+    ? launchDayWatchPanel.watchRecordDraft
+    : null;
+  if (watchRecordDraft) {
+    const watchRecords = Array.isArray(watchRecordDraft.records)
+      ? watchRecordDraft.records
+      : [];
+    const watchRecordKeys = watchRecords.map((item) => item?.key).filter(Boolean);
+    lines.push(
+      `- watchRecordDraft: status=${watchRecordDraft.status || "-"}`
+      + ` | records=${watchRecordKeys.length ? watchRecordKeys.join(", ") : "-"}`
+      + ` | willModifyData=${watchRecordDraft.willModifyData === true}`
+    );
+    for (const record of watchRecords) {
+      const receiptOperations = Array.isArray(record?.receiptOperations)
+        ? record.receiptOperations.filter(Boolean)
+        : [];
+      lines.push(
+        `- watchRecord: ${record?.key || "-"}`
+        + ` | status=${record?.status || "-"}`
+        + ` | receiptOperations=${receiptOperations.length ? receiptOperations.join(", ") : "-"}`
+      );
+    }
+    const watchRecordDownloads = watchRecordDraft.downloads && typeof watchRecordDraft.downloads === "object"
+      ? watchRecordDraft.downloads
+      : null;
+    if (watchRecordDownloads) {
+      lines.push(`- watchRecordDownload: receiptFollowUp=${formatLaunchHandoffDownloadText(watchRecordDownloads.receiptFollowUp, { fileSeparator: " | " })}`);
+    }
   }
   lines.push(`- primaryWorkspace: ${formatWorkspaceActionText(launchDayWatchPanel.primaryWorkspaceAction)}`);
   lines.push(`- primaryDownload: ${formatLaunchHandoffDownloadText(launchDayWatchPanel.primaryDownload, { fileSeparator: " | " })}`);

@@ -6726,6 +6726,23 @@ test("developer release package export bundles integration, versions, and notice
               format: launchMainline.mainlineSummary.launchDayWatchPanel.secondaryDownload.format
             }
           : null,
+        watchRecordDraft: launchMainline.mainlineSummary.launchDayWatchPanel?.watchRecordDraft
+          ? {
+              mode: launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.mode,
+              status: launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.status,
+              willModifyData: launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.willModifyData,
+              recordKeys: Array.isArray(launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.records)
+                ? launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.records.map((item) => item.key)
+                : [],
+              recordStatuses: Array.isArray(launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.records)
+                ? launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.records.map((item) => item.status)
+                : [],
+              launchDayReceiptOperations: Array.isArray(launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.records)
+                ? launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.records.find((item) => item.key === "launch_day_watch_summary")?.receiptOperations || []
+                : [],
+              receiptFollowUpDownloadKey: launchMainline.mainlineSummary.launchDayWatchPanel.watchRecordDraft.downloads?.receiptFollowUp?.key || null
+            }
+          : null,
         firstWaveCheckpoints: launchMainline.mainlineSummary.launchDayWatchPanel?.firstWaveCheckpoints
       }, {
         status: "blocked_by_runway_evidence",
@@ -6764,6 +6781,30 @@ test("developer release package export bundles integration, versions, and notice
         secondaryDownload: {
           key: "launch_mainline_operations_handoff",
           format: "operations-handoff"
+        },
+        watchRecordDraft: {
+          mode: "launch-mainline-watch-record-draft",
+          status: "blocked_until_runway_evidence",
+          willModifyData: false,
+          recordKeys: [
+            "launch_day_watch_summary",
+            "receipt_visibility_snapshot",
+            "first_wave_incident_log",
+            "rollback_signal_review",
+            "stabilization_owner_handoff"
+          ],
+          recordStatuses: [
+            "blocked_until_runway_evidence",
+            "blocked_until_runway_evidence",
+            "blocked_until_runway_evidence",
+            "blocked_until_runway_evidence",
+            "blocked_until_runway_evidence"
+          ],
+          launchDayReceiptOperations: [
+            "record_cutover_walkthrough",
+            "record_launch_day_readiness_review"
+          ],
+          receiptFollowUpDownloadKey: "ops_launch_receipt_next_follow_up"
         },
         firstWaveCheckpoints: [
           "confirm_runtime_alerting",
@@ -6983,6 +7024,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Launch Mainline Launch Ops Overview:/);
       assert.match(launchMainline.summaryText, /overviewStatus=.*receipt=/);
       assert.match(launchMainline.summaryText, /format=launch-operations-overview-status/);
+      assert.match(launchMainline.summaryText, /watchRecordDraft: status=blocked_until_runway_evidence \| records=launch_day_watch_summary, receipt_visibility_snapshot, first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
+      assert.match(launchMainline.summaryText, /watchRecord: launch_day_watch_summary \| status=blocked_until_runway_evidence \| receiptOperations=record_cutover_walkthrough, record_launch_day_readiness_review/);
       assert.match(launchMainline.summaryText, /- decision: HOLD/);
       assert.match(launchMainline.summaryText, /- canEnterInitialLaunch: false/);
       assert.match(

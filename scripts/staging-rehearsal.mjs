@@ -1131,6 +1131,7 @@ function buildStagingProductionSignoffPacket(result) {
   const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
   const fullTestWindow = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
   const productionSignoff = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const closeoutInput = result.closeoutInput || null;
   const readinessReviewPacket = result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result);
   const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
   const launchDayWatch = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
@@ -1168,6 +1169,38 @@ function buildStagingProductionSignoffPacket(result) {
     status: canSignoff ? "filled" : missingSignoffKeys.includes(item.key) ? "missing" : "filled",
     evidence: item.evidence || null
   }));
+  const closeoutReceiptVisibility = closeoutInput?.receiptVisibility && typeof closeoutInput.receiptVisibility === "object"
+    ? closeoutInput.receiptVisibility
+    : {};
+  const productionSignoffInput = canSignoff && closeoutInput?.productionSignoff
+    ? closeoutInput.productionSignoff
+    : buildProductionSignoffInputTemplate(closeout.productionSignoffConditions || {});
+  const receiptVisibilityBackfillDraft = canSignoff
+    ? Object.fromEntries(RECEIPT_VISIBILITY_KEYS.map((key) => {
+      const rawVisibility = closeoutReceiptVisibility[key];
+      const visibilityEvidence = rawVisibility && typeof rawVisibility === "object" && !Array.isArray(rawVisibility)
+        ? rawVisibility.evidence || rawVisibility.artifactPath || null
+        : null;
+      return [
+        key,
+        {
+          status: "filled",
+          value: "visible",
+          evidence: visibilityEvidence
+        }
+      ];
+    }))
+    : buildReceiptVisibilityTemplate();
+  const signoffBackfillDraft = {
+    mode: "production-signoff-backfill-draft",
+    status: canSignoff ? "already_filled" : canRunFullTestWindow ? "ready_for_operator_backfill" : "blocked_until_full_test_window",
+    willModifyData: false,
+    closeoutInputPath,
+    reloadCommand: closeoutReload,
+    productionSignoff: productionSignoffInput,
+    receiptVisibility: receiptVisibilityBackfillDraft,
+    operatorNote: "Merge only redacted full-test results, sign-off decisions, and receipt visibility evidence into filled-closeout-input.json before reloading."
+  };
   return {
     mode: "staging-production-signoff-operator-packet",
     status,
@@ -1194,6 +1227,7 @@ function buildStagingProductionSignoffPacket(result) {
     missingSignoffKeys,
     missingReceiptVisibilityKeys,
     signoffConditions,
+    signoffBackfillDraft,
     routes: {
       launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
       developerOps: launchDayWatch.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
@@ -2979,6 +3013,25 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   const signoffMissingKeys = requiredSignoffKeys.filter((key) => !signoffFilledKeys.includes(key));
   const productionDecision = payload.productionSignoff?.decision || null;
   const receiptVisibility = payload.receiptVisibility || payload.productionSignoff?.receiptVisibility || {};
+  const normalizedProductionSignoff = {
+    decision: productionDecision,
+    requiredDecision: payload.productionSignoff?.requiredDecision || closeout.productionSignoffConditions?.requiredDecision || null,
+    conditions: requiredSignoffKeys.map((key) => {
+      const field = signoffFieldsByKey.get(key);
+      const condition = (closeout.productionSignoffConditions?.conditions || []).find((item) => item.key === key) || {};
+      return field
+        ? {
+          ...field,
+          expectedEvidence: field.expectedEvidence || condition.evidence || null
+        }
+        : {
+          key,
+          status: "missing",
+          value: null,
+          expectedEvidence: condition.evidence || null
+        };
+    })
+  };
   const receiptVisibilityChecks = Object.fromEntries(
     RECEIPT_VISIBILITY_KEYS.map((key) => [
       key,
@@ -3016,6 +3069,8 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
     signoffFilledKeys,
     signoffMissingKeys,
     productionDecision,
+    productionSignoff: normalizedProductionSignoff,
+    receiptVisibility,
     receiptVisibilityStatus: readyForReceiptVisibility ? "visible" : "missing",
     receiptVisibilityChecks,
     missingReceiptVisibilityKeys,
@@ -4337,6 +4392,7 @@ function renderStagingProductionSignoffPacket(packet) {
   }
   const decision = packet.decision || {};
   const routes = packet.routes || {};
+  const signoffDraft = packet.signoffBackfillDraft || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -4349,6 +4405,8 @@ function renderStagingProductionSignoffPacket(packet) {
     `- Full test window ready: ${decision.readyForFullTestWindow ? "yes" : "no"}`,
     `- Missing sign-off keys: ${(packet.missingSignoffKeys || []).join(", ") || "-"}`,
     `- Missing receipt visibility keys: ${(packet.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
+    `- Sign-off backfill draft: ${signoffDraft.status || "-"}`,
+    `- Sign-off draft closeout input: ${signoffDraft.closeoutInputPath || "-"}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,

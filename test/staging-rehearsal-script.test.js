@@ -371,6 +371,17 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   );
   assert.equal(output.stagingProductionSignoffPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingProductionSignoffPacket.commands.fullTestWindow, "npm.cmd test");
+  assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.status, "blocked_until_full_test_window");
+  assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.reloadCommand, output.stagingProductionSignoffPacket.commands.closeoutReload);
+  assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.productionSignoff.decision, null);
+  assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.productionSignoff.requiredDecision, "ready-for-production-signoff");
+  assert.deepEqual(
+    output.stagingProductionSignoffPacket.signoffBackfillDraft.productionSignoff.conditions.map((item) => [item.key, item.status, item.value]),
+    expectedProductionSignoffConditionKeys.map((key) => [key, "pending_operator_entry", null])
+  );
+  assert.deepEqual(Object.keys(output.stagingProductionSignoffPacket.signoffBackfillDraft.receiptVisibility), expectedReceiptVisibilityKeys);
+  assert.match(output.stagingProductionSignoffPacket.signoffBackfillDraft.operatorNote, /redacted/);
   assert.deepEqual(
     output.stagingProductionSignoffPacket.operatorSteps.map((item) => [item.key, item.status]),
     [
@@ -1527,6 +1538,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Can sign off: no/);
     assert.match(handoff, /Missing sign-off keys: full_test_window_passed, staging_artifacts_archived, launch_mainline_receipts_visible, launch_ops_overview_status_visible, backup_restore_drill_passed, rollback_path_confirmed, operator_signoff_recorded/);
     assert.match(handoff, /Missing receipt visibility keys: launchMainline, launchReview, launchSmoke, developerOps, launchOpsOverviewStatus/);
+    assert.match(handoff, /## Staging Production Sign-Off Packet/);
+    assert.match(handoff, /Sign-off backfill draft: blocked_until_full_test_window/);
+    assert.match(handoff, /Sign-off draft closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(handoff, /## Launch Day Watch Plan/);
     assert.match(handoff, /Can start cutover watch: no/);
     assert.match(handoff, /Watch windows: cutover_watch, first_wave_stabilization/);
@@ -2269,6 +2283,16 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     });
     assert.deepEqual(output.stagingProductionSignoffPacket.missingSignoffKeys, []);
     assert.deepEqual(output.stagingProductionSignoffPacket.missingReceiptVisibilityKeys, []);
+    assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.status, "already_filled");
+    assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.productionSignoff.decision, "ready-for-production-signoff");
+    assert.equal(
+      output.stagingProductionSignoffPacket.signoffBackfillDraft.productionSignoff.conditions.every((item) => item.status === "filled"),
+      true
+    );
+    assert.equal(
+      Object.values(output.stagingProductionSignoffPacket.signoffBackfillDraft.receiptVisibility).every((item) => item.value === "visible"),
+      true
+    );
     assert.deepEqual(
       output.stagingProductionSignoffPacket.operatorSteps.map((item) => [item.key, item.status]),
       [

@@ -17434,6 +17434,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateOperationalReview.recordedAction.operation, "record_launch_stabilization_review");
     assert.equal(steadyStateOperationalReview.recordedAction.evidenceKey, "launch_stabilization_review");
     assert.match(steadyStateOperationalReview.reviewDownload.href, /format=steady-state-operational-review/);
+    assert.ok(steadyStateOperationalReview.watchRecordDraftStatus);
+    assert.ok(Number(steadyStateOperationalReview.watchRecordDraftRecordCount) >= 1);
+    const steadyStateWatchRecordDraftStatus = steadyStateOperationalReview.watchRecordDraftStatus;
+    const steadyStateWatchRecordDraftRecordCount = steadyStateOperationalReview.watchRecordDraftRecordCount;
+    const steadyStateWatchRecordDraftPattern = new RegExp(
+      `watchRecordDraft=${steadyStateWatchRecordDraftStatus} \\| records=${steadyStateWatchRecordDraftRecordCount}`
+    );
     assert.match(steadyStateSnapshot.summaryText, /status=steady_state_ready/);
     assert.match(steadyStateSnapshot.summaryText, /stabilizationReviewRecorded=true/);
     assert.match(steadyStateSnapshot.summaryText, /recordedAction=record_launch_stabilization_review/);
@@ -17480,11 +17487,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateHandoffBrief.status, "ready_for_handoff");
     assert.equal(steadyStateHandoffBrief.handoffReady, true);
     assert.equal(steadyStateHandoffBrief.projectCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(steadyStateHandoffBrief.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
+    assert.equal(steadyStateHandoffBrief.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
     assert.match(steadyStateHandoffBrief.handoffDownload.href, /format=steady-state-handoff-brief/);
     assert.match(steadyStateHandoffBrief.reviewDownload.href, /format=steady-state-operational-review/);
     assert.match(steadyStateHandoffBrief.exceptionDigestDownload.href, /format=steady-state-exception-digest/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Handoff Brief:/);
     assert.match(steadyStateSnapshot.summaryText, /handoffReady=true/);
+    assert.match(steadyStateSnapshot.summaryText, steadyStateWatchRecordDraftPattern);
 
     const steadyStateHandoffBriefDownload = await getText(
       baseUrl,
@@ -17496,6 +17506,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateHandoffBriefDownload.body, /RockSolid Developer Ops Steady-State Handoff Brief/);
     assert.match(steadyStateHandoffBriefDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
     assert.match(steadyStateHandoffBriefDownload.body, /Handoff Ready: yes/);
+    assert.match(steadyStateHandoffBriefDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(steadyStateHandoffBriefDownload.body, /Download Set:/);
     assert.match(steadyStateHandoffBriefDownload.body, /Operator Handoff:/);
 
@@ -17505,6 +17516,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateDutyBoard.readyForDuty, true);
     assert.equal(steadyStateDutyBoard.projectCode, "EXPORT_CLOSEOUT_READY");
     assert.equal(steadyStateDutyBoard.queueTotal, steadyStateExceptionDigest.queueSummary.total);
+    assert.equal(steadyStateDutyBoard.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
+    assert.equal(steadyStateDutyBoard.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
     assert.match(steadyStateDutyBoard.boardDownload.href, /format=steady-state-duty-board/);
     assert.match(steadyStateDutyBoard.handoffBriefDownload.href, /format=steady-state-handoff-brief/);
     assert.ok(Array.isArray(steadyStateDutyBoard.quickActions));
@@ -17522,6 +17535,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyBoardDownload.body, /RockSolid Developer Ops Steady-State Duty Board/);
     assert.match(steadyStateDutyBoardDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
     assert.match(steadyStateDutyBoardDownload.body, /Ready For Duty: yes/);
+    assert.match(steadyStateDutyBoardDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:/);
 
@@ -17531,6 +17545,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateDutyActionLinks.readyForDuty, true);
     assert.equal(steadyStateDutyActionLinks.projectCode, "EXPORT_CLOSEOUT_READY");
     assert.equal(steadyStateDutyActionLinks.actionCount, steadyStateDutyBoard.quickActions.length);
+    assert.equal(steadyStateDutyActionLinks.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
+    assert.equal(steadyStateDutyActionLinks.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
     assert.match(steadyStateDutyActionLinks.actionLinksDownload.href, /format=steady-state-duty-action-links/);
     assert.ok(steadyStateDutyActionLinks.workspaceLinks.some((item) => /\/developer\/ops/.test(item.href || "")));
     assert.ok(steadyStateDutyActionLinks.downloadLinks.some((item) => item.format === "steady-state-duty-board"));
@@ -17539,6 +17555,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "open_workspace"));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "download_asset"));
     assert.ok(steadyStateDutyActionLinks.controlIntents.every((item) => item.executionPlan?.status === "ready"));
+    assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
+      item.executionPlan?.prefill?.watchRecordDraftStatus === steadyStateWatchRecordDraftStatus
+      && Number(item.executionPlan?.prefill?.watchRecordDraftRecordCount) === Number(steadyStateWatchRecordDraftRecordCount)
+    )));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.intent === "open_workspace"
       && item.executionPlan?.kind === "workspace"
@@ -17566,6 +17586,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /RockSolid Developer Ops Steady-State Duty Action Links/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Ready For Duty: yes/);
+    assert.match(steadyStateDutyActionLinksDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(steadyStateDutyActionLinksDownload.body, /Workspace Links:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Download Links:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Control Links:/);

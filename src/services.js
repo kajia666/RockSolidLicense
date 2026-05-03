@@ -22659,6 +22659,14 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
   const handoffReady = steadyStateOperationalReview?.monitoringReady === true
     && steadyStateExceptionDigest?.monitoringReady === true
     && closeoutReadinessSummary?.steadyStateReady === true;
+  const watchRecordDraftStatus = steadyStateOperationalReview?.watchRecordDraftStatus
+    || closeoutReadinessSummary?.watchRecordDraftStatus
+    || latestReceipt?.operationalReadinessWatchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = steadyStateOperationalReview?.watchRecordDraftRecordCount
+    ?? closeoutReadinessSummary?.watchRecordDraftRecordCount
+    ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
+    ?? null;
   const handoffDownload = productCode ? buildDeveloperOpsSteadyStateHandoffBriefDownload(briefScope) : null;
   const workspaceAction = steadyStateExceptionDigest?.workspaceAction
     || steadyStateOperationalReview?.workspaceAction
@@ -22733,6 +22741,8 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
     queueTotal: steadyStateExceptionDigest?.queueSummary?.total ?? 0,
     attentionCount: steadyStateExceptionDigest?.attentionCount ?? 0,
     closeoutStatus: closeoutReadinessSummary?.status || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     recordedAction: closeoutReadinessSummary?.recordedAction || null,
     latestReceipt: latestReceipt
       ? {
@@ -22787,6 +22797,16 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     && steadyStateExceptionDigest?.monitoringReady === true
     && steadyStateOperationalReview?.monitoringReady === true;
   const queueTotal = Number(steadyStateExceptionDigest?.queueSummary?.total ?? steadyStateExceptionDigest?.queueTotal ?? 0);
+  const watchRecordDraftStatus = steadyStateHandoffBrief?.watchRecordDraftStatus
+    || steadyStateOperationalReview?.watchRecordDraftStatus
+    || closeoutReadinessSummary?.watchRecordDraftStatus
+    || latestReceipt?.operationalReadinessWatchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = steadyStateHandoffBrief?.watchRecordDraftRecordCount
+    ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
+    ?? closeoutReadinessSummary?.watchRecordDraftRecordCount
+    ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
+    ?? null;
   const boardDownload = productCode ? buildDeveloperOpsSteadyStateDutyBoardDownload(boardScope) : null;
   const workspaceAction = steadyStateHandoffBrief?.workspaceAction
     || steadyStateExceptionDigest?.workspaceAction
@@ -22901,6 +22921,8 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     queueTotal,
     attentionCount: steadyStateExceptionDigest?.attentionCount ?? 0,
     closeoutStatus: closeoutReadinessSummary?.status || steadyStateHandoffBrief?.closeoutStatus || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     latestReceipt: latestReceipt
       ? {
           operation: latestReceipt.operation || null,
@@ -22938,6 +22960,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     channel
   };
   const actionLinksDownload = productCode ? buildDeveloperOpsSteadyStateDutyActionLinksDownload(linkScope) : null;
+  const watchRecordDraftStatus = steadyStateDutyBoard.watchRecordDraftStatus || null;
+  const watchRecordDraftRecordCount = steadyStateDutyBoard.watchRecordDraftRecordCount ?? null;
   const quickActions = Array.isArray(steadyStateDutyBoard.quickActions)
     ? steadyStateDutyBoard.quickActions
     : [];
@@ -23036,6 +23060,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     const basePrefill = compactRouteParams({
       productCode,
       channel,
+      watchRecordDraftStatus: watchRecordDraftStatus || "",
+      watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       ...hrefParams
     });
     if (intent === "download_asset") {
@@ -23126,6 +23152,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     channel,
     status: steadyStateDutyBoard.status || "pending",
     readyForDuty: steadyStateDutyBoard.readyForDuty === true,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     actionCount: quickActions.length,
     workspaceLinkCount: workspaceLinks.length,
     controlLinkCount: controlLinks.length,
@@ -27865,6 +27893,8 @@ function appendDeveloperOpsSteadyStateHandoffBriefLines(lines, brief = null, {
   );
   lines.push(
     `- closeout=${brief.closeoutStatus || "-"}`
+    + ` | watchRecordDraft=${brief.watchRecordDraftStatus || "-"}`
+    + ` | records=${brief.watchRecordDraftRecordCount ?? "-"}`
     + ` | workspace=${brief.workspaceAction?.label || "-"}`
     + ` | href=${brief.workspaceAction?.href || "-"}`
   );
@@ -27918,6 +27948,8 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
     + ` | queueTotal=${board.queueTotal ?? 0}`
     + ` | attention=${board.attentionCount ?? 0}`
     + ` | closeout=${board.closeoutStatus || "-"}`
+    + ` | watchRecordDraft=${board.watchRecordDraftStatus || "-"}`
+    + ` | records=${board.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push(
     `- workspace=${board.workspaceAction?.label || "-"}`
@@ -27970,6 +28002,8 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
     + ` | download=${actionLinks.downloadLinkCount ?? 0}`
     + ` | controlIntents=${actionLinks.controlIntentCount ?? 0}`
     + ` | executionPlans=${actionLinks.executionPlanCount ?? 0}`
+    + ` | watchRecordDraft=${actionLinks.watchRecordDraftStatus || "-"}`
+    + ` | records=${actionLinks.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push(
     `- actionLinksDownload=${actionLinks.actionLinksDownload?.fileName || "-"}`
